@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -82,6 +82,32 @@ const formatTime = (date) => {
   if (diffMs < 86400000 * 7) return d.toLocaleDateString('vi-VN', { weekday: 'short' });
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
+
+function getMessageDateInfo(date) {
+  const d = toValidActivityDate(date);
+  if (!d) return null;
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startOfMessageDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayDiff = Math.round((startOfToday - startOfMessageDay) / 86400000);
+  const label = dayDiff === 0
+    ? 'Hôm nay'
+    : dayDiff === 1
+      ? 'Hôm qua'
+      : d.toLocaleDateString('vi-VN', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+  return { key: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, label };
+}
+
+function maskPhoneLastFour(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length < 5) return '****';
+  return `${digits.slice(0, -4)}****`;
+}
 
 function findCurrentAiSessionStartIndex(messages, escalateIdx) {
   const end = escalateIdx >= 0 ? escalateIdx : messages.length;
@@ -258,13 +284,13 @@ const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
 
       {open && (
         <div
-          className={`absolute ${placeBelow ? 'top-full mt-2' : 'bottom-full mb-2'} ${isMine ? 'right-0' : 'left-0'} flex items-center gap-1 bg-white rounded-full px-2 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 z-[9999] animate-in zoom-in-75 duration-150`}
+          className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${isMine ? 'right-0' : 'left-0'} flex items-center gap-0 bg-white rounded-full px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 z-[9999] animate-in zoom-in-75 duration-150`}
           onMouseLeave={() => setOpen(false)}
         >
           {/* Heart */}
           <button
             onClick={(e) => { e.stopPropagation(); onReact(msgId, 'heart'); setOpen(false); }}
-            className={`w-9 h-9 flex items-center justify-center text-xl rounded-full transition-all hover:scale-125 hover:bg-red-50 ${myReactions?.includes('heart') ? 'bg-red-50 scale-110' : ''}`}
+            className={`w-8 h-8 flex items-center justify-center text-lg rounded-full transition-all hover:scale-125 hover:bg-red-50 ${myReactions?.includes('heart') ? 'bg-red-50 scale-110' : ''}`}
             title="Tim"
           >
             ❤️
@@ -272,7 +298,7 @@ const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
           {/* Like */}
           <button
             onClick={(e) => { e.stopPropagation(); onReact(msgId, 'like'); setOpen(false); }}
-            className={`w-9 h-9 flex items-center justify-center text-xl rounded-full transition-all hover:scale-125 hover:bg-blue-50 ${myReactions?.includes('like') ? 'bg-blue-50 scale-110' : ''}`}
+            className={`w-8 h-8 flex items-center justify-center text-lg rounded-full transition-all hover:scale-125 hover:bg-blue-50 ${myReactions?.includes('like') ? 'bg-blue-50 scale-110' : ''}`}
             title="Thích"
           >
             👍
@@ -462,12 +488,97 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [showTeacherInfoMenu, setShowTeacherInfoMenu] = useState(false);
+  const [showPeerInfo, setShowPeerInfo] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
+  const [messageSearch, setMessageSearch] = useState('');
   const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
 
   useEffect(() => {
-    setShowTeacherInfoMenu(false);
+    setShowPeerInfo(false);
+    setShowMessageSearch(false);
+    setMessageSearch('');
   }, [activeConv?.id]);
+
+  useEffect(() => {
+    if (!showPeerInfo && !showMessageSearch) return undefined;
+    const handleOutsidePopupClick = (event) => {
+      if (event.target.closest?.('[data-chat-popup]')) return;
+      setShowPeerInfo(false);
+      setShowMessageSearch(false);
+    };
+    document.addEventListener('mousedown', handleOutsidePopupClick);
+    return () => document.removeEventListener('mousedown', handleOutsidePopupClick);
+  }, [showPeerInfo, showMessageSearch]);
+
+  const peerProfile = useMemo(() => {
+    if (!activeConv?.user || activeConv.isGroup) return null;
+    const peerId = String(activeConv.user.id || activeConv.user._id || '');
+    const contactProfile = (contacts || []).find((person) => String(person.id || person._id || '') === peerId);
+    const localProfile = [students, teachers, staffs]
+      .flatMap((list) => Array.isArray(list) ? list : [])
+      .find((person) => String(person.id || person._id || '') === peerId);
+    return {
+      ...activeConv.user,
+      ...(localProfile || {}),
+      ...(contactProfile || {}),
+    };
+  }, [activeConv, contacts, students, teachers, staffs]);
+
+  const peerRole = String(peerProfile?.role || activeConv?.user?.role || '').toLowerCase();
+  const canViewTeacherDetails = ['student', 'admin', 'staff'].includes(String(currentUserRole).toLowerCase());
+  const viewerRole = String(currentUserRole || '').toLowerCase();
+  const shouldMaskPeerPhone = (['student', 'teacher'].includes(viewerRole) && ['admin', 'staff'].includes(peerRole))
+    || (viewerRole === 'teacher' && peerRole === 'student')
+    || (viewerRole === 'student' && peerRole === 'teacher');
+  const isBranchPhone = ['admin', 'staff'].includes(peerRole) && Boolean(peerProfile?.branchPhone);
+  const phoneForDisplay = ['admin', 'staff'].includes(peerRole)
+    ? peerProfile?.branchPhone
+    : peerProfile?.personalPhone || peerProfile?.phone;
+  const displayPeerPhone = phoneForDisplay
+    ? (shouldMaskPeerPhone && !isBranchPhone ? maskPhoneLastFour(phoneForDisplay) : phoneForDisplay)
+    : 'Chưa cập nhật';
+
+  const teacherExperience = useMemo(() => {
+    if (!peerProfile) return '';
+    if (peerProfile.experience || peerProfile.experienceYears) {
+      return peerProfile.experience || `${peerProfile.experienceYears} năm`;
+    }
+    if (!peerProfile.startDate) return '';
+    const years = Math.max(0, Math.floor((Date.now() - new Date(peerProfile.startDate).getTime()) / (365.25 * 86400000)));
+    return years ? `${years} năm` : 'Dưới 1 năm';
+  }, [peerProfile]);
+
+  const teacherVoiceLabel = {
+    bac: 'Miền Bắc',
+    trung: 'Miền Trung',
+    nam: 'Miền Nam',
+    tay: 'Miền Tây',
+  }[peerProfile?.voiceRegion] || peerProfile?.voiceRegion || '';
+
+  const peerUpcomingSchedules = useMemo(() => {
+    if (!peerProfile || activeConv?.isGroup) return [];
+    const peerId = String(peerProfile.id || peerProfile._id || activeConv?.user?.id || '');
+    const now = Date.now();
+    return (Array.isArray(schedules) ? schedules : [])
+      .filter((schedule) => {
+        const schedulePeerId = String(schedule.studentId?._id || schedule.studentId || '');
+        const timestamp = new Date(`${String(schedule.date || '').slice(0, 10)}T${schedule.startTime || '00:00'}:00`).getTime();
+        const status = String(schedule.status || '').toLowerCase();
+        return schedulePeerId === peerId && Number.isFinite(timestamp) && timestamp >= now
+          && !['cancelled', 'canceled', 'completed', 'done'].includes(status);
+      })
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+      .slice(0, 3);
+  }, [activeConv, peerProfile, schedules]);
+
+  const peerRemainingSessions = useMemo(() => {
+    if (!peerProfile) return null;
+    if (Number.isFinite(Number(peerProfile.remainingSessions))) return Math.max(0, Number(peerProfile.remainingSessions));
+    const total = Number(peerProfile.totalSessions);
+    const completed = Number(peerProfile.completedSessions);
+    if (Number.isFinite(total) && Number.isFinite(completed)) return Math.max(0, total - completed);
+    return null;
+  }, [peerProfile]);
 
   // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
   // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
@@ -782,6 +893,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               lastTime: toValidActivityDate(existingConv?.lastTime)
                 || (gate.mode === 'AUTHORIZED_CONTACT' || seedContact.trusted ? null : new Date()),
               unread: existingConv?.unread || 0,
+              ...c,
             });
           }
         }
@@ -1068,6 +1180,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     : ((activeConv?.isAiHandoff && !showPriorAiThread)
       ? aiHistorySplit.visible
       : messages);
+  const normalizedMessageSearch = messageSearch.trim().toLocaleLowerCase('vi-VN');
+  const displayedMessages = normalizedMessageSearch
+    ? messagesToRender.filter((message) => (
+      `${message.content || ''} ${message.senderName || ''}`
+        .toLocaleLowerCase('vi-VN')
+        .includes(normalizedMessageSearch)
+    ))
+    : messagesToRender;
 
   const markedReadConvRef = useRef('');
   useEffect(() => {
@@ -2164,7 +2284,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       )}
                       {currentUserRole === 'admin' && activeConv.user.phone && (
                         <a
-                          href={`https://zalo.me/${activeConv.user.phone.replace(/\s+/g, '')}`}
+                          href={`https://zalo.me/${(activeConv.user.branchPhone || activeConv.user.phone).replace(/\s+/g, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:scale-110 transition-transform cursor-pointer"
@@ -2182,35 +2302,126 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
-                {currentUserRole === 'student' && !activeConv.isGroup && activeConv.user?.role === 'teacher' && (
+                <button
+                  type="button"
+                  onClick={() => setShowMessageSearch((open) => !open)}
+                  data-chat-popup
+                  className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${showMessageSearch ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'}`}
+                  aria-label="Tìm kiếm tin nhắn cũ"
+                  title="Tìm kiếm tin nhắn cũ"
+                  aria-expanded={showMessageSearch}
+                >
+                  <Search size={19} />
+                </button>
+                {!activeConv.isGroup && (
                   <div className="relative shrink-0">
                     <button
                       type="button"
-                      onClick={() => setShowTeacherInfoMenu((open) => !open)}
+                      onClick={() => setShowPeerInfo((open) => !open)}
+                      data-chat-popup
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-                      aria-label="Tùy chọn giảng viên"
-                      aria-expanded={showTeacherInfoMenu}
+                      aria-label="Thông tin học viên"
+                      title="Thông tin học viên"
+                      aria-expanded={showPeerInfo}
                     >
-                      <MoreHorizontal size={20} />
+                      <Info size={19} />
                     </button>
-                    {showTeacherInfoMenu && (
-                      <div className="absolute right-0 top-11 z-30 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowTeacherInfoMenu(false);
-                            window.dispatchEvent(new CustomEvent('open-assigned-teacher-card', {
-                              detail: {
-                                teacherId: activeConv.user.id || activeConv.user._id,
-                                teacherName: activeConv.user.name,
-                                avatar: activeConv.user.avatar,
-                              },
-                            }));
-                          }}
-                          className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700"
-                        >
-                          Thông tin giảng viên
-                        </button>
+                    {showPeerInfo && (
+                      <div data-chat-popup className="absolute right-0 top-11 z-40 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                        <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-3">
+                          <Info size={16} className="text-blue-600" />
+                          <h3 className="text-sm font-black text-slate-800">Thông tin {peerRole === 'student' ? 'học viên' : peerRole === 'teacher' ? 'giảng viên' : 'nhân viên'}</h3>
+                        </div>
+                        {peerRole === 'teacher' && canViewTeacherDetails ? (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded-xl bg-slate-50 p-2.5">
+                              <p className="text-slate-400">Tuổi</p>
+                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.age ? `${peerProfile.age} tuổi` : 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="rounded-xl bg-amber-50 p-2.5">
+                              <p className="text-amber-600">Kinh nghiệm</p>
+                              <p className="mt-0.5 font-bold text-amber-700">{teacherExperience || 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="col-span-2 rounded-xl bg-blue-50 p-2.5">
+                              <p className="text-blue-600">Chuyên môn</p>
+                              <p className="mt-0.5 font-bold text-blue-700">{peerProfile?.specialty || 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="rounded-xl bg-yellow-50 p-2.5">
+                              <p className="text-yellow-600">Đánh giá</p>
+                              <p className="mt-0.5 font-bold text-yellow-700">{Number.isFinite(Number(peerProfile?.averageRating)) ? `${Number(peerProfile.averageRating).toFixed(1)} / 5 sao` : 'Chưa có đánh giá'}</p>
+                            </div>
+                            <div className="rounded-xl bg-violet-50 p-2.5">
+                              <p className="text-violet-600">Giọng</p>
+                              <p className="mt-0.5 font-bold text-violet-700">{teacherVoiceLabel || 'Chưa cập nhật'}</p>
+                            </div>
+                          </div>
+                        ) : peerRole === 'admin' || peerRole === 'staff' ? (
+                          <div className="space-y-2 text-xs">
+                            <div className="rounded-xl bg-slate-50 p-2.5">
+                              <p className="text-slate-400">Tên nhân viên</p>
+                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.name || activeConv.user.name || 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="rounded-xl bg-emerald-50 p-2.5">
+                                <p className="text-emerald-600">Chi nhánh</p>
+                                <p className="mt-0.5 font-bold text-emerald-700">{peerProfile?.branchName || peerProfile?.branchCode || 'Chưa cập nhật'}</p>
+                              </div>
+                              <div className="rounded-xl bg-blue-50 p-2.5">
+                                <p className="text-blue-600">Số điện thoại</p>
+                                <p className="mt-0.5 font-bold text-blue-700">{displayPeerPhone}</p>
+                              </div>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-2.5">
+                              <p className="text-slate-400">Địa chỉ</p>
+                              <p className="mt-0.5 break-words font-bold text-slate-700">{peerProfile?.address || 'Chưa cập nhật'}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded-xl bg-slate-50 p-2.5">
+                              <p className="text-slate-400">Khóa học</p>
+                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.course || 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 p-2.5">
+                              <p className="text-slate-400">Tuổi</p>
+                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.age ? `${peerProfile.age} tuổi` : 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="rounded-xl bg-emerald-50 p-2.5">
+                              <p className="text-emerald-600">Còn lại</p>
+                              <p className="mt-0.5 font-bold text-emerald-700">{peerRemainingSessions == null ? 'Chưa cập nhật' : `${peerRemainingSessions} buổi`}</p>
+                            </div>
+                            <div className="rounded-xl bg-blue-50 p-2.5">
+                              <p className="text-blue-600">Vai trò</p>
+                              <p className="mt-0.5 font-bold text-blue-700">Học viên</p>
+                            </div>
+                          </div>
+                        )}
+                        {peerRole === 'student' && (
+                          <>
+                            <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-xs">
+                              <p className="font-bold text-amber-700">Ghi chú Admin</p>
+                              <p className="mt-1 whitespace-pre-wrap break-words text-amber-900">{peerProfile?.notes || peerProfile?.adminNotes || 'Chưa có ghi chú'}</p>
+                            </div>
+                            <div className="mt-3">
+                              <p className="mb-1.5 text-xs font-bold text-slate-700">Lịch sắp tới</p>
+                              {peerUpcomingSchedules.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {peerUpcomingSchedules.map((schedule) => (
+                                    <div key={schedule._id || schedule.id || `${schedule.date}-${schedule.startTime}`} className="rounded-xl bg-violet-50 px-2.5 py-2 text-xs text-violet-900">
+                                      <p className="font-bold">
+                                        {new Date(`${String(schedule.date).slice(0, 10)}T12:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                        {schedule.startTime ? ` · ${schedule.startTime}${schedule.endTime ? `–${schedule.endTime}` : ''}` : ''}
+                                      </p>
+                                      <p className="mt-0.5 truncate">{schedule.course || peerProfile?.course || 'Lịch học'}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-400">Chưa có lịch sắp tới</p>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2298,9 +2509,35 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     );
                   })()
                 ) : null}
-
-
               </div>
+
+              {showMessageSearch && (
+                <div data-chat-popup className="shrink-0 border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <div className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3">
+                    <Search size={16} className="shrink-0 text-slate-400" />
+                    <input
+                      type="search"
+                      value={messageSearch}
+                      onChange={(event) => setMessageSearch(event.target.value)}
+                      placeholder="Tìm trong tin nhắn cũ..."
+                      className="min-w-0 flex-1 bg-transparent py-2 text-sm text-slate-700 outline-none"
+                      autoFocus
+                    />
+                    {messageSearch.trim() && (
+                      <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                        {displayedMessages.length} kết quả
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setMessageSearch(''); setShowMessageSearch(false); }}
+                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-200"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {pinnedMessageObj && (() => {
                 const pinnedSchedule = resolveScheduleMessagePayload(pinnedMessageObj);
@@ -2442,7 +2679,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
                 ) : null}
-                {messagesToRender.map((msg) => {
+                {displayedMessages.map((msg, index) => {
+                  const messageDate = getMessageDateInfo(msg.time);
+                  const previousMessageDate = index > 0
+                    ? getMessageDateInfo(displayedMessages[index - 1]?.time)
+                    : null;
+                  const showDateDivider = messageDate && messageDate.key !== previousMessageDate?.key;
+                  const dateDivider = showDateDivider ? (
+                    <div className="flex justify-center py-3" aria-label={messageDate.label}>
+                      <span className="rounded-full bg-slate-300 px-3 py-1 text-[11px] font-semibold text-white shadow-sm">
+                        {messageDate.label}
+                      </span>
+                    </div>
+                  ) : null;
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const role = normalizeRole(msg.senderRole);
                   const badgeLabel = msg.senderDisplayRole
@@ -2473,283 +2722,289 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     const isSchedulePinned = activeConv?.metadata?.pinnedMessageId === String(msg.id);
                     const canPinSchedule = scheduleInfo && !String(msg.id).startsWith('temp_');
                     return (
-                      <div id={`msg-${msg.id}`} key={msg.id} className="flex justify-center my-3 group/sysmsg">
-                        <span className={`inline-flex items-center gap-1.5 max-w-[92%] px-3 py-1.5 text-xs font-medium rounded-full shadow-sm ${isSchedulePinned
-                          ? 'bg-violet-50 text-violet-800 border border-violet-200'
-                          : 'bg-slate-100 text-slate-500'
-                          }`}>
-                          {isSchedulePinned ? (
-                            <Pin size={11} className="shrink-0 rotate-45 text-violet-600" aria-hidden="true" />
-                          ) : null}
-                          <span className="min-w-0 leading-snug">{msg.content}</span>
-                          {scheduleInfo ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setSchedulePreview(scheduleInfo)}
-                                className="shrink-0 w-7 h-7 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 flex items-center justify-center transition"
-                                title="Xem chi tiết lịch"
-                                aria-label="Xem chi tiết lịch"
-                              >
-                                <Calendar size={14} />
-                              </button>
-                              {canPinSchedule ? (
+                      <React.Fragment key={msg.id}>
+                        {dateDivider}
+                        <div id={`msg-${msg.id}`} className="flex justify-center my-3 group/sysmsg">
+                          <span className={`inline-flex items-center gap-1.5 max-w-[92%] px-3 py-1.5 text-xs font-medium rounded-full shadow-sm ${isSchedulePinned
+                            ? 'bg-violet-50 text-violet-800 border border-violet-200'
+                            : 'bg-slate-100 text-slate-500'
+                            }`}>
+                            {isSchedulePinned ? (
+                              <Pin size={11} className="shrink-0 rotate-45 text-violet-600" aria-hidden="true" />
+                            ) : null}
+                            <span className="min-w-0 leading-snug">{msg.content}</span>
+                            {scheduleInfo ? (
+                              <>
                                 <button
                                   type="button"
-                                  onClick={() => handlePinMessage(msg.id)}
-                                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${isSchedulePinned
-                                    ? 'bg-violet-200 text-violet-800'
-                                    : 'bg-white/80 text-slate-400 hover:bg-violet-100 hover:text-violet-700 opacity-100 sm:opacity-0 sm:group-hover/sysmsg:opacity-100'
-                                    }`}
-                                  title={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
-                                  aria-label={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
+                                  onClick={() => setSchedulePreview(scheduleInfo)}
+                                  className="shrink-0 w-7 h-7 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 flex items-center justify-center transition"
+                                  title="Xem chi tiết lịch"
+                                  aria-label="Xem chi tiết lịch"
                                 >
-                                  <Pin size={14} className={isSchedulePinned ? 'text-violet-700' : ''} />
+                                  <Calendar size={14} />
                                 </button>
-                              ) : null}
-                            </>
-                          ) : null}
-                        </span>
-                      </div>
+                                {canPinSchedule ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePinMessage(msg.id)}
+                                    className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition ${isSchedulePinned
+                                      ? 'bg-violet-200 text-violet-800'
+                                      : 'bg-white/80 text-slate-400 hover:bg-violet-100 hover:text-violet-700 opacity-100 sm:opacity-0 sm:group-hover/sysmsg:opacity-100'
+                                      }`}
+                                    title={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
+                                    aria-label={isSchedulePinned ? 'Bỏ ghim lịch này' : 'Ghim lịch này'}
+                                  >
+                                    <Pin size={14} className={isSchedulePinned ? 'text-violet-700' : ''} />
+                                  </button>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </span>
+                        </div>
+                      </React.Fragment>
                     );
                   }
 
                   return (
-                    <div id={`msg-${msg.id}`} key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
-                      <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
-                        {!isMine && (
-                          <div className="flex items-center gap-2 mb-1 ml-1">
-                            <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
-                              role === 'staff' ? 'bg-amber-600 text-white' :
-                                role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-                              }`}>
-                              {badgeLabel}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Bubble + action buttons */}
-                        <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
-
-                          {/* Message bubble */}
-                          <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${(heartCount > 0 || likeCount > 0) && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
-                            {msg.isRecalled ? (
-                              <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
-                                <RotateCcw size={12} /> Tin nhắn đã được thu hồi
-                              </p>
-                            ) : isAttachmentExpired(msg) ? (
-                              <p className="italic text-amber-600/90 flex items-start gap-1.5 text-xs leading-relaxed">
-                                <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                                <span>{msg.content || 'Tệp đính kèm đã hết hạn lưu trữ (10 ngày) và không còn được lưu trên hệ thống.'}</span>
-                              </p>
-                            ) : isImageMessage(msg) ? (
-                              <div className="space-y-0">
-                                <div
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openImagePreview(msg);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      openImagePreview(msg);
-                                    }
-                                  }}
-                                  className="group/img relative block w-full max-w-[min(420px,100%)] cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl overflow-hidden"
-                                  title="Bấm để xem ảnh lớn"
-                                >
-                                  <img
-                                    src={resolveMediaUrl(msg.fileUrl)}
-                                    alt={showFileName(msg.fileName) || 'Hình ảnh'}
-                                    className="w-full h-auto max-h-96 object-cover select-none"
-                                    draggable={false}
-                                  />
-                                  <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
-                                    <ZoomIn size={12} /> Phóng to
-                                  </span>
-                                </div>
-                                {attachmentCaption(msg) ? (
-                                  <div className={`whitespace-pre-wrap break-words px-4 py-2.5 mt-1 rounded-xl ${isMine ? 'bg-[#dc2626] text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
-                                    <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
-                                  </div>
-                                ) : null}
-                              </div>
-                            ) : msg.messageType === 'file' ? (
-                              <div className="space-y-1.5">
-                                <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                                  <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
-                                    <Paperclip size={18} />
-                                  </div>
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
-                                    <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
-                                  </div>
-                                </a>
-                                {attachmentCaption(msg) ? (
-                                  <div className="whitespace-pre-wrap break-words px-0.5">
-                                    <MessageRichText text={attachmentCaption(msg)} mine={isMine} />
-                                  </div>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <div className="whitespace-pre-wrap break-words">
-                                <MessageRichText text={msg.content} mine={isMine} />
-                              </div>
-                            )}
-
-                            {/* Reaction badge */}
-                            {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
-                              <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
-                                {heartCount > 0 && (
-                                  <span className="flex items-center gap-0.5 text-[11px]">
-                                    <span>❤️</span>
-                                    {heartCount > 1 && <span className="text-gray-500 font-bold">{heartCount}</span>}
-                                  </span>
-                                )}
-                                {likeCount > 0 && (
-                                  <span className="flex items-center gap-0.5 text-[11px]">
-                                    <span>👍</span>
-                                    {likeCount > 1 && <span className="text-gray-500 font-bold">{likeCount}</span>}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Reaction picker button */}
-                          {!msg.isRecalled && (
-                            <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-1 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} top-1/2 -translate-y-1/2`}>
-                              <ReactionPicker
-                                msgId={msg.id}
-                                isMine={isMine}
-                                onReact={handleReaction}
-                                myReactions={myReactions}
-                              />
-                              <button
-                                onClick={() => handlePinMessage(msg.id)}
-                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
-                                title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-                              >
-                                <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
-                              </button>
+                    <React.Fragment key={msg.id}>
+                      {dateDivider}
+                      <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
+                        <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
+                          {!isMine && (
+                            <div className="flex items-center gap-2 mb-1 ml-1">
+                              <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
+                                role === 'staff' ? 'bg-amber-600 text-white' :
+                                  role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                                }`}>
+                                {badgeLabel}
+                              </span>
                             </div>
                           )}
 
-                          {/* Options/Menu button for Soft Delete */}
-                          <ChatFlipWrap open={showMessageOptions === msg.id} estimatedHeight={180} className="relative">
-                            {(placeBelow) => (
-                              <>
+                          {/* Bubble + action buttons */}
+                          <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+
+                            {/* Message bubble */}
+                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${(heartCount > 0 || likeCount > 0) && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                              {msg.isRecalled ? (
+                                <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
+                                  <RotateCcw size={12} /> Tin nhắn đã được thu hồi
+                                </p>
+                              ) : isAttachmentExpired(msg) ? (
+                                <p className="italic text-amber-600/90 flex items-start gap-1.5 text-xs leading-relaxed">
+                                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                  <span>{msg.content || 'Tệp đính kèm đã hết hạn lưu trữ (10 ngày) và không còn được lưu trên hệ thống.'}</span>
+                                </p>
+                              ) : isImageMessage(msg) ? (
+                                <div className="space-y-0">
+                                  <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openImagePreview(msg);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        openImagePreview(msg);
+                                      }
+                                    }}
+                                    className="group/img relative block w-full max-w-[min(420px,100%)] cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl overflow-hidden"
+                                    title="Bấm để xem ảnh lớn"
+                                  >
+                                    <img
+                                      src={resolveMediaUrl(msg.fileUrl)}
+                                      alt={showFileName(msg.fileName) || 'Hình ảnh'}
+                                      className="w-full h-auto max-h-96 object-cover select-none"
+                                      draggable={false}
+                                    />
+                                    <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
+                                      <ZoomIn size={12} /> Phóng to
+                                    </span>
+                                  </div>
+                                  {attachmentCaption(msg) ? (
+                                    <div className={`whitespace-pre-wrap break-words px-4 py-2.5 mt-1 rounded-xl ${isMine ? 'bg-[#dc2626] text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
+                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : msg.messageType === 'file' ? (
+                                <div className="space-y-1.5">
+                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
+                                      <Paperclip size={18} />
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
+                                      <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
+                                    </div>
+                                  </a>
+                                  {attachmentCaption(msg) ? (
+                                    <div className="whitespace-pre-wrap break-words px-0.5">
+                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap break-words">
+                                  <MessageRichText text={msg.content} mine={isMine} highlight={normalizedMessageSearch} />
+                                </div>
+                              )}
+
+                              {/* Reaction badge */}
+                              {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
+                                <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
+                                  {heartCount > 0 && (
+                                    <span className="flex items-center gap-0.5 text-[11px]">
+                                      <span>❤️</span>
+                                      {heartCount > 1 && <span className="text-gray-500 font-bold">{heartCount}</span>}
+                                    </span>
+                                  )}
+                                  {likeCount > 0 && (
+                                    <span className="flex items-center gap-0.5 text-[11px]">
+                                      <span>👍</span>
+                                      {likeCount > 1 && <span className="text-gray-500 font-bold">{likeCount}</span>}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Reaction picker button */}
+                            {!msg.isRecalled && (
+                              <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-0 ${isMine ? 'right-full mr-1' : 'left-full ml-1'} top-1/2 -translate-y-1/2`}>
+                                <ReactionPicker
+                                  msgId={msg.id}
+                                  isMine={isMine}
+                                  onReact={handleReaction}
+                                  myReactions={myReactions}
+                                />
                                 <button
-                                  onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
-                                  className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
-                                  title="Tùy chọn"
+                                  onClick={() => handlePinMessage(msg.id)}
+                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
+                                  title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
                                 >
-                                  <MoreHorizontal size={14} />
+                                  <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
                                 </button>
-                                {showMessageOptions === msg.id && (
-                                  <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
-                                    {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
-                                      <button
-                                        onClick={() => {
-                                          handleDownload(msg.fileUrl, msg.fileName);
-                                          setShowMessageOptions(null);
-                                        }}
-                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
-                                      >
-                                        <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
-                                      </button>
-                                    )}
-                                    {!msg.isRecalled && msg.messageType !== 'image' && (
-                                      <button
-                                        onClick={() => {
-                                          handleCopyText(msg.content);
-                                          setShowMessageOptions(null);
-                                        }}
-                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
-                                      >
-                                        <Copy size={12} /> Sao chép
-                                      </button>
-                                    )}
-                                    {!msg.isRecalled && msg.messageType !== 'image' && (
-                                      <button
-                                        onClick={() => {
-                                          setNewMsg(msg.content);
-                                          setTimeout(() => inputRef.current?.focus(), 100);
-                                          setShowMessageOptions(null);
-                                        }}
-                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
-                                      >
-                                        <Edit3 size={12} /> Chỉnh sửa / Viết lại
-                                      </button>
-                                    )}
-                                    {isMine && !msg.isRecalled && (() => {
-                                      const now = new Date();
-                                      const sentAt = new Date(msg.time);
-                                      const diffHours = (now - sentAt) / (1000 * 60 * 60);
-                                      return diffHours <= 24;
-                                    })() && (
+                              </div>
+                            )}
+
+                            {/* Options/Menu button for Soft Delete */}
+                            <ChatFlipWrap open={showMessageOptions === msg.id} estimatedHeight={180} className="relative">
+                              {(placeBelow) => (
+                                <>
+                                  <button
+                                    onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
+                                    className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
+                                    title="Tùy chọn"
+                                  >
+                                    <MoreHorizontal size={14} />
+                                  </button>
+                                  {showMessageOptions === msg.id && (
+                                    <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
+                                      {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
                                         <button
                                           onClick={() => {
-                                            handleRecall(msg.id);
+                                            handleDownload(msg.fileUrl, msg.fileName);
                                             setShowMessageOptions(null);
                                           }}
-                                          disabled={recallingId === msg.id}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
                                         >
-                                          {recallingId === msg.id
-                                            ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
-                                            : <RotateCcw size={12} />
-                                          } Thu hồi tin nhắn
+                                          <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
                                         </button>
                                       )}
-                                    <button
-                                      onClick={() => {
-                                        handleDeleteHistory(msg.id);
-                                        setShowMessageOptions(null);
-                                      }}
-                                      className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
-                                    >
-                                      <Trash2 size={12} /> Xóa lịch sử
-                                    </button>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </ChatFlipWrap>
-                        </div>
-
-                        {/* Time & read status */}
-                        <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
-                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
-                            <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
-                              <Pin size={10} className="rotate-45" />
-                            </span>
-                          )}
-                          <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
-                          {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
-                            <span title="Chưa gửi được (Kết nối yếu)">
-                              <AlertCircle size={10} className="text-red-500 animate-pulse" />
-                            </span>
-                          ) : isMine && !msg.isRecalled && !isAiSupportConversationId(activeConv?.id) && (
-                            <span
-                              className={`inline-flex items-center gap-0.5 font-semibold ${msg.isRead ? 'text-emerald-600' : 'text-slate-400'
-                                }`}
-                              title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
-                            >
-                              {msg.isRead ? (
-                                <CheckCircle2 size={11} aria-hidden="true" />
-                              ) : (
-                                <CheckCircle2 size={11} aria-hidden="true" />
+                                      {!msg.isRecalled && msg.messageType !== 'image' && (
+                                        <button
+                                          onClick={() => {
+                                            handleCopyText(msg.content);
+                                            setShowMessageOptions(null);
+                                          }}
+                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
+                                        >
+                                          <Copy size={12} /> Sao chép
+                                        </button>
+                                      )}
+                                      {!msg.isRecalled && msg.messageType !== 'image' && (
+                                        <button
+                                          onClick={() => {
+                                            setNewMsg(msg.content);
+                                            setTimeout(() => inputRef.current?.focus(), 100);
+                                            setShowMessageOptions(null);
+                                          }}
+                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
+                                        >
+                                          <Edit3 size={12} /> Chỉnh sửa / Viết lại
+                                        </button>
+                                      )}
+                                      {isMine && !msg.isRecalled && (() => {
+                                        const now = new Date();
+                                        const sentAt = new Date(msg.time);
+                                        const diffHours = (now - sentAt) / (1000 * 60 * 60);
+                                        return diffHours <= 24;
+                                      })() && (
+                                          <button
+                                            onClick={() => {
+                                              handleRecall(msg.id);
+                                              setShowMessageOptions(null);
+                                            }}
+                                            disabled={recallingId === msg.id}
+                                            className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                          >
+                                            {recallingId === msg.id
+                                              ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
+                                              : <RotateCcw size={12} />
+                                            } Thu hồi tin nhắn
+                                          </button>
+                                        )}
+                                      <button
+                                        onClick={() => {
+                                          handleDeleteHistory(msg.id);
+                                          setShowMessageOptions(null);
+                                        }}
+                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
+                                      >
+                                        <Trash2 size={12} /> Xóa lịch sử
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
                               )}
-                              <span>{msg.isRead ? 'Đã đọc' : 'Chưa đọc'}</span>
-                            </span>
-                          )}
+                            </ChatFlipWrap>
+                          </div>
+
+                          {/* Time & read status */}
+                          <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
+                            {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
+                              <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
+                                <Pin size={10} className="rotate-45" />
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
+                            {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
+                              <span title="Chưa gửi được (Kết nối yếu)">
+                                <AlertCircle size={10} className="text-red-500 animate-pulse" />
+                              </span>
+                            ) : isMine && !msg.isRecalled && !isAiSupportConversationId(activeConv?.id) && (
+                              <span
+                                className={`inline-flex items-center gap-0.5 font-semibold ${msg.isRead ? 'text-emerald-600' : 'text-slate-400'
+                                  }`}
+                                title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
+                              >
+                                {msg.isRead ? (
+                                  <CheckCircle2 size={11} aria-hidden="true" />
+                                ) : (
+                                  <CheckCircle2 size={11} aria-hidden="true" />
+                                )}
+                                <span>{msg.isRead ? 'Đã đọc' : 'Chưa đọc'}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
                 {peerTyping ? (

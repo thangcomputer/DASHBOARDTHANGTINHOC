@@ -62,14 +62,23 @@ function fnClass(name) {
   return 'bg-sky-100 text-sky-800';
 }
 
-function renderMarks(chunk, keyPrefix) {
+function highlightChunk(chunk, highlight, keyPrefix) {
+  const needle = String(highlight || '').trim();
+  if (!needle) return [chunk];
+  const parts = String(chunk).split(new RegExp(`(${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig'));
+  return parts.map((part, index) => part && part.toLocaleLowerCase() === needle.toLocaleLowerCase()
+    ? <mark key={`${keyPrefix}-hit-${index}`} className="rounded bg-red-100 px-0.5 text-inherit">{part}</mark>
+    : part);
+}
+
+function renderMarks(chunk, keyPrefix, highlight = '') {
   if (!chunk) return [];
   const out = [];
   let last = 0;
   const re = new RegExp(MARK_RE.source, 'g');
   let m;
   while ((m = re.exec(chunk)) !== null) {
-    if (m.index > last) out.push(chunk.slice(last, m.index));
+    if (m.index > last) out.push(...highlightChunk(chunk.slice(last, m.index), highlight, `${keyPrefix}-plain`));
     const token = m[0];
     const k = `${keyPrefix}-${m.index}`;
     if (token.startsWith('`') && token.endsWith('`')) {
@@ -79,30 +88,30 @@ function renderMarks(chunk, keyPrefix) {
           key={k}
           className={`inline-block font-mono font-bold text-[12px] px-1.5 py-0.5 rounded-md mx-0.5 align-baseline ${fnClass(inner)}`}
         >
-          {inner}
+          {highlightChunk(inner, highlight, k)}
         </span>,
       );
     } else if (token.startsWith('**') && token.endsWith('**')) {
-      out.push(<strong key={k} className="font-bold">{token.slice(2, -2)}</strong>);
+      out.push(<strong key={k} className="font-bold">{highlightChunk(token.slice(2, -2), highlight, k)}</strong>);
     } else if (token.startsWith('*') && token.endsWith('*')) {
-      out.push(<em key={k} className="italic text-slate-600">{token.slice(1, -1)}</em>);
+      out.push(<em key={k} className="italic text-slate-600">{highlightChunk(token.slice(1, -1), highlight, k)}</em>);
     } else {
-      out.push(token);
+      out.push(...highlightChunk(token, highlight, k));
     }
     last = m.index + token.length;
   }
-  if (last < chunk.length) out.push(chunk.slice(last));
+  if (last < chunk.length) out.push(...highlightChunk(chunk.slice(last), highlight, `${keyPrefix}-tail`));
   return out;
 }
 
-function renderTextWithUrls(chunk, segIdx, mine) {
+function renderTextWithUrls(chunk, segIdx, mine, highlight = '') {
   const nodes = [];
   let tLast = 0;
   const urlRe = new RegExp(URL_RE.source, 'gi');
   let tMatch;
   while ((tMatch = urlRe.exec(chunk)) !== null) {
     if (tMatch.index > tLast) {
-      nodes.push(...renderMarks(chunk.slice(tLast, tMatch.index), `m-${segIdx}-${tLast}`));
+      nodes.push(...renderMarks(chunk.slice(tLast, tMatch.index), `m-${segIdx}-${tLast}`, highlight));
     }
     const url = tMatch[0];
     nodes.push(
@@ -114,13 +123,13 @@ function renderTextWithUrls(chunk, segIdx, mine) {
         className={mine ? 'cms-fm-link is-mine' : 'cms-fm-link'}
         onClick={(e) => e.stopPropagation()}
       >
-        {url}
+        {highlightChunk(url, highlight, `url-${segIdx}-${tMatch.index}`)}
       </a>,
     );
     tLast = tMatch.index + url.length;
   }
   if (tLast < chunk.length) {
-    nodes.push(...renderMarks(chunk.slice(tLast), `m-${segIdx}-${tLast}`));
+    nodes.push(...renderMarks(chunk.slice(tLast), `m-${segIdx}-${tLast}`, highlight));
   }
   return nodes;
 }
@@ -229,7 +238,7 @@ function emphasizeStepLine(line) {
   return t;
 }
 
-function renderTextBlocks(chunk, segIdx, mine) {
+function renderTextBlocks(chunk, segIdx, mine, highlight = '') {
   const lines = String(chunk || '').replace(/\r\n/g, '\n').split('\n');
   const out = [];
   let i = 0;
@@ -248,12 +257,12 @@ function renderTextBlocks(chunk, segIdx, mine) {
         continue;
       }
       rows.forEach((line, li) => {
-        out.push(...renderTextWithUrls(emphasizeStepLine(line), `${segIdx}-${start}-${li}`, mine));
+        out.push(...renderTextWithUrls(emphasizeStepLine(line), `${segIdx}-${start}-${li}`, mine, highlight));
         if (start + li < lines.length - 1) out.push('\n');
       });
       continue;
     }
-    out.push(...renderTextWithUrls(emphasizeStepLine(lines[i]), `${segIdx}-${i}`, mine));
+    out.push(...renderTextWithUrls(emphasizeStepLine(lines[i]), `${segIdx}-${i}`, mine, highlight));
     if (i < lines.length - 1) out.push('\n');
     i += 1;
   }
@@ -263,7 +272,7 @@ function renderTextBlocks(chunk, segIdx, mine) {
 /**
  * Render message text: http(s) links, LMS go-links, chat tokens, **bold** *italic* `FUNC`, markdown tables.
  */
-export function MessageRichText({ text, mine = false }) {
+export function MessageRichText({ text, mine = false, highlight = '' }) {
   const navigate = useNavigate();
   const raw = String(text || '');
   if (!raw) return null;
@@ -379,7 +388,7 @@ export function MessageRichText({ text, mine = false }) {
       );
       return;
     }
-    nodes.push(...renderTextBlocks(seg.value, segIdx, mine));
+    nodes.push(...renderTextBlocks(seg.value, segIdx, mine, highlight));
   });
 
   return <>{nodes.length ? nodes : raw}</>;

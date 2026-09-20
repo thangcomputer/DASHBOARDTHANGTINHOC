@@ -16,7 +16,16 @@ const {
   PRODUCT_ROLES,
 } = require('./messagingPolicy');
 
-const CONTACT_SELECT = 'name adminRole gender phone branchId branchCode avatar role status';
+const CONTACT_SELECT = [
+  'name adminRole gender phone branchId branchCode avatar role status address',
+  'age course totalSessions remainingSessions completedSessions notes',
+  'specialty averageRating ratingCount voiceRegion startDate bio experience experienceYears',
+].join(' ');
+
+function branchRefKey(value) {
+  if (!value) return '';
+  return String(value._id || value.id || value).trim();
+}
 
 function staffDisplayName(rawName) {
   return (rawName && String(rawName).trim()) ? String(rawName).trim() : 'Nhân viên';
@@ -26,7 +35,7 @@ async function buildBranchTenantMap(branchIds = []) {
   const ids = [...new Set(
     branchIds
       .filter(Boolean)
-      .map((id) => String(id))
+      .map(branchRefKey)
       .filter((id) => id.length === 24),
   )];
   const map = new Map();
@@ -40,6 +49,29 @@ async function buildBranchTenantMap(branchIds = []) {
   return map;
 }
 
+async function buildBranchProfileMap(branchIds = [], branchCodes = []) {
+  const ids = [...new Set(
+    branchIds
+      .filter(Boolean)
+      .map(branchRefKey)
+      .filter((id) => id.length === 24),
+  )];
+  const codes = [...new Set(branchCodes.filter(Boolean).map((code) => String(code).trim().toUpperCase()))];
+  const map = new Map();
+  if (!ids.length && !codes.length) return map;
+  const clauses = [];
+  if (ids.length) clauses.push({ _id: { $in: ids } });
+  if (codes.length) clauses.push({ code: { $in: codes } });
+  const rows = await Branch.find({ $or: clauses })
+    .select('name code address phone tenantId')
+    .lean();
+  for (const row of rows) {
+    map.set(String(row._id), row);
+    if (row.code) map.set(String(row.code).toUpperCase(), row);
+  }
+  return map;
+}
+
 function tenantForDoc(doc, branchTenantMap) {
   if (doc?.tenantId != null && doc.tenantId !== '') return String(doc.tenantId);
   const bid = doc?.branchId != null ? String(doc.branchId) : null;
@@ -49,7 +81,12 @@ function tenantForDoc(doc, branchTenantMap) {
   return null;
 }
 
-function mapContactFromDoc(doc, transportRoleHint, branchTenantMap) {
+function mapContactFromDoc(doc, transportRoleHint, branchTenantMap, branchProfileMap) {
+  const embeddedBranch = doc?.branchId && typeof doc.branchId === 'object' ? doc.branchId : null;
+  const branch = doc?.branchId
+    ? branchProfileMap.get(branchRefKey(doc.branchId))
+    || embeddedBranch
+    : (doc?.branchCode ? branchProfileMap.get(String(doc.branchCode).toUpperCase()) : null);
   const id = String(doc._id || doc.id);
   const role = transportRoleHint
     || getMessagingRole({ id, role: doc.role, adminRole: doc.adminRole });
@@ -73,14 +110,36 @@ function mapContactFromDoc(doc, transportRoleHint, branchTenantMap) {
     productRole,
     gender: doc.gender || '',
     phone: doc.phone || '',
+    personalPhone: doc.phone || '',
+    branchPhone: branch?.phone || '',
+    age: doc.age ?? null,
+    course: doc.course || '',
+    totalSessions: doc.totalSessions ?? null,
+    remainingSessions: doc.remainingSessions ?? null,
+    completedSessions: doc.completedSessions ?? null,
+    notes: doc.notes || '',
+    specialty: doc.specialty || '',
+    averageRating: doc.averageRating ?? null,
+    ratingCount: doc.ratingCount ?? 0,
+    voiceRegion: doc.voiceRegion || '',
+    startDate: doc.startDate || null,
+    experience: doc.experience || '',
+    experienceYears: doc.experienceYears ?? null,
+    address: doc.address || branch?.address || '',
+    branchName: branch?.name || '',
     avatar: doc.avatar || String(doc.name || 'U').substring(0, 2).toUpperCase(),
-    branchId: doc.branchId ? String(doc.branchId) : null,
-    branchCode: doc.branchCode || '',
+    branchId: doc.branchId ? branchRefKey(doc.branchId) : null,
+    branchCode: doc.branchCode || branch?.code || branch?.name || branchRefKey(doc.branchId),
     tenantId: tenantForDoc(doc, branchTenantMap),
   };
 }
 
-function mapElevated(doc, forceProduct, branchTenantMap) {
+function mapElevated(doc, forceProduct, branchTenantMap, branchProfileMap) {
+  const embeddedBranch = doc?.branchId && typeof doc.branchId === 'object' ? doc.branchId : null;
+  const branch = doc?.branchId
+    ? branchProfileMap.get(branchRefKey(doc.branchId))
+    || embeddedBranch
+    : (doc?.branchCode ? branchProfileMap.get(String(doc.branchCode).toUpperCase()) : null);
   const ar = forceProduct || (doc.adminRole === 'HIGH_ADMIN' ? 'HIGH_ADMIN' : 'SUPER_ADMIN');
   const adminId = (String(doc._id) === 'admin' || doc.phone === 'admin') ? 'admin' : String(doc._id);
   return {
@@ -93,9 +152,21 @@ function mapElevated(doc, forceProduct, branchTenantMap) {
     adminRole: ar,
     productRole: ar,
     phone: doc.phone || '',
+    personalPhone: doc.phone || '',
+    branchPhone: branch?.phone || '',
+    age: doc.age ?? null,
+    specialty: doc.specialty || '',
+    averageRating: doc.averageRating ?? null,
+    ratingCount: doc.ratingCount ?? 0,
+    voiceRegion: doc.voiceRegion || '',
+    startDate: doc.startDate || null,
+    experience: doc.experience || '',
+    experienceYears: doc.experienceYears ?? null,
+    address: doc.address || branch?.address || '',
+    branchName: branch?.name || '',
     avatar: doc.avatar || String(doc.name || 'AD').substring(0, 2).toUpperCase(),
-    branchId: doc.branchId ? String(doc.branchId) : null,
-    branchCode: doc.branchCode || '',
+    branchId: doc.branchId ? branchRefKey(doc.branchId) : null,
+    branchCode: doc.branchCode || branch?.code || branch?.name || branchRefKey(doc.branchId),
     tenantId: tenantForDoc(doc, branchTenantMap),
     gender: doc.gender || '',
   };
@@ -300,9 +371,15 @@ async function listDiscoverableContacts(actorUser, options = {}) {
   const candidates = await loadCandidateDocs(actorUser, options);
   const branchIds = [
     actor.branchId,
-    ...candidates.map((c) => (c.doc?.branchId != null ? String(c.doc.branchId) : null)),
+    ...candidates.map((c) => (c.doc?.branchId != null ? branchRefKey(c.doc.branchId) : null)),
   ];
-  const branchTenantMap = await buildBranchTenantMap(branchIds);
+  const branchCodes = candidates
+    .map((c) => c.doc?.branchCode)
+    .filter(Boolean);
+  const [branchTenantMap, branchProfileMap] = await Promise.all([
+    buildBranchTenantMap(branchIds),
+    buildBranchProfileMap(branchIds, branchCodes),
+  ]);
 
   if (!actor.tenantId && actor.branchId && branchTenantMap.has(actor.branchId)) {
     actor.tenantId = branchTenantMap.get(actor.branchId);
@@ -315,11 +392,12 @@ async function listDiscoverableContacts(actorUser, options = {}) {
     const doc = cand.doc;
     if (!doc) continue;
     const mapped = cand.elevated
-      ? mapElevated(doc, cand.elevated, branchTenantMap)
+      ? mapElevated(doc, cand.elevated, branchTenantMap, branchProfileMap)
       : mapContactFromDoc(
         doc,
         cand.kind === 'student' ? 'student' : undefined,
         branchTenantMap,
+        branchProfileMap,
       );
 
     if (cand.kind === 'teacher' && doc.adminRole === 'SUPPORT') {
