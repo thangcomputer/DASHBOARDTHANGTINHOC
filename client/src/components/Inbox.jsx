@@ -343,25 +343,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         </span>
       );
     }
-    if (!userId || !lastSeenUsers) return <span className="text-slate-400">Ngoại tuyến</span>;
+    if (!userId || !lastSeenUsers) return <span className="text-slate-400">Chưa có dữ liệu truy cập</span>;
     const lastSeenTime = lastSeenUsers[String(userId)];
-    if (!lastSeenTime) return <span className="text-slate-400">Ngoại tuyến</span>;
+    if (!lastSeenTime) return <span className="text-slate-400">Chưa có dữ liệu truy cập</span>;
 
     try {
-      const diffMs = Date.now() - new Date(lastSeenTime).getTime();
-      if (isNaN(diffMs) || diffMs < 0) return <span className="text-slate-400">Ngoại tuyến</span>;
-
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      const diffHours = Math.floor(diffMins / 60);
-      const diffDays = Math.floor(diffHours / 24);
-
-      if (diffMins < 1) return <span className="text-slate-500 font-medium">Hoạt động vừa xong</span>;
-      if (diffMins < 60) return <span className="text-slate-500 font-medium">Hoạt động {diffMins} phút trước</span>;
-      if (diffHours < 24) return <span className="text-slate-500 font-medium">Hoạt động {diffHours} giờ trước</span>;
-      if (diffDays < 7) return <span className="text-slate-500 font-medium">Hoạt động {diffDays} ngày trước</span>;
-      return <span className="text-slate-400">Ngoại tuyến</span>;
+      const lastSeenDate = new Date(lastSeenTime);
+      if (Number.isNaN(lastSeenDate.getTime())) return <span className="text-slate-400">Chưa có dữ liệu truy cập</span>;
+      return (
+        <span className="text-slate-500 font-medium">
+          Truy cập lần cuối: {lastSeenDate.toLocaleString('vi-VN')}
+        </span>
+      );
     } catch {
-      return <span className="text-slate-400">Ngoại tuyến</span>;
+      return <span className="text-slate-400">Chưa có dữ liệu truy cập</span>;
     }
   }, [lastSeenUsers]);
 
