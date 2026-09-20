@@ -372,7 +372,7 @@ export function useAdminDashboardState() {
         handleOpenResetPw(userId, userName || 'Người dùng', role);
       }
     };
-    
+
     const handleOpenStudentDetail = (e) => {
       const { id, tab, scheduleId } = e.detail || {};
       if (!id) return;
@@ -384,7 +384,7 @@ export function useAdminDashboardState() {
 
     window.addEventListener('open-reset-pw', handleResetEvent);
     window.addEventListener('open-student-detail', handleOpenStudentDetail);
-    
+
     return () => {
       window.removeEventListener('open-reset-pw', handleResetEvent);
       window.removeEventListener('open-student-detail', handleOpenStudentDetail);
@@ -483,10 +483,18 @@ export function useAdminDashboardState() {
 
   // Student question bank / exam results UI
   const [sqSearch, setSqSearch] = useState('');
-  const [sqSection, setSqSection] = useState('coban');
+  const [sqSection, setSqSectionState] = useState('coban');
   const [sqType, setSqType] = useState('all');
   const [sqForm, setSqForm] = useState(null);
   const [erSearch, setErSearch] = useState('');
+
+  const setSqSection = useCallback((value) => {
+    setSqSectionState((previous) => {
+      const next = typeof value === 'function' ? value(previous) : value;
+      sqSectionRef.current = next;
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     sqSectionRef.current = sqSection;
@@ -569,7 +577,7 @@ export function useAdminDashboardState() {
     getPrivateEvaluationsForAdmin, markEvaluationRead,
     transactions, addSystemLog, financeStudents, isLoadingFinance, markStudentPaid, financialData,
     selectedBranchId,
-    
+
     sCourseBuilderMode, setSCourseBuilderMode, updateStudentTrainingItem,
     studentTrainingData, sTrainingTab, setSTrainingTab, setSTrainingForm,
     students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,
@@ -606,7 +614,7 @@ export function useAdminDashboardState() {
     safeTeachersList, examSubjectsCatalog,
     getPrivateEvaluationsForAdmin, markEvaluationRead,
     transactions, addSystemLog, financeStudents, isLoadingFinance, markStudentPaid, financialData,
-    
+
     sCourseBuilderMode, updateStudentTrainingItem,
     studentTrainingData, sTrainingTab, setSTrainingTab,
     students, studentQuestions, studentExamMinutes, updateStudentExamMinutes,

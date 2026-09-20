@@ -111,21 +111,30 @@ export function resolveRichHtmlMedia(html, resolveUrl) {
 
 /** Phan cau hoi admin khop mon thi (coban <-> computer, ppt <-> powerpoint). */
 const SUBJECT_SECTION_ALIASES = {
-  coban: ['coban', 'computer', 'basic', 'maytinh', 'windows'],
-  word: ['word'],
-  excel: ['excel'],
-  powerpoint: ['powerpoint', 'ppt', 'pp'],
+  coban: ['coban', 'computer', 'basic', 'maytinh', 'mayvitinh', 'windows'],
+  word: ['word', 'microsoftword', 'msword'],
+  excel: ['excel', 'microsoftexcel', 'msexcel'],
+  powerpoint: ['powerpoint', 'ppt', 'pp', 'microsoftpowerpoint', 'mspowerpoint'],
   canva: ['canva'],
   situation: ['situation', 'supham', 'su-pham', 'pedagogy'],
 };
 
+function normalizeSubjectSection(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, '');
+}
+
 export function questionMatchesExamSubject(section, subjectId) {
   if (section == null || subjectId == null) return false;
-  const s = String(section).toLowerCase().trim();
-  const id = String(subjectId).toLowerCase().trim();
+  const s = normalizeSubjectSection(section);
+  const id = normalizeSubjectSection(subjectId);
   if (!s || !id) return false;
   if (s === id) return true;
-  const aliases = SUBJECT_SECTION_ALIASES[id];
+  const aliases = SUBJECT_SECTION_ALIASES[id]?.map(normalizeSubjectSection);
   if (aliases?.includes(s)) return true;
   // Môn tùy chỉnh (mos-word, ...): chỉ khớp chính xác id hoặc section
   return false;

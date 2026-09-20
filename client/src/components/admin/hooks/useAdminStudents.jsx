@@ -393,7 +393,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const subjectId = sqSectionRef?.current;
+    const subjectId = e.currentTarget?.dataset?.subjectId || sqSectionRef?.current;
     if (!subjectId || subjectId === 'all') {
       toast.error('Chọn môn thi trước khi nhập Excel (không chọn "Tất cả môn").');
       return;
