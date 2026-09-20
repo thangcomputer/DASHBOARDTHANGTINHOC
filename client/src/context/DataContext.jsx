@@ -22,12 +22,12 @@ const DataActionsContext = createContext(null);
 
 export const DataProvider = ({ children, user, onLogout }) => {
   const [currentUser, setCurrentUser] = useState(user || null);
-  const triggerBackgroundSyncRef = useRef(async () => {});
+  const triggerBackgroundSyncRef = useRef(async () => { });
   const triggerBackgroundSyncProxy = useCallback((...args) => triggerBackgroundSyncRef.current(...args), []);
 
   const setGroupsRef = useRef(null);
-  const setSchedulesRef = useRef(() => {});
-  const setExamResultsRef = useRef(() => {});
+  const setSchedulesRef = useRef(() => { });
+  const setExamResultsRef = useRef(() => { });
 
   useEffect(() => {
     applyDataVersionReset();
@@ -54,12 +54,12 @@ export const DataProvider = ({ children, user, onLogout }) => {
       const updated = { ...prev, avatar: newAvatarUrl };
       try {
         localStorage.setItem('thvp_user', JSON.stringify(updated));
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
     try {
       window.dispatchEvent(new CustomEvent('user:avatar-updated', { detail: newAvatarUrl }));
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const {
@@ -104,10 +104,10 @@ export const DataProvider = ({ children, user, onLogout }) => {
     applyStudentExamConfigFromServer,
     addStudentTrainingItem, updateStudentTrainingItem, removeStudentTrainingItem,
     addTrainingItem, updateTrainingItem, removeTrainingItem,
-    addQuestion, addQuestionsBulk, updateQuestion, removeQuestion,     resetQuestions,
+    addQuestion, addQuestionsBulk, updateQuestion, removeQuestion, resetQuestions,
     replaceTeacherQuestionsForSubject,
     addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject, updateStudentQuestion,
-    removeStudentQuestion, resetStudentQuestions, copyTeacherQuestionBankToStudents,
+    removeStudentQuestion, resetStudentQuestions, removeStudentQuestionsForSubject, copyTeacherQuestionBankToStudents,
   } = useDataTraining(currentUser);
 
   const {
@@ -247,7 +247,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     replaceTeacherQuestionsForSubject,
     setTeacherExamTimeLimitMinutes, updateTeacherExamMinutes, updateTeacherEssayExamMinutes,
     addStudentQuestion, addStudentQuestionsBulk, replaceStudentQuestionsForSubject,
-    updateStudentQuestion, removeStudentQuestion, resetStudentQuestions,
+    updateStudentQuestion, removeStudentQuestion, resetStudentQuestions, removeStudentQuestionsForSubject,
     copyTeacherQuestionBankToStudents,
     updateStudentExamMinutes, updateStudentEssayExamMinutes, updateStudentEssayRequired,
     setStudentExamFile, setExamWarningSoundUrl,

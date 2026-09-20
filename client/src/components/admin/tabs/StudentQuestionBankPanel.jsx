@@ -98,11 +98,12 @@ export default function StudentQuestionBankPanel() {
     addStudentQuestion,
     updateStudentQuestion,
     removeStudentQuestion,
+    removeStudentQuestionsForSubject,
   } = useData();
 
   const { showGlobalModal, toast, studentQuestionsExcelInputRef, handleStudentQuestionsExcelFile } = useAdminTab();
   const {
-    resetStudentQuestions, setSqForm, BLANK_Q,
+    setSqForm, BLANK_Q,
     sqSection, setSqSection,
     sqForm, examSubjectsCatalog,
   } = useAdminTraining();
@@ -395,8 +396,8 @@ export default function StudentQuestionBankPanel() {
               Phút TL
             </label>
             <div className={`flex items-center gap-1.5 border-2 rounded-xl px-2.5 py-2 ${studentEssayRequired?.[sqSection] === false
-                ? 'border-slate-200 bg-slate-50 opacity-60'
-                : 'border-violet-200 bg-red-50/80'
+              ? 'border-slate-200 bg-slate-50 opacity-60'
+              : 'border-violet-200 bg-red-50/80'
               }`}>
               <Clock size={14} className="text-violet-700 shrink-0" />
               <input
@@ -422,8 +423,8 @@ export default function StudentQuestionBankPanel() {
                 [sqSection]: studentEssayRequired?.[sqSection] === false,
               })}
               className={`w-full min-h-[42px] px-3 rounded-xl border-2 text-xs font-black transition ${studentEssayRequired?.[sqSection] === false
-                  ? 'border-slate-200 bg-slate-50 text-slate-500'
-                  : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                ? 'border-slate-200 bg-slate-50 text-slate-500'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                 }`}
             >
               {studentEssayRequired?.[sqSection] === false ? 'Tắt — chỉ TN' : 'Bật — TN + TL'}
@@ -437,17 +438,17 @@ export default function StudentQuestionBankPanel() {
               type="button"
               onClick={() => {
                 showGlobalModal({
-                  title: 'Xóa toàn bộ ngân hàng?',
-                  content: 'Xóa mọi câu trắc nghiệm và tự luận của tất cả môn. Không thể hoàn tác.',
+                  title: `Xóa câu hỏi môn ${activeSubject?.label || sqSection}?`,
+                  content: `Xóa ${mcQuestions.length} câu trắc nghiệm và ${essayQuestions.length} câu tự luận của môn này. Các môn khác vẫn được giữ nguyên.`,
                   type: 'warning',
-                  confirmText: 'Xóa toàn bộ',
+                  confirmText: 'Xóa môn này',
                   cancelText: 'Huỷ',
-                  onConfirm: () => resetStudentQuestions(),
+                  onConfirm: () => removeStudentQuestionsForSubject(sqSection),
                 });
               }}
               className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center gap-1.5"
             >
-              <Trash2 size={14} /> Xóa toàn bộ
+              <Trash2 size={14} /> Xóa môn này
             </button>
           </div>
         </div>

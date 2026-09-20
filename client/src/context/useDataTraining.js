@@ -160,7 +160,7 @@ export function useDataTraining(currentUser) {
     if (!currentUser) return;
     const isStaff = currentUser.role === 'admin' || currentUser.role === 'staff';
     const isTeacher = currentUser.role === 'teacher';
-    
+
     const perms = currentUser.permissions || [];
     const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
     const hasSystemPerm = isSuper || perms.includes('system_settings');
@@ -277,7 +277,7 @@ export function useDataTraining(currentUser) {
           questions,
           timeLimitMinutes: teacherExamTimeLimitMinutes,
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 2000);
     return () => clearTimeout(t);
   }, [questions, teacherExamTimeLimitMinutes, currentUser?.role, teacherExamBankHydrated]);
@@ -333,7 +333,7 @@ export function useDataTraining(currentUser) {
   const persistStudentTrainingData = useCallback(() => {
     studentTrainingWritePendingRef.current += 1;
     studentTrainingWriteChainRef.current = studentTrainingWriteChainRef.current
-      .catch(() => {})
+      .catch(() => { })
       .then(async () => {
         const payload = studentTrainingDataRef.current;
         try {
@@ -352,7 +352,7 @@ export function useDataTraining(currentUser) {
   const persistTrainingData = useCallback(() => {
     trainingWritePendingRef.current += 1;
     trainingWriteChainRef.current = trainingWriteChainRef.current
-      .catch(() => {})
+      .catch(() => { })
       .then(async () => {
         const payload = trainingDataRef.current;
         try {
@@ -428,9 +428,9 @@ export function useDataTraining(currentUser) {
         ...prev,
         [category]: exists
           ? list.map((item) =>
-            (matchTrainingItemId(item, id)
-              ? { ...item, ...mergedUpdates, id: trainingItemKey(item) || trainingItemKey(mergedUpdates) || id }
-              : item))
+          (matchTrainingItemId(item, id)
+            ? { ...item, ...mergedUpdates, id: trainingItemKey(item) || trainingItemKey(mergedUpdates) || id }
+            : item))
           : [...list, { ...mergedUpdates, id: id || Date.now() }],
       };
       studentTrainingDataRef.current = newData;
@@ -476,9 +476,9 @@ export function useDataTraining(currentUser) {
         ...prev,
         [category]: exists
           ? list.map((item) =>
-            (matchTrainingItemId(item, id)
-              ? { ...item, ...mergedUpdates, id: trainingItemKey(item) || trainingItemKey(mergedUpdates) || id }
-              : item))
+          (matchTrainingItemId(item, id)
+            ? { ...item, ...mergedUpdates, id: trainingItemKey(item) || trainingItemKey(mergedUpdates) || id }
+            : item))
           : [...list, { ...mergedUpdates, id: id || Date.now() }],
       };
       trainingDataRef.current = newData;
@@ -610,6 +610,13 @@ export function useDataTraining(currentUser) {
 
   const resetStudentQuestions = useCallback(() => {
     setStudentQuestions([]);
+  }, []);
+
+  const removeStudentQuestionsForSubject = useCallback((subjectId) => {
+    if (!subjectId) return;
+    setStudentQuestions((prev) => (
+      (prev || []).filter((q) => !questionMatchesExamSubject(q.section, subjectId))
+    ));
   }, []);
 
   const copyTeacherQuestionBankToStudents = useCallback(() => {
@@ -904,6 +911,7 @@ export function useDataTraining(currentUser) {
     updateStudentQuestion,
     removeStudentQuestion,
     resetStudentQuestions,
+    removeStudentQuestionsForSubject,
     copyTeacherQuestionBankToStudents,
     hydrateTrainingFromSync,
     setTrainingDataFromSync,
