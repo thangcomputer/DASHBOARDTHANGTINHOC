@@ -1049,8 +1049,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                 disabled={!canStartExam}
                 onClick={() => beginOrResumeExam()}
                 className={`w-full py-3 font-black rounded-[14px] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${canStartExam
-                    ? 'bg-red-500 text-white shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-[1.02] active:scale-95'
-                    : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
+                  ? 'bg-red-500 text-white shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-[1.02] active:scale-95'
+                  : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
                   }`}>
                 {questionsLoading
                   ? 'ĐANG TẢI ĐỀ THI...'
@@ -1248,8 +1248,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
               </span>
               <span
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold shadow-inner transition-all ${timeLeft < 300
-                    ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
-                    : 'border-white/15 bg-black/35 text-white'
+                  ? 'border-red-500/45 bg-red-950/60 text-red-200 animate-pulse'
+                  : 'border-white/15 bg-black/35 text-white'
                   }`}
               >
                 <Clock size={12} className="shrink-0 text-sky-400" />
@@ -1289,8 +1289,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                   type="button"
                   onClick={() => setTab('trac_nghiem')}
                   className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${tab === 'trac_nghiem'
-                      ? 'text-indigo-900'
-                      : 'text-slate-400 hover:text-slate-600'
+                    ? 'text-indigo-900'
+                    : 'text-slate-400 hover:text-slate-600'
                     }`}
                 >
                   {tab === 'trac_nghiem' && (
@@ -1306,10 +1306,10 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                   }}
                   disabled={!isTracNghiemSubmitted || !meta.essayRequired}
                   className={`relative flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold transition md:py-3 ${!isTracNghiemSubmitted || !meta.essayRequired
-                      ? 'cursor-not-allowed text-slate-300'
-                      : tab === 'tu_luan'
-                        ? 'text-indigo-900'
-                        : 'text-slate-400 hover:text-slate-600'
+                    ? 'cursor-not-allowed text-slate-300'
+                    : tab === 'tu_luan'
+                      ? 'text-indigo-900'
+                      : 'text-slate-400 hover:text-slate-600'
                     }`}
                 >
                   {tab === 'tu_luan' && isTracNghiemSubmitted && meta.essayRequired && (
@@ -1361,14 +1361,14 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                           }}
                           disabled={isTracNghiemSubmitted}
                           className={`group flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all md:gap-2.5 md:px-3 md:py-2 ${answers[currentQ] === i
-                              ? 'border-indigo-600 bg-indigo-50 shadow-sm shadow-indigo-500/10'
-                              : 'border-slate-200 bg-white hover:border-slate-300'
+                            ? 'border-indigo-600 bg-indigo-50 shadow-sm shadow-indigo-500/10'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
                             } ${isTracNghiemSubmitted ? 'cursor-not-allowed opacity-65' : ''}`}
                         >
                           <span
                             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-black md:h-8 md:w-8 md:text-xs ${answers[currentQ] === i
-                                ? 'bg-red-600 text-white'
-                                : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
                               }`}
                           >
                             {['A', 'B', 'C', 'D', 'E', 'F'][i] ?? i + 1}
@@ -1493,8 +1493,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                               onDrop={handleDrop}
                               onClick={() => fileRef.current?.click()}
                               className={`cursor-pointer rounded-2xl border-2 border-dashed py-12 text-center transition ${isDragging
-                                  ? 'border-indigo-400 bg-indigo-50'
-                                  : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
+                                ? 'border-indigo-400 bg-indigo-50'
+                                : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
                                 }`}
                             >
                               <Upload size={32} className="mx-auto text-slate-300" />
@@ -1544,10 +1544,10 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                         disabled={isTracNghiemSubmitted || tab !== 'trac_nghiem'}
                         onClick={() => setCurrentQ(i)}
                         className={`flex aspect-square items-center justify-center rounded-lg text-xs font-black transition sm:rounded-xl sm:text-sm md:text-[0.95rem] ${active
-                            ? 'bg-red-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
-                            : done
-                              ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                              : 'border border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white'
+                          ? 'bg-red-600 text-white shadow-md shadow-indigo-500/30 ring-2 ring-indigo-300 ring-offset-1 ring-offset-white'
+                          : done
+                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                            : 'border border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white'
                           } ${isTracNghiemSubmitted || tab !== 'trac_nghiem' ? 'cursor-default opacity-60' : ''}`}
                       >
                         {i + 1}

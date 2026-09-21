@@ -64,36 +64,34 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
               const isActive = activeTab === tab.key;
               return (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-[13px] font-bold transition-all border-2 ${
-                    isActive ? `border-black bg-purple-50 ${tab.color} shadow-sm` : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-                  }`}>
+                  className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-[13px] font-bold transition-all border-2 ${isActive ? `border-black bg-purple-50 ${tab.color} shadow-sm` : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                    }`}>
                   <Icon size={16} className={isActive ? tab.color : 'text-slate-400'} />
                   {tab.label}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-black ml-1 ${
-                    isActive ? 'bg-white ' + tab.color : 'bg-slate-100 text-slate-400'
-                  }`}>{
-                    tab.key === 'questions'
-                      ? (studentQuestions?.length || 0)
-                      : (trainingData?.[tab.key]?.length || 0)
-                  }</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-black ml-1 ${isActive ? 'bg-white ' + tab.color : 'bg-slate-100 text-slate-400'
+                    }`}>{
+                      tab.key === 'questions'
+                        ? (studentQuestions?.length || 0)
+                        : (trainingData?.[tab.key]?.length || 0)
+                    }</span>
                 </button>
               );
             })}
           </div>
         </div>
-        
+
         {/* Search */}
         <div className="md:w-72 w-full relative z-10">
-           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500">
-             <Search size={18} />
-           </div>
-           <input 
-             type="text" 
-             value={searchQuery}
-             onChange={e => setSearchQuery(e.target.value)}
-             placeholder={`Tìm ${tabs.find(t => t.key === activeTab)?.label.toLowerCase()}...`}
-             className="w-full h-full min-h-[60px] pl-12 pr-4 bg-white border border-slate-100 rounded-[20px] shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 font-medium text-[13px] transition-all"
-            />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500">
+            <Search size={18} />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={`Tìm ${tabs.find(t => t.key === activeTab)?.label.toLowerCase()}...`}
+            className="w-full h-full min-h-[60px] pl-12 pr-4 bg-white border border-slate-100 rounded-[20px] shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 font-medium text-[13px] transition-all"
+          />
         </div>
       </div>
       {/* Content */}
@@ -106,38 +104,39 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
             {filtered.map(m => {
               const isLocked = !!m.isLocked;
               return (
-              <div key={m.id} className={`px-4 md:px-6 py-5 flex flex-col md:flex-row md:items-center justify-between group transition-colors gap-4 ${isLocked ? 'bg-slate-50 opacity-70' : 'hover:bg-purple-50/30 cursor-pointer'}`} onClick={() => {
-                if (isLocked) window.cmsAlert('Video này hiện đang bị khóa bởi Quản trị viên!', 'warning');
-                else window.open(m.url, '_blank');
-              }}>
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform ${isLocked ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-600 group-hover:scale-110'}`}>
-                    {isLocked ? <Lock size={20} /> : <PlayCircle size={24} />}
+                <div key={m.id} className={`px-4 md:px-6 py-5 flex flex-col md:flex-row md:items-center justify-between group transition-colors gap-4 ${isLocked ? 'bg-slate-50 opacity-70' : 'hover:bg-purple-50/30 cursor-pointer'}`} onClick={() => {
+                  if (isLocked) window.cmsAlert('Video này hiện đang bị khóa bởi Quản trị viên!', 'warning');
+                  else window.open(m.url, '_blank');
+                }}>
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform ${isLocked ? 'bg-slate-200 text-slate-500' : 'bg-purple-100 text-purple-600 group-hover:scale-110'}`}>
+                      {isLocked ? <Lock size={20} /> : <PlayCircle size={24} />}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-extrabold text-[15px] text-slate-800 truncate flex items-center gap-2 mb-1">
+                        {m.title}
+                        {isLocked && <span className="bg-slate-200 text-slate-600 px-2 py-0.5 text-xs cms-min-text-xs uppercase font-bold tracking-wider rounded border border-slate-300">Khóa</span>}
+                      </h4>
+                      <p className="text-xs text-slate-500 line-clamp-1">{htmlToPlainText(m.desc) || ''}</p>
+                      <p className="text-xs font-medium text-slate-400 mt-2 flex items-center gap-4">
+                        <span className="flex items-center gap-1.5"><Calendar size={12} /> {formatVNDateTime(m.createdAt)}</span>
+                        <span className="flex items-center gap-1.5"><Clock size={12} /> {m.duration || '00:00'}</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                     <h4 className="font-extrabold text-[15px] text-slate-800 truncate flex items-center gap-2 mb-1">
-                       {m.title}
-                       {isLocked && <span className="bg-slate-200 text-slate-600 px-2 py-0.5 text-xs cms-min-text-xs uppercase font-bold tracking-wider rounded border border-slate-300">Khóa</span>}
-                     </h4>
-                     <p className="text-xs text-slate-500 line-clamp-1">{htmlToPlainText(m.desc) || ''}</p>
-                     <p className="text-xs font-medium text-slate-400 mt-2 flex items-center gap-4">
-                       <span className="flex items-center gap-1.5"><Calendar size={12} /> {formatVNDateTime(m.createdAt)}</span>
-                       <span className="flex items-center gap-1.5"><Clock size={12} /> {m.duration || '00:00'}</span>
-                     </p>
+                  <div className="flex-shrink-0 pt-2 md:pt-0">
+                    <button className={`w-full md:w-auto px-5 py-2.5 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-2 ${isLocked ? 'bg-slate-100 text-slate-500' : 'bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white'}`}>
+                      {isLocked ? <Lock size={14} /> : <PlayCircle size={15} />}
+                      {isLocked ? 'Đã khóa' : 'Học ngay'}
+                    </button>
                   </div>
                 </div>
-                <div className="flex-shrink-0 pt-2 md:pt-0">
-                  <button className={`w-full md:w-auto px-5 py-2.5 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-2 ${isLocked ? 'bg-slate-100 text-slate-500' : 'bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white'}`}>
-                    {isLocked ? <Lock size={14} /> : <PlayCircle size={15} />}
-                    {isLocked ? 'Đã khóa' : 'Học ngay'}
-                  </button>
-                </div>
-              </div>
-            )})}
+              )
+            })}
             {filtered.length === 0 && (
               <div className="text-center py-16 text-slate-400">
                 <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-3">
-                   <Video size={28} className="text-slate-300" />
+                  <Video size={28} className="text-slate-300" />
                 </div>
                 <p className="text-sm font-medium">Chưa có video bài giảng nào.</p>
               </div>
@@ -192,53 +191,75 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
       {activeTab === 'guides' && (
         <div className="space-y-4">
           {filtered.map(m => {
+            const hasDownloadUrl = !!(m.url && m.url.trim());
+            const isDynamicAssignment = !!m.isDynamicAssignment;
+            const actionButtons = (
+              <div className="flex w-full max-w-[360px] flex-col gap-2 sm:flex-row sm:justify-end lg:w-auto">
+                {hasDownloadUrl ? (
+                  <a
+                    href={m.url.startsWith('http') ? m.url : `https://${m.url}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200 sm:min-w-[130px]"
+                  >
+                    <Download size={14} /> Tải đề bài
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => window.cmsAlert('Giảng viên chưa đính kèm file đề bài cho bài tập này.', 'info')}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-400 transition hover:bg-slate-200 sm:min-w-[130px]"
+                  >
+                    <Download size={14} /> Tải đề bài
+                  </button>
+                )}
+
+                {isDynamicAssignment ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectAssignment && onSelectAssignment(m.rawAssignment)}
+                    className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition sm:min-w-[130px] ${m.rawAssignment.mySubmission ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-500/25'}`}
+                  >
+                    <FileUp size={14} /> {m.rawAssignment.mySubmission ? 'Nộp lại bài' : 'Nộp bài'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs font-bold text-blue-600 transition hover:bg-blue-100 sm:min-w-[130px]"
+                  >
+                    <FileUp size={14} /> Nộp bài
+                  </button>
+                )}
+              </div>
+            );
+
             return (
-              <div key={m.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md border-slate-100`}>
-                <div className="px-4 md:px-6 py-5">
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                    <div className="flex items-start gap-4 min-w-0">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-100 text-blue-600 text-2xl`}>
+              <div key={m.id} className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all hover:shadow-md">
+                <div className="px-4 py-5 md:px-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-2xl text-blue-600">
                         {m.icon || '📝'}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                           <h4 className="font-bold text-base text-slate-800">{m.title}</h4>
+                          <h4 className="text-base font-bold text-slate-800">{m.title}</h4>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed whitespace-pre-wrap">
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500 whitespace-pre-wrap break-words">
                           {htmlToPlainText(m.desc) || ''}
                         </p>
-                        
-                        <div className="flex items-center gap-4 mt-3 flex-wrap">
-                          <span className="text-xs font-bold text-slate-400 flex items-center gap-1">📅 Ngày tạo: {formatVNDateTime(m.createdAt)}</span>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-4">
+                          <span className="flex items-center gap-1 text-xs font-bold text-slate-400">📅 Ngày tạo: {formatVNDateTime(m.createdAt)}</span>
                           {m.isDynamicAssignment && m.rawAssignment?.deadline && (
-                            <span className="text-xs font-bold text-orange-500 flex items-center gap-1">⏰ Hạn nộp: {new Date(m.rawAssignment.deadline).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric'})}</span>
+                            <span className="flex items-center gap-1 text-xs font-bold text-orange-500">⏰ Hạn nộp: {new Date(m.rawAssignment.deadline).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
                           )}
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-row md:flex-col gap-2 flex-shrink-0 mt-2 md:mt-0">
-                      {m.url && m.url.trim() ? (
-                        <a href={m.url.startsWith('http') ? m.url : `https://${m.url}`} target="_blank" rel="noreferrer" className="flex-1 justify-center text-xs font-bold text-slate-600 bg-slate-100 px-4 py-2 rounded-xl hover:bg-slate-200 transition flex items-center gap-2">
-                          <Download size={14} /> Tải đề bài
-                        </a>
-                      ) : (
-                        <button type="button" onClick={() => window.cmsAlert("Giảng viên chưa đính kèm file đề bài cho bài tập này.", "info")} className="flex-1 justify-center text-xs font-bold text-gray-400 bg-gray-50 px-4 py-2 rounded-xl hover:bg-gray-100 transition flex items-center gap-2">
-                          <Download size={14} /> Tải đề bài
-                        </button>
-                      )}
-                      
-                      {m.isDynamicAssignment ? (
-                        <button 
-                          onClick={() => onSelectAssignment && onSelectAssignment(m.rawAssignment)}
-                          className={`flex-1 justify-center text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm ${m.rawAssignment.mySubmission ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-red-600 text-white hover:bg-red-700'}`}>
-                          <FileUp size={14} /> {m.rawAssignment.mySubmission ? 'Nộp lại bài' : 'Nộp bài'}
-                        </button>
-                      ) : (
-                        <button className={`flex-1 justify-center text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-sm bg-blue-50 text-blue-600 hover:bg-blue-100`}>
-                          <FileUp size={14} /> Nộp bài
-                        </button>
-                      )}
+
+                    <div className="w-full lg:w-auto lg:flex-shrink-0">
+                      {actionButtons}
                     </div>
                   </div>
                 </div>
@@ -265,7 +286,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                     <span className="text-xs cms-min-text-xs font-black px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{q.type === 'essay' ? 'Tự luận' : 'Trắc nghiệm'}</span>
                   </div>
                   <h4 className="font-bold text-sm text-slate-800 leading-relaxed mb-3">{q.q}</h4>
-                  
+
                   {q.type === 'multiple' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {(q.options || []).map((opt, i) => (
