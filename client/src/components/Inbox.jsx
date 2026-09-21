@@ -1679,8 +1679,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!activeConvId || !messagesEndRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' });
+    }, 40);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeConvId, messages.length]);
 
   useEffect(() => {
     setPeerTyping(false);
