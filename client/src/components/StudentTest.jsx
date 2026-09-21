@@ -1492,12 +1492,12 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                               onDragLeave={() => setIsDragging(false)}
                               onDrop={handleDrop}
                               onClick={() => fileRef.current?.click()}
-                              className={`cursor-pointer rounded-2xl border-2 border-dashed py-12 text-center transition ${isDragging
+                              className={`cursor-pointer rounded-2xl border-2 border-dashed py-10 text-center transition ${isDragging
                                 ? 'border-indigo-400 bg-indigo-50'
                                 : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
                                 }`}
                             >
-                              <Upload size={32} className="mx-auto text-slate-300" />
+                              <Upload size={28} className="mx-auto text-slate-300" />
                               <p className="mt-2 text-sm text-slate-600">
                                 Kéo thả hoặc <span className="font-bold text-indigo-600">chọn file</span>
                               </p>
@@ -1505,14 +1505,31 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                             </div>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          disabled={tuLuanSubmitting || !uploadFile}
-                          onClick={trySubmitTuLuan}
-                          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 py-4 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : uploadFile ? 'NỘP BÀI THỰC HÀNH' : 'CHỌN FILE ĐỂ NỘP BÀI'}
-                        </button>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <a
+                            href={meta.hasPracticeFile ? buildMediaDownloadUrl(meta.practiceFiles[0].fileUrl, meta.practiceFiles[0].fileName) : '#'}
+                            onClick={(e) => {
+                              if (!meta.hasPracticeFile) {
+                                e.preventDefault();
+                              }
+                            }}
+                            target={meta.hasPracticeFile ? '_blank' : undefined}
+                            rel={meta.hasPracticeFile ? 'noreferrer' : undefined}
+                            className={`flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 ${!meta.hasPracticeFile ? 'cursor-not-allowed opacity-50' : ''}`}
+                          >
+                            <Download size={18} /> Tải đề bài
+                          </a>
+
+                          <button
+                            type="button"
+                            disabled={tuLuanSubmitting || !uploadFile}
+                            onClick={trySubmitTuLuan}
+                            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : uploadFile ? 'NỘP BÀI' : 'CHỌN FILE'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
