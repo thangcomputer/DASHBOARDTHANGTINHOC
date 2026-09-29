@@ -3,6 +3,8 @@ import api from '../services/api';
 import { isTeacherActive, isTeacherPending } from '../constants/teacherStatus';
 import { loadState } from './dataStorage';
 import { expandStudentsForTeacher, sumClientPaidTuition } from '../utils/enrollments';
+import { mapStudent } from '../lib/entityMaps';
+import { getTodayStudentAgeReferenceDate } from '../utils/studentAge';
 
 /**
  * Admin/teacher student-teacher CRUD, exam results, and related helpers for DataProvider.
@@ -151,11 +153,33 @@ export function useDataAdminCrud({
 
   const updateStudent = useCallback(async (studentId, updates, options = {}) => {
     const previousStudents = [...students];
-    const { courseName, ...rest } = updates;
-    const payload = courseName ? { ...rest, courseName } : rest;
+    const {
+      courseName,
+      ageAtEntry: _ageAtEntry,
+      ageWasEdited,
+      ...rest
+    } = updates;
+    const payload = {
+      ...(courseName ? { ...rest, courseName } : rest),
+      ...(ageWasEdited === true ? { ageWasEdited: true } : {}),
+    };
     setStudents(prev => prev.map(s => {
       if (String(s.id) !== String(studentId) && String(s._id) !== String(studentId)) return s;
-      const next = { ...s, ...rest };
+      const nextData = { ...s, ...rest };
+      if (rest.age !== undefined) {
+        const previousAge = s.ageAtEntry ?? s.age;
+        const nextAge = rest.age === '' || rest.age == null ? null : Number(rest.age);
+        const ageChanged = ageWasEdited === true || (nextAge == null
+          ? previousAge != null
+          : Number.isFinite(nextAge) && nextAge !== Number(previousAge));
+        nextData.ageAtEntry = nextAge;
+        nextData.ageAsOf = nextAge == null
+          ? undefined
+          : ageChanged
+            ? getTodayStudentAgeReferenceDate()
+            : s.ageAsOf;
+      }
+      const next = mapStudent(nextData);
       if (courseName && Array.isArray(s.enrollments)) {
         next.enrollments = s.enrollments.map((e) =>
           e.courseName === courseName ? { ...e, ...rest } : e

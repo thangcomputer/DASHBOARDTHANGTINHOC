@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const Student = require('../models/Student');
+const { getTodayAgeReferenceDate } = require('../utils/studentAge');
 const FileAsset = require('../models/FileAsset');
 const Invoice = require('../models/Invoice');
 const Schedule = require('../models/Schedule');
@@ -785,6 +786,7 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
         studentCode: _omitClientCode,
         legacyStudentCodes: _omitLegacy,
         reservedStudentCode: _omitReserved,
+        ageAsOf: _omitClientAgeAsOf,
         branchHint,
         teacherHint,
         ...safe
@@ -827,7 +829,9 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
         phone: phone || zalo,
         zalo: zalo || phone,
         gender,
-        ...(Number.isFinite(ageNum) && ageNum >= 10 && ageNum <= 80 ? { age: ageNum } : {}),
+        ...(Number.isFinite(ageNum) && ageNum >= 10 && ageNum <= 80
+          ? { age: ageNum, ageAsOf: getTodayAgeReferenceDate() }
+          : {}),
         course: String(s.course || '').trim() || 'CHƯA XÁC ĐỊNH',
         price,
         totalSessions,
@@ -981,6 +985,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
       throw dupErr;
     }
 
+    delete req.body.ageAsOf;
     const student = new Student(req.body);
     // Server is sole authority for business codes — ignore client studentCode / legacy arrays
     delete student.legacyStudentCodes;
@@ -1223,6 +1228,9 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     delete safeBody.knownDeviceCount;
     delete safeBody.accountLocked;
     delete safeBody.deviceFingerprint;
+    delete safeBody.ageAsOf;
+    const ageWasEdited = safeBody.ageWasEdited === true;
+    delete safeBody.ageWasEdited;
     let pendingTeacherAlert;
     if (Object.prototype.hasOwnProperty.call(safeBody, 'teacherAlert')) {
       pendingTeacherAlert = sanitizeTeacherAlert(safeBody.teacherAlert);
@@ -1230,10 +1238,22 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     }
     const before = await Student.findById(req.params.id)
       .select(
-        'studentExamUnlocked examApproved name examProgress phone email course status price '
+        'studentExamUnlocked examApproved name examProgress phone email course status price age '
         + 'totalSessions completedSessions remainingSessions teacherId teacherName linkHoc address',
       )
       .lean();
+
+    if (Object.prototype.hasOwnProperty.call(safeBody, 'age')) {
+      const nextAge = safeBody.age === '' || safeBody.age == null ? null : Number(safeBody.age);
+      if (nextAge == null) {
+        safeBody.ageAsOf = null;
+      } else if (
+        Number.isFinite(nextAge)
+        && (ageWasEdited || nextAge !== Number(before?.age))
+      ) {
+        safeBody.ageAsOf = getTodayAgeReferenceDate();
+      }
+    }
 
     // Nếu là Teacher, chỉ cho phép cập nhật thông tin điểm danh, thành tích
     const enrollmentCourse = safeBody.courseName;

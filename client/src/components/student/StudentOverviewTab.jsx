@@ -368,7 +368,7 @@ export default function StudentOverviewTab({
                   >
                     <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/50 blur-2xl transition-transform duration-500 group-hover:scale-125" aria-hidden="true" />
                     <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-3 w-full min-w-0 relative z-10">
-                      <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
+                      <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
                         <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/50 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" aria-hidden="true" />
                         <span className="absolute bottom-1 left-2 h-1.5 w-5 rounded-full bg-white/40 blur-[2px]" aria-hidden="true" />
                         <item.icon size={25} strokeWidth={2.4} className="relative drop-shadow-md" aria-hidden="true" />

@@ -1,3 +1,5 @@
+import { getCurrentStudentAge } from './studentAge';
+
 /**
  * Schema cột Excel học viên — khớp form "Thêm học viên mới".
  * Dùng chung Xuất + Nhập + file mẫu. Không đụng question-bank / invoice.
@@ -133,7 +135,7 @@ export function studentToExcelRow(s = {}) {
   return {
     'Họ tên': s.name || '',
     'Giới tính': genderLabel(s.gender),
-    'Tuổi': s.age ?? '',
+    'Tuổi': getCurrentStudentAge(s) ?? '',
     'Số điện thoại': s.phone || '',
     'Zalo': s.zalo || s.phone || '',
     'Chi nhánh': branchHint,

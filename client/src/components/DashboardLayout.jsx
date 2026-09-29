@@ -232,6 +232,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [ratingDetailError, setRatingDetailError] = useState('');
   const [adminQuickPopup, setAdminQuickPopup] = useState(null);
   const [lmsPlayerOpen, setLmsPlayerOpen] = useState(() => isLmsPlayerOpen());
+  const [lmsPlayerOpenedAt, setLmsPlayerOpenedAt] = useState(null);
   const { socket } = useSocket() || {};
   const { students, teachers, schedules, isRefetching, triggerBackgroundSync, notifications: allNotifications, markNotificationRead, getConversations } = useData();
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
@@ -1318,17 +1319,34 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   }).sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
 
 
-  const unreadCount = myNotifications.filter(n => !n.read).length;
+  const lmsUnreadMessageBaselineRef = React.useRef(new Map());
+  const unreadCount = myNotifications.filter((notification) => !notification.read).length;
   const unreadMessageCount = React.useMemo(() => {
     if (!myId || typeof getConversations !== 'function') return 0;
-    try {
-      return (getConversations(myId) || []).reduce((sum, conversation) => (
-        sum + (Number(conversation?.unread) || 0)
-      ), 0);
-    } catch {
-      return 0;
-    }
+    return (getConversations(myId) || []).reduce((sum, conversation) => (
+      sum + (Number(conversation?.unread) || 0)
+    ), 0);
   }, [getConversations, myId]);
+  const newUnreadNotificationCount = React.useMemo(() => {
+    if (!lmsPlayerOpen || !lmsPlayerOpenedAt) return 0;
+    return myNotifications.filter((notification) => {
+      if (notification.read) return false;
+      const timestamp = new Date(
+        notification.time || notification.createdAt || notification.timestamp || 0,
+      ).getTime();
+      return Number.isFinite(timestamp) && timestamp >= lmsPlayerOpenedAt;
+    }).length;
+  }, [lmsPlayerOpen, lmsPlayerOpenedAt, myNotifications]);
+  const newUnreadMessageCount = React.useMemo(() => {
+    if (!lmsPlayerOpen || !lmsPlayerOpenedAt || !myId || typeof getConversations !== 'function') return 0;
+    return (getConversations(myId) || []).reduce((sum, conversation) => {
+      const timestamp = new Date(conversation?.lastTime || conversation?.updatedAt || 0).getTime();
+      if (!Number.isFinite(timestamp) || timestamp < lmsPlayerOpenedAt) return sum;
+      const currentUnread = Number(conversation?.unread) || 0;
+      const baselineUnread = lmsUnreadMessageBaselineRef.current.get(String(conversation?.id || '')) || 0;
+      return sum + Math.max(0, currentUnread - baselineUnread);
+    }, 0);
+  }, [getConversations, lmsPlayerOpen, lmsPlayerOpenedAt, myId, unreadMessageCount]);
   const [lmsAttentionVisible, setLmsAttentionVisible] = React.useState(true);
   const inboxPath = role === 'student'
     ? '/student/inbox'
@@ -1338,21 +1356,37 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   React.useEffect(() => {
     const onLmsPlayerChange = (event) => {
-      setLmsPlayerOpen(Boolean(event?.detail?.open));
+      const open = Boolean(event?.detail?.open);
+      if (open) {
+        const openedAt = Date.now();
+        const baseline = new Map();
+        if (myId && typeof getConversations === 'function') {
+          (getConversations(myId) || []).forEach((conversation) => {
+            if (!conversation?.id) return;
+            baseline.set(String(conversation.id), Number(conversation.unread) || 0);
+          });
+        }
+        lmsUnreadMessageBaselineRef.current = baseline;
+        setLmsPlayerOpenedAt(openedAt);
+      } else {
+        lmsUnreadMessageBaselineRef.current = new Map();
+        setLmsPlayerOpenedAt(null);
+      }
+      setLmsPlayerOpen(open);
     };
     window.addEventListener(LMS_PLAYER_OPEN_EVENT, onLmsPlayerChange);
     return () => window.removeEventListener(LMS_PLAYER_OPEN_EVENT, onLmsPlayerChange);
-  }, []);
+  }, [getConversations, myId]);
 
   React.useEffect(() => {
-    if (!lmsPlayerOpen || (unreadCount <= 0 && unreadMessageCount <= 0)) {
+    if (!lmsPlayerOpen || (newUnreadNotificationCount <= 0 && newUnreadMessageCount <= 0)) {
       setLmsAttentionVisible(false);
       return undefined;
     }
     setLmsAttentionVisible(true);
     const timer = window.setTimeout(() => setLmsAttentionVisible(false), 10000);
     return () => window.clearTimeout(timer);
-  }, [lmsPlayerOpen, unreadCount, unreadMessageCount]);
+  }, [lmsPlayerOpen, newUnreadNotificationCount, newUnreadMessageCount]);
 
   // GV offline lúc đạt mốc → hiện popup khi vào lại (notif chưa xem + chưa celeb)
   useEffect(() => {
@@ -2195,31 +2229,47 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
       {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
       <FloatingMessenger session={session} role={role} />
-      {lmsPlayerOpen && lmsAttentionVisible && (unreadCount > 0 || unreadMessageCount > 0) ? (
+      {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
         <div className="cms-lms-attention" role="status" aria-live="polite">
           <span className="cms-lms-attention__label">Trong LMS</span>
-          {unreadCount > 0 ? (
+          {newUnreadNotificationCount > 0 ? (
             <button
               type="button"
               className="cms-lms-attention__item cms-lms-attention__item--notification"
               onClick={() => { setShowNotif(true); setNotifLimit(5); }}
-              aria-label={`${unreadCount} thông báo chưa đọc`}
+              aria-label={`${newUnreadNotificationCount} thông báo mới chưa đọc`}
             >
               <Bell size={15} aria-hidden="true" />
               <span>Thông báo</span>
-              <strong>{unreadCount > 99 ? '99+' : unreadCount}</strong>
+              <strong>{newUnreadNotificationCount > 99 ? '99+' : newUnreadNotificationCount}</strong>
             </button>
           ) : null}
-          {unreadMessageCount > 0 ? (
+          {newUnreadMessageCount > 0 ? (
             <button
               type="button"
               className="cms-lms-attention__item cms-lms-attention__item--message"
-              onClick={() => navigate(inboxPath)}
-              aria-label={`${unreadMessageCount} tin nhắn chưa đọc`}
+              onClick={() => {
+                const latestUnreadDirectConversation = (getConversations(myId) || [])
+                  .filter((conversation) => (
+                    !conversation?.isGroup
+                    && conversation?.user?.id != null
+                    && Number(conversation?.unread) > 0
+                  ))
+                  .sort((a, b) => {
+                    const timeA = new Date(a.lastTime || a.updatedAt || 0).getTime();
+                    const timeB = new Date(b.lastTime || b.updatedAt || 0).getTime();
+                    return (Number.isFinite(timeB) ? timeB : 0) - (Number.isFinite(timeA) ? timeA : 0);
+                  })[0];
+                const peerId = latestUnreadDirectConversation?.user?.id;
+                navigate(inboxPath, {
+                  state: peerId != null ? { openPeerId: String(peerId) } : null,
+                });
+              }}
+              aria-label={`${newUnreadMessageCount} tin nhắn mới chưa đọc`}
             >
               <MessageCircle size={15} aria-hidden="true" />
               <span>Tin nhắn</span>
-              <strong>{unreadMessageCount > 99 ? '99+' : unreadMessageCount}</strong>
+              <strong>{newUnreadMessageCount > 99 ? '99+' : newUnreadMessageCount}</strong>
             </button>
           ) : null}
           <button

@@ -335,7 +335,7 @@ async function fetchInlineImageFromUrl(fileUrl) {
     );
     const isSameOrigin = parsed.hostname.toLowerCase() === baseUrl.hostname.toLowerCase()
       && (parsed.port || (parsed.protocol === 'https:' ? '443' : '80'))
-        === (baseUrl.port || (baseUrl.protocol === 'https:' ? '443' : '80'));
+      === (baseUrl.port || (baseUrl.protocol === 'https:' ? '443' : '80'));
     if (isSameOrigin && !parsed.pathname.startsWith('/uploads/messages/')) return null;
     if (!isSameOrigin && !configuredHosts.includes(parsed.hostname.toLowerCase())) return null;
     if (!isSameOrigin && parsed.protocol !== 'https:') return null;
@@ -734,7 +734,7 @@ function lmsFaqReply(userRole, userText) {
         '2. **Lịch học**: xem buổi học, giáo viên, điểm danh và lịch sử.',
         '3. **Tài liệu/Video**: học video, mở tài liệu và phần mềm học tập.',
         '4. **Bài tập & điểm**: làm bài được giao và xem kết quả.',
-        '5. **Phòng thi/MOS-IC3**: vào thi hoặc luyện chứng chỉ.',
+        '5. **Phòng thi/MOS-IC3**: vào thi hoặc luyện chứng nhận.',
         '6. **Đánh giá giáo viên**: đánh giá sau buổi học đủ điều kiện.',
         '7. **Hộp thư**: nhắn giáo viên, giáo vụ hoặc hỗ trợ trực tiếp.',
         '⟦go:/student|Mở Tổng quan⟧ · ⟦go:/student#schedule|Mở Lịch học⟧ · ⟦go:/student#materials-videos|Mở Video học⟧',
@@ -868,7 +868,7 @@ function lmsFaqReply(userRole, userText) {
   if (student && /(điểm thi|bảng điểm|kết quả thi|xem điểm của tôi)/i.test(t)) {
     return [
       'Hướng dẫn **Điểm thi**:',
-      '**Bước 1:** Mở **Thi & chứng chỉ → Điểm thi**.',
+      '**Bước 1:** Mở **Thi & chứng nhận → Điểm thi**.',
       '**Bước 2:** Xem bảng điểm tổng hợp theo từng môn: trắc nghiệm, tự luận/thực hành và kết quả.',
       '**Bước 3:** Trạng thái **CHƯA THI** hoặc **Chưa làm** nghĩa là chưa có kết quả được ghi nhận, không phải điểm 0.',
       '**Bước 4:** Nếu đã thi nhưng chưa cập nhật, gửi mã môn và thời điểm thi cho giáo viên/giáo vụ kiểm tra.',
@@ -878,7 +878,7 @@ function lmsFaqReply(userRole, userText) {
   if (student && /(phòng thi|trắc nghiệm buổi học|bài kiểm tra|thi chứng nhận môn học)/i.test(t)) {
     return [
       'Hướng dẫn **Phòng thi**:',
-      '**Bước 1:** Mở **Thi & chứng chỉ → Phòng thi**.',
+      '**Bước 1:** Mở **Thi & chứng nhận → Phòng thi**.',
       '**Bước 2:** Chọn **Trắc nghiệm buổi học** để xem bài giáo viên đã giao.',
       '**Bước 3:** Chỉ bấm bắt đầu khi đã sẵn sàng; đọc thời lượng và quy định trước khi làm.',
       '**Bước 4:** Với bài thi chứng nhận môn học, làm bài theo hướng dẫn và nộp trước khi hết giờ.',
@@ -886,10 +886,10 @@ function lmsFaqReply(userRole, userText) {
       '⟦go:/student/exam|Mở Phòng thi⟧',
     ].join('\n');
   }
-  if (student && /(mos|ic3|ôn thi|luyện chứng chỉ|khóa ôn thi)/i.test(t)) {
+  if (student && /(mos|ic3|ôn thi|luyện chứng nhận|khóa ôn thi)/i.test(t)) {
     return [
       'Hướng dẫn **Ôn thi MOS/IC3**:',
-      '**Bước 1:** Mở **Thi & chứng chỉ → MOS / IC3**.',
+      '**Bước 1:** Mở **Thi & chứng nhận → MOS / IC3**.',
       '**Bước 2:** Chọn khóa/cấp độ được cấp để xem bài luyện và tiến độ.',
       '**Bước 3:** Làm bài luyện, xem kết quả hoặc lịch sử lần làm nếu khóa có hỗ trợ.',
       '*Nếu ghi “Chưa có khóa ôn thi cho tài khoản này”, Admin chưa liên kết khóa MOS/IC3 hoặc chưa cấp quyền thủ công; hãy liên hệ trung tâm để được kiểm tra.*',
@@ -926,11 +926,11 @@ function lmsFaqReply(userRole, userText) {
       '⟦go:/student#evaluation|Mở Đánh giá GV⟧',
     ].join('\n');
   }
-  if (student && /(trung tâm|chi nhánh|nhân sự|mạng xã hội|dịch vụ đào tạo|địa điểm thi|chứng chỉ)/i.test(t)) {
+  if (student && /(trung tâm|chi nhánh|nhân sự|mạng xã hội|dịch vụ đào tạo|địa điểm thi|chứng nhận)/i.test(t)) {
     return [
       'Hướng dẫn **Thông tin trung tâm**:',
       '**Bước 1:** Mở menu **Trung tâm**.',
-      '**Bước 2:** Chọn **Tổng quan**, **Nhân sự**, **Chi nhánh**, **Mạng xã hội**, **Dịch vụ đào tạo**, **Địa điểm thi** hoặc **Chứng chỉ**.',
+      '**Bước 2:** Chọn **Tổng quan**, **Nhân sự**, **Chi nhánh**, **Mạng xã hội**, **Dịch vụ đào tạo**, **Địa điểm thi** hoặc **chứng nhận**.',
       '**Bước 3:** Xem nội dung được trung tâm công bố ở từng tab.',
       '*Nếu hiển thị “Nội dung đang được cập nhật”, dữ liệu tab đó chưa được trung tâm phát hành hoặc đang được cập nhật; không phải lỗi thao tác của bạn.*',
       '⟦go:/student/center-info|Mở Trung tâm⟧',
@@ -974,9 +974,9 @@ function lmsFaqReply(userRole, userText) {
       '⟦go:/student#materials-assignments|Mở Bài tập⟧ · ⟦go:/student#exam-scores|Mở Điểm thi⟧',
     ].join('\n');
   }
-  if (student && /(phòng thi|vào thi|mos|ic3|luyện thi|chứng chỉ)/i.test(t)) {
+  if (student && /(phòng thi|vào thi|mos|ic3|luyện thi|chứng nhận)/i.test(t)) {
     return [
-      'Hướng dẫn **phòng thi và luyện chứng chỉ**:',
+      'Hướng dẫn **phòng thi và luyện chứng nhận**:',
       '**Bước 1:** Chọn **Phòng thi** để vào bài thi được cấp quyền.',
       '**Bước 2:** Chọn **MOS/IC3** để luyện theo cấp độ và xem lịch sử kết quả.',
       '**Bước 3:** Đọc kỹ quy định trước khi bắt đầu và nộp bài đúng thời gian.',
@@ -1667,9 +1667,9 @@ function buildLocalHandoffSummary({ history, user, reason }) {
   const role = getMessagingRole(user) === 'teacher' ? 'Teacher' : 'Student';
   const sessionMsgs = currentSessionMessages(history);
   const lines = sessionMsgs.slice(-20).map((m) => {
-      const who = String(m.senderId) === AI_PEER_ID ? 'AI' : 'User';
-      return `${who}: ${String(m.content || '').slice(0, 180)}`;
-    });
+    const who = String(m.senderId) === AI_PEER_ID ? 'AI' : 'User';
+    return `${who}: ${String(m.content || '').slice(0, 180)}`;
+  });
   return [
     `AI SUMMARY`,
     `Người dùng: ${role} (${user.name || user.id || ''})`,

@@ -21,6 +21,7 @@ import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAct
 import ZaloIcon from './ZaloIcon';
 import { formatStudentGradeNote } from '../utils/studentActivityLogs';
 import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
+import { mapStudent } from '../lib/entityMaps';
 
 const fmt = (n) => n ? Number(n).toLocaleString('vi-VN') + 'đ' : '0đ';
 const fmtTuition = (n) => {
@@ -496,24 +497,37 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     if (!studentId) return;
     setLoading(true);
     api.students.getFullDetail(studentId)
-      .then((res) => { if (res.success) setData(res.data); })
+      .then((res) => {
+        if (res.success) {
+          setData({
+            ...res.data,
+            student: mapStudent(res.data.student),
+          });
+        }
+      })
       .finally(() => setLoading(false));
   };
 
   const handleSaveEditProfile = async () => {
     const sid = data?.student?._id || data?.student?.id || studentId;
-    if (!sid) return;
+    const student = data?.student;
+    if (!sid || !student) return;
     if (!String(editForm.name || '').trim() || !String(editForm.phone || '').trim()) {
       toast.error('Vui lòng nhập họ tên và số điện thoại');
       return;
     }
+    const ageWasEdited = String(editForm.age ?? '')
+      !== (student.age == null || student.age === '' ? '' : String(student.age));
     const payload = {
       name: String(editForm.name || '').trim().toUpperCase(),
       gender: editForm.gender || 'male',
       email: String(editForm.email || '').trim().toLowerCase(),
       phone: String(editForm.phone || '').trim(),
       zalo: String(editForm.zalo || '').trim(),
-      age: editForm.age === '' ? '' : Number(String(editForm.age).replace(/\D/g, '') || 0),
+      age: ageWasEdited
+        ? (editForm.age === '' ? '' : Number(String(editForm.age).replace(/\D/g, '') || 0))
+        : (student.ageAtEntry ?? student.age),
+      ageWasEdited,
     };
     if (String(editForm.password || '').trim()) {
       payload.password = String(editForm.password).trim();
@@ -817,7 +831,10 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     api.students.getFullDetail(studentId)
       .then(res => {
         if (res.success) {
-          setData(res.data);
+          setData({
+            ...res.data,
+            student: mapStudent(res.data.student),
+          });
         }
       })
       .catch(err => void 0)

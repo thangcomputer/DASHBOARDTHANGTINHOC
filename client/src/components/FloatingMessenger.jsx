@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
-  ImagePlus, Link2, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
+  ImagePlus, Paperclip, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
   Copy, Scaling, Calendar,
   Smile, Users,
 } from 'lucide-react';
@@ -482,7 +482,7 @@ function ChatHead({ tab, unread = 0, online = false, onOpen, onClose }) {
 }
 
 function ChatWindow({
-  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onSendLink, onRecall, onReact, onlineUsers = [], isSuper = false,
+  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onRecall, onReact, onlineUsers = [], isSuper = false,
   peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
   canShowEscalate = false, feedbackPhase = '', supportOnline = false,
   onEscalate, onResetAi, onAgree, onDisagree, onMoreYes, onMoreNo,
@@ -505,6 +505,7 @@ function ChatWindow({
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const imageRef = useRef(null);
+  const attachmentRef = useRef(null);
   const typingTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
   const [winSize, setWinSize] = useState(readFmSize);
@@ -760,6 +761,24 @@ function ChatWindow({
     inputRef.current?.focus();
   };
 
+  const stageAttachment = (file) => {
+    if (!file || uploading || sending) return;
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error('Tệp quá lớn (tối đa 5MB)');
+      return;
+    }
+    if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
+    const url = URL.createObjectURL(file);
+    pendingUrlRef.current = url;
+    setPendingImage({
+      file,
+      url,
+      name: file.name,
+      isImage: file.type.startsWith('image/'),
+    });
+    inputRef.current?.focus();
+  };
+
   const submit = async (e) => {
     e?.preventDefault?.();
     const body = text.trim();
@@ -840,14 +859,6 @@ function ChatWindow({
     e.target.value = '';
     if (!file) return;
     stageImage(file);
-  };
-
-  const insertLink = () => {
-    const url = window.prompt('Dán link (https://…)');
-    if (!url?.trim()) return;
-    let link = url.trim();
-    if (!/^https?:\/\//i.test(link)) link = `https://${link}`;
-    onSendLink(tab, link);
   };
 
   const handlePaste = (e) => {
@@ -1208,10 +1219,18 @@ function ChatWindow({
       <form className="cms-fm-window__foot" onSubmit={submit}>
         {pendingImage ? (
           <div className="cms-fm-pending">
-            <img src={pendingImage.url} alt="" className="cms-fm-pending__thumb" />
+            {pendingImage.isImage === false ? (
+              <span className="cms-fm-pending__thumb flex items-center justify-center bg-slate-100 text-slate-500">
+                <Paperclip size={16} aria-hidden="true" />
+              </span>
+            ) : (
+              <img src={pendingImage.url} alt="" className="cms-fm-pending__thumb" />
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold text-slate-800 truncate">
-                {pendingImage.existingFileUrl ? 'Ảnh kèm câu hỏi' : 'Ảnh đã chọn'}
+                {pendingImage.existingFileUrl
+                  ? 'Ảnh kèm câu hỏi'
+                  : pendingImage.isImage === false ? 'Tệp đã chọn' : 'Ảnh đã chọn'}
               </p>
               <p className="text-[10px] text-slate-500 truncate">{pendingImage.name || 'ảnh'}</p>
             </div>
@@ -1231,6 +1250,18 @@ function ChatWindow({
           {(canAttachImage || imageBlocked) ? (
             <>
               <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
+              {!isAiPeer ? (
+                <input
+                  ref={attachmentRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) stageAttachment(file);
+                  }}
+                />
+              ) : null}
               <button
                 type="button"
                 className="cms-fm-attach"
@@ -1256,12 +1287,12 @@ function ChatWindow({
                 <button
                   type="button"
                   className="cms-fm-attach"
-                  disabled={uploading}
-                  onClick={insertLink}
-                  title="Gửi link"
-                  aria-label="Gửi link"
+                  disabled={uploading || sending}
+                  onClick={() => attachmentRef.current?.click()}
+                  title="Đính kèm tệp"
+                  aria-label="Đính kèm tệp"
                 >
-                  <Link2 size={16} />
+                  <Paperclip size={16} />
                 </button>
               ) : null}
             </>
@@ -2087,20 +2118,13 @@ export default function FloatingMessenger({ session, role }) {
     }
   };
 
-  const handleSendLink = async (tab, link) => {
-    await handleSend(tab, link);
-  };
-
   const handleSendFile = async (tab, file, caption = '') => {
     if (!file) return false;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Chỉ gửi ảnh tại chat nổi. File khác dùng Inbox.');
-      return false;
-    }
     if (file.size > MAX_FILE_BYTES) {
-      toast.error('Ảnh quá lớn (tối đa 5MB)');
+      toast.error('Tệp quá lớn (tối đa 5MB)');
       return false;
     }
+    const isImage = file.type.startsWith('image/');
     const isAi = isAiSupportPeer(tab.user);
     const isGroup = Boolean(tab.user?.isGroup);
     const status = aiStatusMap[tab.id] || AI_SUPPORT_STATUS.AI_ACTIVE;
@@ -2110,11 +2134,11 @@ export default function FloatingMessenger({ session, role }) {
       toast.error(`Hết ${lim} lượt hỏi AI hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`);
       return false;
     }
-    if (quotaApplies && Number(aiImageQuota.remaining) <= 0) {
+    if (isImage && quotaApplies && Number(aiImageQuota.remaining) <= 0) {
       toast.error('Bạn đã hết lượt gửi ảnh hôm nay. Ngày mai hãy gửi tiếp nhé.');
       return false;
     }
-    const content = String(caption || '').trim() || '[Hình ảnh]';
+    const content = String(caption || '').trim() || (isImage ? '[Hình ảnh]' : file.name);
     try {
       const uploadRes = await messagesAPI.uploadMessageFile(file);
       if (!uploadRes?.success) throw new Error(uploadRes?.message || 'Upload thất bại');
@@ -2128,7 +2152,7 @@ export default function FloatingMessenger({ session, role }) {
         receiverName: isAi ? AI_SUPPORT_PEER.name : tab.user.name,
         receiverRole: isAi ? AI_SUPPORT_PEER.role : (isGroup ? 'group' : tab.user.role),
         content,
-        messageType: 'image',
+        messageType: isImage ? 'image' : 'file',
         fileUrl: uploadRes.url,
         fileName: file.name,
         isGroup,
@@ -2142,7 +2166,7 @@ export default function FloatingMessenger({ session, role }) {
         toast.error(sent.failReason || 'Gửi ảnh thất bại');
         return false;
       }
-      if (quotaApplies && Number.isFinite(Number(sent?.aiImageRemaining))) {
+      if (isImage && quotaApplies && Number.isFinite(Number(sent?.aiImageRemaining))) {
         const remaining = Math.max(0, Number(sent.aiImageRemaining));
         setAiImageQuota((prev) => ({
           ...prev,
@@ -2281,7 +2305,6 @@ export default function FloatingMessenger({ session, role }) {
             onSend={handleSend}
             onSendFile={handleSendFile}
             onSendExistingImage={handleSendExistingImage}
-            onSendLink={handleSendLink}
             onRecall={recallMessage}
             onReact={toggleMessageReaction}
             peerTyping={!!peerTypingMap[openWindow.id]}
@@ -2496,7 +2519,7 @@ export default function FloatingMessenger({ session, role }) {
             <button
               type="button"
               onClick={handleSupportFabClick}
-              className={`cms-fm-fab cms-fm-fab--mascot ${fabExpanded ? 'is-expanded' : ''}`}
+              className={`cms-fm-fab cms-fm-fab--mascot border-2 border-white ring-2 ring-red-500/70 shadow-[0_0_0_4px_rgba(239,68,68,0.12)] ${fabExpanded ? 'is-expanded' : ''}`}
               title={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Liên hệ Hỗ trợ viên')}
               aria-label={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Mở Hỗ trợ viên')}
               aria-expanded={fabExpanded}

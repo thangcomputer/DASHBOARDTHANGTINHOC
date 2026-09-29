@@ -211,9 +211,13 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
       return;
     }
     const sessions = clampSessions(form.totalSessions, form.completedSessions, form.remainingSessions);
+    const currentAge = student.age == null || student.age === '' ? '' : String(student.age);
+    const ageChanged = String(form.age ?? '') !== currentAge;
     onSave({
       ...student,
       ...form,
+      age: ageChanged ? form.age : (student.ageAtEntry ?? student.age),
+      ageWasEdited: ageChanged,
       ...sessions,
       price: Number(form.price) || 0,
       studentExamUnlocked,

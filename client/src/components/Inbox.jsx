@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../utils/toast';
 import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
 import TeacherStudentWeekSlotSheet from './teacher/TeacherStudentWeekSlotSheet';
@@ -321,6 +321,7 @@ function ChatFlipWrap({ open, estimatedHeight = 160, className = 'relative', chi
 // ─── MAIN INBOX ──────────────────────────────────────────────────────────────
 const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUserRole = 'admin', onNavigate }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const toast = useToast();
   const socketCtx = useSocket();
   const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onGroupDelete, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
@@ -893,7 +894,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               lastTime: toValidActivityDate(existingConv?.lastTime)
                 || (gate.mode === 'AUTHORIZED_CONTACT' || seedContact.trusted ? null : new Date()),
               unread: existingConv?.unread || 0,
-              ...c,
             });
           }
         }
@@ -1425,6 +1425,65 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setActiveConv(conv);
     }
   };
+
+  const requestedContact = location.state?.selectUser || null;
+  const requestedPeerId = String(
+    location.state?.selectUserId
+      || requestedContact?.id
+      || location.state?.openPeerId
+      || '',
+  );
+  useEffect(() => {
+    if (!requestedPeerId) return;
+    if (String(seedContact?.id || '') === requestedPeerId) return;
+
+    const existing = dataContextConvs.find((conversation) => (
+      !conversation.isGroup
+      && String(conversation.user?.id || '') === requestedPeerId
+    ));
+    const contact = contacts.find((person) => String(person.id || person._id || '') === requestedPeerId);
+    setSeedContact({
+      ...(requestedContact || {}),
+      id: requestedPeerId,
+      name: requestedContact?.name || existing?.user?.name || contact?.name || 'Người dùng',
+      role: requestedContact?.role || existing?.user?.role || contact?.role || 'student',
+      avatar: requestedContact?.avatar || existing?.user?.avatar || contact?.avatar || '',
+      trusted: Boolean(requestedContact?.trusted),
+    });
+  }, [
+    contacts,
+    dataContextConvs,
+    requestedContact,
+    requestedPeerId,
+    seedContact?.id,
+  ]);
+
+  useEffect(() => {
+    if (!requestedPeerId || !contactsLoaded) return;
+
+    const target = conversations.find((conversation) => (
+      !conversation.isGroup
+      && String(conversation.user?.id || '') === requestedPeerId
+    ));
+    if (!target) return;
+
+    setPinnedMessageObj(null);
+    setMessages([]);
+    setActiveConv(target);
+    navigate({
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    }, { replace: true, state: null });
+  }, [
+    contactsLoaded,
+    conversations,
+    location.hash,
+    location.pathname,
+    location.search,
+    requestedPeerId,
+    navigate,
+  ]);
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
@@ -2426,22 +2485,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <p className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-400">Chưa có lịch sắp tới</p>
                               )}
                             </div>
+                            {currentUserRole === 'teacher' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowPeerInfo(false);
+                                  setShowScheduleModal(true);
+                                }}
+                                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100"
+                                title="Xếp lịch tuần cho học viên này"
+                              >
+                                <Calendar size={16} aria-hidden="true" />
+                                <span>Xếp lịch tuần</span>
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
                     )}
                   </div>
-                )}
-                {(!activeConv.isGroup && currentUserRole === 'teacher' && activeConv?.user?.role === 'student') && (
-                  <button
-                    type="button"
-                    onClick={() => setShowScheduleModal(true)}
-                    className="shrink-0 ml-1 inline-flex items-center justify-center gap-1.5 min-h-10 px-2.5 sm:px-3 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-100 text-xs font-bold"
-                    title="Xếp lịch tuần cho học viên này"
-                  >
-                    <Calendar size={16} />
-                    <span>Xếp lịch</span>
-                  </button>
                 )}
                 {activeConv.isGroup && (() => {
                   const groupIdStr = activeConv.id.replace('group_', '');

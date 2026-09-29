@@ -194,13 +194,13 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
             const hasDownloadUrl = !!(m.url && m.url.trim());
             const isDynamicAssignment = !!m.isDynamicAssignment;
             const actionButtons = (
-              <div className="flex w-full max-w-[360px] flex-col gap-2 sm:flex-row sm:justify-end lg:w-auto">
+              <div className="grid w-full max-w-[700px] grid-cols-1 gap-3 lg:grid-cols-[1.1fr_1.7fr_1.1fr] lg:items-center">
                 {hasDownloadUrl ? (
                   <a
                     href={m.url.startsWith('http') ? m.url : `https://${m.url}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200 sm:min-w-[130px]"
+                    className="inline-flex h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                   >
                     <Download size={14} /> Tải đề bài
                   </a>
@@ -208,24 +208,35 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                   <button
                     type="button"
                     onClick={() => window.cmsAlert('Giảng viên chưa đính kèm file đề bài cho bài tập này.', 'info')}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-400 transition hover:bg-slate-200 sm:min-w-[130px]"
+                    className="inline-flex h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-400 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                   >
                     <Download size={14} /> Tải đề bài
                   </button>
                 )}
 
+                <div className="flex min-w-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-center">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-800">{m.title}</p>
+                    <p className="mt-1 text-[11px] font-medium text-slate-500">
+                      {m.isDynamicAssignment && m.rawAssignment?.deadline
+                        ? `⏰ ${new Date(m.rawAssignment.deadline).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                        : `📅 ${formatVNDateTime(m.createdAt)}`}
+                    </p>
+                  </div>
+                </div>
+
                 {isDynamicAssignment ? (
                   <button
                     type="button"
                     onClick={() => onSelectAssignment && onSelectAssignment(m.rawAssignment)}
-                    className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition sm:min-w-[130px] ${m.rawAssignment.mySubmission ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-500/25'}`}
+                    className={`inline-flex h-[48px] items-center justify-center gap-2 rounded-xl px-3 text-[11px] font-bold shadow-sm transition ${m.rawAssignment.mySubmission ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
                   >
                     <FileUp size={14} /> {m.rawAssignment.mySubmission ? 'Nộp lại bài' : 'Nộp bài'}
                   </button>
                 ) : (
                   <button
                     type="button"
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 py-2.5 text-xs font-bold text-blue-600 transition hover:bg-blue-100 sm:min-w-[130px]"
+                    className="inline-flex h-[48px] items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-600"
                   >
                     <FileUp size={14} /> Nộp bài
                   </button>

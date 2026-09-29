@@ -1,3 +1,5 @@
+import { getCurrentStudentAge } from '../utils/studentAge';
+
 /** Chuẩn hóa document API → shape frontend */
 export function mapSchedule(sch) {
   return {
@@ -14,6 +16,8 @@ export function mapSchedule(sch) {
 
 export function mapStudent(s) {
   if (!s) return s;
+  const ageAtEntry = s.ageAtEntry ?? s.age;
+  const age = getCurrentStudentAge({ ...s, ageAtEntry });
   const teacherIdRaw = s.teacherId;
   let teacherId = '';
   let teacherIds = [];
@@ -75,6 +79,8 @@ export function mapStudent(s) {
   const teacherName = teacherNames[0] || s.teacherName || '';
   return {
     ...s,
+    ...(ageAtEntry != null && ageAtEntry !== '' ? { ageAtEntry } : {}),
+    age: age ?? s.age,
     id: s._id || s.id,
     teacherId,
     ...(teacherIds.length ? { teacherIds } : {}),

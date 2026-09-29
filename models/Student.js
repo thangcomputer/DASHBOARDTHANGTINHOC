@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { getTodayAgeReferenceDate } = require('../utils/studentAge');
 
 /**
  * Schema cho Học Viên
@@ -23,6 +24,10 @@ const StudentSchema = new mongoose.Schema(
       type: Number,
       min: [10, 'Tuổi tối thiểu là 10'],
       max: [80, 'Tuổi tối đa là 80'],
+    },
+    ageAsOf: {
+      type: String,
+      match: [/^\d{4}-\d{2}-\d{2}$/, 'Ngày mốc tuổi không hợp lệ'],
     },
     phone: {
       type: String,
@@ -341,6 +346,13 @@ StudentSchema.virtual('progressPercent').get(function () {
 
 // ── Middleware: Hash password trước khi save ───────────────────────
 StudentSchema.pre('save', async function () {
+  if (this.isModified('age')) {
+    if (this.age == null) {
+      this.ageAsOf = undefined;
+    } else {
+      this.ageAsOf = getTodayAgeReferenceDate();
+    }
+  }
   if (this.isModified('password') && this.password) {
     this.password = await bcrypt.hash(this.password, 10);
   }
