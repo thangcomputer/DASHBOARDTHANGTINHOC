@@ -1502,9 +1502,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     e.preventDefault();
 
     const file = imageFile;
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      setUploadError('Ảnh quá lớn. Giới hạn 5MB.');
+      setUploadError('Ảnh quá lớn. Giới hạn 10MB.');
       setTimeout(() => setUploadError(''), 4000);
       return;
     }
@@ -1532,9 +1532,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   /** Chụp màn hình → pending (giống dán ảnh), Enter mới gửi. */
   const stageScreenshotForSend = useCallback(async (file) => {
     if (!file || !activeConv) return;
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      setUploadError('Ảnh quá lớn. Giới hạn 5MB.');
+      setUploadError('Ảnh quá lớn. Giới hạn 10MB.');
       setTimeout(() => setUploadError(''), 4000);
       return;
     }
@@ -1677,8 +1677,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (!file || !activeConv) return;
 
     const isImage = file.type.startsWith('image/');
-    const maxSize = 5 * 1024 * 1024;
-    const maxLabel = '5MB';
+    const maxSize = 10 * 1024 * 1024;
+    const maxLabel = '10MB';
 
     if (file.size > maxSize) {
       setUploadError(`File quá lớn. Giới hạn ${maxLabel}.`);
@@ -3092,7 +3092,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   </div>
                 )}
                 <div className="flex items-center gap-2 relative max-w-4xl mx-auto">
-                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+                  <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
                   <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
 
                   <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100">
@@ -3100,7 +3100,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       onClick={() => imageInputRef.current?.click()}
                       disabled={isUploading}
                       className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Gửi ảnh (tối đa 5MB, lưu 10 ngày)"
+                      title="Gửi ảnh (tối đa 10MB, lưu 10 ngày)"
                     >
                       {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
                     </button>
@@ -3116,7 +3116,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
                       className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Đính kèm tài liệu (tối đa 5MB, lưu 10 ngày)"
+                      title="Đính kèm tài liệu Word, Excel, PowerPoint, PDF hoặc ZIP (tối đa 10MB, lưu 10 ngày)"
                     >
                       <Paperclip size={20} />
                     </button>

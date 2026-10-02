@@ -88,7 +88,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const okMime = allowedMsgMime.test(file.mimetype || '');
     const okExt = allowedMsgExt.test(file.originalname || '');
@@ -140,7 +140,7 @@ router.post('/broadcast',chatController.post_broadcast);
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ success: false, message: 'File quá lớn (tối đa 50MB).' });
+      return res.status(400).json({ success: false, message: 'File quá lớn (tối đa 10MB).' });
     }
     return res.status(400).json({ success: false, message: err.message });
   }

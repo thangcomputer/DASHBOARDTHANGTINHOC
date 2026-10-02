@@ -65,7 +65,8 @@ const CHAT_ROLE_LABEL = {
   student: 'Học viên',
 };
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i;
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const CHAT_FILE_ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav';
 const FM_SIZE_KEY = 'cms_fm_win_size';
 const FM_SIZE_DEFAULT = { w: 400, h: 480 };
 
@@ -751,7 +752,7 @@ function ChatWindow({
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      toast.error('Ảnh quá lớn (tối đa 5MB)');
+      toast.error('Ảnh quá lớn (tối đa 10MB)');
       return;
     }
     if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
@@ -764,7 +765,7 @@ function ChatWindow({
   const stageAttachment = (file) => {
     if (!file || uploading || sending) return;
     if (file.size > MAX_FILE_BYTES) {
-      toast.error('Tệp quá lớn (tối đa 5MB)');
+      toast.error('Tệp quá lớn (tối đa 10MB)');
       return;
     }
     if (pendingUrlRef.current) URL.revokeObjectURL(pendingUrlRef.current);
@@ -1247,21 +1248,20 @@ function ChatWindow({
           </div>
         ) : null}
         <div className="cms-fm-window__compose">
-          {(canAttachImage || imageBlocked) ? (
+          {(canAttachImage || imageBlocked || isAiPeer) ? (
             <>
               <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={pickImage} />
-              {!isAiPeer ? (
-                <input
-                  ref={attachmentRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (file) stageAttachment(file);
-                  }}
-                />
-              ) : null}
+              <input
+                ref={attachmentRef}
+                type="file"
+                accept={CHAT_FILE_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) stageAttachment(file);
+                }}
+              />
               <button
                 type="button"
                 className="cms-fm-attach"
@@ -1283,18 +1283,16 @@ function ChatWindow({
                 onCaptured={(file) => stageImage(file)}
                 onError={(msg) => toast.error(msg)}
               />
-              {!isAiPeer ? (
-                <button
-                  type="button"
-                  className="cms-fm-attach"
-                  disabled={uploading || sending}
-                  onClick={() => attachmentRef.current?.click()}
-                  title="Đính kèm tệp"
-                  aria-label="Đính kèm tệp"
-                >
-                  <Paperclip size={16} />
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="cms-fm-attach"
+                disabled={uploading || sending || questionBlocked}
+                onClick={() => attachmentRef.current?.click()}
+                title="Đính kèm Word, Excel, PowerPoint, PDF hoặc ZIP (tối đa 10MB)"
+                aria-label="Đính kèm tệp"
+              >
+                <Paperclip size={16} />
+              </button>
             </>
           ) : null}
           <input
@@ -2121,7 +2119,7 @@ export default function FloatingMessenger({ session, role }) {
   const handleSendFile = async (tab, file, caption = '') => {
     if (!file) return false;
     if (file.size > MAX_FILE_BYTES) {
-      toast.error('Tệp quá lớn (tối đa 5MB)');
+      toast.error('Tệp quá lớn (tối đa 10MB)');
       return false;
     }
     const isImage = file.type.startsWith('image/');
