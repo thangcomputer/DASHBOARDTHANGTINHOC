@@ -12,6 +12,7 @@ import {
   AdminLazyLogsTab,
   AdminLazyStudentTrainingTab,
   AdminLazyCertPrepTab,
+  AdminLazyLessonPracticeTab,
 } from './admin/AdminLazyTabShell';
 
 import AdminModalManager from './admin/shared/AdminModalManager';
@@ -62,6 +63,7 @@ const AdminDashboard = () => {
               </AdminTrainingProvider>
             )}
             {activeTab === 'cert-prep' && <AdminLazyCertPrepTab />}
+            {activeTab === 'lesson-practice' && <AdminLazyLessonPracticeTab />}
             {activeTab === 'logs' && (
               <AdminLogsProvider activeTab={activeTab}>
                 <AdminLazyLogsTab />
