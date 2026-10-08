@@ -37,6 +37,9 @@ const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/Cer
 const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
 const CertPrepStudentPlayer = lazy(() => import('./components/student/certPrep/CertPrepStudentPlayer'));
 const CertPrepResult = lazy(() => import('./components/student/certPrep/CertPrepResult'));
+const LessonPracticeCatalogPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeCatalogPage'));
+const LessonPracticeUnitsPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeUnitsPage'));
+const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonPractice/LessonPracticePlayerPage'));
 import DashboardLayout                       from './components/DashboardLayout';
 import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
 import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
@@ -451,6 +454,21 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
         <Route path="/student/cert-prep/result/:sessionId" element={
           <ErrorBoundary inline>
             <CertPrepResult />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/lesson-practice" element={
+          <ErrorBoundary inline>
+            <LessonPracticeCatalogPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/lesson-practice/subjects/:subjectId" element={
+          <ErrorBoundary inline>
+            <LessonPracticeUnitsPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/lesson-practice/units/:unitId" element={
+          <ErrorBoundary inline>
+            <LessonPracticePlayerPage />
           </ErrorBoundary>
         } />
       </Route>
