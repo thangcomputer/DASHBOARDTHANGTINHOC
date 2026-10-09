@@ -76,7 +76,7 @@ export function useDataSync({
       // Do not pull the full training catalog during dashboard startup.
       const needsTeacherTraining = isAdmin;
       promises.push((!needsTeacherTraining || (isAdmin && !isAdminTrainingPerm))
-        ? Promise.resolve({ success: true, data: {} })
+        ? Promise.resolve({ success: false })
         : api.settings.getTrainingData().catch(() => ({ success: false })));
 
       // Student training data is not needed by teachers.
