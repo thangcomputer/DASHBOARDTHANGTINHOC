@@ -91,7 +91,9 @@ function unitChecklist(unit, progress = {}, practiceFinished = false) {
   };
 }
 
-function isUnitLocked(units, completedIds, unitId) {
+function isUnitLocked(units, completedIds, unitId, previewUnitIds = new Set()) {
+  const previews = previewUnitIds instanceof Set ? previewUnitIds : new Set(previewUnitIds || []);
+  if (previews.has(String(unitId))) return false;
   const ordered = [...(units || [])].sort(compareByOrder);
   const index = ordered.findIndex((u) => String(u._id || u.id) === String(unitId));
   if (index <= 0) return false;
@@ -372,6 +374,7 @@ function normalizeItem(body) {
     videoId: String(body.videoId || ''),
     prompt: String(body.prompt || '').trim(),
     imageUrl: String(body.imageUrl || '').trim(),
+    imageName: String(body.imageName || '').trim().slice(0, 255),
     caption: String(body.caption || '').trim(),
     explanation: String(body.explanation || '').trim(),
     sortOrder: Number(body.sortOrder) || 0,

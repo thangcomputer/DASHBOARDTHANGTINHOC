@@ -16,6 +16,7 @@ import { useModal } from '../utils/Modal.jsx';
 import { useToast } from '../utils/toast.jsx';
 import { isValidVNPhone } from '../utils/validators';
 import { toBranchId, branchOptionLabel } from '../utils/branchIds';
+import { getEffectiveCoursePrice, isCourseDiscountActive } from '../utils/coursePricing';
 
 const API   = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 const TOTAL = 5 * 60; // 5 phút = 300 giây
@@ -29,10 +30,6 @@ function readReEnrollPhone(searchParams) {
     return '';
   }
 }
-
-// Helper: tính effective price
-const calcEff = (price, pct) =>
-  pct > 0 ? Math.round(Number(price) * (1 - Number(pct) / 100)) : Number(price);
 
 // ── Đồng hồ đếm ngược đẹp ────────────────────────────────────────────────────
 function Countdown({ seconds, total }) {
@@ -170,13 +167,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
           const list = res.data;
           setDbCourses(list);
           const first = list[0];
-          const ep = calcEff(first.price, first.discountPercent);
+          const discountActive = isCourseDiscountActive(first);
+          const ep = getEffectiveCoursePrice(first);
           setFormData(f => ({
             ...f,
             courseId: first._id,
             course: first.name,
             price: first.price,
-            discountPercent: first.discountPercent || 0,
+            discountPercent: discountActive ? first.discountPercent : 0,
             effectivePrice: ep,
           }));
         }
@@ -395,13 +393,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
     } else if (name === 'courseId') {
       const selected = dbCourses.find(c => c._id === value);
       if (selected) {
-        const ep = calcEff(selected.price, selected.discountPercent);
+        const discountActive = isCourseDiscountActive(selected);
+        const ep = getEffectiveCoursePrice(selected);
         setFormData(f => ({
           ...f,
           courseId: selected._id,
           course: selected.name,
           price: selected.price,
-          discountPercent: selected.discountPercent || 0,
+          discountPercent: discountActive ? selected.discountPercent : 0,
           effectivePrice: ep,
         }));
       }
@@ -569,8 +568,8 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     <CmsSelect name="courseId" value={formData.courseId} onChange={handleChange}
                       className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none font-bold text-blue-800 bg-white transition-all">
                       {dbCourses.map(c => {
-                        const ep = calcEff(c.price, c.discountPercent);
-                        const pct = c.discountPercent || 0;
+                        const ep = getEffectiveCoursePrice(c);
+                        const pct = isCourseDiscountActive(c) ? c.discountPercent || 0 : 0;
                         return (
                           <option key={c._id} value={c._id}>
                             {c.name} — {pct > 0 ? `${ep.toLocaleString('vi-VN')}đ (-${pct}%)` : `${c.price.toLocaleString('vi-VN')}đ`}
@@ -786,9 +785,9 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       name: '', age: '', zalo: '',
                       course: first?.name || '',
                       price: first?.price || 0,
-                      effectivePrice: first ? calcEff(first.price, first.discountPercent) : 0,
+                      effectivePrice: first ? getEffectiveCoursePrice(first) : 0,
                       courseId: first?._id || '',
-                      discountPercent: first?.discountPercent || 0,
+                      discountPercent: first && isCourseDiscountActive(first) ? first.discountPercent : 0,
                       branchId: formData.branchId,
                       branchCode: formData.branchCode,
                     });

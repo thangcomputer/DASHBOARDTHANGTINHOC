@@ -4,6 +4,7 @@ const lessonVideoSchema = new mongoose.Schema({
   id: { type: String, required: true },
   title: { type: String, default: '' },
   url: { type: String, default: '' },
+  antiSeek: { type: Boolean },
 }, { _id: false });
 
 const lessonContentSchema = new mongoose.Schema({

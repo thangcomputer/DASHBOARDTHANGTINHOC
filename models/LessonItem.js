@@ -20,6 +20,7 @@ const lessonItemSchema = new mongoose.Schema({
   sortOrder: { type: Number, default: 0 },
   prompt: { type: String, default: '' },
   imageUrl: { type: String, default: '' },
+  imageName: { type: String, default: '', maxlength: 255 },
   caption: { type: String, default: '' },
   region: { type: regionSchema, default: undefined },
   options: { type: [optionSchema], default: undefined },

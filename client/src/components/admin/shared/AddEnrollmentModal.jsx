@@ -7,9 +7,10 @@ import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
+import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
 
 function courseEffectivePrice(c) {
-  return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
+  return getEffectiveCoursePrice(c);
 }
 
 function courseDefaultSessions(c) {

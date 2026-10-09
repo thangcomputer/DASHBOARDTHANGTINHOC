@@ -15,6 +15,7 @@ import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { apiFetch, resolveMediaUrl } from '../services/api';
 import lessonPracticeApi from '../services/lessonPracticeApi';
+import { isCourseDiscountActive } from '../utils/coursePricing';
 import {
   getExamSubjectOptions,
   formatExamSubjectsSummary,
@@ -29,6 +30,14 @@ const API = import.meta.env.VITE_API_URL || '';
 const fmt = (n) => Number(n || 0).toLocaleString('vi-VN');
 const calcEffective = (price, pct) =>
   pct > 0 ? Math.round(Number(price) * (1 - Number(pct) / 100)) : Number(price);
+const toLocalDateTimeInput = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+const fromLocalDateTimeInput = (value) => value ? new Date(value).toISOString() : null;
 
 function getCourseExamSubjectIds(c, catalog) {
   if (Array.isArray(c?.examSubjects) && c.examSubjects.length) return c.examSubjects;
@@ -62,6 +71,8 @@ function CourseModal({
     name:            course?.name || '',
     price:           course?.price || '',
     discountPercent: course?.discountPercent || 0,
+    discountStartsAt: toLocalDateTimeInput(course?.discountStartsAt),
+    discountEndsAt:   toLocalDateTimeInput(course?.discountEndsAt),
     totalSessions:   course?.totalSessions || 12,
     category:        course?.category || 'van-phong',
     examSubjects:    Array.isArray(course?.examSubjects) && course.examSubjects.length
@@ -69,6 +80,8 @@ function CourseModal({
       : [],
     description:     course?.description || '',
     thumbnail:       course?.thumbnail || '',
+    bannerColorStart: course?.bannerColorStart || '',
+    bannerColorEnd:   course?.bannerColorEnd || '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -94,8 +107,20 @@ function CourseModal({
     return acc;
   }, {});
 
-  const effective = calcEffective(form.price, form.discountPercent);
-  const hasDiscount = Number(form.discountPercent) > 0 && Number(form.price) > 0;
+  const scheduleConfigured = Boolean(form.discountStartsAt || form.discountEndsAt);
+  const discountStartsAt = form.discountStartsAt ? new Date(form.discountStartsAt).getTime() : null;
+  const discountEndsAt = form.discountEndsAt ? new Date(form.discountEndsAt).getTime() : null;
+  const scheduledDiscountActive = !scheduleConfigured
+    || (
+      Number.isFinite(discountStartsAt)
+      && Number.isFinite(discountEndsAt)
+      && Date.now() >= discountStartsAt
+      && Date.now() < discountEndsAt
+    );
+  const hasDiscount = Number(form.discountPercent) > 0
+    && Number(form.price) > 0
+    && scheduledDiscountActive;
+  const effective = hasDiscount ? calcEffective(form.price, form.discountPercent) : Number(form.price) || 0;
   const selectedCount = Array.isArray(form.examSubjects) ? form.examSubjects.length : 0;
 
   const mergeExamSubjectsFromCourse = (sourceCourse) => {
@@ -234,6 +259,14 @@ function CourseModal({
     if (!form.name.trim()) { toast.error('Vui lòng nhập tên khóa học'); return; }
     if (!form.price || Number(form.price) <= 0) { toast.error('Giá gốc không hợp lệ'); return; }
     if (!form.examSubjects?.length) { toast.error('Chọn ít nhất một môn thi cho khóa học'); return; }
+    if (Boolean(form.discountStartsAt) !== Boolean(form.discountEndsAt)) {
+      toast.error('Cần nhập đủ thời gian bắt đầu và kết thúc khuyến mãi');
+      return;
+    }
+    if (form.discountStartsAt && new Date(form.discountEndsAt) <= new Date(form.discountStartsAt)) {
+      toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -244,11 +277,15 @@ function CourseModal({
         price:           Number(form.price),
         discountPercent: Number(form.discountPercent),
         discountPrice:   effective,
+        discountStartsAt: fromLocalDateTimeInput(form.discountStartsAt),
+        discountEndsAt:   fromLocalDateTimeInput(form.discountEndsAt),
         totalSessions:   Number(form.totalSessions),
         category:        form.category,
         examSubjects:    form.examSubjects,
         description:     form.description,
         thumbnail:       form.thumbnail || '',
+        bannerColorStart: form.bannerColorStart,
+        bannerColorEnd:   form.bannerColorEnd,
         status:          'published',
       };
 
@@ -342,6 +379,36 @@ function CourseModal({
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                <p className="mb-3 text-xs font-black uppercase tracking-wider text-amber-800">
+                  Thời gian khuyến mãi
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-bold text-gray-600">
+                    Bắt đầu
+                    <input
+                      type="datetime-local"
+                      value={form.discountStartsAt}
+                      onChange={(event) => setForm((current) => ({ ...current, discountStartsAt: event.target.value }))}
+                      className="mt-1.5 w-full rounded-xl border border-amber-100 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 outline-none transition focus:border-amber-400"
+                    />
+                  </label>
+                  <label className="block text-xs font-bold text-gray-600">
+                    Kết thúc
+                    <input
+                      type="datetime-local"
+                      value={form.discountEndsAt}
+                      min={form.discountStartsAt || undefined}
+                      onChange={(event) => setForm((current) => ({ ...current, discountEndsAt: event.target.value }))}
+                      className="mt-1.5 w-full rounded-xl border border-amber-100 bg-white px-3 py-2.5 text-sm font-semibold text-gray-800 outline-none transition focus:border-amber-400"
+                    />
+                  </label>
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                  Để trống cả hai nếu muốn giữ mức giảm không thời hạn. Khi đặt lịch, giá giảm chỉ áp dụng trong khoảng thời gian này.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -445,7 +512,59 @@ function CourseModal({
                     />
                   </label>
                 )}
-              </div>            </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500">
+                      Tinh chỉnh màu banner khóa học
+                    </label>
+                    <p className="mt-1 text-xs text-gray-400">Để trống để dùng màu mặc định.</p>
+                  </div>
+                  {(form.bannerColorStart || form.bannerColorEnd) && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, bannerColorStart: '', bannerColorEnd: '' }))}
+                      className="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-800"
+                    >
+                      Mặc định
+                    </button>
+                  )}
+                </div>
+                <div
+                  className="mb-3 h-12 rounded-xl border border-black/5 shadow-inner"
+                  style={{
+                    background: form.bannerColorStart || form.bannerColorEnd
+                      ? `linear-gradient(135deg, ${form.bannerColorStart || '#be123c'}, ${form.bannerColorEnd || '#7f1d1d'})`
+                      : 'linear-gradient(135deg, #be123c, #7f1d1d)',
+                  }}
+                  aria-label="Xem trước màu banner"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
+                    <input
+                      type="color"
+                      value={form.bannerColorStart || '#be123c'}
+                      onChange={(e) => setForm((f) => ({ ...f, bannerColorStart: e.target.value }))}
+                      className="h-9 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
+                      aria-label="Chọn màu đầu banner"
+                    />
+                    <span className="text-xs font-bold text-gray-600">Màu đầu</span>
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
+                    <input
+                      type="color"
+                      value={form.bannerColorEnd || '#7f1d1d'}
+                      onChange={(e) => setForm((f) => ({ ...f, bannerColorEnd: e.target.value }))}
+                      className="h-9 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
+                      aria-label="Chọn màu cuối banner"
+                    />
+                    <span className="text-xs font-bold text-gray-600">Màu cuối</span>
+                  </label>
+                </div>
+              </div>
+            </div>
 
             {/* Cột phải: Môn thi */}
             <div className="space-y-5 md:pl-2">
@@ -927,8 +1046,8 @@ export default function CoursePricingTab() {
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {courses.map((course) => {
-              const ep = calcEffective(course.price, course.discountPercent);
-              const hasDiscount = course.discountPercent > 0;
+              const hasDiscount = isCourseDiscountActive(course);
+              const ep = hasDiscount ? calcEffective(course.price, course.discountPercent) : Number(course.price) || 0;
               return (
                 <article key={course._id} className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -1018,8 +1137,8 @@ export default function CoursePricingTab() {
               </thead>
               <tbody>
                 {courses.map((course, idx) => {
-                  const ep = calcEffective(course.price, course.discountPercent);
-                  const hasDiscount = course.discountPercent > 0;
+                  const hasDiscount = isCourseDiscountActive(course);
+                  const ep = hasDiscount ? calcEffective(course.price, course.discountPercent) : Number(course.price) || 0;
                   return (
                     <tr key={course._id} className={`border-b border-slate-100 hover:bg-blue-50/30 transition ${idx % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
                       <td className="px-4 py-3.5">

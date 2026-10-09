@@ -26,6 +26,12 @@ const lessonPracticeApi = {
     updateItem: async (id, body) => parse(await apiFetch(`/lesson-practice/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) })),
     deleteItem: async (id) => parse(await apiFetch(`/lesson-practice/items/${id}`, { method: 'DELETE' })),
     progress: async (subjectId) => parse(await apiFetch(`/lesson-practice/progress${subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : ''}`)),
+    exportBackup: async () => parse(await apiFetch('/lesson-practice/backup/export')),
+    importBackup: async (file) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      return uploadWithAuth('/lesson-practice/backup/import', fd);
+    },
   },
   student: {
     subjects: async () => parse(await apiFetch('/lesson-practice/my/subjects')),

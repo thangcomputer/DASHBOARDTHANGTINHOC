@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { effectiveCoursePrice } = require('../utils/coursePricing');
 
 const courseSchema = new mongoose.Schema({
   name: {
@@ -34,6 +35,16 @@ const courseSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  bannerColorStart: {
+    type: String,
+    default: '',
+    match: [/^$|^#[0-9a-fA-F]{6}$/, 'Màu banner phải là mã HEX hợp lệ'],
+  },
+  bannerColorEnd: {
+    type: String,
+    default: '',
+    match: [/^$|^#[0-9a-fA-F]{6}$/, 'Màu banner phải là mã HEX hợp lệ'],
+  },
   price: {
     type: Number,
     required: [true, 'Giá khóa học không được để trống'],
@@ -48,6 +59,14 @@ const courseSchema = new mongoose.Schema({
     min: 0,
     max: 100,
     default: 0,
+  },
+  discountStartsAt: {
+    type: Date,
+    default: null,
+  },
+  discountEndsAt: {
+    type: Date,
+    default: null,
   },
   totalSessions: {
     type: Number,
@@ -158,7 +177,7 @@ courseSchema.pre('findOneAndUpdate', async function () {
 
 // Virtual helper: giá thực tế thu
 courseSchema.virtual('effectivePrice').get(function () {
-  return this.discountPercent > 0 ? this.discountPrice : this.price;
+  return effectiveCoursePrice(this);
 });
 
 module.exports = mongoose.model('Course', courseSchema);

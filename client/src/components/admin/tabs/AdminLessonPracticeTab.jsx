@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Clock, GripVertical, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleHelp, Clock, Download, GripVertical, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
+import RichTextEditor from '../shared/RichTextEditor';
 import AdminStudentTrainingTab from './AdminStudentTrainingTab';
 
 const TYPES = [
@@ -29,6 +30,7 @@ function blankItem() {
     type: 'mcq',
     prompt: '',
     imageUrl: '',
+    imageName: '',
     caption: '',
     explanation: '',
     rubric: '',
@@ -207,6 +209,9 @@ export default function AdminLessonPracticeTab() {
   const [showAddContentMenu, setShowAddContentMenu] = useState(false);
   const [draggedEntry, setDraggedEntry] = useState('');
   const [dragOverEntry, setDragOverEntry] = useState('');
+  const [dragOverAfter, setDragOverAfter] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [notice, setNotice] = useState('');
   const [unitTitle, setUnitTitle] = useState('');
   const [progress, setProgress] = useState([]);
   const [error, setError] = useState('');
@@ -275,6 +280,35 @@ export default function AdminLessonPracticeTab() {
     reorderLessonEntries(source, target, insertAfter);
     setDraggedEntry('');
     setDragOverEntry('');
+  }
+
+  function entryDropProps(entry) {
+    return {
+      onDragOver: (event) => {
+        event.preventDefault();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        setDragOverEntry(entry);
+        setDragOverAfter(event.clientY > bounds.top + bounds.height / 2);
+      },
+      onDrop: (event) => handleLessonEntryDrop(event, entry),
+    };
+  }
+
+  function entryDragStart(event, entry) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', entry);
+    const card = event.currentTarget.closest('[data-lesson-entry]');
+    if (card) event.dataTransfer.setDragImage(card, 24, 20);
+    setDraggedEntry(entry);
+    setDragOverEntry('');
+  }
+
+  function entryCardClass(entry) {
+    if (draggedEntry === entry) return 'space-y-2 rounded-xl border border-red-300 p-3 opacity-50 transition-colors';
+    const line = dragOverEntry === entry && draggedEntry
+      ? (dragOverAfter ? 'shadow-[0_5px_0_0_#ef4444]' : 'shadow-[0_-5px_0_0_#ef4444]')
+      : '';
+    return `space-y-2 rounded-xl border border-slate-200 p-3 transition-colors ${line}`;
   }
 
   async function loadSubjects(preferId) {
@@ -414,14 +448,69 @@ export default function AdminLessonPracticeTab() {
     setIsUnitEditing(false);
   }
 
+  async function exportBackup() {
+    setBackupBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await lessonPracticeApi.admin.exportBackup();
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sao-luu-bai-hoc-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setNotice('Đã xuất dữ liệu bài học.');
+    } catch (err) {
+      setError(err.message || 'Không xuất được dữ liệu');
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  async function importBackup(file) {
+    if (!file) return;
+    if (!window.confirm('Nhập dữ liệu sẽ cập nhật các buổi/câu hỏi trùng và thêm phần còn thiếu (không xóa dữ liệu hiện có). Tiếp tục?')) return;
+    setBackupBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await lessonPracticeApi.admin.importBackup(file);
+      const d = res.data || {};
+      const skipped = d.skippedSubjects?.length ? ` Bỏ qua môn không tồn tại: ${d.skippedSubjects.join(', ')}.` : '';
+      setNotice(`Đã nhập ${d.units || 0} buổi, ${d.items || 0} câu hỏi.${skipped}`);
+      const nextId = await loadSubjects(subjectId);
+      await loadUnits(nextId);
+    } catch (err) {
+      setError(err.message || 'Không nhập được dữ liệu');
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
   async function uploadImage(file) {
     if (!file || !draft) return;
+    setDraft((current) => current && ({
+      ...current,
+      pendingImageName: file.name,
+      imageUploadStatus: 'uploading',
+    }));
     setSaving(true);
     setError('');
     try {
       const res = await lessonPracticeApi.upload(file);
-      setDraft((current) => ({ ...current, imageUrl: res.data.url }));
+      setDraft((current) => current && ({
+        ...current,
+        imageUrl: res.data.url,
+        imageName: res.data.originalName || file.name,
+        pendingImageName: '',
+        imageUploadStatus: 'success',
+      }));
     } catch (err) {
+      setDraft((current) => current && ({ ...current, imageUploadStatus: 'error' }));
       setError(err.message || 'Không tải được ảnh');
     } finally {
       setSaving(false);
@@ -446,22 +535,38 @@ export default function AdminLessonPracticeTab() {
           >
             Bài học học viên
           </button>
+          <button
+            type="button"
+            onClick={() => setModuleTab('guide')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'guide' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <CircleHelp size={16} />
+            Hướng dẫn học
+          </button>
         </div>
         {moduleTab === 'videos' ? (
           <AdminStudentTrainingTab videoCoursesOnly />
+        ) : moduleTab === 'guide' ? (
+          <AdminStudentTrainingTab learningGuideOnly />
         ) : (
           <>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-black text-slate-900">Bài học</h1>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={exportBackup} disabled={backupBusy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"><Download size={15} /> Xuất dữ liệu</button>
+                <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold ${backupBusy ? 'pointer-events-none opacity-50' : ''}`}>
+                  <Upload size={15} /> Nhập dữ liệu
+                  <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; importBackup(file); }} />
+                </label>
                 <button type="button" onClick={() => setSection('build')} className={`rounded-xl px-3 py-2 text-sm font-bold ${section === 'build' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200'}`}>Soạn bài</button>
                 <button type="button" onClick={() => setSection('progress')} className={`rounded-xl px-3 py-2 text-sm font-bold ${section === 'progress' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200'}`}>Tiến độ</button>
               </div>
             </div>
             {loading && <div className="flex items-center gap-2 text-slate-400"><Loader2 className="animate-spin" size={18} /> Đang tải...</div>}
             {error && <p className="text-sm text-red-600">{error}</p>}
+            {notice && <p className="text-sm font-semibold text-emerald-700">{notice}</p>}
 
             {section === 'progress' && (
               <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
@@ -531,7 +636,7 @@ export default function AdminLessonPracticeTab() {
                 </aside>
 
                 {subject && (
-                  <section className="space-y-4">
+                  <section className="flex flex-col gap-4">
                     <div className="rounded-2xl border border-slate-100 bg-white p-4 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex-1 min-w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800">{subject.name}</div>
@@ -541,7 +646,10 @@ export default function AdminLessonPracticeTab() {
                       </div>
                     </div>
 
-                    <div className={`flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 ${isUnitEditing && unitId ? '' : 'hidden'}`}>
+                    <div
+                      style={{ order: Math.max(0, units.findIndex((unit) => unit.id === unitId)) + 1 }}
+                      className={`flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 ${isUnitEditing && unitId ? '' : 'hidden'}`}
+                    >
                       {isUnitEditing && unitId && (() => {
                         const selectedIndex = units.findIndex((unit) => unit.id === unitId);
                         const unit = units[selectedIndex];
@@ -613,25 +721,17 @@ export default function AdminLessonPracticeTab() {
                               return (
                                 <div
                                   key={entry}
+                                  data-lesson-entry={entry}
                                   style={{ order: entryIndex }}
-                                  onDragOver={(event) => {
-                                    event.preventDefault();
-                                    setDragOverEntry(entry);
-                                  }}
-                                  onDrop={(event) => handleLessonEntryDrop(event, entry)}
-                                  className={`space-y-2 rounded-xl border p-3 transition-colors ${draggedEntry === entry ? 'border-red-300 opacity-50' : dragOverEntry === entry ? 'border-red-400 bg-red-50/50' : 'border-slate-200'}`}
+                                  {...entryDropProps(entry)}
+                                  className={entryCardClass(entry)}
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-1.5">
                                       <button
                                         type="button"
                                         draggable
-                                        onDragStart={(event) => {
-                                          event.dataTransfer.effectAllowed = 'move';
-                                          event.dataTransfer.setData('text/plain', entry);
-                                          setDraggedEntry(entry);
-                                          setDragOverEntry('');
-                                        }}
+                                        onDragStart={(event) => entryDragStart(event, entry)}
                                         onDragEnd={() => { setDraggedEntry(''); setDragOverEntry(''); }}
                                         aria-label="Kéo để di chuyển nội dung buổi học"
                                         title="Kéo để sắp xếp"
@@ -663,15 +763,12 @@ export default function AdminLessonPracticeTab() {
                                         <Trash2 size={16} />
                                       </button>
                                     </div>
-                                    <textarea
+                                    <RichTextEditor
                                       value={content.content}
-                                      onChange={(event) => setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                        ? { ...unit, contents: unit.contents.map((row) => row.id === content.id ? { ...row, content: event.target.value } : row) }
+                                      onChange={(value) => setUnits((rows) => rows.map((unit) => unit.id === unitId
+                                        ? { ...unit, contents: unit.contents.map((row) => row.id === content.id ? { ...row, content: value } : row) }
                                         : unit))}
-                                      rows={4}
                                       placeholder="Nội dung học viên đọc trong buổi học"
-                                      aria-label={`Nội dung ${index + 1}`}
-                                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                                     />
                                   </div>
                                 </div>
@@ -685,25 +782,17 @@ export default function AdminLessonPracticeTab() {
                               return (
                                 <div
                                   key={entry}
+                                  data-lesson-entry={entry}
                                   style={{ order: entryIndex }}
-                                  onDragOver={(event) => {
-                                    event.preventDefault();
-                                    setDragOverEntry(entry);
-                                  }}
-                                  onDrop={(event) => handleLessonEntryDrop(event, entry)}
-                                  className={`space-y-2 rounded-xl border p-3 transition-colors ${draggedEntry === entry ? 'border-red-300 opacity-50' : dragOverEntry === entry ? 'border-red-400 bg-red-50/50' : 'border-slate-200'}`}
+                                  {...entryDropProps(entry)}
+                                  className={entryCardClass(entry)}
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-1.5">
                                       <button
                                         type="button"
                                         draggable
-                                        onDragStart={(event) => {
-                                          event.dataTransfer.effectAllowed = 'move';
-                                          event.dataTransfer.setData('text/plain', entry);
-                                          setDraggedEntry(entry);
-                                          setDragOverEntry('');
-                                        }}
+                                        onDragStart={(event) => entryDragStart(event, entry)}
                                         onDragEnd={() => { setDraggedEntry(''); setDragOverEntry(''); }}
                                         aria-label="Kéo để di chuyển video"
                                         title="Kéo để sắp xếp"
@@ -743,16 +832,16 @@ export default function AdminLessonPracticeTab() {
                                       <Trash2 size={16} />
                                     </button>
                                   </div>
-                                  {index === 0 && (
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedUnit?.antiSeek !== false}
-                                        onChange={(event) => setUnits((rows) => rows.map((unit) => (unit.id === unitId ? { ...unit, antiSeek: event.target.checked } : unit)))}
-                                      />
-                                      Bật chống tua video (học viên phải xem tối thiểu 70%)
-                                    </label>
-                                  )}
+                                  <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                                    <input
+                                      type="checkbox"
+                                      checked={(video.antiSeek ?? selectedUnit?.antiSeek) !== false}
+                                      onChange={(event) => setUnits((rows) => rows.map((unit) => (unit.id === unitId
+                                        ? { ...unit, videos: unit.videos.map((row) => (row.id === video.id ? { ...row, antiSeek: event.target.checked } : row)) }
+                                        : unit)))}
+                                    />
+                                    Bật chống tua video (học viên phải xem tối thiểu 70%)
+                                  </label>
                                 </div>
                               );
                             }
@@ -762,25 +851,17 @@ export default function AdminLessonPracticeTab() {
                       )}
                       {unitId && hasPracticeBlock && (
                         <div
+                          data-lesson-entry={practiceEntry}
                           style={{ order: orderedLessonEntries.indexOf(practiceEntry) }}
-                          onDragOver={(event) => {
-                            event.preventDefault();
-                            setDragOverEntry(practiceEntry);
-                          }}
-                          onDrop={(event) => handleLessonEntryDrop(event, practiceEntry)}
-                          className={`space-y-2 rounded-xl border p-3 transition-colors ${draggedEntry === practiceEntry ? 'border-red-300 opacity-50' : dragOverEntry === practiceEntry ? 'border-red-400 bg-red-50/50' : 'border-slate-200'}`}
+                          {...entryDropProps(practiceEntry)}
+                          className={entryCardClass(practiceEntry)}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-3">
                               <button
                                 type="button"
                                 draggable
-                                onDragStart={(event) => {
-                                  event.dataTransfer.effectAllowed = 'move';
-                                  event.dataTransfer.setData('text/plain', practiceEntry);
-                                  setDraggedEntry(practiceEntry);
-                                  setDragOverEntry('');
-                                }}
+                                onDragStart={(event) => entryDragStart(event, practiceEntry)}
                                 onDragEnd={() => { setDraggedEntry(''); setDragOverEntry(''); }}
                                 aria-label="Kéo để di chuyển luyện tập bài học"
                                 title="Kéo để sắp xếp"
@@ -901,12 +982,19 @@ export default function AdminLessonPracticeTab() {
                                     className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
                                   />
                                 </label>
-                                <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                                  Ảnh
-                                  <input type="file" accept="image/*" className="max-w-52 text-xs" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; uploadImage(file); }} />
+                                <label className="inline-flex cursor-pointer items-center gap-2 text-[11px] font-semibold text-slate-500">
+                                  <span>Ảnh</span>
+                                  <span className="rounded border border-slate-300 bg-slate-100 px-2 py-1 text-slate-700">Choose File</span>
+                                  <span className="max-w-64 truncate font-normal text-slate-600" title={draft.imageName || draft.pendingImageName || ''}>
+                                    {draft.imageUploadStatus === 'uploading'
+                                      ? `Đang tải: ${draft.pendingImageName}`
+                                      : draft.imageUploadStatus === 'error'
+                                        ? `Tải lên thất bại: ${draft.pendingImageName}`
+                                        : draft.imageName || 'No file chosen'}
+                                  </span>
+                                  <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; uploadImage(file); }} />
                                 </label>
                               </div>
-                              {draft.imageUrl && <img src={resolveMediaUrl(draft.imageUrl)} alt="" className="max-h-40 rounded-xl border border-slate-100" />}
                               {draft.type === 'hotspot' && (
                                 <RegionDraw imageUrl={draft.imageUrl} region={draft.region} onChange={(region) => setDraft({ ...draft, region })} />
                               )}
@@ -1009,78 +1097,78 @@ export default function AdminLessonPracticeTab() {
                           )}
                         </div>
                       )}
-                    {isUnitEditing && unitId && (
-                    <>
-                      <div
-                        style={{ order: orderedLessonEntries.length + 1 }}
-                        className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4"
-                      >
-                        <div className="relative min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => setShowAddContentMenu((open) => !open)}
-                          aria-expanded={showAddContentMenu}
-                          className="inline-flex min-h-9 min-w-36 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
-                        >
-                          <Plus size={16} /> Thêm nội dung
-                        </button>
-                        {showAddContentMenu && (
-                          <div className="absolute bottom-full left-0 z-20 mb-2 grid min-w-52 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                            <button type="button" onClick={() => {
-                              const id = newContentId();
-                              setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                ? {
-                                  ...unit,
-                                  contents: [...(unit.contents || []), { id, title: '', content: '' }],
-                                  contentOrder: [...unitContentOrder(unit, items), `content:${id}`],
-                                }
-                                : unit));
-                              setShowAddContentMenu(false);
-                            }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
-                              Nội dung bài học
-                            </button>
-                            <button type="button" onClick={() => {
-                              const id = newContentId();
-                              setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                ? {
-                                  ...unit,
-                                  videos: [...(unit.videos || []), { id, title: '', url: '' }],
-                                  contentOrder: [...unitContentOrder(unit, items), `video:${id}`],
-                                }
-                                : unit));
-                              setShowAddContentMenu(false);
-                            }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
-                              Video bài học
-                            </button>
-                            <button type="button" onClick={() => {
-                              setUnits((rows) => rows.map((unit) => unit.id === unitId
-                                ? { ...unit, contentOrder: [...unitContentOrder(unit, items), practiceEntry] }
-                                : unit));
-                              setDraft((current) => current || blankItem());
-                              setShowAddContentMenu(false);
-                            }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
-                              Luyện tập bài học
+                      {isUnitEditing && unitId && (
+                        <>
+                          <div
+                            style={{ order: orderedLessonEntries.length + 1 }}
+                            className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4"
+                          >
+                            <div className="relative min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddContentMenu((open) => !open)}
+                                aria-expanded={showAddContentMenu}
+                                className="inline-flex min-h-9 min-w-36 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
+                              >
+                                <Plus size={16} /> Thêm nội dung
+                              </button>
+                              {showAddContentMenu && (
+                                <div className="absolute bottom-full left-0 z-20 mb-2 grid min-w-52 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                                  <button type="button" onClick={() => {
+                                    const id = newContentId();
+                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
+                                      ? {
+                                        ...unit,
+                                        contents: [...(unit.contents || []), { id, title: '', content: '' }],
+                                        contentOrder: [...unitContentOrder(unit, items), `content:${id}`],
+                                      }
+                                      : unit));
+                                    setShowAddContentMenu(false);
+                                  }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
+                                    Nội dung bài học
+                                  </button>
+                                  <button type="button" onClick={() => {
+                                    const id = newContentId();
+                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
+                                      ? {
+                                        ...unit,
+                                        videos: [...(unit.videos || []), { id, title: '', url: '' }],
+                                        contentOrder: [...unitContentOrder(unit, items), `video:${id}`],
+                                      }
+                                      : unit));
+                                    setShowAddContentMenu(false);
+                                  }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
+                                    Video bài học
+                                  </button>
+                                  <button type="button" onClick={() => {
+                                    setUnits((rows) => rows.map((unit) => unit.id === unitId
+                                      ? { ...unit, contentOrder: [...unitContentOrder(unit, items), practiceEntry] }
+                                      : unit));
+                                    setDraft((current) => current || blankItem());
+                                    setShowAddContentMenu(false);
+                                  }} className="rounded-lg px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-slate-50">
+                                    Luyện tập bài học
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              disabled={!lessonContentReady || saving}
+                              className="min-h-9 min-w-36 rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-red-700"
+                              onClick={() => run(saveAllUnitContent)}
+                            >
+                              Hoàn tất
                             </button>
                           </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        disabled={!lessonContentReady || saving}
-                        className="min-h-9 min-w-36 rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:bg-red-700"
-                        onClick={() => run(saveAllUnitContent)}
-                      >
-                        Hoàn tất
-                      </button>
-                    </div>
-                  </>
-                    )}
+                        </>
+                      )}
                     </div>
                     {units.length > 0 && (!isUnitEditing || units.some((unit) => unit.id !== unitId)) && (
-                      <div className="space-y-2 rounded-2xl border border-slate-100 bg-white p-4">
-                        <div className="space-y-2">
-                          {units.map((unit, index) => isUnitEditing && unit.id === unitId ? null : (
-                            <div key={unit.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto_auto] items-stretch gap-2">
+                      <div className="contents">
+                        {units.map((unit, index) => isUnitEditing && unit.id === unitId ? null : (
+                          <div key={unit.id} style={{ order: index + 1 }} className="rounded-2xl border border-slate-100 bg-white p-2">
+                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_auto_auto] items-stretch gap-2">
                               <button
                                 type="button"
                                 onClick={() => { setUnitId(unit.id); setIsUnitEditing(false); }}
@@ -1127,15 +1215,15 @@ export default function AdminLessonPracticeTab() {
                                 <Trash2 size={16} />
                               </button>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
                     )}
-                    <div className="flex gap-2 rounded-2xl border border-slate-100 bg-white p-4">
+                    <div style={{ order: units.length + 1 }} className="flex gap-2 rounded-2xl border border-slate-100 bg-white p-4">
                       <input
                         value={unitTitle}
                         onChange={(event) => setUnitTitle(event.target.value)}
-                        placeholder="Tên buổi, ví dụ Buổi 1"
+                        placeholder="Tên bài, ví dụ Bài 1"
                         className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
                       />
                       <button
@@ -1152,7 +1240,7 @@ export default function AdminLessonPracticeTab() {
                           setIsUnitEditing(true);
                         })}
                       >
-                        Thêm buổi
+                        Thêm bài
                       </button>
                     </div>
                   </section>

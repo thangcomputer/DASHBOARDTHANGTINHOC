@@ -25,8 +25,161 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 86_400_000)} ngày trước`;
 }
 
-export function LmsTabBar({ courseTab, setCourseTab, className = '', includeLessonList = true, light = false }) {
+function qaReadStorageKey({ userId, courseId, lessonId, audience }) {
+  return `lms-qa-read:v1:${audience}:${userId}:${courseId}:${lessonId || 'all'}`;
+}
+
+function qaAnswerMarker(item) {
+  const staffReplies = (Array.isArray(item.thread) ? item.thread : []).filter((message) => (
+    ['admin', 'staff', 'teacher'].includes(String(message.authorRole || '').toLowerCase())
+  ));
+  const latestReply = staffReplies[staffReplies.length - 1];
+  if (latestReply) {
+    return `${latestReply.id || ''}:${latestReply.createdAt || ''}:${String(latestReply.body || '')}`;
+  }
+  if (item.answer || item.status === 'answered') {
+    return `${item.answeredAt || item.updatedAt || ''}:${String(item.answer || '')}`;
+  }
+  return '';
+}
+
+function readQaReadMarkers(storageKey) {
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch (error) {
+    console.error('Failed to read LMS Q&A read markers:', error);
+    return {};
+  }
+}
+
+function markQaItemsAsRead(storageKey, items) {
+  const markers = readQaReadMarkers(storageKey);
+  let changed = false;
+  for (const item of items) {
+    const marker = qaAnswerMarker(item);
+    const id = String(item.id || item._id || '');
+    if (marker && id && markers[id] !== marker) {
+      markers[id] = marker;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(markers));
+    window.dispatchEvent(new CustomEvent('lms-qa-read', { detail: { storageKey } }));
+  } catch (error) {
+    console.error('Failed to save LMS Q&A read marker:', error);
+  }
+}
+
+function markQaAsRead(storageKey, item) {
+  markQaItemsAsRead(storageKey, [item]);
+}
+
+function isQaItemRead(storageKey, item) {
+  const marker = qaAnswerMarker(item);
+  const id = String(item.id || item._id || '');
+  return Boolean(marker && id && readQaReadMarkers(storageKey)[id] === marker);
+}
+
+export function LmsTabBar({
+  courseTab,
+  setCourseTab,
+  className = '',
+  includeLessonList = true,
+  light = false,
+  courseId = '',
+  lessonId = '',
+  audience = 'student',
+  userId = '',
+}) {
+  const { socket } = useSocket() || {};
   const tabs = includeLessonList ? LMS_PLAYER_TABS : LMS_PLAYER_TABS.filter((tab) => tab.key !== 'list');
+  const [qaItems, setQaItems] = useState([]);
+  const storageKey = qaReadStorageKey({ userId, courseId, lessonId, audience });
+  const { answeredQaCount, unreadQaCount } = useMemo(() => {
+    const readMarkers = readQaReadMarkers(storageKey);
+    let answered = 0;
+    let unread = 0;
+    for (const item of qaItems) {
+      const marker = qaAnswerMarker(item);
+      const id = String(item.id || item._id || '');
+      if (!marker || !id) continue;
+      answered += 1;
+      if (readMarkers[id] !== marker) unread += 1;
+    }
+    return { answeredQaCount: answered, unreadQaCount: unread };
+  }, [qaItems, storageKey]);
+
+  const loadQaItems = useCallback(() => {
+    let active = true;
+    if (!courseId) {
+      setQaItems([]);
+      return () => { active = false; };
+    }
+
+    const params = new URLSearchParams({ courseId: String(courseId) });
+    if (lessonId) params.set('lessonId', String(lessonId));
+    if (audience) params.set('audience', audience);
+
+    apiFetch(`/training-lms/qa?${params.toString()}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (!active) return;
+        if (!json?.success || !Array.isArray(json.data)) {
+          setQaItems([]);
+          return;
+        }
+        setQaItems(json.data);
+      })
+      .catch((error) => {
+        console.error('Failed to load answered LMS questions for tab badge:', error);
+        if (active) setQaItems([]);
+      });
+
+    return () => { active = false; };
+  }, [courseId, lessonId, audience]);
+
+  useEffect(() => loadQaItems(), [loadQaItems]);
+
+  useEffect(() => {
+    const updateReadState = (event) => {
+      if (event.detail?.storageKey === storageKey) setQaItems((items) => [...items]);
+    };
+    window.addEventListener('lms-qa-read', updateReadState);
+    return () => window.removeEventListener('lms-qa-read', updateReadState);
+  }, [storageKey]);
+
+  useEffect(() => {
+    const refreshOnUpdate = (event) => {
+      const detail = event.detail || {};
+      if (detail.courseId && String(detail.courseId) !== String(courseId)) return;
+      if (detail.audience && String(detail.audience) !== String(audience)) return;
+      if (detail.lessonId && String(detail.lessonId) !== String(lessonId || '')) return;
+      loadQaItems();
+    };
+    window.addEventListener('lms-qa-updated', refreshOnUpdate);
+    return () => window.removeEventListener('lms-qa-updated', refreshOnUpdate);
+  }, [courseId, lessonId, audience, loadQaItems]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onQaEvent = (raw) => {
+      const payload = raw?.payload || raw || {};
+      if (String(payload.kind || '') !== 'lms_qa') return;
+      if (courseId && payload.courseId && String(payload.courseId) !== String(courseId)) return;
+      if (audience && payload.audience && String(payload.audience) !== String(audience)) return;
+      loadQaItems();
+    };
+    socket.on('lms_qa:updated', onQaEvent);
+    socket.on('RECEIVE_NOTIFICATION', onQaEvent);
+    return () => {
+      socket.off('lms_qa:updated', onQaEvent);
+      socket.off('RECEIVE_NOTIFICATION', onQaEvent);
+    };
+  }, [socket, courseId, audience, loadQaItems]);
+
   return (
     <div
       className={`${light ? 'border-b border-slate-200 bg-white' : 'border-b border-white/[0.08] bg-[#0d1117]'} ${className}`}
@@ -40,7 +193,10 @@ export function LmsTabBar({ courseTab, setCourseTab, className = '', includeLess
             type="button"
             role="tab"
             aria-selected={courseTab === t.key}
-            onClick={() => setCourseTab(t.key)}
+            onClick={() => {
+              if (t.key === 'qa') markQaItemsAsRead(storageKey, qaItems);
+              setCourseTab(t.key);
+            }}
             className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${
               t.mobileOnly ? 'lg:hidden' : ''
             } ${
@@ -53,7 +209,17 @@ export function LmsTabBar({ courseTab, setCourseTab, className = '', includeLess
                   : 'text-slate-500 border-transparent hover:text-slate-300'
             }`}
           >
-            {t.label}
+            <span className="inline-flex items-center justify-center gap-1.5">
+              {t.label}
+              {t.key === 'qa' && unreadQaCount > 0 ? (
+                <span
+                  aria-label={`${unreadQaCount} tin nhắn mới chưa đọc`}
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white"
+                >
+                  {unreadQaCount}
+                </span>
+              ) : null}
+            </span>
           </button>
         ))}
       </div>
@@ -301,12 +467,36 @@ function QaPanel({
   const [q, setQ] = useState('');
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [replyDrafts, setReplyDrafts] = useState({});
+  const [expandedQaId, setExpandedQaId] = useState('');
   const [error, setError] = useState('');
   const [liveAtSec, setLiveAtSec] = useState(() => readNoteTimeSec(getCurrentTime));
   const getCurrentTimeRef = useRef(getCurrentTime);
   const liveAtSecRef = useRef(liveAtSec);
+  const readStorageKey = qaReadStorageKey({
+    userId: currentUserId,
+    courseId,
+    lessonId,
+    audience,
+  });
   getCurrentTimeRef.current = getCurrentTime;
   liveAtSecRef.current = liveAtSec;
+
+  useEffect(() => {
+    setExpandedQaId('');
+  }, [lessonId]);
+
+  useEffect(() => {
+    if (!expandedQaId) return undefined;
+    const collapseOnOutsideClick = (event) => {
+      const target = event.target;
+      const clickedQa = target instanceof Element ? target.closest('[data-lms-qa-id]') : null;
+      if (clickedQa?.getAttribute('data-lms-qa-id') !== expandedQaId) {
+        setExpandedQaId('');
+      }
+    };
+    document.addEventListener('pointerdown', collapseOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', collapseOnOutsideClick);
+  }, [expandedQaId]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -338,6 +528,9 @@ function QaPanel({
       const json = await res.json().catch(() => ({}));
       if (json?.success && Array.isArray(json.data)) {
         setItems(json.data);
+        window.dispatchEvent(new CustomEvent('lms-qa-updated', {
+          detail: { courseId: String(courseId), lessonId: String(lessonId || ''), audience },
+        }));
       } else if (!silent) {
         setError(json?.message || 'Không tải được hỏi đáp');
       }
@@ -375,11 +568,14 @@ function QaPanel({
 
   useEffect(() => {
     if (!highlightQaId) return;
+    setExpandedQaId(String(highlightQaId));
+    const highlightedItem = items.find((item) => String(item.id || item._id) === String(highlightQaId));
+    if (highlightedItem) markQaAsRead(readStorageKey, highlightedItem);
     const el = document.getElementById(`lms-qa-${highlightQaId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [highlightQaId, items]);
+  }, [highlightQaId, items, readStorageKey]);
 
   const filtered = useMemo(() => {
     let list = [...(Array.isArray(items) ? items : [])];
@@ -585,27 +781,65 @@ function QaPanel({
           {filtered.map((it) => {
             const id = String(it.id || it._id);
             const highlighted = highlightQaId && String(highlightQaId) === id;
+            const expanded = expandedQaId === id;
+            const dialogue = dialogueOf(it);
+            const isRead = isQaItemRead(readStorageKey, it);
             return (
               <li
                 key={id}
                 id={`lms-qa-${id}`}
-                className={`rounded-xl border p-4 ${
+                data-lms-qa-id={id}
+                className={`relative rounded-xl border p-4 ${
                   highlighted
                     ? light ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300' : 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
                     : light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'
                 }`}
               >
+                {dialogue.length > 0 ? (
+                  <button
+                    type="button"
+                    aria-label={`${expanded ? 'Thu gọn' : 'Xem'} ${dialogue.length} tin nhắn trả lời`}
+                    aria-expanded={expanded}
+                    title={`${dialogue.length} tin nhắn trả lời`}
+                    onClick={() => {
+                      if (!expanded) markQaAsRead(readStorageKey, it);
+                      setExpandedQaId((current) => (current === id ? '' : id));
+                    }}
+                    className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${
+                      isRead
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        : 'border-red-700 bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                  >
+                    <MessageSquare size={14} />
+                    <span>{dialogue.length}</span>
+                  </button>
+                ) : null}
                 <div className="flex gap-3">
                   <div className={`w-10 h-10 rounded-full text-xs font-black flex items-center justify-center shrink-0 ${light ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-500/20 text-emerald-300'}`}>
                     {initials(it.askerName || it.author)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2 flex-wrap">
-                      <p className={`text-sm font-bold ${light ? 'text-slate-900' : 'text-slate-100'}`}>{it.title}</p>
+                    <div className="flex items-start gap-2 flex-wrap pr-12">
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-label={`${expanded ? 'Thu gọn' : 'Xem'} câu hỏi ${it.title}`}
+                        onClick={() => {
+                          if (!expanded) markQaAsRead(readStorageKey, it);
+                          setExpandedQaId((current) => (current === id ? '' : id));
+                        }}
+                        className={`flex min-w-0 items-center gap-1.5 text-left text-sm font-bold ${light ? 'text-slate-900' : 'text-slate-100'}`}
+                      >
+                        <span>{it.title}</span>
+                        <ChevronDown size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                      </button>
                       <span
                         className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                           it.status === 'answered'
-                            ? light ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-500/15 text-emerald-300'
+                            ? isRead
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-red-100 text-red-800'
                             : light ? 'bg-amber-100 text-amber-800' : 'bg-amber-500/15 text-amber-300'
                         }`}
                       >
@@ -620,7 +854,7 @@ function QaPanel({
                       {` · ${timeAgo(it.createdAt)}`}
                     </p>
 
-                    {dialogueOf(it).map((msg, idx) => {
+                    {expanded && dialogue.map((msg, idx) => {
                       const staffish = ['admin', 'staff', 'teacher'].includes(String(msg.authorRole || '').toLowerCase());
                       return (
                         <div
@@ -644,7 +878,7 @@ function QaPanel({
                       );
                     })}
 
-                    {canAnswer ? (
+                    {expanded && canAnswer ? (
                       <div className="mt-3 space-y-2">
                         <textarea
                           value={answerDrafts[id] || ''}
@@ -664,7 +898,7 @@ function QaPanel({
                       </div>
                     ) : null}
 
-                    {!canAnswer && String(it.askerId || '') === String(currentUserId || '') && (it.answer || (Array.isArray(it.thread) && it.thread.length > 0)) ? (
+                    {expanded && !canAnswer && String(it.askerId || '') === String(currentUserId || '') && (it.answer || (Array.isArray(it.thread) && it.thread.length > 0)) ? (
                       <div className="mt-3 space-y-2">
                         <textarea
                           value={replyDrafts[id] || ''}

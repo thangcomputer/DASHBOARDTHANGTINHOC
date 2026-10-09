@@ -1585,7 +1585,14 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                 />
               </div>
             </div>
-            <LmsTabBar courseTab={courseTab} setCourseTab={setCourseTab} />
+            <LmsTabBar
+              courseTab={courseTab}
+              setCourseTab={setCourseTab}
+              courseId={selectedCourse?._id || selectedCourse?.id || ''}
+              lessonId={currentLesson?._id || ''}
+              audience="teacher"
+              userId={teacherSession?.id || teacherSession?._id || 'teacher'}
+            />
           </div>
 
           <div className="px-4 sm:px-6 py-4 sm:py-5 pb-16 w-full" style={{ background: '#0d1117' }}>

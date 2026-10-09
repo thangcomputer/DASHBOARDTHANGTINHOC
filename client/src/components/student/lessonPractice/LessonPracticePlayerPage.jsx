@@ -64,6 +64,7 @@ function Explanation({ item }) {
 }
 
 const PRACTICE_TYPES = new Set(['mcq', 'multi', 'match', 'drag', 'hotspot', 'written']);
+const COOLDOWN_QUESTION_TYPES = new Set(['mcq', 'multi', 'match', 'drag', 'hotspot']);
 
 function formatClock(seconds) {
   const safe = Math.max(0, Number(seconds) || 0);
@@ -105,7 +106,13 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
   const dragListeners = useRef(null);
 
   useEffect(() => {
-    if (retry?.n) setChoiceId('');
+    if (!retry?.n) return;
+    setChoiceId('');
+    setChoiceIds([]);
+    setMatches({});
+    setOrder(item.options || []);
+    setText('');
+    setPoint(null);
   }, [retry?.n]);
 
   useEffect(() => () => {
@@ -387,6 +394,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
   const [remaining, setRemaining] = useState(0);
   const [expired, setExpired] = useState(false);
   const [started, setStarted] = useState(false);
+  const [wrongAnswerCooldown, setWrongAnswerCooldown] = useState(0);
 
   const items = payload?.items || [];
   const quizzes = items.filter((item) => PRACTICE_TYPES.has(item.type));
@@ -411,6 +419,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
     lessonPracticeApi.student.unit(unitId)
       .then((res) => {
         if (!alive) return;
+        setWrongAnswerCooldown(0);
         setPayload(res.data);
         setStarted(false);
         setClockTry(0);
@@ -443,10 +452,19 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
     return () => window.clearInterval(timer);
   }, [timed, clockLimit, warnAt, clockTry, visibleQuiz?.id, practiceRound, started]);
 
+  useEffect(() => {
+    if (wrongAnswerCooldown <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setWrongAnswerCooldown((remainingSeconds) => Math.max(0, remainingSeconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [wrongAnswerCooldown > 0]);
+
   async function confirm(item, body) {
     unlockAudio();
     setBusyId(item.id);
     setError('');
+    const usesWrongAnswerCooldown = COOLDOWN_QUESTION_TYPES.has(item.type);
     try {
       const res = await lessonPracticeApi.student.confirm(item.id, body);
       if (res.data.retry || res.data.item?.correct === false) playLessonWrongSound();
@@ -456,7 +474,11 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
           ...prev,
           [item.id]: { text: res.data.item?.feedback || 'Bạn sai rồi, vui lòng chọn lại đáp án', n: (prev[item.id]?.n || 0) + 1 },
         }));
+        if (usesWrongAnswerCooldown) setWrongAnswerCooldown(10);
         return;
+      }
+      if (usesWrongAnswerCooldown && res.data.item?.correct === false) {
+        setWrongAnswerCooldown(10);
       }
       setRetries((prev) => {
         if (!prev[item.id]) return prev;
@@ -593,7 +615,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                 </div>
               )}
               {quizzes.length === 0 && others.map((item) => (
-                <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} onConfirm={(answer) => confirm(item, answer)} />
+                <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} waiting={wrongAnswerCooldown > 0} onConfirm={(answer) => confirm(item, answer)} />
               ))}
               {visibleQuiz && (
                 <QuestionCard
@@ -602,7 +624,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                   index={visibleIndex + 1}
                   busy={busyId === visibleQuiz.id}
                   open
-                  waiting={!started}
+                  waiting={!started || wrongAnswerCooldown > 0}
                   expired={timed && started && expired}
                   retry={retries[visibleQuiz.id]}
                   onRetryTime={() => setClockTry((tryCount) => tryCount + 1)}
@@ -629,6 +651,40 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
               {items.length === 0 && <p className="text-sm text-slate-500">Buổi này chưa có bài luyện tập.</p>}
             </div>
           </>
+        )}
+        {wrongAnswerCooldown > 0 && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="wrong-answer-cooldown-title"
+            aria-describedby="wrong-answer-cooldown-description"
+          >
+            <div className="w-full max-w-sm rounded-3xl border border-red-100 bg-white p-7 text-center shadow-2xl">
+              <div className="relative mx-auto mb-5 grid h-28 w-28 place-items-center">
+                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle cx="50" cy="50" r="43" fill="none" stroke="#fee2e2" strokeWidth="8" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="43"
+                    fill="none"
+                    stroke="#dc2626"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 43}
+                    strokeDashoffset={(2 * Math.PI * 43) * (1 - wrongAnswerCooldown / 10)}
+                    className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+                  />
+                </svg>
+                <span className="text-4xl font-black tabular-nums text-red-700">{wrongAnswerCooldown}</span>
+              </div>
+              <h2 id="wrong-answer-cooldown-title" className="text-lg font-black text-slate-900">Hãy bình tĩnh suy nghĩ</h2>
+              <p id="wrong-answer-cooldown-description" className="mt-2 text-sm leading-relaxed text-slate-600">
+                Đáp án chưa chính xác. Vui lòng chờ hết đếm ngược rồi hãy chọn lại.
+              </p>
+            </div>
+          </div>
         )}
     </div>
   );

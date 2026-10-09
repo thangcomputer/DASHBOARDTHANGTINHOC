@@ -6,8 +6,10 @@ const TABS = [
   { key: 'video', label: 'Video', icon: PlayCircle, to: '/student#materials-videos' },
 ];
 
-export default function LessonVideoTabs({ active }) {
+export default function LessonVideoTabs({ active, hidden = false }) {
   const navigate = useNavigate();
+  if (hidden) return null;
+
   return (
     <div className="mb-5 inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
       {TABS.map((t) => (

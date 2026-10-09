@@ -54,6 +54,34 @@ function uploadImage(req, res, next) {
   });
 }
 
+router.get('/backup/export', ...requireAdmin, async (req, res) => {
+  try {
+    const data = await service.exportBackup();
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+const backupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+router.post('/backup/import', ...requireAdmin, (req, res, next) => {
+  backupUpload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: 'Không đọc được file (tối đa 50MB)' });
+    return next();
+  });
+}, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Chưa chọn file sao lưu' });
+    let payload;
+    try {
+      payload = JSON.parse(req.file.buffer.toString('utf8'));
+    } catch {
+      return res.status(400).json({ success: false, message: 'File không phải JSON hợp lệ' });
+    }
+    const data = await service.importBackup(payload);
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
 router.get('/subjects', ...requireAdmin, async (req, res) => {
   try {
     const data = await service.listSubjectsAdmin();
@@ -171,7 +199,7 @@ router.post('/upload', ...requireAdmin, uploadImage, async (req, res) => {
     });
     return res.status(201).json({
       success: true,
-      data: { id: asset._id, url: asset.url },
+      data: { id: asset._id, url: asset.url, originalName: asset.originalName },
     });
   } catch (err) { return sendError(res, err); }
 });

@@ -13,6 +13,7 @@ const {
 const { policyShadowCourse } = require('../middleware/policyShadowCourse');
 const { coursesCutoverGate } = require('../middleware/coursesCutoverGate');
 const { generateCourseCode } = require('../services/businessCodeService');
+const { effectiveCoursePrice } = require('../utils/coursePricing');
 
 const router = express.Router();
 
@@ -139,6 +140,20 @@ function calcEffectivePrice(price, discountPercent) {
   return Math.round(price * (1 - discountPercent / 100));
 }
 
+function parseDiscountSchedule(startsAt, endsAt) {
+  const parseDate = (value) => {
+    if (value == null || value === '') return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  };
+  const start = parseDate(startsAt);
+  const end = parseDate(endsAt);
+  if (start === undefined || end === undefined) return { error: 'Thời gian khuyến mãi không hợp lệ' };
+  if (Boolean(start) !== Boolean(end)) return { error: 'Cần nhập đủ thời gian bắt đầu và kết thúc khuyến mãi' };
+  if (start && end <= start) return { error: 'Thời gian kết thúc phải sau thời gian bắt đầu' };
+  return { start, end };
+}
+
 async function loadCustomExamSubjects() {
   const settings = await getCachedSettings();
   return settings?.examSubjectsCustomRaw;
@@ -159,6 +174,10 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
   try {
     const body = { ...req.body };
     delete body.courseCode; // server-only
+    const schedule = parseDiscountSchedule(body.discountStartsAt, body.discountEndsAt);
+    if (schedule.error) return res.status(400).json({ success: false, message: schedule.error });
+    body.discountStartsAt = schedule.start;
+    body.discountEndsAt = schedule.end;
     if (body.price !== undefined) {
       body.discountPrice = calcEffectivePrice(Number(body.price), Number(body.discountPercent || 0));
     }
@@ -173,7 +192,7 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
     return res.status(201).json({
       success: true,
       message: `Đã tạo khóa học: ${course.name}`,
-      data: { ...course.toObject(), effectivePrice: course.discountPercent > 0 ? course.discountPrice : course.price },
+      data: { ...course.toObject(), effectivePrice: effectiveCoursePrice(course) },
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -188,8 +207,27 @@ router.post('/', courseWriteGuard('create'), async (req, res) => {
 router.put('/:id', courseWriteGuard('update'), async (req, res) => {
   try {
     const body = { ...req.body };
+    let course;
+    if (
+      body.price !== undefined
+      || body.discountPercent !== undefined
+      || body.discountStartsAt !== undefined
+      || body.discountEndsAt !== undefined
+    ) {
+      course = await Course.findById(req.params.id).lean();
+      if (!course) return res.status(404).json({ success: false, message: 'Không tìm thấy khóa học' });
+      const schedule = parseDiscountSchedule(
+        Object.prototype.hasOwnProperty.call(body, 'discountStartsAt') ? body.discountStartsAt : course.discountStartsAt,
+        Object.prototype.hasOwnProperty.call(body, 'discountEndsAt') ? body.discountEndsAt : course.discountEndsAt,
+      );
+      if (schedule.error) return res.status(400).json({ success: false, message: schedule.error });
+      if (body.discountStartsAt !== undefined || body.discountEndsAt !== undefined) {
+        body.discountStartsAt = schedule.start;
+        body.discountEndsAt = schedule.end;
+      }
+    }
     if (body.price !== undefined || body.discountPercent !== undefined) {
-      const course = await Course.findById(req.params.id).lean();
+      course ||= await Course.findById(req.params.id).lean();
       const price  = Number(body.price ?? course?.price ?? 0);
       const pct    = Number(body.discountPercent ?? course?.discountPercent ?? 0);
       body.discountPrice = calcEffectivePrice(price, pct);
@@ -208,7 +246,7 @@ router.put('/:id', courseWriteGuard('update'), async (req, res) => {
     }
     await invalidateCourseCache();
 
-    const ep = updated.discountPercent > 0 ? updated.discountPrice : updated.price;
+    const ep = effectiveCoursePrice(updated);
     return res.json({
       success: true,
       message: `Đã cập nhật khóa học: ${updated.name}`,
@@ -238,7 +276,7 @@ router.patch('/:id/price', courseWriteGuard('price'), async (req, res) => {
     return res.json({
       success: true,
       message: `Đã cập nhật giá: ${dp.toLocaleString('vi-VN')}đ`,
-      data: { ...course.toObject(), effectivePrice: dp },
+      data: { ...course.toObject(), effectivePrice: effectiveCoursePrice(course) },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });

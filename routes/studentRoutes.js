@@ -14,6 +14,7 @@ const { policyShadowStudentMutation } = require('../middleware/policyShadowStude
 const { dataScopeObserve } = require('../middleware/dataScopeObserve');
 const { validateOwnedCertificationFile } = require('../utils/certificationFilePolicy');
 const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
+const { effectiveCoursePrice } = require('../utils/coursePricing');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -2778,7 +2779,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
     }
 
     const sessions = Number(totalSessions) > 0 ? Number(totalSessions) : (catalogCourse?.totalSessions || 12);
-    const resolvedPrice = Number(price) || catalogCourse?.discountPrice || catalogCourse?.price || 0;
+    const resolvedPrice = Number(price) || (catalogCourse ? effectiveCoursePrice(catalogCourse) : 0);
     const isPaid = paid === true || paid === 'true' || paid === 1 || paid === '1';
     const examSubjects = await resolveEnrollmentExamSubjects({
       courseName: resolvedName,

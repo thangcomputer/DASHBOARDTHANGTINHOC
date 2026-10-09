@@ -11,6 +11,7 @@ const {
   studentHasCourse,
 } = require('../../services/lessonPracticePurchaseService');
 const { isPreviewUnit } = require('../../services/lessonPracticeService');
+const { isCourseDiscountActive, effectiveCoursePrice: priceAtTime } = require('../../utils/coursePricing');
 
 test('multi, match and drag grade only the full correct answer', () => {
   const multi = {
@@ -38,7 +39,11 @@ test('multi, match and drag grade only the full correct answer', () => {
   });
   assert.equal(timed.timeLimitSec, 90);
   assert.equal(rules.normalizeItem({ ...timed, timeLimitSec: 99999 }).timeLimitSec, 3600);
+  const imageItem = rules.normalizeItem({ ...timed, imageName: 'hinh-minh-hoa.jpg' });
+  assert.equal(imageItem.imageName, 'hinh-minh-hoa.jpg');
+  assert.equal(rules.normalizeItem({ ...timed, imageName: 'a'.repeat(300) }).imageName.length, 255);
   assert.equal(rules.publicItem({ _id: '1', type: 'mcq', timeLimitSec: 45 }).timeLimitSec, 45);
+  assert.equal('imageName' in rules.publicItem({ _id: '1', type: 'mcq', imageName: 'hinh-minh-hoa.jpg' }), false);
   assert.equal(rules.clampTimeLimit(60), 60);
   assert.equal(rules.clampTimeLimit(0), 0);
   assert.equal(rules.clampTimeLimit(-5), 0);
@@ -108,6 +113,27 @@ test('course purchases use the active discounted price and only treat accessible
   assert.equal(studentHasCourse({
     enrollments: [{ courseId: 'course-1', status: 'refunded', learningAccess: false }],
   }, course), false);
+});
+
+test('scheduled course discounts activate and expire at their configured timestamps', () => {
+  const course = {
+    price: 100000,
+    discountPrice: 80000,
+    discountPercent: 20,
+    discountStartsAt: '2026-10-10T00:00:00.000Z',
+    discountEndsAt: '2026-10-11T00:00:00.000Z',
+  };
+  assert.equal(isCourseDiscountActive(course, new Date('2026-10-09T23:59:59.999Z')), false);
+  assert.equal(priceAtTime(course, new Date('2026-10-09T23:59:59.999Z')), 100000);
+  assert.equal(isCourseDiscountActive(course, new Date('2026-10-10T00:00:00.000Z')), true);
+  assert.equal(priceAtTime(course, new Date('2026-10-10T12:00:00.000Z')), 80000);
+  assert.equal(isCourseDiscountActive(course, new Date('2026-10-11T00:00:00.000Z')), false);
+  assert.equal(priceAtTime(course, new Date('2026-10-11T00:00:00.000Z')), 100000);
+  assert.equal(isCourseDiscountActive({
+    price: 100000,
+    discountPrice: 80000,
+    discountPercent: 20,
+  }, new Date('2026-10-11T00:00:00.000Z')), true);
 });
 
 test('preview access is enabled only for units explicitly opened by an admin', () => {
@@ -218,6 +244,16 @@ test('later units stay locked until every previous unit is completed', () => {
   assert.equal(rules.isUnitLocked(units, new Set(), 'b'), true);
   assert.equal(rules.isUnitLocked(units, new Set(['a']), 'b'), false);
   assert.equal(rules.isUnitLocked(units, new Set(['a']), 'c'), true);
+});
+
+test('an explicitly preview-enabled unit can open before earlier units are completed', () => {
+  const units = [
+    { _id: 'a', sortOrder: 1 },
+    { _id: 'b', sortOrder: 2 },
+    { _id: 'c', sortOrder: 3 },
+  ];
+  assert.equal(rules.isUnitLocked(units, new Set(), 'c', new Set(['c'])), false);
+  assert.equal(rules.isUnitLocked(units, new Set(), 'b'), true);
 });
 
 test('admin progress summary has no score fields', () => {

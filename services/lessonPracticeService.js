@@ -9,6 +9,7 @@ const LessonUnitProgress = require('../models/LessonUnitProgress');
 const LessonAnswer = require('../models/LessonAnswer');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
+const { isCourseDiscountActive, effectiveCoursePrice } = require('../utils/coursePricing');
 const SystemSettings = require('../models/SystemSettings');
 const {
   getMergedExamCatalog,
@@ -98,6 +99,7 @@ function mapUnit(doc, extra = {}) {
       id: String(item.id || `video-${index + 1}`),
       title: String(item.title || `Video ${index + 1}`),
       url: String(item.url || ''),
+      antiSeek: typeof item.antiSeek === 'boolean' ? item.antiSeek : doc.antiSeek !== false,
     })),
     contents: contents.map((item, index) => ({
       id: String(item.id || `note-${index + 1}`),
@@ -124,6 +126,7 @@ function mapItemAdmin(doc) {
     sortOrder: doc.sortOrder || 0,
     prompt: doc.prompt || '',
     imageUrl: doc.imageUrl || '',
+    imageName: doc.imageName || '',
     caption: doc.caption || '',
     region: doc.region || null,
     options: doc.options || [],
@@ -323,6 +326,7 @@ async function updateUnit(id, body) {
         id: videoId,
         title: String(item.title || '').trim().slice(0, 200) || `Video ${index + 1}`,
         url,
+        antiSeek: typeof item.antiSeek === 'boolean' ? item.antiSeek : body.antiSeek !== false && doc.antiSeek !== false,
       }];
     });
     doc.videoUrl = doc.videos[0]?.url || '';
@@ -330,7 +334,7 @@ async function updateUnit(id, body) {
   if (Array.isArray(body.contents)) {
     const usedIds = new Set();
     doc.contents = body.contents.flatMap((item, index) => {
-      const content = String(item?.content || '').slice(0, 20000);
+      const content = String(item?.content || '').slice(0, 200000);
       if (!content.trim()) return [];
       const contentId = String(item.id || crypto.randomUUID()).slice(0, 100);
       if (usedIds.has(contentId)) throw httpError(400, 'Mỗi nội dung cần có mã riêng');
@@ -541,7 +545,7 @@ async function previewCourseForSubject(subject, requestedCourseId = '') {
   const [settings, courses] = await Promise.all([
     SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
     Course.find({ status: 'published', deletedAt: null })
-      .select('name price discountPrice discountPercent examSubjects')
+      .select('name price discountPrice discountPercent discountStartsAt discountEndsAt examSubjects')
       .lean(),
   ]);
   const candidates = courses.filter((course) => {
@@ -554,17 +558,21 @@ async function previewCourseForSubject(subject, requestedCourseId = '') {
       .sort((a, b) => effectiveCoursePriceForPreview(a) - effectiveCoursePriceForPreview(b))[0]
     || candidates.sort((a, b) => effectiveCoursePriceForPreview(a) - effectiveCoursePriceForPreview(b))[0];
   if (!selected) return null;
+  const catalogById = new Map(
+    getMergedExamCatalog(settings?.examSubjectsCustomRaw)
+      .map((entry) => [entry.id, catalogLabel(entry)]),
+  );
+  const subjectIds = resolveExamSubjectsForCourse(selected, settings?.examSubjectsCustomRaw);
   return {
     id: String(selected._id),
     name: selected.name,
     price: effectiveCoursePriceForPreview(selected),
+    subjects: subjectIds.map((id) => catalogById.get(id) || id),
   };
 }
 
 function effectiveCoursePriceForPreview(course) {
-  const price = Number(course?.price) || 0;
-  const discountPrice = Number(course?.discountPrice) || 0;
-  return Number(course?.discountPercent) > 0 && discountPrice > 0 ? discountPrice : price;
+  return effectiveCoursePrice(course);
 }
 
 /**
@@ -572,9 +580,9 @@ function effectiveCoursePriceForPreview(course) {
  * ưu tiên khóa lẻ (1 môn); nếu không có thì dùng gói rẻ nhất chứa môn đó.
  */
 async function courseOffersBySubject(subjects) {
-  const courses = await Course.find({ status: 'published', deletedAt: null }).select('name description thumbnail price discountPrice discountPercent examSubjects').lean();
+  const courses = await Course.find({ status: 'published', deletedAt: null }).select('name description thumbnail price discountPrice discountPercent discountStartsAt discountEndsAt examSubjects').lean();
   const offers = courses.map((course) => {
-    const hasDiscount = course.discountPercent > 0 && course.discountPrice > 0;
+    const hasDiscount = isCourseDiscountActive(course);
     return {
       keys: new Set((course.examSubjects || []).map((id) => rules.normalizeSubjectKey(id)).filter(Boolean)),
       single: (course.examSubjects || []).length === 1,
@@ -611,10 +619,10 @@ async function listSubjectsForStudent(studentId) {
   const [units, progress, student, settings, courses] = await Promise.all([
     LessonUnit.find({ subjectId: { $in: subjectIds }, isActive: true }).select('subjectId').lean(),
     LessonUnitProgress.find({ studentId, subjectId: { $in: subjectIds }, status: 'completed' }).select('subjectId').lean(),
-    Student.findById(studentId).select('course courseId enrollments').lean(),
+    Student.findById(studentId).select('course courseId teacherId enrollments').lean(),
     SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
     Course.find({ status: 'published', deletedAt: null })
-      .select('name description thumbnail price discountPrice discountPercent totalSessions examSubjects')
+      .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects')
       .sort({ createdAt: -1 })
       .lean(),
   ]);
@@ -642,7 +650,13 @@ async function listSubjectsForStudent(studentId) {
   }));
   const enrollmentRows = Array.isArray(student?.enrollments) && student.enrollments.length
     ? student.enrollments
-    : (student?.course ? [{ courseName: student.course, courseId: student.courseId, status: 'active', learningAccess: true }] : []);
+    : (student?.course ? [{
+      courseName: student.course,
+      courseId: student.courseId,
+      teacherId: student.teacherId,
+      status: 'active',
+      learningAccess: true,
+    }] : []);
   const learningEnrollments = enrollmentRows.filter((enrollment) =>
     String(enrollment?.status || 'active').toLowerCase() === 'active'
     && enrollment?.learningAccess !== false);
@@ -654,25 +668,32 @@ async function listSubjectsForStudent(studentId) {
       labelsById,
       granted,
     );
-    const enrolled = learningEnrollments.some((enrollment) =>
+    const matchesCourse = (enrollment) =>
       (enrollment.courseId && String(enrollment.courseId) === String(course._id))
       || (
         enrollment.courseName
         && rules.normalizeSubjectKey(enrollment.courseName) === rules.normalizeSubjectKey(course.name)
-      ));
-    const hasDiscount = Number(course.discountPercent) > 0 && Number(course.discountPrice) > 0;
+      );
+    const courseEnrollment = learningEnrollments.find(matchesCourse);
+    const enrolled = Boolean(courseEnrollment);
+    const hasDiscount = isCourseDiscountActive(course);
     return {
       id: String(course._id),
       name: course.name,
       description: String(course.description || '').trim(),
       thumbnail: String(course.thumbnail || '').trim(),
+      bannerColorStart: course.bannerColorStart || '',
+      bannerColorEnd: course.bannerColorEnd || '',
       price: hasDiscount ? course.discountPrice : course.price,
       originalPrice: hasDiscount ? course.price : null,
       discountPercent: hasDiscount ? course.discountPercent : 0,
+      discountStartsAt: hasDiscount && course.discountStartsAt ? course.discountStartsAt : null,
+      discountEndsAt: hasDiscount && course.discountEndsAt ? course.discountEndsAt : null,
       totalSessions: course.totalSessions || 0,
       offerType: examSubjectIds.length === 1 ? 'single' : 'bundle',
       subjects: courseSubjects,
       enrolled,
+      hasAssignedTeacher: Boolean(courseEnrollment?.teacherId),
     };
   });
   return { subjects: studentSubjects, courses: courseCatalog };
@@ -690,17 +711,16 @@ async function listUnitsForStudent(studentId, subjectId, requestedCourseId = '')
   const progressByUnit = new Map(progress.map((p) => [String(p.unitId), p]));
   const states = await completionStates(studentId, units);
   const done = new Set([...states.entries()].filter(([, state]) => state.completed).map(([id]) => id));
-  const previewUnitIds = new Set(subjectIsOpen
-    ? []
-    : units.filter(isPreviewUnit).map((unit) => String(unit._id)));
+  const previewUnitIds = new Set(units.filter(isPreviewUnit).map((unit) => String(unit._id)));
   return {
     subject: mapSubject(subject, {
       previewOnly: !subjectIsOpen,
       purchaseCourse,
     }),
     units: units.map((unit) => {
-      const isPreview = previewUnitIds.has(String(unit._id));
-      const locked = rules.isUnitLocked(units, done, unit._id);
+      const previewAllowed = previewUnitIds.has(String(unit._id));
+      const isPreview = !subjectIsOpen && previewAllowed;
+      const locked = rules.isUnitLocked(units, done, unit._id, previewAllowed ? previewUnitIds : undefined);
       const row = progressByUnit.get(String(unit._id));
       const check = states.get(String(unit._id))?.check || rules.unitChecklist(unit, row, false);
       const purchaseRequired = !subjectIsOpen && !isPreview;
@@ -741,7 +761,7 @@ async function loadStudentUnit(studentId, unitId) {
     throw httpError(403, 'Khóa học này hiện không mở bán');
   }
   const done = await completedUnitIds(studentId, subject._id, units);
-  if (rules.isUnitLocked(units, done, unit._id)) {
+  if (rules.isUnitLocked(units, done, unit._id, isPreviewUnit(unit) ? new Set([String(unit._id)]) : undefined)) {
     throw httpError(403, 'Hoàn thành buổi trước để mở buổi này');
   }
   return { unit, subject, isPreview };
@@ -992,7 +1012,127 @@ async function resetPractice(studentId, unitId) {
   return getUnitForStudent(studentId, unit._id);
 }
 
+const BACKUP_FORMAT = 'lesson-practice-backup';
+
+async function exportBackup() {
+  const [subjects, units, items] = await Promise.all([
+    LessonSubject.find({}).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    LessonUnit.find({}).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    LessonItem.find({}).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+  ]);
+  const itemsByUnit = new Map();
+  items.forEach((item) => {
+    const key = String(item.unitId);
+    if (!itemsByUnit.has(key)) itemsByUnit.set(key, []);
+    itemsByUnit.get(key).push(mapItemAdmin(item));
+  });
+  const unitsBySubject = new Map();
+  units.forEach((unit) => {
+    const key = String(unit.subjectId);
+    if (!unitsBySubject.has(key)) unitsBySubject.set(key, []);
+    unitsBySubject.get(key).push({
+      ...mapUnit(unit),
+      items: itemsByUnit.get(String(unit._id)) || [],
+    });
+  });
+  return {
+    format: BACKUP_FORMAT,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    subjects: subjects.map((subject) => ({
+      ...mapSubject(subject),
+      units: unitsBySubject.get(String(subject._id)) || [],
+    })),
+  };
+}
+
+async function findBackupSubject(entry) {
+  const examSubjectId = String(entry?.examSubjectId || '').trim();
+  if (examSubjectId) {
+    const found = await LessonSubject.findOne({ examSubjectId });
+    if (found) return found;
+  }
+  const slug = String(entry?.slug || '').trim();
+  if (slug) {
+    const found = await LessonSubject.findOne({ slug });
+    if (found) return found;
+  }
+  const name = String(entry?.name || '').trim();
+  return name ? LessonSubject.findOne({ name }) : null;
+}
+
+async function importBackup(payload) {
+  if (!payload || payload.format !== BACKUP_FORMAT || !Array.isArray(payload.subjects)) {
+    throw httpError(400, 'File sao lưu không hợp lệ');
+  }
+  const result = {
+    subjects: 0, units: 0, items: 0, skippedSubjects: [], skippedItems: 0,
+  };
+  for (const entry of payload.subjects) {
+    const subject = await findBackupSubject(entry);
+    if (!subject) {
+      result.skippedSubjects.push(String(entry?.name || 'Không rõ tên'));
+      continue;
+    }
+    result.subjects += 1;
+    for (const unitEntry of Array.isArray(entry.units) ? entry.units : []) {
+      const title = String(unitEntry?.title || '').trim();
+      if (!title) continue;
+      let unit = null;
+      if (isId(unitEntry.id)) {
+        unit = await LessonUnit.findById(unitEntry.id);
+        if (unit && String(unit.subjectId) !== String(subject._id)) unit = null;
+      }
+      if (!unit) unit = await LessonUnit.findOne({ subjectId: subject._id, title });
+      if (!unit) {
+        const reuseId = isId(unitEntry.id) && !(await LessonUnit.exists({ _id: unitEntry.id }));
+        unit = await LessonUnit.create({
+          ...(reuseId ? { _id: unitEntry.id } : {}),
+          subjectId: subject._id,
+          title,
+          sortOrder: Number(unitEntry.sortOrder) || 0,
+        });
+      }
+      await updateUnit(unit._id, {
+        title,
+        sortOrder: unitEntry.sortOrder,
+        isActive: unitEntry.isActive,
+        isPreviewAllowed: unitEntry.isPreviewAllowed,
+        antiSeek: unitEntry.antiSeek,
+        timeLimitSec: unitEntry.timeLimitSec,
+        videos: Array.isArray(unitEntry.videos) ? unitEntry.videos : undefined,
+        contents: Array.isArray(unitEntry.contents) ? unitEntry.contents : undefined,
+      });
+      for (const itemEntry of Array.isArray(unitEntry.items) ? unitEntry.items : []) {
+        if (rules.validateItemPayload(itemEntry)) {
+          result.skippedItems += 1;
+          continue;
+        }
+        const data = { ...rules.normalizeItem(itemEntry), videoId: '', unitId: unit._id, subjectId: subject._id };
+        let item = isId(itemEntry.id) ? await LessonItem.findById(itemEntry.id) : null;
+        if (item && String(item.unitId) !== String(unit._id)) item = null;
+        if (item) {
+          Object.assign(item, data);
+          if (!data.region) item.region = undefined;
+          await item.save();
+        } else {
+          const reuseId = isId(itemEntry.id) && !(await LessonItem.exists({ _id: itemEntry.id }));
+          await LessonItem.create({ ...(reuseId ? { _id: itemEntry.id } : {}), ...data });
+        }
+        result.items += 1;
+      }
+      if (Array.isArray(unitEntry.contentOrder)) {
+        await updateUnit(unit._id, { contentOrder: unitEntry.contentOrder });
+      }
+      result.units += 1;
+    }
+  }
+  return result;
+}
+
 module.exports = {
+  exportBackup,
+  importBackup,
   listSubjectsAdmin,
   listCoursesForAdmin,
   updateSubject,

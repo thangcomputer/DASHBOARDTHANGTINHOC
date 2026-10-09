@@ -6,6 +6,7 @@ const Course = require('../models/Course');
 const PaymentSession = require('../models/PaymentSession');
 const Student = require('../models/Student');
 const { settlePayment } = require('./ledgerService');
+const { effectiveCoursePrice: getEffectiveCoursePrice } = require('../utils/coursePricing');
 
 function httpError(status, message) {
   const error = new Error(message);
@@ -22,9 +23,7 @@ function normalizeCourseName(value) {
 }
 
 function effectiveCoursePrice(course) {
-  const price = Number(course?.price) || 0;
-  const discountPrice = Number(course?.discountPrice) || 0;
-  return Number(course?.discountPercent) > 0 && discountPrice > 0 ? discountPrice : price;
+  return getEffectiveCoursePrice(course);
 }
 
 function studentHasCourse(student, course) {
@@ -62,7 +61,7 @@ async function checkoutCourse({ user, courseId }) {
 
   const [course, student] = await Promise.all([
     Course.findOne({ _id: courseId, status: 'published', deletedAt: null })
-      .select('name price discountPrice discountPercent totalSessions examSubjects')
+      .select('name price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects')
       .lean(),
     Student.findById(studentId).select('name studentCode branchId course courseId enrollments').lean(),
   ]);

@@ -10,6 +10,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { apiFetch, getAccessToken } from '../../../services/api';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
+import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
 
 function readPortalAccessToken() {
   return (
@@ -111,7 +112,7 @@ export default function AddStudentModal({
         if (res.success && res.data.length) {
           setDbCourses(res.data);
           const first = res.data[0];
-          const ep = Math.round(first.price * (1 - (first.discountPercent || 0) / 100));
+          const ep = getEffectiveCoursePrice(first);
           let defaultBranchId = '';
           if (selectedBranchId && selectedBranchId !== 'all') {
              defaultBranchId = selectedBranchId;
@@ -192,7 +193,7 @@ export default function AddStudentModal({
     if (name === 'courseId') {
       const c = dbCourses.find(x => x._id === value);
       if (c) {
-        const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
+        const ep = getEffectiveCoursePrice(c);
         const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
         setForm(f => ({
           ...f,
@@ -718,7 +719,7 @@ export default function AddStudentModal({
                 {dbCourses.length > 0 ? (
                   <CmsSelect name="courseId" value={form.courseId} onChange={handleChange} className="cms-input">
                     {dbCourses.map((c) => {
-                      const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
+                      const ep = getEffectiveCoursePrice(c);
                       const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
                       return (
                         <option key={c._id} value={c._id}>
@@ -766,7 +767,7 @@ export default function AddStudentModal({
                           const c = dbCourses.find((x) => String(x._id) === String(form.courseId));
                           if (!c) return;
                           const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
-                          const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
+                          const ep = getEffectiveCoursePrice(c);
                           setForm((f) => ({ ...f, totalSessions: sessions, price: ep }));
                         }}
                       >

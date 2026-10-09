@@ -31,7 +31,6 @@ import { getGradeBadgeClasses, getGradeIconClasses } from '../utils/gradeColors'
 import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
 import LmsPlayerPanels, { LmsTabBar } from './lms/LmsPlayerTabs';
 import StudentVideoPlayer from './lms/StudentVideoPlayer';
-import LessonVideoTabs from './student/LessonVideoTabs';
 import LessonSidebarMeta from './lms/LessonSidebarMeta';
 import {
   isLessonAntiSeekEnabled,
@@ -1281,7 +1280,6 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             ))}
           </div>
         )}
-        {hideTabBar && mainTab === 'courses' && !selectedCourse && <LessonVideoTabs active="video" />}
         {hideTabBar && <div className="mb-5 border-b border-slate-200" />}
 
         {mainTab === 'courses' && (
@@ -2077,7 +2075,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 />
               </div>
             </div>
-            <LmsTabBar courseTab={courseTab} setCourseTab={setCourseTab} />
+            <LmsTabBar
+              courseTab={courseTab}
+              setCourseTab={setCourseTab}
+              courseId={selectedCourse?._id || selectedCourse?.id || ''}
+              lessonId={currentLesson?._id || ''}
+              audience="student"
+              userId={session?.id || student?.id || 'student'}
+            />
           </div>
 
           <div className="px-4 sm:px-6 py-4 sm:py-5 pb-16 w-full" style={{ background: '#0d1117' }}>
@@ -2251,7 +2256,4 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 };
 
 export default StudentTrainingLMS;
-
-
-
 

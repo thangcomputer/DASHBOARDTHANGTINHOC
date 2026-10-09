@@ -15,6 +15,8 @@ import RichTextEditor from '../shared/RichTextEditor';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import { getExamSubjectOptions } from '../../../utils/examSubjects';
+import { DEFAULT_LEARNING_GUIDE_HTML, getLearningGuideVideoEmbedUrl } from '../../../utils/learningGuide';
+import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlContent';
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { useData } from '../../../context/DataContext';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
@@ -61,7 +63,7 @@ function findDocumentCourse(courses, document) {
   ) || null;
 }
 
-export default function AdminStudentTrainingTab({ videoCoursesOnly = false, resourceOnly = false, examRoomOnly = false }) {
+export default function AdminStudentTrainingTab({ videoCoursesOnly = false, resourceOnly = false, examRoomOnly = false, learningGuideOnly = false }) {
   const {
     students, showGlobalModal, BLANK_Q,
     erSearch, setErSearch, gradingRow, setGradingRow,
@@ -109,8 +111,10 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
     removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
     updateExamResult, addExamResult, examSubjectsCatalog,
   } = useAdminTraining();
-  const { examAdminGroupLabel } = useData();
-  const sTrainingTab = examRoomOnly
+  const { examAdminGroupLabel, setStudentTrainingData } = useData();
+  const sTrainingTab = learningGuideOnly
+    ? 'learning-guide'
+    : examRoomOnly
     ? storedSTrainingTab === 'exam-results' ? 'exam-results' : 'questions'
     : resourceOnly
     ? ['files', 'softwareLinks'].includes(storedSTrainingTab) ? storedSTrainingTab : 'files'
@@ -122,6 +126,35 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
   const [courseCatalogLoading, setCourseCatalogLoading] = React.useState(true);
   const [courseCatalogError, setCourseCatalogError] = React.useState('');
   const [coverUploading, setCoverUploading] = React.useState(false);
+  const [learningGuideHtml, setLearningGuideHtml] = React.useState(DEFAULT_LEARNING_GUIDE_HTML);
+  const [learningGuideVideoUrl, setLearningGuideVideoUrl] = React.useState('');
+  const [learningGuideSaving, setLearningGuideSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (sTrainingTab !== 'learning-guide') return;
+    setLearningGuideHtml(typeof studentTrainingData?.learningGuideHtml === 'string'
+      ? studentTrainingData.learningGuideHtml
+      : DEFAULT_LEARNING_GUIDE_HTML);
+    setLearningGuideVideoUrl(studentTrainingData?.learningGuideVideoUrl || '');
+  }, [sTrainingTab, studentTrainingData?.learningGuideHtml, studentTrainingData?.learningGuideVideoUrl]);
+
+  const saveLearningGuide = async () => {
+    const updatedData = {
+      ...studentTrainingData,
+      learningGuideHtml,
+      learningGuideVideoUrl: learningGuideVideoUrl.trim(),
+    };
+    setLearningGuideSaving(true);
+    try {
+      await api.settings.updateStudentTrainingData(updatedData);
+      setStudentTrainingData(updatedData);
+      toast.success('Đã lưu hướng dẫn học');
+    } catch (err) {
+      toast.error(err.message || 'Không lưu được hướng dẫn học');
+    } finally {
+      setLearningGuideSaving(false);
+    }
+  };
 
   const handleCoverUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -232,7 +265,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
               ) : (
               <>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                {!videoCoursesOnly && (
+                {!videoCoursesOnly && !learningGuideOnly && (
                   <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
                     <BookOpen size={20} className="text-sky-700 shrink-0" /> {resourceOnly ? 'Tài liệu & link phần mềm' : examRoomOnly ? 'Phòng thi' : 'Quản lý Đào tạo Học viên'}
                   </h2>
@@ -241,18 +274,19 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
 
               {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}
               <div className="flex flex-col gap-3 lg:gap-4">
-              {!videoCoursesOnly && !resourceOnly && !examRoomOnly && (
+              {!videoCoursesOnly && !resourceOnly && !examRoomOnly && !learningGuideOnly && (
               <div className="cms-hscroll-tabs w-full rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                 <div className="cms-hscroll-tabs__track">
                 {[
                   { key: 'files', icon: Download, label: 'Tài liệu & link phần mềm', count: (studentTrainingData?.files?.length || 0) + (studentTrainingData?.softwareLinks?.length || 0) },
                   { key: 'exam-room', icon: Trophy, label: 'Phòng thi', count: (studentQuestions?.length || 0) + summarizeExamProgress(students).total },
+                  { key: 'learning-guide', icon: BookOpen, label: 'Hướng dẫn học' },
                 ].map(t => (
                   <button
                     key={t.key}
                     type="button"
-                    title={`${t.label} (${t.count})`}
-                    aria-label={`${t.label} (${t.count})`}
+                    title={t.count === undefined ? t.label : `${t.label} (${t.count})`}
+                    aria-label={t.count === undefined ? t.label : `${t.label} (${t.count})`}
                     onClick={() => {
                       setSTrainingTab(t.key === 'exam-room' ? (sTrainingTab === 'exam-results' ? 'exam-results' : 'questions') : t.key);
                       setSTrainingForm(null);
@@ -261,14 +295,16 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                     className={`cms-hscroll-tab ${
                       (t.key === 'files'
                         ? ['files', 'softwareLinks'].includes(sTrainingTab)
-                        : ['questions', 'exam-results'].includes(sTrainingTab))
+                        : t.key === 'exam-room'
+                          ? ['questions', 'exam-results'].includes(sTrainingTab)
+                          : sTrainingTab === 'learning-guide')
                         ? 'bg-red-600 text-white shadow-md'
                         : 'text-gray-500 hover:bg-gray-100'
                     }`}
                   >
                     <t.icon size={16} className="shrink-0" aria-hidden="true" />
                     <span className="cms-hscroll-tab__label">{t.label}</span>
-                    <span className="cms-hscroll-tab__count">({t.count})</span>
+                    {t.count !== undefined && <span className="cms-hscroll-tab__count">({t.count})</span>}
                   </button>
                 ))}
                 </div>
@@ -319,13 +355,91 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                 </div>
               )}
 
-              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && (
+              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && sTrainingTab !== 'learning-guide' && (
                 <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
                   className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
                   <Plus size={15} /> {sTrainingTab === 'videos' ? 'Gắn nội dung khóa đã tạo' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                 </button>
               )}
               </div>
+              {sTrainingTab === 'learning-guide' ? (
+                <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Hướng dẫn học viên</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Nội dung này hiển thị trong tab Hướng dẫn học ở danh mục khóa học. Có thể chèn ảnh trong trình soạn thảo và nhúng video YouTube hoặc Vimeo.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Nội dung hướng dẫn</label>
+                    <RichTextEditor
+                      value={learningGuideHtml}
+                      onChange={setLearningGuideHtml}
+                      placeholder="Soạn hướng dẫn từng bước, định dạng chữ, danh sách và chèn hình ảnh..."
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="learning-guide-video" className="mb-1 block text-xs font-bold uppercase text-slate-500">Video hướng dẫn (YouTube hoặc Vimeo)</label>
+                    <input
+                      id="learning-guide-video"
+                      type="url"
+                      value={learningGuideVideoUrl}
+                      onChange={(event) => setLearningGuideVideoUrl(event.target.value)}
+                      placeholder="https://youtu.be/... hoặc https://vimeo.com/..."
+                      className="min-h-11 w-full rounded-xl border-2 border-slate-200 px-3 text-sm outline-none focus:border-red-400"
+                    />
+                    {learningGuideVideoUrl.trim() && !getLearningGuideVideoEmbedUrl(learningGuideVideoUrl) && (
+                      <p className="mt-1 text-xs font-medium text-red-600">Liên kết video không hợp lệ. Hãy dùng URL YouTube hoặc Vimeo.</p>
+                    )}
+                    {getLearningGuideVideoEmbedUrl(learningGuideVideoUrl) && (
+                      <div className="mt-3 aspect-video max-w-2xl overflow-hidden rounded-xl bg-slate-950">
+                        <iframe
+                          title="Xem trước video hướng dẫn"
+                          src={getLearningGuideVideoEmbedUrl(learningGuideVideoUrl)}
+                          className="h-full w-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                    <p className="text-xs text-slate-500">Lưu ý: học viên sẽ thấy nội dung sau khi lưu.</p>
+                    <button
+                      type="button"
+                      onClick={saveLearningGuide}
+                      disabled={learningGuideSaving || (learningGuideVideoUrl.trim() && !getLearningGuideVideoEmbedUrl(learningGuideVideoUrl))}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {learningGuideSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      {learningGuideSaving ? 'Đang lưu...' : 'Lưu hướng dẫn'}
+                    </button>
+                  </div>
+                  <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <summary className="cursor-pointer text-sm font-bold text-slate-700">Xem trước nội dung học viên</summary>
+                    <div className="mt-4 space-y-4">
+                      {learningGuideVideoUrl.trim() && getLearningGuideVideoEmbedUrl(learningGuideVideoUrl) && (
+                        <div className="aspect-video max-w-2xl overflow-hidden rounded-xl bg-slate-950">
+                          <iframe
+                            title="Video hướng dẫn học viên"
+                            src={getLearningGuideVideoEmbedUrl(learningGuideVideoUrl)}
+                            className="h-full w-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
+                      <div
+                        className="prose prose-sm max-w-none text-slate-700 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl"
+                        dangerouslySetInnerHTML={{
+                          __html: resolveRichHtmlMedia(sanitizeRichHtml(learningGuideHtml), resolveMediaUrl),
+                        }}
+                      />
+                    </div>
+                  </details>
+                </section>
+              ) : (
+              <>
               {sTrainingTab === 'questions' && (
                 <StudentQuestionBankPanel
                   courses={dbCourses}
@@ -1248,6 +1362,8 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                  </div>
               )}
 
+            </>
+              )}
             </>
             )}
             </div>

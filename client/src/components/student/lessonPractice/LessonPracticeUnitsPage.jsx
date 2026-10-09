@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, NotebookPen, PartyPopper, PenLine, ShoppingCart, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, NotebookPen, PartyPopper, PenLine, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
+import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlContent';
 import StudentVideoPlayer from '../../lms/StudentVideoPlayer';
 import LessonPracticePlayerPage from './LessonPracticePlayerPage';
-import VideoCoursePayModal from '../../VideoCoursePayModal';
 import LmsPlayerPanels, { LmsTabBar } from '../../lms/LmsPlayerTabs';
-import { useToast } from '../../../utils/toast';
 
 function orderedSections(unit) {
   const contents = unit?.contents?.length
@@ -258,7 +257,16 @@ function VideoPane({
           {media}
         </div>
       </div>
-      <LmsTabBar courseTab={videoTab} setCourseTab={setVideoTab} includeLessonList={false} light />
+      <LmsTabBar
+        courseTab={videoTab}
+        setCourseTab={setVideoTab}
+        includeLessonList={false}
+        light
+        courseId={selectedCourse.id}
+        lessonId={currentLesson._id}
+        audience="student"
+        userId={studentId}
+      />
       <div className="min-h-56 bg-white px-4 py-5 sm:px-6">
         <LmsPlayerPanels
           courseTab={videoTab}
@@ -285,6 +293,10 @@ function VideoPane({
 function NotePane({ unit, content, done, onMarkRead }) {
   const selectedContent = content;
   const note = String(selectedContent?.content || '').trim();
+  const isRichHtml = /<\/?[a-z][^>]*>/i.test(note);
+  const safeNoteHtml = isRichHtml
+    ? resolveRichHtmlMedia(sanitizeRichHtml(note), resolveMediaUrl)
+    : '';
   const contentDone = done || unit?.noteDoneIds?.includes(selectedContent?.id);
   const scroller = useRef(null);
   const [atEnd, setAtEnd] = useState(false);
@@ -306,9 +318,19 @@ function NotePane({ unit, content, done, onMarkRead }) {
   return (
     <div className="flex min-h-0 flex-col gap-3">
       {selectedContent?.title && <h3 className="shrink-0 text-base font-black text-slate-800">{selectedContent.title}</h3>}
-      <div ref={scroller} onScroll={checkEnd} className="max-h-80 min-h-20 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-800">
-        {note}
-      </div>
+      {isRichHtml ? (
+        <div
+          ref={scroller}
+          onScroll={checkEnd}
+          onLoad={checkEnd}
+          className="prose prose-sm h-[min(70vh,48rem)] min-h-80 max-w-none overflow-y-auto text-slate-800 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl"
+          dangerouslySetInnerHTML={{ __html: safeNoteHtml }}
+        />
+      ) : (
+        <div ref={scroller} onScroll={checkEnd} className="h-[min(70vh,48rem)] min-h-80 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-800">
+          {note}
+        </div>
+      )}
       {contentDone ? (
         <p className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700">
           <CheckCircle2 size={16} /> Đã đọc xong nội dung buổi học.
@@ -318,7 +340,7 @@ function NotePane({ unit, content, done, onMarkRead }) {
           type="button"
           disabled={!atEnd}
           onClick={() => onMarkRead?.(selectedContent?.id)}
-          className="self-start rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          className="mt-auto self-start rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
         >
           {atEnd ? 'Tôi đã đọc xong' : 'Lăn hết nội dung để tích đã đọc'}
         </button>
@@ -330,8 +352,9 @@ function NotePane({ unit, content, done, onMarkRead }) {
 function withSessionLocks(units) {
   let waitingOnEarlier = false;
   return units.map((unit) => {
-    const locked = !!unit.purchaseRequired || waitingOnEarlier || !!unit.locked;
-    if (!locked && unit.status !== 'completed') waitingOnEarlier = true;
+    const previewAllowed = unit.isPreviewAllowed === true;
+    const locked = !!unit.purchaseRequired || (!previewAllowed && (waitingOnEarlier || !!unit.locked));
+    if (!previewAllowed && !locked && unit.status !== 'completed') waitingOnEarlier = true;
     return { ...unit, locked };
   });
 }
@@ -342,6 +365,134 @@ const MOTIVATION = [
   'Thành công đến từ những bước nhỏ liên tục. Tiếp tục phát huy nhé!',
   'Bạn đã chứng minh được sự nỗ lực của mình. Buổi tiếp theo đang chờ bạn!',
 ];
+
+function playFireworkSound() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const master = ctx.createGain();
+    master.gain.value = 0.9;
+    const comp = ctx.createDynamicsCompressor();
+    master.connect(comp).connect(ctx.destination);
+    const noiseBuffer = (seconds, decay) => {
+      const len = Math.floor(ctx.sampleRate * seconds);
+      const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** decay;
+      return buffer;
+    };
+    const tone = (type, freqFrom, freqTo, t, dur, vol) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freqFrom, t);
+      if (freqTo !== freqFrom) osc.frequency.exponentialRampToValueAtTime(freqTo, t + dur);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(g).connect(master);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    };
+    const noise = (t, dur, decay, filterType, freq, vol) => {
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(dur, decay);
+      const filter = ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(filter).connect(g).connect(master);
+      src.start(t);
+    };
+    const firework = (at, pitch) => {
+      const t = ctx.currentTime + at;
+      tone('sine', 500 * pitch, 1800 * pitch, t, 0.45, 0.12);
+      const b = t + 0.45;
+      noise(b, 0.12, 1.5, 'highpass', 1200, 0.9);
+      noise(b, 0.9, 2.5, 'lowpass', 900, 0.8);
+      tone('sine', 140, 35, b, 0.45, 0.9);
+      for (let i = 0; i < 14; i += 1) {
+        const c = b + 0.12 + Math.random() * 0.8;
+        noise(c, 0.04, 1, 'highpass', 4000 + Math.random() * 3000, 0.22);
+      }
+    };
+    [[0, 1], [0.7, 1.15], [1.4, 0.9], [2.1, 1.25]].forEach(([at, pitch]) => firework(at, pitch));
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const t = ctx.currentTime + 0.3 + i * 0.16;
+      tone('triangle', freq, freq, t, 0.6, 0.16);
+      tone('sine', freq * 2, freq * 2, t, 0.5, 0.05);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 5000);
+  } catch {
+    // Audio may be blocked by the browser.
+  }
+}
+const CELEBRATION_MS = 5000;
+const CONFETTI_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7', '#ec4899', '#facc15'];
+
+function CompletionCelebrationModal({ subjectName, onClose }) {
+  const pieces = useMemo(() => Array.from({ length: 70 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    delay: Math.random() * 2.5,
+    duration: 3 + Math.random() * 3,
+    size: 6 + Math.random() * 8,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    round: i % 3 === 0,
+  })), []);
+  const bursts = useMemo(() => [
+    { x: 18, y: 28, delay: 0.1 }, { x: 82, y: 24, delay: 0.5 }, { x: 50, y: 14, delay: 1 },
+    { x: 28, y: 62, delay: 1.5 }, { x: 74, y: 60, delay: 2 },
+  ], []);
+
+  useEffect(() => {
+    playFireworkSound();
+    const timer = setTimeout(onClose, CELEBRATION_MS);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Chúc mừng hoàn thành môn học" className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <style>{`
+        @keyframes lp-cele-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: .9; } }
+        @keyframes lp-cele-burst { 0% { transform: scale(0); opacity: 1; } 70% { opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+        @keyframes lp-cele-trophy { 0% { transform: scale(0) rotate(-20deg); opacity: 0; } 60% { transform: scale(1.2) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+        @keyframes lp-cele-glow { 0%, 100% { box-shadow: 0 0 40px 8px rgba(251,191,36,.5); } 50% { box-shadow: 0 0 70px 20px rgba(251,191,36,.8); } }
+        @keyframes lp-cele-bar { from { width: 100%; } to { width: 0%; } }
+        @keyframes lp-cele-in { from { transform: translateY(24px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .lp-cele-anim { animation: none !important; } }
+      `}</style>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        {pieces.map((p) => (
+          <span key={p.id} className="lp-cele-anim absolute top-0 block" style={{ left: `${p.left}%`, width: p.size, height: p.round ? p.size : p.size * 1.6, background: p.color, borderRadius: p.round ? '50%' : 2, animation: `lp-cele-fall ${p.duration}s linear ${p.delay}s infinite` }} />
+        ))}
+        {bursts.map((b, i) => (
+          <span key={i} className="lp-cele-anim absolute block h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${b.x}%`, top: `${b.y}%`, background: `radial-gradient(circle, ${CONFETTI_COLORS[i]} 0 3px, transparent 4px), repeating-conic-gradient(from 0deg, ${CONFETTI_COLORS[(i + 2) % 7]} 0 4deg, transparent 4deg 20deg)`, WebkitMask: 'radial-gradient(circle, transparent 20%, #000 21%, #000 100%)', mask: 'radial-gradient(circle, transparent 20%, #000 21%, #000 100%)', animation: `lp-cele-burst 1.6s ease-out ${b.delay}s infinite` }} />
+        ))}
+      </div>
+      <div onClick={(e) => e.stopPropagation()} className="lp-cele-anim relative w-full max-w-md overflow-hidden rounded-3xl bg-white text-center shadow-2xl" style={{ animation: 'lp-cele-in .5s ease-out both' }}>
+        <div className="bg-gradient-to-br from-amber-400 via-orange-500 to-red-600 px-6 pb-10 pt-8">
+          <div className="lp-cele-anim mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white/95" style={{ animation: 'lp-cele-trophy .9s ease-out both, lp-cele-glow 2s ease-in-out .9s infinite' }}>
+            <Trophy size={64} className="text-amber-500" strokeWidth={2} />
+          </div>
+          <p className="mt-4 text-xs font-black uppercase tracking-[0.3em] text-white/90">Hoàn thành môn học</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Chúc mừng bạn!</h2>
+        </div>
+        <div className="px-6 pb-6 pt-5">
+          <p className="text-sm font-semibold text-slate-600">Bạn đã hoàn thành xuất sắc tất cả các buổi của môn</p>
+          <p className="mt-1 text-xl font-black text-red-600">{subjectName}</p>
+          <p className="mt-3 text-sm text-slate-500">Tiếp tục phát huy, thành quả này là bước tiến lớn trên hành trình học tập của bạn.</p>
+          <button type="button" onClick={onClose} className="mt-5 inline-flex min-h-10 items-center justify-center rounded-xl bg-red-600 px-8 text-sm font-black text-white shadow-md transition hover:bg-red-700">Tiếp tục</button>
+        </div>
+        <div className="h-1.5 bg-slate-100">
+          <div className="h-full bg-gradient-to-r from-amber-400 to-red-500" style={{ animation: `lp-cele-bar ${CELEBRATION_MS}ms linear forwards` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CourseCompleteBanner({ title, message, className = 'mt-2' }) {
   return (
@@ -381,7 +532,6 @@ export default function LessonPracticeUnitsPage() {
   const { subjectId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const toast = useToast();
   const requestedCourseId = searchParams.get('courseId') || '';
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -390,8 +540,6 @@ export default function LessonPracticeUnitsPage() {
   const [section, setSection] = useState('note');
   const [selectedVideoId, setSelectedVideoId] = useState('');
   const [videoTab, setVideoTab] = useState('overview');
-  const [checkout, setCheckout] = useState(null);
-  const [purchasing, setPurchasing] = useState(false);
   const [studentUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('student_user') || '{}') || {}; }
     catch { return {}; }
@@ -427,6 +575,16 @@ export default function LessonPracticeUnitsPage() {
     : (openUnit?.note ? [{ id: 'legacy-note', title: 'Nội dung 1', content: openUnit.note }] : []))
     .find((content) => content.id === activeSection?.itemId) || null;
   const allCompleted = units.length > 0 && units.every((unit) => unit.status === 'completed');
+
+  const [celebrating, setCelebrating] = useState(false);
+  const wasCompleted = useRef(null);
+  useEffect(() => { wasCompleted.current = null; }, [subjectId]);
+  useEffect(() => {
+    if (!payload || payload.subject?.id !== subjectId) return;
+    if (wasCompleted.current === false && allCompleted) setCelebrating(true);
+    wasCompleted.current = allCompleted;
+  }, [payload, subjectId, allCompleted]);
+  const closeCelebration = useCallback(() => setCelebrating(false), []);
 
   useEffect(() => {
     if (!payload || payload.subject?.id !== subjectId) return undefined;
@@ -468,37 +626,9 @@ export default function LessonPracticeUnitsPage() {
     }
   }
 
-  async function startCheckout() {
-    const course = payload?.subject?.purchaseCourse;
-    if (!course?.id || purchasing) return;
-    setPurchasing(true);
-    try {
-      const res = await lessonPracticeApi.student.checkoutCourse(course.id);
-      if (res.data?.owned) {
-        await loadUnits();
-        toast.success('Bạn đã sở hữu khóa học này');
-        return;
-      }
-      setCheckout({ ...res.data, courseId: course.id });
-    } catch (err) {
-      toast.error(err.message || 'Không tạo được thanh toán');
-    } finally {
-      setPurchasing(false);
-    }
-  }
-
-  async function handlePurchasePaid() {
-    setCheckout(null);
-    try {
-      await loadUnits();
-      toast.success('Thanh toán thành công, các buổi học đã được mở');
-    } catch (err) {
-      toast.error(err.message || 'Thanh toán thành công nhưng chưa tải được quyền học');
-    }
-  }
-
   return (
     <div className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden">
+      {celebrating && <CompletionCelebrationModal subjectName={payload?.subject?.name || ''} onClose={closeCelebration} />}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="flex shrink-0 items-center gap-3">
           <button type="button" onClick={() => navigate('/student/lesson-practice')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50">
@@ -509,19 +639,6 @@ export default function LessonPracticeUnitsPage() {
         {payload?.subject?.previewOnly && units.some((unit) => unit.isPreview) && (
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
             <p className="min-w-0 flex-1 text-sm font-semibold text-amber-900">Bạn đang xem thử các buổi được mở của môn học.</p>
-            {Number(payload.subject.purchaseCourse?.price) > 0 ? (
-              <button
-                type="button"
-                onClick={startCheckout}
-                disabled={purchasing || !payload.subject.purchaseCourse?.id}
-                className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {purchasing ? <Loader2 size={15} className="animate-spin" /> : <ShoppingCart size={15} />}
-                Mua ngay · {Number(payload.subject.purchaseCourse.price).toLocaleString('vi-VN')}đ
-              </button>
-            ) : (
-              <span className="shrink-0 text-sm font-bold text-slate-500">Liên hệ trung tâm để đăng ký</span>
-            )}
           </div>
         )}
       </div>
@@ -541,22 +658,12 @@ export default function LessonPracticeUnitsPage() {
                         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-400">{index + 1}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-bold text-slate-400">{unit.title}</span>
-                          <span className="block text-xs text-slate-400">
-                            {unit.purchaseRequired ? 'Cần mua khóa học để mở' : 'Hoàn thành buổi trước để mở'}
-                          </span>
+                          {!unit.purchaseRequired && (
+                            <span className="block text-xs text-slate-400">Hoàn thành buổi trước để mở</span>
+                          )}
                         </span>
-                        {unit.purchaseRequired && Number(payload.subject.purchaseCourse?.price) > 0 ? (
-                          <button
-                            type="button"
-                            onClick={startCheckout}
-                            disabled={purchasing || !payload?.subject?.purchaseCourse?.id}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
-                          >
-                            {purchasing ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
-                            Mua ngay · {Number(payload.subject.purchaseCourse.price).toLocaleString('vi-VN')}đ
-                          </button>
-                        ) : unit.purchaseRequired ? (
-                          <span className="shrink-0 text-xs font-bold text-slate-500">Liên hệ đăng ký</span>
+                        {unit.purchaseRequired ? (
+                          <Lock size={15} className="shrink-0 text-slate-400" aria-label="Buổi học bị khóa" />
                         ) : (
                           <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 text-xs font-bold text-amber-800">
                             <Lock size={14} /> Khóa
@@ -572,12 +679,11 @@ export default function LessonPracticeUnitsPage() {
                       <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate font-bold ${opened ? 'text-red-700' : 'text-slate-900'}`}>{unit.title}</span>
-                        <span className={`block text-xs ${opened ? 'text-red-500' : 'text-slate-500'}`}>
-                          {unit.isPreview && unit.status !== 'completed' && 'Xem thử'}
-                          {unit.status === 'completed' && 'Đã xong'}
-                          {unit.status === 'in_progress' && 'Đang học'}
-                          {unit.status !== 'completed' && unit.status !== 'in_progress' && 'Chưa học'}
-                        </span>
+                        {(unit.status === 'completed' || unit.status === 'in_progress') && (
+                          <span className={`block text-xs ${opened ? 'text-red-500' : 'text-slate-500'}`}>
+                            {unit.status === 'completed' ? 'Đã xong' : 'Đang học'}
+                          </span>
+                        )}
                       </span>
                       {unit.status === 'completed' && <CheckCircle2 size={16} className="text-emerald-600" />}
                     </button>
@@ -626,7 +732,7 @@ export default function LessonPracticeUnitsPage() {
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     {selectedVideo ? (
                       <VideoPane
-                        unit={openUnit}
+                        unit={{ ...openUnit, antiSeek: selectedVideo.antiSeek ?? openUnit.antiSeek }}
                         videos={selectedVideo ? [selectedVideo] : []}
                         selectedVideo={selectedVideo}
                         selectedVideoIndex={openUnitVideos.findIndex((video) => video.id === selectedVideo.id)}
@@ -645,7 +751,7 @@ export default function LessonPracticeUnitsPage() {
                   </div>
                 )}
                 {activeSection?.kind === 'note' && (
-                  <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex min-h-[min(76vh,54rem)] flex-1 flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
                     <NotePane
                       unit={openUnit}
                       content={selectedContent}
@@ -677,21 +783,6 @@ export default function LessonPracticeUnitsPage() {
             )}
           </section>
         </div>
-      )}
-      {checkout && (
-        <VideoCoursePayModal
-          courseTitle={checkout.courseTitle}
-          sessionId={checkout.sessionId}
-          refCode={checkout.ref}
-          amount={checkout.amount}
-          paymentTitle="Thanh toán mua khóa học"
-          getPaymentSession={lessonPracticeApi.student.getCoursePurchaseSession}
-          simulatePayment={() => lessonPracticeApi.student.simulateCoursePurchase(checkout.sessionId)}
-          paidEvent="tuition:paid"
-          onClose={() => setCheckout(null)}
-          onPaid={handlePurchasePaid}
-          onSessionAlreadyPaid={handlePurchasePaid}
-        />
       )}
     </div>
   );
