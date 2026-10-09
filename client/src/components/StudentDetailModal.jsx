@@ -1676,23 +1676,14 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             const studentBranchId = data.student?.branchId;
                             const splitTeachers = (courseOrEnr) => {
                               const matched = [];
-                              const other = [];
-                              const currentTeacherId = String(courseOrEnr.teacherId || '');
                               const branchId = toBranchId(studentBranchId);
                               for (const t of activeTeachers) {
-                                const tid = String(t.id || t._id);
-                                const sameBranch = teacherInStudentBranch(t, branchId) || (currentTeacherId && tid === currentTeacherId);
-                                if (!sameBranch) {
-                                  other.push({ ...t, _branchMismatch: true });
-                                  continue;
-                                }
-                                if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog) || (currentTeacherId && tid === currentTeacherId)) {
+                                if (!teacherInStudentBranch(t, branchId)) continue;
+                                if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog)) {
                                   matched.push(t);
-                                } else {
-                                  other.push(t);
                                 }
                               }
-                              return { matched, other };
+                              return matched;
                             };
                             const canDelete = enrollments.length > 1;
                             return (
@@ -1770,21 +1761,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                             >
                                               <option value="">Chưa phân công GV</option>
                                               {(() => {
-                                                const { matched, other } = splitTeachers(enr);
-                                                const allOptions = [...matched, ...other];
-                                                const currentTid = String(enr.teacherId || '');
-                                                const currentInList = currentTid && allOptions.some(t => String(t.id || t._id) === currentTid);
+                                                const matched = splitTeachers(enr);
                                                 return (
                                                   <>
-                                                    {/* Nếu GV hiện tại không có trong danh sách (ID không khớp), thêm option fallback */}
-                                                    {currentTid && !currentInList && (
-                                                      <option value={currentTid}>{enr.teacherName || currentTid}</option>
-                                                    )}
                                                     {matched.map((t) => (
                                                       <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                                                    ))}
-                                                    {other.map((t) => (
-                                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}</option>
                                                     ))}
                                                   </>
                                                 );
@@ -2793,6 +2774,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         <AddEnrollmentModal
           student={data.student}
           teachers={teachers || []}
+          examSubjectsCatalog={examSubjectsCatalog}
           onSubmit={handleAddEnrollmentSubmit}
           onClose={() => setShowAddEnrollment(false)}
         />

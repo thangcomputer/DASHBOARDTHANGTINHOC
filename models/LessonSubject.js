@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const lessonSubjectSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, trim: true, lowercase: true },
+  examSubjectId: { type: String, default: '', trim: true, lowercase: true },
   summary: { type: String, default: '' },
   unlockMode: { type: String, enum: ['sequential', 'open'], default: 'sequential' },
   sortOrder: { type: Number, default: 0 },

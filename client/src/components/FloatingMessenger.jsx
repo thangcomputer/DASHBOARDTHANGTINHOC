@@ -352,9 +352,8 @@ function MessageBubble({
           )}
         </div>
         {showAiImageQuota && m.aiImageRemaining != null && Number.isFinite(Number(m.aiImageRemaining)) ? (
-          <p className={`mt-1 px-1 text-[10px] font-semibold ${
-            Number(m.aiImageRemaining) <= 0 ? 'text-amber-700' : 'text-slate-500'
-          }`}>
+          <p className={`mt-1 px-1 text-[10px] font-semibold ${Number(m.aiImageRemaining) <= 0 ? 'text-amber-700' : 'text-slate-500'
+            }`}>
             {Number(m.aiImageRemaining) <= 0
               ? 'Đã hết lượt gửi ảnh hôm nay — ngày mai gửi tiếp nhé.'
               : `Còn ${Number(m.aiImageRemaining)} ảnh hôm nay`}
@@ -942,11 +941,10 @@ function ChatWindow({
         </div>
       </div>
       {isAiPeer && statusFlash ? (
-        <p className={`shrink-0 px-3 py-1.5 text-[10px] font-semibold text-center leading-snug border-b animate-in fade-in duration-200 ${
-          aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+        <p className={`shrink-0 px-3 py-1.5 text-[10px] font-semibold text-center leading-snug border-b animate-in fade-in duration-200 ${aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
             ? 'border-amber-100 bg-amber-50 text-amber-800'
             : 'border-emerald-100 bg-emerald-50 text-emerald-800'
-        }`}>
+          }`}>
           {statusFlash}
         </p>
       ) : null}
@@ -1313,11 +1311,11 @@ function ChatWindow({
                 ? 'Đang gửi ảnh…'
                 : sending
                   ? (isAiPeer ? 'Trợ lý AI đang trả lời…' : 'Đang gửi…')
-                : questionBlocked
-                  ? `Hết ${questionLimit} lượt hỏi AI hôm nay`
-                  : pendingImage
-                    ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
-                    : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Aa (Dán ảnh Ctrl+V)')
+                  : questionBlocked
+                    ? `Hết ${questionLimit} lượt hỏi AI hôm nay`
+                    : pendingImage
+                      ? (isAiPeer ? 'Nhập câu hỏi rồi nhấn Gửi…' : 'Nhập lời nhắn rồi nhấn Gửi…')
+                      : (isAiPeer ? 'Hỏi tin học, Office, MOS, LMS…' : 'Aa (Dán ảnh Ctrl+V)')
             }
             disabled={uploading || sending || questionBlocked}
             className="cms-fm-input"
@@ -1466,24 +1464,24 @@ export default function FloatingMessenger({ session, role }) {
   const directory = useMemo(
     () => {
       const base = buildSupportDirectory({
-      session,
-      onlineUsers,
-      meId,
-      staffs: effectiveStaffs,
-      supportAgentsOnly: canUseAiSupport,
+        session,
+        onlineUsers,
+        meId,
+        staffs: effectiveStaffs,
+        supportAgentsOnly: canUseAiSupport,
       });
       const withAi = canUseAiSupport
         ? {
-            ...base,
-            groups: [
-              {
-                key: 'ai',
-                label: 'Trợ lý AI',
-                people: [{ ...AI_SUPPORT_PEER, online: true, displayRole: 'AI' }],
-              },
-              ...base.groups,
-            ],
-          }
+          ...base,
+          groups: [
+            {
+              key: 'ai',
+              label: 'Trợ lý AI',
+              people: [{ ...AI_SUPPORT_PEER, online: true, displayRole: 'AI' }],
+            },
+            ...base.groups,
+          ],
+        }
         : base;
       const activityByPeer = new Map(
         conversations
@@ -1721,7 +1719,7 @@ export default function FloatingMessenger({ session, role }) {
           });
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [tabs, activeTabId]);
 
   useEffect(() => {
@@ -1737,7 +1735,7 @@ export default function FloatingMessenger({ session, role }) {
       if (resolvedBySupport) {
         // Support đã đóng yêu cầu: chuyển người dùng về AI ngay, không cần
         // bấm thêm nút "Hỏi Trợ lý AI".
-        aiSupportAPI.reset(cid).catch(() => {});
+        aiSupportAPI.reset(cid).catch(() => { });
       }
       if (nextStatus !== AI_SUPPORT_STATUS.AI_ACTIVE) {
         setSendingMap((prev) => {
@@ -1848,21 +1846,21 @@ export default function FloatingMessenger({ session, role }) {
           participants: group?.participants || [],
         }
         : String(data.senderId) === 'ai_support'
-        ? { ...AI_SUPPORT_PEER }
-        : {
-          id: String(data.senderId),
-          name: knownPeer?.user?.name || data.sender?.displayName || data.senderName || 'Người dùng',
-          role: normalizeChatRole(knownPeer?.user?.role || data.senderRole || 'student'),
-          adminRole: knownPeer?.user?.adminRole || data.sender?.adminRole || null,
-          avatar: knownPeer?.user?.avatar
-            || knownPeer?.user?.avatarUrl
-            || data.sender?.avatar
-            || data.sender?.avatarUrl
-            || data.senderAvatar
-            || data.senderPhoto
-            || '',
-          gender: knownPeer?.user?.gender || data.sender?.gender || '',
-        };
+          ? { ...AI_SUPPORT_PEER }
+          : {
+            id: String(data.senderId),
+            name: knownPeer?.user?.name || data.sender?.displayName || data.senderName || 'Người dùng',
+            role: normalizeChatRole(knownPeer?.user?.role || data.senderRole || 'student'),
+            adminRole: knownPeer?.user?.adminRole || data.sender?.adminRole || null,
+            avatar: knownPeer?.user?.avatar
+              || knownPeer?.user?.avatarUrl
+              || data.sender?.avatar
+              || data.sender?.avatarUrl
+              || data.senderAvatar
+              || data.senderPhoto
+              || '',
+            gender: knownPeer?.user?.gender || data.sender?.gender || '',
+          };
 
       if (String(data.senderId) === 'ai_support' && data.conversationId) {
         setPeerTypingMap((prev) => {

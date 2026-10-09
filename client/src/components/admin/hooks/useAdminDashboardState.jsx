@@ -21,7 +21,12 @@ const TAB_PERMISSION = {
   staff: PERMISSIONS.MANAGE_STAFF,
   hr: PERMISSIONS.MANAGE_HR,
   training: PERMISSIONS.MANAGE_TRAINING,
+  'training-videos': PERMISSIONS.MANAGE_TRAINING,
+  'training-guides-evaluations': PERMISSIONS.VIEW_EVALUATIONS,
+  'training-resources': PERMISSIONS.MANAGE_TRAINING,
+  'training-exam-room': PERMISSIONS.MANAGE_TRAINING,
   'student-training': PERMISSIONS.MANAGE_STUDENT_TRAINING,
+  'student-resources': PERMISSIONS.MANAGE_STUDENT_TRAINING,
   'lesson-practice': PERMISSIONS.MANAGE_STUDENT_TRAINING,
   'cert-prep': PERMISSIONS.MANAGE_CERT_PREP,
   evaluations: PERMISSIONS.VIEW_EVALUATIONS,
@@ -119,7 +124,8 @@ export function useAdminDashboardState() {
     // Nếu là Staff (không phải SuperAdmin / HighAdmin) chỉ có quyền Hộp thư (manage_messages)
     if (_sess && !isSuperAdmin && !isHighAdmin) {
       const perms = Array.isArray(_sess.permissions) ? _sess.permissions : [];
-      const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) => perms.includes(p));
+      const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) =>
+        (Array.isArray(p) ? p : [p]).some((permission) => perms.includes(permission)));
       if (!hasOtherPerms && perms.includes(PERMISSIONS.MANAGE_MESSAGES)) {
         if (location.pathname === '/admin' && (activeTab === 'dashboard' || activeTab === 'overview')) {
           navigate('/admin/inbox', { replace: true });
@@ -142,6 +148,12 @@ export function useAdminDashboardState() {
     if (activeTab === 'analytics') {
       const ok = hasPermission(_sess, PERMISSIONS.MANAGE_FINANCE)
         || hasPermission(_sess, PERMISSIONS.VIEW_BRANCH_REVENUE);
+      if (!ok) navigate('/admin#dashboard', { replace: true });
+      return undefined;
+    }
+    if (activeTab === 'training-guides-evaluations') {
+      const ok = hasPermission(_sess, PERMISSIONS.MANAGE_TRAINING)
+        || hasPermission(_sess, PERMISSIONS.VIEW_EVALUATIONS);
       if (!ok) navigate('/admin#dashboard', { replace: true });
       return undefined;
     }

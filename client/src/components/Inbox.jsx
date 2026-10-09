@@ -1429,9 +1429,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const requestedContact = location.state?.selectUser || null;
   const requestedPeerId = String(
     location.state?.selectUserId
-      || requestedContact?.id
-      || location.state?.openPeerId
-      || '',
+    || requestedContact?.id
+    || location.state?.openPeerId
+    || '',
   );
   useEffect(() => {
     if (!requestedPeerId) return;

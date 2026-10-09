@@ -5,6 +5,11 @@ const lessonUnitProgressSchema = new mongoose.Schema({
   subjectId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
   unitId: { type: mongoose.Schema.Types.ObjectId, required: true },
   status: { type: String, enum: ['in_progress', 'completed'], default: 'in_progress' },
+  videoDone: { type: Boolean, default: false },
+  noteDone: { type: Boolean, default: false },
+  completedVideoIds: { type: [String], default: [] },
+  completedNoteIds: { type: [String], default: [] },
+  practiceDone: { type: Boolean, default: false },
   completedAt: { type: Date, default: null },
 }, { timestamps: true });
 

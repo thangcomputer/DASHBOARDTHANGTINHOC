@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { lazy, Suspense } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import {
   Award, Bell, ChevronRight, Clock, FileText, Monitor,
   CheckCircle, XCircle, Lock, Trophy, User, LogOut,
-  BarChart2, BookOpen, Play, Filter
+  BarChart2, BookOpen, Play, Filter, GraduationCap
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments } from '../utils/enrollments';
@@ -23,6 +24,8 @@ import { useIsDesktopExamDevice } from '../utils/examDevice';
 import StudentQuizList from './student/StudentQuizList';
 import api from '../services/api';
 import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
+
+const CertPrepCatalogPage = lazy(() => import('./student/certPrep/CertPrepCatalogPage'));
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -473,7 +476,7 @@ const StudentExamRoom = ({
   onNavigate,
   onStartExam,
 }) => {
-  const [roomTab, setRoomTab] = useState('quiz'); // quiz | cert | scores
+  const [roomTab, setRoomTab] = useState('quiz'); // quiz | cert | scores | mos-ic3
   const [filterCourse, setFilterCourse] = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -660,8 +663,8 @@ const StudentExamRoom = ({
   return (
     <div className="bg-transparent font-sans h-full min-w-0 w-full max-w-full overflow-x-hidden">
       <div className="w-full min-w-0 py-1 sm:py-2 text-left space-y-4">
-        {/* 3 cột: trắc nghiệm · chứng nhận · xem điểm */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        {/* Khu vực thi và ôn tập */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
           <button
             type="button"
             onClick={() => setRoomTab('quiz')}
@@ -722,9 +725,33 @@ const StudentExamRoom = ({
               </div>
             </div>
           </button>
+          <button
+            type="button"
+            onClick={() => setRoomTab('mos-ic3')}
+            className={`group min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
+              roomTab === 'mos-ic3'
+                ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
+                : 'bg-white border-slate-100 hover:border-red-300'
+            }`}
+          >
+            <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
+              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-800 text-white shadow-lg shadow-violet-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-2">
+                <span className="absolute -right-5 -top-5 h-10 w-10 rounded-full bg-white/35 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" />
+                <GraduationCap size={32} strokeWidth={2.1} className="relative drop-shadow-md" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-black text-slate-800 text-base">MOS / IC3</p>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Ôn tập và luyện thi chứng chỉ</p>
+              </div>
+            </div>
+          </button>
         </div>
 
-        {roomTab === 'quiz' ? (
+        {roomTab === 'mos-ic3' ? (
+          <Suspense fallback={<div className="py-10 text-center text-sm font-medium text-slate-500">Đang tải nội dung MOS / IC3...</div>}>
+            <CertPrepCatalogPage />
+          </Suspense>
+        ) : roomTab === 'quiz' ? (
           <StudentQuizList />
         ) : roomTab === 'scores' ? (
           <div className="mt-4 sm:mt-6">

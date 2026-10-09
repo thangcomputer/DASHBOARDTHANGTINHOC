@@ -1058,9 +1058,6 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
                     ? 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'
                     : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
               </button>
-              {!canStartExam && cameraReady && !questionsLoading && bankTotal === 0 && (
-                <p className="text-[10px] text-amber-700 font-bold mt-2 px-1">Admin cần thêm câu hỏi môn {meta.short} tại Đào tạo HV › Ngân hàng câu hỏi.</p>
-              )}
               {!cameraReady && !cameraError && (
                 <p className="text-[10px] text-slate-400 font-bold mt-2">Bấm &quot;Cho phép mỗi khi truy cập&quot; để bật camera.</p>
               )}
@@ -1181,7 +1178,6 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center p-6 font-sans">
         <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-8 text-center border border-gray-100">
           <p className="text-gray-800 font-bold text-sm mb-2">Không có câu hỏi trắc nghiệm cho môn {meta.label}.</p>
-          <p className="text-gray-500 text-xs mb-6">Admin cần thêm câu hỏi (phần thi khớp Word/Excel/PowerPoint) vào ngân hàng học viên.</p>
           <button type="button" onClick={() => onBack?.()} className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl text-sm hover:bg-black inline-flex items-center justify-center gap-1">
             <NavArrow size={16} direction="back" className="text-white" />
             Quay lại

@@ -273,6 +273,25 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matched = true;
             matchedRef = claimed.ref;
             logger.info(`[SEPAY] Video-course session ${claimed.sessionId} — ${amount}đ`);
+          } else if (String(claimed.kind || 'tuition') === 'course_purchase') {
+            const { fulfillCoursePurchase } = require('../services/lessonPracticePurchaseService');
+            const purchase = await fulfillCoursePurchase({ session: claimed, amount });
+            const io = req.app.get('io');
+            if (io) {
+              emitFinanceEvent(io, {
+                branchId: claimed.branchId || null,
+                userIds: claimed.studentId ? [claimed.studentId] : [],
+              }, 'tuition:paid', {
+                sessionId: claimed.sessionId,
+                amount,
+                message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+              });
+            }
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(
+              `[SEPAY] Course-purchase session ${claimed.sessionId} — student ${purchase.studentId} course ${purchase.courseId} — ${amount}đ`,
+            );
           } else {
             const { settlePayment } = require('../services/ledgerService');
           await settlePayment({

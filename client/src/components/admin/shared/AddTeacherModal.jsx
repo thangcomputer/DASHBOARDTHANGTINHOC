@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { GraduationCap, X, MapPin, DollarSign, Star, Info } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
-import ExamSubjectCheckboxGrid from './ExamSubjectCheckboxGrid';
+import { apiFetch } from '../../../services/api';
+import CourseSubjectSelector from './CourseSubjectSelector';
 import { formatSubjectIdsAsSpecialty } from '../../../utils/examSubjects';
 import {
   formatHoaHong,
@@ -18,9 +19,39 @@ const SALARY_PRESETS = [100000, 130000, 150000, 180000];
 export default function AddTeacherModal({
   teacherForm, setTeacherForm, onClose, onSubmit, isSuperAdmin, safeBranches,
 }) {
-  const { examSubjectsCatalog, examAdminGroupLabel } = useData() || {};
-  const branches = (safeBranches || []).filter((b) => b && b.isActive !== false);
+  const { examSubjectsCatalog } = useData() || {};
+  const [loadedBranches, setLoadedBranches] = useState(null);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [branchesError, setBranchesError] = useState('');
+  const branches = (loadedBranches ?? safeBranches ?? [])
+    .filter((branch) => branch && branch.isActive !== false);
   const salary = Number(teacherForm.baseSalaryPerSession) || 0;
+
+  useEffect(() => {
+    if (!isSuperAdmin) return undefined;
+    let cancelled = false;
+    setBranchesLoading(true);
+    setBranchesError('');
+    apiFetch('/branches')
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.message || 'Không tải được danh sách chi nhánh');
+        }
+        if (!cancelled) {
+          setLoadedBranches(Array.isArray(result.data) ? result.data : []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBranchesError(error.message || 'Không tải được danh sách chi nhánh');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBranchesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isSuperAdmin]);
 
   const setSalary = (raw) => {
     const n = Math.max(0, Number(String(raw).replace(/\D/g, '')) || 0);
@@ -158,13 +189,10 @@ export default function AddTeacherModal({
             </div>
             <div className="cms-form space-y-3">
               <div>
-              <ExamSubjectCheckboxGrid
+              <CourseSubjectSelector
                 catalog={examSubjectsCatalog}
                 value={teacherForm.subjectIds || []}
                 accent="blue"
-                columns={3}
-                dense
-                groupLabels={{ admin: examAdminGroupLabel }}
                 onChange={(ids) => setTeacherForm((p) => ({
                   ...p,
                   subjectIds: ids,
@@ -200,11 +228,22 @@ export default function AddTeacherModal({
                   >
                     <option value="">— Chọn chi nhánh —</option>
                     {branches.map((b) => (
-                      <option key={b._id} value={b._id}>
+                      <option key={b._id || b.id} value={b._id || b.id}>
                         {b.name}{b.code ? ` (${b.code})` : ''}
                       </option>
                     ))}
                   </CmsSelect>
+                  {branchesLoading && branches.length === 0 && (
+                    <p className="mt-1 text-xs text-slate-500">Đang tải danh sách chi nhánh…</p>
+                  )}
+                  {!branchesLoading && branches.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      {branchesError || 'Chưa có chi nhánh đang hoạt động.'}
+                    </p>
+                  )}
+                  {branchesError && branches.length > 0 && (
+                    <p className="mt-1 text-xs text-amber-600">{branchesError}</p>
+                  )}
                 </div>
               ) : (
                 <div>

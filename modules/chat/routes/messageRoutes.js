@@ -1,7 +1,7 @@
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const Message = require('../models/Message');
-const Group   = require('../../student/models/Group');
+const Group = require('../../student/models/Group');
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
 console.log('--- MESSAGE ROUTES LOADED ---', typeof authMiddleware);
 router.use(authMiddleware);
@@ -49,23 +49,23 @@ function deptOutboundToStudent(reqUser) {
 // │ STAFF          │ SuperAdmin + Teacher(cùng branch) + Student(cùng branch)   │
 // │ SUPER_ADMIN    │ Tất cả (có filter theo branch trên query)                  │
 // └────────────────┴────────────────────────────────────────────┘
-router.get('/contacts',chatController.get_contacts);
+router.get('/contacts', chatController.get_contacts);
 
 
 // ── Lấy danh sách cuộc trò chuyện ──
-router.get('/conversations/:userId',chatController.get_conversations_userId);
+router.get('/conversations/:userId', chatController.get_conversations_userId);
 
 // ── Tìm kiếm tin nhắn toàn cục (bỏ qua is_hidden) ──
-router.get('/search/:userId',chatController.get_search_userId);
+router.get('/search/:userId', chatController.get_search_userId);
 
 // ── Lấy danh sách cuộc trò chuyện bị ẨN (phải đặt TRƯỚC /:conversationId vì không thì "hidden" bị coi là conversationId → 403) ──
-router.get('/hidden',chatController.get_hidden);
+router.get('/hidden', chatController.get_hidden);
 
 // ── Lấy tin nhắn của cuộc trò chuyện ──
-router.get('/:conversationId',chatController.get_conversationId);
+router.get('/:conversationId', chatController.get_conversationId);
 
 // ── Lấy toàn bộ tin nhắn của một user (để đồng bộ) ──
-router.get('/sync/:userId',chatController.get_sync_userId);
+router.get('/sync/:userId', chatController.get_sync_userId);
 
 
 const multer = require('multer');
@@ -99,43 +99,43 @@ const upload = multer({
 });
 
 // ── Upload file ──
-router.post('/upload', upload.single('file'),chatController.post_upload);
+router.post('/upload', upload.single('file'), chatController.post_upload);
 
 // ── Gửi tin nhắn ──
-router.post('/',chatController.post_root);
+router.post('/', chatController.post_root);
 
 // ── Ẩn cuộc trò chuyện ──
-router.post('/hide/:conversationId',chatController.post_hide_conversationId);
+router.post('/hide/:conversationId', chatController.post_hide_conversationId);
 
 // ── Đánh dấu đã đọc ──
-router.put('/read/:conversationId',chatController.put_read_conversationId);
+router.put('/read/:conversationId', chatController.put_read_conversationId);
 router.put('/:conversationId/pin', chatController.put_pinMessage);
 router.get('/message/:id', chatController.get_message_ById);
 
 // ── Phản ứng (Reaction) ──
-router.patch('/:messageId/reaction',chatController.patch_messageId_reaction);
+router.patch('/:messageId/reaction', chatController.patch_messageId_reaction);
 
 // ── Thu hồi tin nhắn ──
-router.patch('/:messageId/recall',chatController.patch_messageId_recall);
+router.patch('/:messageId/recall', chatController.patch_messageId_recall);
 
 // ── Xóa mềm tin nhắn (Chỉ xóa phía mình) ──
-router.patch('/:messageId/soft-delete',chatController.patch_messageId_soft_delete);
+router.patch('/:messageId/soft-delete', chatController.patch_messageId_soft_delete);
 
 // ── Tạo nhóm mới ──
-router.post('/groups',chatController.post_groups);
+router.post('/groups', chatController.post_groups);
 
 // ── Lấy danh sách nhóm của user ──
-router.get('/groups/user/:userId',chatController.get_groups_user_userId);
+router.get('/groups/user/:userId', chatController.get_groups_user_userId);
 
 // ── Xóa nhóm vĩnh viễn ──
-router.delete('/groups/:groupId',chatController.delete_groups_groupId);
+router.delete('/groups/:groupId', chatController.delete_groups_groupId);
 
 // ── Lấy số tin nhắn chưa đọc ──
-router.get('/unread/:userId',chatController.get_unread_userId);
+router.get('/unread/:userId', chatController.get_unread_userId);
 
 
 // ══ POST /api/chat/broadcast  ──  Gửi tin nhắn hàng loạt ══
-router.post('/broadcast',chatController.post_broadcast);
+router.post('/broadcast', chatController.post_broadcast);
 
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

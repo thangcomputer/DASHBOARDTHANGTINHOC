@@ -169,7 +169,7 @@ const YouTubePlayerSecure = ({
   const [isTabActive, setIsTabActive] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [maxSeekableUi, setMaxSeekableUi] = useState(0);
-  const [volume, setVolume] = useState(() => readLmsVolume(80));
+  const [volume, setVolume] = useState(() => readLmsVolume(50));
   const [muted, setMuted] = useState(() => readLmsMuted(false));
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -680,13 +680,13 @@ const YouTubePlayerSecure = ({
             try {
               if (muted) {
                 playerRef.current?.unMute?.();
-                const nextVol = volume || 80;
+                const nextVol = volume || 50;
                 playerRef.current?.setVolume?.(nextVol);
                 setMuted(false);
                 writeLmsMuted(false);
                 if (volume === 0) {
-                  setVolume(80);
-                  writeLmsVolume(80);
+                  setVolume(50);
+                  writeLmsVolume(50);
                 }
               } else {
                 playerRef.current?.mute?.();

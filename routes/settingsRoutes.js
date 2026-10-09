@@ -684,9 +684,18 @@ router.get('/teacher-exam-config', authMiddleware, ...settingsGuard('auth_only')
 // ── PUT /api/settings/teacher-exam-config ── Admin/Staff lưu ngân hàng thi GV (+ phút làm bài tùy chọn)
 router.put('/teacher-exam-config', authMiddleware, ...settingsGuard('training_write'), async (req, res) => {
   try {
-    const { questions, timeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes } = req.body || {};
+    const {
+      questions,
+      timeLimitMinutes,
+      teacherExamMinutes,
+      teacherEssayExamMinutes,
+      allowedTeacherExamSubjectIds,
+    } = req.body || {};
     const settings = await getSettings();
     const $set = {};
+    let prunedTeacherQuestions = 0;
+    let prunedTeacherExamMinutes = 0;
+    let prunedTeacherEssayExamMinutes = 0;
     if (questions !== undefined) {
       if (!Array.isArray(questions)) {
         return res.status(400).json({ success: false, message: 'questions phải là mảng' });
@@ -733,10 +742,47 @@ router.put('/teacher-exam-config', authMiddleware, ...settingsGuard('training_wr
       }
       $set.teacherEssayExamMinutesRaw = prev;
     }
+    if (allowedTeacherExamSubjectIds !== undefined) {
+      if (
+        !Array.isArray(allowedTeacherExamSubjectIds)
+        || allowedTeacherExamSubjectIds.some((id) => typeof id !== 'string')
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'allowedTeacherExamSubjectIds phải là mảng chuỗi',
+        });
+      }
+      const allowed = new Set(
+        allowedTeacherExamSubjectIds.map((id) => id.trim().toLowerCase()).filter(Boolean),
+      );
+      const currentQuestions = Array.isArray($set.teacherExamBankRawData || settings?.teacherExamBankRawData)
+        ? ($set.teacherExamBankRawData || settings.teacherExamBankRawData)
+        : [];
+      const retainedQuestions = currentQuestions.filter((question) => (
+        allowed.has(String(question?.section || '').trim().toLowerCase())
+      ));
+      prunedTeacherQuestions = currentQuestions.length - retainedQuestions.length;
+      $set.teacherExamBankRawData = retainedQuestions;
+      const filterSubjectMinutes = (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+        const retained = Object.fromEntries(Object.entries(value).filter(([id]) => allowed.has(id.trim().toLowerCase())));
+        return { retained, removed: Object.keys(value).length - Object.keys(retained).length };
+      };
+      const teacherMinutes = filterSubjectMinutes($set.teacherExamMinutesRaw || settings?.teacherExamMinutesRaw);
+      if (teacherMinutes?.retained) {
+        $set.teacherExamMinutesRaw = teacherMinutes.retained;
+        prunedTeacherExamMinutes = teacherMinutes.removed;
+      }
+      const teacherEssayMinutes = filterSubjectMinutes($set.teacherEssayExamMinutesRaw || settings?.teacherEssayExamMinutesRaw);
+      if (teacherEssayMinutes?.retained) {
+        $set.teacherEssayExamMinutesRaw = teacherEssayMinutes.retained;
+        prunedTeacherEssayExamMinutes = teacherEssayMinutes.removed;
+      }
+    }
     if (Object.keys($set).length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Cần gửi questions, timeLimitMinutes, teacherExamMinutes hoặc teacherEssayExamMinutes',
+        message: 'Cần gửi cấu hình thi giảng viên',
       });
     }
     await updateMainSettings({ $set });
@@ -753,6 +799,9 @@ router.put('/teacher-exam-config', authMiddleware, ...settingsGuard('training_wr
         hasTeacherEssayExamMinutes: freshTl != null && typeof freshTl === 'object',
         teacherExamMinutes: rawTeacherExamMinutesPayload(freshTn),
         teacherEssayExamMinutes: rawTeacherEssayExamMinutesPayload(freshTl),
+        prunedTeacherQuestions,
+        prunedTeacherExamMinutes,
+        prunedTeacherEssayExamMinutes,
       },
     });
   } catch (err) {
@@ -798,11 +847,16 @@ router.post('/exam-subjects', authMiddleware, ...settingsGuard('system_write'), 
     if (!entry) {
       return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ (ít nhất 2 ký tự)' });
     }
-    if (BUILTIN_EXAM_SUBJECT_IDS.includes(entry.id)) {
-      return res.status(409).json({ success: false, message: 'Ma mon trung voi mon mac dinh he thong' });
-    }
     const settings = await getSettings();
     const custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
+    if (BUILTIN_EXAM_SUBJECT_IDS.includes(entry.id)) {
+      const base = `-le`;
+      let candidate = base;
+      for (let i = 2; BUILTIN_EXAM_SUBJECT_IDS.includes(candidate) || custom.some((c) => c.id === candidate); i += 1) {
+        candidate = `-`;
+      }
+      entry.id = candidate;
+    }
     if (custom.some((c) => c.id === entry.id)) {
       return res.status(409).json({ success: false, message: 'Ma mon thi da ton tai' });
     }

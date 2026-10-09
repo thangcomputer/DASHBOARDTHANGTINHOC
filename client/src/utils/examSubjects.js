@@ -172,20 +172,6 @@ export function mapCourseToExamSubjectIdsStrict(courseName, catalog) {
   return loose;
 }
 
-/** Khớp mờ tên khóa ↔ specialty / label môn của GV (chỉ khi chưa có focus rõ) */
-function fuzzyCourseTeacherMatch(courseName, teacher, catalog) {
-  const courseKey = normalizeCourseKey(courseName);
-  if (!courseKey) return false;
-  const specialtyKey = normalizeCourseKey(teacher?.specialty || '');
-  if (specialtyKey) {
-    if (specialtyKey.includes(courseKey) || courseKey.includes(specialtyKey)) return true;
-    for (const part of specialtyKey.split(/[,;|/]+/).map((s) => s.trim()).filter(Boolean)) {
-      if (part.length >= 3 && (courseKey.includes(part) || part.includes(courseKey))) return true;
-    }
-  }
-  return false;
-}
-
 /**
  * Focus giảng dạy của khóa — không gộp THVP thành mọi môn Office.
  * Excel-only ≠ THVP; THVP teacher không match Excel-only và ngược lại.
@@ -290,23 +276,18 @@ export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
     ? courseOrEnrollment
     : (courseOrEnrollment?.courseName || courseOrEnrollment?.name || '');
 
-  const courseFocus = getCourseTeachingFocus(courseOrEnrollment, cat);
-  const teacherFocus = getTeacherTeachingFocus(teacher, cat);
-
-  if (courseFocus.length && teacherFocus.length) {
-    const set = new Set(teacherFocus.map(String));
-    if (courseFocus.some((f) => set.has(String(f)))) return true;
-    // THVP: GV đủ ≥2 môn Office (Word/Excel/PPT) vẫn gán được — tránh kẹt khi chưa khai báo đủ bộ
-    if (courseFocus.map(String).includes('thvp')) {
-      const officeHits = ['word', 'excel', 'powerpoint'].filter((id) => set.has(id));
-      if (officeHits.length >= 2) return true;
-    }
-  }
-
-  // Chưa khai báo môn → không khớp
-  if (!teacherFocus.length && !String(teacher?.specialty || '').trim()) return false;
-
-  return fuzzyCourseTeacherMatch(courseName, teacher, cat);
+  const hasCourseSubjects = Array.isArray(courseOrEnrollment?.examSubjects)
+    && courseOrEnrollment.examSubjects.length > 0;
+  const courseSubjectIds = (hasCourseSubjects
+    ? courseOrEnrollment.examSubjects
+    : mapCourseToExamSubjectIdsStrict(courseName, cat))
+    .map(String)
+    .filter((id) => id && id !== 'coban');
+  const teacherSubjectIds = new Set(resolveTeacherSubjectIds(teacher, cat)
+    .map(String)
+    .filter((id) => id && id !== 'coban'));
+  return courseSubjectIds.length > 0
+    && courseSubjectIds.every((id) => teacherSubjectIds.has(id));
 }
 
 export function getSubjectIdsForEnrollment(enrollment, catalog) {

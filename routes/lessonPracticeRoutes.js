@@ -8,6 +8,8 @@ const { PERMISSIONS } = require('../constants/permissions');
 const fileService = require('../services/fileService');
 const logger = require('../config/logger');
 const service = require('../services/lessonPracticeService');
+const coursePurchaseService = require('../services/lessonPracticePurchaseService');
+const PaymentSession = require('../models/PaymentSession');
 
 const requireAdmin = [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING)];
 
@@ -59,11 +61,18 @@ router.get('/subjects', ...requireAdmin, async (req, res) => {
   } catch (err) { return sendError(res, err); }
 });
 
-router.post('/subjects', ...requireAdmin, async (req, res) => {
+router.get('/courses', ...requireAdmin, async (req, res) => {
   try {
-    const data = await service.createSubject(req.body || {});
-    return res.status(201).json({ success: true, data });
+    const data = await service.listCoursesForAdmin();
+    return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
+});
+
+router.post('/subjects', ...requireAdmin, async (req, res) => {
+  return res.status(400).json({
+    success: false,
+    message: 'Môn học được đồng bộ từ khóa học. Hãy tạo hoặc chỉnh sửa khóa học để thay đổi danh sách môn.',
+  });
 });
 
 router.post('/subjects/seed-defaults', ...requireAdmin, async (req, res) => {
@@ -174,9 +183,50 @@ router.get('/my/subjects', ...requireStudent, async (req, res) => {
   } catch (err) { return sendError(res, err); }
 });
 
+router.post('/my/courses/:id/checkout', ...requireStudent, async (req, res) => {
+  try {
+    const data = await coursePurchaseService.checkoutCourse({
+      user: req.user,
+      courseId: req.params.id,
+    });
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.get('/my/course-purchase-sessions/:sessionId', ...requireStudent, async (req, res) => {
+  try {
+    const session = await PaymentSession.findOne({
+      sessionId: req.params.sessionId,
+      studentId: studentId(req),
+      kind: 'course_purchase',
+    }).select('status amount ref').lean();
+    if (!session) return res.json({ success: true, paid: false, status: 'not_found' });
+    return res.json({
+      success: true,
+      paid: session.status === 'paid',
+      status: session.status,
+      amount: session.amount,
+      ref: session.ref,
+    });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.post('/my/course-purchase-sessions/:sessionId/simulate-paid', ...requireStudent, async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ success: false, message: 'Không tìm thấy endpoint' });
+  }
+  try {
+    const data = await coursePurchaseService.simulateCoursePurchase({
+      studentId: studentId(req),
+      sessionId: req.params.sessionId,
+    });
+    return res.json({ success: true, paid: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
 router.get('/my/subjects/:id/units', ...requireStudent, async (req, res) => {
   try {
-    const data = await service.listUnitsForStudent(studentId(req), req.params.id);
+    const data = await service.listUnitsForStudent(studentId(req), req.params.id, req.query.courseId || '');
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });
@@ -184,6 +234,20 @@ router.get('/my/subjects/:id/units', ...requireStudent, async (req, res) => {
 router.get('/my/units/:id', ...requireStudent, async (req, res) => {
   try {
     const data = await service.getUnitForStudent(studentId(req), req.params.id);
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.post('/my/units/:id/sections/:section', ...requireStudent, async (req, res) => {
+  try {
+    const data = await service.markUnitSection(studentId(req), req.params.id, req.params.section, req.body?.itemId || '');
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.post('/my/units/:id/reset-practice', ...requireStudent, async (req, res) => {
+  try {
+    const data = await service.resetPractice(studentId(req), req.params.id);
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });

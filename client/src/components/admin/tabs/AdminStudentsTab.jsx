@@ -625,25 +625,16 @@ export default function AdminStudentsTab() {
     (t) => t && (t.role == null || t.role === 'teacher') && isTeacherActive(t.status),
   );
 
-  const teachersForCourse = (courseOrEnrollment, currentTeacherId = '', studentBranchId = '') => {
+  const teachersForCourse = (courseOrEnrollment, studentBranchId = '') => {
     const matched = [];
-    const other = [];
-    const cur = String(currentTeacherId || '');
     const branchId = toBranchId(studentBranchId);
     for (const t of assignableTeachers) {
-      const tid = String(t.id || t._id);
-      const sameBranch = teacherInStudentBranch(t, branchId) || (cur && tid === cur);
-      if (!sameBranch) {
-        other.push({ ...t, _branchMismatch: true });
-        continue;
-      }
-      if (teacherMatchesCourse(t, courseOrEnrollment, examSubjectsCatalog) || (cur && tid === cur)) {
+      if (!teacherInStudentBranch(t, branchId)) continue;
+      if (teacherMatchesCourse(t, courseOrEnrollment, examSubjectsCatalog)) {
         matched.push(t);
-      } else {
-        other.push(t);
       }
     }
-    return { matched, other };
+    return matched;
   };
 
   const handleAssignTeacher = async (studentId, teacherId, enrollmentId) => {
@@ -684,7 +675,7 @@ export default function AdminStudentsTab() {
             const enrTeacherVal = enr.teacherId || '';
             const enrId = enr.enrollmentId || enr.id;
             const courseLabel = enr.courseName || enr.name || '';
-            const { matched, other } = teachersForCourse(enr, enrTeacherVal, studentBranchId);
+            const matched = teachersForCourse(enr, studentBranchId);
             return (
               <div key={enrId} className="space-y-1 min-w-0">
                 <p className="text-xs font-semibold text-sky-700 truncate" title={courseLabel}>{courseLabel}</p>
@@ -702,11 +693,6 @@ export default function AdminStudentsTab() {
                   {matched.map((t) => (
                     <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
                   ))}
-                  {other.map((t) => (
-                    <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-                      {t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}
-                    </option>
-                  ))}
                 </CmsSelect>
               </div>
             );
@@ -715,7 +701,7 @@ export default function AdminStudentsTab() {
       );
     }
     const courseRef = primaryEnr || s.course;
-    const { matched, other } = teachersForCourse(courseRef, teacherVal, studentBranchId);
+    const matched = teachersForCourse(courseRef, studentBranchId);
     return (
       <CmsSelect
         value={teacherVal ? String(teacherVal) : ''}
@@ -730,11 +716,6 @@ export default function AdminStudentsTab() {
         <option value="">Chưa phân công</option>
         {matched.map((t) => (
           <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-        ))}
-        {other.map((t) => (
-          <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-            {t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}
-          </option>
         ))}
       </CmsSelect>
     );
@@ -1026,7 +1007,7 @@ export default function AdminStudentsTab() {
                         const enrId = enr.enrollmentId || enr.id;
                         const enrTeacherVal = enr.teacherId || '';
                         const courseLabel = enr.courseName || enr.name || '';
-                        const { matched, other } = teachersForCourse(enr, enrTeacherVal, s?.branchId);
+                        const matched = teachersForCourse(enr, s?.branchId);
                         return (
                           <div key={enrId} className="contents">
                             <div className="min-w-0 space-y-1">
@@ -1047,11 +1028,6 @@ export default function AdminStudentsTab() {
                                 <option value="">Chưa phân công</option>
                                 {matched.map((t) => (
                                   <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                                ))}
-                                {other.map((t) => (
-                                  <option key={t.id || t._id} value={String(t.id || t._id)} disabled>
-                                    {t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}
-                                  </option>
                                 ))}
                               </CmsSelect>
                             </div>

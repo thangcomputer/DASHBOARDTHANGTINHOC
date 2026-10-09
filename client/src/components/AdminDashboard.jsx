@@ -7,6 +7,7 @@ import {
   AdminLazyStudentsTab,
   AdminLazyTeachersTab,
   AdminLazyTrainingTab,
+  AdminLazyTeacherWorkflowModule,
   AdminLazyEvaluationsTab,
   AdminLazyFinanceTab,
   AdminLazyLogsTab,
@@ -46,9 +47,20 @@ const AdminDashboard = () => {
 
             {activeTab === 'students' && <AdminLazyStudentsTab />}
             {activeTab === 'teachers' && <AdminLazyTeachersTab />}
-            {activeTab === 'training' && (
+            {(activeTab === 'training' || activeTab.startsWith('training-')) && activeTab !== 'training-guides-evaluations' && (
               <AdminTrainingProvider activeTab={activeTab}>
-                <AdminLazyTrainingTab />
+                <AdminLazyTrainingTab
+                  section={activeTab === 'training' ? undefined : ({
+                    'training-videos': 'videos',
+                    'training-resources': 'resources',
+                    'training-exam-room': 'exam-room',
+                  })[activeTab]}
+                />
+              </AdminTrainingProvider>
+            )}
+            {activeTab === 'training-guides-evaluations' && (
+              <AdminTrainingProvider activeTab={activeTab}>
+                <AdminLazyTeacherWorkflowModule />
               </AdminTrainingProvider>
             )}
             {activeTab === 'evaluations' && <AdminLazyEvaluationsTab />}
@@ -57,13 +69,20 @@ const AdminDashboard = () => {
                 <AdminLazyFinanceTab />
               </AdminFinanceProvider>
             )}
-            {activeTab === 'student-training' && (
+            {['student-training', 'student-resources'].includes(activeTab) && (
               <AdminTrainingProvider activeTab={activeTab}>
-                <AdminLazyStudentTrainingTab />
+                <AdminLazyStudentTrainingTab
+                  resourceOnly={activeTab === 'student-resources'}
+                  examRoomOnly={activeTab === 'student-training'}
+                />
               </AdminTrainingProvider>
             )}
             {activeTab === 'cert-prep' && <AdminLazyCertPrepTab />}
-            {activeTab === 'lesson-practice' && <AdminLazyLessonPracticeTab />}
+            {activeTab === 'lesson-practice' && (
+              <AdminTrainingProvider activeTab={activeTab}>
+                <AdminLazyLessonPracticeTab />
+              </AdminTrainingProvider>
+            )}
             {activeTab === 'logs' && (
               <AdminLogsProvider activeTab={activeTab}>
                 <AdminLazyLogsTab />

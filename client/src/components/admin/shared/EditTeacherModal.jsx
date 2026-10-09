@@ -1,10 +1,14 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
-import { Edit3, X, Save, KeyRound, CreditCard, MapPin, DollarSign, Star } from 'lucide-react';
+import {
+  Edit3, X, Save, KeyRound, CreditCard, MapPin, DollarSign, Star, CalendarCheck,
+} from 'lucide-react';
 import { BankSelect } from '../../BankSelect';
 import TeacherScheduleHistoryPanel from '../../TeacherScheduleHistoryPanel';
 import { useData } from '../../../context/DataContext';
-import ExamSubjectCheckboxGrid from './ExamSubjectCheckboxGrid';
+import { apiFetch } from '../../../services/api';
+import { toBranchId } from '../../../utils/branchIds';
+import CourseSubjectSelector from './CourseSubjectSelector';
 import { formatSubjectIdsAsSpecialty, resolveTeacherSubjectIds } from '../../../utils/examSubjects';
 import {
   formatHoaHong,
@@ -21,7 +25,36 @@ export default function EditTeacherModal({
   editTeacher, setEditTeacher, onClose, onSave, onResetPassword, isSuperAdmin, safeBranches,
   getTeacherRating,
 }) {
-  const { examSubjectsCatalog, examAdminGroupLabel } = useData() || {};
+  const { examSubjectsCatalog } = useData() || {};
+  const [loadedBranches, setLoadedBranches] = useState(null);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [branchesError, setBranchesError] = useState('');
+
+  useEffect(() => {
+    if (!isSuperAdmin) return undefined;
+    let cancelled = false;
+    setBranchesLoading(true);
+    setBranchesError('');
+    apiFetch('/branches/all')
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.message || 'Không tải được danh sách chi nhánh');
+        }
+        if (!cancelled) {
+          setLoadedBranches(Array.isArray(result.data) ? result.data : []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBranchesError(error.message || 'Không tải được danh sách chi nhánh');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBranchesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     if (!editTeacher) return;
@@ -56,7 +89,19 @@ export default function EditTeacherModal({
   const salary = Number(editTeacher.baseSalaryPerSession) || 0;
   const avg = Number(rating?.avg) || 0;
   const count = Number(rating?.count) || 0;
-  const branches = (safeBranches || []).filter((b) => b && b.isActive !== false);
+  const currentBranchId = toBranchId(editTeacher.branchId);
+  const branchSource = loadedBranches?.length
+    ? loadedBranches
+    : (safeBranches?.length ? safeBranches : loadedBranches || []);
+  const branches = branchSource.filter((branch) => (
+    branch
+    && (branch.isActive !== false || toBranchId(branch) === currentBranchId)
+  ));
+  const currentBranchObject = editTeacher.branchId && typeof editTeacher.branchId === 'object'
+    ? editTeacher.branchId
+    : null;
+  const hasCurrentBranchOption = currentBranchId
+    && branches.some((branch) => toBranchId(branch) === currentBranchId);
 
   return (
     <>
@@ -71,10 +116,12 @@ export default function EditTeacherModal({
         <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
         <div className="cms-sheet-header">
           <span className="cms-sheet-header__side bg-sky-50 text-sky-600" aria-hidden="true">
-            <Edit3 size={18} />
+            {isHistory ? <CalendarCheck size={18} /> : <Edit3 size={18} />}
           </span>
           <div className="min-w-0 px-1 text-center">
-            <h3 className="cms-sheet-header__title">Hồ sơ giảng viên</h3>
+            <h3 className="cms-sheet-header__title">
+              {isHistory ? 'Lịch sử sắp lịch' : 'Hồ sơ giảng viên'}
+            </h3>
             {editTeacher.name && (
               <p className="text-xs text-slate-500 mt-0.5 truncate">{editTeacher.name}</p>
             )}
@@ -86,27 +133,6 @@ export default function EditTeacherModal({
             className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <X size={18} />
-          </button>
-        </div>
-
-        <div className="cms-sheet-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!isHistory}
-            onClick={() => setEditTeacher((p) => ({ ...p, _tab: 'info' }))}
-            className={`cms-sheet-tab ${!isHistory ? 'is-active' : ''}`}
-          >
-            Thông tin chung
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isHistory}
-            onClick={() => setEditTeacher((p) => ({ ...p, _tab: 'history' }))}
-            className={`cms-sheet-tab ${isHistory ? 'is-active' : ''}`}
-          >
-            Lịch sử sắp lịch
           </button>
         </div>
 
@@ -220,13 +246,10 @@ export default function EditTeacherModal({
                   <span className="cms-step__label">Chuyên môn &amp; trạng thái</span>
                 </div>
                 <div className="cms-form space-y-2.5">
-                  <ExamSubjectCheckboxGrid
+                  <CourseSubjectSelector
                     catalog={examSubjectsCatalog}
                     value={editTeacher.subjectIds || []}
                     accent="red"
-                    columns={3}
-                    dense
-                    groupLabels={{ admin: examAdminGroupLabel }}
                     onChange={(ids) => setEditTeacher((p) => ({
                       ...p,
                       subjectIds: ids,
@@ -257,26 +280,44 @@ export default function EditTeacherModal({
                         <MapPin size={12} /> Chi nhánh
                       </label>
                       {isSuperAdmin ? (
-                        <CmsSelect
-                          value={editTeacher.branchId || ''}
-                          onChange={(e) => {
-                            const id = e.target.value;
-                            const b = branches.find((x) => String(x._id) === String(id));
-                            setEditTeacher((p) => ({
-                              ...p,
-                              branchId: id,
-                              branchCode: b?.code || '',
-                            }));
-                          }}
-                          className="cms-input"
-                        >
-                          <option value="">— Chưa phân chi nhánh —</option>
-                          {branches.map((b) => (
-                            <option key={b._id} value={b._id}>
-                              {b.name}{b.code ? ` (${b.code})` : ''}
-                            </option>
-                          ))}
-                        </CmsSelect>
+                        <>
+                          <CmsSelect
+                            value={currentBranchId}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              const b = branches.find((x) => toBranchId(x) === String(id));
+                              setEditTeacher((p) => ({
+                                ...p,
+                                branchId: id,
+                                branchCode: b?.code || '',
+                              }));
+                            }}
+                            className="cms-input"
+                          >
+                            <option value="">— Chưa phân chi nhánh —</option>
+                            {currentBranchId && !hasCurrentBranchOption && (
+                              <option value={currentBranchId}>
+                                {currentBranchObject?.name || editTeacher.branchCode || `Chi nhánh ${currentBranchId}`}
+                              </option>
+                            )}
+                            {branches.map((b) => (
+                              <option key={toBranchId(b)} value={toBranchId(b)}>
+                                {b.name}{b.code ? ` (${b.code})` : ''}
+                              </option>
+                            ))}
+                          </CmsSelect>
+                          {branchesLoading && branches.length === 0 && (
+                            <p className="mt-1 text-xs text-slate-500">Đang tải danh sách chi nhánh…</p>
+                          )}
+                          {!branchesLoading && branches.length === 0 && (
+                            <p className="mt-1 text-xs text-amber-600">
+                              {branchesError || 'Chưa có chi nhánh.'}
+                            </p>
+                          )}
+                          {branchesError && branches.length > 0 && (
+                            <p className="mt-1 text-xs text-amber-600">{branchesError}</p>
+                          )}
+                        </>
                       ) : (
                         <input
                           type="text"

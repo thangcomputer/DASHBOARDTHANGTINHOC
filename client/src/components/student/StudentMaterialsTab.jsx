@@ -16,7 +16,7 @@ export default function StudentMaterialsTab({
   return (
           <div className="cms-sd cms-sd-page bg-slate-50 min-h-full">
             <CourseSwitcher
-              courses={enrollments}
+              courses={initialMainTab === 'courses' ? [] : enrollments}
               activeCourseName={activeCourseName || viewStudent?.course}
               onChange={setActiveCourseName}
             />

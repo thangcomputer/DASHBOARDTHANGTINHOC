@@ -169,6 +169,105 @@ export const playExamWarningSound = (customUrl = '') => {
   }
 };
 
+function lessonAudio() {
+  if (muted) return null;
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioUnlocked = true;
+    }
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+    return audioCtx;
+  } catch {
+    return null;
+  }
+}
+
+function noiseCrack(ctx, start, duration, volume, freq) {
+  const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(freq, start);
+  filter.frequency.exponentialRampToValueAtTime(160, start + duration);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  source.start(start);
+  source.stop(start + duration);
+}
+
+/** Tiếng nổ pháo khi chọn đúng. */
+export const playLessonCorrectSound = () => {
+  unlockAudio();
+  const ctx = lessonAudio();
+  if (!ctx) return;
+  const start = ctx.currentTime;
+  noiseCrack(ctx, start, 0.16, 0.5, 1600);
+  noiseCrack(ctx, start + 0.14, 0.12, 0.35, 2200);
+  noiseCrack(ctx, start + 0.28, 0.2, 0.42, 1200);
+  [988, 1318, 1760].forEach((freq, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const at = start + index * 0.07;
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, at);
+    gain.gain.setValueAtTime(0.1, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + 0.2);
+  });
+};
+
+/** Tiếng tích tắc khi đồng hồ câu hỏi gần hết giờ. */
+export const playLessonTick = (tock = false) => {
+  unlockAudio();
+  const ctx = lessonAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const start = ctx.currentTime;
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(tock ? 620 : 980, start);
+  gain.gain.setValueAtTime(0.045, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + 0.045);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + 0.05);
+};
+
+/** Tiếng trầm khi chọn sai, khác hẳn tiếng nổ. */
+export const playLessonWrongSound = () => {
+  unlockAudio();
+  const ctx = lessonAudio();
+  if (!ctx) return;
+  const start = ctx.currentTime;
+  [196, 130].forEach((freq, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const at = start + index * 0.14;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, at);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, at + 0.16);
+    gain.gain.setValueAtTime(0.22, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + 0.2);
+  });
+};
+
 export const stopExamWarningSound = () => {
   warningPlaybackToken += 1;
   if (currentWarningAudio) {

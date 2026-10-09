@@ -1202,7 +1202,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
          {(examPool?.length || 0) === 0 && (
            <p className="text-xs cms-min-text-xs font-bold text-red-600 mb-2 px-1 leading-relaxed">
-             Chưa có câu hỏi trong ngân hàng. Admin cần thêm câu tại mục Ngân hàng câu hỏi (GV).
+             Chưa có câu hỏi trong ngân hàng.
            </p>
          )}
          {(examPool?.length || 0) > 0 && questions.length === 0 && (
@@ -1351,7 +1351,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               </p>
             )}
             <p className="mt-3 text-center text-xs font-medium text-slate-400 sm:text-sm">
-              Tự luận mở sau khi đạt trắc nghiệm · mỗi môn có đồng hồ riêng
             </p>
           </div>
 

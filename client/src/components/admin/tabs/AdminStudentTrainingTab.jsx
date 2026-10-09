@@ -7,49 +7,67 @@ import { EXAM_RESULTS_STUDENTS_FETCH_CAP } from '../hooks/adminConstants';
 import {
   BookOpen, Video, Download, HelpCircle, Trophy, Plus, Clock, Trash2,
   FileSpreadsheet, Edit3, X, Upload, Loader2, FileText, Save, Search,
-  CheckCircle2, XCircle, Layers, Award, ImagePlus, Link2,
+  CheckCircle2, XCircle, Layers, ImagePlus, Link2,
 } from 'lucide-react';
 import NavArrow from '../../ui/NavArrow';
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import RichTextEditor from '../shared/RichTextEditor';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
+import { getExamSubjectOptions } from '../../../utils/examSubjects';
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { useData } from '../../../context/DataContext';
 import StudentQuestionBankPanel from './StudentQuestionBankPanel';
-import AdminTeacherQuizHistoryPanel from '../shared/AdminTeacherQuizHistoryPanel';
 import { getExamProgressDisplayStatus, summarizeExamProgress } from '../../../utils/examProgressStats';
 
-function mergeDocumentCourseOptions(dbCourses, lmsVideos) {
-  const merged = [];
-  const seen = new Set();
-  (dbCourses || []).forEach((c) => {
-    const id = String(c._id);
-    const title = String(c.name || '').trim();
-    if (!title) return;
-    const key = title.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    merged.push({ id, title, source: 'db' });
-  });
-  (lmsVideos || []).forEach((c) => {
-    const title = String(c.title || '').trim();
-    if (!title) return;
-    const key = title.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    merged.push({ id: String(c.id), title, source: 'lms' });
-  });
-  return merged;
+function mergeDocumentCourseOptions(dbCourses) {
+  return (dbCourses || [])
+    .map((course) => ({
+      id: String(course._id || course.id),
+      title: String(course.name || '').trim(),
+      examSubjects: Array.isArray(course.examSubjects) ? course.examSubjects : [],
+    }))
+    .filter((course) => course.id && course.title);
 }
 
-export default function AdminStudentTrainingTab() {
+function findCourseTrainingVideo(items, course, courses) {
+  const courseId = String(course?._id || course?.id || '');
+  const directMatch = items.find((item) => (
+    String(item.courseId || item.course_id || '') === courseId
+    || String(item.id || item._id || '') === courseId
+  ));
+  if (directMatch) return directMatch;
+
+  const knownCourseIds = new Set((courses || []).map((item) => String(item._id || item.id || '')));
+  const courseName = String(course?.name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  return items.find((item) => {
+    if (item.courseId || item.course_id) return false;
+    const itemId = String(item.id || item._id || '');
+    if (itemId && knownCourseIds.has(itemId)) return false;
+    return String(item.title || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === courseName;
+  });
+}
+
+function findDocumentCourse(courses, document) {
+  const courseId = String(document?.courseId || document?.course_id || '');
+  if (courseId) {
+    const byId = courses.find((course) => String(course._id || course.id) === courseId);
+    if (byId) return byId;
+  }
+  const courseName = String(document?.courseName || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  if (!courseName) return null;
+  return courses.find(
+    (course) => String(course.name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === courseName,
+  ) || null;
+}
+
+export default function AdminStudentTrainingTab({ videoCoursesOnly = false, resourceOnly = false, examRoomOnly = false }) {
   const {
     students, showGlobalModal, BLANK_Q,
     erSearch, setErSearch, gradingRow, setGradingRow,
     gradingValue, setGradingValue, ctxUpdateStudent, toast, addNotification,
     erForm, setErForm, safeStudentsList,
-    sTrainingTab, setSTrainingTab,
+    sTrainingTab: storedSTrainingTab, setSTrainingTab,
     fetchStudentsPaginated, selectedBranchId,
   } = useAdminTab();
   const { socket } = useSocket() || {};
@@ -92,8 +110,17 @@ export default function AdminStudentTrainingTab() {
     updateExamResult, addExamResult, examSubjectsCatalog,
   } = useAdminTraining();
   const { examAdminGroupLabel } = useData();
+  const sTrainingTab = examRoomOnly
+    ? storedSTrainingTab === 'exam-results' ? 'exam-results' : 'questions'
+    : resourceOnly
+    ? ['files', 'softwareLinks'].includes(storedSTrainingTab) ? storedSTrainingTab : 'files'
+    : videoCoursesOnly
+    ? 'videos'
+    : storedSTrainingTab === 'videos' ? 'files' : storedSTrainingTab;
 
   const [dbCourses, setDbCourses] = React.useState([]);
+  const [courseCatalogLoading, setCourseCatalogLoading] = React.useState(true);
+  const [courseCatalogError, setCourseCatalogError] = React.useState('');
   const [coverUploading, setCoverUploading] = React.useState(false);
 
   const handleCoverUpload = async (e) => {
@@ -118,20 +145,65 @@ export default function AdminStudentTrainingTab() {
   };
 
   React.useEffect(() => {
+    if (!['videos', 'files', 'questions'].includes(sTrainingTab)) return undefined;
     let cancelled = false;
     (async () => {
       try {
+        setCourseCatalogLoading(true);
         const res = await apiFetch('/courses');
         const json = await res.json();
-        if (!cancelled && json?.success) setDbCourses(json.data || []);
-      } catch { /* ignore */ }
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.message || 'Không tải được danh sách khóa học');
+        }
+        if (!cancelled) {
+          setDbCourses(Array.isArray(json.data) ? json.data : []);
+          setCourseCatalogError('');
+        }
+      } catch (err) {
+        if (!cancelled) setCourseCatalogError(err.message || 'Không tải được danh sách khóa học');
+      } finally {
+        if (!cancelled) setCourseCatalogLoading(false);
+      }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [sTrainingTab]);
+
+  const studentVideoItems = Array.isArray(studentTrainingData?.videos) ? studentTrainingData.videos : [];
+  const linkedVideos = new Set();
+  const catalogVideoItems = dbCourses.map((course) => {
+    const courseId = String(course._id || course.id || '');
+    const linkedItem = findCourseTrainingVideo(studentVideoItems, course, dbCourses);
+    if (linkedItem) linkedVideos.add(linkedItem);
+    const itemId = String(linkedItem?.id || linkedItem?._id || courseId);
+    return {
+      ...linkedItem,
+      id: itemId,
+      _id: itemId,
+      courseId,
+      title: course.name,
+      name: course.name,
+      examSubjects: Array.isArray(course.examSubjects) ? course.examSubjects : [],
+      coverImage: course.thumbnail || linkedItem?.coverImage || '',
+      desc: linkedItem?.desc || course.shortDescription || course.description || '',
+      totalSessions: course.totalSessions,
+      status: course.status,
+      isCourseCatalogItem: true,
+    };
+  });
+  const unlinkedVideoItems = studentVideoItems
+    .filter((item) => !linkedVideos.has(item))
+    .map((item) => ({ ...item, isUnlinkedVideo: true }));
 
   const documentCourseOptions = React.useMemo(
-    () => mergeDocumentCourseOptions(dbCourses, studentTrainingData?.videos),
-    [dbCourses, studentTrainingData?.videos],
+    () => mergeDocumentCourseOptions(dbCourses),
+    [dbCourses],
+  );
+  const trainingItems = sTrainingTab === 'videos'
+    ? [...catalogVideoItems, ...unlinkedVideoItems]
+    : (studentTrainingData?.[sTrainingTab] || []);
+  const examSubjectLabels = React.useMemo(
+    () => new Map(getExamSubjectOptions(examSubjectsCatalog).map(({ id, label }) => [id, label])),
+    [examSubjectsCatalog],
   );
 
   return (
@@ -143,43 +215,54 @@ export default function AdminStudentTrainingTab() {
                   onBack={() => setSCourseBuilderMode(null)}
                   onPatch={async (updatedCourse) => {
                     const cid = sCourseBuilderMode.id || sCourseBuilderMode._id;
-                    await updateStudentTrainingItem('videos', cid, updatedCourse);
+                    const payload = { ...updatedCourse };
+                    delete payload.isCourseCatalogItem;
+                    delete payload.isUnlinkedVideo;
+                    await updateStudentTrainingItem('videos', cid, payload);
                   }}
                   onSave={async (updatedCourse) => {
                     const cid = sCourseBuilderMode.id || sCourseBuilderMode._id;
-                    await updateStudentTrainingItem('videos', cid, updatedCourse);
+                    const payload = { ...updatedCourse };
+                    delete payload.isCourseCatalogItem;
+                    delete payload.isUnlinkedVideo;
+                    await updateStudentTrainingItem('videos', cid, payload);
                     setSCourseBuilderMode(null);
                   }}
                 />
               ) : (
               <>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
-                  <BookOpen size={20} className="text-sky-700 shrink-0" /> Quản lý Đào tạo Học viên
-                </h2>
+                {!videoCoursesOnly && (
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 min-w-0">
+                    <BookOpen size={20} className="text-sky-700 shrink-0" /> {resourceOnly ? 'Tài liệu & link phần mềm' : examRoomOnly ? 'Phòng thi' : 'Quản lý Đào tạo Học viên'}
+                  </h2>
+                )}
               </div>
 
               {/* Sub-tabs + primary action (laptop+: one row of tabs, action left-aligned) */}
               <div className="flex flex-col gap-3 lg:gap-4">
+              {!videoCoursesOnly && !resourceOnly && !examRoomOnly && (
               <div className="cms-hscroll-tabs w-full rounded-2xl p-1.5 shadow-sm border border-gray-100 bg-white">
                 <div className="cms-hscroll-tabs__track">
                 {[
-                  { key: 'videos', icon: Video, label: 'Quản lý Khóa học', count: studentTrainingData?.videos?.length || 0 },
-                  { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
-                  { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
-                  { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
-                  { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: summarizeExamProgress(students).total },
-                  { key: 'quizzes', icon: Award, label: 'Lịch sử Trắc nghiệm GV', count: 'Mới' },
+                  { key: 'files', icon: Download, label: 'Tài liệu & link phần mềm', count: (studentTrainingData?.files?.length || 0) + (studentTrainingData?.softwareLinks?.length || 0) },
+                  { key: 'exam-room', icon: Trophy, label: 'Phòng thi', count: (studentQuestions?.length || 0) + summarizeExamProgress(students).total },
                 ].map(t => (
                   <button
                     key={t.key}
                     type="button"
                     title={`${t.label} (${t.count})`}
                     aria-label={`${t.label} (${t.count})`}
-                    onClick={() => { setSTrainingTab(t.key); setSTrainingForm(null); setSCourseBuilderMode(null); }}
+                    onClick={() => {
+                      setSTrainingTab(t.key === 'exam-room' ? (sTrainingTab === 'exam-results' ? 'exam-results' : 'questions') : t.key);
+                      setSTrainingForm(null);
+                      setSCourseBuilderMode(null);
+                    }}
                     className={`cms-hscroll-tab ${
-                      sTrainingTab === t.key
-                        ? t.key === 'exam-results' ? 'bg-amber-600 text-white shadow-md' : 'bg-red-600 text-white shadow-md'
+                      (t.key === 'files'
+                        ? ['files', 'softwareLinks'].includes(sTrainingTab)
+                        : ['questions', 'exam-results'].includes(sTrainingTab))
+                        ? 'bg-red-600 text-white shadow-md'
                         : 'text-gray-500 hover:bg-gray-100'
                     }`}
                   >
@@ -190,15 +273,66 @@ export default function AdminStudentTrainingTab() {
                 ))}
                 </div>
               </div>
+              )}
 
-              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && sTrainingTab !== 'quizzes' && (
+              {!videoCoursesOnly && ['files', 'softwareLinks'].includes(sTrainingTab) && (
+                <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
+                  {[
+                    { key: 'files', icon: Download, label: 'Tài liệu', count: studentTrainingData?.files?.length || 0 },
+                    { key: 'softwareLinks', icon: Link2, label: 'Link phần mềm', count: studentTrainingData?.softwareLinks?.length || 0 },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+                        sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <tab.icon size={15} aria-hidden="true" />
+                      <span>{tab.label}</span>
+                      <span className="text-xs opacity-80">({tab.count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!videoCoursesOnly && ['questions', 'exam-results'].includes(sTrainingTab) && (
+                <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm">
+                  {[
+                    { key: 'questions', icon: HelpCircle, label: 'Ngân hàng câu hỏi', count: studentQuestions?.length || 0 },
+                    { key: 'exam-results', icon: Trophy, label: 'Kết quả thi', count: summarizeExamProgress(students).total },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => { setSTrainingTab(tab.key); setSTrainingForm(null); }}
+                      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+                        sTrainingTab === tab.key ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <tab.icon size={15} aria-hidden="true" />
+                      <span>{tab.label}</span>
+                      <span className="text-xs opacity-80">({tab.count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {sTrainingTab !== 'questions' && sTrainingTab !== 'exam-results' && (
                 <button type="button" onClick={() => { setSCourseBuilderMode(null); setSTrainingForm(sTrainingTab === 'softwareLinks' ? { title: '', linkUrl: '', description: '', installGuide: '' } : { examSubjects: [] }); }}
                   className="inline-flex w-full sm:w-auto self-stretch sm:self-center lg:self-start min-h-11 justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-md transition items-center gap-2">
-                  <Plus size={15} /> {sTrainingTab === 'videos' ? 'Thêm Khóa học' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
+                  <Plus size={15} /> {sTrainingTab === 'videos' ? 'Gắn nội dung khóa đã tạo' : sTrainingTab === 'softwareLinks' ? 'Thêm link phần mềm' : 'Thêm tài liệu'}
                 </button>
               )}
               </div>
-              {sTrainingTab === 'questions' && <StudentQuestionBankPanel />}
+              {sTrainingTab === 'questions' && (
+                <StudentQuestionBankPanel
+                  courses={dbCourses}
+                  coursesLoading={courseCatalogLoading}
+                  coursesError={courseCatalogError}
+                />
+              )}
 
               {/* Kết quả thi tự động từ bài thi của học viên - không cần thêm thủ công */}
 
@@ -240,7 +374,51 @@ export default function AdminStudentTrainingTab() {
                       </>
                     ) : (
                     <>
-                    {sTrainingTab !== 'files' && (
+                    {sTrainingTab === 'videos' && (
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học trong danh mục *</label>
+                        <CmsSelect
+                          value={sTrainingForm.courseId || ''}
+                          onChange={(e) => {
+                            const courseId = e.target.value;
+                            const course = dbCourses.find((item) => String(item._id || item.id) === courseId);
+                            if (!course) {
+                              setSTrainingForm((prev) => ({ ...prev, courseId: '', title: '', examSubjects: [] }));
+                              return;
+                            }
+                            const existing = findCourseTrainingVideo(studentVideoItems, course, dbCourses);
+                            setSTrainingForm((prev) => ({
+                              ...prev,
+                              ...(existing || {}),
+                              id: existing?.id || existing?._id || undefined,
+                              courseId,
+                              title: course.name,
+                              examSubjects: Array.isArray(course.examSubjects) ? course.examSubjects : [],
+                              coverImage: course.thumbnail || existing?.coverImage || prev.coverImage || '',
+                              desc: existing?.desc || course.shortDescription || course.description || '',
+                            }));
+                          }}
+                          className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none bg-white"
+                        >
+                          <option value="">— Chọn khóa đã tạo —</option>
+                          {dbCourses.map((course) => (
+                            <option key={course._id || course.id} value={course._id || course.id}>
+                              {course.name}{course.status && course.status !== 'published' ? ` (${course.status})` : ''}
+                            </option>
+                          ))}
+                        </CmsSelect>
+                        {courseCatalogLoading ? (
+                          <p className="mt-1 text-xs text-slate-500">Đang tải danh mục khóa học…</p>
+                        ) : courseCatalogError ? (
+                          <p className="mt-1 text-xs font-medium text-red-600">{courseCatalogError}</p>
+                        ) : dbCourses.length === 0 ? (
+                          <p className="mt-1 text-xs text-amber-600">Chưa có khóa trong danh mục. Hãy tạo khóa ở mục Quản lý Học phí Khóa học trước.</p>
+                        ) : (
+                          <p className="mt-1 text-xs text-slate-500">Tên khóa và môn học được đồng bộ từ danh mục khóa học.</p>
+                        )}
+                      </div>
+                    )}
+                    {sTrainingTab !== 'files' && sTrainingTab !== 'videos' && (
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>
                       <input value={sTrainingForm.title || ''} onChange={e => setSTrainingForm({ ...sTrainingForm, title: e.target.value })}
@@ -319,7 +497,7 @@ export default function AdminStudentTrainingTab() {
                     {sTrainingTab === 'files' && (
                       <>
                         <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học (Không bắt buộc)</label>
+                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học *</label>
                           <CmsSelect
                             value={sTrainingForm.courseId || ''}
                             onChange={(e) => {
@@ -329,15 +507,30 @@ export default function AdminStudentTrainingTab() {
                                 ...sTrainingForm,
                                 courseId: cid,
                                 courseName: course?.title || '',
+                                examSubjects: course?.examSubjects || [],
                               });
                             }}
+                            required
                             className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 outline-none bg-white"
                           >
-                            <option value="">— Chọn khóa học (tùy chọn) —</option>
+                            <option value="">— Chọn khóa học đã tạo —</option>
                             {documentCourseOptions.map((c) => (
                               <option key={c.id} value={c.id}>{c.title}</option>
                             ))}
                           </CmsSelect>
+                          {courseCatalogLoading ? (
+                            <p className="mt-1 text-xs text-slate-500">Đang tải danh sách khóa học…</p>
+                          ) : courseCatalogError ? (
+                            <p className="mt-1 text-xs font-medium text-red-600">{courseCatalogError}</p>
+                          ) : documentCourseOptions.length === 0 ? (
+                            <p className="mt-1 text-xs font-medium text-amber-700">
+                              Chưa có khóa học. Hãy tạo khóa trong Quản lý Học phí Khóa học trước.
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Danh sách được đồng bộ trực tiếp từ các khóa học đã tạo.
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>
@@ -400,7 +593,29 @@ export default function AdminStudentTrainingTab() {
                     </>
                     )}
                   </div>
-                  {sTrainingTab !== 'softwareLinks' && (
+                  {sTrainingTab === 'videos' && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Môn học trong khóa (đồng bộ)</label>
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                        {sTrainingForm.examSubjects?.length
+                          ? sTrainingForm.examSubjects.map((id) => examSubjectLabels.get(id) || id).join(', ')
+                          : 'Chọn khóa học để xem các môn đã gắn.'}
+                      </p>
+                    </div>
+                  )}
+                  {sTrainingTab === 'files' && sTrainingForm.courseId && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Môn thuộc khóa (đồng bộ)</label>
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                        {sTrainingForm.examSubjects?.length
+                          ? sTrainingForm.examSubjects.map((id) => examSubjectLabels.get(id) || id).join(', ')
+                          : 'Khóa học chưa được gắn môn trong danh mục.'}
+                      </p>
+                    </div>
+                  )}
+                  {sTrainingTab !== 'softwareLinks'
+                    && sTrainingTab !== 'videos'
+                    && sTrainingTab !== 'files' && (
                   <ExamSubjectCheckboxGrid
                     catalog={examSubjectsCatalog}
                     value={sTrainingForm.examSubjects || []}
@@ -418,7 +633,7 @@ export default function AdminStudentTrainingTab() {
                     />
                   </div>
                   )}
-                  <button onClick={() => {
+                  <button onClick={async () => {
                     if (sTrainingTab === 'softwareLinks') {
                       if (!String(sTrainingForm.title || '').trim()) {
                         toast.error('Nhập tên phần mềm');
@@ -442,7 +657,56 @@ export default function AdminStudentTrainingTab() {
                       setSTrainingForm(null);
                       return;
                     }
-                    if (!sTrainingForm.examSubjects?.length) {
+                    const selectedDocumentCourse = sTrainingTab === 'files'
+                      ? documentCourseOptions.find((course) => course.id === String(sTrainingForm.courseId))
+                      : null;
+                    if (sTrainingTab === 'files' && !selectedDocumentCourse) {
+                      toast.error(
+                        sTrainingForm.courseId
+                          ? 'Khóa tài liệu không còn trong danh mục. Hãy chọn lại khóa học.'
+                          : 'Hãy chọn khóa học đã tạo để gắn tài liệu.',
+                      );
+                      return;
+                    }
+                    if (sTrainingTab === 'videos') {
+                      const selectedCourse = dbCourses.find(
+                        (course) => String(course._id || course.id) === String(sTrainingForm.courseId || ''),
+                      );
+                      if (!selectedCourse) {
+                        toast.error('Hãy chọn khóa học đã tạo trong danh mục trước khi lưu');
+                        return;
+                      }
+                      const courseId = String(selectedCourse._id || selectedCourse.id);
+                      const existing = findCourseTrainingVideo(studentVideoItems, selectedCourse, dbCourses);
+                      const formValues = { ...sTrainingForm };
+                      delete formValues.isCourseCatalogItem;
+                      delete formValues.isUnlinkedVideo;
+                      const payload = {
+                        ...formValues,
+                        id: existing?.id || existing?._id || courseId,
+                        courseId,
+                        title: selectedCourse.name,
+                        examSubjects: Array.isArray(selectedCourse.examSubjects) ? selectedCourse.examSubjects : [],
+                        coverImage: selectedCourse.thumbnail || sTrainingForm.coverImage || '',
+                        totalSessions: selectedCourse.totalSessions,
+                      };
+                      try {
+                        if (existing) {
+                          await updateStudentTrainingItem('videos', existing.id || existing._id, payload);
+                        } else {
+                          await addStudentTrainingItem('videos', {
+                            ...payload,
+                            createdAt: new Date().toISOString().split('T')[0],
+                          });
+                        }
+                      } catch (err) {
+                        toast.error(err.message || 'Không lưu được nội dung khóa học');
+                        return;
+                      }
+                      setSTrainingForm(null);
+                      return;
+                    }
+                    if (sTrainingTab !== 'files' && !sTrainingForm.examSubjects?.length) {
                       showGlobalModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn ít nhất một môn học!', type: 'warning' });
                       return;
                     }
@@ -454,19 +718,23 @@ export default function AdminStudentTrainingTab() {
                           const url = link || String(sTrainingForm.fileUrl || '').trim();
                           return {
                             ...sTrainingForm,
+                            courseId: selectedDocumentCourse?.id || '',
+                            courseName: selectedDocumentCourse?.title || (sTrainingForm.courseId ? sTrainingForm.courseName : ''),
+                            examSubjects: selectedDocumentCourse?.examSubjects || sTrainingForm.examSubjects || [],
                             fileUrl: url,
                             url,
                             fileType: 'LINK',
                             fileSize: '',
                             fileOriginalName: '',
                             linkUrl: undefined,
-                            courseName: sTrainingForm.courseName || 'Tài liệu học tập',
                           };
                         }
                         return {
                           ...sTrainingForm,
+                          courseId: selectedDocumentCourse?.id || '',
+                          courseName: selectedDocumentCourse?.title || (sTrainingForm.courseId ? sTrainingForm.courseName : ''),
+                          examSubjects: selectedDocumentCourse?.examSubjects || sTrainingForm.examSubjects || [],
                           fileType: sTrainingForm.fileType || 'PDF',
-                          courseName: sTrainingForm.courseName || 'Tài liệu học tập',
                         };
                       })()
                       : sTrainingForm;
@@ -861,14 +1129,20 @@ export default function AdminStudentTrainingTab() {
                 );
               })()}
 
-              {sTrainingTab === 'quizzes' && (
-                <AdminTeacherQuizHistoryPanel />
-              )}
-
               {/* List items (training content) */}
-              {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && sTrainingTab !== 'quizzes' && (
+              {sTrainingTab !== 'exam-results' && sTrainingTab !== 'questions' && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    {(studentTrainingData?.[sTrainingTab] || []).map(item => (
+                    {sTrainingTab === 'videos' && courseCatalogError && (
+                      <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        Không thể đồng bộ danh mục khóa học: {courseCatalogError}
+                      </div>
+                    )}
+                    {sTrainingTab === 'videos' && unlinkedVideoItems.length > 0 && (
+                      <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                        Có {unlinkedVideoItems.length} nội dung cũ chưa khớp khóa trong danh mục. Mở chỉnh sửa và liên kết với khóa đã tạo để đồng bộ.
+                      </div>
+                    )}
+                    {trainingItems.map(item => (
                       <div key={item.id} className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50/50 transition border-b border-gray-50 last:border-b-0">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full">
                           {sTrainingTab === 'videos' && (
@@ -894,8 +1168,20 @@ export default function AdminStudentTrainingTab() {
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-[15px] sm:text-base text-gray-800 line-clamp-2">{item.title}</p>
+                            {sTrainingTab === 'videos' && item.isUnlinkedVideo && (
+                              <p className="mt-0.5 text-xs font-semibold text-amber-700">Chưa liên kết danh mục khóa học</p>
+                            )}
+                            {sTrainingTab === 'videos' && item.isCourseCatalogItem && (
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                {item.examSubjects?.length || 0} môn · {item.totalSessions || 0} buổi
+                                {item.status && item.status !== 'published' ? ` · ${item.status}` : ''}
+                              </p>
+                            )}
                             {sTrainingTab === 'files' && item.courseName && (
                               <p className="text-xs sm:text-[13px] text-sky-700 font-bold mt-0.5">Khóa: {item.courseName}</p>
+                            )}
+                            {sTrainingTab === 'files' && !item.courseId && !findDocumentCourse(dbCourses, item) && (
+                              <p className="text-xs font-semibold text-amber-700 mt-0.5">Chưa liên kết khóa trong danh mục</p>
                             )}
                             {sTrainingTab === 'softwareLinks' && item.linkUrl && (
                               <p className="text-xs sm:text-[13px] text-sky-700 font-semibold mt-0.5 truncate">{item.linkUrl}</p>
@@ -915,9 +1201,21 @@ export default function AdminStudentTrainingTab() {
                                <Layers size={13} /> Giáo trình
                              </button>
                           )}
-                          <button type="button" onClick={() => setSTrainingForm({ ...item })}
-                            className="cms-btn cms-btn-outline cms-btn-icon text-sky-600" aria-label="Chỉnh sửa" title="Chỉnh sửa"><Edit3 size={16} /></button>
                           <button type="button" onClick={() => {
+                            const linkedCourse = sTrainingTab === 'files'
+                              ? findDocumentCourse(dbCourses, item)
+                              : null;
+                            setSTrainingForm({
+                              ...item,
+                              ...(linkedCourse ? {
+                                courseId: String(linkedCourse._id || linkedCourse.id),
+                                courseName: linkedCourse.name,
+                                examSubjects: Array.isArray(linkedCourse.examSubjects) ? linkedCourse.examSubjects : [],
+                              } : {}),
+                            });
+                          }}
+                            className="cms-btn cms-btn-outline cms-btn-icon text-sky-600" aria-label="Chỉnh sửa" title="Chỉnh sửa"><Edit3 size={16} /></button>
+                          {!item.isCourseCatalogItem && <button type="button" onClick={() => {
                             showGlobalModal({
                               title: 'Xác nhận xoá tài liệu',
                               content: `Bạn có chắc muốn xoá tài liệu "${item.title}" dành cho học viên không?`,
@@ -926,15 +1224,25 @@ export default function AdminStudentTrainingTab() {
                               cancelText: 'Huỷ bỏ',
                               onConfirm: () => removeStudentTrainingItem(sTrainingTab, item.id)
                             });
-                          }} className="cms-btn cms-btn-outline cms-btn-icon text-red-600" aria-label="Xóa" title="Xóa"><Trash2 size={16} /></button>
+                          }} className="cms-btn cms-btn-outline cms-btn-icon text-red-600" aria-label="Xóa" title="Xóa"><Trash2 size={16} /></button>}
                         </div>
                       </div>
                     ))}
-                  {(studentTrainingData?.[sTrainingTab] || []).length === 0 && (
+                  {trainingItems.length === 0 && (
                     <div className="p-12 text-center text-gray-400">
                       <BookOpen size={40} className="mx-auto mb-3 text-gray-300" />
-                      <p className="text-sm">Chưa có nội dung nào</p>
-                      <p className="text-xs text-gray-300 mt-1">Bấm "Thêm" để tạo nội dung đào tạo cho học viên</p>
+                      <p className="text-sm">
+                        {sTrainingTab === 'videos' && courseCatalogLoading
+                          ? 'Đang tải danh sách khóa học…'
+                          : sTrainingTab === 'videos'
+                            ? 'Chưa có khóa học trong danh mục'
+                            : 'Chưa có nội dung nào'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {sTrainingTab === 'videos'
+                          ? 'Tạo khóa tại mục Quản lý Học phí Khóa học để khóa xuất hiện đồng bộ ở đây.'
+                          : 'Bấm "Thêm" để tạo nội dung đào tạo cho học viên'}
+                      </p>
                     </div>
                   )}
                  </div>

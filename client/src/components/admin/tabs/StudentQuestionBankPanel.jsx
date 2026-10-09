@@ -18,6 +18,7 @@ import { getExamSubjectOptions } from '../../../utils/examSubjects';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 
 const DIFF_LABELS = { easy: 'Cơ bản', medium: 'TB', hard: 'Nâng cao' };
+const EMPTY_SUBJECT_IDS = [];
 
 function QuestionRow({ q, index, onEdit, onDelete, showImage }) {
   const isEssay = String(q.type).toLowerCase() === 'essay';
@@ -82,7 +83,11 @@ function EmptyState({ icon: Icon, title, hint }) {
   );
 }
 
-export default function StudentQuestionBankPanel() {
+export default function StudentQuestionBankPanel({
+  courses = [],
+  coursesLoading = false,
+  coursesError = '',
+}) {
   const {
     studentQuestions,
     studentExamMinutes,
@@ -108,11 +113,19 @@ export default function StudentQuestionBankPanel() {
     sqForm, examSubjectsCatalog,
   } = useAdminTraining();
 
-  const subjectOpts = React.useMemo(
-    () => getExamSubjectOptions(examSubjectsCatalog),
-    [examSubjectsCatalog],
-  );
-  const activeSubject = subjectOpts.find((s) => s.id === sqSection) || subjectOpts[0];
+  const [selectedCourseId, setSelectedCourseId] = React.useState('');
+  const selectedCourse = courses.find(
+    (course) => String(course._id || course.id) === selectedCourseId,
+  ) || courses[0] || null;
+  const selectedCourseSubjects = Array.isArray(selectedCourse?.examSubjects)
+    ? selectedCourse.examSubjects
+    : EMPTY_SUBJECT_IDS;
+  const subjectOpts = getExamSubjectOptions(examSubjectsCatalog)
+    .filter((subject) => selectedCourseSubjects.includes(subject.id));
+  const activeSection = subjectOpts.some((subject) => subject.id === sqSection)
+    ? sqSection
+    : (subjectOpts[0]?.id || '');
+  const activeSubject = subjectOpts.find((s) => s.id === activeSection) || subjectOpts[0];
 
   const [mcSearch, setMcSearch] = React.useState('');
   const [tlSearch, setTlSearch] = React.useState('');
@@ -121,24 +134,20 @@ export default function StudentQuestionBankPanel() {
   const [pdfUploading, setPdfUploading] = React.useState(false);
   const [examFileUploading, setExamFileUploading] = React.useState(false);
 
-  React.useEffect(() => {
-    setMcSearch('');
-    setTlSearch('');
-  }, [sqSection]);
-
-  const mcQuestions = React.useMemo(() => {
-    const list = getStudentMcQuestionsForExam(studentQuestions, sqSection);
-    const q = mcSearch.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((item) => String(item.q || '').toLowerCase().includes(q));
-  }, [studentQuestions, sqSection, mcSearch]);
-
-  const essayQuestions = React.useMemo(() => {
-    const list = getStudentEssayQuestionsForExam(studentQuestions, sqSection);
-    const q = tlSearch.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((item) => String(item.q || '').toLowerCase().includes(q));
-  }, [studentQuestions, sqSection, tlSearch]);
+  const mcQuestionList = activeSection
+    ? getStudentMcQuestionsForExam(studentQuestions, activeSection)
+    : [];
+  const mcQuery = mcSearch.trim().toLowerCase();
+  const mcQuestions = mcQuery
+    ? mcQuestionList.filter((item) => String(item.q || '').toLowerCase().includes(mcQuery))
+    : mcQuestionList;
+  const essayQuestionList = activeSection
+    ? getStudentEssayQuestionsForExam(studentQuestions, activeSection)
+    : [];
+  const essayQuery = tlSearch.trim().toLowerCase();
+  const essayQuestions = essayQuery
+    ? essayQuestionList.filter((item) => String(item.q || '').toLowerCase().includes(essayQuery))
+    : essayQuestionList;
 
   const handleEssayPdfUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -164,7 +173,7 @@ export default function StudentQuestionBankPanel() {
   const handleSubjectExamFileUpload = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !sqSection) return;
+    if (!file || !activeSection) return;
     setExamFileUploading(true);
     try {
       const data = await api.settings.uploadTrainingFile(file);
@@ -174,21 +183,21 @@ export default function StudentQuestionBankPanel() {
         fileName: data.fileOriginalName || file.name,
         fileType: file.type || '',
       };
-      setStudentExamFile(sqSection, fileMeta);
+      setStudentExamFile(activeSection, fileMeta);
       const saved = await api.settings.updateStudentExamConfig({
         studentQuestions,
         studentExamMinutes,
         studentEssayExamMinutes,
         studentEssayRequired,
-        studentExamFiles: { ...studentExamFiles, [sqSection]: fileMeta },
+        studentExamFiles: { ...studentExamFiles, [activeSection]: fileMeta },
         examWarningSoundUrl,
       });
-      const savedFile = saved?.data?.studentExamFiles?.[sqSection];
+      const savedFile = saved?.data?.studentExamFiles?.[activeSection];
       if (!saved?.success || !savedFile?.fileUrl) {
         throw new Error('Máy chủ không lưu được file đề cho môn thi này');
       }
-      setStudentExamFile(sqSection, savedFile);
-      toast.success(`Đã tải đề tự luận môn ${activeSubject?.label || sqSection}`);
+      setStudentExamFile(activeSection, savedFile);
+      toast.success(`Đã tải đề tự luận môn ${activeSubject?.label || activeSection}`);
     } catch (err) {
       toast.error(err.message || 'Không tải được file đề');
     } finally {
@@ -249,7 +258,7 @@ export default function StudentQuestionBankPanel() {
     setSqForm({
       ...BLANK_Q,
       type,
-      section: sqSection,
+      section: activeSection,
       imageUrl: '',
       imageName: '',
       attachedFileUrl: '',
@@ -267,7 +276,11 @@ export default function StudentQuestionBankPanel() {
   };
 
   const handleSaveQuestion = async () => {
-    const section = sqForm.section || sqSection;
+    const section = sqForm.section || activeSection;
+    if (!subjectOpts.some((subject) => subject.id === section)) {
+      toast.error('Chọn khóa học có môn hợp lệ trước khi lưu câu hỏi');
+      return;
+    }
     const isEssay = String(sqForm.type).toLowerCase() === 'essay';
     const fileUrl = String(sqForm.attachedFileUrl || '').trim();
     const fileName = String(sqForm.attachedFileName || '').trim();
@@ -339,36 +352,73 @@ export default function StudentQuestionBankPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Header — chọn môn */}
+      {/* Câu hỏi được quản lý theo môn; khóa học chỉ giới hạn các môn thuộc khóa. */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
         <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[12rem]">
+            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+              Khóa học
+            </label>
+            <CmsSelect
+              value={selectedCourse ? String(selectedCourse._id || selectedCourse.id) : ''}
+              onChange={(e) => {
+                const nextCourse = courses.find(
+                  (course) => String(course._id || course.id) === e.target.value,
+                );
+                setSelectedCourseId(e.target.value);
+                const nextSubjectId = Array.isArray(nextCourse?.examSubjects)
+                  ? nextCourse.examSubjects[0] || ''
+                  : '';
+                if (nextSubjectId) setSqSection(nextSubjectId);
+              }}
+              disabled={coursesLoading || courses.length === 0}
+              className="w-full border-2 border-sky-200 rounded-xl px-3 py-2.5 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
+            >
+              {!selectedCourse && <option value="">— Chọn khóa học —</option>}
+              {courses.map((course) => (
+                <option key={course._id || course.id} value={course._id || course.id}>{course.name}</option>
+              ))}
+            </CmsSelect>
+          </div>
           <div className="flex-1 min-w-[12rem]">
             <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
             <CmsSelect
-              value={sqSection}
+              value={activeSection}
               onChange={(e) => setSqSection(e.target.value)}
+              disabled={!subjectOpts.length}
               className="w-full border-2 border-green-200 rounded-xl px-3 py-2.5 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500"
             >
               {subjectOpts.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </CmsSelect>
+            {!coursesLoading && !courses.length && (
+              <p className="mt-1.5 text-xs font-medium text-amber-700">
+                Chưa có khóa học. Tạo khóa trước trong Quản lý Học phí Khóa học.
+              </p>
+            )}
+            {coursesError && <p className="mt-1.5 text-xs font-medium text-red-600">{coursesError}</p>}
+            {selectedCourse && !subjectOpts.length && (
+              <p className="mt-1.5 text-xs font-medium text-amber-700">
+                Khóa này chưa có môn gắn trong danh mục khóa học.
+              </p>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700">
-                {examFileUploading ? 'Đang tải đề...' : (studentExamFiles?.[sqSection]?.fileUrl ? 'Thay file đề tự luận' : 'Tải file đề tự luận')}
+                {examFileUploading ? 'Đang tải đề...' : (studentExamFiles?.[activeSection]?.fileUrl ? 'Thay file đề tự luận' : 'Tải file đề tự luận')}
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
                   className="sr-only"
-                  disabled={examFileUploading}
+                  disabled={examFileUploading || !activeSection}
                   onChange={handleSubjectExamFileUpload}
                 />
               </label>
-              {studentExamFiles?.[sqSection]?.fileUrl ? (
+              {studentExamFiles?.[activeSection]?.fileUrl ? (
                 <span className="max-w-full truncate text-xs font-semibold text-emerald-700">
-                  {studentExamFiles[sqSection].fileName || 'Đã có file đề'}
+                  {studentExamFiles[activeSection].fileName || 'Đã có file đề'}
                 </span>
               ) : (
                 <span className="text-xs font-semibold text-amber-700">Chưa có file đề cho môn này</span>
@@ -385,8 +435,8 @@ export default function StudentQuestionBankPanel() {
                 type="number"
                 min={1}
                 max={600}
-                value={studentExamMinutes?.[sqSection] ?? 90}
-                onChange={(e) => updateStudentExamMinutes({ [sqSection]: e.target.value })}
+                value={studentExamMinutes?.[activeSection] ?? 90}
+                onChange={(e) => updateStudentExamMinutes({ [activeSection]: e.target.value })}
                 className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center"
               />
             </div>
@@ -395,7 +445,7 @@ export default function StudentQuestionBankPanel() {
             <label className="text-[11px] font-bold uppercase tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
-            <div className={`flex items-center gap-1.5 border-2 rounded-xl px-2.5 py-2 ${studentEssayRequired?.[sqSection] === false
+            <div className={`flex items-center gap-1.5 border-2 rounded-xl px-2.5 py-2 ${studentEssayRequired?.[activeSection] === false
               ? 'border-slate-200 bg-slate-50 opacity-60'
               : 'border-violet-200 bg-red-50/80'
               }`}>
@@ -404,9 +454,9 @@ export default function StudentQuestionBankPanel() {
                 type="number"
                 min={1}
                 max={600}
-                disabled={studentEssayRequired?.[sqSection] === false}
-                value={studentEssayExamMinutes?.[sqSection] ?? 60}
-                onChange={(e) => updateStudentEssayExamMinutes({ [sqSection]: e.target.value })}
+                disabled={studentEssayRequired?.[activeSection] === false}
+                value={studentEssayExamMinutes?.[activeSection] ?? 60}
+                onChange={(e) => updateStudentEssayExamMinutes({ [activeSection]: e.target.value })}
                 className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center disabled:cursor-not-allowed"
               />
             </div>
@@ -418,16 +468,16 @@ export default function StudentQuestionBankPanel() {
             <button
               type="button"
               role="switch"
-              aria-checked={studentEssayRequired?.[sqSection] !== false}
+              aria-checked={studentEssayRequired?.[activeSection] !== false}
               onClick={() => updateStudentEssayRequired({
-                [sqSection]: studentEssayRequired?.[sqSection] === false,
+                [activeSection]: studentEssayRequired?.[activeSection] === false,
               })}
-              className={`w-full min-h-[42px] px-3 rounded-xl border-2 text-xs font-black transition ${studentEssayRequired?.[sqSection] === false
+              className={`w-full min-h-[42px] px-3 rounded-xl border-2 text-xs font-black transition ${studentEssayRequired?.[activeSection] === false
                 ? 'border-slate-200 bg-slate-50 text-slate-500'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                 }`}
             >
-              {studentEssayRequired?.[sqSection] === false ? 'Tắt — chỉ TN' : 'Bật — TN + TL'}
+              {studentEssayRequired?.[activeSection] === false ? 'Tắt — chỉ TN' : 'Bật — TN + TL'}
             </button>
           </div>
           <div className="flex items-center gap-2 ml-auto">
@@ -438,12 +488,12 @@ export default function StudentQuestionBankPanel() {
               type="button"
               onClick={() => {
                 showGlobalModal({
-                  title: `Xóa câu hỏi môn ${activeSubject?.label || sqSection}?`,
+                  title: `Xóa câu hỏi môn ${activeSubject?.label || activeSection}?`,
                   content: `Xóa ${mcQuestions.length} câu trắc nghiệm và ${essayQuestions.length} câu tự luận của môn này. Các môn khác vẫn được giữ nguyên.`,
                   type: 'warning',
                   confirmText: 'Xóa môn này',
                   cancelText: 'Huỷ',
-                  onConfirm: () => removeStudentQuestionsForSubject(sqSection),
+                  onConfirm: () => removeStudentQuestionsForSubject(activeSection),
                 });
               }}
               className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center gap-1.5"
@@ -470,9 +520,6 @@ export default function StudentQuestionBankPanel() {
                 <span className="text-slate-400">Chưa tải — dùng beep mặc định</span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
-              MP3 / WAV / OGG / M4A · tối đa 5MB. Chỉ trắc nghiệm; tự luận không chặn.
-            </p>
           </div>
           <label className="px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer inline-flex items-center gap-1.5">
             {soundUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
@@ -536,14 +583,16 @@ export default function StudentQuestionBankPanel() {
             <button
               type="button"
               onClick={() => openAddForm('multiple')}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              disabled={!activeSection}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               <Plus size={14} /> Thêm câu
             </button>
             <button
               type="button"
-              onClick={() => downloadStudentQuestionsExcelTemplate(sqSection, activeSubject?.label, 'multiple')}
-              className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-blue-50"
+              onClick={() => downloadStudentQuestionsExcelTemplate(activeSection, activeSubject?.label, 'multiple')}
+              disabled={!activeSection}
+              className="bg-white border border-blue-200 text-blue-700 disabled:opacity-50 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-blue-50"
             >
               <Download size={14} /> Mẫu Excel
             </button>
@@ -551,10 +600,11 @@ export default function StudentQuestionBankPanel() {
               <FileSpreadsheet size={14} /> Nhập Excel
               <input
                 ref={studentQuestionsExcelInputRef}
-                data-subject-id={sqSection}
+                data-subject-id={activeSection}
                 type="file"
                 accept=".xlsx,.xls"
                 className="hidden"
+                disabled={!activeSection}
                 onChange={handleStudentQuestionsExcelFile}
               />
             </label>
@@ -576,7 +626,6 @@ export default function StudentQuestionBankPanel() {
               <EmptyState
                 icon={ListChecks}
                 title="Chưa có câu trắc nghiệm"
-                hint="Thêm thủ công hoặc nhập từ Excel"
               />
             ) : (
               mcQuestions.map((q, i) => (
@@ -606,14 +655,12 @@ export default function StudentQuestionBankPanel() {
             <button
               type="button"
               onClick={() => openAddForm('essay')}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              disabled={!activeSection}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               <Plus size={14} /> Thêm câu / đề TH
             </button>
           </div>
-          <p className="px-3 py-1.5 text-[11px] text-violet-700 bg-red-50/60 border-b border-violet-50">
-            Mỗi câu tự luận có file đề riêng — thêm câu mới sẽ không dùng lại file câu trước.
-          </p>
           <div className="px-3 py-2 border-b border-slate-100">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
@@ -631,7 +678,6 @@ export default function StudentQuestionBankPanel() {
               <EmptyState
                 icon={PenLine}
                 title="Chưa có câu tự luận"
-                hint="Thêm câu và tải file đề riêng cho từng câu"
               />
             ) : (
               essayQuestions.map((q, i) => (
@@ -669,7 +715,7 @@ export default function StudentQuestionBankPanel() {
                 <div>
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Môn</label>
                   <CmsSelect
-                    value={sqForm.section || sqSection}
+                    value={sqForm.section || activeSection}
                     onChange={(e) => setSqForm({ ...sqForm, section: e.target.value })}
                     className="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-blue-400"
                   >

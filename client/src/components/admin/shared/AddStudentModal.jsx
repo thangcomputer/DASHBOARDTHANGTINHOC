@@ -7,8 +7,9 @@ import {
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
-import { getAccessToken } from '../../../services/api';
+import { apiFetch, getAccessToken } from '../../../services/api';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
+import { teacherMatchesCourse } from '../../../utils/examSubjects';
 
 function readPortalAccessToken() {
   return (
@@ -31,17 +32,27 @@ function isOnlineBranch(branch) {
   return String(branch?.name || '').toLowerCase().includes('online');
 }
 
-export default function AddStudentModal({ onAdd, onClose, teachers , isSubmitting }) {
+export default function AddStudentModal({
+  onAdd, onClose, teachers, examSubjectsCatalog, isSubmitting,
+}) {
   const toast    = useToast();
   const API      = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
   const TOTAL_PAYMENT_SECS = 900; // 15 phút
 
-  const { isSuperAdmin, branches, selectedBranchId } = useBranch();
+  const {
+    isSuperAdmin, branches: contextBranches, selectedBranchId, selectedTenantId,
+  } = useBranch();
   const { socket } = useSocket();
 
   // ── Step: 'form' | 'qr' | 'success' ─────────────────────────────────────
   const [step, setStep] = useState('form');
   const [submitting, setSubmitting] = useState(false);
+  const [loadedBranches, setLoadedBranches] = useState(null);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [branchesError, setBranchesError] = useState('');
+  const branches = loadedBranches?.length
+    ? loadedBranches
+    : (contextBranches?.length ? contextBranches : loadedBranches || []);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [dbCourses, setDbCourses] = useState([]);
@@ -51,6 +62,46 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
     paid: false, teacherId: '', learningMode: 'OFFLINE', branchId: '', branchCode: '',
     teacherAlert: '',
   });
+  const selectedCourse = useMemo(
+    () => dbCourses.find((course) => String(course._id) === String(form.courseId)),
+    [dbCourses, form.courseId],
+  );
+  const qualifiedTeachers = useMemo(
+    () => (teachers || [])
+      .filter(Boolean)
+      .filter((teacher) => String(teacher.status || '').toLowerCase() === 'active')
+      .filter((teacher) => teacherMatchesCourse(
+        teacher,
+        selectedCourse || form.course,
+        examSubjectsCatalog,
+      )),
+    [teachers, selectedCourse, form.course, examSubjectsCatalog],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setBranchesLoading(true);
+    setBranchesError('');
+    apiFetch('/branches')
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.message || 'Không tải được danh sách chi nhánh');
+        }
+        if (!cancelled) {
+          setLoadedBranches(Array.isArray(result.data) ? result.data : []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBranchesError(error.message || 'Không tải được danh sách chi nhánh');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBranchesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedTenantId]);
 
   // Fetch courses from DB
   useEffect(() => {
@@ -65,18 +116,18 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
           if (selectedBranchId && selectedBranchId !== 'all') {
              defaultBranchId = selectedBranchId;
           } else if (branches && branches.length > 0) {
-             defaultBranchId = branches[0]._id;
+             defaultBranchId = branches[0]._id || branches[0].id || '';
           }
           
           let mode = 'OFFLINE';
           if (defaultBranchId) {
-             const checkBranch = branches.find(b => String(b._id) === String(defaultBranchId));
+             const checkBranch = branches.find(b => toBranchId(b) === String(defaultBranchId));
              if (checkBranch && isOnlineBranch(checkBranch)) {
                 mode = 'ONLINE';
              }
           }
 
-          const bCode = defaultBranchId ? (branches.find(b => String(b._id) === String(defaultBranchId))?.code || '') : '';
+          const bCode = defaultBranchId ? (branches.find(b => toBranchId(b) === String(defaultBranchId))?.code || '') : '';
           const sessions = Number(first.totalSessions) > 0 ? Number(first.totalSessions) : 12;
           setForm(f => ({ ...f, courseId: first._id, course: first.name, price: ep, totalSessions: sessions, branchId: defaultBranchId, branchCode: bCode, learningMode: mode }));
         }
@@ -102,21 +153,22 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
       const filtered = mode === 'ONLINE'
         ? list.filter(isOnlineBranch)
         : list.filter((b) => !isOnlineBranch(b));
-      const stillOk = filtered.some((b) => String(b._id) === String(form.branchId));
+      const stillOk = filtered.some((b) => toBranchId(b) === String(form.branchId));
       const nextBranch = stillOk
-        ? list.find((b) => String(b._id) === String(form.branchId))
+        ? list.find((b) => toBranchId(b) === String(form.branchId))
         : filtered[0];
       setForm((f) => ({
         ...f,
         learningMode: mode,
-        branchId: nextBranch?._id || '',
+        branchId: nextBranch ? (nextBranch._id || nextBranch.id || '') : '',
         branchCode: nextBranch?.code || '',
+        teacherId: '',
       }));
       return;
     }
     
     if (name === 'branchId') {
-      const selectedB = branches.find(b => String(b._id) === String(value));
+      const selectedB = branches.find(b => toBranchId(b) === String(value));
       setForm(f => {
         const next = {
           ...f,
@@ -126,7 +178,11 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
         };
         if (f.teacherId) {
           const t = (teachers || []).find((x) => String(x.id || x._id) === String(f.teacherId));
-          if (!t || !teacherInStudentBranch(t, value)) next.teacherId = '';
+          if (
+            !t
+            || !teacherInStudentBranch(t, value)
+            || !teacherMatchesCourse(t, selectedCourse || f.course, examSubjectsCatalog)
+          ) next.teacherId = '';
         }
         return next;
       });
@@ -138,7 +194,14 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
       if (c) {
         const ep = Math.round(c.price * (1 - (c.discountPercent || 0) / 100));
         const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
-        setForm(f => ({ ...f, courseId: c._id, course: c.name, price: ep, totalSessions: sessions }));
+        setForm(f => ({
+          ...f,
+          courseId: c._id,
+          course: c.name,
+          price: ep,
+          totalSessions: sessions,
+          teacherId: '',
+        }));
       }
       return;
     }
@@ -177,7 +240,9 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
       .catch(() => {});
 
     const token = readPortalAccessToken();
-    const selectedBranch = branches.find(b => String(b._id) === String(form.branchId || (selectedBranchId !== 'all' ? selectedBranchId : '')));
+    const selectedBranch = branches.find(
+      (branch) => toBranchId(branch) === String(form.branchId || (selectedBranchId !== 'all' ? selectedBranchId : '')),
+    );
     const branchCode = selectedBranch?.code || '';
 
     (async () => {
@@ -635,12 +700,14 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
                   >
                     <option value="">-- Chọn địa điểm --</option>
                     {locationBranches.map((b) => (
-                      <option key={b._id} value={b._id}>{b.name}</option>
+                      <option key={b._id || b.id} value={b._id || b.id}>{b.name}</option>
                     ))}
                   </CmsSelect>
                   {locationBranches.length === 0 && (
                     <p className="text-[11px] text-amber-600 mt-1">
-                      Chưa có chi nhánh phù hợp hình thức này.
+                      {branchesLoading
+                        ? 'Đang tải danh sách chi nhánh…'
+                        : branchesError || 'Chưa có chi nhánh phù hợp hình thức này.'}
                     </p>
                   )}
                 </div>
@@ -714,22 +781,20 @@ export default function AddStudentModal({ onAdd, onClose, teachers , isSubmittin
                 <label className="cms-label">Giảng viên hướng dẫn</label>
                 <CmsSelect name="teacherId" value={form.teacherId} onChange={handleChange} className="cms-input">
                   <option value="">-- Chọn sau (không bắt buộc) --</option>
-                  {(teachers || []).filter(Boolean).filter((t) => {
-                    if (String(t.status || '').toLowerCase() !== 'active') return false;
+                  {qualifiedTeachers.filter((t) => {
                     const bid = toBranchId(form.branchId);
-                    if (!bid) return true;
-                    return teacherInStudentBranch(t, bid);
+                    return !bid || teacherInStudentBranch(t, bid);
                   }).map((t) => (
                     <option key={t.id || t._id} value={t.id || t._id}>
                       {t.name}{t.phone ? ` — ${t.phone}` : ''}
                     </option>
                   ))}
                 </CmsSelect>
-                {toBranchId(form.branchId) && (teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active' && teacherInStudentBranch(t, form.branchId)).length === 0 && (
-                  <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active cùng chi nhánh để phân công.</p>
+                {toBranchId(form.branchId) && qualifiedTeachers.filter((t) => teacherInStudentBranch(t, form.branchId)).length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên đúng chuyên môn và cùng chi nhánh để phân công.</p>
                 )}
-                {!toBranchId(form.branchId) && (teachers || []).filter(Boolean).filter((t) => String(t.status || '').toLowerCase() === 'active').length === 0 && (
-                  <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên Active để phân công.</p>
+                {!toBranchId(form.branchId) && qualifiedTeachers.length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">Chưa có giảng viên đúng chuyên môn để phân công.</p>
                 )}
               </div>
 

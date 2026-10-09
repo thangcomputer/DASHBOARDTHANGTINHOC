@@ -46,10 +46,11 @@ const TeacherDashboard = ({ onNavigate }) => {
     getSchedulesByTeacher, getTeacherRating, RATING_CRITERIA, getTransactionsByTeacher,
     addSchedule, updateSchedule, cancelSchedule,
     revokeStudentExam, updateStudent, updateTeacher, failStudentExam,
-    trainingData,
+    trainingData, setTrainingData,
   } = useData();
 
   const { socket, onlineUsers, lastSeenUsers } = useSocket();
+
 
   // Helper: tính "X phút trước" từ ISO string
   const timeAgo = (isoStr) => {
@@ -285,6 +286,21 @@ const TeacherDashboard = ({ onNavigate }) => {
   const location = useLocation();
   // Hash có thể kèm query (#students?studentId=…) — chỉ lấy tên tab
   const hashRaw = location.hash?.replace('#', '') || '';
+
+  const currentHashForSoftware = (location.hash || '').replace('#', '').split(/[?#]/)[0];
+  const settingsRefreshTick = useRef(0);
+  useEffect(() => {
+    if (currentHashForSoftware !== 'software-links') return undefined;
+    let alive = true;
+    const load = () => api.settings.getTrainingData()
+      .then((res) => { if (alive && res?.success && res.data) setTrainingData(res.data); })
+      .catch(() => {});
+    load();
+    const onRefresh = () => { settingsRefreshTick.current += 1; load(); };
+    const onData = (p) => { if (!p || p.type === 'settings') onRefresh(); };
+    socket?.on?.('data:refresh', onData);
+    return () => { alive = false; socket?.off?.('data:refresh', onData); };
+  }, [currentHashForSoftware, socket, setTrainingData]);
   const currentHash = hashRaw.split(/[?#]/)[0];
   const hashQuery = hashRaw.includes('?') ? hashRaw.slice(hashRaw.indexOf('?') + 1) : '';
   const [selectedEnrollmentKey, setSelectedEnrollmentKey] = useState(null);

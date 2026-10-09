@@ -13,7 +13,8 @@ import {
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
-import { apiFetch } from '../services/api';
+import { apiFetch, resolveMediaUrl } from '../services/api';
+import lessonPracticeApi from '../services/lessonPracticeApi';
 import {
   getExamSubjectOptions,
   formatExamSubjectsSummary,
@@ -65,9 +66,11 @@ function CourseModal({
     category:        course?.category || 'van-phong',
     examSubjects:    Array.isArray(course?.examSubjects) && course.examSubjects.length
       ? [...course.examSubjects]
-      : ['coban', 'word', 'excel', 'powerpoint'],
+      : [],
     description:     course?.description || '',
+    thumbnail:       course?.thumbnail || '',
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importCourseId, setImportCourseId] = useState('');
   const [showNewSubject, setShowNewSubject] = useState(false);
@@ -83,7 +86,7 @@ function CourseModal({
   const [savingGroupLabel, setSavingGroupLabel] = useState(false);
 
   const groupLabelOverrides = { admin: examAdminGroupLabel };
-  const examOptions = getExamSubjectOptions(examSubjectsCatalog);
+  const examOptions = getExamSubjectOptions(examSubjectsCatalog).filter((item) => !!examSubjectsCatalog?.[item.id]?.custom || (Array.isArray(form.examSubjects) && form.examSubjects.includes(item.id)));
   const groupedExamOptions = examOptions.reduce((acc, item) => {
     const key = item.group || 'admin';
     if (!acc[key]) acc[key] = [];
@@ -245,6 +248,7 @@ function CourseModal({
         category:        form.category,
         examSubjects:    form.examSubjects,
         description:     form.description,
+        thumbnail:       form.thumbnail || '',
         status:          'published',
       };
 
@@ -398,7 +402,50 @@ function CourseModal({
                   placeholder="Mô tả ngắn về khóa học..."
                 />
               </div>
-            </div>
+
+              <div>
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Ảnh banner khóa học (tùy chọn)</label>
+                {form.thumbnail ? (
+                  <div className="relative overflow-hidden rounded-[20px] border border-gray-100 shadow-sm">
+                    <img src={resolveMediaUrl(form.thumbnail)} alt="" className="h-36 w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, thumbnail: '' }))}
+                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      title="Xóa ảnh"
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-[20px] border-2 border-dashed border-gray-200 bg-gray-50 text-xs font-bold text-gray-400 transition hover:border-blue-400 hover:text-blue-600">
+                    {uploadingImage ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Plus size={18} aria-hidden="true" />}
+                    {uploadingImage ? 'Đang tải ảnh...' : 'Chọn ảnh banner (tối đa 5MB)'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingImage}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        setUploadingImage(true);
+                        try {
+                          const res = await lessonPracticeApi.upload(file);
+                          const url = res?.data?.url;
+                          if (!url) throw new Error('Không nhận được đường dẫn ảnh');
+                          setForm((f) => ({ ...f, thumbnail: url }));
+                        } catch (err) {
+                          toast.error(err.message || 'Tải ảnh thất bại');
+                        } finally {
+                          setUploadingImage(false);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>            </div>
 
             {/* Cột phải: Môn thi */}
             <div className="space-y-5 md:pl-2">
@@ -976,7 +1023,12 @@ export default function CoursePricingTab() {
                   return (
                     <tr key={course._id} className={`border-b border-slate-100 hover:bg-blue-50/30 transition ${idx % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
                       <td className="px-4 py-3.5">
-                        <p className="font-semibold text-slate-800 text-sm leading-snug">{course.name}</p>
+                        <p className="font-semibold text-slate-800 text-sm leading-snug">
+                          {course.name}
+                          <span className={`ml-2 align-middle rounded-full px-2 py-0.5 text-[10px] font-bold ${Array.isArray(course.examSubjects) && course.examSubjects.length === 1 ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                            {Array.isArray(course.examSubjects) && course.examSubjects.length === 1 ? 'Khóa lẻ' : 'Trọn gói'}
+                          </span>
+                        </p>
                         {course.description && (
                           <p className="text-[12px] text-slate-500 mt-0.5 line-clamp-1">{course.description}</p>
                         )}

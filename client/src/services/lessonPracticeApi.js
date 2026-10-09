@@ -13,7 +13,7 @@ async function parse(res) {
 const lessonPracticeApi = {
   admin: {
     subjects: async () => parse(await apiFetch('/lesson-practice/subjects')),
-    createSubject: async (body) => parse(await apiFetch('/lesson-practice/subjects', { method: 'POST', body: JSON.stringify(body) })),
+    courses: async () => parse(await apiFetch('/lesson-practice/courses')),
     updateSubject: async (id, body) => parse(await apiFetch(`/lesson-practice/subjects/${id}`, { method: 'PATCH', body: JSON.stringify(body) })),
     deleteSubject: async (id) => parse(await apiFetch(`/lesson-practice/subjects/${id}`, { method: 'DELETE' })),
     seedDefaults: async () => parse(await apiFetch('/lesson-practice/subjects/seed-defaults', { method: 'POST', body: '{}' })),
@@ -29,9 +29,16 @@ const lessonPracticeApi = {
   },
   student: {
     subjects: async () => parse(await apiFetch('/lesson-practice/my/subjects')),
-    units: async (subjectId) => parse(await apiFetch(`/lesson-practice/my/subjects/${subjectId}/units`)),
+    checkoutCourse: async (courseId) => parse(await apiFetch(`/lesson-practice/my/courses/${encodeURIComponent(courseId)}/checkout`, { method: 'POST', body: '{}' })),
+    getCoursePurchaseSession: async (sessionId) => parse(await apiFetch(`/lesson-practice/my/course-purchase-sessions/${encodeURIComponent(sessionId)}`)),
+    simulateCoursePurchase: async (sessionId) => parse(await apiFetch(`/lesson-practice/my/course-purchase-sessions/${encodeURIComponent(sessionId)}/simulate-paid`, { method: 'POST', body: '{}' })),
+    units: async (subjectId, courseId = '') => parse(await apiFetch(
+      `/lesson-practice/my/subjects/${subjectId}/units${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`,
+    )),
     unit: async (unitId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}`)),
+    markSection: async (unitId, section, itemId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/sections/${section}`, { method: 'POST', body: JSON.stringify({ itemId }) })),
     confirm: async (itemId, body) => parse(await apiFetch(`/lesson-practice/my/items/${itemId}/confirm`, { method: 'POST', body: JSON.stringify(body) })),
+    resetPractice: async (unitId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/reset-practice`, { method: 'POST', body: '{}' })),
   },
   upload: async (file) => {
     const fd = new FormData();

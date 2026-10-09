@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, BookOpen, Calendar, MessageSquare,
-  Trophy, FileText, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
+  Trophy, FileText, Download, Video, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
   GraduationCap, Users, DollarSign, ClipboardList, X,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, PlayCircle, Award, FileBox, Link2,
+  Newspaper, Award, FileBox, Link2,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
@@ -34,41 +34,20 @@ const MENU_CONFIG = {
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/student', requiresLearningAccess: true },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/student/feed' },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
+      { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       {
         key: 'schedule-materials-group',
         label: 'Học tập',
-        icon: Calendar,
+        icon: BookOpen,
         isGroup: true,
         children: [
-          { key: 'lesson-practice', icon: BookOpen, label: 'Bài học', path: '/student/lesson-practice', requiresLearningAccess: true },
-          { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
-          { key: 'materials-videos', icon: PlayCircle, label: 'Video', path: '/student', hash: 'materials-videos', requiresLearningAccess: true },
-          { key: 'materials-assignments', icon: ClipboardList, label: 'Bài tập', path: '/student', hash: 'materials-assignments', requiresLearningAccess: true },
-          { key: 'materials-files', icon: FileBox, label: 'Tài liệu', path: '/student', hash: 'materials-files', requiresLearningAccess: true },
-          { key: 'materials-software', icon: Link2, label: 'Phần mềm', path: '/student', hash: 'materials-software', requiresLearningAccess: true },
-        ],
-      },
-      {
-        key: 'exam-group',
-        label: 'Thi & chứng nhận',
-        icon: Trophy,
-        isGroup: true,
-        children: [
+          { key: 'lesson-practice', icon: BookOpen, label: 'Bài học & Video', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+          { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
           { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
-          { key: 'cert-prep', icon: GraduationCap, label: 'MOS / IC3', path: '/student/cert-prep', requiresLearningAccess: true },
-          { key: 'exam-scores', icon: Award, label: 'Điểm thi', path: '/student', hash: 'exam-scores', requiresLearningAccess: true },
         ],
       },
-      {
-        key: 'news-evaluation-group',
-        label: 'Tin tức & góp ý',
-        icon: FileText,
-        isGroup: true,
-        children: [
-          { key: 'news', icon: FileText, label: 'Tin tức', path: '/student/news' },
-          { key: 'evaluation', icon: Star, label: 'Đánh giá GV', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
-        ],
-      },
+      { key: 'news', icon: FileText, label: 'Tin tức', path: '/student/news' },
+      { key: 'evaluation', icon: Star, label: 'Đánh giá GV', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
       { key: 'center-info', icon: Building2, label: 'Trung tâm', path: '/student/center-info' },
     ],
     bottomItems: [
@@ -142,7 +121,8 @@ const MENU_CONFIG = {
             isGroup: true,
             children: [
               { key: 'students', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
-              { key: 'student-training', icon: BookOpen, label: 'Đào tạo HV', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'student-training', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'student-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'lesson-practice', icon: BookOpen, label: 'Bài học HV', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'cert-prep', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
             ],
@@ -154,8 +134,10 @@ const MENU_CONFIG = {
             isGroup: true,
             children: [
               { key: 'teachers', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-              { key: 'training', icon: BookOpen, label: 'Đào tạo GV', path: '/admin', hash: 'training', permission: PERMISSIONS.MANAGE_TRAINING },
-              { key: 'evaluations', icon: AlertTriangle, label: 'Đánh giá nội bộ', path: '/admin', hash: 'evaluations', permission: PERMISSIONS.VIEW_EVALUATIONS },
+              { key: 'training-videos', icon: Video, label: 'Video khóa học', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
+              { key: 'training-guides-evaluations', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
+              { key: 'training-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
+              { key: 'training-exam-room', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },
             ],
           },
           {
@@ -216,10 +198,7 @@ const SIDEBAR_GROUP_SIBLINGS = {
   'students-hub': ['teachers-hub', 'staff-hub'],
   'teachers-hub': ['students-hub', 'staff-hub'],
   'staff-hub': ['students-hub', 'teachers-hub'],
-  'exam-group': ['schedule-materials-group', 'news-evaluation-group'],
-  'schedule-materials-group': ['exam-group', 'news-evaluation-group'],
-  'news-evaluation-group': ['exam-group', 'schedule-materials-group'],
-  'teaching-group': ['news-training-group'],
+      'teaching-group': ['news-training-group'],
   'news-training-group': ['teaching-group'],
 };
 
@@ -336,7 +315,6 @@ const AppSidebar = ({
       'system-group': false,
       'exam-group': false,
       'schedule-materials-group': false,
-      'news-evaluation-group': false,
       'teaching-group': false,
       'news-training-group': false,
       // legacy keys (localStorage cũ)
@@ -644,7 +622,7 @@ const AppSidebar = ({
     // Item has a hash → active when path matches AND (hash khớp, hoặc hash rỗng với tab mặc định dashboard)
     if (item.hash) {
       if (location.pathname !== item.path) return false;
-      if (currentHash === item.hash) return true;
+      if (currentHash === item.hash || item.altHashes?.includes(currentHash)) return true;
       // /admin không hash = Tổng quan (dashboard)
       if (!currentHash && item.hash === 'dashboard' && item.path === '/admin') return true;
       return false;
@@ -666,6 +644,7 @@ const AppSidebar = ({
         || location.pathname.startsWith(`${item.path}/`);
       return onExam && !currentHash;
     }
+    if (item.altHashes?.includes(currentHash) && location.pathname === '/student') return true;
     if (item.path?.endsWith('/cert-prep') || item.path?.endsWith('/lesson-practice')) {
       const onSection = location.pathname === item.path
         || location.pathname.startsWith(`${item.path}/`);

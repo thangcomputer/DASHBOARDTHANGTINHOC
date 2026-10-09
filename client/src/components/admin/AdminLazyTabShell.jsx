@@ -10,6 +10,7 @@ const LazyAdminOverviewTab = lazy(() => import('./tabs/AdminOverviewTab'));
 const LazyStudentsTab = lazy(() => import('./tabs/AdminStudentsTab'));
 const LazyTeachersTab = lazy(() => import('./tabs/AdminTeachersTab'));
 const LazyTrainingTab = lazy(() => import('./tabs/AdminTrainingTab'));
+const LazyTeacherWorkflowModule = lazy(() => import('./tabs/AdminTeacherWorkflowModule'));
 const LazyEvaluationsTab = lazy(() => import('./tabs/AdminEvaluationsTab'));
 const LazyFinanceTab = lazy(() => import('./tabs/AdminFinanceTab'));
 const LazyLogsTab = lazy(() => import('./tabs/AdminLogsTab'));
@@ -59,12 +60,12 @@ export function AdminLazyOverviewTab(props) {
   );
 }
 
-function LazyAdminTab({ Component }) {
+function LazyAdminTab({ Component, componentProps = {} }) {
   return (
     <div className="animate-in fade-in duration-300 h-full min-h-0">
       <ErrorBoundary inline>
         <Suspense fallback={<TabFallback />}>
-          <Component />
+          <Component {...componentProps} />
         </Suspense>
       </ErrorBoundary>
     </div>
@@ -79,8 +80,12 @@ export function AdminLazyTeachersTab() {
   return <LazyAdminTab Component={LazyTeachersTab} />;
 }
 
-export function AdminLazyTrainingTab() {
-  return <LazyAdminTab Component={LazyTrainingTab} />;
+export function AdminLazyTrainingTab(props) {
+  return <LazyAdminTab Component={LazyTrainingTab} componentProps={props} />;
+}
+
+export function AdminLazyTeacherWorkflowModule() {
+  return <LazyAdminTab Component={LazyTeacherWorkflowModule} />;
 }
 
 export function AdminLazyEvaluationsTab() {
@@ -95,8 +100,8 @@ export function AdminLazyLogsTab() {
   return <LazyAdminTab Component={LazyLogsTab} />;
 }
 
-export function AdminLazyStudentTrainingTab() {
-  return <LazyAdminTab Component={LazyStudentTrainingTab} />;
+export function AdminLazyStudentTrainingTab(props) {
+  return <LazyAdminTab Component={LazyStudentTrainingTab} componentProps={props} />;
 }
 
 export function AdminLazyCertPrepTab() {

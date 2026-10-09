@@ -121,6 +121,17 @@ function TeacherActionMenu({
         </button>
       )}
       {canManageTeacherActions && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => { setEditTeacher({ ...t, _tab: 'history' }); close(); }}
+          className={`${itemCls} text-indigo-700 hover:bg-indigo-50`}
+        >
+          <CalendarCheck size={15} className="shrink-0" />
+          <span>Lịch sử sắp lịch</span>
+        </button>
+      )}
+      {canManageTeacherActions && (
         <button type="button" role="menuitem" onClick={() => { setEditTeacher(t); close(); }}
           className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
           <Edit3 size={15} className="shrink-0 text-slate-500" />

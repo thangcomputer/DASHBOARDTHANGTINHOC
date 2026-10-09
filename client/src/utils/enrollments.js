@@ -470,6 +470,16 @@ export function filterStudentTrainingFiles(files, { enrollments, fallbackCourse,
   const hasEnrollment = !!(enrollments?.length || fallbackCourse);
 
   return list.filter((f) => {
+    // A document assigned to a course must match that enrollment before subject fallbacks apply.
+    const isAssignedToCourse = Boolean(
+      f.courseId
+      || (f.courseName && normCourseKey(f.courseName) !== normCourseKey('Tài liệu học tập')),
+    );
+    if (isAssignedToCourse) {
+      if (!studentCanAccessTrainingItem(f, accessKeys, enrollments, fallbackCourse)) return false;
+      return matchesActiveCourse(f, activeCourseName, enrollments);
+    }
+
     // 1) Khớp môn thi/môn học của khóa HV đang học (Excel, Word, PowerPoint, Canva...) -> Hiển thị ngay
     if (allowedSubjectIds?.length && itemMatchesSubjectIds(f, allowedSubjectIds, catalog)) {
       return true;
