@@ -3,8 +3,9 @@ import {
   Play, CheckCircle, Lock, ChevronRight, Clock, Award, BookOpen,
   ArrowLeft, Shield, Users, BarChart2, RefreshCw, GraduationCap,
   PlayCircle, ChevronDown, ChevronUp, Star, AlertCircle, CheckCircle2,
-  FileBox, Video, Download, FileText, Plus, Pencil, ExternalLink
+  FileBox, Video, Download, FileText, Plus, Pencil, ExternalLink, Link2
 } from 'lucide-react';
+import SoftwareLinksTable from './SoftwareLinksTable';
 
 import { useData } from '../context/DataContext';
 import {
@@ -888,8 +889,17 @@ const AdminProgressPanel = ({ courseId }) => {
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
-  const { trainingData, examSubjectsCatalog } = useData() || { trainingData: { videos: [], guides: [], files: [] } };
+  const { trainingData, setTrainingData, examSubjectsCatalog } = useData() || { trainingData: { videos: [], guides: [], files: [] } };
   const [teacherProfile, setTeacherProfile] = useState(null);
+
+  useEffect(() => {
+    if (isAdmin || !setTrainingData) return undefined;
+    let alive = true;
+    api.settings.getTrainingData()
+      .then((res) => { if (alive && res?.success && res.data) setTrainingData(res.data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isAdmin, setTrainingData]);
 
   useEffect(() => {
     if (isAdmin) return;
@@ -1278,11 +1288,12 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         )}
 
         {/* TOP TABS FOR TEACHER */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-slate-200 pb-3 mb-6 mt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 border-b border-slate-200 pb-3 mb-6 mt-1">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length, tone: 'from-red-500 via-rose-500 to-red-700' },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0, tone: 'from-sky-400 via-blue-500 to-indigo-700' },
             { key: 'files', icon: Download, label: 'Tài liệu', count: visibleTraining?.files?.length || 0, tone: 'from-amber-400 via-orange-500 to-red-600' },
+            { key: 'software', icon: Link2, label: 'Phần mềm', count: visibleTraining?.softwareLinks?.length || 0, tone: 'from-emerald-400 via-teal-500 to-cyan-700' },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
               className={`group relative flex min-h-[5.5rem] w-full min-w-0 items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 ${
@@ -1504,6 +1515,10 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                )}
              </div>
            </div>
+        )}
+
+        {mainTab === 'software' && (
+          <SoftwareLinksTable items={Array.isArray(trainingData?.softwareLinks) ? trainingData.softwareLinks : []} />
         )}
 
       </div>

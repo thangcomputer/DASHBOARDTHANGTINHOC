@@ -33,22 +33,14 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/student', requiresLearningAccess: true },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/student/feed' },
+      { key: 'lesson-practice', icon: BookOpen, label: 'Video khóa học', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
-      {
-        key: 'schedule-materials-group',
-        label: 'Học tập',
-        icon: BookOpen,
-        isGroup: true,
-        children: [
-          { key: 'lesson-practice', icon: BookOpen, label: 'Bài học & Video', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
-          { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
-          { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
-        ],
-      },
+      { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
+      { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
       { key: 'news', icon: FileText, label: 'Tin tức', path: '/student/news' },
       { key: 'evaluation', icon: Star, label: 'Đánh giá GV', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
-      { key: 'center-info', icon: Building2, label: 'Trung tâm', path: '/student/center-info' },
+      { key: 'center-info', icon: Building2, label: 'Liên hệ Trung tâm', path: '/student/center-info' },
     ],
     bottomItems: [
       { key: 'profile', icon: User, label: 'Hồ sơ', path: '/student', hash: 'profile' },
@@ -62,31 +54,14 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/teacher' },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/teacher/feed' },
+      { key: 'schedule', icon: Calendar, label: 'Lịch dạy', path: '/teacher', hash: 'schedule' },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/teacher/inbox' },
-      {
-        key: 'teaching-group',
-        label: 'Giảng dạy',
-        icon: Users,
-        isGroup: true,
-        children: [
-          { key: 'students', icon: Users, label: 'Học viên', path: '/teacher', hash: 'students' },
-          { key: 'schedule', icon: Calendar, label: 'Lịch dạy', path: '/teacher', hash: 'schedule' },
-          { key: 'assignments', icon: ClipboardList, label: 'Bài tập & kiểm tra', path: '/teacher', hash: 'assignments' },
-        ],
-      },
+      { key: 'students', icon: Users, label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
+      { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', path: '/teacher', hash: 'assignments' },
+      { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
       { key: 'finance', icon: DollarSign, label: 'Tài chính', path: '/teacher/finance' },
-      {
-        key: 'news-training-group',
-        label: 'Học & tài nguyên',
-        icon: FileText,
-        isGroup: true,
-        children: [
-          { key: 'news', icon: FileText, label: 'Tin tức', path: '/teacher/news' },
-          { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
-          { key: 'software-links', icon: Link2, label: 'Phần mềm', path: '/teacher', hash: 'software-links' },
-        ],
-      },
-      { key: 'center-info', icon: Building2, label: 'Trung tâm', path: '/teacher/center-info' },
+      { key: 'news', icon: FileText, label: 'Tin tức', path: '/teacher/news' },
+      { key: 'center-info', icon: Building2, label: 'Thông tin Trung tâm', path: '/teacher/center-info' },
     ],
     bottomItems: [
       { key: 'profile', icon: User, label: 'Hồ sơ', path: '/teacher', hash: 'profile' },
@@ -198,7 +173,7 @@ const SIDEBAR_GROUP_SIBLINGS = {
   'students-hub': ['teachers-hub', 'staff-hub'],
   'teachers-hub': ['students-hub', 'staff-hub'],
   'staff-hub': ['students-hub', 'teachers-hub'],
-      'teaching-group': ['news-training-group'],
+  'teaching-group': ['news-training-group'],
   'news-training-group': ['teaching-group'],
 };
 
