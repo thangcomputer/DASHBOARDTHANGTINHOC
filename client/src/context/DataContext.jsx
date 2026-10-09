@@ -226,6 +226,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
 
   const actionsValue = useMemo(() => ({
     setCurrentUser,
+    setTrainingData: setTrainingDataFromSync,
     addExamResult, updateExamResult, removeExamResult,
     addStudent, addTeacher, removeTeacher, updateTeacher, updateStudent, assignTeacher,
     approveTeacher, manualActivateTeacher, suspendTeacher, reactivateTeacher,
@@ -286,7 +287,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     setStudentExamFile, setExamWarningSoundUrl,
     applyStudentExamConfigFromServer,
     addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject, updateExamAdminGroupLabel,
-    addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
+    addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar, setTrainingDataFromSync,
   ]);
 
   const value = useMemo(
