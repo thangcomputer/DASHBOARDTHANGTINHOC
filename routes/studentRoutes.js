@@ -15,6 +15,7 @@ const { dataScopeObserve } = require('../middleware/dataScopeObserve');
 const { validateOwnedCertificationFile } = require('../utils/certificationFilePolicy');
 const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
 const { effectiveCoursePrice } = require('../utils/coursePricing');
+const { isExcludedExamSubjectId } = require('../services/examSubjectCatalog');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -3448,13 +3449,15 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       const idxPreview = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
       if (idxPreview >= 0) {
         targetCourse = student.enrollments[idxPreview].courseName || targetCourse;
-        targetExamSubjects = student.enrollments[idxPreview].examSubjects || [];
+        targetExamSubjects = (student.enrollments[idxPreview].examSubjects || [])
+          .filter((id) => !isExcludedExamSubjectId(id));
       }
     } else if (student.enrollments?.length) {
       const primaryIdx = student.enrollments.findIndex((e) => e.isPrimary);
       const idx = primaryIdx >= 0 ? primaryIdx : 0;
       targetCourse = student.enrollments[idx]?.courseName || targetCourse;
-      targetExamSubjects = student.enrollments[idx]?.examSubjects || [];
+      targetExamSubjects = (student.enrollments[idx]?.examSubjects || [])
+        .filter((id) => !isExcludedExamSubjectId(id));
     }
 
     if (
@@ -3473,9 +3476,9 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
     if (!isUnassign && teacherDoc && targetCourse) {
       const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
       const teacherSubSet = new Set(
-        resolveTeacherSubjectIds(teacherDoc).map(String).filter((id) => id && id !== 'coban'),
+        resolveTeacherSubjectIds(teacherDoc).map(String).filter(Boolean),
       );
-      const courseSubIds = [...new Set((targetExamSubjects || []).map(String).filter((id) => id && id !== 'coban'))];
+      const courseSubIds = [...new Set((targetExamSubjects || []).map(String).filter(Boolean))];
       const matched = courseSubIds.length > 0 && courseSubIds.every((id) => teacherSubSet.has(id));
       if (!matched) {
         return res.status(400).json({

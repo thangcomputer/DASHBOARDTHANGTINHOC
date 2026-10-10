@@ -7,6 +7,7 @@ import {
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
 import api from '../../services/api';
+import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { readOwnedVideoCourseCache } from '../../utils/lmsDeepLink';
 
 function openChangePassword() {
@@ -31,6 +32,10 @@ function normalizeVideoOrders(rows) {
   );
 }
 
+function normalizeCourseName(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
 export default function StudentProfileTab({
   studentData,
   progressPct,
@@ -45,6 +50,7 @@ export default function StudentProfileTab({
     videoOrders: true,
   });
   const [videoOrders, setVideoOrders] = useState([]);
+  const [lessonProgress, setLessonProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
   const studentId = String(
     studentData?.id || studentData?._id || (() => {
       try { return JSON.parse(localStorage.getItem('student_user') || '{}').id; } catch { return ''; }
@@ -100,6 +106,44 @@ export default function StudentProfileTab({
       window.removeEventListener('lms-video-owned-updated', onRefresh);
     };
   }, [studentId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLessonProgress((prev) => ({ ...prev, loading: true, error: '' }));
+      try {
+        const res = await lessonPracticeApi.student.subjects();
+        if (cancelled) return;
+        const enrolledVideoCourses = (res.data?.courses || []).filter(
+          (course) => course.enrolled && course.deliveryMode === 'video',
+        );
+        const byId = new Map();
+        const byName = new Map();
+        enrolledVideoCourses.forEach((course) => {
+          const progress = {
+            completed: Number(course.completedLessonCount) || 0,
+            total: Number(course.lessonCount) || 0,
+          };
+          byId.set(String(course.id), progress);
+          byName.set(normalizeCourseName(course.name), progress);
+        });
+        setLessonProgress({ loading: false, error: '', byId, byName });
+      } catch (err) {
+        if (!cancelled) {
+          setLessonProgress({ loading: false, error: err.message || 'Không tải được tiến độ bài học', byId: new Map(), byName: new Map() });
+        }
+      }
+    };
+    const refresh = () => load();
+    load();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('lesson-practice-progress-updated', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('lesson-practice-progress-updated', refresh);
+    };
+  }, [studentId]);
   const toggleSection = (key) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const handleResumeVideoPay = (order) => {
@@ -121,6 +165,20 @@ export default function StudentProfileTab({
       : (studentData?.teacher || 'Chưa phân công'));
 
   const courses = Array.isArray(studentData?.courses) ? studentData.courses : [];
+  const progressForCourse = (course) => {
+    const courseId = String(course.courseId || '');
+    return (courseId && lessonProgress.byId.get(courseId))
+      || lessonProgress.byName.get(normalizeCourseName(course.courseName || course.name))
+      || null;
+  };
+  const primaryVideoCourse = courses.find((course) =>
+    (course.isPrimary || normalizeCourseName(course.courseName || course.name) === normalizeCourseName(studentData?.course))
+    && progressForCourse(course))
+    || (courses.length === 1 ? courses.find((course) => progressForCourse(course)) : null);
+  const primaryVideoProgress = primaryVideoCourse ? progressForCourse(primaryVideoCourse) : null;
+  const primaryVideoPct = primaryVideoProgress?.total
+    ? Math.round((primaryVideoProgress.completed / primaryVideoProgress.total) * 100)
+    : 0;
   const tuitionLines = courses.length
     ? courses.map((c) => {
       const name = c.courseName || c.name || 'Khóa học';
@@ -158,7 +216,7 @@ export default function StudentProfileTab({
             </p>
             <div className="mt-3 lg:mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 max-w-xl">
               <div className="rounded-xl bg-white/12 backdrop-blur-sm px-3 py-2.5 lg:px-4 lg:py-3">
-                <p className="text-lg sm:text-xl lg:text-2xl font-extrabold tabular-nums leading-none">{progressPct}%</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-extrabold tabular-nums leading-none">{primaryVideoProgress ? primaryVideoPct : progressPct}%</p>
                 <p className="text-[11px] sm:text-xs text-teal-100 mt-1 font-semibold uppercase tracking-wide">Tiến độ</p>
               </div>
               <div className="rounded-xl bg-white/12 backdrop-blur-sm px-3 py-2.5 lg:px-4 lg:py-3">
@@ -167,9 +225,13 @@ export default function StudentProfileTab({
               </div>
               <div className="rounded-xl bg-white/12 backdrop-blur-sm px-3 py-2.5 lg:px-4 lg:py-3 col-span-2 sm:col-span-1">
                 <p className="text-lg sm:text-xl lg:text-2xl font-extrabold tabular-nums leading-none">
-                  {studentData.remainingSessions ?? Math.max(0, (studentData.totalSessions || 0) - (studentData.completedSessions || 0))}
+                  {primaryVideoProgress
+                    ? Math.max(0, primaryVideoProgress.total - primaryVideoProgress.completed)
+                    : (studentData.remainingSessions ?? Math.max(0, (studentData.totalSessions || 0) - (studentData.completedSessions || 0)))}
                 </p>
-                <p className="text-[11px] sm:text-xs text-teal-100 mt-1 font-semibold uppercase tracking-wide">Buổi còn lại</p>
+                <p className="text-[11px] sm:text-xs text-teal-100 mt-1 font-semibold uppercase tracking-wide">
+                  {primaryVideoProgress ? 'Bài còn lại' : 'Buổi còn lại'}
+                </p>
               </div>
             </div>
           </div>
@@ -315,10 +377,18 @@ export default function StudentProfileTab({
                 </div>
               </div>
               <div className={`${openSections.courses ? 'grid' : 'hidden lg:grid'} p-3 lg:p-4 gap-2.5 lg:gap-3 sm:grid-cols-1 xl:grid-cols-2`}>
+                {lessonProgress.error && (
+                  <p className="sm:col-span-1 xl:col-span-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                    Không đồng bộ được tiến độ bài học: {lessonProgress.error}
+                  </p>
+                )}
                 {courses.map((c) => {
-                  const isCompleted = c.status === 'completed';
-                  const total = Number(c.totalSessions) || 12;
-                  const done = Number(c.completedSessions) || 0;
+                  const videoProgress = progressForCourse(c);
+                  const isVideoCourse = Boolean(videoProgress);
+                  const total = isVideoCourse ? videoProgress.total : (Number(c.totalSessions) || 12);
+                  const done = isVideoCourse ? videoProgress.completed : (Number(c.completedSessions) || 0);
+                  const isCompleted = c.status === 'completed'
+                    || (isVideoCourse && total > 0 && done >= total);
                   const pct = Math.round((done / total) * 100) || 0;
                   const title = c.courseName || c.name || 'Khóa học';
                   return (
@@ -356,7 +426,9 @@ export default function StudentProfileTab({
                           </div>
                           <div className="flex justify-between mt-1.5">
                             <p className="text-[11px] lg:text-xs font-semibold text-slate-500 tabular-nums">
-                              {done}/{total} buổi
+                              {lessonProgress.loading && c.deliveryMode === 'video'
+                                ? 'Đang đồng bộ bài học'
+                                : `${done}/${total} ${isVideoCourse || c.deliveryMode === 'video' ? 'bài' : 'buổi'}`}
                             </p>
                             <p className="text-[11px] lg:text-xs font-bold text-slate-600 tabular-nums">{pct}%</p>
                           </div>

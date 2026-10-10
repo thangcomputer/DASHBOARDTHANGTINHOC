@@ -13,7 +13,7 @@ import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
-import { teacherMatchesCourse } from '../utils/examSubjects';
+import { getExamSubjectMeta, teacherMatchesCourse } from '../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../utils/branchIds';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
@@ -2396,7 +2396,6 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest italic">Học viên chưa tham gia kỳ thi nào</p>
                             </div>
                           ) : (() => {
-                              const SL = { coban: 'Máy vi tính (Cơ bản)', word: 'Word', excel: 'Excel', powerpoint: 'PowerPoint' };
                               return (data.student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').map(ep => {
                                 const tn = ep.tracNghiem || {};
                                 const pct = tn.total > 0 ? Math.round(((tn.score || 0) / tn.total) * 100) : 0;
@@ -2412,7 +2411,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                            <Trophy size={20} />
                                         </div>
                                         <div>
-                                           <p className="text-sm font-black text-slate-800">{SL[ep.id] || ep.id}</p>
+                                           <p className="text-sm font-black text-slate-800">{getExamSubjectMeta(ep.id, examSubjectsCatalog).label}</p>
                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${isDat ? 'bg-emerald-50 text-emerald-600' : isKhongDat ? 'bg-red-50 text-red-500' : isChoNop ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
                                              {isDat ? 'ĐẠT' : isKhongDat ? 'RỚT' : isChoNop ? 'CHỜ NỘP' : isChoCham ? 'CHỜ CHẤM' : 'ĐANG THI'}
                                            </span>

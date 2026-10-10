@@ -272,7 +272,7 @@ const MESSAGE_REACTIONS = [
   { type: 'angry', emoji: '😡', label: 'Phẫn nộ' },
 ];
 
-function ReactionPicker({ msgId, onReact, myReactions }) {
+function ReactionPicker({ msgId, onReact, myReactions, align = 'right' }) {
   return (
     <div className="pointer-events-none absolute -bottom-2 -right-2 z-20 opacity-0 transition-opacity group-hover/msg:pointer-events-auto group-hover/msg:opacity-100 group-focus-within/msg:pointer-events-auto group-focus-within/msg:opacity-100">
       <div className="group/reaction relative">
@@ -282,17 +282,23 @@ function ReactionPicker({ msgId, onReact, myReactions }) {
             event.stopPropagation();
             onReact(msgId, 'like');
           }}
-          className={`flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.2)] transition hover:scale-110 hover:bg-slate-50 hover:text-slate-700 ${
-            myReactions?.includes('like') ? 'ring-1 ring-blue-300' : ''
+          className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(15,23,42,0.2)] transition hover:scale-110 ${
+            myReactions?.includes('like')
+              ? 'border-amber-300 bg-amber-100 text-amber-500 hover:bg-amber-200 hover:text-amber-600'
+              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
           }`}
           title="Thích"
           aria-label="Thích"
           aria-pressed={myReactions?.includes('like') || false}
         >
-          <ThumbsUp size={15} strokeWidth={1.8} />
+          <ThumbsUp
+            size={15}
+            strokeWidth={1.8}
+            fill={myReactions?.includes('like') ? 'currentColor' : 'none'}
+          />
         </button>
         <div
-          className="pointer-events-none absolute bottom-full right-0 flex translate-y-1 items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-1 opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all group-hover/reaction:pointer-events-auto group-hover/reaction:translate-y-0 group-hover/reaction:opacity-100 group-focus-within/reaction:pointer-events-auto group-focus-within/reaction:translate-y-0 group-focus-within/reaction:opacity-100"
+          className={`pointer-events-none absolute bottom-full ${align === 'left' ? 'left-0' : 'right-0'} flex translate-y-1 items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-1 opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all group-hover/reaction:pointer-events-auto group-hover/reaction:translate-y-0 group-hover/reaction:opacity-100 group-focus-within/reaction:pointer-events-auto group-focus-within/reaction:translate-y-0 group-focus-within/reaction:opacity-100`}
           role="group"
           aria-label="Cảm xúc khác"
         >
@@ -3035,6 +3041,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                   msgId={msg.id}
                                   onReact={handleReaction}
                                   myReactions={myReactions}
+                                  align={isMine ? 'right' : 'left'}
                                 />
                               )}
 

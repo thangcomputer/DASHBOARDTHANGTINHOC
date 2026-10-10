@@ -128,7 +128,7 @@ export function useAdminDashboardState() {
   const financeStudents = financeRes?.financeStudents || [];
 
   // Training UI (shared GV + HV)
-  const BLANK_Q = { type: 'multiple', section: 'excel', q: '', options: ['', '', '', ''], correct: 0, difficulty: 'medium', sampleAnswer: '' };
+  const BLANK_Q = { type: 'multiple', section: 'mon-kiem-thu', q: '', options: ['', '', '', ''], correct: 0, difficulty: 'medium', sampleAnswer: '' };
   const [qSearch, setQSearch] = useState('');
   const [qSection, setQSection] = useState('all');
   const [qDifficulty, setQDifficulty] = useState('all');

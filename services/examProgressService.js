@@ -3,7 +3,10 @@
  * Admin/staff vẫn có thể ghi đè qua PUT /students/:id.
  */
 
-const { inferExamSubjectsFromCourseName } = require('./examSubjectCatalog');
+const {
+  inferExamSubjectsFromCourseName,
+  isExcludedExamSubjectId,
+} = require('./examSubjectCatalog');
 
 const ALLOWED_STATUS = new Set(['chua_thi', 'dang_thi', 'khong_dat', 'dat']);
 const ALLOWED_THUC_HANH = new Set(['chua_nop', 'da_nop']);
@@ -58,9 +61,11 @@ function isActiveEnrollment(enr) {
 
 function subjectIdsForEnrollment(enr) {
   if (Array.isArray(enr?.examSubjects) && enr.examSubjects.length) {
-    return enr.examSubjects.map(String);
+    return enr.examSubjects.map(String).filter((id) => !isExcludedExamSubjectId(id));
   }
-  return inferExamSubjectsFromCourseName(enr?.courseName || enr?.name).map(String);
+  return inferExamSubjectsFromCourseName(enr?.courseName || enr?.name)
+    .map(String)
+    .filter((id) => !isExcludedExamSubjectId(id));
 }
 
 function examMilestoneMet(subjectIds, subjectId, completedSessions, totalSessions) {
@@ -80,7 +85,7 @@ function examMilestoneMet(subjectIds, subjectId, completedSessions, totalSession
 function canStudentWriteExamProgress(student, subjectId) {
   if (!student) return false;
   const sid = String(subjectId || '').trim();
-  if (!sid) return false;
+  if (!sid || isExcludedExamSubjectId(sid)) return false;
 
   const entry = (student.examProgress || []).find((e) => String(e.id) === sid);
   if (entry && String(entry.status) === 'dang_thi') return true;

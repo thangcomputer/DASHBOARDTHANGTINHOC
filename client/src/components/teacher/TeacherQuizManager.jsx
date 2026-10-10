@@ -257,7 +257,7 @@ export default function TeacherQuizManager({
       let binary = '';
       for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
 
-      const parsed = await parseQuestionBankExcel(binary, { defaultSection: 'excel' });
+      const parsed = await parseQuestionBankExcel(binary, { defaultSection: 'mon-kiem-thu' });
       const parsedQs = Array.isArray(parsed?.questions) ? parsed.questions : [];
       const errors = Array.isArray(parsed?.errors) ? parsed.errors : [];
 
@@ -721,7 +721,7 @@ export default function TeacherQuizManager({
                   </button>
                   <button
                     type="button"
-                    onClick={() => downloadTeacherQuestionsExcelTemplate('excel', 'Excel', 'multiple')}
+                    onClick={() => downloadTeacherQuestionsExcelTemplate('mon-kiem-thu', 'Môn kiểm thử', 'multiple')}
                     className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition"
                   >
                     Mẫu

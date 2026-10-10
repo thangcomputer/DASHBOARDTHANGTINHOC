@@ -1,3 +1,14 @@
+const DISCOUNT_PRICE_ROUNDING_UNIT = 10000;
+
+export function calculateDiscountPrice(price, discountPercent) {
+  const basePrice = Number(price) || 0;
+  const percent = Number(discountPercent) || 0;
+  if (percent <= 0) return basePrice;
+  const discountedPrice = basePrice * (1 - percent / 100);
+  const roundedPrice = Math.round(discountedPrice / DISCOUNT_PRICE_ROUNDING_UNIT) * DISCOUNT_PRICE_ROUNDING_UNIT;
+  return Math.max(0, roundedPrice - 1000);
+}
+
 export function isCourseDiscountActive(course, now = Date.now()) {
   if (!(Number(course?.discountPercent) > 0)) return false;
   const startsAt = course.discountStartsAt ? new Date(course.discountStartsAt).getTime() : null;
@@ -9,8 +20,5 @@ export function isCourseDiscountActive(course, now = Date.now()) {
 export function getEffectiveCoursePrice(course, now = Date.now()) {
   const price = Number(course?.price) || 0;
   if (!isCourseDiscountActive(course, now)) return price;
-  const discountPrice = Number(course?.discountPrice);
-  return discountPrice > 0
-    ? discountPrice
-    : Math.round(price * (1 - Number(course.discountPercent) / 100));
+  return calculateDiscountPrice(price, course.discountPercent);
 }

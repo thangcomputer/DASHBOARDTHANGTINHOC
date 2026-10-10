@@ -167,8 +167,8 @@ export function useAdminDashboardState() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [resetPwModal, setResetPwModal] = useState(null);
   const sTrainingTabRef = useRef('videos');
-  const sqSectionRef = useRef('coban');
-  const qSectionRef = useRef('coban');
+  const sqSectionRef = useRef('mon-kiem-thu');
+  const qSectionRef = useRef('mon-kiem-thu');
 
   const studentsApi = useAdminStudents({ activeTab, setDeleteModal, sqSectionRef });
   const teachersApi = useAdminTeachers({
@@ -484,19 +484,19 @@ export function useAdminDashboardState() {
 
   // Teacher question bank filters
   const BLANK_Q = {
-    type: 'multiple', section: 'excel', q: '', options: ['', '', '', ''], correct: 0,
+    type: 'multiple', section: 'mon-kiem-thu', q: '', options: ['', '', '', ''], correct: 0,
     difficulty: 'medium', sampleAnswer: '', imageUrl: '', imageName: '',
     attachedFileUrl: '', attachedFileName: '',
   };
   const [qSearch, setQSearch] = useState('');
-  const [qSection, setQSection] = useState('coban');
+  const [qSection, setQSection] = useState('mon-kiem-thu');
   const [qDifficulty, setQDifficulty] = useState('all');
   const [qSort, setQSort] = useState('newest');
   const [qForm, setQForm] = useState(null);
 
   // Student question bank / exam results UI
   const [sqSearch, setSqSearch] = useState('');
-  const [sqSection, setSqSectionState] = useState('coban');
+  const [sqSection, setSqSectionState] = useState('mon-kiem-thu');
   const [sqType, setSqType] = useState('all');
   const [sqForm, setSqForm] = useState(null);
   const [erSearch, setErSearch] = useState('');

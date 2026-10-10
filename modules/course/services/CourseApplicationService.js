@@ -3,6 +3,7 @@ const { courseRepository } = require('./../repositories');
 const Course = require('./../models/Course'); // Temp for new Course
 const logger = require('./../../../config/logger');
 const cache = require('./../../../utils/cache');
+const { calculateDiscountPrice, effectiveCoursePrice } = require('./../../../utils/coursePricing');
 const { getCachedSettings } = require('./../../system/settingsCache');
 
 const {
@@ -108,7 +109,7 @@ class CourseApplicationService {
   try {
     const body = { ...data.body };
     if (body.price !== undefined) {
-      body.discountPrice = calcEffectivePrice(Number(body.price), Number(body.discountPercent || 0));
+      body.discountPrice = calculateDiscountPrice(Number(body.price), Number(body.discountPercent || 0));
     }
     if (body.examSubjects !== undefined) {
       body.examSubjects = await sanitizeCourseExamSubjects(body.examSubjects);
@@ -120,7 +121,7 @@ class CourseApplicationService {
     return { _status: 201, _body: {
       success: true,
       message: `Đã tạo khóa học: ${course.name}`,
-      data: { ...course.toObject(), effectivePrice: course.discountPercent > 0 ? course.discountPrice : course.price },
+      data: { ...course.toObject(), effectivePrice: effectiveCoursePrice(course) },
     } };
   } catch (error) {
     if (error.code === 11000) {
@@ -138,7 +139,7 @@ class CourseApplicationService {
       const course = await courseRepository.findById(data.id).lean();
       const price  = Number(body.price ?? course?.price ?? 0);
       const pct    = Number(body.discountPercent ?? course?.discountPercent ?? 0);
-      body.discountPrice = calcEffectivePrice(price, pct);
+      body.discountPrice = calculateDiscountPrice(price, pct);
     }
     if (body.examSubjects !== undefined) {
       body.examSubjects = await sanitizeCourseExamSubjects(body.examSubjects);
@@ -154,7 +155,7 @@ class CourseApplicationService {
     }
     await invalidateCourseCache();
 
-    const ep = updated.discountPercent > 0 ? updated.discountPrice : updated.price;
+    const ep = effectiveCoursePrice(updated);
     return { _status: 200, _body: {
       success: true,
       message: `Đã cập nhật khóa học: ${updated.name}`,
@@ -172,7 +173,7 @@ class CourseApplicationService {
     if (price === undefined || isNaN(price) || Number(price) < 0) {
       return { _status: 400, _body: { success: false, message: 'Giá không hợp lệ' } };
     }
-    const dp = calcEffectivePrice(Number(price), Number(discountPercent));
+    const dp = calculateDiscountPrice(Number(price), Number(discountPercent));
     const course = await courseRepository.updateById(
       data.id,
       { price: Number(price), discountPercent: Number(discountPercent), discountPrice: dp },

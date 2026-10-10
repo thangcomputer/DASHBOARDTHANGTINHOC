@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { isEnrollmentCompleted } from '../../utils/enrollments';
+import lessonPracticeApi from '../../services/lessonPracticeApi';
 
 export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
   <div className="cms-sd-card !p-4 h-full flex flex-col min-w-0">
@@ -19,22 +20,81 @@ export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
 );
 
 export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
+  const [videoProgress, setVideoProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setVideoProgress((prev) => ({ ...prev, loading: true, error: '' }));
+      try {
+        const res = await lessonPracticeApi.student.subjects();
+        if (cancelled) return;
+        const byId = new Map();
+        const byName = new Map();
+        (res.data?.courses || [])
+          .filter((course) => course.enrolled && course.deliveryMode === 'video')
+          .forEach((course) => {
+            const progress = {
+              completed: Number(course.completedLessonCount) || 0,
+              total: Number(course.lessonCount) || 0,
+            };
+            byId.set(String(course.id), progress);
+            byName.set(normalizeCourseName(course.name), progress);
+          });
+        setVideoProgress({ loading: false, error: '', byId, byName });
+      } catch (err) {
+        if (!cancelled) {
+          setVideoProgress({
+            loading: false,
+            error: err.message || 'Không tải được tiến độ bài học',
+            byId: new Map(),
+            byName: new Map(),
+          });
+        }
+      }
+    };
+    const refresh = () => load();
+    load();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('lesson-practice-progress-updated', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('lesson-practice-progress-updated', refresh);
+    };
+  }, []);
+
   if (!courses || courses.length <= 1) return null;
   const orderedCourses = [...courses].sort(
     (a, b) => Number(isEnrollmentCompleted(a)) - Number(isEnrollmentCompleted(b)),
   );
+  const progressForCourse = (course) => {
+    const courseId = String(course.courseId || '');
+    return (courseId && videoProgress.byId.get(courseId))
+      || videoProgress.byName.get(normalizeCourseName(course.courseName || course.name))
+      || null;
+  };
   return (
     <section className="min-w-0">
       <p className="cms-sd-caption font-semibold uppercase tracking-wide mb-3 text-slate-400">
         Khóa học của bạn
       </p>
+      {videoProgress.error && (
+        <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+          Không đồng bộ được tiến độ bài học: {videoProgress.error}
+        </p>
+      )}
       <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1 -mx-1 px-1 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {orderedCourses.map((c) => {
           const name = c.courseName || c.name;
-          const completed = isEnrollmentCompleted(c);
+          const lessonProgress = progressForCourse(c);
+          const isVideoCourse = Boolean(lessonProgress);
+          const total = isVideoCourse ? lessonProgress.total : (c.totalSessions ?? 12);
+          const done = isVideoCourse ? lessonProgress.completed : (c.completedSessions ?? 0);
+          const completed = isVideoCourse
+            ? total > 0 && done >= total
+            : isEnrollmentCompleted(c);
           const active = name === activeCourseName;
-          const total = c.totalSessions ?? 12;
-          const done = c.completedSessions ?? 0;
           const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
           return (
             <button
@@ -76,7 +136,9 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
                 </div>
                 <div className="mt-1.5 flex items-center justify-between gap-2">
                   <span className="cms-sd-caption font-semibold text-slate-500 tabular-nums">
-                    {done}/{total} buổi
+                    {videoProgress.loading && c.deliveryMode === 'video'
+                      ? 'Đang đồng bộ bài học'
+                      : `${done}/${total} ${isVideoCourse || c.deliveryMode === 'video' ? 'bài' : 'buổi'}`}
                   </span>
                   <span className="cms-sd-caption font-bold text-slate-600 tabular-nums">
                     {pct}%
@@ -90,6 +152,10 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
     </section>
   );
 };
+
+function normalizeCourseName(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
 
 export {
   getGradeTextClasses,

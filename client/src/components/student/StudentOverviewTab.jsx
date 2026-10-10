@@ -8,6 +8,7 @@ import {
 import { CourseSwitcher, StatCard } from './StudentShared';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 import api, { downloadMediaFile, resolveMediaUrl } from '../../services/api';
+import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
 
 function formatSessionDayLabel(date) {
@@ -17,6 +18,10 @@ function formatSessionDayLabel(date) {
     weekday: d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' }),
     dateLabel: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }),
   };
+}
+
+function normalizeCourseName(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
 export default function StudentOverviewTab({
@@ -41,6 +46,7 @@ export default function StudentOverviewTab({
   const [pendingQuizCount, setPendingQuizCount] = useState(0);
   const [banners, setBanners] = useState([]);
   const [bannerSpeed, setBannerSpeed] = useState(5);
+  const [lessonProgress, setLessonProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
   /** Tick so banner flips to "Đang học" when the session window opens */
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -48,6 +54,60 @@ export default function StudentOverviewTab({
     const t = setInterval(() => setNowTick(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLessonProgress((prev) => ({ ...prev, loading: true, error: '' }));
+      try {
+        const res = await lessonPracticeApi.student.subjects();
+        if (cancelled) return;
+        const byId = new Map();
+        const byName = new Map();
+        (res.data?.courses || [])
+          .filter((course) => course.enrolled && course.deliveryMode === 'video')
+          .forEach((course) => {
+            const progress = {
+              completed: Number(course.completedLessonCount) || 0,
+              total: Number(course.lessonCount) || 0,
+            };
+            byId.set(String(course.id), progress);
+            byName.set(normalizeCourseName(course.name), progress);
+          });
+        setLessonProgress({ loading: false, error: '', byId, byName });
+      } catch (err) {
+        if (!cancelled) {
+          setLessonProgress({
+            loading: false,
+            error: err.message || 'Không tải được tiến độ bài học',
+            byId: new Map(),
+            byName: new Map(),
+          });
+        }
+      }
+    };
+    const refresh = () => load();
+    load();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('lesson-practice-progress-updated', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('lesson-practice-progress-updated', refresh);
+    };
+  }, []);
+
+  const matchedLessonProgress = useMemo(() => {
+    const courseId = String(viewStudent?.courseId || '');
+    return (courseId && lessonProgress.byId.get(courseId))
+      || lessonProgress.byName.get(normalizeCourseName(viewStudent?.course))
+      || null;
+  }, [lessonProgress, viewStudent?.course, viewStudent?.courseId]);
+  const isActiveVideoCourse = viewStudent?.deliveryMode === 'video' || Boolean(matchedLessonProgress);
+  const activeLessonProgress = matchedLessonProgress || (isActiveVideoCourse ? { completed: 0, total: 0 } : null);
+  const activeLessonPct = activeLessonProgress?.total
+    ? Math.min(100, Math.round((activeLessonProgress.completed / activeLessonProgress.total) * 100))
+    : 0;
 
   const ongoingSchedule = useMemo(() => {
     void nowTick;
@@ -335,11 +395,30 @@ export default function StudentOverviewTab({
             </section>
 
             <div className="cms-sd-stat-grid">
-              <StatCard icon={BookOpen} label="Đã học" value={viewStudent.completedSessions} sub={`/ ${viewStudent.totalSessions}`} color="from-red-500 to-red-600" />
-              <StatCard icon={Clock} label="Còn lại" value={viewStudent.remainingSessions} sub="buổi" color="from-[#1E3A8A] to-[#203DB5]" />
+              <StatCard
+                icon={BookOpen}
+                label="Đã học"
+                value={activeLessonProgress ? activeLessonProgress.completed : viewStudent.completedSessions}
+                sub={`/ ${activeLessonProgress ? activeLessonProgress.total : viewStudent.totalSessions}`}
+                color="from-red-500 to-red-600"
+              />
+              <StatCard
+                icon={Clock}
+                label="Còn lại"
+                value={activeLessonProgress
+                  ? Math.max(0, activeLessonProgress.total - activeLessonProgress.completed)
+                  : viewStudent.remainingSessions}
+                sub={activeLessonProgress ? 'bài' : 'buổi'}
+                color="from-[#1E3A8A] to-[#203DB5]"
+              />
               <StatCard icon={Star} label="Điểm TB" value={viewStudent.avgGrade} sub="/ 10" color="from-orange-400 to-orange-500" />
-              <StatCard icon={TrendingUp} label="Tiến độ" value={`${progressPct}%`} sub="hoàn thành" color="from-emerald-400 to-emerald-500" />
+              <StatCard icon={TrendingUp} label="Tiến độ" value={`${activeLessonProgress ? activeLessonPct : progressPct}%`} sub="hoàn thành" color="from-emerald-400 to-emerald-500" />
             </div>
+            {lessonProgress.error && (
+              <p role="status" className="mt-2 text-xs font-semibold text-amber-700">
+                Không đồng bộ được tiến độ bài học: {lessonProgress.error}
+              </p>
+            )}
 
             {/* To-do */}
             <section className="cms-sd-card relative overflow-hidden">

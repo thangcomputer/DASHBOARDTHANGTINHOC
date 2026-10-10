@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { effectiveCoursePrice } = require('../utils/coursePricing');
+const { calculateDiscountPrice, effectiveCoursePrice } = require('../utils/coursePricing');
 
 const courseSchema = new mongoose.Schema({
   name: {
@@ -159,7 +159,7 @@ courseSchema.pre('save', async function () {
   }
   // Tính giá giảm
   if (this.discountPercent > 0) {
-    this.discountPrice = Math.round(this.price * (1 - this.discountPercent / 100));
+    this.discountPrice = calculateDiscountPrice(this.price, this.discountPercent);
   }
 });
 
@@ -173,7 +173,7 @@ courseSchema.pre('findOneAndUpdate', async function () {
 
   if (price !== undefined || pct !== undefined) {
     if (price !== undefined && pct !== undefined) {
-      const dp = pct > 0 ? Math.round(price * (1 - pct / 100)) : price;
+      const dp = calculateDiscountPrice(price, pct);
       if (!update.$set) update.$set = {};
       update.$set.discountPrice = dp;
     }

@@ -1,34 +1,32 @@
-/** Catalog mon thi (mac dinh + tuy chinh tu server) */
+/** Exam subjects are loaded from server configuration. */
 export const BUILTIN_EXAM_SUBJECTS = {
-  coban: { id: 'coban', label: 'M\u00E1y vi t\u00EDnh (C\u01A1 b\u1EA3n)', short: 'C', bg: 'bg-slate-600', minutes: 90, group: 'office' },
-  word: { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90, group: 'office' },
-  excel: { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90, group: 'office' },
-  powerpoint: { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90, group: 'office' },
-  photoshop: { id: 'photoshop', label: 'Photoshop', short: 'PS', bg: 'bg-sky-600', minutes: 90, group: 'design' },
-  canva: { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90, group: 'design' },
-  corel: { id: 'corel', label: 'Corel', short: 'CR', bg: 'bg-pink-600', minutes: 90, group: 'design' },
-  autocad: { id: 'autocad', label: 'AutoCAD', short: 'AU', bg: 'bg-amber-600', minutes: 90, group: 'design' },
-  'mos-word': { id: 'mos-word', label: 'MOS-Word', short: 'MW', bg: 'bg-indigo-600', minutes: 90, group: 'mos' },
-  'mos-excel': { id: 'mos-excel', label: 'MOS-Excel', short: 'ME', bg: 'bg-emerald-700', minutes: 90, group: 'mos' },
-  'mos-powerpoint': { id: 'mos-powerpoint', label: 'MOS-PowerPoint', short: 'MP', bg: 'bg-rose-600', minutes: 90, group: 'mos' },
-  cpp: { id: 'cpp', label: 'C++', short: 'C+', bg: 'bg-cyan-700', minutes: 90, group: 'programming' },
-  web: { id: 'web', label: 'Web', short: 'WB', bg: 'bg-teal-700', minutes: 90, group: 'programming' },
-  python: { id: 'python', label: 'Python', short: 'PY', bg: 'bg-yellow-600', minutes: 90, group: 'programming' },
-  situation: { id: 'situation', label: 'S\u01B0 ph\u1EA1m (T\u00ECnh hu\u1ED1ng)', short: 'SP', bg: 'bg-rose-600', minutes: 90, group: 'pedagogy' },
+  'mon-kiem-thu': {
+    id: 'mon-kiem-thu',
+    label: 'Môn kiểm thử',
+    short: 'TEST',
+    bg: 'bg-gray-600',
+    minutes: 90,
+    group: 'admin',
+  },
 };
 export const EXAM_SUBJECTS = BUILTIN_EXAM_SUBJECTS;
-export const OFFICE_EXAM_IDS = ['coban', 'word', 'excel', 'powerpoint'];
-export const MOS_EXAM_IDS = ['mos-word', 'mos-excel', 'mos-powerpoint'];
-export const DESIGN_EXAM_IDS = ['photoshop', 'canva', 'corel', 'autocad'];
-export const PROGRAMMING_EXAM_IDS = ['cpp', 'web', 'python'];
+export const OFFICE_EXAM_IDS = [];
+export const MOS_EXAM_IDS = [];
+export const DESIGN_EXAM_IDS = [];
+export const PROGRAMMING_EXAM_IDS = [];
 export const EXAM_SUBJECT_GROUP_LABELS = {
-  office: 'Tin học văn phòng',
-  design: 'Design',
-  mos: 'Tin học MOS',
-  programming: 'Lập trình',
-  pedagogy: 'Sư phạm',
   admin: 'Admin tạo',
 };
+function isExcludedExamSubjectId(id) {
+  return !String(id || '').trim();
+}
+
+function isCatalogSubjectId(id, catalog = BUILTIN_EXAM_SUBJECTS) {
+  const subjectId = String(id || '').trim();
+  return Boolean(subjectId)
+    && !isExcludedExamSubjectId(subjectId)
+    && Object.prototype.hasOwnProperty.call(catalog || BUILTIN_EXAM_SUBJECTS, subjectId);
+}
 
 export function slugifyExamSubjectId(raw) {
   return String(raw || '')
@@ -59,22 +57,34 @@ export function getExamSubjectInitials(meta) {
 
 export function mergeExamCatalog(customList) {
   const merged = { ...BUILTIN_EXAM_SUBJECTS };
-  (Array.isArray(customList) ? customList : []).forEach((item) => {
-    if (!item?.id || !item?.label) return;
-    const entry = { id: item.id, label: item.label, bg: item.bg || 'bg-gray-600', minutes: item.minutes || 90, custom: true, group: item.group || 'admin' };
-    merged[item.id] = { ...entry, short: getExamSubjectInitials({ ...entry, short: item.short }) };
+  (Array.isArray(customList) ? customList : []).forEach((subject) => {
+    const id = String(subject?.id || '').trim().toLowerCase();
+    const label = String(subject?.label || '').trim();
+    if (!id || !label || isExcludedExamSubjectId(id) || Object.prototype.hasOwnProperty.call(merged, id)) return;
+    if (subject.createdByAdmin !== true) return;
+    merged[id] = {
+      ...subject,
+      id,
+      label,
+      custom: true,
+      group: String(subject.group || 'admin'),
+    };
   });
   return merged;
 }
 
 export function mergedArrayToCatalog(list) {
-  const custom = (Array.isArray(list) ? list : []).filter((s) => s?.id && !BUILTIN_EXAM_SUBJECTS[s.id]);
+  const custom = (Array.isArray(list) ? list : []).filter((s) => (
+    s?.id && !BUILTIN_EXAM_SUBJECTS[s.id] && s.createdByAdmin === true
+  ));
   return mergeExamCatalog(custom);
 }
 
 export function getExamSubjectOptions(catalog) {
   const map = catalog || BUILTIN_EXAM_SUBJECTS;
-  return Object.values(map).map(({ id, label, group }) => ({ id, label, group: group || 'admin' }));
+  return Object.values(map)
+    .filter(({ id }) => !isExcludedExamSubjectId(id))
+    .map(({ id, label, group }) => ({ id, label, group: group || 'admin' }));
 }
 
 export function getExamSubjectGroupLabel(group, overrides = null) {
@@ -97,85 +107,19 @@ export function normalizeCourseKey(name) {
 export function mapCourseToExamSubjectIds(courseName, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
   const n = normalizeCourseKey(courseName);
-  const pick = (ids) => ids.filter((id) => cat[id]);
   if (!n) return [];
-  if (n.includes('mos')) return pick([...MOS_EXAM_IDS]);
-  if (n.includes('photoshop')) return pick(['photoshop']);
-  if (n.includes('corel')) return pick(['corel']);
-  if (n.includes('autocad')) return pick(['autocad']);
-  if (n.includes('python')) return pick(['python']);
-  if (n.includes('c++') || n.includes('cpp')) return pick(['cpp']);
-  if (n.includes('web')) return pick(['web']);
-  // Combo Powerpoint + Canva trong cùng tên khóa
-  if (n.includes('canva') && (n.includes('powerpoint') || n.includes('ppt'))) {
-    return pick(['coban', 'powerpoint', 'canva']);
-  }
-  if (n.includes('canva')) return pick(['canva']);
-  if (n.includes('thiet ke') || n.includes('do hoa') || n.includes('design')) return pick([...DESIGN_EXAM_IDS]);
-  if (n.includes('lap trinh') || n.includes('programming')) return pick([...PROGRAMMING_EXAM_IDS]);
-  if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick([...OFFICE_EXAM_IDS]);
-  if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
-  if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
-  if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
-  // Đồ họa — không mặc định sang tin học văn phòng
-  if (n.includes('photoshop') || n.includes('illustrator') || n.includes('do hoa') || n.includes('thiet ke')) {
-    for (const sub of Object.values(cat)) {
-      const ln = normalizeCourseKey(sub.label || '');
-      const idn = normalizeCourseKey(sub.id || '');
-      if (n.includes(idn) || n.includes(ln) || ln.includes(n) || idn.includes('photoshop')) return [sub.id];
-    }
-    return [];
-  }
   for (const sub of Object.values(cat)) {
-    if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
+    if (isExcludedExamSubjectId(sub.id)) continue;
+    if (n === sub.id || n === normalizeCourseKey(sub.label)) return [sub.id];
   }
   return [];
 }
 
-/**
- * Map khóa → subjectIds nhưng KHÔNG fallback sang Office khi không nhận ra tên khóa.
- * Dùng khi lọc giảng viên phù hợp môn.
- */
+/** Resolve a course name only when it exactly identifies a catalog subject. */
 export function mapCourseToExamSubjectIdsStrict(courseName, catalog) {
-  const cat = catalog || BUILTIN_EXAM_SUBJECTS;
-  const n = normalizeCourseKey(courseName);
-  if (!n) return [];
-  const loose = mapCourseToExamSubjectIds(courseName, cat);
-  const looksOffice =
-    n.includes('thvp')
-    || n.includes('van phong')
-    || n.includes('tin hoc van phong')
-    || n.includes('microsoft office')
-    || n.includes('excel')
-    || n.includes('word')
-    || n.includes('powerpoint')
-    || n.includes('ppt')
-    || n.includes('coban')
-    || n.includes('may vi tinh')
-    || n.includes('co ban')
-    || n.includes('canva');
-  const looksExtended =
-    n.includes('mos')
-    || n.includes('photoshop')
-    || n.includes('corel')
-    || n.includes('autocad')
-    || n.includes('python')
-    || n.includes('c++')
-    || n.includes('cpp')
-    || n.includes('web')
-    || n.includes('lap trinh')
-    || n.includes('thiet ke')
-    || n.includes('do hoa')
-    || n.includes('design');
-  const allOffice = loose.length > 0 && loose.every((id) => OFFICE_EXAM_IDS.includes(id));
-  if (allOffice && !looksOffice && !looksExtended) return [];
-  return loose;
+  return mapCourseToExamSubjectIds(courseName, catalog);
 }
 
-/**
- * Focus giảng dạy của khóa — không gộp THVP thành mọi môn Office.
- * Excel-only ≠ THVP; THVP teacher không match Excel-only và ngược lại.
- */
 export function getCourseTeachingFocus(courseOrEnrollment, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
   const courseName = typeof courseOrEnrollment === 'string'
@@ -184,118 +128,46 @@ export function getCourseTeachingFocus(courseOrEnrollment, catalog) {
   const enrollmentSubjects = Array.isArray(courseOrEnrollment?.examSubjects)
     ? courseOrEnrollment.examSubjects.filter(Boolean)
     : [];
-  const n = normalizeCourseKey(courseName);
-
-  if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) {
-    return ['thvp'];
-  }
-  if (n.includes('canva') && (n.includes('powerpoint') || n.includes('ppt'))) return ['powerpoint', 'canva'];
-  if (n.includes('canva')) return ['canva'];
-  if (n.includes('photoshop')) return ['photoshop'];
-  if (n.includes('corel')) return ['corel'];
-  if (n.includes('autocad')) return ['autocad'];
-  if (n.includes('mos')) return [...MOS_EXAM_IDS];
-  if (n.includes('python')) return ['python'];
-  if (n.includes('c++') || n.includes('cpp')) return ['cpp'];
-  if (n.includes('web')) return ['web'];
-  if (n.includes('excel')) return ['excel'];
-  if (n.includes('word')) return ['word'];
-  if (n.includes('powerpoint') || n.includes('ppt')) return ['powerpoint'];
-  if (n.includes('coban') || n.includes('may vi tinh') || n.includes('co ban')) return ['coban'];
-
   if (enrollmentSubjects.length) {
-    const officeHits = enrollmentSubjects.filter((id) => OFFICE_EXAM_IDS.includes(String(id)));
-    const nonCobanOffice = officeHits.filter((id) => id !== 'coban');
-    if (nonCobanOffice.length >= 3) return ['thvp'];
-    const focuses = [];
-    enrollmentSubjects.forEach((id) => {
-      const sid = String(id);
-      if (sid === 'coban') return;
-      if (OFFICE_EXAM_IDS.includes(sid) || cat[sid] || sid === 'canva') focuses.push(sid);
-    });
-    if (focuses.length) return [...new Set(focuses)];
+    return [...new Set(enrollmentSubjects.map(String).filter((id) => isCatalogSubjectId(id, cat)))];
   }
-
-  return mapCourseToExamSubjectIdsStrict(courseName, cat).filter((id) => id !== 'coban');
+  return mapCourseToExamSubjectIdsStrict(courseName, cat);
 }
 
-/** Focus chuyên môn GV từ specialty / subjectIds */
+/** Resolve a teacher's configured subject IDs. */
 export function getTeacherTeachingFocus(teacher, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
-  const specialtyKey = normalizeCourseKey(teacher?.specialty || '');
-  if (
-    specialtyKey.includes('thvp')
-    || specialtyKey.includes('van phong')
-    || specialtyKey.includes('tin hoc van phong')
-    || specialtyKey.includes('microsoft office')
-  ) {
-    return ['thvp'];
-  }
-
-  const focuses = new Set();
-  if (specialtyKey.includes('excel')) focuses.add('excel');
-  if (specialtyKey.includes('word')) focuses.add('word');
-  if (specialtyKey.includes('powerpoint') || specialtyKey.includes('ppt')) focuses.add('powerpoint');
-  if (specialtyKey.includes('canva')) focuses.add('canva');
-  if (specialtyKey.includes('coban') || specialtyKey.includes('may vi tinh') || specialtyKey.includes('co ban')) {
-    focuses.add('coban');
-  }
-
-  const ids = resolveTeacherSubjectIds(teacher, cat).map(String);
-  ids.forEach((id) => {
-    if (id === 'coban') return;
-    if (id === 'canva' || OFFICE_EXAM_IDS.includes(id) || cat[id]) focuses.add(id);
-  });
-
-  // Đủ Word + Excel + PowerPoint (specialty hoặc subjectIds) → focus THVP
-  // để khớp khóa "Tin học văn phòng". Giữ môn ngoài Office (MOS, Design, Sư phạm…).
-  // Canva (hoặc môn design khác) KHÔNG chặn quy đổi THVP — trước đây !hasCanva khiến
-  // GV dạy Office+Canva bị coi "khác môn" với khóa THVP.
-  const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
-  if (hasFullOffice) {
-    focuses.delete('word');
-    focuses.delete('excel');
-    focuses.delete('powerpoint');
-    focuses.delete('coban');
-    focuses.add('thvp');
-  }
-
-  return [...focuses];
+  return [...new Set(resolveTeacherSubjectIds(teacher, cat).map(String).filter((id) => isCatalogSubjectId(id, cat)))];
 }
 
-/**
- * GV có thể dạy khóa này không?
- * Khớp theo focus chuyên môn (Excel / Word / THVP / Canva…), không dùng giao subjectIds
- * quá rộng khiến GV THVP bị coi là dạy được Excel-only.
- * Lệch môn → UI làm mờ và không cho chọn.
- */
+/** A teacher matches only when their configured subject IDs cover the course IDs. */
 export function teacherMatchesCourse(teacher, courseOrEnrollment, catalog) {
   if (!teacher) return false;
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
-  const courseName = typeof courseOrEnrollment === 'string'
-    ? courseOrEnrollment
-    : (courseOrEnrollment?.courseName || courseOrEnrollment?.name || '');
-
   const hasCourseSubjects = Array.isArray(courseOrEnrollment?.examSubjects)
     && courseOrEnrollment.examSubjects.length > 0;
   const courseSubjectIds = (hasCourseSubjects
     ? courseOrEnrollment.examSubjects
-    : mapCourseToExamSubjectIdsStrict(courseName, cat))
+    : mapCourseToExamSubjectIdsStrict(
+      typeof courseOrEnrollment === 'string'
+        ? courseOrEnrollment
+        : (courseOrEnrollment?.courseName || courseOrEnrollment?.name || ''),
+      cat,
+    ))
     .map(String)
-    .filter((id) => id && id !== 'coban');
+    .filter((id) => isCatalogSubjectId(id, cat));
   const teacherSubjectIds = new Set(resolveTeacherSubjectIds(teacher, cat)
     .map(String)
-    .filter((id) => id && id !== 'coban'));
+    .filter((id) => isCatalogSubjectId(id, cat)));
   return courseSubjectIds.length > 0
     && courseSubjectIds.every((id) => teacherSubjectIds.has(id));
 }
 
-export function getSubjectIdsForEnrollment(enrollment, catalog) {
-  const cat = catalog || BUILTIN_EXAM_SUBJECTS;
-  if (Array.isArray(enrollment?.examSubjects) && enrollment.examSubjects.length) {
-    return enrollment.examSubjects.filter((id) => cat[id]);
-  }
-  return mapCourseToExamSubjectIds(enrollment?.courseName || enrollment?.name, cat);
+export function getSubjectIdsForEnrollment(enrollment, catalog = BUILTIN_EXAM_SUBJECTS) {
+  if (!Array.isArray(enrollment?.examSubjects)) return [];
+  return [...new Set(enrollment.examSubjects
+    .map((id) => String(id || '').trim())
+    .filter((id) => isCatalogSubjectId(id, catalog)))];
 }
 
 /** Các enrollment gắn với một môn thi (theo examSubjects / tên khóa). */
@@ -324,31 +196,29 @@ export function requireWebcamForSubject(enrollments, subjectId, catalog, fallbac
   return fallbackRequire === true;
 }
 
-export function getSubjectIdsForStudent(enrollments, fallbackCourse, catalog) {
+export function getSubjectIdsForStudent(enrollments, fallbackCourse, catalog = BUILTIN_EXAM_SUBJECTS) {
   const ids = new Set();
   if (Array.isArray(enrollments) && enrollments.length) {
     enrollments.forEach((e) => {
       if (e.cancelledAt || e.status === 'cancelled' || e.status === 'refunded') return; // Bỏ qua khóa học đã hủy
       getSubjectIdsForEnrollment(e, catalog).forEach((id) => ids.add(id));
     });
-  } else if (fallbackCourse) {
-    mapCourseToExamSubjectIds(fallbackCourse, catalog).forEach((id) => ids.add(id));
   }
   return [...ids];
 }
 
-export function getSubjectIdsForCourseFilter(enrollments, filterCourse, fallbackCourse, catalog) {
+export function getSubjectIdsForCourseFilter(enrollments, filterCourse, fallbackCourse, catalog = BUILTIN_EXAM_SUBJECTS) {
   if (filterCourse === 'all') return getSubjectIdsForStudent(enrollments, fallbackCourse, catalog);
   const enr = enrollments.find((e) => (e.courseName || e.name) === filterCourse);
   if (enr) {
     if (enr.cancelledAt || enr.status === 'cancelled' || enr.status === 'refunded') return []; // Bỏ qua khóa học đã hủy
     return getSubjectIdsForEnrollment(enr, catalog);
   }
-  return mapCourseToExamSubjectIds(filterCourse, catalog);
+  return [];
 }
 
-export function buildExamSubjectsFromProgress(examProgress, subjectIds) {
-  const ids = subjectIds || [];
+export function buildExamSubjectsFromProgress(examProgress, subjectIds, catalog = BUILTIN_EXAM_SUBJECTS) {
+  const ids = (subjectIds || []).filter((id) => isCatalogSubjectId(id, catalog));
   return ids.map((id) => {
     const def = { id, status: 'chua_thi', tracNghiem: null, thucHanh: 'chua_nop', lockUntil: null };
     const saved = (examProgress || []).find((s) => s.id === id);
@@ -434,13 +304,13 @@ export function getExamSubjectMeta(subjectId, catalog) {
 export const EXAM_SUBJECT_OPTIONS = getExamSubjectOptions(BUILTIN_EXAM_SUBJECTS);
 
 export function formatExamSubjectsSummary(examSubjects, catalog) {
-  const ids = Array.isArray(examSubjects) ? examSubjects : [];
+  const ids = Array.isArray(examSubjects) ? examSubjects.filter((id) => !isExcludedExamSubjectId(id)) : [];
   if (!ids.length) return '\u2014';
   return ids.map((id) => getExamSubjectMeta(id, catalog).label).join(', ');
 }
 
 export function formatSubjectIdsAsSpecialty(subjectIds, catalog) {
-  const ids = Array.isArray(subjectIds) ? subjectIds : [];
+  const ids = Array.isArray(subjectIds) ? subjectIds.filter((id) => !isExcludedExamSubjectId(id)) : [];
   if (!ids.length) return '';
   return ids.map((id) => getExamSubjectMeta(id, catalog).label).join(', ');
 }
@@ -453,6 +323,7 @@ export function parseSpecialtyToSubjectIds(specialty, catalog = BUILTIN_EXAM_SUB
   const ids = new Set();
 
   const entries = Object.entries(cat)
+    .filter(([id]) => !isExcludedExamSubjectId(id))
     .map(([id, meta]) => ({
       id,
       labelN: normalizeCourseKey(meta.label || ''),
@@ -485,7 +356,9 @@ export function parseSpecialtyToSubjectIds(specialty, catalog = BUILTIN_EXAM_SUB
 }
 
 export function resolveTeacherSubjectIds(teacher, catalog = BUILTIN_EXAM_SUBJECTS) {
-  const fromIds = Array.isArray(teacher?.subjectIds) ? teacher.subjectIds.filter(Boolean) : [];
+  const fromIds = Array.isArray(teacher?.subjectIds)
+    ? teacher.subjectIds.filter((id) => Boolean(id) && !isExcludedExamSubjectId(id))
+    : [];
   if (fromIds.length) return fromIds;
   return parseSpecialtyToSubjectIds(teacher?.specialty, catalog);
 }

@@ -13,39 +13,16 @@ const { isCourseDiscountActive, effectiveCoursePrice } = require('../utils/cours
 const SystemSettings = require('../models/SystemSettings');
 const {
   getMergedExamCatalog,
-  collectSubjectsFromCourses,
   resolveExamSubjectsForCourse,
+  isExcludedExamSubjectId,
 } = require('./examSubjectCatalog');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
 const logger = require('../config/logger');
 const rules = require('./lessonPracticeRules');
 
-const CATALOG_LABELS = {
-  coban: 'Máy vi tính (Cơ bản)',
-  word: 'Word',
-  excel: 'Excel',
-  powerpoint: 'PowerPoint',
-  photoshop: 'Photoshop',
-  canva: 'Canva',
-  corel: 'Corel',
-  autocad: 'AutoCAD',
-  'mos-word': 'MOS-Word',
-  'mos-excel': 'MOS-Excel',
-  'mos-powerpoint': 'MOS-PowerPoint',
-  cpp: 'C++',
-  web: 'Web',
-  python: 'Python',
-  situation: 'Sư phạm (Tình huống)',
-};
-const HIDDEN_CATALOG_IDS = new Set(['situation', 'photoshop', 'canva', 'corel', 'autocad', 'cpp', 'web', 'python', 'word', 'excel', 'powerpoint', 'mos-word', 'mos-excel', 'mos-powerpoint']);
-
 function isPreviewUnit(unit) {
   return unit?.isPreviewAllowed === true;
 }
-
-const SLUG_ALIASES = {
-  coban: ['su-dung-may-tinh', 'coban'],
-};
 
 function httpError(status, message) {
   const err = new Error(message);
@@ -141,31 +118,19 @@ function mapItemAdmin(doc) {
 }
 
 function catalogLabel(entry) {
-  if (entry.custom) return entry.label;
-  return CATALOG_LABELS[entry.id] || entry.label;
+  return entry.label;
 }
 
 async function syncCatalogSubjects() {
-  const [settings, courses] = await Promise.all([
-    SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
-    Course.find({ status: 'published', deletedAt: null }).select('examSubjects').lean(),
-  ]);
-  const catalog = [
-    ...getMergedExamCatalog(settings?.examSubjectsCustomRaw),
-    ...collectSubjectsFromCourses(courses, settings?.examSubjectsCustomRaw),
-  ].filter((entry) => !HIDDEN_CATALOG_IDS.has(entry.id));
+  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
+  const catalog = getMergedExamCatalog(settings?.examSubjectsCustomRaw);
   const rows = await LessonSubject.find({});
-  await LessonSubject.updateMany(
-    { examSubjectId: { $in: [...HIDDEN_CATALOG_IDS] }, isActive: { $ne: false } },
-    { $set: { isActive: false } },
-  );
   const byExam = new Map(rows.filter((row) => row.examSubjectId).map((row) => [row.examSubjectId, row]));
   const bySlug = new Map(rows.map((row) => [row.slug, row]));
 
   for (let i = 0; i < catalog.length; i += 1) {
     const entry = catalog[i];
-    const aliases = SLUG_ALIASES[entry.id] || [entry.id];
-    const found = byExam.get(entry.id) || aliases.map((slug) => bySlug.get(slug)).find(Boolean);
+    const found = byExam.get(entry.id) || bySlug.get(entry.id);
     const name = catalogLabel(entry);
     const sortOrder = i + 1;
     if (!found) {
@@ -200,17 +165,16 @@ async function syncCatalogSubjects() {
     }
     if (changed) await found.save();
   }
-
-  const extras = rows.filter((row) => !row.examSubjectId && row.sortOrder < 1000);
-  for (const row of extras) {
-    row.sortOrder += 1000;
-    await row.save();
-  }
 }
 
 async function listSubjectsAdmin() {
   await syncCatalogSubjects();
-  const rows = await LessonSubject.find({ isActive: { $ne: false } }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
+  const catalogIds = getMergedExamCatalog(settings?.examSubjectsCustomRaw).map((entry) => entry.id);
+  const rows = await LessonSubject.find({
+    isActive: { $ne: false },
+    examSubjectId: { $in: catalogIds },
+  }).sort({ sortOrder: 1, createdAt: 1 }).lean();
   return rows.map((row) => mapSubject(row));
 }
 
@@ -225,14 +189,18 @@ async function listCoursesForAdmin() {
   return courses.map((course) => ({
     id: String(course._id),
     name: course.name,
-    examSubjects: resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw),
+    examSubjects: rules.normalizeCourseExamSubjectIds(
+      resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw),
+    ),
   }));
 }
 
 async function updateSubject(id, body) {
   if (!isId(id)) throw httpError(400, 'Môn không hợp lệ');
   const doc = await LessonSubject.findById(id);
-  if (!doc) throw httpError(404, 'Không tìm thấy môn');
+  if (!doc || isExcludedExamSubjectId(doc.examSubjectId) || isExcludedExamSubjectId(doc.slug)) {
+    throw httpError(404, 'Không tìm thấy môn');
+  }
   if (body.name != null && !doc.examSubjectId) {
     const name = String(body.name).trim();
     if (!name) throw httpError(400, 'Tên môn không được để trống');
@@ -249,7 +217,9 @@ async function updateSubject(id, body) {
 async function deleteSubject(id) {
   if (!isId(id)) throw httpError(400, 'Môn không hợp lệ');
   const doc = await LessonSubject.findById(id);
-  if (!doc) throw httpError(404, 'Không tìm thấy môn');
+  if (!doc || isExcludedExamSubjectId(doc.examSubjectId) || isExcludedExamSubjectId(doc.slug)) {
+    throw httpError(404, 'Không tìm thấy môn');
+  }
   if (doc.examSubjectId) throw httpError(400, 'Môn có sẵn trong danh sách khóa học, không xóa được');
   const units = await LessonUnit.find({ subjectId: id }).select('_id').lean();
   const unitIds = units.map((u) => u._id);
@@ -263,14 +233,21 @@ async function deleteSubject(id) {
 
 async function seedDefaults() {
   await syncCatalogSubjects();
-  const rows = await LessonSubject.find({ examSubjectId: { $ne: '' } }).sort({ sortOrder: 1 }).lean();
+  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
+  const catalogIds = getMergedExamCatalog(settings?.examSubjectsCustomRaw).map((entry) => entry.id);
+  const rows = await LessonSubject.find({
+    examSubjectId: { $in: catalogIds },
+    isActive: { $ne: false },
+  }).sort({ sortOrder: 1 }).lean();
   return rows.map((row) => mapSubject(row));
 }
 
 async function assertSubject(id) {
   if (!isId(id)) throw httpError(400, 'Môn không hợp lệ');
   const doc = await LessonSubject.findById(id);
-  if (!doc) throw httpError(404, 'Không tìm thấy môn');
+  if (!doc || isExcludedExamSubjectId(doc.examSubjectId) || isExcludedExamSubjectId(doc.slug)) {
+    throw httpError(404, 'Không tìm thấy môn');
+  }
   return doc;
 }
 
@@ -589,7 +566,7 @@ async function courseOffersBySubject(subjects) {
       courseName: course.name,
       description: String(course.description || '').trim(),
       thumbnail: String(course.thumbnail || '').trim(),
-      price: hasDiscount ? course.discountPrice : course.price,
+      price: hasDiscount ? effectiveCoursePrice(course) : course.price,
       originalPrice: hasDiscount ? course.price : null,
       discountPercent: hasDiscount ? course.discountPercent : 0,
     };
@@ -614,13 +591,17 @@ async function courseOffersBySubject(subjects) {
 }
 async function listSubjectsForStudent(studentId) {
   await syncCatalogSubjects();
-  const subjects = await LessonSubject.find({ isActive: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const settings = await SystemSettings.findOne().select('examSubjectsCustomRaw').lean();
+  const catalogIds = getMergedExamCatalog(settings?.examSubjectsCustomRaw).map((entry) => entry.id);
+  const subjects = await LessonSubject.find({
+    isActive: true,
+    examSubjectId: { $in: catalogIds },
+  }).sort({ sortOrder: 1, createdAt: 1 }).lean();
   const subjectIds = subjects.map((s) => s._id);
-  const [units, progress, student, settings, courses] = await Promise.all([
+  const [units, progress, student, courses] = await Promise.all([
     LessonUnit.find({ subjectId: { $in: subjectIds }, isActive: true }).select('subjectId').lean(),
     LessonUnitProgress.find({ studentId, subjectId: { $in: subjectIds }, status: 'completed' }).select('subjectId').lean(),
     Student.findById(studentId).select('course courseId teacherId enrollments').lean(),
-    SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
     Course.find({ status: 'published', deletedAt: null })
       .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects deliveryMode')
       .sort({ createdAt: -1 })
@@ -661,7 +642,9 @@ async function listSubjectsForStudent(studentId) {
     String(enrollment?.status || 'active').toLowerCase() === 'active'
     && enrollment?.learningAccess !== false);
   const courseCatalog = courses.map((course) => {
-    const examSubjectIds = resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw);
+    const examSubjectIds = rules.normalizeCourseExamSubjectIds(
+      resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw),
+    );
     const courseSubjects = rules.mapCourseSubjectsToLessons(
       examSubjectIds,
       studentSubjects,
@@ -670,6 +653,10 @@ async function listSubjectsForStudent(studentId) {
     );
     const lessonCount = courseSubjects.reduce(
       (total, subject) => total + (Number(subject.totalUnitCount) || 0),
+      0,
+    );
+    const completedLessonCount = courseSubjects.reduce(
+      (total, subject) => total + (Number(subject.completedUnitCount) || 0),
       0,
     );
     const matchesCourse = (enrollment) =>
@@ -688,20 +675,35 @@ async function listSubjectsForStudent(studentId) {
       thumbnail: String(course.thumbnail || '').trim(),
       bannerColorStart: course.bannerColorStart || '',
       bannerColorEnd: course.bannerColorEnd || '',
-      price: hasDiscount ? course.discountPrice : course.price,
+      price: hasDiscount ? effectiveCoursePrice(course) : course.price,
       originalPrice: hasDiscount ? course.price : null,
       discountPercent: hasDiscount ? course.discountPercent : 0,
       discountStartsAt: hasDiscount && course.discountStartsAt ? course.discountStartsAt : null,
       discountEndsAt: hasDiscount && course.discountEndsAt ? course.discountEndsAt : null,
       totalSessions: course.totalSessions || 0,
       offerType: examSubjectIds.length === 1 ? 'single' : 'bundle',
+      subjectKeys: [...new Set(examSubjectIds.map(rules.normalizeSubjectKey).filter(Boolean))],
       subjects: courseSubjects,
       lessonCount,
+      completedLessonCount,
       enrolled,
       deliveryMode: course.deliveryMode === 'video' ? 'video' : 'instructor',
     };
   });
-  return { subjects: studentSubjects, courses: courseCatalog };
+  const ownedSubjectKeys = new Set(
+    courseCatalog
+      .filter((course) => course.enrolled)
+      .flatMap((course) => course.subjectKeys),
+  );
+  const visibleCourseCatalog = courseCatalog.map((course) => {
+    const { subjectKeys, ...publicCourse } = course;
+    return {
+      ...publicCourse,
+      hiddenByEnrollment: !course.enrolled
+        && rules.courseSubjectsCovered(subjectKeys, ownedSubjectKeys),
+    };
+  });
+  return { subjects: studentSubjects, courses: visibleCourseCatalog };
 }
 
 async function listUnitsForStudent(studentId, subjectId, requestedCourseId = '') {
@@ -754,7 +756,14 @@ async function loadStudentUnit(studentId, unitId) {
   const unit = await LessonUnit.findById(unitId);
   if (!unit || unit.isActive === false) throw httpError(404, 'Không tìm thấy buổi');
   const subject = await LessonSubject.findById(unit.subjectId);
-  if (!subject || subject.isActive === false) throw httpError(404, 'Không tìm thấy môn');
+  if (
+    !subject
+    || subject.isActive === false
+    || isExcludedExamSubjectId(subject.examSubjectId)
+    || isExcludedExamSubjectId(subject.slug)
+  ) {
+    throw httpError(404, 'Không tìm thấy môn');
+  }
   const granted = await grantedSubjectKeys(studentId);
   const subjectIsOpen = rules.subjectOpenedByKeys(subject, granted);
   const units = await LessonUnit.find({ subjectId: subject._id, isActive: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();

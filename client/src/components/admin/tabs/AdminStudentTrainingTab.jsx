@@ -866,7 +866,6 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
 
               {/* ===== EXAM RESULTS TAB - ĐỌC TỪ students.examProgress ===== */}
               {sTrainingTab === 'exam-results' && (() => {
-                const SUBJECT_LABELS = { coban: 'Máy vi tính (Cơ bản)', word: 'Word', excel: 'Excel', powerpoint: 'PowerPoint' };
                 // Flatten all students' examProgress into rows
                 const allRows = (students || []).flatMap(s => 
                   (s.examProgress || [])
@@ -876,7 +875,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       studentName: s.name,
                       course: s.course,
                       subjectId: ep.id,
-                      subjectLabel: SUBJECT_LABELS[ep.id] || ep.id,
+                      subjectLabel: examSubjectLabels.get(ep.id) || ep.id,
                       score: ep.tracNghiem?.score ?? 0,
                       total: ep.tracNghiem?.total ?? 15,
                       tracNghiem: ep.tracNghiem || { score: 0, total: 0 },
@@ -909,7 +908,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                   const idx = progress.findIndex(ep => ep.id === subjectId);
                   if (idx === -1) return;
                   progress[idx].essayScore = newScore;
-                  const subjectLabel = SUBJECT_LABELS[subjectId] || subjectId;
+                  const subjectLabel = examSubjectLabels.get(subjectId) || subjectId;
                   // Nếu trắc nghiệm đạt >= 50% VÀ tự luận >= 5 => đạt, nếu < 5 => rớt + khóa 7 ngày
                   const tn = progress[idx].tracNghiem;
                   const tnPct = tn ? Math.round((tn.score / tn.total) * 100) : 0;
@@ -1400,12 +1399,10 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                       <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Môn / Khóa học thi</label>
                       <CmsSelect value={erForm.subject || ''} onChange={e => setErForm({ ...erForm, subject: e.target.value })}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-amber-500 outline-none text-sm font-bold">
-                        <option value="THVP NÂNG CAO (12 BUỔI)">THVP NÂNG CAO (12 BUỔI)</option>
-                        <option value="MOS EXCEL CHUYÊN SÂU (10 BUỔI)">MOS EXCEL CHUYÊN SÂU (10 BUỔI)</option>
-                        <option value="THIẾT KẾ ĐỒ HỌA CƠ BẢN">THIẾT KẾ ĐỒ HỌA CƠ BẢN</option>
-                        <option value="AUTOCAD 2D - 3D (15 BUỔI)">AUTOCAD 2D - 3D (15 BUỔI)</option>
-                        <option value="LẬP TRÌNH PYTHON CƠ BẢN">LẬP TRÌNH PYTHON CƠ BẢN</option>
-                        <option value="Khác">Khác</option>
+                        <option value="">-- Chọn môn kiểm thử --</option>
+                        {getExamSubjectOptions(examSubjectsCatalog).map(({ id, label }) => (
+                          <option key={id} value={id}>{label}</option>
+                        ))}
                       </CmsSelect>
                     </div>
                   </div>

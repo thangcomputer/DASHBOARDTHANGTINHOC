@@ -187,10 +187,9 @@ function statusLabel(row) {
 
 function findCourseLessonSubject(subjects, examSubjectId) {
   const id = String(examSubjectId || '').toLowerCase();
-  const aliases = id === 'coban' ? ['coban', 'su-dung-may-tinh'] : [id];
-  return subjects.find((row) =>
-    aliases.includes(String(row.examSubjectId || '').toLowerCase())
-    || aliases.includes(String(row.slug || '').toLowerCase()));
+  return (Array.isArray(subjects) ? subjects : []).find((row) => row && (
+    String(row.examSubjectId || '').toLowerCase() === id
+    || String(row.slug || '').toLowerCase() === id));
 }
 
 export default function AdminLessonPracticeTab() {
@@ -241,9 +240,12 @@ export default function AdminLessonPracticeTab() {
     && (!hasPracticeBlock || (draftHasContent(draft) ? draftIsComplete(draft) : items.length > 0));
   const orderedLessonEntries = unitContentOrder(selectedUnit, items);
   const courseGroups = courses.map((course) => {
-    const courseSubjects = (course.examSubjects || []).map((examSubjectId) => {
-      return findCourseLessonSubject(subjects, examSubjectId);
-    }).filter((row, index, rows) => row && rows.findIndex((candidate) => candidate.id === row.id) === index);
+    const courseSubjects = (course.examSubjects || [])
+      .map((examSubjectId) => {
+        return findCourseLessonSubject(subjects, examSubjectId);
+      })
+      .filter(Boolean)
+      .filter((row, index, rows) => rows.findIndex((candidate) => candidate?.id === row.id) === index);
     return { ...course, subjects: courseSubjects };
   }).filter((course) => course.subjects.length > 0);
 

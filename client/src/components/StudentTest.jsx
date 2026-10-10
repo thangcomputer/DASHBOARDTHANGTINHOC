@@ -29,14 +29,6 @@ import {
 } from '../utils/examLiveSession';
 import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../services/api';
 
-const SUBJECT_META = {
-  coban: { label: 'Máy vi tính (Cơ bản)', short: 'Cơ bản', examFile: 'De_thi_Co_ban.docx', time: 90 * 60 },
-  word: { label: 'Word', short: 'Word', examFile: 'De_thi_Word.docx', time: 90 * 60 },
-  excel: { label: 'Excel', short: 'Excel', examFile: 'De_thi_Excel.xlsx', time: 90 * 60 },
-  powerpoint: { label: 'PowerPoint', short: 'PowerPoint', examFile: 'De_thi_PPT.pptx', time: 90 * 60 },
-  canva: { label: 'Canva', short: 'Canva', examFile: 'De_thi_Canva.pdf', time: 90 * 60 },
-};
-
 /** Logo từ cấu hình web (đồng bộ sidebar); fallback SVG chỉnh tông cho nền tối */
 function ExamBrandLogo({ resolvedUrl, className }) {
   return (
@@ -71,7 +63,7 @@ const ConfirmModal = ({ title, message, boldText, onConfirm, onCancel, confirmLa
 );
 
 // ─── Main StudentTest ─────────────────────────────────────────────────────────
-const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = 'THIÊN TRANG', onBack }) => {
+const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TRANG', onBack }) => {
   // Socket & Data
   let session = {};
   try {
@@ -84,9 +76,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
   const { students, studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired, studentExamFiles, examWarningSoundUrl = '', updateStudent, addNotification, examSubjectsCatalog, applyStudentExamConfigFromServer } = useData() || {
     students: [],
     studentQuestions: [],
-    studentExamMinutes: { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 },
-    studentEssayExamMinutes: { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 },
-    studentEssayRequired: { coban: true, word: true, excel: true, powerpoint: true, canva: true },
+    studentExamMinutes: {},
+    studentEssayExamMinutes: {},
+    studentEssayRequired: {},
     studentExamFiles: {},
     examWarningSoundUrl: '',
     updateStudent: () => { },
@@ -109,9 +101,8 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
 
   const meta = useMemo(() => {
     const sub = getExamSubjectMeta(subjectId, examSubjectsCatalog);
-    const fallback = SUBJECT_META[subjectId] || SUBJECT_META.word;
     const mins = Number(studentExamMinutes?.[subjectId]);
-    const baseMins = Number.isFinite(mins) && mins >= 1 ? mins : (sub.minutes || fallback.time / 60);
+    const baseMins = Number.isFinite(mins) && mins >= 1 ? mins : (sub.minutes || 90);
     const mcSecs = Math.max(60, Math.min(8 * 3600, Math.round(baseMins * 60)));
     const essayMins = Number(studentEssayExamMinutes?.[subjectId]);
     const baseEssayMins = Number.isFinite(essayMins) && essayMins >= 1 ? essayMins : 60;
@@ -121,16 +112,9 @@ const StudentTest = ({ subjectId = 'word', studentSbd = '11111', studentName = '
       subjectId,
       studentExamFiles,
     );
-    const primaryPractice = practiceFiles[0];
-    const examFileName = primaryPractice?.fileName || fallback.examFile;
-    const examFileUrl = primaryPractice?.fileUrl
-      ? buildMediaDownloadUrl(primaryPractice.fileUrl, primaryPractice.fileName)
-      : '';
     return {
-      label: sub.label || fallback.label,
-      short: sub.short || fallback.short,
-      examFile: examFileName,
-      examFileUrl,
+      label: sub.label,
+      short: sub.short,
       practiceFiles,
       hasPracticeFile: practiceFiles.length > 0,
       essayRequired: studentEssayRequired?.[subjectId] !== false,

@@ -220,7 +220,7 @@ function StudentTestWrapper({ session }) {
     <ErrorBoundary>
       <div className="h-[100dvh] max-h-[100dvh] overflow-hidden">
         <StudentTest
-          subjectId={subjectId || 'word'}
+          subjectId={subjectId}
           studentSbd={session?.phone || session?.sbd || '---'}
           studentName={session?.name || 'Học viên'}
           onBack={() => nav('/student/exam')}

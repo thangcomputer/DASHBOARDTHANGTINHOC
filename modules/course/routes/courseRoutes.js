@@ -8,6 +8,7 @@ const NEW_PERMISSIONS = require('../../../shared/constants/permissions');
 const { sanitizeRegex } = require('../../../middleware/sanitizeRegex');
 const logger = require('../../../config/logger');
 const cache = require('../../../utils/cache');
+const { calculateDiscountPrice } = require('../../../utils/coursePricing');
 const { getCachedSettings } = require('../../system/settingsCache');
 const {
   sanitizeExamSubjects,
@@ -43,8 +44,7 @@ router.get('/',courseController.get_root);
 router.get('/:id',courseController.get_id);
 
 function calcEffectivePrice(price, discountPercent) {
-  if (!discountPercent || discountPercent <= 0) return price;
-  return Math.round(price * (1 - discountPercent / 100));
+  return calculateDiscountPrice(price, discountPercent);
 }
 
 async function loadCustomExamSubjects() {

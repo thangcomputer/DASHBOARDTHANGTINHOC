@@ -14,12 +14,10 @@ const {
   getMergedExamCatalog,
   normalizeCustomList,
   sanitizeCustomExamSubjectEntry,
-  mergeCourseSubjectsIntoCustom,
-  inferExamSubjectsFromCourseName,
+  isExcludedExamSubjectId,
   BUILTIN_EXAM_SUBJECT_IDS,
 } = require('../services/examSubjectCatalog');
 const { getCachedSettings, invalidateSettingsCache } = require('../services/settingsCache');
-const Course = require('../models/Course');
 const { emitSystemWide } = require('../utils/realtimeEmit');
 const { policyShadowSettings } = require('../middleware/policyShadowSettings');
 const { settingsCutoverGate } = require('../middleware/settingsCutoverGate');
@@ -441,9 +439,9 @@ router.put('/student-training-data', authMiddleware, ...settingsGuard('student_t
   }
 });
 
-const DEFAULT_EXAM_MINUTES_SERVER = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 };
-const DEFAULT_ESSAY_EXAM_MINUTES_SERVER = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 };
-const DEFAULT_ESSAY_REQUIRED_SERVER = { coban: true, word: true, excel: true, powerpoint: true, canva: true };
+const DEFAULT_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 90 };
+const DEFAULT_ESSAY_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 60 };
+const DEFAULT_ESSAY_REQUIRED_SERVER = { 'mon-kiem-thu': true };
 
 function sanitizeStudentExamMinutesPayload(body) {
   const out = { ...DEFAULT_EXAM_MINUTES_SERVER };
@@ -497,37 +495,9 @@ function studentExamFilesFromQuestionBank(bank) {
   return out;
 }
 
-/**
- * Catalog môn thi = builtin + custom settings + môn gắn trên Course (đồng bộ DB).
- * Nếu tìm thấy môn còn thiếu → ghi vào examSubjectsCustomRaw để lần sau dùng chung.
- * Khóa học cũ thiếu examSubjects → backfill từ tên/category.
- */
+/** Include only subjects explicitly created in settings; never discover them from courses. */
 async function examCatalogPayload(settings) {
-  let custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
-  try {
-    const courses = await Course.find({}).select('name category examSubjects').lean();
-
-    // Backfill examSubjects cho khóa học cũ (chỉ những bản ghi đang trống)
-    const toBackfill = courses.filter((c) => !Array.isArray(c.examSubjects) || c.examSubjects.length === 0);
-    if (toBackfill.length) {
-      await Promise.all(toBackfill.map(async (c) => {
-        const ids = inferExamSubjectsFromCourseName(c.name, c.category, custom);
-        if (!ids.length) return;
-        await Course.updateOne({ _id: c._id }, { $set: { examSubjects: ids } });
-        c.examSubjects = ids;
-      }));
-      logger.info(`[EXAM-SUBJECTS] Backfilled examSubjects for ${toBackfill.length} course(s)`);
-    }
-
-    const { custom: mergedCustom, added } = mergeCourseSubjectsIntoCustom(custom, courses);
-    if (added.length) {
-      custom = mergedCustom;
-      await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
-      logger.info(`[EXAM-SUBJECTS] Synced ${added.length} subject(s) from courses: ${added.map((s) => s.id).join(', ')}`);
-    }
-  } catch (err) {
-    logger.warn('[EXAM-SUBJECTS] Course sync skipped:', err.message);
-  }
+  const custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
   return {
     custom,
     merged: getMergedExamCatalog(custom),
@@ -586,8 +556,8 @@ router.get('/student-exam-config', authMiddleware, ...settingsGuard('auth_only')
   }
 });
 
-const DEFAULT_TEACHER_EXAM_MINUTES_SERVER = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90, situation: 90, computer: 90, other: 90 };
-const DEFAULT_TEACHER_ESSAY_EXAM_MINUTES_SERVER = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60, situation: 60, computer: 60, other: 60 };
+const DEFAULT_TEACHER_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 90 };
+const DEFAULT_TEACHER_ESSAY_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 60 };
 
 function rawTeacherExamMinutesPayload(body) {
   if (!body || typeof body !== 'object') return null;
@@ -809,7 +779,7 @@ router.put('/teacher-exam-config', authMiddleware, ...settingsGuard('training_wr
   }
 });
 
-// ── GET /api/settings/exam-subjects ── Danh muc mon thi (mac dinh + tuy chinh + sync Course)
+// ── GET /api/settings/exam-subjects ── Danh mục môn thi đã cấu hình
 router.get('/exam-subjects', authMiddleware, ...settingsGuard('auth_only'), async (req, res) => {
   try {
     const settings = await getSettings();
@@ -840,107 +810,138 @@ router.put('/exam-admin-group-label', authMiddleware, ...settingsGuard('system_w
   }
 });
 
-// ── POST /api/settings/exam-subjects ── Admin them mon thi moi
+// ── POST /api/settings/exam-subjects ── Thêm môn thi do Admin tạo
 router.post('/exam-subjects', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const entry = sanitizeCustomExamSubjectEntry(req.body || {});
     if (!entry) {
-      return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ (ít nhất 2 ký tự)' });
+      return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ' });
+    }
+    if (BUILTIN_EXAM_SUBJECT_IDS.includes(entry.id) || isExcludedExamSubjectId(entry.id)) {
+      return res.status(409).json({ success: false, message: 'Mã môn thi không được phép sử dụng' });
     }
     const settings = await getSettings();
-    const custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
-    if (BUILTIN_EXAM_SUBJECT_IDS.includes(entry.id)) {
-      const base = `-le`;
-      let candidate = base;
-      for (let i = 2; BUILTIN_EXAM_SUBJECT_IDS.includes(candidate) || custom.some((c) => c.id === candidate); i += 1) {
-        candidate = `-`;
-      }
-      entry.id = candidate;
+    const stored = Array.isArray(settings?.examSubjectsCustomRaw) ? settings.examSubjectsCustomRaw : [];
+    const custom = normalizeCustomList(stored);
+    if (custom.some((item) => item.id === entry.id)) {
+      return res.status(409).json({ success: false, message: 'Mã môn thi đã tồn tại' });
     }
-    if (custom.some((c) => c.id === entry.id)) {
-      return res.status(409).json({ success: false, message: 'Ma mon thi da ton tai' });
-    }
-    custom.push(entry);
-    const minsRaw = settings.studentExamMinutesRaw && typeof settings.studentExamMinutesRaw === 'object'
+    const nextCustom = [...custom, entry];
+    const minutes = settings?.studentExamMinutesRaw && typeof settings.studentExamMinutesRaw === 'object'
       ? { ...settings.studentExamMinutesRaw }
       : { ...DEFAULT_EXAM_MINUTES_SERVER };
-    minsRaw[entry.id] = entry.minutes;
+    minutes[entry.id] = entry.minutes;
+    const essayMinutes = settings?.studentEssayExamMinutesRaw && typeof settings.studentEssayExamMinutesRaw === 'object'
+      ? { ...settings.studentEssayExamMinutesRaw }
+      : { ...DEFAULT_ESSAY_EXAM_MINUTES_SERVER };
+    essayMinutes[entry.id] = 60;
+    const essayRequired = settings?.studentEssayRequiredRaw && typeof settings.studentEssayRequiredRaw === 'object'
+      ? { ...settings.studentEssayRequiredRaw }
+      : { ...DEFAULT_ESSAY_REQUIRED_SERVER };
+    essayRequired[entry.id] = true;
     await updateMainSettings({
       $set: {
-        examSubjectsCustomRaw: custom,
-        studentExamMinutesRaw: sanitizeStudentExamMinutesPayload(minsRaw),
+        examSubjectsCustomRaw: [...stored, entry],
+        studentExamMinutesRaw: sanitizeStudentExamMinutesPayload(minutes),
+        studentEssayExamMinutesRaw: sanitizeStudentEssayExamMinutesPayload(essayMinutes),
+        studentEssayRequiredRaw: sanitizeStudentEssayRequiredPayload(essayRequired),
       },
     });
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
     return res.status(201).json({
       success: true,
-      message: `Da them mon thi "${entry.label}"`,
-      data: { subject: entry, merged: getMergedExamCatalog(custom) },
+      message: `Đã thêm môn "${entry.label}"`,
+      data: { subject: entry, merged: getMergedExamCatalog(nextCustom) },
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ── PUT /api/settings/exam-subjects/:id ── Admin doi ten mon tuy chinh (giu ma id)
+// ── PUT /api/settings/exam-subjects/:id ── Sửa môn thi do Admin tạo
 router.put('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!id || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) {
-      return res.status(400).json({ success: false, message: 'Khong the sua mon mac dinh' });
-    }
-    const label = String(req.body?.label || '').trim();
-    if (label.length < 2) {
-      return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ (ít nhất 2 ký tự)' });
+      return res.status(400).json({ success: false, message: 'Không thể sửa môn mặc định' });
     }
     const settings = await getSettings();
-    const custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
-    const idx = custom.findIndex((c) => c.id === id);
-    if (idx < 0) {
-      return res.status(404).json({ success: false, message: 'Khong tim thay mon thi' });
+    const stored = Array.isArray(settings?.examSubjectsCustomRaw) ? settings.examSubjectsCustomRaw : [];
+    const custom = normalizeCustomList(stored);
+    const index = custom.findIndex((item) => item.id === id);
+    if (index < 0) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy môn thi' });
     }
     const updated = sanitizeCustomExamSubjectEntry({
-      ...custom[idx],
+      ...custom[index],
       id,
-      label,
+      label: req.body?.label,
       short: req.body?.short,
-      minutes: req.body?.minutes ?? custom[idx].minutes,
-      bg: req.body?.bg || custom[idx].bg,
-      group: custom[idx].group || 'admin',
+      minutes: req.body?.minutes ?? custom[index].minutes,
+      bg: req.body?.bg || custom[index].bg,
+      group: custom[index].group,
     });
     if (!updated) {
       return res.status(400).json({ success: false, message: 'Tên môn thi không hợp lệ' });
     }
-    // Giữ nguyên id (không đổi slug theo tên mới) để khóa học / ngân hàng đề không gãy
-    updated.id = id;
-    custom[idx] = updated;
-    await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
+    const nextCustom = custom.map((item) => (item.id === id ? updated : item));
+    const nextStored = stored.map((item) => (
+      item?.createdByAdmin === true && sanitizeCustomExamSubjectEntry(item)?.id === id ? updated : item
+    ));
+    await updateMainSettings({ $set: { examSubjectsCustomRaw: nextStored } });
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
     return res.json({
       success: true,
-      message: `Da doi ten mon thanh "${updated.label}"`,
-      data: { subject: updated, merged: getMergedExamCatalog(custom) },
+      message: `Đã đổi tên môn thành "${updated.label}"`,
+      data: { subject: updated, merged: getMergedExamCatalog(nextCustom) },
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// ── DELETE /api/settings/exam-subjects/:id ── Admin xoa mon tuy chinh
+// ── DELETE /api/settings/exam-subjects/:id ── Xóa môn thi do Admin tạo
 router.delete('/exam-subjects/:id', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!id || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) {
-      return res.status(400).json({ success: false, message: 'Khong the xoa mon mac dinh' });
+      return res.status(400).json({ success: false, message: 'Không thể xóa môn mặc định' });
     }
     const settings = await getSettings();
-    const custom = normalizeCustomList(settings?.examSubjectsCustomRaw).filter((c) => c.id !== id);
-    await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
+    const stored = Array.isArray(settings?.examSubjectsCustomRaw) ? settings.examSubjectsCustomRaw : [];
+    const custom = normalizeCustomList(stored);
+    if (!custom.some((item) => item.id === id)) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy môn thi' });
+    }
+    const nextStored = stored.filter((item) => (
+      item?.createdByAdmin !== true || sanitizeCustomExamSubjectEntry(item)?.id !== id
+    ));
+    const minutes = settings?.studentExamMinutesRaw && typeof settings.studentExamMinutesRaw === 'object'
+      ? { ...settings.studentExamMinutesRaw }
+      : {};
+    delete minutes[id];
+    const essayMinutes = settings?.studentEssayExamMinutesRaw && typeof settings.studentEssayExamMinutesRaw === 'object'
+      ? { ...settings.studentEssayExamMinutesRaw }
+      : {};
+    delete essayMinutes[id];
+    const essayRequired = settings?.studentEssayRequiredRaw && typeof settings.studentEssayRequiredRaw === 'object'
+      ? { ...settings.studentEssayRequiredRaw }
+      : {};
+    delete essayRequired[id];
+    await updateMainSettings({
+      $set: {
+        examSubjectsCustomRaw: nextStored,
+        studentExamMinutesRaw: sanitizeStudentExamMinutesPayload(minutes),
+        studentEssayExamMinutesRaw: sanitizeStudentEssayExamMinutesPayload(essayMinutes),
+        studentEssayRequiredRaw: sanitizeStudentEssayRequiredPayload(essayRequired),
+      },
+    });
+    const nextCustom = custom.filter((item) => item.id !== id);
     const io = req.app.get('io');
     if (io) emitSettingsRefresh(io);
-    return res.json({ success: true, message: 'Da xoa mon thi', data: { merged: getMergedExamCatalog(custom) } });
+    return res.json({ success: true, message: 'Đã xóa môn thi', data: { merged: getMergedExamCatalog(nextCustom) } });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

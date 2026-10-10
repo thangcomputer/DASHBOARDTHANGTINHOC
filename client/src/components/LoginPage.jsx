@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, CheckCircle2, AlertCircle, Phone, Database, BookOpen, Monitor, Lock, User, KeyRound, X, Copy, Check, MonitorX, MessageCircle, Clock } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2, AlertCircle, Phone, BookOpen, Lock, User, KeyRound, X, Copy, Check, MonitorX, MessageCircle, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { setTokens, clearOtherRoleSessions, ensureCsrfToken, API_BASE } from '../services/api';
 import { unlockAudio } from '../utils/sound';
@@ -215,8 +215,8 @@ const LoginPage = ({ onLogin }) => {
             </h1>
             <p className="text-slate-400 text-lg leading-relaxed max-w-lg">Tổ chức đào tạo, thi cử và cấp chứng nhận tin học văn phòng với công nghệ hiện đại.</p>
             <div className="flex flex-wrap gap-4 pt-4">
-              {[{ label: 'Word', icon: BookOpen }, { label: 'Excel', icon: Database }, { label: 'PowerPoint', icon: Monitor }].map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl hover:bg-white/10 transition-all cursor-default group">
+              {[{ label: 'Môn kiểm thử', icon: BookOpen }].map((item) => (
+                <div key={item.label} className="flex items-center gap-3 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl hover:bg-white/10 transition-all cursor-default group">
                   <item.icon size={18} className="text-red-500 group-hover:scale-110 transition-transform" aria-hidden="true" />
                   <span className="text-sm font-bold text-gray-200">{item.label}</span>
                 </div>

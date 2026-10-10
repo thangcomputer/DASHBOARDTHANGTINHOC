@@ -180,12 +180,16 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
     );
   }
   return (
-    <article id={`lesson-q-${item.id}`} className="rounded-2xl border border-slate-100 bg-white p-3 space-y-3">
+    <article id={`lesson-q-${item.id}`} className="rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.06)] space-y-4 sm:p-5">
       {(index > 0 || item.prompt) && (
-        <h2 className="flex items-baseline gap-2 overflow-x-auto whitespace-nowrap text-base font-bold text-slate-900">
-          {index > 0 && <span className="shrink-0 text-xs font-black uppercase tracking-widest text-red-600">Câu {index}.</span>}
-          <span>{item.prompt}</span>
-        </h2>
+        <div className="space-y-2">
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-red-600">
+            {index > 0 ? `Câu ${index}` : 'Câu'}
+          </p>
+          <h2 className="text-xl sm:text-2xl font-black leading-snug text-slate-900">
+            {item.prompt}
+          </h2>
+        </div>
       )}
       <div className={frozen && !done ? 'pointer-events-none select-none' : ''}>
       {item.type === 'hotspot' && (
@@ -201,41 +205,48 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
         <LessonFigure imageUrl={item.imageUrl} caption={item.caption} compact={item.type === 'mcq'} />
       )}
       {item.type === 'mcq' && (
-        <div className="space-y-1.5">
-          {(item.options || []).map((opt) => {
+        <div className="space-y-2.5">
+          {(item.options || []).map((opt, optIndex) => {
             const selected = (done ? item.answer?.choiceId : choiceId) === opt.id;
             const isKey = done && item.correctOptionId === opt.id;
             return (
-              <label key={opt.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-sm ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
+              <label key={opt.id}                   className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-red-200 ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                 <input
                   type="radio"
                   name={`q-${item.id}`}
-                  className="mt-1"
+                  className="sr-only"
                   disabled={frozen}
                   checked={selected}
                   onChange={() => setChoiceId(opt.id)}
                 />
-                <span>{opt.text}</span>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
+                  {isKey ? '✓' : optIndex + 1}
+                </span>
+                <span className="leading-relaxed text-slate-800">{opt.text}</span>
               </label>
             );
           })}
         </div>
       )}
       {item.type === 'multi' && (
-        <div className="space-y-1.5">
-          {(item.options || []).map((opt) => {
+        <div className="space-y-2.5">
+          {(item.options || []).map((opt, optIndex) => {
             const picked = done ? (item.answer?.choiceIds || []) : choiceIds;
             const selected = picked.includes(opt.id);
             const isKey = done && (item.correctOptionIds || []).includes(opt.id);
             return (
-              <label key={opt.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-sm ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}>
+              <label key={opt.id}               className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-red-200 ${isKey ? 'border-emerald-300 bg-emerald-50' : selected ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
                 <input
                   type="checkbox"
                   disabled={frozen}
+                  className="sr-only"
                   checked={selected}
                   onChange={() => setChoiceIds((current) => (current.includes(opt.id) ? current.filter((id) => id !== opt.id) : [...current, opt.id]))}
                 />
-                <span>{opt.text}</span>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-black ${isKey ? 'border-emerald-600 bg-emerald-600 text-white' : selected ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white text-slate-500'}`}>
+                  {isKey ? '✓' : selected ? '✓' : String(optIndex + 1)}
+                </span>
+                <span className="leading-relaxed text-slate-800">{opt.text}</span>
               </label>
             );
           })}
@@ -304,28 +315,28 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
       {(retry?.text && !done) || (done && typeof item.correct === 'boolean') || cooldownSeconds > 0 ? (
         <div
           aria-live="off"
-          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${
+          className={`lesson-feedback-card flex items-start gap-3 rounded-2xl border px-4 py-3 ${
             done && item.correct === true
               ? 'border-emerald-200 bg-emerald-50'
-              : 'border-amber-200 bg-amber-50'
+              : 'border-rose-200 bg-rose-50'
           }`}
         >
-          <div className={`relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-3xl ${
-            done && item.correct === true ? 'bg-emerald-100' : 'bg-amber-100'
+          <div className={`relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-2xl ${
+            done && item.correct === true ? 'bg-emerald-100' : 'bg-rose-100'
           }`}>
-            <span className="motion-safe:animate-bounce motion-reduce:animate-none" aria-hidden="true">🤖</span>
-            <span className="absolute -right-1.5 -top-1.5 text-xl" aria-hidden="true">
+            <span aria-hidden="true">🤖</span>
+            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm shadow-sm" aria-hidden="true">
               {done && item.correct === true ? '👏' : '📏'}
             </span>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div aria-live="polite">
               <p className={`text-sm font-black ${
-                done && item.correct === true ? 'text-emerald-800' : 'text-amber-900'
+                done && item.correct === true ? 'text-emerald-800' : 'text-rose-800'
               }`}>
                 {done && item.correct === true ? 'Thầy Robo: Chính xác!' : 'Thầy Robo: Mình thử lại nhé!'}
               </p>
-              <p className="mt-0.5 text-sm text-slate-700">
+              <p className="mt-1 text-sm leading-relaxed text-slate-700">
                 {retry?.text && !done
                   ? retry.text
                   : done && item.correct === true
@@ -334,7 +345,7 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
               </p>
             </div>
             {waiting && cooldownSeconds > 0 ? (
-              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white/80 px-2.5 py-1.5 text-xs font-bold text-amber-900">
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-800">
                 <Clock size={14} aria-hidden="true" />
                 <span>Thử lại sau {cooldownSeconds} giây</span>
               </div>
@@ -377,40 +388,13 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
             else if (item.type === 'hotspot') onConfirm(point || {});
             else onConfirm({ text });
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(239,68,68,0.25)] transition hover:brightness-105 disabled:opacity-60"
         >
           {busy && <Loader2 size={14} className="animate-spin" />}
           Xác nhận
         </button>
       )}
     </article>
-  );
-}
-
-function ConfettiBurst() {
-  const bits = Array.from({ length: 28 }, (_, i) => i);
-  const colors = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899'];
-  return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-40 overflow-hidden" aria-hidden>
-      <style>{`
-        @keyframes lesson-confetti-fall {
-          0% { transform: translateY(-8px) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(150px) rotate(200deg); opacity: 0; }
-        }
-        .lesson-confetti { animation: lesson-confetti-fall 1.5s ease-in forwards; }
-      `}</style>
-      {bits.map((i) => (
-        <span
-          key={i}
-          className="lesson-confetti absolute top-0 h-2 w-1.5 rounded-sm"
-          style={{
-            left: `${(i * 37) % 100}%`,
-            background: colors[i % colors.length],
-            animationDelay: `${(i % 8) * 0.06}s`,
-          }}
-        />
-      ))}
-    </div>
   );
 }
 
@@ -438,6 +422,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
   const quizzes = items.filter((item) => PRACTICE_TYPES.has(item.type));
   const others = items.filter((item) => !PRACTICE_TYPES.has(item.type));
   const answered = quizzes.filter((item) => item.confirmed).length;
+  const progressPercent = quizzes.length ? Math.round((answered / quizzes.length) * 100) : 0;
   const allCorrect = quizzes.length > 0 && answered === quizzes.length;
   const firstOpen = quizzes.findIndex((item) => !item.confirmed && !skipped[item.id]);
   const lastIndex = Math.max(quizzes.length - 1, 0);
@@ -582,13 +567,18 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
         {payload?.unit && (
           <>
             {!embedded && (
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400">{payload.subject?.name}</p>
-              <h1 className="text-2xl font-black text-slate-900">{payload.unit.title}</h1>
-            </div>
-            )}
-            {!embedded && unitStatus === 'completed' && (
-              <p className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">Bạn đã xong buổi này.</p>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{payload.subject?.name || 'Khóa học'}</p>
+                    <h1 className="mt-1 text-xl font-bold leading-tight text-slate-900 sm:text-2xl">{payload.unit.title}</h1>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                    <span className={`inline-block h-2 w-2 rounded-full ${unitStatus === 'completed' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
+                    {unitStatus === 'completed' ? 'Hoàn thành' : 'Đang luyện tập'}
+                  </div>
+                </div>
+              </div>
             )}
             <div className="relative space-y-4">
               <style>{`
@@ -597,12 +587,20 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                   50%, 100% { opacity: 0.28; }
                 }
                 .lesson-clock-blink { animation: lesson-clock-blink 0.5s step-end infinite; }
+                @media (prefers-reduced-motion: no-preference) {
+                  .lesson-feedback-card { animation: lesson-feedback-in 180ms ease-out; }
+                }
+                @keyframes lesson-feedback-in {
+                  from { opacity: 0.6; transform: translateY(4px); }
+                  to { opacity: 1; transform: translateY(0); }
+                }
               `}</style>
-              {allCorrect && <ConfettiBurst />}
               {quizzes.length > 0 && (
-                <div className="sticky top-0 z-10 rounded-2xl border border-slate-100 bg-white/95 p-3 backdrop-blur">
+                <div className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="text-xs font-bold text-slate-500">{answered}/{quizzes.length} câu đúng</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      Tiến độ <span className="ml-1 font-bold text-slate-900">{answered}/{quizzes.length}</span>
+                    </p>
                     {timed && (
                       <QuizClock remaining={remaining} warning={started && remaining > 0 && remaining <= warnAt} />
                     )}
@@ -613,59 +611,63 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                       Chúc mừng! Bạn đã làm đúng tất cả câu hỏi.
                     </p>
                   )}
-                  <nav aria-label="Tiến trình câu hỏi" className="flex gap-1.5 overflow-x-auto pb-1">
+                  <nav
+                    aria-label={`Tiến trình câu hỏi, ${answered} trên ${quizzes.length} câu`}
+                    className="overflow-x-auto pb-1"
+                  >
+                    <div
+                      className="relative flex min-h-10 items-start justify-between"
+                      style={{ minWidth: `${Math.max(100, quizzes.length * 36)}px` }}
+                    >
+                      <div aria-hidden="true" className="absolute left-3 right-3 top-[7px] h-1.5 rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-[width] duration-300"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
                       {quizzes.map((item, index) => {
                         const reachable = started && index <= openLimit;
                         const current = started && index === visibleIndex;
                         const wrong = Boolean(retries[item.id]?.n) || (item.confirmed && item.correct === false);
                         const tone = item.confirmed && item.correct === true
-                          ? 'bg-emerald-500'
+                          ? 'bg-emerald-500 text-white'
                           : wrong
-                            ? 'bg-rose-500'
+                            ? 'bg-rose-500 text-white'
                             : current
-                              ? 'bg-sky-500'
+                              ? 'border-2 border-red-600 bg-white text-red-700'
                               : skipped[item.id]
-                                ? 'bg-amber-400'
-                                : 'bg-slate-200';
+                                ? 'bg-amber-400 text-white'
+                                : 'border border-slate-300 bg-white text-slate-500';
                         return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          disabled={!reachable}
-                          onClick={() => { setFocusId(item.id); setClockTry(0); }}
-                          aria-current={current ? 'step' : undefined}
-                          aria-label={`Câu ${index + 1}${wrong ? ', trả lời sai' : item.confirmed ? ', trả lời đúng' : skipped[item.id] ? ', đã bỏ qua' : ', chưa làm'}${current ? ', đang xem' : ''}`}
-                          className={`group min-w-8 flex-1 rounded-md p-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-40 ${current ? 'ring-1 ring-sky-400' : ''}`}
-                        >
-                          <span className={`block h-2.5 rounded-full transition-colors ${tone}`} />
-                          <span className={`mt-1 block text-center text-[10px] font-bold tabular-nums ${
-                            item.confirmed && item.correct === true
-                              ? 'text-emerald-700'
-                              : wrong
-                                ? 'text-rose-700'
-                                : current
-                                  ? 'text-sky-700'
-                                  : 'text-slate-500'
-                          }`}>
-                            {index + 1}{item.confirmed && item.correct === true ? ' ✓' : wrong ? ' ×' : ''}
-                          </span>
-                        </button>
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={!reachable}
+                            onClick={() => { setFocusId(item.id); setClockTry(0); }}
+                            aria-current={current ? 'step' : undefined}
+                            aria-label={`Câu ${index + 1}${wrong ? ', trả lời sai' : item.confirmed ? ', trả lời đúng' : skipped[item.id] ? ', đã bỏ qua' : ', chưa làm'}${current ? ', đang xem' : ''}`}
+                            className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <span className={`grid h-4 w-4 place-items-center rounded-full text-[9px] leading-none ${tone}`}>
+                              {item.confirmed && item.correct === true ? '✓' : wrong ? '×' : ''}
+                            </span>
+                            <span>{index + 1}</span>
+                          </button>
                         );
                       })}
+                    </div>
                   </nav>
                   <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[10px] font-semibold text-slate-500">
-                      <span className="text-emerald-700">Xanh: đúng</span>
+                    <p className="text-[10px] font-medium text-slate-500">
+                      <span className="text-emerald-700">Đúng</span>
                       <span className="px-1">·</span>
-                      <span className="text-rose-700">Đỏ: sai</span>
-                      <span className="px-1">·</span>
-                      Xanh dương: đang làm
+                      <span className="text-rose-700">Sai</span>
                     </p>
                     {!started && !allCorrect ? (
                       <button
                         type="button"
                         onClick={() => { unlockAudio(); setStarted(true); setClockTry(0); }}
-                        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-red-600 px-3 text-sm font-bold text-white"
+                        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-red-700"
                       >
                         <Play size={14} fill="currentColor" /> Bắt đầu
                       </button>
@@ -674,7 +676,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                         type="button"
                         disabled={resetting}
                         onClick={resetPractice}
-                        className="h-8 shrink-0 rounded-lg bg-red-600 px-3 text-sm font-bold text-white disabled:opacity-60"
+                        className="h-8 shrink-0 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
                       >
                         {resetting ? 'Đang làm lại...' : 'Luyện tập lại'}
                       </button>
@@ -704,18 +706,6 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                   }}
                   onConfirm={(answer) => confirm(visibleQuiz, answer)}
                 />
-              )}
-              {!started && !allCorrect && quizzes.length > 0 && (
-                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-center">
-                  <p className="mb-3 text-sm font-bold text-red-800">Bấm Bắt đầu khi sẵn sàng. Đồng hồ sẽ chạy từ lúc đó.</p>
-                  <button
-                    type="button"
-                    onClick={() => { unlockAudio(); setStarted(true); setClockTry(0); }}
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-black text-white"
-                  >
-                    <Play size={16} fill="currentColor" /> Bắt đầu
-                  </button>
-                </div>
               )}
               {items.length === 0 && <p className="text-sm text-slate-500">Buổi này chưa có bài luyện tập.</p>}
             </div>

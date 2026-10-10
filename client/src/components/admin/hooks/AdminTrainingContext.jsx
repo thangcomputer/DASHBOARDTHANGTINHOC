@@ -24,18 +24,18 @@ export function AdminTrainingProvider({ children, activeTab }) {
   const [courseBuilderMode, setCourseBuilderMode] = useState(null);
 
   const BLANK_Q = {
-    type: 'multiple', section: 'excel', q: '', options: ['', '', '', ''], correct: 0,
+    type: 'multiple', section: 'mon-kiem-thu', q: '', options: ['', '', '', ''], correct: 0,
     difficulty: 'medium', sampleAnswer: '', imageUrl: '', imageName: '',
     attachedFileUrl: '', attachedFileName: '',
   };
   const [qSearch, setQSearch] = useState('');
-  const [qSection, setQSection] = useState('coban');
+  const [qSection, setQSection] = useState('mon-kiem-thu');
   const [qDifficulty, setQDifficulty] = useState('all');
   const [qSort, setQSort] = useState('newest');
   const [qForm, setQForm] = useState(null);
 
   const [sqSearch, setSqSearch] = useState('');
-  const [sqSection, setSqSection] = useState('coban');
+  const [sqSection, setSqSection] = useState('mon-kiem-thu');
   const [sqType, setSqType] = useState('all');
   const [sqForm, setSqForm] = useState(null);
   const [erSearch, setErSearch] = useState('');

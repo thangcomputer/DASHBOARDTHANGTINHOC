@@ -6,15 +6,6 @@ const STUDENT_PASS_PERCENT = 50;
 const TEACHER_PASS_PERCENT = 80;
 const TEACHER_SECTION_PASS_PERCENT = 50;
 
-const SUBJECT_ALIASES = {
-  coban: ['coban', 'computer', 'basic', 'maytinh', 'mayvitinh', 'windows'],
-  word: ['word', 'microsoftword', 'msword'],
-  excel: ['excel', 'microsoftexcel', 'msexcel'],
-  powerpoint: ['powerpoint', 'ppt', 'pp', 'microsoftpowerpoint', 'mspowerpoint'],
-  canva: ['canva'],
-  situation: ['situation', 'supham', 'su-pham', 'pedagogy'],
-};
-
 function normalizeSubjectSection(value) {
   return String(value || '')
     .toLowerCase()
@@ -115,15 +106,7 @@ function verifyAttemptToken(token, expected = {}, options = {}) {
 
 function expandSubjectMatchIds(subjectId) {
   const wanted = normalizeSubjectSection(subjectId);
-  if (!wanted) return [];
-  const ids = new Set([wanted, ...(SUBJECT_ALIASES[wanted] || [])]);
-  // Môn custom "Word NC" / "Excel NC" dùng chung ngân hàng word/excel/powerpoint
-  if (wanted.endsWith('nc') && wanted.length > 2) {
-    const base = wanted.slice(0, -2);
-    ids.add(base);
-    (SUBJECT_ALIASES[base] || []).forEach((alias) => ids.add(alias));
-  }
-  return [...ids];
+  return wanted ? [wanted] : [];
 }
 
 function questionMatchesSubject(section, subjectId) {

@@ -160,8 +160,8 @@ const TeacherSchema = new mongoose.Schema(
 
 
     // ── Thông tin thêm ────────────────────────────────────────────
-    specialty: { type: String, default: '' }, // Chuyên môn: "THVP, Excel, ..."
-    subjectIds: { type: [String], default: [] }, // Môn phụ trách: coban, word, excel...
+    specialty: { type: String, default: '' },
+    subjectIds: { type: [String], default: [] },
     /** Giọng giảng dạy theo vùng miền */
     voiceRegion: {
       type: String,

@@ -63,8 +63,8 @@ async function runTests() {
       phone: studentPhone,
       email: `qa_firstlogin_student_${studentPhone}@example.com`,
       zalo: studentPhone,
-      courseName: 'Lập trình C cơ bản',
-      course: 'Lập trình C cơ bản',
+      courseName: 'Khóa học QA',
+      course: 'Khóa học QA',
       price: 5000000,
       branchId: null,
       password: studentTempPassword

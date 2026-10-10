@@ -595,7 +595,8 @@ export default function LessonPracticeCatalogPage() {
   };
 
   const enrolledCourses = courses.filter((course) => course.enrolled);
-  const availableCourses = courses.filter((course) => !course.enrolled);
+  const availableCourses = courses.filter((course) => !course.enrolled && !course.hiddenByEnrollment);
+  const visibleCourses = [...enrolledCourses, ...availableCourses];
   const matchesCourseFilter = (course) => {
     if (filter === 'registered') return course.enrolled;
     if (filter === 'video') return course.deliveryMode === 'video';
@@ -623,10 +624,10 @@ export default function LessonPracticeCatalogPage() {
         ];
   const progressById = new Map(subjects.map((subject) => [subject.id, subject]));
   const filters = [
-    { id: 'all', label: 'Tất cả', icon: Layers3, count: courses.length },
+    { id: 'all', label: 'Tất cả', icon: Layers3, count: visibleCourses.length },
     { id: 'registered', label: 'Khóa đã đăng ký', icon: CheckCircle2, count: enrolledCourses.length },
-    { id: 'video', label: 'Tự học qua video', icon: Clapperboard, count: courses.filter((course) => course.deliveryMode === 'video').length },
-    { id: 'instructor', label: 'Học cùng giảng viên', icon: GraduationCap, count: courses.filter((course) => course.deliveryMode === 'instructor').length },
+    { id: 'video', label: 'Tự học qua video', icon: Clapperboard, count: visibleCourses.filter((course) => course.deliveryMode === 'video').length },
+    { id: 'instructor', label: 'Học cùng giảng viên', icon: GraduationCap, count: visibleCourses.filter((course) => course.deliveryMode === 'instructor').length },
     { id: 'guide', label: 'Hướng dẫn học', icon: CircleHelp },
   ];
 

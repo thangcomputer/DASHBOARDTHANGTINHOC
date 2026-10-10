@@ -109,16 +109,6 @@ export function resolveRichHtmlMedia(html, resolveUrl) {
   );
 }
 
-/** Phan cau hoi admin khop mon thi (coban <-> computer, ppt <-> powerpoint). */
-const SUBJECT_SECTION_ALIASES = {
-  coban: ['coban', 'computer', 'basic', 'maytinh', 'mayvitinh', 'windows'],
-  word: ['word', 'microsoftword', 'msword'],
-  excel: ['excel', 'microsoftexcel', 'msexcel'],
-  powerpoint: ['powerpoint', 'ppt', 'pp', 'microsoftpowerpoint', 'mspowerpoint'],
-  canva: ['canva'],
-  situation: ['situation', 'supham', 'su-pham', 'pedagogy'],
-};
-
 function normalizeSubjectSection(value) {
   return String(value || '')
     .toLowerCase()
@@ -133,11 +123,7 @@ export function questionMatchesExamSubject(section, subjectId) {
   const s = normalizeSubjectSection(section);
   const id = normalizeSubjectSection(subjectId);
   if (!s || !id) return false;
-  if (s === id) return true;
-  const aliases = SUBJECT_SECTION_ALIASES[id]?.map(normalizeSubjectSection);
-  if (aliases?.includes(s)) return true;
-  // Môn tùy chỉnh (mos-word, ...): chỉ khớp chính xác id hoặc section
-  return false;
+  return s === id;
 }
 
 export function normalizeMcCorrectIndex(raw) {
@@ -186,11 +172,8 @@ export function getStudentPracticeFilesForSubject(studentQuestions, subjectId, s
     .map((q) => getEssayQuestionFile(q))
     .filter(Boolean);
   if (fromEssays.length > 0) return fromEssays;
-  const subject = String(subjectId || '').toLowerCase().trim();
-  const aliases = SUBJECT_SECTION_ALIASES[subject] || [subject];
-  const legacy = aliases
-    .map((key) => studentExamFiles?.[key])
-    .find((item) => item && (item.fileUrl || item.url || item.attachedFileUrl));
+  const subject = normalizeSubjectSection(subjectId);
+  const legacy = studentExamFiles?.[subjectId];
   if (legacy?.fileUrl) {
     return [{ fileUrl: legacy.fileUrl, fileName: legacy.fileName || 'De_thuc_hanh' }];
   }
@@ -243,21 +226,6 @@ export function computeTeacherExamTotalMinutes(
     const n = Number(teacherExamMinutes?.[s]);
     if (Number.isFinite(n) && n >= 1) mins = Math.round(n);
     if (mins == null) {
-      for (const [canonical, aliases] of Object.entries({
-        coban: ['coban', 'computer'],
-        powerpoint: ['powerpoint', 'ppt', 'pp'],
-        situation: ['situation', 'supham', 'su-pham'],
-      })) {
-        if (canonical === s || aliases.includes(s)) {
-          const cn = Number(teacherExamMinutes?.[canonical]);
-          if (Number.isFinite(cn) && cn >= 1) { mins = Math.round(cn); break; }
-          for (const a of aliases) {
-            const an = Number(teacherExamMinutes?.[a]);
-            if (Number.isFinite(an) && an >= 1) { mins = Math.round(an); break; }
-          }
-          if (mins != null) break;
-        }
-      }
     }
     total += mins ?? 90;
   }

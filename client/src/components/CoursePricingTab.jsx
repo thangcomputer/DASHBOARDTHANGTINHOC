@@ -4,18 +4,20 @@
  * Tích hợp trong SystemSettingsTab
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import CmsSelect from './ui/CmsSelect';
 import {
   Plus, Edit2, Trash2, Save, X, Loader2, AlertCircle,
-  DollarSign, Percent, Tag, BookOpen, CheckCircle2, Clapperboard, GraduationCap
+  DollarSign, Percent, Tag, BookOpen, CheckCircle2, Clapperboard, GraduationCap,
+  Download, Upload, FileSpreadsheet, RefreshCw
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { apiFetch, resolveMediaUrl } from '../services/api';
 import lessonPracticeApi from '../services/lessonPracticeApi';
-import { isCourseDiscountActive } from '../utils/coursePricing';
+import { calculateDiscountPrice, isCourseDiscountActive } from '../utils/coursePricing';
 import {
   getExamSubjectOptions,
   formatExamSubjectsSummary,
@@ -25,11 +27,119 @@ import {
 } from '../utils/examSubjects';
 
 const API = import.meta.env.VITE_API_URL || '';
+const COURSE_IMPORT_COLUMNS = [
+  { header: 'Tên khóa học', key: 'name' },
+  { header: 'Giá gốc', key: 'price' },
+  { header: 'Giảm giá (%)', key: 'discountPercent' },
+  { header: 'Bắt đầu giảm giá (ISO)', key: 'discountStartsAt' },
+  { header: 'Kết thúc giảm giá (ISO)', key: 'discountEndsAt' },
+  { header: 'Số buổi', key: 'totalSessions' },
+  { header: 'Hình thức (instructor/video)', key: 'deliveryMode' },
+  { header: 'Danh mục', key: 'category' },
+  { header: 'Mã môn (phân cách bằng ;)', key: 'examSubjects' },
+  { header: 'Mô tả', key: 'description' },
+  { header: 'Ảnh bìa (URL)', key: 'thumbnail' },
+  { header: 'Màu banner đầu', key: 'bannerColorStart' },
+  { header: 'Màu banner cuối', key: 'bannerColorEnd' },
+  { header: 'Trạng thái (draft/published/archived)', key: 'status' },
+];
+
+const normalizeSpreadsheetHeader = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd')
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, '');
+
+const normalizeCourseName = (value) => normalizeSpreadsheetHeader(value);
+
+function downloadCourseWorkbook(rows, filename) {
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    COURSE_IMPORT_COLUMNS.map(({ header }) => header),
+    ...rows.map((row) => COURSE_IMPORT_COLUMNS.map(({ key }) => row[key] ?? '')),
+  ]);
+  worksheet['!cols'] = COURSE_IMPORT_COLUMNS.map(({ header }) => ({ wch: Math.max(18, header.length + 2) }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'KhoaHoc');
+  XLSX.writeFile(workbook, filename);
+}
+
+function parseCourseImportRow(row, rowNumber) {
+  const valuesByHeader = new Map(Object.entries(row).map(([header, value]) => [
+    normalizeSpreadsheetHeader(header),
+    value,
+  ]));
+  const get = (key) => {
+    const column = COURSE_IMPORT_COLUMNS.find((item) => item.key === key);
+    return valuesByHeader.get(normalizeSpreadsheetHeader(column?.header))
+      ?? valuesByHeader.get(normalizeSpreadsheetHeader(key))
+      ?? '';
+  };
+  const name = String(get('name') || '').trim();
+  const price = Number(get('price'));
+  const discountPercent = Number(get('discountPercent') || 0);
+  const totalSessions = Number(get('totalSessions') || 12);
+  const rawExamSubjects = String(get('examSubjects') || '')
+    .split(/[;,|]/)
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const examSubjects = rawExamSubjects.map((id) => slugifyExamSubjectId(id));
+  const deliveryInput = normalizeSpreadsheetHeader(get('deliveryMode'));
+  const deliveryMode = ['video', 'tuhocquavideo'].includes(deliveryInput)
+    ? 'video'
+    : ['instructor', 'hoccunggiangvien'].includes(deliveryInput)
+      ? 'instructor'
+      : '';
+  const category = String(get('category') || 'van-phong').trim().toLowerCase();
+  const allowedCategories = new Set(['van-phong', 'do-hoa', 'lap-trinh', 'ai', 'chung-chi', 'khac']);
+  const status = String(get('status') || 'published').trim().toLowerCase();
+  const allowedStatuses = new Set(['draft', 'published', 'archived']);
+  const discountStartsAt = String(get('discountStartsAt') || '').trim();
+  const discountEndsAt = String(get('discountEndsAt') || '').trim();
+
+  const errors = [];
+  if (!name) errors.push('thiếu tên khóa học');
+  if (!Number.isFinite(price) || price <= 0) errors.push('giá gốc phải lớn hơn 0');
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) errors.push('giảm giá phải từ 0 đến 100');
+  if (!Number.isInteger(totalSessions) || totalSessions < 1) errors.push('số buổi phải là số nguyên dương');
+  if (!examSubjects.length) errors.push('thiếu mã môn');
+  if (examSubjects.some((id) => !id || id.length < 2)) errors.push('có mã môn không hợp lệ');
+  if (!deliveryMode) errors.push('hình thức học phải là instructor hoặc video');
+  if (!allowedCategories.has(category)) errors.push(`danh mục "${category}" không hợp lệ`);
+  if (!allowedStatuses.has(status)) errors.push(`trạng thái "${status}" không hợp lệ`);
+  if (Boolean(discountStartsAt) !== Boolean(discountEndsAt)) errors.push('cần nhập đủ thời gian bắt đầu và kết thúc giảm giá');
+  if (
+    discountStartsAt
+    && discountEndsAt
+    && (
+      Number.isNaN(new Date(discountStartsAt).getTime())
+      || Number.isNaN(new Date(discountEndsAt).getTime())
+      || new Date(discountEndsAt) <= new Date(discountStartsAt)
+    )
+  ) errors.push('thời gian giảm giá không hợp lệ');
+
+  if (errors.length) throw new Error(`Dòng ${rowNumber}: ${errors.join(', ')}`);
+  return {
+    name,
+    price,
+    discountPercent,
+    discountStartsAt: discountStartsAt || null,
+    discountEndsAt: discountEndsAt || null,
+    totalSessions,
+    deliveryMode,
+    category,
+    examSubjects,
+    description: String(get('description') || '').trim(),
+    thumbnail: String(get('thumbnail') || '').trim(),
+    bannerColorStart: String(get('bannerColorStart') || '').trim(),
+    bannerColorEnd: String(get('bannerColorEnd') || '').trim(),
+    status,
+  };
+}
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 const fmt = (n) => Number(n || 0).toLocaleString('vi-VN');
-const calcEffective = (price, pct) =>
-  pct > 0 ? Math.round(Number(price) * (1 - Number(pct) / 100)) : Number(price);
+const calcEffective = calculateDiscountPrice;
 const toLocalDateTimeInput = (value) => {
   if (!value) return '';
   const date = new Date(value);
@@ -968,19 +1078,226 @@ export default function CoursePricingTab() {
   const [loading, setLoading]       = useState(true);
   const [modalCourse, setModalCourse] = useState(undefined); // undefined=closed, null=add, obj=edit
   const [deleting, setDeleting]     = useState(null);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef(null);
 
   const fetchCourses = useCallback(() => {
     setLoading(true);
     fetch(`${API}/api/courses`)
-      .then(r => r.json())
-      .then(res => {
-        if (res.success) setCourses(res.data);
+      .then(async (response) => {
+        const res = await response.json();
+        if (!response.ok || !res.success) {
+          throw new Error(res.message || 'Không tải được danh sách khóa học');
+        }
+        return res;
       })
-      .catch(() => toast.error('Không tải được danh sách khóa học'))
+      .then(res => {
+        setCourses(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch((error) => toast.error(error.message || 'Không tải được danh sách khóa học'))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { fetchCourses(); }, [fetchCourses]);
+
+  const exportCourses = () => {
+    const rows = courses.map((course) => ({
+      name: course.name || '',
+      price: Number(course.price) || 0,
+      discountPercent: Number(course.discountPercent) || 0,
+      discountStartsAt: course.discountStartsAt ? new Date(course.discountStartsAt).toISOString() : '',
+      discountEndsAt: course.discountEndsAt ? new Date(course.discountEndsAt).toISOString() : '',
+      totalSessions: Number(course.totalSessions) || 12,
+      deliveryMode: course.deliveryMode || 'instructor',
+      category: course.category || 'van-phong',
+      examSubjects: Array.isArray(course.examSubjects) ? course.examSubjects.join(';') : '',
+      description: course.description || '',
+      thumbnail: course.thumbnail || '',
+      bannerColorStart: course.bannerColorStart || '',
+      bannerColorEnd: course.bannerColorEnd || '',
+      status: course.status || 'published',
+    }));
+    downloadCourseWorkbook(rows, `danh-sach-khoa-hoc-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Đã xuất ${rows.length} khóa học`);
+  };
+
+  const downloadImportTemplate = () => {
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      COURSE_IMPORT_COLUMNS.map(({ header }) => header),
+    ]);
+    worksheet['!cols'] = COURSE_IMPORT_COLUMNS.map(({ header }) => ({ wch: Math.max(18, header.length + 2) }));
+    const guide = XLSX.utils.aoa_to_sheet([
+      ['HƯỚNG DẪN NHẬP KHÓA HỌC'],
+      ['Mỗi dòng trong sheet KhoaHoc là một khóa học mới. Tên trùng với khóa hiện có sẽ được bỏ qua, không ghi đè.'],
+      ['Giá gốc: số tiền VND; Giảm giá: phần trăm từ 0 đến 100; Số buổi: số nguyên dương.'],
+      ['Hình thức: instructor hoặc video. Danh mục: van-phong, do-hoa, lap-trinh, ai, chung-chi hoặc khac.'],
+      ['Mã môn: nhập mã môn, nhiều môn phân cách bằng dấu chấm phẩy (;). Mã chưa có trong danh mục sẽ được thêm tự động từ file.'],
+      ['Tên môn mới được tạo từ mã môn nếu danh mục chưa có mã đó (ví dụ: word-co-ban → Word Co Ban).'],
+      ['Thời gian giảm giá: định dạng ISO, ví dụ 2026-10-10T09:00:00.000Z; để trống nếu không đặt lịch.'],
+      ['Trạng thái: draft, published hoặc archived. Mặc định published nếu để trống.'],
+      ['Có thể tải danh sách khóa học hiện tại để lấy file Excel mẫu đầy đủ dữ liệu.'],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'KhoaHoc');
+    XLSX.utils.book_append_sheet(workbook, guide, 'HuongDan');
+    XLSX.writeFile(workbook, 'mau-nhap-khoa-hoc.xlsx');
+  };
+
+  const importCourses = async (file) => {
+    if (!file || importing) return;
+    setImporting(true);
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) throw new Error('File Excel không có sheet dữ liệu');
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
+      if (!rawRows.length) throw new Error('File chưa có dòng dữ liệu khóa học');
+
+      const firstRowHeaders = new Set(Object.keys(rawRows[0]).map(normalizeSpreadsheetHeader));
+      const hasNameColumn = firstRowHeaders.has(normalizeSpreadsheetHeader('Tên khóa học'))
+        || firstRowHeaders.has('name');
+      const hasPriceColumn = firstRowHeaders.has(normalizeSpreadsheetHeader('Giá gốc'))
+        || firstRowHeaders.has('price');
+      if (!hasNameColumn || !hasPriceColumn) {
+        throw new Error('Không đúng mẫu Excel: cần có cột Tên khóa học và Giá gốc');
+      }
+
+      if (!window.confirm(`Sẽ thêm khóa mới từ file "${file.name}". Tên khóa trùng với khóa đang có sẽ được bỏ qua; dữ liệu hiện có không bị ghi đè. Tiếp tục?`)) {
+        return;
+      }
+
+      const existingNames = new Set(courses.map((course) => normalizeCourseName(course.name)));
+      const importedById = new Map();
+      const restoredNames = [];
+      const skipped = [];
+      const failures = [];
+      let deletedCoursesByName = null;
+      const subjectCatalogResponse = await apiFetch('/settings/exam-subjects');
+      const subjectCatalogResult = await subjectCatalogResponse.json();
+      if (!subjectCatalogResponse.ok || !subjectCatalogResult.success) {
+        throw new Error(subjectCatalogResult.message || 'Không tải được danh mục môn thi');
+      }
+      const importedSubjectCatalog = new Map(
+        (Array.isArray(subjectCatalogResult.data?.merged) ? subjectCatalogResult.data.merged : [])
+          .map((subject) => [String(subject.id || '').toLowerCase(), subject]),
+      );
+      Object.entries(examSubjectsCatalog || {}).forEach(([id, subject]) => {
+        if (!importedSubjectCatalog.has(id.toLowerCase())) importedSubjectCatalog.set(id.toLowerCase(), subject);
+      });
+
+      const ensureImportedSubjects = async (subjectIds) => {
+        for (const id of subjectIds) {
+          if (importedSubjectCatalog.has(id)) continue;
+          const label = id
+            .split('-')
+            .filter(Boolean)
+            .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+            .join(' ');
+          const subject = await addCustomExamSubject({ id, label });
+          if (!subject?.id) {
+            throw new Error(`Không tạo được môn "${label}" từ mã "${id}"`);
+          }
+          importedSubjectCatalog.set(id, subject);
+        }
+      };
+
+      const findSoftDeletedCourse = async (nameKey) => {
+        if (!deletedCoursesByName) {
+          const response = await apiFetch('/courses?includeDeleted=true');
+          const result = await response.json();
+          if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Không kiểm tra được các khóa học đã xóa mềm');
+          }
+          deletedCoursesByName = new Map(
+            (Array.isArray(result.data) ? result.data : [])
+              .filter((course) => course.deletedAt)
+              .map((course) => [normalizeCourseName(course.name), course]),
+          );
+        }
+        return deletedCoursesByName.get(nameKey) || null;
+      };
+
+      const readSuccessfulResponse = async (response, fallbackMessage) => {
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || fallbackMessage);
+        }
+        return result.data;
+      };
+
+      for (const [index, row] of rawRows.entries()) {
+        const rowNumber = index + 2;
+        try {
+          const payload = parseCourseImportRow(row, rowNumber);
+          const nameKey = normalizeCourseName(payload.name);
+          if (existingNames.has(nameKey)) {
+            skipped.push(payload.name);
+            continue;
+          }
+          await ensureImportedSubjects(payload.examSubjects);
+          const response = await apiFetch('/courses', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.success) {
+            if (response.status === 409) {
+              const deletedCourse = await findSoftDeletedCourse(nameKey);
+              if (deletedCourse) {
+                const restoredCourse = await readSuccessfulResponse(
+                  await apiFetch(`/courses/${deletedCourse._id}/restore`, {
+                    method: 'POST',
+                    body: '{}',
+                  }),
+                  `Không khôi phục được khóa "${payload.name}"`,
+                );
+                importedById.set(String(restoredCourse._id), restoredCourse);
+                restoredNames.push(payload.name);
+
+                const updatedCourse = await readSuccessfulResponse(
+                  await apiFetch(`/courses/${deletedCourse._id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                  }),
+                  `Đã khôi phục nhưng không cập nhật được khóa "${payload.name}"`,
+                );
+                importedById.set(String(updatedCourse._id), updatedCourse);
+                existingNames.add(nameKey);
+                deletedCoursesByName.delete(nameKey);
+                continue;
+              }
+              skipped.push(payload.name);
+              existingNames.add(nameKey);
+              continue;
+            }
+            throw new Error(result.message || `Không tạo được khóa "${payload.name}"`);
+          }
+          importedById.set(String(result.data._id), result.data);
+          existingNames.add(nameKey);
+        } catch (err) {
+          failures.push(err.message || `Dòng ${rowNumber}: không nhập được khóa học`);
+        }
+      }
+
+      if (importedById.size) {
+        setCourses((current) => [
+          ...importedById.values(),
+          ...current.filter((course) => !importedById.has(String(course._id))),
+        ]);
+      }
+      if (failures.length) {
+        const detail = failures.slice(0, 3).join('; ');
+        toast.error(`Đã nhập ${importedById.size} khóa (khôi phục ${restoredNames.length}), bỏ qua ${skipped.length}, lỗi ${failures.length}. ${detail}`);
+      } else {
+        toast.success(`Đã nhập ${importedById.size} khóa (khôi phục ${restoredNames.length}); bỏ qua ${skipped.length} khóa đang hoạt động trùng tên`);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Không đọc được file Excel khóa học');
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
 
   const handleDelete = async (course) => {
     showModal({
@@ -992,12 +1309,17 @@ export default function CoursePricingTab() {
       onConfirm: async () => {
         setDeleting(course._id);
         try {
-          const res = await apiFetch(`/courses/${course._id}`, {
+          const response = await apiFetch(`/courses/${course._id}`, {
             method: 'DELETE',
-          }).then((r) => r.json());
+          });
+          const res = await response.json();
           if (res.success) {
             setCourses(prev => prev.filter(c => c._id !== course._id));
             toast.success(`🗑️ Đã xóa "${course.name}"`);
+          } else if (response.status === 404) {
+            setCourses(prev => prev.filter(c => c._id !== course._id));
+            fetchCourses();
+            toast.success(`"${course.name}" không còn trong dữ liệu; đã làm mới danh sách`);
           } else {
             toast.error(res.message || 'Lỗi xóa khóa học');
           }
@@ -1051,13 +1373,54 @@ export default function CoursePricingTab() {
             Thay đổi giá chỉ ảnh hưởng học viên đăng ký <strong className="font-semibold text-slate-700">mới</strong>
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModalCourse(null)}
-          className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition shadow-sm shrink-0 w-full sm:w-auto"
-        >
-          <Plus size={15} /> Thêm khóa học
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={fetchCourses}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-1.5 min-h-10 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Làm mới
+          </button>
+          <button
+            type="button"
+            onClick={downloadImportTemplate}
+            className="inline-flex items-center justify-center gap-1.5 min-h-10 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition"
+          >
+            <FileSpreadsheet size={15} /> Tải mẫu
+          </button>
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing}
+            className="inline-flex items-center justify-center gap-1.5 min-h-10 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition disabled:opacity-50"
+          >
+            {importing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+            {importing ? 'Đang nhập...' : 'Nhập Excel'}
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(event) => importCourses(event.target.files?.[0])}
+          />
+          <button
+            type="button"
+            onClick={exportCourses}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-1.5 min-h-10 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition disabled:opacity-50"
+          >
+            <Download size={15} /> Xuất Excel
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalCourse(null)}
+            className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition shadow-sm shrink-0 w-full sm:w-auto"
+          >
+            <Plus size={15} /> Thêm khóa học
+          </button>
+        </div>
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3 text-[13px] text-amber-900 flex items-start gap-2.5 leading-relaxed">

@@ -23,12 +23,12 @@ describe('student milestone evaluation state', () => {
     assert.equal(isMilestoneDone({
       evaluations: [{
         studentId: 'student-1',
-        courseName: '  Tin   học văn phòng ',
+        courseName: '  Khóa   học A ',
         milestone: 'lesson_1',
       }],
       submittedKeys: new Set(),
       studentId: 'student-1',
-      courseName: 'Tin học văn phòng',
+      courseName: 'Khóa học A',
       milestone: 'lesson_1',
     }), true);
   });
@@ -36,9 +36,9 @@ describe('student milestone evaluation state', () => {
   it('keeps a successful local submission done before the server refresh returns', () => {
     assert.equal(isMilestoneDone({
       evaluations: [],
-      submittedKeys: new Set(['student-1::tin học văn phòng::lesson_1']),
+      submittedKeys: new Set(['student-1::khóa học a::lesson_1']),
       studentId: 'student-1',
-      courseName: 'Tin học văn phòng',
+      courseName: 'Khóa học A',
       milestone: 'lesson_1',
     }), true);
   });

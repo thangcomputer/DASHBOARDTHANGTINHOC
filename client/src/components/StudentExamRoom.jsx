@@ -557,7 +557,7 @@ const StudentExamRoom = ({
   );
 
   const buildSubjects = React.useCallback(
-    (ep) => buildExamSubjectsFromProgress(ep, studentSubjectIds),
+    (ep) => buildExamSubjectsFromProgress(ep, studentSubjectIds, examSubjectsCatalog),
     [studentSubjectIds]
   );
 
@@ -668,7 +668,7 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('quiz')}
-            className={`group min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
+            className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
               roomTab === 'quiz'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
@@ -688,7 +688,7 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('cert')}
-            className={`group min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
+            className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
               roomTab === 'cert'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
@@ -708,7 +708,7 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('scores')}
-            className={`group min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
+            className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
               roomTab === 'scores'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
@@ -728,7 +728,7 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('mos-ic3')}
-            className={`group min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
+            className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
               roomTab === 'mos-ic3'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'

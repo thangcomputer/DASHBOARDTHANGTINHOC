@@ -620,7 +620,10 @@ export default function LessonPracticeUnitsPage() {
           practiceDone: res.data.practiceDone,
         } : unit)),
       }));
-      if (res.data.status === 'completed') loadUnits().catch(() => {});
+      if (res.data.status === 'completed') {
+        loadUnits().catch(() => {});
+        window.dispatchEvent(new Event('lesson-practice-progress-updated'));
+      }
     } catch (err) {
       setError(err.message || 'Không ghi nhận được phần này');
     }
@@ -766,7 +769,12 @@ export default function LessonPracticeUnitsPage() {
                       key={openUnit.id}
                       unitId={openUnit.id}
                       embedded
-                      onUnitStatus={() => { loadUnits().catch(() => {}); }}
+                      onUnitStatus={(status) => {
+                        loadUnits().catch(() => {});
+                        if (status === 'completed') {
+                          window.dispatchEvent(new Event('lesson-practice-progress-updated'));
+                        }
+                      }}
                     />
                     {openUnit.status === 'completed' && (
                       <CourseCompleteBanner

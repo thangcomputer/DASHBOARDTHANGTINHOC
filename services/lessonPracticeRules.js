@@ -101,13 +101,6 @@ function isUnitLocked(units, completedIds, unitId, previewUnitIds = new Set()) {
   return ordered.slice(0, index).some((u) => !done.has(String(u._id || u.id)));
 }
 
-const SUBJECT_EXAM_KEYS = {
-  'su-dung-may-tinh': ['coban', 'su-dung-may-tinh'],
-  word: ['word', 'mos-word'],
-  excel: ['excel', 'mos-excel'],
-  powerpoint: ['powerpoint', 'mos-powerpoint'],
-};
-
 function normalizeSubjectKey(value) {
   return String(value || '')
     .normalize('NFD')
@@ -122,24 +115,43 @@ function subjectOpenedByKeys(subject, grantedKeys) {
   const granted = grantedKeys instanceof Set ? grantedKeys : new Set(grantedKeys || []);
   const slug = normalizeSubjectKey(subject?.slug || subject?.name);
   const examId = normalizeSubjectKey(subject?.examSubjectId);
-  const keys = new Set([slug, examId, ...(SUBJECT_EXAM_KEYS[slug] || []), ...(SUBJECT_EXAM_KEYS[examId] || [])].filter(Boolean));
+  const keys = new Set([slug, examId].filter(Boolean));
   for (const key of keys) {
     if (granted.has(key)) return true;
   }
   return false;
 }
 
+function courseSubjectsCovered(courseSubjectKeys, ownedSubjectKeys) {
+  const courseKeys = [...new Set((courseSubjectKeys || []).map(normalizeSubjectKey).filter(Boolean))];
+  const ownedKeys = ownedSubjectKeys instanceof Set
+    ? ownedSubjectKeys
+    : new Set((ownedSubjectKeys || []).map(normalizeSubjectKey).filter(Boolean));
+  return courseKeys.length > 0 && courseKeys.every((key) => ownedKeys.has(key));
+}
+
+function normalizeCourseExamSubjectIds(examSubjectIds) {
+  const seen = new Set();
+  const normalized = [];
+  (Array.isArray(examSubjectIds) ? examSubjectIds : []).forEach((examSubjectId) => {
+    const key = normalizeSubjectKey(examSubjectId);
+    if (!key) return;
+    if (seen.has(key)) return;
+    seen.add(key);
+    normalized.push(String(examSubjectId));
+  });
+  return [...new Set(normalized)];
+}
+
 function mapCourseSubjectsToLessons(examSubjectIds, subjects, labelsById, grantedKeys) {
   const granted = grantedKeys instanceof Set ? grantedKeys : new Set(grantedKeys || []);
   const rows = Array.isArray(subjects) ? subjects : [];
-  const aliases = { coban: ['su-dung-may-tinh'] };
-  return (Array.isArray(examSubjectIds) ? examSubjectIds : []).map((examSubjectId) => {
+  return normalizeCourseExamSubjectIds(examSubjectIds).map((examSubjectId) => {
     const key = normalizeSubjectKey(examSubjectId);
-    const lookupKeys = new Set([key, ...(aliases[key] || [])].filter(Boolean));
     const subject = rows.find((row) => {
       const examId = normalizeSubjectKey(row.examSubjectId);
       const slug = normalizeSubjectKey(row.slug);
-      return (examId && lookupKeys.has(examId)) || (slug && lookupKeys.has(slug));
+      return (examId && examId === key) || (slug && slug === key);
     });
     if (subject) {
       return {
@@ -157,7 +169,7 @@ function mapCourseSubjectsToLessons(examSubjectIds, subjects, labelsById, grante
       completedUnitCount: 0,
       totalUnitCount: 0,
     };
-  });
+  }).filter(Boolean);
 }
 
 function describeProgress(units, progressDocs) {
@@ -440,6 +452,8 @@ module.exports = {
   isUnitLocked,
   describeProgress,
   subjectOpenedByKeys,
+  courseSubjectsCovered,
+  normalizeCourseExamSubjectIds,
   mapCourseSubjectsToLessons,
   normalizeSubjectKey,
   publicItem,

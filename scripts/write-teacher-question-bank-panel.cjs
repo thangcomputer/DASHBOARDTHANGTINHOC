@@ -68,12 +68,7 @@ const fixed = out.replace(
 fs.writeFileSync(
   path.join(__dirname, '..', 'client', 'src', 'utils', 'teacherExamSections.js'),
   `export const TEACHER_EXAM_SECTIONS = [
-  { id: 'excel', label: 'Excel' },
-  { id: 'word', label: 'Word' },
-  { id: 'powerpoint', label: 'PowerPoint' },
-  { id: 'computer', label: 'M\\u00e1y t\\u00ednh & Windows' },
-  { id: 'situation', label: 'T\\u00ecnh Hu\\u1ed1ng S\\u01b0 Ph\\u1ea1m' },
-  { id: 'other', label: 'Ki\\u1ebfn th\\u1ee9c Kh\\u00e1c' },
+  { id: 'mon-kiem-thu', label: 'M\\u00f4n ki\\u1ec3m th\\u1eed' },
 ];
 
 export const DEFAULT_TEACHER_EXAM_MINUTES = Object.fromEntries(

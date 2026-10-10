@@ -11,7 +11,11 @@ const {
   studentHasCourse,
 } = require('../../services/lessonPracticePurchaseService');
 const { isPreviewUnit } = require('../../services/lessonPracticeService');
-const { isCourseDiscountActive, effectiveCoursePrice: priceAtTime } = require('../../utils/coursePricing');
+const {
+  calculateDiscountPrice,
+  isCourseDiscountActive,
+  effectiveCoursePrice: priceAtTime,
+} = require('../../utils/coursePricing');
 
 test('multi, match and drag grade only the full correct answer', () => {
   const multi = {
@@ -21,7 +25,7 @@ test('multi, match and drag grade only the full correct answer', () => {
   };
   assert.equal(rules.gradeObjective(multi, { choiceIds: ['c', 'a'] }).correct, true);
   assert.equal(rules.gradeObjective(multi, { choiceIds: ['a'] }).correct, false);
-  const match = { type: 'match', pairs: [{ id: '1', left: 'Word', right: 'Văn bản' }, { id: '2', left: 'Excel', right: 'Bảng tính' }] };
+  const match = { type: 'match', pairs: [{ id: '1', left: 'Ứng dụng A', right: 'Mô tả A' }, { id: '2', left: 'Ứng dụng B', right: 'Mô tả B' }] };
   assert.equal(rules.gradeObjective(match, { matches: [{ leftId: '1', rightId: '1' }, { leftId: '2', rightId: '2' }] }).correct, true);
   assert.equal(rules.gradeObjective(match, { matches: [{ leftId: '1', rightId: '2' }, { leftId: '2', rightId: '1' }] }).correct, false);
   const drag = { type: 'drag', options: [{ id: 'a', text: '1' }, { id: 'b', text: '2' }] };
@@ -58,58 +62,67 @@ test('hotspot accepts a click inside the region only', () => {
 });
 
 test('lesson subject opens only when the registered course includes it', () => {
-  const word = { slug: 'word', name: 'Word' };
-  const excel = { slug: 'excel', name: 'Excel' };
-  const basic = { slug: 'su-dung-may-tinh', name: 'Sử dụng máy tính' };
-  assert.equal(rules.subjectOpenedByKeys(word, ['word']), true);
-  assert.equal(rules.subjectOpenedByKeys(excel, ['word']), false);
-  assert.equal(rules.subjectOpenedByKeys(basic, ['coban']), true);
-  assert.equal(rules.subjectOpenedByKeys({ slug: 'mon-moi', name: 'Môn mới' }, ['word', 'coban']), false);
-  assert.equal(rules.subjectOpenedByKeys({ slug: 'mon-moi', examSubjectId: 'canva' }, ['canva']), true);
+  const subjectA = { slug: 'subject-a', name: 'Môn A' };
+  const subjectB = { slug: 'subject-b', name: 'Môn B' };
+  assert.equal(rules.subjectOpenedByKeys(subjectA, ['subject-a']), true);
+  assert.equal(rules.subjectOpenedByKeys(subjectB, ['subject-a']), false);
+  assert.equal(rules.subjectOpenedByKeys({ slug: 'subject-c', name: 'Môn C' }, ['subject-a', 'subject-b']), false);
+  assert.equal(rules.subjectOpenedByKeys({ slug: 'subject-d', examSubjectId: 'subject-d' }, ['subject-d']), true);
 });
 
-test('published courses can add missing custom subjects to the lesson catalog', () => {
+test('a course is hidden only when active enrollments cover every subject it contains', () => {
+  const ownedBundleSubjects = new Set(['subject-a-advanced', 'subject-b-advanced']);
+  assert.equal(rules.courseSubjectsCovered(['subject-a-advanced'], ownedBundleSubjects), true);
+  assert.equal(rules.courseSubjectsCovered(['subject-a-advanced', 'subject-b-advanced', 'subject-c-advanced'], ownedBundleSubjects), false);
+  ownedBundleSubjects.add('subject-c-advanced');
+  assert.equal(rules.courseSubjectsCovered(['subject-a-advanced', 'subject-b-advanced', 'subject-c-advanced'], ownedBundleSubjects), true);
+
+  const ownedIndividualSubjects = new Set(['subject-a', 'subject-b']);
+  assert.equal(rules.courseSubjectsCovered(['subject-a', 'subject-b', 'subject-c'], ownedIndividualSubjects), false);
+  ownedIndividualSubjects.add('subject-c');
+  assert.equal(rules.courseSubjectsCovered(['subject-a', 'subject-b', 'subject-c'], ownedIndividualSubjects), true);
+  assert.equal(rules.courseSubjectsCovered([], ownedIndividualSubjects), false);
+});
+
+test('published courses do not generate new lesson subjects from course subject IDs', () => {
   const discovered = collectSubjectsFromCourses([
-    { examSubjects: ['powerpoint-co-ban', 'excel-nang-cao'] },
-    { examSubjects: ['powerpoint-co-ban'] },
+    { examSubjects: ['topic-a-basic', 'topic-b-advanced'] },
+    { examSubjects: ['topic-a-basic'] },
   ], []);
 
-  assert.deepEqual(discovered.map(({ id, label }) => ({ id, label })), [
-    { id: 'powerpoint-co-ban', label: 'Powerpoint Co Ban' },
-    { id: 'excel-nang-cao', label: 'Excel Nang Cao' },
-  ]);
+  assert.deepEqual(discovered, []);
 });
 
 test('course cards use the exact matching lesson subject name instead of a nearby subject', () => {
   const subjects = [
-    { id: '1', slug: 'powerpoint-co-ban', name: 'POWERPOINT CƠ BẢN', opened: false, totalUnitCount: 2, completedUnitCount: 1 },
-    { id: '2', slug: 'powerpoint-nang-cao', name: 'POWERPOINT NÂNG CAO', opened: false, totalUnitCount: 4, completedUnitCount: 3 },
+    { id: '1', slug: 'topic-a-basic', name: 'CHỦ ĐỀ A CƠ BẢN', opened: false, totalUnitCount: 2, completedUnitCount: 1 },
+    { id: '2', slug: 'topic-a-advanced', name: 'CHỦ ĐỀ A NÂNG CAO', opened: false, totalUnitCount: 4, completedUnitCount: 3 },
   ];
   const mapped = rules.mapCourseSubjectsToLessons(
-    ['powerpoint-nang-cao', 'powerpoint-co-ban'],
+    ['topic-a-advanced', 'topic-a-basic'],
     subjects,
     new Map(),
     [],
   );
 
   assert.deepEqual(mapped, [
-    { id: '2', name: 'POWERPOINT NÂNG CAO', opened: false, completedUnitCount: 3, totalUnitCount: 4 },
-    { id: '1', name: 'POWERPOINT CƠ BẢN', opened: false, completedUnitCount: 1, totalUnitCount: 2 },
+    { id: '2', name: 'CHỦ ĐỀ A NÂNG CAO', opened: false, completedUnitCount: 3, totalUnitCount: 4 },
+    { id: '1', name: 'CHỦ ĐỀ A CƠ BẢN', opened: false, completedUnitCount: 1, totalUnitCount: 2 },
   ]);
 });
 
 test('course purchases use the active discounted price and only treat accessible active enrollments as owned', () => {
-  assert.equal(effectiveCoursePrice({ price: 100000, discountPrice: 80000, discountPercent: 20 }), 80000);
+  assert.equal(effectiveCoursePrice({ price: 100000, discountPrice: 80000, discountPercent: 20 }), 79000);
   assert.equal(effectiveCoursePrice({ price: 100000, discountPrice: 80000, discountPercent: 0 }), 100000);
 
-  const course = { _id: 'course-1', name: 'Khóa Excel' };
+  const course = { _id: 'course-1', name: 'Khóa học A' };
   assert.equal(studentHasCourse({
     enrollments: [{ courseId: 'course-1', status: 'active', learningAccess: true }],
   }, course), true);
   assert.equal(studentHasCourse({
-    enrollments: [{ courseName: 'KHOA EXCEL', status: 'active', learningAccess: true }],
+    enrollments: [{ courseName: 'KHOA HOC A', status: 'active', learningAccess: true }],
   }, course), true);
-  assert.equal(studentHasCourse({ course: 'Khóa Excel', courseId: 'course-1' }, course), true);
+  assert.equal(studentHasCourse({ course: 'Khóa học A', courseId: 'course-1' }, course), true);
   assert.equal(studentHasCourse({
     enrollments: [{ courseId: 'course-1', status: 'refunded', learningAccess: false }],
   }, course), false);
@@ -126,7 +139,7 @@ test('scheduled course discounts activate and expire at their configured timesta
   assert.equal(isCourseDiscountActive(course, new Date('2026-10-09T23:59:59.999Z')), false);
   assert.equal(priceAtTime(course, new Date('2026-10-09T23:59:59.999Z')), 100000);
   assert.equal(isCourseDiscountActive(course, new Date('2026-10-10T00:00:00.000Z')), true);
-  assert.equal(priceAtTime(course, new Date('2026-10-10T12:00:00.000Z')), 80000);
+  assert.equal(priceAtTime(course, new Date('2026-10-10T12:00:00.000Z')), 79000);
   assert.equal(isCourseDiscountActive(course, new Date('2026-10-11T00:00:00.000Z')), false);
   assert.equal(priceAtTime(course, new Date('2026-10-11T00:00:00.000Z')), 100000);
   assert.equal(isCourseDiscountActive({
@@ -134,6 +147,21 @@ test('scheduled course discounts activate and expire at their configured timesta
     discountPrice: 80000,
     discountPercent: 20,
   }, new Date('2026-10-11T00:00:00.000Z')), true);
+});
+
+test('discounted course prices round to the nearest ten thousand', () => {
+  assert.equal(calculateDiscountPrice(1699000, 11), 1509000);
+  assert.equal(calculateDiscountPrice(599000, 34), 399000);
+  assert.equal(calculateDiscountPrice(749000, 0), 749000);
+  assert.equal(calculateDiscountPrice(100000, 10.5), 89000);
+  assert.equal(calculateDiscountPrice(100000, 10.6), 89000);
+  assert.equal(calculateDiscountPrice(100000, 5), 99000);
+  assert.equal(calculateDiscountPrice(100000, 5.01), 89000);
+  assert.equal(calculateDiscountPrice(599000, 16), 499000);
+  assert.equal(
+    priceAtTime({ price: 1699000, discountPrice: 1512110, discountPercent: 11 }),
+    1509000,
+  );
 });
 
 test('preview access is enabled only for units explicitly opened by an admin', () => {

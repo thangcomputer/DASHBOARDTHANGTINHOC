@@ -13,7 +13,7 @@ const {
 const { policyShadowCourse } = require('../middleware/policyShadowCourse');
 const { coursesCutoverGate } = require('../middleware/coursesCutoverGate');
 const { generateCourseCode } = require('../services/businessCodeService');
-const { effectiveCoursePrice } = require('../utils/coursePricing');
+const { calculateDiscountPrice, effectiveCoursePrice } = require('../utils/coursePricing');
 
 const router = express.Router();
 
@@ -136,8 +136,7 @@ router.get('/:id', courseReadGuard('get'), async (req, res) => {
 });
 
 function calcEffectivePrice(price, discountPercent) {
-  if (!discountPercent || discountPercent <= 0) return price;
-  return Math.round(price * (1 - discountPercent / 100));
+  return calculateDiscountPrice(price, discountPercent);
 }
 
 function parseDiscountSchedule(startsAt, endsAt) {

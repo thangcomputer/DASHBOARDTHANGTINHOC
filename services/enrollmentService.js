@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { resolveExamSubjectsForCourse } = require('./examSubjectCatalog');
+const { sanitizeExamSubjects, isExcludedExamSubjectId } = require('./examSubjectCatalog');
 
 function sanitizeTeacherAlert(raw) {
   return String(raw || '').trim().slice(0, 500);
@@ -77,9 +77,10 @@ async function resolveEnrollmentExamSubjects({ courseName, courseId }) {
     const escaped = String(courseName).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     course = await Course.findOne({ name: new RegExp(`^${escaped}$`, 'i') }).lean();
   }
+  if (!course) return null;
   const settings = await getCachedSettings();
   const custom = settings?.examSubjectsCustomRaw;
-  return resolveExamSubjectsForCourse(course || { name: courseName }, custom);
+  return sanitizeExamSubjects(course.examSubjects, custom);
 }
 
 function isPlaceholderCourseName(name) {
@@ -133,7 +134,9 @@ function toClientCourse(enrollment, index) {
     name: enrollment.courseName,
     courseName: enrollment.courseName,
     courseId: enrollment.courseId ? String(enrollment.courseId) : '',
-    examSubjects: Array.isArray(enrollment.examSubjects) ? enrollment.examSubjects : [],
+    examSubjects: Array.isArray(enrollment.examSubjects)
+      ? enrollment.examSubjects.filter((id) => !isExcludedExamSubjectId(id))
+      : [],
     teacherId: teacherIdStr(enrollment.teacherId),
     teacherName: enrollment.teacherName
       || (enrollment.teacherId && typeof enrollment.teacherId === 'object' ? (enrollment.teacherId.name || '') : '')
@@ -293,6 +296,9 @@ function recordAttendanceGrade(studentDoc, {
 }
 
 async function applyEnrollmentStats(doc, studentId, Schedule) {
+  if (typeof doc.toObject !== 'function' && Array.isArray(doc.examProgress)) {
+    doc.examProgress = doc.examProgress.filter((entry) => !isExcludedExamSubjectId(entry?.id));
+  }
   const enrollments = getEnrollmentsFromStudent(doc);
   if (!enrollments.length) {
     doc.enrollments = [];
@@ -331,14 +337,12 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
 
   for (let i = 0; i < enrollments.length; i++) {
     const e = enrollments[i];
-    if (!Array.isArray(e.examSubjects) || !e.examSubjects.length) {
-      // eslint-disable-next-line no-await-in-loop
-      const resolved = await resolveEnrollmentExamSubjects({
-        courseName: e.courseName || e.course,
-        courseId: e.courseId,
-      });
-      enrollments[i] = { ...e, examSubjects: resolved };
-    }
+    // eslint-disable-next-line no-await-in-loop
+    const resolved = await resolveEnrollmentExamSubjects({
+      courseName: e.courseName || e.course,
+      courseId: e.courseId,
+    });
+    if (resolved) enrollments[i] = { ...e, examSubjects: resolved };
   }
 
   // Backfill teacherName khi chỉ có teacherId (HV không load danh sách GV)
@@ -384,6 +388,9 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
       ...e,
       _id: e._id,
       courseName,
+      examSubjects: Array.isArray(e.examSubjects)
+        ? e.examSubjects.filter((id) => !isExcludedExamSubjectId(id))
+        : [],
       teacherName: e.teacherName
         || (e.teacherId && typeof e.teacherId === 'object' ? (e.teacherId.name || '') : '')
         || '',

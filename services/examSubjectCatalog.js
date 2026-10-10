@@ -1,23 +1,13 @@
 const BUILTIN_EXAM_SUBJECTS = [
-  { id: 'coban', label: 'May vi tinh (Co ban)', short: 'C', bg: 'bg-slate-600', minutes: 90, builtin: true, group: 'office' },
-  { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90, builtin: true, group: 'office' },
-  { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90, builtin: true, group: 'office' },
-  { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90, builtin: true, group: 'office' },
-  { id: 'photoshop', label: 'Photoshop', short: 'PS', bg: 'bg-sky-600', minutes: 90, builtin: true, group: 'design' },
-  { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90, builtin: true, group: 'design' },
-  { id: 'corel', label: 'Corel', short: 'CR', bg: 'bg-pink-600', minutes: 90, builtin: true, group: 'design' },
-  { id: 'autocad', label: 'AutoCAD', short: 'AU', bg: 'bg-amber-600', minutes: 90, builtin: true, group: 'design' },
-  { id: 'mos-word', label: 'MOS-Word', short: 'MW', bg: 'bg-indigo-600', minutes: 90, builtin: true, group: 'mos' },
-  { id: 'mos-excel', label: 'MOS-Excel', short: 'ME', bg: 'bg-emerald-700', minutes: 90, builtin: true, group: 'mos' },
-  { id: 'mos-powerpoint', label: 'MOS-PowerPoint', short: 'MP', bg: 'bg-rose-600', minutes: 90, builtin: true, group: 'mos' },
-  { id: 'cpp', label: 'C++', short: 'C+', bg: 'bg-cyan-700', minutes: 90, builtin: true, group: 'programming' },
-  { id: 'web', label: 'Web', short: 'WB', bg: 'bg-teal-700', minutes: 90, builtin: true, group: 'programming' },
-  { id: 'python', label: 'Python', short: 'PY', bg: 'bg-yellow-600', minutes: 90, builtin: true, group: 'programming' },
-  { id: 'situation', label: 'Su pham (Tinh huong)', short: 'SP', bg: 'bg-red-600', minutes: 90, builtin: true, group: 'pedagogy' },
+  { id: 'mon-kiem-thu', label: 'Môn kiểm thử' },
 ];
 
 const BUILTIN_EXAM_SUBJECT_IDS = BUILTIN_EXAM_SUBJECTS.map((s) => s.id);
-const OFFICE_EXAM_IDS = ['coban', 'word', 'excel', 'powerpoint'];
+const OFFICE_EXAM_IDS = [];
+
+function isExcludedExamSubjectId(id) {
+  return !String(id || '').trim();
+}
 
 const EXAM_SUBJECT_LABELS = Object.fromEntries(BUILTIN_EXAM_SUBJECTS.map((s) => [s.id, s.label]));
 
@@ -61,7 +51,16 @@ function sanitizeCustomExamSubjectEntry(raw) {
   const minutes = Number.isFinite(minutesRaw) && minutesRaw >= 1 && minutesRaw <= 600
     ? Math.round(minutesRaw)
     : 90;
-  return { id, label, short, bg, minutes, custom: true, group: String(raw?.group || 'admin').trim() || 'admin' };
+  return {
+    id,
+    label,
+    short,
+    bg,
+    minutes,
+    custom: true,
+    createdByAdmin: true,
+    group: String(raw?.group || 'admin').trim() || 'admin',
+  };
 }
 
 function normalizeCustomList(customRaw) {
@@ -69,8 +68,9 @@ function normalizeCustomList(customRaw) {
   const out = [];
   const seen = new Set(BUILTIN_EXAM_SUBJECT_IDS);
   customRaw.forEach((item) => {
+    if (item?.createdByAdmin !== true) return;
     const entry = sanitizeCustomExamSubjectEntry(item);
-    if (!entry || seen.has(entry.id)) return;
+    if (!entry || seen.has(entry.id) || isExcludedExamSubjectId(entry.id)) return;
     seen.add(entry.id);
     out.push(entry);
   });
@@ -78,8 +78,7 @@ function normalizeCustomList(customRaw) {
 }
 
 function getMergedExamCatalog(customRaw) {
-  const custom = normalizeCustomList(customRaw);
-  return [...BUILTIN_EXAM_SUBJECTS, ...custom];
+  return [...BUILTIN_EXAM_SUBJECTS, ...normalizeCustomList(customRaw)];
 }
 
 function getValidExamSubjectIds(customRaw) {
@@ -102,22 +101,8 @@ function normalizeCourseKey(name) {
 
 function inferExamSubjectsFromCourseName(name, category, customRaw) {
   const n = normalizeCourseKey(name);
-  const valid = getValidExamSubjectIds(customRaw);
-  const pick = (ids) => ids.filter((id) => valid.has(id));
-  if (n.includes('mos')) return pick(['mos-word', 'mos-excel', 'mos-powerpoint']);
-  if (n.includes('photoshop')) return pick(['photoshop']);
-  if (n.includes('corel')) return pick(['corel']);
-  if (n.includes('autocad')) return pick(['autocad']);
-  if (n.includes('python')) return pick(['python']);
-  if (n.includes('c++') || n.includes('cpp')) return pick(['cpp']);
-  if (n.includes('web')) return pick(['web']);
-  if (n.includes('canva')) return pick(['canva']);
-
-  if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
-  if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
-  if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
   for (const sub of getMergedExamCatalog(customRaw)) {
-    if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
+    if (n === sub.id || n === normalizeCourseKey(sub.label)) return [sub.id];
   }
   return [];
 }
@@ -129,60 +114,19 @@ function resolveExamSubjectsForCourse(course, customRaw) {
   return inferExamSubjectsFromCourseName(course.name, course.category, customRaw);
 }
 
-/**
- * Quét Course.examSubjects / tên khóa → sinh môn custom còn thiếu (group: admin).
- * Dùng để Teacher/Student nhìn thấy đúng các môn Admin đã gắn vào khóa học cũ.
- */
 function collectSubjectsFromCourses(courses, customRaw) {
-  const existing = new Set(getMergedExamCatalog(customRaw).map((s) => s.id));
-  const discovered = [];
-  const seen = new Set();
-
-  (Array.isArray(courses) ? courses : []).forEach((course) => {
-    const rawIds = Array.isArray(course?.examSubjects)
-      ? course.examSubjects.map(String)
-      : [];
-
-    rawIds.forEach((rawId) => {
-      const id = String(rawId || '').trim();
-      if (!id || existing.has(id) || seen.has(id) || BUILTIN_EXAM_SUBJECT_IDS.includes(id)) return;
-      seen.add(id);
-      const labelFromId = id
-        .split('-')
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-      const entry = sanitizeCustomExamSubjectEntry({
-        id,
-        label: labelFromId || id,
-        group: 'admin',
-      });
-      if (entry) discovered.push(entry);
-    });
-  });
-
-  return discovered;
+  return [];
 }
 
 function mergeCourseSubjectsIntoCustom(customRaw, courses) {
-  const base = normalizeCustomList(customRaw);
-  const discovered = collectSubjectsFromCourses(courses, base);
-  if (!discovered.length) return { custom: base, added: [] };
-  const seen = new Set(base.map((s) => s.id));
-  const added = [];
-  discovered.forEach((entry) => {
-    if (seen.has(entry.id) || BUILTIN_EXAM_SUBJECT_IDS.includes(entry.id)) return;
-    seen.add(entry.id);
-    base.push(entry);
-    added.push(entry);
-  });
-  return { custom: base, added };
+  return { custom: normalizeCustomList(customRaw), added: [] };
 }
 
 module.exports = {
   BUILTIN_EXAM_SUBJECT_IDS,
   BUILTIN_EXAM_SUBJECTS,
   OFFICE_EXAM_IDS,
+  isExcludedExamSubjectId,
   EXAM_SUBJECT_LABELS,
   slugifyExamSubjectId,
   sanitizeCustomExamSubjectEntry,

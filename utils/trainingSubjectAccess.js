@@ -1,29 +1,24 @@
 'use strict';
 const BUILTIN_EXAM_SUBJECTS = {
-  coban: { id: 'coban', label: 'May vi tinh (Co ban)' },
-  word: { id: 'word', label: 'Word' },
-  excel: { id: 'excel', label: 'Excel' },
-  powerpoint: { id: 'powerpoint', label: 'PowerPoint' },
-  canva: { id: 'canva', label: 'Canva' },
+  'mon-kiem-thu': { id: 'mon-kiem-thu', label: 'Môn kiểm thử' },
 };
+function isSupportedExamSubjectId(id) {
+  return Boolean(String(id || '').trim());
+}
 function normalizeCourseKey(name) {
   return String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
 }
 function mapCourseToExamSubjectIds(courseName) {
   const n = normalizeCourseKey(courseName);
-  const pick = (ids) => ids.filter((id) => BUILTIN_EXAM_SUBJECTS[id]);
-  if (n.includes('canva')) return pick(['canva']);
-  if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick(['coban', 'word', 'excel', 'powerpoint']);
-  if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
-  if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
-  if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
   for (const sub of Object.values(BUILTIN_EXAM_SUBJECTS)) {
-    if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
+    if (n === normalizeCourseKey(sub.id) || n === normalizeCourseKey(sub.label)) return [sub.id];
   }
   return [];
 }
 function getItemExamSubjects(item) {
-  return Array.isArray(item?.examSubjects) ? item.examSubjects.filter(Boolean) : [];
+  return Array.isArray(item?.examSubjects)
+    ? item.examSubjects.filter(isSupportedExamSubjectId)
+    : [];
 }
 function resolveItemExamSubjects(item) {
   const explicit = getItemExamSubjects(item);
@@ -40,6 +35,7 @@ function parseSpecialtyToSubjectIds(specialty, catalog) {
   const ids = new Set();
 
   const entries = Object.entries(cat)
+    .filter(([id]) => isSupportedExamSubjectId(id))
     .map(([id, meta]) => ({
       id,
       labelN: normalizeCourseKey(meta.label || ''),
@@ -71,7 +67,9 @@ function parseSpecialtyToSubjectIds(specialty, catalog) {
   return [...ids];
 }
 function resolveTeacherSubjectIds(teacher) {
-  const fromIds = Array.isArray(teacher?.subjectIds) ? teacher.subjectIds.filter(Boolean) : [];
+  const fromIds = Array.isArray(teacher?.subjectIds)
+    ? teacher.subjectIds.filter(isSupportedExamSubjectId)
+    : [];
   if (fromIds.length) return fromIds;
   return parseSpecialtyToSubjectIds(teacher?.specialty);
 }

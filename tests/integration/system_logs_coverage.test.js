@@ -17,7 +17,7 @@ const {
 describe('Admin System Logs Coverage Verification', () => {
 
   it('1. Student Creation is logged as THÊM HỌC VIÊN and included in visible actions', () => {
-    const res = describeAction('POST', '/api/students', { name: 'Nguyễn Văn A', course: 'Tin học văn phòng', paid: true, paidAmount: 1500000 }, { success: true, data: { name: 'Nguyễn Văn A', course: 'Tin học văn phòng', paid: true, paidAmount: 1500000 } });
+    const res = describeAction('POST', '/api/students', { name: 'Nguyễn Văn A', course: 'Khóa học A', paid: true, paidAmount: 1500000 }, { success: true, data: { name: 'Nguyễn Văn A', course: 'Khóa học A', paid: true, paidAmount: 1500000 } });
     assert.equal(res.action, 'THÊM HỌC VIÊN');
     assert.equal(res.category, 'student');
     assert.ok(res.desc.includes('Nguyễn Văn A'));

@@ -426,7 +426,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     [enrollments, student?.course, examSubjectsCatalog]
   );
   const examScoreRows = useMemo(
-    () => buildExamSubjectsFromProgress(student?.examProgress, examScoreSubjectIds).map((sub) => ({
+    () => buildExamSubjectsFromProgress(student?.examProgress, examScoreSubjectIds, examSubjectsCatalog).map((sub) => ({
       ...sub,
       label: getExamSubjectMeta(sub.id, examSubjectsCatalog).label,
     })),
@@ -2256,4 +2256,3 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 };
 
 export default StudentTrainingLMS;
-

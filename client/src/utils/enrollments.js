@@ -73,6 +73,8 @@ export function getClientEnrollments(student) {
       enrollmentId: e._id ? String(e._id) : `enr-${idx}`,
       name: e.courseName, courseName: e.courseName,
       courseId: e.courseId ? String(e.courseId) : '',
+      format: e.format || e.courseFormat || '',
+      deliveryMode: e.deliveryMode === 'video' || e.deliveryMode === 'instructor' ? e.deliveryMode : '',
       examSubjects: Array.isArray(e.examSubjects) ? e.examSubjects : [],
       teacherId: teacherIdStr(e.teacherId),
       teacherName: teacherNameFromRef(e.teacherId, e.teacherName),
@@ -96,6 +98,7 @@ export function getClientEnrollments(student) {
     const completed = student.completedSessions ?? Math.max(0, (student.totalSessions || 12) - (student.remainingSessions ?? 0));
     return [{ id: 'main', enrollmentId: 'main', name: student.course, courseName: student.course,
       courseId: '', examSubjects: [], teacherId: tid,
+      deliveryMode: student.deliveryMode === 'video' || student.deliveryMode === 'instructor' ? student.deliveryMode : '',
       teacherName: teacherNameFromRef(student.teacherId, student.teacherName),
       completedSessions: completed, totalSessions: student.totalSessions || 12, remainingSessions: student.remainingSessions,
       avgGrade: student.avgGrade || 0, grades: student.grades || [], linkHoc: student.linkHoc || '',
@@ -114,6 +117,21 @@ export function getClientEnrollments(student) {
 /** Chỉ khóa đang hoạt động (ẩn khóa đã hủy khỏi danh sách ngoài / gán GV / học phí list). */
 export function getActiveClientEnrollments(student) {
   return getClientEnrollments(student).filter((e) => e?.status !== 'cancelled' && e?.status !== 'refunded');
+}
+
+function normalizeEnrollmentLabel(value) {
+  return String(value || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+export function getActiveOneToOneEnrollment(enrollments) {
+  return (enrollments || []).find((enrollment) => {
+    if (String(enrollment?.status || 'active').toLowerCase() !== 'active') return false;
+    if (enrollment?.learningAccess === false) return false;
+    const format = normalizeEnrollmentLabel(enrollment?.format || enrollment?.courseFormat);
+    const name = normalizeEnrollmentLabel(enrollment?.courseName || enrollment?.name);
+    return format === 'online-1-1' || /1\s*kem\s*1/.test(name);
+  }) || null;
 }
 
 export function isEnrollmentCompleted(enrollment) {
@@ -262,6 +280,8 @@ export function scopeStudentToEnrollment(student, enrollment) {
     ? (name.startsWith('Thầy ') || name.startsWith('Cô ') ? name : `Thầy ${name}`)
     : 'Chưa phân công';
   return { ...student, course: enrollment.courseName || enrollment.name, teacherId: enrollment.teacherId || '',
+    courseId: enrollment.courseId ? String(enrollment.courseId) : '',
+    deliveryMode: enrollment.deliveryMode || '',
     teacher: teacherLabel, teacherName: name,
     completedSessions: enrollment.completedSessions ?? 0,
     totalSessions: enrollment.totalSessions ?? 12,
