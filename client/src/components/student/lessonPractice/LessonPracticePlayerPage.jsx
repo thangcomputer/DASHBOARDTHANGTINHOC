@@ -94,7 +94,7 @@ function QuizClock({ remaining, warning }) {
   );
 }
 
-function QuestionCard({ item, index, busy, open = true, retry, expired = false, waiting = false, onRetryTime, onConfirm, onSkip }) {
+function QuestionCard({ item, index, busy, open = true, retry, expired = false, waiting = false, cooldownSeconds = 0, onRetryTime, onConfirm, onSkip }) {
   const [choiceId, setChoiceId] = useState(item.answer?.choiceId || '');
   const [choiceIds, setChoiceIds] = useState(item.answer?.choiceIds || []);
   const [matches, setMatches] = useState(() => Object.fromEntries((item.answer?.matches || []).map((row) => [row.leftId, row.rightId])));
@@ -301,9 +301,47 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 disabled:bg-slate-50"
         />
       )}
-      {retry?.text && !done && !waiting && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-950">{retry.text}</p>
-      )}
+      {(retry?.text && !done) || (done && typeof item.correct === 'boolean') || cooldownSeconds > 0 ? (
+        <div
+          aria-live="off"
+          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${
+            done && item.correct === true
+              ? 'border-emerald-200 bg-emerald-50'
+              : 'border-amber-200 bg-amber-50'
+          }`}
+        >
+          <div className={`relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-3xl ${
+            done && item.correct === true ? 'bg-emerald-100' : 'bg-amber-100'
+          }`}>
+            <span className="motion-safe:animate-bounce motion-reduce:animate-none" aria-hidden="true">🤖</span>
+            <span className="absolute -right-1.5 -top-1.5 text-xl" aria-hidden="true">
+              {done && item.correct === true ? '👏' : '📏'}
+            </span>
+          </div>
+          <div className="min-w-0">
+            <div aria-live="polite">
+              <p className={`text-sm font-black ${
+                done && item.correct === true ? 'text-emerald-800' : 'text-amber-900'
+              }`}>
+                {done && item.correct === true ? 'Thầy Robo: Chính xác!' : 'Thầy Robo: Mình thử lại nhé!'}
+              </p>
+              <p className="mt-0.5 text-sm text-slate-700">
+                {retry?.text && !done
+                  ? retry.text
+                  : done && item.correct === true
+                    ? 'Tuyệt lắm, bạn đã hoàn thành câu này.'
+                    : item.feedback || 'Chưa đúng rồi. Hãy xem lại câu hỏi và chọn đáp án khác nhé.'}
+              </p>
+            </div>
+            {waiting && cooldownSeconds > 0 ? (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white/80 px-2.5 py-1.5 text-xs font-bold text-amber-900">
+                <Clock size={14} aria-hidden="true" />
+                <span>Thử lại sau {cooldownSeconds} giây</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <Explanation item={item} />
       </div>
       {expired && (
@@ -575,24 +613,54 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                       Chúc mừng! Bạn đã làm đúng tất cả câu hỏi.
                     </p>
                   )}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <nav aria-label="Tiến trình câu hỏi" className="flex gap-1.5 overflow-x-auto pb-1">
                       {quizzes.map((item, index) => {
                         const reachable = started && index <= openLimit;
                         const current = started && index === visibleIndex;
+                        const wrong = Boolean(retries[item.id]?.n) || (item.confirmed && item.correct === false);
+                        const tone = item.confirmed && item.correct === true
+                          ? 'bg-emerald-500'
+                          : wrong
+                            ? 'bg-rose-500'
+                            : current
+                              ? 'bg-sky-500'
+                              : skipped[item.id]
+                                ? 'bg-amber-400'
+                                : 'bg-slate-200';
                         return (
                         <button
                           key={item.id}
                           type="button"
                           disabled={!reachable}
                           onClick={() => { setFocusId(item.id); setClockTry(0); }}
-                          className={`h-8 min-w-8 rounded-lg px-2 text-xs font-black ${item.confirmed ? 'bg-emerald-600 text-white' : current ? 'bg-red-600 text-white' : skipped[item.id] ? 'border border-amber-300 bg-amber-100 text-amber-900' : 'bg-white text-slate-700 border border-slate-200'} disabled:cursor-not-allowed disabled:opacity-40`}
+                          aria-current={current ? 'step' : undefined}
+                          aria-label={`Câu ${index + 1}${wrong ? ', trả lời sai' : item.confirmed ? ', trả lời đúng' : skipped[item.id] ? ', đã bỏ qua' : ', chưa làm'}${current ? ', đang xem' : ''}`}
+                          className={`group min-w-8 flex-1 rounded-md p-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-40 ${current ? 'ring-1 ring-sky-400' : ''}`}
                         >
-                          {index + 1}
+                          <span className={`block h-2.5 rounded-full transition-colors ${tone}`} />
+                          <span className={`mt-1 block text-center text-[10px] font-bold tabular-nums ${
+                            item.confirmed && item.correct === true
+                              ? 'text-emerald-700'
+                              : wrong
+                                ? 'text-rose-700'
+                                : current
+                                  ? 'text-sky-700'
+                                  : 'text-slate-500'
+                          }`}>
+                            {index + 1}{item.confirmed && item.correct === true ? ' ✓' : wrong ? ' ×' : ''}
+                          </span>
                         </button>
                         );
                       })}
-                    </div>
+                  </nav>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold text-slate-500">
+                      <span className="text-emerald-700">Xanh: đúng</span>
+                      <span className="px-1">·</span>
+                      <span className="text-rose-700">Đỏ: sai</span>
+                      <span className="px-1">·</span>
+                      Xanh dương: đang làm
+                    </p>
                     {!started && !allCorrect ? (
                       <button
                         type="button"
@@ -615,7 +683,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                 </div>
               )}
               {quizzes.length === 0 && others.map((item) => (
-                <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} waiting={wrongAnswerCooldown > 0} onConfirm={(answer) => confirm(item, answer)} />
+                <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} waiting={wrongAnswerCooldown > 0} cooldownSeconds={wrongAnswerCooldown} onConfirm={(answer) => confirm(item, answer)} />
               ))}
               {visibleQuiz && (
                 <QuestionCard
@@ -625,6 +693,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                   busy={busyId === visibleQuiz.id}
                   open
                   waiting={!started || wrongAnswerCooldown > 0}
+                  cooldownSeconds={wrongAnswerCooldown}
                   expired={timed && started && expired}
                   retry={retries[visibleQuiz.id]}
                   onRetryTime={() => setClockTry((tryCount) => tryCount + 1)}
@@ -651,40 +720,6 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
               {items.length === 0 && <p className="text-sm text-slate-500">Buổi này chưa có bài luyện tập.</p>}
             </div>
           </>
-        )}
-        {wrongAnswerCooldown > 0 && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="wrong-answer-cooldown-title"
-            aria-describedby="wrong-answer-cooldown-description"
-          >
-            <div className="w-full max-w-sm rounded-3xl border border-red-100 bg-white p-7 text-center shadow-2xl">
-              <div className="relative mx-auto mb-5 grid h-28 w-28 place-items-center">
-                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-                  <circle cx="50" cy="50" r="43" fill="none" stroke="#fee2e2" strokeWidth="8" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="43"
-                    fill="none"
-                    stroke="#dc2626"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeDasharray={2 * Math.PI * 43}
-                    strokeDashoffset={(2 * Math.PI * 43) * (1 - wrongAnswerCooldown / 10)}
-                    className="transition-[stroke-dashoffset] duration-1000 ease-linear"
-                  />
-                </svg>
-                <span className="text-4xl font-black tabular-nums text-red-700">{wrongAnswerCooldown}</span>
-              </div>
-              <h2 id="wrong-answer-cooldown-title" className="text-lg font-black text-slate-900">Hãy bình tĩnh suy nghĩ</h2>
-              <p id="wrong-answer-cooldown-description" className="mt-2 text-sm leading-relaxed text-slate-600">
-                Đáp án chưa chính xác. Vui lòng chờ hết đếm ngược rồi hãy chọn lại.
-              </p>
-            </div>
-          </div>
         )}
     </div>
   );
