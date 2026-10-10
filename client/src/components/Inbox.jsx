@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
   User, Circle, Image, Paperclip, Smile, Download,
-  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -81,6 +81,12 @@ const formatTime = (date) => {
   if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   if (diffMs < 86400000 * 7) return d.toLocaleDateString('vi-VN', { weekday: 'short' });
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' });
+};
+
+const formatMessageTime = (date) => {
+  const d = toValidActivityDate(date);
+  if (!d) return '';
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 };
 
 function getMessageDateInfo(date) {
@@ -257,60 +263,79 @@ function usePlaceChatMenuBelow(open, estimatedHeight = 48) {
   return [wrapRef, placeBelow];
 }
 
-// ─── Reaction Picker (floating) ────────────────────────────────────────────────
-const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
-  const [open, setOpen] = useState(false);
-  const [ref, placeBelow] = usePlaceChatMenuBelow(open, 48);
+const MESSAGE_REACTIONS = [
+  { type: 'like', emoji: '👍', label: 'Thích' },
+  { type: 'heart', emoji: '❤️', label: 'Yêu thích' },
+  { type: 'laugh', emoji: '😂', label: 'Haha' },
+  { type: 'wow', emoji: '😮', label: 'Ngạc nhiên' },
+  { type: 'sad', emoji: '😭', label: 'Buồn' },
+  { type: 'angry', emoji: '😡', label: 'Phẫn nộ' },
+];
 
-  // Đóng khi click ngoài
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    if (open) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open, ref]);
-
+function ReactionPicker({ msgId, onReact, myReactions }) {
   return (
-    <div className="relative flex items-center" ref={ref}>
-      <button
-        onMouseEnter={() => setOpen(true)}
-        onClick={() => setOpen(v => !v)}
-        className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-pink-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
-        title="Thả cảm xúc"
-      >
-        <Smile size={15} />
-      </button>
-
-      {open && (
-        <div
-          className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${isMine ? 'right-0' : 'left-0'} flex items-center gap-0 bg-white rounded-full px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 z-[9999] animate-in zoom-in-75 duration-150`}
-          onMouseLeave={() => setOpen(false)}
+    <div className="pointer-events-none absolute -bottom-2 -right-2 z-20 opacity-0 transition-opacity group-hover/msg:pointer-events-auto group-hover/msg:opacity-100 group-focus-within/msg:pointer-events-auto group-focus-within/msg:opacity-100">
+      <div className="group/reaction relative">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onReact(msgId, 'like');
+          }}
+          className={`flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.2)] transition hover:scale-110 hover:bg-slate-50 hover:text-slate-700 ${
+            myReactions?.includes('like') ? 'ring-1 ring-blue-300' : ''
+          }`}
+          title="Thích"
+          aria-label="Thích"
+          aria-pressed={myReactions?.includes('like') || false}
         >
-          {/* Heart */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onReact(msgId, 'heart'); setOpen(false); }}
-            className={`w-8 h-8 flex items-center justify-center text-lg rounded-full transition-all hover:scale-125 hover:bg-red-50 ${myReactions?.includes('heart') ? 'bg-red-50 scale-110' : ''}`}
-            title="Tim"
-          >
-            ❤️
-          </button>
-          {/* Like */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onReact(msgId, 'like'); setOpen(false); }}
-            className={`w-8 h-8 flex items-center justify-center text-lg rounded-full transition-all hover:scale-125 hover:bg-blue-50 ${myReactions?.includes('like') ? 'bg-blue-50 scale-110' : ''}`}
-            title="Thích"
-          >
-            👍
-          </button>
+          <ThumbsUp size={15} strokeWidth={1.8} />
+        </button>
+        <div
+          className="pointer-events-none absolute bottom-full right-0 flex translate-y-1 items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-1 opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all group-hover/reaction:pointer-events-auto group-hover/reaction:translate-y-0 group-hover/reaction:opacity-100 group-focus-within/reaction:pointer-events-auto group-focus-within/reaction:translate-y-0 group-focus-within/reaction:opacity-100"
+          role="group"
+          aria-label="Cảm xúc khác"
+        >
+          {MESSAGE_REACTIONS.filter(({ type }) => type !== 'like').map(({ type, emoji, label }) => (
+            <button
+              key={type}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onReact(msgId, type);
+              }}
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-slate-100 ${
+                myReactions?.includes(type) ? 'bg-blue-50 ring-1 ring-blue-200' : ''
+              }`}
+              title={label}
+              aria-label={label}
+              aria-pressed={myReactions?.includes(type) || false}
+            >
+              {emoji}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
-};
+}
 
-function ChatFlipWrap({ open, estimatedHeight = 160, className = 'relative', children }) {
+function ChatFlipWrap({ open, onClose, estimatedHeight = 160, className = 'relative', children }) {
   const [wrapRef, placeBelow] = usePlaceChatMenuBelow(open, estimatedHeight);
+
+  useEffect(() => {
+    if (!open || !onClose) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (!wrapRef.current?.contains(event.target)) onClose();
+    };
+    document.addEventListener('mousedown', closeOnOutsidePointer);
+    document.addEventListener('touchstart', closeOnOutsidePointer);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsidePointer);
+      document.removeEventListener('touchstart', closeOnOutsidePointer);
+    };
+  }, [open, onClose, wrapRef]);
+
   return (
     <div className={className} ref={wrapRef}>
       {typeof children === 'function' ? children(placeBelow) : children}
@@ -488,6 +513,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
+  const [replyMessage, setReplyMessage] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showPeerInfo, setShowPeerInfo] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
@@ -665,6 +691,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             isGroup: sendIsGroup,
             groupId: sendGroupId,
           };
+
           await ctxSendMessage(properMsg);
         }
       } else {
@@ -673,6 +700,23 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     } catch (err) {
       toast.error('Lỗi khi ghim tin nhắn');
     }
+  };
+
+  const startReply = (msg) => {
+    if (!msg || msg.isRecalled) return;
+    setReplyMessage({
+      id: String(msg.id || msg._id || ''),
+      senderName: msg.senderName || 'Người dùng',
+      content: String(msg.content || '').slice(0, 500),
+      messageType: msg.messageType || 'text',
+    });
+    setShowMessageOptions(null);
+    window.setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const scrollToMessage = (msgId) => {
+    if (!msgId) return;
+    document.getElementById(`msg-${msgId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const notifyInboxScheduleEvent = async (formData, action = 'created') => {
@@ -1263,6 +1307,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               fileExpired: data.fileExpired || false,
               reactions: data.reactions || [],
               isPinned: data.isPinned || false,
+              payload: data.payload && typeof data.payload === 'object' ? data.payload : null,
             };
             return [...prev, mappedMsg];
           });
@@ -1390,13 +1435,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Gửi tin nhắn ────────────────────────────────────────────────────────────
   const selectConversation = (conv) => {
+    setReplyMessage(null);
     setPinnedMessageObj(null);
-    setMessages([]);
+    const activateConversation = (target) => {
+      if (String(activeConv?.id || '') !== String(target?.id || '')) {
+        setMessages([]);
+      }
+      setActiveConv(target);
+    };
     const { isGroup } = resolveGroupSendFlags(conv);
     // Never rebuild group threads as DM conversationIds
     if (isGroup) {
       const gid = String(conv?.user?.id || conv?.groupId || (String(conv?.id || '').startsWith('group_') ? String(conv.id).slice(6) : ''));
-      setActiveConv({
+      activateConversation({
         ...conv,
         isGroup: true,
         id: gid ? `group_${gid}` : conv.id,
@@ -1417,12 +1468,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       // Kiểm tra xem đã có conv này trong dataContext chưa
       const existing = dataContextConvs.find(dc => dc.id === properId);
       if (existing) {
-        setActiveConv(existing);
+        activateConversation(existing);
       } else {
-        setActiveConv({ ...conv, id: properId });
+        activateConversation({ ...conv, id: properId });
       }
     } else {
-      setActiveConv(conv);
+      activateConversation(conv);
     }
   };
 
@@ -1605,6 +1656,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if ((!newMsg.trim() && !pendingImage) || !activeConv) return;
     stopInboxTyping();
     const contentText = newMsg.trim();
+    const replyPayload = replyMessage
+      ? { replyTo: { ...replyMessage } }
+      : undefined;
 
     if (activeConv.isAiHandoff) {
       if (!contentText && !pendingImage) return;
@@ -1617,6 +1671,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         });
         setNewMsg('');
         setPendingImage(null);
+        setReplyMessage(null);
       } catch (err) {
         toast.error(err.message || 'Không gửi được');
       }
@@ -1639,6 +1694,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         fileName: pendingImage.fileName,
         isGroup: sendIsGroup,
         groupId: sendGroupId,
+        payload: replyPayload,
       };
       const sentImg = await ctxSendMessage(msgData);
       if (sentImg?.failed) {
@@ -1646,6 +1702,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       }
       setPendingImage(null);
       setNewMsg('');
+      setReplyMessage(null);
     } else if (contentText) {
       const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
@@ -1660,12 +1717,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         messageType: 'text',
         isGroup: sendIsGroup,
         groupId: sendGroupId,
+        payload: replyPayload,
       };
       const sent = await ctxSendMessage(msgData);
       if (sent?.failed) {
         toast.error(sent.failReason || 'Không gửi được tin nhắn');
       }
       setNewMsg('');
+      setReplyMessage(null);
     }
 
     setShowEmojis(false);
@@ -1719,9 +1778,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         fileName: file.name,
         isGroup: sendIsGroup,
         groupId: sendGroupId,
+        payload: replyMessage ? { replyTo: { ...replyMessage } } : undefined,
       };
 
       await ctxSendMessage(msgData);
+      setReplyMessage(null);
     } catch (err) {
       setUploadError('Tải tệp thất bại: ' + (err.message || ''));
       setTimeout(() => setUploadError(''), 4000);
@@ -2069,6 +2130,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               <SupportAiHandoffPanel
                 onQueueChange={setHandoffQueue}
                 onOpen={async (item) => {
+                  setReplyMessage(null);
                   setActiveConv({
                     id: item.conversationId,
                     isAiHandoff: true,
@@ -2761,6 +2823,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </div>
                   ) : null;
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
+                  const nextMessage = displayedMessages[index + 1];
+                  const currentTimestamp = new Date(msg.time).getTime();
+                  const nextTimestamp = nextMessage ? new Date(nextMessage.time).getTime() : NaN;
+                  const nextMessageStartsGroup = !nextMessage
+                    || nextMessage.messageType === 'system'
+                    || messageIsFromMe(nextMessage, currentUserId, currentUserRole) !== isMine
+                    || !Number.isFinite(currentTimestamp)
+                    || !Number.isFinite(nextTimestamp)
+                    || nextTimestamp - currentTimestamp >= 5 * 60 * 1000
+                    || getMessageDateInfo(nextMessage.time)?.key !== messageDate?.key;
+                  const showMessageTimestamp = index === 0 || nextMessageStartsGroup;
                   const role = normalizeRole(msg.senderRole);
                   const badgeLabel = msg.senderDisplayRole
                     ? displayRoleLabel(msg.senderDisplayRole)
@@ -2781,8 +2854,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             ? 'cms-bubble-other-student'
                             : '';
 
-                  const heartCount = (msg.reactions || []).filter(r => r.type === 'heart').length;
-                  const likeCount = (msg.reactions || []).filter(r => r.type === 'like').length;
+                  const reactionCounts = MESSAGE_REACTIONS
+                    .map((reaction) => ({
+                      ...reaction,
+                      count: (msg.reactions || []).filter((item) => item.type === reaction.type).length,
+                    }))
+                    .filter((reaction) => reaction.count > 0);
                   const myReactions = (msg.reactions || []).filter(r => r.userId === currentUserId).map(r => r.type);
 
                   if (msg.messageType === 'system') {
@@ -2855,7 +2932,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                             {/* Message bubble */}
-                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${(heartCount > 0 || likeCount > 0) && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${reactionCounts.length > 0 && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                              {!msg.isRecalled && msg.payload?.replyTo && (
+                                <button
+                                  type="button"
+                                  onClick={() => scrollToMessage(msg.payload.replyTo.id)}
+                                  className="mb-2 block w-full rounded-lg border-l-2 border-blue-400 bg-black/5 px-2.5 py-1.5 text-left text-xs transition hover:bg-black/10"
+                                  title="Đi đến tin nhắn được trả lời"
+                                >
+                                  <span className="block truncate font-bold">{msg.payload.replyTo.senderName || 'Người dùng'}</span>
+                                  <span className="block line-clamp-2 opacity-80">
+                                    {msg.payload.replyTo.content || (msg.payload.replyTo.messageType === 'image' ? '[Hình ảnh]' : '[Tệp đính kèm]')}
+                                  </span>
+                                </button>
+                              )}
                               {msg.isRecalled ? (
                                 <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
                                   <RotateCcw size={12} /> Tin nhắn đã được thu hồi
@@ -2922,89 +3012,98 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               )}
 
-                              {/* Reaction badge */}
-                              {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
-                                <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
-                                  {heartCount > 0 && (
-                                    <span className="flex items-center gap-0.5 text-[11px]">
-                                      <span>❤️</span>
-                                      {heartCount > 1 && <span className="text-gray-500 font-bold">{heartCount}</span>}
-                                    </span>
-                                  )}
-                                  {likeCount > 0 && (
-                                    <span className="flex items-center gap-0.5 text-[11px]">
-                                      <span>👍</span>
-                                      {likeCount > 1 && <span className="text-gray-500 font-bold">{likeCount}</span>}
-                                    </span>
-                                  )}
+                              {showMessageTimestamp && formatMessageTime(msg.time) && (
+                                <div className={`mt-1 text-left text-[10px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {formatMessageTime(msg.time)}
                                 </div>
                               )}
-                            </div>
 
-                            {/* Reaction picker button */}
-                            {!msg.isRecalled && (
-                              <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-0 ${isMine ? 'right-full mr-1' : 'left-full ml-1'} top-1/2 -translate-y-1/2`}>
+                              {/* Reaction badge */}
+                              {!msg.isRecalled && reactionCounts.length > 0 && (
+                                <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
+                                  {reactionCounts.map(({ type, emoji, count }) => (
+                                    <span key={type} className="flex items-center gap-0.5 text-[11px]">
+                                      <span>{emoji}</span>
+                                      {count > 1 && <span className="text-gray-500 font-bold">{count}</span>}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {!msg.isRecalled && (
                                 <ReactionPicker
                                   msgId={msg.id}
-                                  isMine={isMine}
                                   onReact={handleReaction}
                                   myReactions={myReactions}
                                 />
-                                <button
-                                  onClick={() => handlePinMessage(msg.id)}
-                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
-                                  title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-                                >
-                                  <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
-                                </button>
-                              </div>
-                            )}
+                              )}
 
-                            {/* Options/Menu button for Soft Delete */}
-                            <ChatFlipWrap open={showMessageOptions === msg.id} estimatedHeight={180} className="relative">
+                            </div>
+
+                            <ChatFlipWrap
+                              open={showMessageOptions === msg.id}
+                              onClose={() => setShowMessageOptions(null)}
+                              estimatedHeight={240}
+                              className="relative"
+                            >
                               {(placeBelow) => (
                                 <>
-                                  <button
-                                    onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
-                                    className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
-                                    title="Tùy chọn"
-                                  >
-                                    <MoreHorizontal size={14} />
-                                  </button>
+                                  <div className={`flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                                    <button
+                                      onClick={() => startReply(msg)}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800"
+                                      title="Trả lời tin nhắn"
+                                      aria-label="Trả lời tin nhắn"
+                                    >
+                                      <Reply size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 active:scale-90"
+                                      title="Tùy chọn"
+                                    >
+                                      <MoreHorizontal size={14} />
+                                    </button>
+                                  </div>
                                   {showMessageOptions === msg.id && (
-                                    <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
+                                    <div
+                                      onClick={(event) => event.stopPropagation()}
+                                      className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'right-0' : 'left-0'}`}
+                                    >
+                                      {!msg.isRecalled && (
+                                        <button
+                                          onClick={() => {
+                                            handlePinMessage(msg.id);
+                                            setShowMessageOptions(null);
+                                          }}
+                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                        >
+                                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned
+                                            ? <PinOff size={12} />
+                                            : <Pin size={12} />}
+                                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
+                                        </button>
+                                      )}
                                       {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
                                         <button
                                           onClick={() => {
                                             handleDownload(msg.fileUrl, msg.fileName);
                                             setShowMessageOptions(null);
                                           }}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
+                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                         >
                                           <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
                                         </button>
                                       )}
-                                      {!msg.isRecalled && msg.messageType !== 'image' && (
+                                      {!msg.isRecalled && (
                                         <button
                                           onClick={() => {
-                                            handleCopyText(msg.content);
+                                            handleCopyText(msg.content || msg.fileName);
                                             setShowMessageOptions(null);
                                           }}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
+                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                         >
-                                          <Copy size={12} /> Sao chép
-                                        </button>
-                                      )}
-                                      {!msg.isRecalled && msg.messageType !== 'image' && (
-                                        <button
-                                          onClick={() => {
-                                            setNewMsg(msg.content);
-                                            setTimeout(() => inputRef.current?.focus(), 100);
-                                            setShowMessageOptions(null);
-                                          }}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
-                                        >
-                                          <Edit3 size={12} /> Chỉnh sửa / Viết lại
+                                          <Copy size={12} /> Copy tin nhắn
                                         </button>
                                       )}
                                       {isMine && !msg.isRecalled && (() => {
@@ -3019,12 +3118,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                               setShowMessageOptions(null);
                                             }}
                                             disabled={recallingId === msg.id}
-                                            className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
                                           >
                                             {recallingId === msg.id
                                               ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
                                               : <RotateCcw size={12} />
-                                            } Thu hồi tin nhắn
+                                            } Thu hồi
                                           </button>
                                         )}
                                       <button
@@ -3032,9 +3131,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                           handleDeleteHistory(msg.id);
                                           setShowMessageOptions(null);
                                         }}
-                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
+                                        className="flex w-full items-center gap-3 whitespace-nowrap border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                                       >
-                                        <Trash2 size={12} /> Xóa lịch sử
+                                        <Trash2 size={12} /> Xóa chỉ ở phía tôi
                                       </button>
                                     </div>
                                   )}
@@ -3050,7 +3149,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 <Pin size={10} className="rotate-45" />
                               </span>
                             )}
-                            <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
                             {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
                               <span title="Chưa gửi được (Kết nối yếu)">
                                 <AlertCircle size={10} className="text-red-500 animate-pulse" />
@@ -3089,6 +3187,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <div className="mb-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium flex items-center gap-2">
                     <span>⚠️</span>
                     <span>{uploadError}</span>
+                  </div>
+                )}
+                {replyMessage && (
+                  <div className="mx-auto mb-2 flex max-w-4xl items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2">
+                    <div className="min-w-0 border-l-2 border-blue-500 pl-2.5">
+                      <p className="text-xs font-semibold text-blue-700">Trả lời {replyMessage.senderName}</p>
+                      <p className="truncate text-xs text-slate-600">
+                        {replyMessage.content || (replyMessage.messageType === 'image' ? '[Hình ảnh]' : '[Tệp đính kèm]')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyMessage(null)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-800"
+                      title="Hủy trả lời"
+                      aria-label="Hủy trả lời"
+                    >
+                      <X size={15} />
+                    </button>
                   </div>
                 )}
                 <div className="flex items-center gap-2 relative max-w-4xl mx-auto">

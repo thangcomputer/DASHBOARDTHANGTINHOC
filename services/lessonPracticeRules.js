@@ -142,12 +142,20 @@ function mapCourseSubjectsToLessons(examSubjectIds, subjects, labelsById, grante
       return (examId && lookupKeys.has(examId)) || (slug && lookupKeys.has(slug));
     });
     if (subject) {
-      return { id: subject.id, name: subject.name, opened: subject.opened === true };
+      return {
+        id: subject.id,
+        name: subject.name,
+        opened: subject.opened === true,
+        completedUnitCount: subject.completedUnitCount || 0,
+        totalUnitCount: subject.totalUnitCount || 0,
+      };
     }
     return {
       id: '',
       name: labelsById?.get(examSubjectId) || examSubjectId,
       opened: granted.has(key),
+      completedUnitCount: 0,
+      totalUnitCount: 0,
     };
   });
 }

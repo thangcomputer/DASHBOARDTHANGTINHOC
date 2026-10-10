@@ -654,8 +654,8 @@ router.put('/:conversationId/pin', messagesGuard('reaction'), async (req, res) =
 router.patch('/:messageId/reaction', messagesGuard('reaction'), async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { type } = req.body; // 'heart' or 'like'
-    if (!['heart', 'like'].includes(type)) {
+    const { type } = req.body;
+    if (!['like', 'heart', 'laugh', 'wow', 'sad', 'angry'].includes(type)) {
       return res.status(400).json({ success: false, message: 'Loại reaction không hợp lệ' });
     }
     const userId = req.user.id;

@@ -90,6 +90,11 @@ const courseSchema = new mongoose.Schema({
     enum: ['online-1-1', 'online-group', 'offline', 'video'],
     default: 'online-1-1',
   },
+  deliveryMode: {
+    type: String,
+    enum: ['instructor', 'video'],
+    default: 'instructor',
+  },
   // Chương trình học
   curriculum: [{
     title: { type: String, required: true },

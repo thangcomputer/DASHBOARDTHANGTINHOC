@@ -96,6 +96,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
         fileExpired: n.fileExpired,
         aiImageRemaining: n.aiImageRemaining,
         reactions: n.reactions,
+        payload: n.payload,
       };
 
       const tempIdx = prev.findIndex(

@@ -82,8 +82,8 @@ test('published courses can add missing custom subjects to the lesson catalog', 
 
 test('course cards use the exact matching lesson subject name instead of a nearby subject', () => {
   const subjects = [
-    { id: '1', slug: 'powerpoint-co-ban', name: 'POWERPOINT CƠ BẢN', opened: false },
-    { id: '2', slug: 'powerpoint-nang-cao', name: 'POWERPOINT NÂNG CAO', opened: false },
+    { id: '1', slug: 'powerpoint-co-ban', name: 'POWERPOINT CƠ BẢN', opened: false, totalUnitCount: 2, completedUnitCount: 1 },
+    { id: '2', slug: 'powerpoint-nang-cao', name: 'POWERPOINT NÂNG CAO', opened: false, totalUnitCount: 4, completedUnitCount: 3 },
   ];
   const mapped = rules.mapCourseSubjectsToLessons(
     ['powerpoint-nang-cao', 'powerpoint-co-ban'],
@@ -93,8 +93,8 @@ test('course cards use the exact matching lesson subject name instead of a nearb
   );
 
   assert.deepEqual(mapped, [
-    { id: '2', name: 'POWERPOINT NÂNG CAO', opened: false },
-    { id: '1', name: 'POWERPOINT CƠ BẢN', opened: false },
+    { id: '2', name: 'POWERPOINT NÂNG CAO', opened: false, completedUnitCount: 3, totalUnitCount: 4 },
+    { id: '1', name: 'POWERPOINT CƠ BẢN', opened: false, completedUnitCount: 1, totalUnitCount: 2 },
   ]);
 });
 

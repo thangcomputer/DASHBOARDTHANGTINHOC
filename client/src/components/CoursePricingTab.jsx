@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import {
   Plus, Edit2, Trash2, Save, X, Loader2, AlertCircle,
-  DollarSign, Percent, Tag, BookOpen, CheckCircle2
+  DollarSign, Percent, Tag, BookOpen, CheckCircle2, Clapperboard, GraduationCap
 } from 'lucide-react';
 import { useToast } from '../utils/toast';
 import { useModal } from '../utils/Modal.jsx';
@@ -74,6 +74,7 @@ function CourseModal({
     discountStartsAt: toLocalDateTimeInput(course?.discountStartsAt),
     discountEndsAt:   toLocalDateTimeInput(course?.discountEndsAt),
     totalSessions:   course?.totalSessions || 12,
+    deliveryMode:    course?.deliveryMode || 'instructor',
     category:        course?.category || 'van-phong',
     examSubjects:    Array.isArray(course?.examSubjects) && course.examSubjects.length
       ? [...course.examSubjects]
@@ -280,6 +281,7 @@ function CourseModal({
         discountStartsAt: fromLocalDateTimeInput(form.discountStartsAt),
         discountEndsAt:   fromLocalDateTimeInput(form.discountEndsAt),
         totalSessions:   Number(form.totalSessions),
+        deliveryMode:    form.deliveryMode,
         category:        form.category,
         examSubjects:    form.examSubjects,
         description:     form.description,
@@ -352,6 +354,48 @@ function CourseModal({
                   placeholder="VD: THVP Nâng Cao (12 Buổi)"
                 />
               </div>
+
+              <fieldset>
+                <legend className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-500">
+                  Hình thức học
+                </legend>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {[
+                    { id: 'instructor', label: 'Học cùng giảng viên', description: 'Học theo lịch với giảng viên', Icon: GraduationCap },
+                    { id: 'video', label: 'Tự học qua video', description: 'Chủ động học theo lộ trình video', Icon: Clapperboard },
+                  ].map((option) => {
+                    const selected = form.deliveryMode === option.id;
+                    return (
+                      <label
+                        key={option.id}
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-blue-300 ${
+                          selected
+                            ? 'border-red-500 bg-red-50 text-red-800'
+                            : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="course-delivery-mode"
+                          value={option.id}
+                          checked={selected}
+                          onChange={() => setForm((current) => ({ ...current, deliveryMode: option.id }))}
+                          className="sr-only"
+                        />
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          selected ? 'bg-red-100 text-red-700' : 'bg-white text-gray-500'
+                        }`}>
+                          <option.Icon size={20} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-extrabold">{option.label}</span>
+                          <span className="mt-0.5 block text-[11px] text-gray-500">{option.description}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

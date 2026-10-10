@@ -77,9 +77,9 @@ const messageSchema = new mongoose.Schema({
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
   isGroup: { type: Boolean, default: false },
 
-  // Phản ứng (Heart, Like)
+  // Phản ứng (like, heart, laugh, wow, sad, angry)
   reactions: [{
-    type: { type: String }, // 'heart', 'like'
+    type: { type: String },
     userId: { type: String },
     userName: { type: String }
   }],

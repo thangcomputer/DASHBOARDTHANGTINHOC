@@ -622,7 +622,7 @@ async function listSubjectsForStudent(studentId) {
     Student.findById(studentId).select('course courseId teacherId enrollments').lean(),
     SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
     Course.find({ status: 'published', deletedAt: null })
-      .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects')
+      .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects deliveryMode')
       .sort({ createdAt: -1 })
       .lean(),
   ]);
@@ -668,6 +668,10 @@ async function listSubjectsForStudent(studentId) {
       labelsById,
       granted,
     );
+    const lessonCount = courseSubjects.reduce(
+      (total, subject) => total + (Number(subject.totalUnitCount) || 0),
+      0,
+    );
     const matchesCourse = (enrollment) =>
       (enrollment.courseId && String(enrollment.courseId) === String(course._id))
       || (
@@ -692,8 +696,9 @@ async function listSubjectsForStudent(studentId) {
       totalSessions: course.totalSessions || 0,
       offerType: examSubjectIds.length === 1 ? 'single' : 'bundle',
       subjects: courseSubjects,
+      lessonCount,
       enrolled,
-      hasAssignedTeacher: Boolean(courseEnrollment?.teacherId),
+      deliveryMode: course.deliveryMode === 'video' ? 'video' : 'instructor',
     };
   });
   return { subjects: studentSubjects, courses: courseCatalog };

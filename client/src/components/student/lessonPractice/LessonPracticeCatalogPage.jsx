@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, BookOpen, CheckCircle2, Clapperboard, Clock3, GraduationCap, Layers3, Loader2, Lock, PackageOpen, ShoppingCart, Sparkles, CircleHelp, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, Clapperboard, Clock3, GraduationCap, Layers3, Loader2, Lock, ShoppingCart, Sparkles, CircleHelp, X } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { useData } from '../../../context/DataContext';
@@ -10,6 +10,9 @@ import LessonVideoTabs from '../LessonVideoTabs';
 import VideoCoursePayModal from '../../VideoCoursePayModal';
 import CoursePurchaseConfirmModal from './CoursePurchaseConfirmModal';
 import { useToast } from '../../../utils/toast';
+
+const COURSE_CONSULTATION_ZALO_PHONE = '0984623486';
+const ZALO_LOGO_URL = 'https://upload.wikimedia.org/wikipedia/commons/9/91/Icon_of_Zalo.svg';
 
 function formatDiscountTimeLeft(endsAt, now) {
   const secondsLeft = Math.ceil((new Date(endsAt).getTime() - now) / 1000);
@@ -36,9 +39,18 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
     && (endsAt === null || now < endsAt);
   const displayPrice = course.originalPrice && !saleActive ? course.originalPrice : course.price;
   const countdown = saleActive && endsAt !== null ? formatDiscountTimeLeft(endsAt, now) : '';
+  const isInstructorCourse = course.deliveryMode === 'instructor';
+  const lessonCount = Number.isFinite(Number(course.lessonCount))
+    ? Number(course.lessonCount)
+    : (course.subjects || []).reduce(
+      (total, subject) => total + (Number(subject.totalUnitCount) || 0),
+      0,
+    );
+  const consultationMessage = `[THẮNG TIN HỌC] Tôi muốn được tư vấn khóa học 1 kèm 1: ${course.name}`;
+  const consultationUrl = `https://zalo.me/${COURSE_CONSULTATION_ZALO_PHONE}?text=${encodeURIComponent(consultationMessage)}`;
 
   return (
-    <article className={`group relative z-0 flex h-[344px] w-full flex-col rounded-2xl border bg-white shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:z-40 hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(15,23,42,0.12)] ${selected ? 'border-emerald-300 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-slate-300'}`}>
+    <article className={`group relative z-0 flex h-full min-h-[312px] w-full flex-col rounded-2xl border bg-white shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:z-40 hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(15,23,42,0.12)] ${selected ? 'border-emerald-300 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-slate-300'}`}>
       <button
         type="button"
         onClick={onSelect}
@@ -47,7 +59,7 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
         className="flex min-h-0 w-full flex-1 flex-col rounded-t-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400"
       >
         <span
-          className={`relative flex h-28 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-4 ${
+          className={`relative flex h-24 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-3 sm:h-28 sm:p-4 ${
             course.bannerColorStart || course.bannerColorEnd ? '' : 'bg-gradient-to-br from-rose-700 via-red-700 to-red-900'
           }`}
           style={course.bannerColorStart || course.bannerColorEnd ? {
@@ -67,20 +79,20 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
               <Lock size={14} strokeWidth={2.5} />
             </span>
           )}
-          <span className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <span className="absolute inset-x-3 top-1/2 z-20 flex -translate-y-[15%] justify-center">
             <span
-              title={course.hasAssignedTeacher ? 'Học cùng giảng viên' : 'Khóa tự học'}
-              className="inline-grid w-[min(88%,280px)] grid-cols-[32px_minmax(0,1fr)] items-center gap-2 rounded-full border border-white/80 bg-white/95 py-1.5 pl-1.5 pr-3.5 text-[10px] font-black tracking-[0.08em] text-slate-800 shadow-lg shadow-slate-950/15 ring-4 ring-white/15 backdrop-blur-sm transition"
+              title={course.deliveryMode === 'instructor' ? 'Học cùng giảng viên' : 'Khóa tự học'}
+              className="inline-grid w-fit max-w-full grid-cols-[28px_max-content] items-center gap-2 rounded-full border border-white/80 bg-white/95 py-1.5 pl-1.5 pr-4 text-[9px] font-black tracking-[0.05em] text-slate-800 shadow-lg shadow-slate-950/15 ring-4 ring-white/15 backdrop-blur-sm transition sm:grid-cols-[32px_max-content] sm:gap-2.5 sm:py-2 sm:pl-2 sm:pr-5 sm:text-[10px]"
             >
-              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                course.hasAssignedTeacher ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8 ${
+                course.deliveryMode === 'instructor' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
               }`}>
-                {course.hasAssignedTeacher
+                {course.deliveryMode === 'instructor'
                   ? <GraduationCap size={17} strokeWidth={2.4} />
                   : <Clapperboard size={16} strokeWidth={2.4} />}
               </span>
-              <span className="min-w-0 text-center leading-tight">
-                {course.hasAssignedTeacher ? 'HỌC CÙNG GIẢNG VIÊN' : 'TỰ HỌC QUA VIDEO'}
+              <span className="whitespace-nowrap text-center leading-none">
+                {course.deliveryMode === 'instructor' ? 'HỌC CÙNG GIẢNG VIÊN' : 'TỰ HỌC QUA VIDEO'}
               </span>
             </span>
           </span>
@@ -88,74 +100,78 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
             {course.offerType === 'single' ? 'Khóa lẻ' : 'Trọn gói'}
           </span>
         </span>
-        <span className="flex min-h-0 flex-1 flex-col p-4">
+        <span className="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
           <span className="group/course-details relative flex min-h-0 flex-1 flex-col">
             <span className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <span className="line-clamp-2 min-h-5 text-base font-black leading-5 text-slate-900">{course.name}</span>
-              <span className="flex min-h-0 min-w-0 flex-1 items-stretch justify-between gap-3">
-                <span className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  <span className="mt-1.5 flex h-[54px] flex-wrap content-start items-center gap-1 overflow-hidden" aria-label="Các môn trong khóa học">
-                  <span className="inline-flex items-center text-[10px] font-bold leading-none text-slate-500">Môn:</span>
-                  {Array.isArray(course.subjects) && course.subjects.slice(0, course.subjects.length > 4 ? 3 : 4).map((subject, index) => (
-                    <span
-                      key={`${subject.id || subject.name}-${index}`}
-                      title={subject.name}
-                      className={`inline-flex w-fit max-w-full truncate rounded-md border px-2 py-1 text-[10px] font-semibold leading-4 ${
-                        [
-                          'border-sky-100 bg-sky-50 text-sky-700',
-                          'border-rose-100 bg-rose-50 text-rose-700',
-                          'border-violet-100 bg-violet-50 text-violet-700',
-                          'border-amber-100 bg-amber-50 text-amber-700',
-                        ][index % 4]
-                      }`}
-                    >
-                      {formatSubjectName(subject.name)}
-                    </span>
-                  ))}
-                  {course.subjects?.length > 4 && (
-                    <span className="inline-flex w-fit max-w-full truncate rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-[10px] font-bold leading-4 text-slate-500">
-                      +{course.subjects.length - 3} môn
-                    </span>
-                  )}
+              <span className="line-clamp-2 min-h-8 text-[13px] font-black leading-4 text-slate-900 sm:text-sm sm:leading-[18px]">{course.name}</span>
+              <span className="mt-1.5 flex min-h-[44px] flex-wrap content-start items-center gap-1 overflow-hidden sm:min-h-[50px]" aria-label="Các môn trong khóa học">
+                <span className="inline-flex items-center text-[10px] font-bold leading-none text-slate-500">Môn:</span>
+                {Array.isArray(course.subjects) && course.subjects.slice(0, course.subjects.length > 4 ? 3 : 4).map((subject, index) => (
+                  <span
+                    key={`${subject.id || subject.name}-${index}`}
+                    title={subject.name}
+                    className={`inline-flex w-fit max-w-[calc(100%-2rem)] truncate rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-4 sm:px-2 sm:py-1 sm:text-[10px] ${
+                      [
+                        'border-sky-100 bg-sky-50 text-sky-700',
+                        'border-rose-100 bg-rose-50 text-rose-700',
+                        'border-violet-100 bg-violet-50 text-violet-700',
+                        'border-amber-100 bg-amber-50 text-amber-700',
+                      ][index % 4]
+                    }`}
+                  >
+                    {formatSubjectName(subject.name)}
                   </span>
-                  <span className="mt-auto inline-flex items-center gap-1 pt-2 text-[11px] font-medium text-slate-500">
-                    <Clock3 size={12} className="shrink-0 text-slate-400" />
-                    {course.totalSessions > 0
-                      ? <><strong className="font-bold text-slate-700">{course.totalSessions}</strong> bài học</>
-                      : <><strong className="font-bold text-slate-700">{course.subjects?.length || 0}</strong> môn học</>}
+                ))}
+                {course.subjects?.length > 4 && (
+                  <span className="inline-flex w-fit max-w-full truncate rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold leading-4 text-slate-500 sm:px-2 sm:py-1 sm:text-[10px]">
+                    +{course.subjects.length - 3} môn
                   </span>
+                )}
+              </span>
+              <span className="mt-auto flex min-w-0 items-end justify-between gap-2 border-t border-slate-100 pt-2.5">
+                <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-slate-500 sm:text-[11px]">
+                  <Clock3 size={12} className="shrink-0 text-slate-400" />
+                  <strong className="font-bold text-slate-700">{lessonCount}</strong> bài học
                 </span>
-                <span className="mt-1.5 flex shrink-0 flex-col items-end gap-2">
                 {course.enrolled ? (
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">Đã đăng ký</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700 sm:text-[10px]">
+                    <CheckCircle2 size={12} />
+                    Đã đăng ký
+                  </span>
                 ) : (
-                  <>
-                    {saleActive && (
-                      <span className="flex items-center gap-1 whitespace-nowrap text-[10px] text-slate-400">
-                        <span>Giá gốc:</span>
-                        <span className="text-xs line-through">{Number(course.originalPrice).toLocaleString('vi-VN')}đ</span>
-                        {Number(course.discountPercent) > 0 && (
-                          <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-black text-rose-700">-{course.discountPercent}%</span>
-                        )}
-                      </span>
-                    )}
-                    <span className={`whitespace-nowrap rounded-xl border px-3 py-2.5 text-lg font-black leading-none tracking-tight shadow-sm ${
-                      saleActive
-                        ? 'border-rose-100 bg-gradient-to-br from-rose-50 to-white text-rose-700 shadow-rose-100/70'
-                        : 'border-slate-200 bg-gradient-to-br from-slate-50 to-white text-slate-800'
+                  <span className={`flex min-w-0 flex-col items-end rounded-lg border px-2 py-1.5 ${
+                    saleActive
+                      ? 'border-rose-100 bg-rose-50/70'
+                      : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <span className="flex max-w-full items-center gap-1">
+                      {saleActive && (
+                        <>
+                          <span className="truncate text-[9px] font-medium text-slate-400 line-through">
+                            {Number(course.originalPrice).toLocaleString('vi-VN')}đ
+                          </span>
+                          {Number(course.discountPercent) > 0 && (
+                            <span className="shrink-0 rounded-full bg-rose-100 px-1 py-0.5 text-[8px] font-black leading-3 text-rose-700">
+                              -{course.discountPercent}%
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </span>
+                    <span className={`whitespace-nowrap text-sm font-black leading-tight tracking-tight sm:text-base ${
+                      saleActive ? 'text-rose-700' : 'text-slate-800'
                     }`}>
                       {Number(displayPrice || 0).toLocaleString('vi-VN')}đ
                     </span>
                     {countdown && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold tabular-nums text-amber-700" aria-label={`Khuyến mãi kết thúc sau ${countdown}`}>
-                        <Clock3 size={11} className="shrink-0" />
+                      <span className="mt-0.5 inline-flex items-center gap-1 text-[8px] font-bold tabular-nums text-amber-700 sm:text-[9px]" aria-label={`Khuyến mãi kết thúc sau ${countdown}`}>
+                        <Clock3 size={9} className="shrink-0" />
                         Còn {countdown}
                       </span>
                     )}
-                  </>
+                  </span>
                 )}
               </span>
-            </span>
             </span>
             {!course.enrolled && (
               <span
@@ -164,25 +180,36 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
               >
                 <span className="mb-1 flex items-center gap-1.5 text-xs font-black text-slate-900">
                   <Sparkles size={14} className="text-amber-500" />
-                  Khóa tự học là gì?
+                  {course.deliveryMode === 'instructor' ? 'Học cùng giảng viên 1 kèm 1' : 'Khóa tự học là gì?'}
                 </span>
-                <ul className="space-y-2 text-[13px] leading-relaxed text-slate-600">
-                  <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Học theo lộ trình có sẵn, kèm video hướng dẫn.</span></li>
-                  <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Có bài tập thực hành để củng cố kiến thức.</span></li>
-                  <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Trắc nghiệm được hệ thống chấm tự động.</span></li>
-                  <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Bài tự luận được AI đánh giá và phản hồi.</span></li>
-                  <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Đăng ký một lần, học trọn đời.</span></li>
-                </ul>
-                <p className="mt-3 border-t border-red-100 pt-2 text-xs font-bold leading-relaxed text-slate-900">
-                  <span className="text-red-700">Lưu ý:</span> Khóa học trên <em className="text-red-700">không phải là học 1 kèm 1</em>; không hoàn phí nếu đã đăng ký.
-                </p>
+                {course.deliveryMode === 'instructor' ? (
+                  <ul className="space-y-2 text-[13px] leading-relaxed text-slate-600">
+                    <li className="flex gap-2"><span className="font-black text-emerald-600">•</span><span>Học trực tiếp 1 kèm 1 với giảng viên qua UltraViewer hoặc TeamViewer; hỗ trợ Chrome Remote Desktop trên MacBook.</span></li>
+                    <li className="flex gap-2"><span className="font-black text-emerald-600">•</span><span>Mỗi buổi học đều được ghi lại màn hình để bạn xem lại.</span></li>
+                    <li className="flex gap-2"><span className="font-black text-emerald-600">•</span><span>Thời gian học linh động, sắp xếp phù hợp với lịch của bạn.</span></li>
+                    <li className="flex gap-2"><span className="font-black text-emerald-600">•</span><span>Được hỗ trợ trọn đời trong quá trình học.</span></li>
+                  </ul>
+                ) : (
+                  <>
+                    <ul className="space-y-2 text-[13px] leading-relaxed text-slate-600">
+                      <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Học theo lộ trình có sẵn, kèm video hướng dẫn.</span></li>
+                      <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Có bài tập thực hành để củng cố kiến thức.</span></li>
+                      <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Trắc nghiệm được hệ thống chấm tự động.</span></li>
+                      <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Bài tự luận được AI đánh giá và phản hồi.</span></li>
+                      <li className="flex gap-2"><span className="font-black text-amber-600">•</span><span>Đăng ký một lần, học trọn đời.</span></li>
+                    </ul>
+                    <p className="mt-3 border-t border-red-100 pt-2 text-xs font-bold leading-relaxed text-slate-900">
+                      <span className="text-red-700">Lưu ý:</span> Khóa học trên <em className="text-red-700">không phải là học 1 kèm 1</em>; không hoàn phí nếu đã đăng ký.
+                    </p>
+                  </>
+                )}
               </span>
             )}
           </span>
         </span>
       </button>
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-4 pb-3 pt-2">
-        {!course.enrolled ? (
+        {!course.enrolled && !isInstructorCourse ? (
           <button
             type="button"
             disabled={registering}
@@ -192,6 +219,18 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
             {registering ? <Loader2 className="animate-spin" size={14} /> : <ShoppingCart size={14} />}
             Đăng ký học
           </button>
+        ) : !course.enrolled && isInstructorCourse ? (
+          <a
+            href={consultationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Tư vấn Zalo khóa học ${course.name}`}
+            title={`Tư vấn khóa học qua Zalo ${COURSE_CONSULTATION_ZALO_PHONE}`}
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#e6f4ff] px-3 text-xs font-black text-[#0873b9] shadow-sm transition-colors hover:bg-[#0873b9] hover:text-white"
+          >
+            <img src={ZALO_LOGO_URL} alt="" className="h-4 w-4 shrink-0" loading="lazy" />
+            Zalo tư vấn
+          </a>
         ) : <span />}
         <button
           type="button"
@@ -289,6 +328,7 @@ function CourseSubjectsModal({
                   const progress = progressById.get(subject.id);
                   const done = progress?.completedUnitCount || 0;
                   const total = progress?.totalUnitCount || 0;
+                  const progressPercent = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
                   const canOpen = subject.id && (subject.opened || !course.enrolled);
                   const cardClassName = `group relative flex min-h-40 w-full flex-col justify-between overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition duration-200 ${
                     canOpen
@@ -302,13 +342,32 @@ function CourseSubjectsModal({
                         <span className="min-w-0 flex-1">
                           <span className="block line-clamp-2 pr-1 text-sm font-extrabold leading-5 text-slate-800">{subject.name}</span>
                           {canOpen && subject.opened
-                            ? <span className="mt-2 block text-xs font-medium text-slate-500">{done}/{total} buổi đã xong</span>
+                            ? <span className="mt-2 block text-xs font-medium text-slate-500">{done}/{total} bài đã hoàn thành</span>
                             : canOpen
                               ? <span className="mt-2 block text-xs font-medium text-amber-700">Có buổi học xem thử</span>
                               : <span className="mt-2 block text-xs font-medium text-slate-400">Chưa đăng ký</span>}
                         </span>
                         <span className="inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black tabular-nums text-slate-500 ring-1 ring-slate-200/80">
                           {String(index + 1).padStart(2, '0')}
+                        </span>
+                      </span>
+                      <span className="relative z-10 mt-4 block rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                        <span className="mb-2 flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-slate-500">TIẾN ĐỘ HỌC</span>
+                          <span className={progressPercent === 100 ? 'text-emerald-700' : 'text-slate-700'}>{progressPercent}%</span>
+                        </span>
+                        <span
+                          role="progressbar"
+                          aria-label={`Tiến độ ${subject.name}`}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={progressPercent}
+                          className="block h-1.5 overflow-hidden rounded-full bg-slate-200/80"
+                        >
+                          <span
+                            className={`block h-full rounded-full transition-all duration-500 ${progressPercent === 100 ? 'bg-emerald-600' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
+                            style={{ width: `${progressPercent}%` }}
+                          />
                         </span>
                       </span>
                       {canOpen && (
@@ -350,16 +409,79 @@ function CourseSubjectsModal({
 }
 
 function CourseCollection({
-  title, courses, selectedCourseId, onSelectCourse, onRegisterCourse, registeringCourseId, progressById, onOpenSubject, now,
+  title, type, courses, selectedCourseId, onSelectCourse, onRegisterCourse, registeringCourseId, progressById, onOpenSubject, now,
 }) {
   if (!courses.length) return null;
   const selectedCourse = courses.find((course) => course.id === selectedCourseId) || null;
+  const heading = {
+    registered: {
+      icon: CheckCircle2,
+      eyebrow: 'LỘ TRÌNH CỦA BẠN',
+      description: 'Các khóa học bạn đã đăng ký và có thể tiếp tục học.',
+      iconClass: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+      countClass: 'bg-emerald-100 text-emerald-800',
+      lineClass: 'from-emerald-300 via-emerald-200 to-transparent',
+    },
+    video: {
+      icon: Clapperboard,
+      eyebrow: 'CHỦ ĐỘNG HỌC TẬP',
+      description: 'Học theo video bài giảng, linh hoạt theo thời gian của bạn.',
+      iconClass: 'bg-amber-100 text-amber-700 ring-amber-200',
+      countClass: 'bg-amber-100 text-amber-800',
+      lineClass: 'from-amber-300 via-orange-200 to-transparent',
+    },
+    instructor: {
+      icon: GraduationCap,
+      eyebrow: 'HỌC CÙNG GIẢNG VIÊN',
+      description: 'Học có giảng viên hướng dẫn và đồng hành.',
+      iconClass: 'bg-sky-100 text-sky-700 ring-sky-200',
+      countClass: 'bg-sky-100 text-sky-800',
+      lineClass: 'from-sky-300 via-indigo-200 to-transparent',
+    },
+    other: {
+      icon: BookOpen,
+      eyebrow: 'KHÁM PHÁ KHÓA HỌC',
+      description: 'Các khóa học đang mở để bạn tham khảo.',
+      iconClass: 'bg-slate-100 text-slate-700 ring-slate-200',
+      countClass: 'bg-slate-100 text-slate-700',
+      lineClass: 'from-slate-300 via-slate-200 to-transparent',
+    },
+  }[type] || {
+    icon: BookOpen,
+    eyebrow: 'KHÓA HỌC',
+    description: '',
+    iconClass: 'bg-slate-100 text-slate-700 ring-slate-200',
+    countClass: 'bg-slate-100 text-slate-700',
+    lineClass: 'from-slate-300 via-slate-200 to-transparent',
+  };
+  const HeadingIcon = heading.icon;
   return (
     <section className="mt-8">
-      <h2 className="mb-3 text-sm font-black uppercase tracking-wide text-slate-500">
-        {title} · {courses.length}
-      </h2>
-      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 sm:h-12 sm:w-12 ${heading.iconClass}`}>
+            <HeadingIcon size={22} strokeWidth={2.3} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-extrabold tracking-[0.16em] text-slate-400 sm:text-[11px]">
+              {heading.eyebrow}
+            </p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="text-lg font-black leading-tight tracking-tight text-slate-900 sm:text-xl">
+                {title}
+              </h2>
+              <span className={`inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-xs font-black tabular-nums ${heading.countClass}`}>
+                {courses.length}
+              </span>
+            </div>
+            {heading.description && (
+              <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-sm">{heading.description}</p>
+            )}
+          </div>
+        </div>
+        <div className={`ml-14 mt-3 h-px bg-gradient-to-r sm:ml-16 ${heading.lineClass}`} />
+      </div>
+      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {courses.map((course) => (
           <CourseCatalogCard
             key={course.id}
@@ -382,89 +504,6 @@ function CourseCollection({
         />
       )}
     </section>
-  );
-}
-
-function RegisteredSubjects({ subjects, onOpenSubject }) {
-  if (!subjects.length) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
-        <BookOpen className="mx-auto mb-3 text-slate-300" size={28} />
-        <p className="font-bold text-slate-700">Chưa có môn học nào đã đăng ký</p>
-        <p className="mt-1 text-sm text-slate-500">Các môn trong khóa học bạn đã đăng ký sẽ xuất hiện ở đây.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {subjects.map((subject, index) => {
-        const done = subject.completedUnitCount || 0;
-        const total = subject.totalUnitCount || 0;
-        const progress = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
-        const completed = total > 0 && done >= total;
-        return (
-          <button
-            key={subject.id}
-            type="button"
-            onClick={() => onOpenSubject(subject.id)}
-            className="group relative flex min-h-[228px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-[0_3px_12px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-[0_16px_30px_rgba(16,185,129,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-          >
-            <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-20 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400" />
-            <span className={`pointer-events-none absolute inset-x-0 top-0 h-24 ${
-              completed
-                ? 'bg-gradient-to-br from-emerald-100/90 via-teal-50 to-white'
-                : 'bg-gradient-to-br from-emerald-50 via-cyan-50/60 to-white'
-            }`} />
-            <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 select-none text-[92px] font-black leading-none tracking-tighter text-emerald-900/[0.045]">
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <span className="relative z-10 flex items-center justify-between gap-3 px-4 pt-4">
-              <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 transition duration-200 group-hover:scale-105 ${
-                completed
-                  ? 'bg-emerald-600 text-white ring-emerald-700/10'
-                  : 'bg-white/90 text-emerald-700 ring-emerald-100'
-              }`}>
-                {completed ? <CheckCircle2 size={22} /> : <BookOpen size={22} />}
-              </span>
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
-                completed ? 'bg-emerald-100/90 text-emerald-800' : 'bg-white/90 text-emerald-700 ring-1 ring-emerald-100'
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${completed ? 'bg-emerald-600' : 'bg-emerald-500'}`} />
-                {completed ? 'Hoàn thành' : 'Đã đăng ký'}
-              </span>
-            </span>
-            <span className="relative z-10 mt-4 block px-4">
-              <span className="block truncate text-base font-black tracking-tight text-slate-900">{subject.name}</span>
-              <span className="mt-1.5 block text-xs font-medium text-slate-500">
-                {total > 0 ? `${done} trên ${total} buổi học đã hoàn thành` : 'Chưa có buổi học'}
-              </span>
-            </span>
-            <span className="relative z-10 mx-4 mt-4 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-              <span className="mb-2 flex items-center justify-between text-[11px] font-bold">
-                <span className="text-slate-500">TIẾN ĐỘ HỌC</span>
-                <span className={completed ? 'text-emerald-700' : 'text-slate-700'}>{progress}%</span>
-              </span>
-              <span className="block h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-                <span
-                  className={`block h-full rounded-full transition-all duration-500 ${completed ? 'bg-emerald-600' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
-                  style={{ width: `${progress}%` }}
-                />
-              </span>
-            </span>
-            <span className="relative z-10 mt-auto flex items-center justify-between px-4 pb-4 pt-4">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Lộ trình học tập
-              </span>
-              <span className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white shadow-sm transition group-hover:bg-emerald-700 group-hover:shadow-md">
-                Vào học <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
-              </span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -557,19 +596,37 @@ export default function LessonPracticeCatalogPage() {
 
   const enrolledCourses = courses.filter((course) => course.enrolled);
   const availableCourses = courses.filter((course) => !course.enrolled);
-  const visibleEnrolledCourses = filter === 'all'
-    ? enrolledCourses
-    : enrolledCourses.filter((course) => filter === 'single' ? course.offerType === 'single' : course.offerType !== 'single');
-  const visibleAvailableCourses = filter === 'all'
-    ? availableCourses
-    : availableCourses.filter((course) => filter === 'single' ? course.offerType === 'single' : course.offerType !== 'single');
-  const openedSubjects = subjects.filter((subject) => subject.opened !== false);
+  const matchesCourseFilter = (course) => {
+    if (filter === 'registered') return course.enrolled;
+    if (filter === 'video') return course.deliveryMode === 'video';
+    if (filter === 'instructor') return course.deliveryMode === 'instructor';
+    return true;
+  };
+  const visibleEnrolledCourses = enrolledCourses.filter(matchesCourseFilter);
+  const visibleAvailableCourses = availableCourses.filter(matchesCourseFilter);
+  const courseSections = filter === 'all'
+    ? [
+      { title: 'Khóa đã đăng ký', type: 'registered', courses: enrolledCourses },
+      { title: 'Khóa tự học qua video', type: 'video', courses: availableCourses.filter((course) => course.deliveryMode === 'video') },
+      { title: 'Khóa học cùng với giảng viên', type: 'instructor', courses: availableCourses.filter((course) => course.deliveryMode === 'instructor') },
+    ]
+    : filter === 'registered'
+      ? [{ title: 'Khóa đã đăng ký', type: 'registered', courses: visibleEnrolledCourses }]
+      : filter === 'video' || filter === 'instructor'
+        ? [
+          { title: `${filter === 'video' ? 'Khóa tự học qua video' : 'Khóa học cùng với giảng viên'} · Đã đăng ký`, type: filter, courses: visibleEnrolledCourses },
+          { title: `${filter === 'video' ? 'Khóa tự học qua video' : 'Khóa học cùng với giảng viên'} · Chưa đăng ký`, type: filter, courses: visibleAvailableCourses },
+        ]
+        : [
+          { title: 'Khóa đã đăng ký', type: 'registered', courses: visibleEnrolledCourses },
+          { title: 'Khóa chưa đăng ký', type: 'other', courses: visibleAvailableCourses },
+        ];
   const progressById = new Map(subjects.map((subject) => [subject.id, subject]));
   const filters = [
     { id: 'all', label: 'Tất cả', icon: Layers3, count: courses.length },
-    { id: 'subjects', label: 'Môn đã đăng ký', icon: GraduationCap, count: openedSubjects.length },
-    { id: 'bundle', label: 'Khóa trọn gói', icon: PackageOpen, count: courses.filter((course) => course.offerType !== 'single').length },
-    { id: 'single', label: 'Khóa lẻ', icon: BookOpen, count: courses.filter((course) => course.offerType === 'single').length },
+    { id: 'registered', label: 'Khóa đã đăng ký', icon: CheckCircle2, count: enrolledCourses.length },
+    { id: 'video', label: 'Tự học qua video', icon: Clapperboard, count: courses.filter((course) => course.deliveryMode === 'video').length },
+    { id: 'instructor', label: 'Học cùng giảng viên', icon: GraduationCap, count: courses.filter((course) => course.deliveryMode === 'instructor').length },
     { id: 'guide', label: 'Hướng dẫn học', icon: CircleHelp },
   ];
 
@@ -585,21 +642,21 @@ export default function LessonPracticeCatalogPage() {
         {!loading && (
           <>
             <div className="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-              {filters.map(({ id, label, icon: Icon, count }) => (
+              {filters.map((filterOption) => (
                 <button
-                  key={id}
+                  key={filterOption.id}
                   type="button"
-                  aria-pressed={filter === id}
-                  onClick={() => { setFilter(id); setSelectedCourseId(''); }}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold transition sm:px-4 ${filter === id
+                  aria-pressed={filter === filterOption.id}
+                  onClick={() => { setFilter(filterOption.id); setSelectedCourseId(''); }}
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold transition sm:px-4 ${filter === filterOption.id
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                 >
-                  <Icon size={16} />
-                  {label}
-                  {count !== undefined && (
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${filter === id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                  <filterOption.icon size={16} />
+                  {filterOption.label}
+                  {filterOption.count !== undefined && (
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${filter === filterOption.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{filterOption.count}</span>
                   )}
                 </button>
               ))}
@@ -640,42 +697,24 @@ export default function LessonPracticeCatalogPage() {
                   }}
                 />
               </section>
-            ) : filter === 'subjects' ? (
-              <section className="space-y-3">
-                <div>
-                  <h2 className="text-lg font-black text-slate-900">Môn đã đăng ký</h2>
-                  <p className="mt-1 text-sm text-slate-500">Mở thẳng môn học bạn đã có quyền truy cập.</p>
-                </div>
-                <RegisteredSubjects
-                  subjects={openedSubjects}
-                  onOpenSubject={(id) => navigate(`/student/lesson-practice/subjects/${id}`)}
-                />
-              </section>
             ) : (
               <>
-                <CourseCollection
-                  title={filter === 'all' ? 'Khóa đã đăng ký' : filter === 'single' ? 'Khóa lẻ đã đăng ký' : 'Khóa trọn gói đã đăng ký'}
-                  courses={visibleEnrolledCourses}
-                  selectedCourseId={selectedCourseId}
-                  onSelectCourse={selectCourse}
-                  onRegisterCourse={requestCourseRegistration}
-                  registeringCourseId={registeringCourseId}
-                  progressById={progressById}
-                  now={now}
-                  onOpenSubject={(id, courseId) => navigate(`/student/lesson-practice/subjects/${id}?courseId=${encodeURIComponent(courseId)}`)}
-                />
-                <CourseCollection
-                  title={filter === 'all' ? 'Khóa chưa đăng ký' : filter === 'single' ? 'Khóa lẻ chưa đăng ký' : 'Khóa trọn gói chưa đăng ký'}
-                  courses={visibleAvailableCourses}
-                  selectedCourseId={selectedCourseId}
-                  onSelectCourse={selectCourse}
-                  onRegisterCourse={requestCourseRegistration}
-                  registeringCourseId={registeringCourseId}
-                  progressById={progressById}
-                  now={now}
-                  onOpenSubject={(id, courseId) => navigate(`/student/lesson-practice/subjects/${id}?courseId=${encodeURIComponent(courseId)}`)}
-                />
-                {!visibleEnrolledCourses.length && !visibleAvailableCourses.length && (
+                {courseSections.map((section) => (
+                  <CourseCollection
+                    key={section.title}
+                    title={section.title}
+                    type={section.type}
+                    courses={section.courses}
+                    selectedCourseId={selectedCourseId}
+                    onSelectCourse={selectCourse}
+                    onRegisterCourse={requestCourseRegistration}
+                    registeringCourseId={registeringCourseId}
+                    progressById={progressById}
+                    now={now}
+                    onOpenSubject={(id, courseId) => navigate(`/student/lesson-practice/subjects/${id}?courseId=${encodeURIComponent(courseId)}`)}
+                  />
+                ))}
+                {!courseSections.some((section) => section.courses.length > 0) && (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500">
                     Chưa có khóa học nào trong bộ lọc này.
                   </div>
