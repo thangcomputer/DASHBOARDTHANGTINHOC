@@ -658,6 +658,8 @@ export default function LessonPracticeUnitsPage() {
 
   const units = withSessionLocks(payload?.units || []);
   const openUnit = units.find((unit) => unit.id === openUnitId && !unit.locked) || null;
+  const openUnitIndex = openUnit ? units.findIndex((unit) => unit.id === openUnit.id) : -1;
+  const nextUnit = openUnitIndex >= 0 ? units[openUnitIndex + 1] : null;
   const openUnitVideos = openUnit?.videos?.length
     ? openUnit.videos
     : (openUnit?.videoUrl ? [{ id: 'legacy-video', title: 'Video 1', url: openUnit.videoUrl }] : []);
@@ -814,6 +816,11 @@ export default function LessonPracticeUnitsPage() {
               {units.map((unit, index) => {
                 const opened = openUnit?.id === unit.id;
                 const justUnlocked = unlockCelebrationUnitId === unit.id && !unit.locked;
+                const lessonStatus = unit.status === 'completed'
+                  ? { label: 'Đã học', className: 'bg-emerald-50 text-emerald-700' }
+                  : unit.status === 'in_progress'
+                    ? { label: 'Đang học', className: 'bg-sky-50 text-sky-700' }
+                    : { label: 'Chưa học', className: 'bg-slate-100 text-slate-600' };
                 return (
                   <li key={unit.id} className="relative pb-2">
                     {unit.locked ? (
@@ -838,16 +845,15 @@ export default function LessonPracticeUnitsPage() {
                       type="button"
                       onClick={() => chooseUnit(unit)}
                       title={unit.title}
+                      aria-label={`${unit.title} — ${lessonStatus.label}`}
                       className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                       <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate font-bold ${opened ? 'text-red-700' : 'text-slate-900'}`}>{unit.title}</span>
-                        {(unit.status === 'completed' || unit.status === 'in_progress') && (
-                          <span className={`block text-xs ${opened ? 'text-red-500' : 'text-slate-500'}`}>
-                            {unit.status === 'completed' ? 'Đã xong' : 'Đang học'}
-                          </span>
-                        )}
+                        <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${lessonStatus.className}`}>
+                          {lessonStatus.label}
+                        </span>
                       </span>
                       {unit.status === 'completed' && <CheckCircle2 size={16} className="text-emerald-600" />}
                     </button>
@@ -955,6 +961,10 @@ export default function LessonPracticeUnitsPage() {
                       unitId={openUnit.id}
                       practiceGroupId={activeSection.itemId}
                       embedded
+                      canContinue={Boolean(nextUnit && !nextUnit.locked)}
+                      onContinue={() => {
+                        if (nextUnit && !nextUnit.locked) chooseUnit(nextUnit);
+                      }}
                       onUnitStatus={(status) => {
                         if (status === 'completed') {
                           const wasCompleted = openUnit.status === 'completed';
