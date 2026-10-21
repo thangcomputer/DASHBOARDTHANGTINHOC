@@ -262,7 +262,24 @@ test('practice completion is independent from video completion', () => {
   assert.equal(allSectionsDone.completed, true);
 });
 
-test('later units stay locked until every previous unit is completed', () => {
+test('practice completion is tracked independently for each group', () => {
+  const questions = [
+    { _id: 'q1', type: 'mcq', practiceGroupId: 'group-1' },
+    { _id: 'q2', type: 'match', practiceGroupId: 'group-1' },
+    { _id: 'q3', type: 'mcq', practiceGroupId: 'group-2' },
+    { _id: 'q4', type: 'mcq' },
+  ];
+  const answers = new Map([
+    ['q1', { correct: true }],
+    ['q2', { correct: false }],
+    ['q3', { correct: true }],
+    ['q4', { correct: true }],
+  ]);
+
+  assert.deepEqual(rules.completedPracticeGroupIds(questions, answers, 'unit-1'), ['group-2', 'unit-1']);
+});
+
+test('each unit unlocks when its immediately previous unit is completed', () => {
   const units = [
     { _id: 'a', sortOrder: 1 },
     { _id: 'b', sortOrder: 2 },
@@ -272,6 +289,7 @@ test('later units stay locked until every previous unit is completed', () => {
   assert.equal(rules.isUnitLocked(units, new Set(), 'b'), true);
   assert.equal(rules.isUnitLocked(units, new Set(['a']), 'b'), false);
   assert.equal(rules.isUnitLocked(units, new Set(['a']), 'c'), true);
+  assert.equal(rules.isUnitLocked(units, new Set(['b']), 'c'), false);
 });
 
 test('an explicitly preview-enabled unit can open before earlier units are completed', () => {
@@ -303,12 +321,25 @@ test('admin progress summary has no score fields', () => {
 });
 
 test('student item hides the answer key until confirmed', () => {
+  const normalized = rules.normalizeItem({
+    type: 'mcq',
+    practiceGroupId: 'practice-group-2',
+    prompt: 'Phím nào lưu?',
+    hint: 'Hãy nghĩ đến phím tắt của thao tác lưu.',
+    options: [{ id: 'a', text: 'Ctrl+S' }, { id: 'b', text: 'Ctrl+P' }],
+    correctOptionId: 'a',
+  });
+  assert.equal(normalized.practiceGroupId, 'practice-group-2');
+  assert.equal(normalized.hint, 'Hãy nghĩ đến phím tắt của thao tác lưu.');
+
   const item = {
     _id: 'q1',
     type: 'mcq',
     prompt: 'Phím nào lưu?',
     options: [{ id: 'a', text: 'Ctrl+S' }, { id: 'b', text: 'Ctrl+P' }],
     correctOptionId: 'a',
+    practiceGroupId: 'practice-group-2',
+    hint: 'Hãy nghĩ đến phím tắt của thao tác lưu.',
     explanation: 'Ctrl+S là Save.',
     rubric: 'không lộ',
   };
@@ -316,6 +347,8 @@ test('student item hides the answer key until confirmed', () => {
   assert.equal('correctOptionId' in hidden, false);
   assert.equal('explanation' in hidden, false);
   assert.equal('rubric' in hidden, false);
+  assert.equal(hidden.hint, 'Hãy nghĩ đến phím tắt của thao tác lưu.');
+  assert.equal(hidden.practiceGroupId, 'practice-group-2');
   const shown = rules.withConfirmedAnswer(item, {
     correct: false,
     explanation: 'Ctrl+S là Save.',

@@ -105,6 +105,7 @@ const saveSession = (user) => {
   const key = user.adminRole === 'STAFF' || user.role === 'staff' ? 'staff' : (user.role || 'admin');
   localStorage.setItem(`${key}_user`, JSON.stringify(user));
 };
+const ACTIVE_TAB_SESSION_KEY = 'cms_active_login_session_v1';
 
 // ── Protected Route ───────────────────────────────────────────────────────────
 const Guard = ({ allowedRoles, session, children }) => {
@@ -605,6 +606,10 @@ function App() {
   // ── Khôi phục session khi reload ──────────────────────────────────────────
   useEffect(() => {
     const restoreSession = async () => {
+      if (sessionStorage.getItem(ACTIVE_TAB_SESSION_KEY) !== '1') {
+        setIsAuthLoading(false);
+        return;
+      }
       const savedUser = loadSession();
 
       if (!savedUser) {
@@ -707,6 +712,7 @@ function App() {
     // Xóa thời gian không hoạt động cũ để tránh bị văng ngay lần đăng nhập đầu tiên
     localStorage.removeItem('last_activity_at');
 
+    sessionStorage.setItem(ACTIVE_TAB_SESSION_KEY, '1');
     saveSession(account);
     setSession(account);
     const teacherHome = String(account.status || '').toLowerCase() === 'active' ? '/teacher' : '/teacher/test';

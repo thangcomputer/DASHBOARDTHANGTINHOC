@@ -26,10 +26,13 @@ const lessonPracticeApi = {
     updateItem: async (id, body) => parse(await apiFetch(`/lesson-practice/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) })),
     deleteItem: async (id) => parse(await apiFetch(`/lesson-practice/items/${id}`, { method: 'DELETE' })),
     progress: async (subjectId) => parse(await apiFetch(`/lesson-practice/progress${subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : ''}`)),
-    exportBackup: async () => parse(await apiFetch('/lesson-practice/backup/export')),
-    importBackup: async (file) => {
+    exportBackup: async (courseId = '') => parse(await apiFetch(
+      `/lesson-practice/backup/export${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`,
+    )),
+    importBackup: async (file, courseId = '') => {
       const fd = new FormData();
       fd.append('file', file);
+      if (courseId) fd.append('courseId', courseId);
       return uploadWithAuth('/lesson-practice/backup/import', fd);
     },
   },
@@ -44,7 +47,10 @@ const lessonPracticeApi = {
     unit: async (unitId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}`)),
     markSection: async (unitId, section, itemId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/sections/${section}`, { method: 'POST', body: JSON.stringify({ itemId }) })),
     confirm: async (itemId, body) => parse(await apiFetch(`/lesson-practice/my/items/${itemId}/confirm`, { method: 'POST', body: JSON.stringify(body) })),
-    resetPractice: async (unitId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/reset-practice`, { method: 'POST', body: '{}' })),
+    resetPractice: async (unitId, practiceGroupId = '') => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/reset-practice`, {
+      method: 'POST',
+      body: JSON.stringify({ practiceGroupId }),
+    })),
   },
   upload: async (file) => {
     const fd = new FormData();

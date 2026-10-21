@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, Loader2, Move, Play, Trophy } from 'lucide-react';
+import { ArrowLeft, Clock, Lightbulb, Loader2, Move, Play, Sparkles, Trophy } from 'lucide-react';
+import SupportMascot from '../../SupportMascot';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { playLessonCorrectSound, playLessonTick, playLessonWrongSound, unlockAudio } from '../../../utils/sound';
+import { remainingPracticeSeconds, resolvePracticeClock, resolvePracticeGroupTimeLimit, restorePracticeClockSession } from '../../../utils/lessonPracticeClock';
 
 function eventPercent(event, node) {
   const box = node.getBoundingClientRect();
@@ -63,6 +65,28 @@ function Explanation({ item }) {
   );
 }
 
+function StudentEarPullMascot() {
+  return (
+    <svg className="lesson-feedback-ear-pull" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="23" fill="#DC2626" />
+      <path d="M12 42c1-8 5-12 12-12s11 4 12 12" fill="#FEF2F2" />
+      <path d="M20 28h8v7h-8z" fill="#FFE4C8" />
+      <circle cx="24" cy="20" r="10" fill="#FFE4C8" />
+      <path d="M14 19c0-7 4-12 10-12s10 5 10 12c-2-2-5-4-10-4s-8 2-10 4z" fill="#1E293B" />
+      <path d="M15 18c-2 0-3 2-3 4s1 4 3 4M33 18c2 0 3 2 3 4s-1 4-3 4" fill="#FFE4C8" stroke="#FCA5A5" strokeWidth="1.5" />
+      <circle cx="21" cy="21" r="1.2" fill="#0F172A" />
+      <circle cx="27" cy="21" r="1.2" fill="#0F172A" />
+      <path d="M21 27c1.5-1 4.5-1 6 0" stroke="#BE123C" strokeWidth="1.4" strokeLinecap="round" />
+      <g className="lesson-feedback-ear-pull__hand">
+        <path d="M47 13 37 18" stroke="#FFE4C8" strokeWidth="3.5" strokeLinecap="round" />
+        <path d="M38 18c-1-2-3-2-4-1-1 1 0 3 2 4l2 1c1 1 3 0 3-1 0-1-1-2-3-3z" fill="#FFE4C8" stroke="#FCA5A5" strokeWidth="1" />
+        <path d="M35 18c-1-1-2-1-3 0" stroke="#FFE4C8" strokeWidth="2" strokeLinecap="round" />
+      </g>
+      <path d="m11 12-2-2m4-2-1-3m-3 7-3-1" stroke="#FDE68A" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const PRACTICE_TYPES = new Set(['mcq', 'multi', 'match', 'drag', 'hotspot', 'written']);
 const COOLDOWN_QUESTION_TYPES = new Set(['mcq', 'multi', 'match', 'drag', 'hotspot']);
 
@@ -76,6 +100,37 @@ function formatClock(seconds) {
 function warnAtFor(limit) {
   if (limit <= 10) return Math.max(3, Math.ceil(limit / 2));
   return 10;
+}
+
+function readSavedPracticeSeconds(key, limitSec) {
+  try {
+    const saved = sessionStorage.getItem(key);
+    if (saved === null) return null;
+    const seconds = Number(saved);
+    if (!Number.isFinite(seconds)) return null;
+    return Math.min(Math.max(0, Math.round(limitSec)), Math.max(0, Math.round(seconds)));
+  } catch (err) {
+    console.warn('Không đọc được thời gian luyện tập đã lưu', err);
+    return null;
+  }
+}
+
+function savePracticeValue(key, value) {
+  try {
+    sessionStorage.setItem(key, String(value));
+  } catch (err) {
+    console.warn('Không lưu được trạng thái luyện tập', err);
+  }
+}
+
+function clearPracticeStorage(prefix) {
+  try {
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith(prefix))
+      .forEach((key) => sessionStorage.removeItem(key));
+  } catch (err) {
+    console.warn('Không xóa được trạng thái luyện tập đã lưu', err);
+  }
 }
 
 function QuizClock({ remaining, warning }) {
@@ -94,13 +149,34 @@ function QuizClock({ remaining, warning }) {
   );
 }
 
-function QuestionCard({ item, index, busy, open = true, retry, expired = false, waiting = false, cooldownSeconds = 0, onRetryTime, onConfirm, onSkip }) {
+function PracticeModalIcon({ timeout = false }) {
+  const Icon = timeout ? Clock : Play;
+  return (
+    <div
+      aria-hidden="true"
+      className={`relative mx-auto mb-4 grid h-[76px] w-[76px] place-items-center rounded-[26px] bg-gradient-to-br ${
+        timeout ? 'from-orange-500 to-red-600 shadow-orange-200' : 'from-red-500 to-rose-600 shadow-red-200'
+      } text-white shadow-lg`}
+    >
+      <span className="absolute inset-[5px] rounded-[22px] border border-white/35" />
+      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 shadow-inner backdrop-blur-sm">
+        <Icon size={timeout ? 27 : 25} strokeWidth={2.5} fill={timeout ? 'none' : 'currentColor'} />
+      </span>
+      <Sparkles className="absolute -right-1 -top-1 text-amber-300 drop-shadow-sm" size={19} strokeWidth={2.5} />
+      <span className="absolute -bottom-1 -left-1 h-3 w-3 rounded-full border-2 border-white bg-amber-300" />
+    </div>
+  );
+}
+
+function QuestionCard({ item, index, busy, open = true, retry, expired = false, waiting = false, cooldownSeconds = 0, onConfirm, onSkip }) {
+  const [showHint, setShowHint] = useState(false);
   const [choiceId, setChoiceId] = useState(item.answer?.choiceId || '');
   const [choiceIds, setChoiceIds] = useState(item.answer?.choiceIds || []);
   const [matches, setMatches] = useState(() => Object.fromEntries((item.answer?.matches || []).map((row) => [row.leftId, row.rightId])));
   const [order, setOrder] = useState(item.options || []);
   const [text, setText] = useState(item.answer?.text || '');
   const [point, setPoint] = useState(item.answer?.x != null ? { x: item.answer.x, y: item.answer.y } : null);
+  const [hasReordered, setHasReordered] = useState(false);
   const [dragGhost, setDragGhost] = useState(null);
   const [dropId, setDropId] = useState('');
   const dragListeners = useRef(null);
@@ -113,6 +189,7 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
     setOrder(item.options || []);
     setText('');
     setPoint(null);
+    setHasReordered(false);
   }, [retry?.n]);
 
   useEffect(() => () => {
@@ -131,6 +208,19 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
 
   const done = !!item.confirmed;
   const frozen = done || waiting || expired;
+  const canConfirm = item.type === 'mcq'
+    ? !!choiceId
+    : item.type === 'multi'
+      ? choiceIds.length > 0
+      : item.type === 'match'
+        ? (item.lefts || []).length > 0 && item.lefts.every((left) => !!matches[left.id])
+        : item.type === 'drag'
+          ? hasReordered
+          : item.type === 'hotspot'
+            ? !!point
+            : item.type === 'written'
+              ? !!text.trim()
+              : false;
 
   function beginDrag(event, opt, step) {
     if (frozen || event.button !== 0) return;
@@ -147,6 +237,9 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
       dragListeners.current = null;
       const row = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-drag-id]');
       const toId = row?.getAttribute('data-drag-id') || '';
+      const fromIndex = order.findIndex((rowItem) => rowItem.id === fromId);
+      const toIndex = order.findIndex((rowItem) => rowItem.id === toId);
+      if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) setHasReordered(true);
       setOrder((current) => {
         const from = current.findIndex((rowItem) => rowItem.id === fromId);
         const to = current.findIndex((rowItem) => rowItem.id === toId);
@@ -321,13 +414,15 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
               : 'border-rose-200 bg-rose-50'
           }`}
         >
-          <div className={`relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-2xl ${
-            done && item.correct === true ? 'bg-emerald-100' : 'bg-rose-100'
+          <div className={`lesson-feedback-mascot relative grid h-11 w-11 shrink-0 place-items-center ${
+            done && item.correct === true ? '' : 'is-ear-pull'
           }`}>
-            <span aria-hidden="true">🤖</span>
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm shadow-sm" aria-hidden="true">
-              {done && item.correct === true ? '👏' : '📏'}
-            </span>
+            {done && item.correct === true
+              ? <SupportMascot size={44} waving={false} className="lesson-feedback-mascot__icon" />
+              : <StudentEarPullMascot />}
+            {done && item.correct === true && (
+              <span className="absolute -right-0.5 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm shadow-sm" aria-hidden="true">👏</span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div aria-live="polite">
@@ -355,50 +450,46 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
       ) : null}
       <Explanation item={item} />
       </div>
-      {expired && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-sm font-black text-red-800">Bạn đã hết thời gian</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onRetryTime}
-              className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
-            >
-              Làm lại
-            </button>
-            <button
-              type="button"
-              onClick={onSkip}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700"
-            >
-              Bỏ qua
-            </button>
-          </div>
+      {!frozen && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={busy || !canConfirm}
+            onClick={() => {
+              if (item.type === 'mcq') onConfirm({ choiceId });
+              else if (item.type === 'multi') onConfirm({ choiceIds });
+              else if (item.type === 'match') onConfirm({ matches: (item.lefts || []).map((left) => ({ leftId: left.id, rightId: matches[left.id] || '' })) });
+              else if (item.type === 'drag') onConfirm({ order: order.map((row) => row.id) });
+              else if (item.type === 'hotspot') onConfirm(point || {});
+              else onConfirm({ text });
+            }}
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(239,68,68,0.25)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            Xác nhận
+          </button>
+          <button
+            type="button"
+            aria-expanded={showHint}
+            onClick={() => setShowHint((visible) => !visible)}
+            className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-black text-amber-800 transition hover:bg-amber-100"
+          >
+            <Lightbulb size={15} />
+            {showHint ? 'Ẩn gợi ý' : 'Gợi ý'}
+          </button>
         </div>
       )}
-      {!frozen && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            if (item.type === 'mcq') onConfirm({ choiceId });
-            else if (item.type === 'multi') onConfirm({ choiceIds });
-            else if (item.type === 'match') onConfirm({ matches: (item.lefts || []).map((left) => ({ leftId: left.id, rightId: matches[left.id] || '' })) });
-            else if (item.type === 'drag') onConfirm({ order: order.map((row) => row.id) });
-            else if (item.type === 'hotspot') onConfirm(point || {});
-            else onConfirm({ text });
-          }}
-          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 px-4 py-2.5 text-sm font-black text-white shadow-[0_16px_24px_rgba(239,68,68,0.25)] transition hover:brightness-105 disabled:opacity-60"
-        >
-          {busy && <Loader2 size={14} className="animate-spin" />}
-          Xác nhận
-        </button>
+      {showHint && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-black">Gợi ý</p>
+          <p className="mt-1 whitespace-pre-wrap">{item.hint || 'Giáo viên chưa thêm gợi ý cho câu này.'}</p>
+        </div>
       )}
     </article>
   );
 }
 
-export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded = false, onUnitStatus }) {
+export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceGroupId = '', embedded = false, onUnitStatus }) {
   const params = useParams();
   const unitId = unitIdProp || params.unitId;
   const navigate = useNavigate();
@@ -417,8 +508,13 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
   const [expired, setExpired] = useState(false);
   const [started, setStarted] = useState(false);
   const [wrongAnswerCooldown, setWrongAnswerCooldown] = useState(0);
+  const [celebratingQuestionId, setCelebratingQuestionId] = useState('');
+  const clockSessionRef = useRef(null);
+  const clockPersistenceDisabledRef = useRef(false);
 
-  const items = payload?.items || [];
+  const items = (payload?.items || []).filter((item) => (
+    !practiceGroupId || String(item.practiceGroupId || unitId) === practiceGroupId
+  ));
   const quizzes = items.filter((item) => PRACTICE_TYPES.has(item.type));
   const others = items.filter((item) => !PRACTICE_TYPES.has(item.type));
   const answered = quizzes.filter((item) => item.confirmed).length;
@@ -430,11 +526,29 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
   const focusIndex = quizzes.findIndex((item) => item.id === focusId);
   const visibleIndex = focusIndex >= 0 && focusIndex <= openLimit ? focusIndex : (firstOpen === -1 ? -1 : firstOpen);
   const visibleQuiz = visibleIndex >= 0 ? quizzes[visibleIndex] : null;
-  const clockLimit = visibleQuiz && !visibleQuiz.confirmed
-    ? Math.max(0, Math.round(Number(visibleQuiz.timeLimitSec) || payload?.unit?.timeLimitSec || 0))
-    : 0;
+  const groupTimeLimitSec = resolvePracticeGroupTimeLimit(
+    payload?.unit?.practiceTimeLimits,
+    practiceGroupId,
+    payload?.unit?.timeLimitSec,
+  );
+  const clock = resolvePracticeClock(groupTimeLimitSec, visibleQuiz?.timeLimitSec);
+  const clockLimit = visibleQuiz && !visibleQuiz.confirmed ? clock.limitSec : 0;
   const timed = clockLimit > 0;
   const warnAt = warnAtFor(clockLimit);
+  const clockSessionKey = `${unitId}:${practiceGroupId || 'all'}:${practiceRound}:${clockTry}:${clock.shared ? 'shared' : visibleQuiz?.id || ''}`;
+  const clockStoragePrefix = `lesson-practice-clock:${unitId}:${practiceGroupId || 'all'}:`;
+  const clockStorageKey = `${clockStoragePrefix}${clock.shared ? 'shared' : visibleQuiz?.id || ''}`;
+  const startedStorageKey = `lesson-practice-started:${unitId}:${practiceGroupId || 'all'}`;
+  const savedClockSeconds = timed ? readSavedPracticeSeconds(clockStorageKey, clockLimit) : null;
+  const hasResumableAttempt = answered > 0
+    || savedClockSeconds !== null
+    || (() => {
+      try { return sessionStorage.getItem(startedStorageKey) === '1'; }
+      catch (err) {
+        console.warn('Không đọc được trạng thái bắt đầu luyện tập', err);
+        return false;
+      }
+    })();
 
   useEffect(() => {
     let alive = true;
@@ -459,21 +573,47 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
   }, [unitId]);
 
   useEffect(() => {
-    setRemaining(timed ? clockLimit : 0);
-    setExpired(false);
-    if (!timed || !started) return undefined;
-    let left = clockLimit;
+    if (!timed || !started) {
+      setRemaining(timed ? clockLimit : 0);
+      setExpired(false);
+      return undefined;
+    }
+    clockPersistenceDisabledRef.current = false;
+    const restoredSeconds = readSavedPracticeSeconds(clockStorageKey, clockLimit);
+    clockSessionRef.current = restorePracticeClockSession(
+      clockSessionRef.current,
+      clockSessionKey,
+      clockLimit,
+      restoredSeconds,
+    );
+    const initialRemaining = remainingPracticeSeconds(clockSessionRef.current);
+    setRemaining(initialRemaining);
+    setExpired(initialRemaining <= 0);
+    savePracticeValue(clockStorageKey, initialRemaining);
     const timer = window.setInterval(() => {
-      left -= 1;
+      const left = remainingPracticeSeconds(clockSessionRef.current);
       setRemaining(Math.max(0, left));
+      if (!clockPersistenceDisabledRef.current) savePracticeValue(clockStorageKey, left);
       if (left > 0 && left <= warnAt) playLessonTick(left % 2 === 0);
       if (left <= 0) {
         window.clearInterval(timer);
         setExpired(true);
       }
     }, 1000);
-    return () => window.clearInterval(timer);
-  }, [timed, clockLimit, warnAt, clockTry, visibleQuiz?.id, practiceRound, started]);
+    return () => {
+      window.clearInterval(timer);
+      if (!clockPersistenceDisabledRef.current && clockSessionRef.current?.key === clockSessionKey) {
+        savePracticeValue(clockStorageKey, remainingPracticeSeconds(clockSessionRef.current));
+      }
+    };
+  }, [timed, clockLimit, warnAt, clockSessionKey, clockStorageKey, started]);
+
+  useEffect(() => {
+    if (!allCorrect) return;
+    clockPersistenceDisabledRef.current = true;
+    clearPracticeStorage(clockStoragePrefix);
+    clearPracticeStorage(startedStorageKey);
+  }, [allCorrect, clockStoragePrefix, startedStorageKey]);
 
   useEffect(() => {
     if (wrongAnswerCooldown <= 0) return undefined;
@@ -482,6 +622,12 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
     }, 1000);
     return () => window.clearInterval(timer);
   }, [wrongAnswerCooldown > 0]);
+
+  useEffect(() => {
+    if (!celebratingQuestionId) return undefined;
+    const timeout = window.setTimeout(() => setCelebratingQuestionId(''), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [celebratingQuestionId]);
 
   async function confirm(item, body) {
     unlockAudio();
@@ -513,7 +659,11 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
         ...prev,
         items: (prev?.items || []).map((row) => (row.id === item.id ? res.data.item : row)),
       }));
-      if (res.data.item?.correct === true) setFocusId('');
+      if (res.data.item?.correct === true) {
+        setFocusId('');
+        setCelebratingQuestionId(item.id);
+      }
+      if (res.data.item?.confirmed) savePracticeValue(startedStorageKey, '1');
       if (res.data.unitStatus) {
         setUnitStatus(res.data.unitStatus);
         onUnitStatus?.(res.data.unitStatus);
@@ -525,17 +675,22 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
     }
   }
 
-  async function resetPractice() {
+  async function resetPractice({ startImmediately = false } = {}) {
     setResetting(true);
     setError('');
     try {
-      const res = await lessonPracticeApi.student.resetPractice(unitId);
+      const res = await lessonPracticeApi.student.resetPractice(unitId, practiceGroupId);
+      clockPersistenceDisabledRef.current = true;
+      clearPracticeStorage(clockStoragePrefix);
+      clearPracticeStorage(startedStorageKey);
+      clockSessionRef.current = null;
       setPayload(res.data);
       setRetries({});
       setFocusId('');
       setSkipped({});
       setClockTry(0);
-      setStarted(true);
+      if (startImmediately) savePracticeValue(startedStorageKey, '1');
+      setStarted(startImmediately);
       setPracticeRound((round) => round + 1);
       const status = res.data?.unit?.status || '';
       if (status) {
@@ -552,7 +707,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
   const subjectId = payload?.subject?.id;
 
   const body = (
-    <div className={embedded ? 'space-y-4' : 'max-w-3xl mx-auto space-y-4'}>
+    <div className={embedded ? 'flex min-h-full flex-col gap-4' : 'max-w-3xl mx-auto space-y-4'}>
         {!embedded && (
         <button
           type="button"
@@ -580,7 +735,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                 </div>
               </div>
             )}
-            <div className="relative space-y-4">
+            <div className={embedded ? 'relative flex min-h-0 flex-1 flex-col gap-4' : 'relative space-y-4'}>
               <style>{`
                 @keyframes lesson-clock-blink {
                   0%, 49% { opacity: 1; }
@@ -594,6 +749,49 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                   from { opacity: 0.6; transform: translateY(4px); }
                   to { opacity: 1; transform: translateY(0); }
                 }
+                .lesson-feedback-ear-pull {
+                  display: block;
+                  width: 44px;
+                  height: 44px;
+                  overflow: visible;
+                }
+                .lesson-feedback-ear-pull__hand {
+                  transform-origin: 38px 19px;
+                  animation: lesson-ear-pull 1.2s ease-in-out infinite;
+                }
+                @keyframes lesson-ear-pull {
+                  0%, 18%, 48%, 100% { transform: translate(0, 0) rotate(0); }
+                  30% { transform: translate(2px, -1px) rotate(8deg); }
+                  38% { transform: translate(0, 0) rotate(0); }
+                }
+                .lesson-progress-marker {
+                  position: relative;
+                  overflow: visible;
+                }
+                .lesson-progress-confetti {
+                  position: absolute;
+                  left: 50%;
+                  top: 50%;
+                  z-index: 20;
+                  width: 5px;
+                  height: 8px;
+                  border-radius: 1px;
+                  pointer-events: none;
+                  animation: lesson-progress-burst 2s cubic-bezier(.15,.65,.3,1) both;
+                }
+                @keyframes lesson-progress-burst {
+                  0% { opacity: 1; transform: translate(-50%, -50%) scale(.5) rotate(0deg); }
+                  100% { opacity: 0; transform: translate(var(--burst-x), var(--burst-y)) scale(.85) rotate(var(--burst-rotate)); }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                  .lesson-feedback-ear-pull__hand {
+                    animation: none;
+                  }
+                  .lesson-progress-confetti {
+                    animation: none;
+                    opacity: 0;
+                  }
+                }
               `}</style>
               {quizzes.length > 0 && (
                 <div className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
@@ -602,7 +800,10 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                       Tiến độ <span className="ml-1 font-bold text-slate-900">{answered}/{quizzes.length}</span>
                     </p>
                     {timed && (
-                      <QuizClock remaining={remaining} warning={started && remaining > 0 && remaining <= warnAt} />
+                      <QuizClock
+                        remaining={started ? remaining : (savedClockSeconds ?? clockLimit)}
+                        warning={started && remaining > 0 && remaining <= warnAt}
+                      />
                     )}
                   </div>
                   {allCorrect && (
@@ -643,13 +844,40 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                             key={item.id}
                             type="button"
                             disabled={!reachable}
-                            onClick={() => { setFocusId(item.id); setClockTry(0); }}
+                            onClick={() => setFocusId(item.id)}
                             aria-current={current ? 'step' : undefined}
                             aria-label={`Câu ${index + 1}${wrong ? ', trả lời sai' : item.confirmed ? ', trả lời đúng' : skipped[item.id] ? ', đã bỏ qua' : ', chưa làm'}${current ? ', đang xem' : ''}`}
                             className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <span className={`grid h-4 w-4 place-items-center rounded-full text-[9px] leading-none ${tone}`}>
+                            <span className={`lesson-progress-marker grid h-4 w-4 place-items-center rounded-full text-[9px] leading-none ${tone}`}>
                               {item.confirmed && item.correct === true ? '✓' : wrong ? '×' : ''}
+                              {celebratingQuestionId === item.id && item.confirmed && item.correct === true && (
+                                <span className="pointer-events-none absolute inset-0" aria-hidden="true">
+                                  {[
+                                    [-21, -19, '#f43f5e', -55],
+                                    [-12, -28, '#f59e0b', 35],
+                                    [1, -31, '#10b981', -25],
+                                    [14, -25, '#3b82f6', 60],
+                                    [22, -13, '#a855f7', -40],
+                                    [22, 2, '#f97316', 75],
+                                    [12, 17, '#06b6d4', 45],
+                                    [-5, 20, '#eab308', -65],
+                                    [-19, 12, '#ec4899', 30],
+                                    [-26, -2, '#22c55e', -35],
+                                  ].map(([x, y, color, rotation], particleIndex) => (
+                                    <i
+                                      key={particleIndex}
+                                      className="lesson-progress-confetti"
+                                      style={{
+                                        backgroundColor: color,
+                                        '--burst-x': `${x}px`,
+                                        '--burst-y': `${y}px`,
+                                        '--burst-rotate': `${rotation}deg`,
+                                      }}
+                                    />
+                                  ))}
+                                </span>
+                              )}
                             </span>
                             <span>{index + 1}</span>
                           </button>
@@ -663,19 +891,11 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                       <span className="px-1">·</span>
                       <span className="text-rose-700">Sai</span>
                     </p>
-                    {!started && !allCorrect ? (
-                      <button
-                        type="button"
-                        onClick={() => { unlockAudio(); setStarted(true); setClockTry(0); }}
-                        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-red-700"
-                      >
-                        <Play size={14} fill="currentColor" /> Bắt đầu
-                      </button>
-                    ) : (
+                    {(started || allCorrect) && (
                       <button
                         type="button"
                         disabled={resetting}
-                        onClick={resetPractice}
+                        onClick={() => resetPractice()}
                         className="h-8 shrink-0 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
                       >
                         {resetting ? 'Đang làm lại...' : 'Luyện tập lại'}
@@ -684,30 +904,92 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, embedded 
                   </div>
                 </div>
               )}
-              {quizzes.length === 0 && others.map((item) => (
-                <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} waiting={wrongAnswerCooldown > 0} cooldownSeconds={wrongAnswerCooldown} onConfirm={(answer) => confirm(item, answer)} />
-              ))}
-              {visibleQuiz && (
-                <QuestionCard
-                  key={`${visibleQuiz.id}-${practiceRound}-${clockTry}`}
-                  item={visibleQuiz}
-                  index={visibleIndex + 1}
-                  busy={busyId === visibleQuiz.id}
-                  open
-                  waiting={!started || wrongAnswerCooldown > 0}
-                  cooldownSeconds={wrongAnswerCooldown}
-                  expired={timed && started && expired}
-                  retry={retries[visibleQuiz.id]}
-                  onRetryTime={() => setClockTry((tryCount) => tryCount + 1)}
-                  onSkip={() => {
-                    setSkipped((prev) => ({ ...prev, [visibleQuiz.id]: true }));
-                    setFocusId('');
-                    setClockTry(0);
-                  }}
-                  onConfirm={(answer) => confirm(visibleQuiz, answer)}
-                />
-              )}
-              {items.length === 0 && <p className="text-sm text-slate-500">Buổi này chưa có bài luyện tập.</p>}
+              <div className={embedded ? 'relative min-h-[15rem] flex-1' : 'relative min-h-[15rem]'}>
+                {quizzes.length === 0 && others.map((item) => (
+                  <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} waiting={wrongAnswerCooldown > 0} cooldownSeconds={wrongAnswerCooldown} onConfirm={(answer) => confirm(item, answer)} />
+                ))}
+                {started && visibleQuiz && (
+                  <QuestionCard
+                    key={`${visibleQuiz.id}-${practiceRound}-${clockTry}`}
+                    item={visibleQuiz}
+                    index={visibleIndex + 1}
+                    busy={busyId === visibleQuiz.id}
+                    open
+                    waiting={!started || wrongAnswerCooldown > 0}
+                    cooldownSeconds={wrongAnswerCooldown}
+                    expired={timed && started && expired}
+                    retry={retries[visibleQuiz.id]}
+                    onSkip={() => {
+                      setSkipped((prev) => ({ ...prev, [visibleQuiz.id]: true }));
+                      setFocusId('');
+                    }}
+                    onConfirm={(answer) => confirm(visibleQuiz, answer)}
+                  />
+                )}
+                {items.length === 0 && <p className="text-sm text-slate-500">Buổi này chưa có bài luyện tập.</p>}
+                {started && visibleQuiz && timed && expired && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center rounded-[28px] bg-slate-900/50 p-4" role="presentation">
+                    <section
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="practice-timeout-title"
+                      className="w-full max-w-sm translate-y-8 overflow-hidden rounded-3xl border border-red-100 bg-white p-6 text-center shadow-2xl"
+                    >
+                      <PracticeModalIcon timeout />
+                      <h2 id="practice-timeout-title" className="text-xl font-black text-slate-900">
+                        Bạn đã hết thời gian
+                      </h2>
+                      <button
+                        type="button"
+                        disabled={resetting}
+                        onClick={() => resetPractice({ startImmediately: true })}
+                        className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 text-sm font-black text-white transition-colors hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {resetting ? 'Đang làm lại...' : 'Làm lại'}
+                      </button>
+                    </section>
+                  </div>
+                )}
+                {quizzes.length > 0 && !started && !allCorrect && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-slate-900/20 p-4" role="presentation">
+                    <section
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="practice-start-title"
+                      className="w-full max-w-md translate-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                    >
+                      <PracticeModalIcon />
+                      <h2 id="practice-start-title" className="text-center text-xl font-black text-slate-900">
+                        {hasResumableAttempt ? 'Tiếp tục luyện tập?' : 'Sẵn sàng luyện tập?'}
+                      </h2>
+                      <p className="mt-2 text-center text-sm leading-6 text-slate-600">
+                        Có {quizzes.length} câu hỏi. {hasResumableAttempt
+                          ? 'Tiếp tục từ tiến độ và thời gian còn lại trước đó.'
+                          : 'Câu hỏi sẽ hiện và đồng hồ bắt đầu tính sau khi bạn bấm nút bên dưới.'}
+                      </p>
+                      {clockLimit > 0 && (
+                        <p className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
+                          <Clock size={16} className="text-red-600" />
+                          {hasResumableAttempt ? 'Còn lại:' : 'Thời gian:'} {formatClock(savedClockSeconds ?? clockLimit)}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          unlockAudio();
+                          clockPersistenceDisabledRef.current = false;
+                          savePracticeValue(startedStorageKey, '1');
+                          setStarted(true);
+                          setClockTry(0);
+                        }}
+                        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white transition-colors hover:bg-red-700"
+                      >
+                        <Play size={16} fill="currentColor" /> {hasResumableAttempt ? 'Tiếp tục làm' : 'Bắt đầu luyện tập'}
+                      </button>
+                    </section>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

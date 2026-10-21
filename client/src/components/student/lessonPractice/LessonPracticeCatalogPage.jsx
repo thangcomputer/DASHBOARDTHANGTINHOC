@@ -10,6 +10,11 @@ import LessonVideoTabs from '../LessonVideoTabs';
 import VideoCoursePayModal from '../../VideoCoursePayModal';
 import CoursePurchaseConfirmModal from './CoursePurchaseConfirmModal';
 import { useToast } from '../../../utils/toast';
+import {
+  getCourseProgressPercent,
+  getDirectCourseSubject,
+  groupCoveredEnrolledCourses,
+} from '../../../utils/lessonPracticeCatalog';
 
 const COURSE_CONSULTATION_ZALO_PHONE = '0984623486';
 const ZALO_LOGO_URL = 'https://upload.wikimedia.org/wikipedia/commons/9/91/Icon_of_Zalo.svg';
@@ -31,7 +36,9 @@ function formatSubjectName(name) {
     .replace(/(^|\s)(\S)/gu, (_, space, letter) => `${space}${letter.toLocaleUpperCase('vi-VN')}`);
 }
 
-function CourseCatalogCard({ course, onSelect, onRegister, registering = false, selected = false, now }) {
+function CourseCatalogCard({
+  course, onSelect, onRegister, registering = false, selected = false, progressById, now,
+}) {
   const startsAt = course.discountStartsAt ? new Date(course.discountStartsAt).getTime() : null;
   const endsAt = course.discountEndsAt ? new Date(course.discountEndsAt).getTime() : null;
   const saleActive = Boolean(course.originalPrice)
@@ -46,6 +53,16 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
       (total, subject) => total + (Number(subject.totalUnitCount) || 0),
       0,
     );
+  const showSessionCount = isInstructorCourse && !course.enrolled;
+  const blockUnregisteredInstructorPreview = isInstructorCourse && !course.enrolled;
+  const displayCount = showSessionCount
+    ? Math.max(0, Number(course.totalSessions) || 0)
+    : lessonCount;
+  const directSubject = getDirectCourseSubject(course);
+  const showCourseProgress = course.enrolled;
+  const courseProgressPercent = showCourseProgress
+    ? getCourseProgressPercent(course, progressById)
+    : 0;
   const consultationMessage = `[THẮNG TIN HỌC] Tôi muốn được tư vấn khóa học 1 kèm 1: ${course.name}`;
   const consultationUrl = `https://zalo.me/${COURSE_CONSULTATION_ZALO_PHONE}?text=${encodeURIComponent(consultationMessage)}`;
 
@@ -53,10 +70,11 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
     <article className={`group relative z-0 flex h-full min-h-[312px] w-full flex-col rounded-2xl border bg-white shadow-[0_4px_18px_rgba(15,23,42,0.06)] transition-all duration-200 hover:z-40 hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(15,23,42,0.12)] ${selected ? 'border-emerald-300 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-slate-300'}`}>
       <button
         type="button"
-        onClick={onSelect}
-        aria-haspopup="dialog"
+        onClick={blockUnregisteredInstructorPreview ? undefined : onSelect}
+        aria-disabled={blockUnregisteredInstructorPreview}
+        aria-haspopup={directSubject ? undefined : 'dialog'}
         aria-expanded={selected}
-        className="flex min-h-0 w-full flex-1 flex-col rounded-t-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400"
+        className={`flex min-h-0 w-full flex-1 flex-col rounded-t-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${blockUnregisteredInstructorPreview ? 'cursor-default' : ''}`}
       >
         <span
           className={`relative flex h-24 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-3 sm:h-28 sm:p-4 ${
@@ -129,10 +147,35 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
                 )}
               </span>
               <span className="mt-auto flex min-w-0 items-end justify-between gap-2 border-t border-slate-100 pt-2.5">
-                <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-slate-500 sm:text-[11px]">
-                  <Clock3 size={12} className="shrink-0 text-slate-400" />
-                  <strong className="font-bold text-slate-700">{lessonCount}</strong> bài học
-                </span>
+                {showCourseProgress ? (
+                  <span
+                    role="img"
+                    aria-label={`Tiến độ khóa học ${courseProgressPercent}%`}
+                    title={`Tiến độ học ${courseProgressPercent}%`}
+                    className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  >
+                    <svg viewBox="0 0 36 36" className="h-8 w-8 -rotate-90" aria-hidden="true">
+                      <circle cx="18" cy="18" r="15" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15"
+                        fill="none"
+                        stroke={courseProgressPercent === 100 ? '#059669' : '#10b981'}
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 15}`}
+                        strokeDashoffset={`${2 * Math.PI * 15 * (1 - courseProgressPercent / 100)}`}
+                      />
+                    </svg>
+                    <span className="absolute text-[8px] font-black tabular-nums text-slate-700">{courseProgressPercent}%</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium text-slate-500 sm:text-[11px]">
+                    <Clock3 size={12} className="shrink-0 text-slate-400" />
+                    <strong className="font-bold text-slate-700">{displayCount}</strong> {showSessionCount ? 'buổi' : 'bài học'}
+                  </span>
+                )}
                 {course.enrolled ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700 sm:text-[10px]">
                     <CheckCircle2 size={12} />
@@ -176,7 +219,7 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
             {!course.enrolled && (
               <span
                 role="tooltip"
-                className="invisible absolute left-1/2 top-1/2 z-50 w-[min(22rem,88vw)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-4 text-left opacity-0 shadow-2xl transition duration-150 group-hover/course-details:visible group-hover/course-details:opacity-100"
+                className="invisible absolute left-1/2 top-1/2 z-[100] w-[min(22rem,88vw)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white/100 p-4 text-left opacity-0 shadow-[0_20px_60px_rgba(15,23,42,0.35)] transition duration-150 group-hover/course-details:visible group-hover/course-details:opacity-100"
               >
                 <span className="mb-1 flex items-center gap-1.5 text-xs font-black text-slate-900">
                   <Sparkles size={14} className="text-amber-500" />
@@ -208,7 +251,9 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
           </span>
         </span>
       </button>
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-4 pb-3 pt-2">
+      <div className={`flex items-center gap-2 border-t border-slate-100 px-4 pb-3 pt-2 ${
+        blockUnregisteredInstructorPreview ? 'justify-center' : 'justify-between'
+      }`}>
         {!course.enrolled && !isInstructorCourse ? (
           <button
             type="button"
@@ -226,22 +271,30 @@ function CourseCatalogCard({ course, onSelect, onRegister, registering = false, 
             rel="noopener noreferrer"
             aria-label={`Tư vấn Zalo khóa học ${course.name}`}
             title={`Tư vấn khóa học qua Zalo ${COURSE_CONSULTATION_ZALO_PHONE}`}
-            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#e6f4ff] px-3 text-xs font-black text-[#0873b9] shadow-sm transition-colors hover:bg-[#0873b9] hover:text-white"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#d6ecff] px-3 text-xs font-black text-[#075985] shadow-sm transition-colors hover:bg-[#0873b9] hover:text-white"
           >
             <img src={ZALO_LOGO_URL} alt="" className="h-4 w-4 shrink-0" loading="lazy" />
             Zalo tư vấn
           </a>
         ) : <span />}
-        <button
-          type="button"
-          onClick={onSelect}
-          aria-haspopup="dialog"
-          aria-expanded={selected}
-          className={`inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-xs font-black shadow-sm transition-colors ${course.enrolled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white'}`}
-        >
-          {course.enrolled ? 'Vào học' : selected ? 'Đang xem nội dung' : 'Xem thêm'}
-          <ArrowRight size={16} />
-        </button>
+        {!blockUnregisteredInstructorPreview && (
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-haspopup={directSubject ? undefined : 'dialog'}
+            aria-expanded={selected}
+            className={`inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-xs font-black shadow-sm transition-colors ${course.enrolled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white'}`}
+          >
+            {course.enrolled
+              ? courseProgressPercent > 0 && courseProgressPercent < 100
+                ? 'Tiếp tục học'
+                : courseProgressPercent >= 100
+                  ? 'Xem lại khóa học'
+                  : 'Vào học'
+              : directSubject ? 'Học thử' : selected ? 'Đang xem nội dung' : 'Xem thêm'}
+            <ArrowRight size={16} />
+          </button>
+        )}
       </div>
     </article>
   );
@@ -344,7 +397,7 @@ function CourseSubjectsModal({
                           {canOpen && subject.opened
                             ? <span className="mt-2 block text-xs font-medium text-slate-500">{done}/{total} bài đã hoàn thành</span>
                             : canOpen
-                              ? <span className="mt-2 block text-xs font-medium text-amber-700">Có buổi học xem thử</span>
+                              ? <span className="mt-2 block text-xs font-medium text-amber-700">Có bài học thử</span>
                               : <span className="mt-2 block text-xs font-medium text-slate-400">Chưa đăng ký</span>}
                         </span>
                         <span className="inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black tabular-nums text-slate-500 ring-1 ring-slate-200/80">
@@ -376,7 +429,13 @@ function CourseSubjectsModal({
                             ? 'bg-emerald-600 group-hover:bg-emerald-700'
                             : 'bg-amber-500 group-hover:bg-amber-600'
                         }`}>
-                          {subject.opened ? 'Vào học' : 'Xem thử'} <ArrowRight size={14} />
+                          {subject.opened
+                            ? done > 0 && done < total
+                              ? 'Tiếp tục học'
+                              : done >= total && total > 0
+                                ? 'Xem lại khóa học'
+                                : 'Vào học'
+                            : 'Học thử'} <ArrowRight size={14} />
                         </span>
                       )}
                     </>
@@ -487,8 +546,16 @@ function CourseCollection({
             key={course.id}
             course={course}
             now={now}
+            progressById={progressById}
             selected={selectedCourseId === course.id}
-            onSelect={() => onSelectCourse((current) => current === course.id ? '' : course.id)}
+            onSelect={() => {
+              const directSubject = getDirectCourseSubject(course);
+              if (directSubject) {
+                onOpenSubject(directSubject.id, course.id);
+                return;
+              }
+              onSelectCourse((current) => current === course.id ? '' : course.id);
+            }}
             onRegister={onRegisterCourse}
             registering={registeringCourseId === course.id}
           />
@@ -594,8 +661,9 @@ export default function LessonPracticeCatalogPage() {
     });
   };
 
-  const enrolledCourses = courses.filter((course) => course.enrolled);
-  const availableCourses = courses.filter((course) => !course.enrolled && !course.hiddenByEnrollment);
+  const catalogCourses = groupCoveredEnrolledCourses(courses);
+  const enrolledCourses = catalogCourses.filter((course) => course.enrolled);
+  const availableCourses = catalogCourses.filter((course) => !course.enrolled);
   const visibleCourses = [...enrolledCourses, ...availableCourses];
   const matchesCourseFilter = (course) => {
     if (filter === 'registered') return course.enrolled;

@@ -7,7 +7,7 @@ const { pathToFileURL } = require('node:url');
 
 describe('student training documents respect assigned course', async () => {
   const helperPath = path.join(__dirname, '../../client/src/utils/enrollments.js');
-  const { filterStudentTrainingFiles } = await import(pathToFileURL(helperPath).href);
+  const { filterStudentTrainingFiles, filterStudentTrainingVideos } = await import(pathToFileURL(helperPath).href);
   const catalog = {
     word: { id: 'word', label: 'Word', group: 'office' },
   };
@@ -37,5 +37,35 @@ describe('student training documents respect assigned course', async () => {
     });
 
     assert.deepEqual(visible.map((file) => file.id), ['word-a', 'word-general']);
+  });
+
+  it('shows course videos linked to the student enrollment even without subject metadata', () => {
+    const videos = [
+      { id: 'video-a', title: 'Bài giảng A', courseId: 'course-a' },
+      { id: 'video-b', title: 'Bài giảng B', courseId: 'course-b' },
+    ];
+
+    const visible = filterStudentTrainingVideos(videos, {
+      enrollments: [{ courseId: 'course-a', courseName: 'Khóa A' }],
+      allowedSubjectIds: [],
+      catalog,
+    });
+
+    assert.deepEqual(visible.map((video) => video.id), ['video-a']);
+  });
+
+  it('keeps same-subject course videos visible as offerings while hiding unrelated assigned videos', () => {
+    const videos = [
+      { id: 'word-b', title: 'Video khóa B', courseId: 'course-b', examSubjects: ['word'] },
+      { id: 'other-course', title: 'Video khóa khác', courseId: 'course-c' },
+    ];
+
+    const visible = filterStudentTrainingVideos(videos, {
+      enrollments: [{ courseId: 'course-a', courseName: 'Khóa A' }],
+      allowedSubjectIds: ['word'],
+      catalog,
+    });
+
+    assert.deepEqual(visible.map((video) => video.id), ['word-b']);
   });
 });

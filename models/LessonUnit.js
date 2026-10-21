@@ -13,6 +13,11 @@ const lessonContentSchema = new mongoose.Schema({
   content: { type: String, default: '' },
 }, { _id: false });
 
+const practiceTimeLimitSchema = new mongoose.Schema({
+  groupId: { type: String, required: true },
+  timeLimitSec: { type: Number, default: 0, min: 0, max: 3600 },
+}, { _id: false });
+
 const lessonUnitSchema = new mongoose.Schema({
   subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonSubject', required: true, index: true },
   title: { type: String, required: true, trim: true },
@@ -24,6 +29,7 @@ const lessonUnitSchema = new mongoose.Schema({
   antiSeek: { type: Boolean, default: true },
   isPreviewAllowed: { type: Boolean, default: false },
   timeLimitSec: { type: Number, default: 0, min: 0, max: 3600 },
+  practiceTimeLimits: { type: [practiceTimeLimitSchema], default: [] },
   sortOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });

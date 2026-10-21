@@ -119,20 +119,15 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   }, []);
 
   useEffect(() => {
-    const resolveToken = () => {
-      if (token) return token;
-      for (const r of ['staff', 'admin', 'teacher', 'student']) {
-        const direct = localStorage.getItem(`${r}_access_token`);
-        if (direct) return direct;
-        try {
-          const u = JSON.parse(localStorage.getItem(`${r}_user`) || 'null');
-          if (u?.accessToken || u?.token) return u.accessToken || u.token;
-        } catch { /* noop */ }
-      }
-      return null;
-    };
+    if (!userId || !token) {
+      setSocket(null);
+      setIsConnected(false);
+      setOnlineUsers([]);
+      setLastSeenUsers({});
+      socketRef.current = null;
+      return undefined;
+    }
 
-    const effectiveToken = resolveToken();
     const sessionUser = { id: userId, role, adminRole };
 
     const newSocket = io(SOCKET_URL, {
@@ -143,7 +138,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       reconnectionDelayMax: 15000,
       randomizationFactor: 0.4,
       timeout: 20000,
-      auth: { token: effectiveToken },
+      auth: { token },
     });
 
     let refreshDebounceTimer = null;

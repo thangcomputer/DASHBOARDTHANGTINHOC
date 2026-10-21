@@ -87,6 +87,12 @@ function mapUnit(doc, extra = {}) {
     antiSeek: doc.antiSeek !== false,
     isPreviewAllowed: doc.isPreviewAllowed === true,
     timeLimitSec: rules.clampTimeLimit(doc.timeLimitSec),
+    practiceTimeLimits: Array.isArray(doc.practiceTimeLimits)
+      ? doc.practiceTimeLimits.map((entry) => ({
+        groupId: String(entry.groupId || ''),
+        timeLimitSec: rules.clampTimeLimit(entry.timeLimitSec),
+      })).filter((entry) => entry.groupId)
+      : [],
     sortOrder: doc.sortOrder || 0,
     isActive: doc.isActive !== false,
     ...extra,
@@ -98,6 +104,7 @@ function mapItemAdmin(doc) {
     id: String(doc._id),
     unitId: String(doc.unitId),
     subjectId: String(doc.subjectId),
+    practiceGroupId: String(doc.practiceGroupId || ''),
     videoId: String(doc.videoId || ''),
     type: doc.type,
     sortOrder: doc.sortOrder || 0,
@@ -112,6 +119,7 @@ function mapItemAdmin(doc) {
     pairs: doc.pairs || [],
     rubric: doc.rubric || '',
     modelAnswer: doc.modelAnswer || '',
+    hint: doc.hint || '',
     explanation: doc.explanation || '',
     timeLimitSec: rules.clampTimeLimit(doc.timeLimitSec),
   };
@@ -331,7 +339,10 @@ async function updateUnit(id, body) {
       ...videos.map((item) => `video:${item.id}`),
       ...contents.map((item) => `content:${item.id}`),
       `practice:${doc._id}`,
-      ...((await LessonItem.find({ unitId: doc._id }).select('_id').lean()).map((item) => `quiz:${item._id}`)),
+      ...((await LessonItem.find({ unitId: doc._id }).select('_id practiceGroupId').lean()).flatMap((item) => [
+        `quiz:${item._id}`,
+        ...(item.practiceGroupId ? [`practice:${item.practiceGroupId}`] : []),
+      ])),
     ]);
     const seen = new Set();
     doc.contentOrder = body.contentOrder
@@ -340,6 +351,17 @@ async function updateUnit(id, body) {
   }
   if (body.antiSeek != null) doc.antiSeek = !!body.antiSeek;
   if (body.timeLimitSec != null) doc.timeLimitSec = rules.clampTimeLimit(body.timeLimitSec);
+  if (Array.isArray(body.practiceTimeLimits)) {
+    const seenGroupIds = new Set();
+    doc.practiceTimeLimits = body.practiceTimeLimits
+      .slice(0, 200)
+      .flatMap((entry) => {
+        const groupId = String(entry?.groupId || '').trim().slice(0, 100);
+        if (!groupId || seenGroupIds.has(groupId)) return [];
+        seenGroupIds.add(groupId);
+        return [{ groupId, timeLimitSec: rules.clampTimeLimit(entry.timeLimitSec) }];
+      });
+  }
   await doc.save();
   return mapUnit(doc);
 }
@@ -467,14 +489,18 @@ async function completionStates(studentId, units) {
   return new Map(units.map((unit) => {
     const id = String(unit._id || unit.id);
     const unitQuestions = (itemsByUnit.get(id) || []).filter((item) => rules.isQuestionType(item.type));
-    const practiceFinished = unitQuestions.every((question) => {
-      const answer = answersByItem.get(String(question._id));
-      if (!answer) return false;
-      return !(rules.needsExactCorrect(question.type) || question.type === 'written') || answer.correct === true;
-    });
+    const practiceDoneGroupIds = rules.completedPracticeGroupIds(unitQuestions, answersByItem, id);
+    const practiceGroupIds = [...new Set(unitQuestions.map((question) => String(question.practiceGroupId || id)))];
+    const practiceFinished = unitQuestions.length === 0 || practiceDoneGroupIds.length === practiceGroupIds.length;
     const progress = progressByUnit.get(id) || {};
     const check = rules.unitChecklist(unit, progress, practiceFinished);
-    return [id, { check, completed: check.completed }];
+    return [id, {
+      check,
+      completed: check.completed,
+      hasPractice: unitQuestions.length > 0,
+      practiceGroupIds,
+      practiceDoneGroupIds,
+    }];
   }));
 }
 
@@ -742,6 +768,9 @@ async function listUnitsForStudent(studentId, subjectId, requestedCourseId = '')
         videoDoneIds: check.videoDoneIds,
         noteDoneIds: check.noteDoneIds,
         practiceDone: check.practiceDone,
+        hasPractice: states.get(String(unit._id))?.hasPractice === true,
+        practiceGroupIds: states.get(String(unit._id))?.practiceGroupIds || [],
+        practiceDoneGroupIds: states.get(String(unit._id))?.practiceDoneGroupIds || [],
         videos: purchaseRequired ? [] : mapUnit(unit).videos,
         contents: purchaseRequired ? [] : mapUnit(unit).contents,
         videoUrl: purchaseRequired ? '' : (unit.videoUrl || ''),
@@ -1010,12 +1039,18 @@ async function confirmItem(studentId, itemId, body) {
   return { item: rules.withConfirmedAnswer(item, saved), unitStatus, alreadyConfirmed: false };
 }
 
-async function resetPractice(studentId, unitId) {
+async function resetPractice(studentId, unitId, practiceGroupId = '') {
   const { unit } = await loadStudentUnit(studentId, unitId);
-  const quizzes = await LessonItem.find({
+  const quizQuery = {
     unitId: unit._id,
     type: { $in: ['mcq', 'multi', 'match', 'drag', 'hotspot', 'written'] },
-  }).select('_id').lean();
+  };
+  if (practiceGroupId) {
+    quizQuery.practiceGroupId = practiceGroupId === String(unit._id)
+      ? { $in: ['', null] }
+      : practiceGroupId;
+  }
+  const quizzes = await LessonItem.find(quizQuery).select('_id').lean();
   if (quizzes.length) {
     await LessonAnswer.deleteMany({
       studentId,
@@ -1028,11 +1063,29 @@ async function resetPractice(studentId, unitId) {
 
 const BACKUP_FORMAT = 'lesson-practice-backup';
 
-async function exportBackup() {
+async function backupSubjectsForCourse(courseId) {
+  if (!courseId) return null;
+  if (!isId(courseId)) throw httpError(400, 'Khóa học không hợp lệ');
+  const [course, settings] = await Promise.all([
+    Course.findOne({ _id: courseId, status: 'published', deletedAt: null }).lean(),
+    SystemSettings.findOne().select('examSubjectsCustomRaw').lean(),
+  ]);
+  if (!course) throw httpError(404, 'Không tìm thấy khóa học');
+  const examSubjectIds = resolveExamSubjectsForCourse(course, settings?.examSubjectsCustomRaw);
+  return LessonSubject.find({ examSubjectId: { $in: examSubjectIds } }).select('_id examSubjectId').lean();
+}
+
+async function exportBackup(courseId = '') {
+  const courseSubjects = await backupSubjectsForCourse(courseId);
+  const subjectFilter = courseSubjects
+    ? { _id: { $in: courseSubjects.map((subject) => subject._id) } }
+    : {};
+  const subjectIds = courseSubjects ? courseSubjects.map((subject) => subject._id) : null;
+  const unitFilter = subjectIds ? { subjectId: { $in: subjectIds } } : {};
   const [subjects, units, items] = await Promise.all([
-    LessonSubject.find({}).sort({ sortOrder: 1, createdAt: 1 }).lean(),
-    LessonUnit.find({}).sort({ sortOrder: 1, createdAt: 1 }).lean(),
-    LessonItem.find({}).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    LessonSubject.find(subjectFilter).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    LessonUnit.find(unitFilter).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+    LessonItem.find(unitFilter).sort({ sortOrder: 1, createdAt: 1 }).lean(),
   ]);
   const itemsByUnit = new Map();
   items.forEach((item) => {
@@ -1075,14 +1128,19 @@ async function findBackupSubject(entry) {
   return name ? LessonSubject.findOne({ name }) : null;
 }
 
-async function importBackup(payload) {
+async function importBackup(payload, courseId = '') {
   if (!payload || payload.format !== BACKUP_FORMAT || !Array.isArray(payload.subjects)) {
     throw httpError(400, 'File sao lưu không hợp lệ');
   }
+  const courseSubjects = await backupSubjectsForCourse(courseId);
+  const allowedExamSubjectIds = courseSubjects
+    ? new Set(courseSubjects.map((subject) => String(subject.examSubjectId || '')))
+    : null;
   const result = {
     subjects: 0, units: 0, items: 0, skippedSubjects: [], skippedItems: 0,
   };
   for (const entry of payload.subjects) {
+    if (allowedExamSubjectIds && !allowedExamSubjectIds.has(String(entry?.examSubjectId || ''))) continue;
     const subject = await findBackupSubject(entry);
     if (!subject) {
       result.skippedSubjects.push(String(entry?.name || 'Không rõ tên'));
@@ -1114,6 +1172,7 @@ async function importBackup(payload) {
         isPreviewAllowed: unitEntry.isPreviewAllowed,
         antiSeek: unitEntry.antiSeek,
         timeLimitSec: unitEntry.timeLimitSec,
+        practiceTimeLimits: unitEntry.practiceTimeLimits,
         videos: Array.isArray(unitEntry.videos) ? unitEntry.videos : undefined,
         contents: Array.isArray(unitEntry.contents) ? unitEntry.contents : undefined,
       });

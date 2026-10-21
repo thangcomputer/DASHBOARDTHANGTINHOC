@@ -15,6 +15,7 @@ const optionSchema = new mongoose.Schema({
 const lessonItemSchema = new mongoose.Schema({
   unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonUnit', required: true, index: true },
   subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonSubject', required: true, index: true },
+  practiceGroupId: { type: String, default: '' },
   videoId: { type: String, default: '' },
   type: { type: String, enum: ['image_view', 'hotspot', 'mcq', 'multi', 'match', 'drag', 'written'], required: true },
   sortOrder: { type: Number, default: 0 },
@@ -37,6 +38,7 @@ const lessonItemSchema = new mongoose.Schema({
   timeLimitSec: { type: Number, default: 0, min: 0, max: 3600 },
   rubric: { type: String, default: '' },
   modelAnswer: { type: String, default: '' },
+  hint: { type: String, default: '' },
   explanation: { type: String, default: '' },
 }, { timestamps: true });
 

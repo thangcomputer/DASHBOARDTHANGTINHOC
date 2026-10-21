@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, NotebookPen, PartyPopper, PenLine, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, Menu, NotebookPen, PartyPopper, PenLine, Trophy, X } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
@@ -19,10 +19,14 @@ function orderedSections(unit) {
   const entries = [];
   const seen = new Set();
   const add = (kind, id, label, icon) => {
-    const key = kind === 'practice' ? 'practice' : `${kind}:${id}`;
+    const key = `${kind}:${id}`;
     if (seen.has(key)) return;
     seen.add(key);
     entries.push({ id: key, kind, itemId: id, label, icon });
+  };
+  const addPractice = (groupId) => {
+    const part = entries.filter((entry) => entry.kind === 'practice').length + 1;
+    add('practice', groupId, `Luyện tập bài học · Phần ${part}`, PenLine);
   };
 
   (unit?.contentOrder || []).forEach((entry) => {
@@ -35,14 +39,22 @@ function orderedSections(unit) {
       const id = value.slice('video:'.length);
       const video = videos.find((item) => String(item.id) === id);
       if (video) add('video', id, video.title || `Video ${videos.indexOf(video) + 1}`, Clapperboard);
-    } else if (value.startsWith('practice:') || value.startsWith('quiz:')) {
-      add('practice', 'practice', 'Luyện tập', PenLine);
+    } else if (value.startsWith('practice:')) {
+      const groupId = value.slice('practice:'.length);
+      if ((unit?.practiceGroupIds || []).includes(groupId) || groupId === unit?.id) {
+        addPractice(groupId);
+      }
+    } else if (value.startsWith('quiz:') && unit?.hasPractice) {
+      addPractice(String(unit.id));
     }
   });
 
   contents.forEach((content, index) => add('note', String(content.id), content.title || `Nội dung ${index + 1}`, NotebookPen));
   videos.forEach((video, index) => add('video', String(video.id), video.title || `Video ${index + 1}`, Clapperboard));
-  add('practice', 'practice', 'Luyện tập', PenLine);
+  (unit?.practiceGroupIds || []).forEach((groupId) => addPractice(String(groupId)));
+  if (unit?.hasPractice && !(unit?.practiceGroupIds || []).length) {
+    addPractice(String(unit.id));
+  }
   return entries;
 }
 
@@ -300,6 +312,7 @@ function NotePane({ unit, content, done, onMarkRead }) {
   const contentDone = done || unit?.noteDoneIds?.includes(selectedContent?.id);
   const scroller = useRef(null);
   const [atEnd, setAtEnd] = useState(false);
+  const [readCelebrating, setReadCelebrating] = useState(false);
 
   function checkEnd() {
     const node = scroller.current;
@@ -310,36 +323,65 @@ function NotePane({ unit, content, done, onMarkRead }) {
 
   useEffect(() => {
     setAtEnd(false);
+    setReadCelebrating(false);
     const id = window.requestAnimationFrame(checkEnd);
     return () => window.cancelAnimationFrame(id);
   }, [note, selectedContent?.id]);
 
+  useEffect(() => {
+    if (!readCelebrating) return undefined;
+    const timer = window.setTimeout(() => setReadCelebrating(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [readCelebrating]);
+
   if (!note) return <p className="text-sm text-slate-500">Buổi này chưa có nội dung.</p>;
   return (
-    <div className="flex min-h-0 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {selectedContent?.title && <h3 className="shrink-0 text-base font-black text-slate-800">{selectedContent.title}</h3>}
       {isRichHtml ? (
         <div
           ref={scroller}
           onScroll={checkEnd}
           onLoad={checkEnd}
-          className="prose prose-sm h-[min(70vh,48rem)] min-h-80 max-w-none overflow-y-auto text-slate-800 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl"
+          className="prose prose-sm min-h-0 max-w-none flex-1 overflow-y-auto text-slate-800 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-xl"
           dangerouslySetInnerHTML={{ __html: safeNoteHtml }}
         />
       ) : (
-        <div ref={scroller} onScroll={checkEnd} className="h-[min(70vh,48rem)] min-h-80 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-800">
+        <div ref={scroller} onScroll={checkEnd} className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-800">
           {note}
         </div>
       )}
       {contentDone ? (
-        <p className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700">
-          <CheckCircle2 size={16} /> Đã đọc xong nội dung buổi học.
-        </p>
+        <div className="relative inline-flex min-h-8 items-center self-start">
+          <p className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700">
+            <CheckCircle2 size={16} /> Đã đọc xong nội dung buổi học.
+          </p>
+          {readCelebrating && (
+            <span className="pointer-events-none absolute left-7 top-1/2 z-10 h-0 w-0" aria-hidden="true">
+              {UNLOCK_CONFETTI.map(([x, y, color, burstX, burstY, delay], pieceIndex) => (
+                <i
+                  key={pieceIndex}
+                  className="lesson-unlock-burst lesson-read-burst"
+                  style={{
+                    backgroundColor: color,
+                    '--burst-x': `${x + burstX}px`,
+                    '--burst-y': `${y + burstY}px`,
+                    '--burst-rotate': `${(pieceIndex % 2 ? 1 : -1) * 360}deg`,
+                    '--burst-delay': `${delay / 3}ms`,
+                  }}
+                />
+              ))}
+            </span>
+          )}
+        </div>
       ) : (
         <button
           type="button"
           disabled={!atEnd}
-          onClick={() => onMarkRead?.(selectedContent?.id)}
+          onClick={async () => {
+            const saved = await onMarkRead?.(selectedContent?.id);
+            if (saved) setReadCelebrating(true);
+          }}
           className="mt-auto self-start rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
         >
           {atEnd ? 'Tôi đã đọc xong' : 'Lăn hết nội dung để tích đã đọc'}
@@ -350,11 +392,11 @@ function NotePane({ unit, content, done, onMarkRead }) {
 }
 
 function withSessionLocks(units) {
-  let waitingOnEarlier = false;
-  return units.map((unit) => {
+  return units.map((unit, index) => {
     const previewAllowed = unit.isPreviewAllowed === true;
-    const locked = !!unit.purchaseRequired || (!previewAllowed && (waitingOnEarlier || !!unit.locked));
-    if (!previewAllowed && !locked && unit.status !== 'completed') waitingOnEarlier = true;
+    const previousUnit = units[index - 1];
+    const waitingOnPrevious = previousUnit && previousUnit.status !== 'completed';
+    const locked = !!unit.purchaseRequired || (!previewAllowed && (!!unit.locked || waitingOnPrevious));
     return { ...unit, locked };
   });
 }
@@ -364,6 +406,21 @@ const MOTIVATION = [
   'Kiên trì từng ngày, bạn sẽ giỏi hơn chính mình hôm qua!',
   'Thành công đến từ những bước nhỏ liên tục. Tiếp tục phát huy nhé!',
   'Bạn đã chứng minh được sự nỗ lực của mình. Buổi tiếp theo đang chờ bạn!',
+];
+
+const UNLOCK_CONFETTI = [
+  [-20, -14, '#ef4444', 0, -32, 0],
+  [-12, -22, '#f59e0b', -4, -38, 180],
+  [-3, -26, '#10b981', 0, -42, 360],
+  [7, -22, '#3b82f6', 5, -38, 90],
+  [17, -14, '#a855f7', 9, -32, 270],
+  [22, -3, '#ec4899', 12, -24, 450],
+  [18, 9, '#facc15', 10, 24, 630],
+  [8, 16, '#06b6d4', 5, 34, 810],
+  [-4, 17, '#22c55e', 0, 36, 990],
+  [-16, 11, '#f97316', -6, 28, 1170],
+  [-23, 1, '#8b5cf6', -12, 16, 1350],
+  [-19, -8, '#14b8a6', -9, -20, 1530],
 ];
 
 function playFireworkSound() {
@@ -528,6 +585,26 @@ function pickStarter(units) {
     || null;
 }
 
+function readResumePoint(key) {
+  try {
+    const point = JSON.parse(localStorage.getItem(key) || 'null');
+    return point && typeof point.unitId === 'string' && typeof point.sectionId === 'string'
+      ? point
+      : null;
+  } catch (err) {
+    console.warn('Không đọc được vị trí học gần nhất', err);
+    return null;
+  }
+}
+
+function saveResumePoint(key, unitId, sectionId) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ unitId, sectionId }));
+  } catch (err) {
+    console.warn('Không lưu được vị trí học gần nhất', err);
+  }
+}
+
 export default function LessonPracticeUnitsPage() {
   const { subjectId } = useParams();
   const [searchParams] = useSearchParams();
@@ -538,15 +615,34 @@ export default function LessonPracticeUnitsPage() {
   const [error, setError] = useState('');
   const [openUnitId, setOpenUnitId] = useState('');
   const [section, setSection] = useState('note');
+  const [lessonListOpen, setLessonListOpen] = useState(false);
+  const [unlockCelebrationUnitId, setUnlockCelebrationUnitId] = useState('');
   const [selectedVideoId, setSelectedVideoId] = useState('');
   const [videoTab, setVideoTab] = useState('overview');
   const [studentUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('student_user') || '{}') || {}; }
     catch { return {}; }
   });
+  const resumeStorageKey = `lesson-practice-resume:${studentUser.id || studentUser._id || 'student'}:${subjectId}`;
 
   function loadUnits() {
-    return lessonPracticeApi.student.units(subjectId, requestedCourseId).then((res) => setPayload(res.data));
+    return lessonPracticeApi.student.units(subjectId, requestedCourseId).then((res) => {
+      setPayload(res.data);
+      return res.data;
+    });
+  }
+
+  async function celebrateNextUnlockedUnit(completedUnitId, wasCompleted) {
+    const completedIndex = units.findIndex((unit) => unit.id === completedUnitId);
+    const nextUnit = units[completedIndex + 1];
+    if (wasCompleted || !nextUnit?.locked) return;
+
+    const updated = await loadUnits();
+    const refreshedUnits = withSessionLocks(updated?.units || []);
+    const refreshedNextUnit = refreshedUnits.find((unit) => unit.id === nextUnit.id);
+    if (refreshedNextUnit && !refreshedNextUnit.locked) {
+      setUnlockCelebrationUnitId(refreshedNextUnit.id);
+    }
   }
 
   useEffect(() => {
@@ -587,25 +683,38 @@ export default function LessonPracticeUnitsPage() {
   const closeCelebration = useCallback(() => setCelebrating(false), []);
 
   useEffect(() => {
+    if (!unlockCelebrationUnitId) return undefined;
+    const timer = window.setTimeout(() => setUnlockCelebrationUnitId(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [unlockCelebrationUnitId]);
+
+  useEffect(() => {
     if (!payload || payload.subject?.id !== subjectId) return undefined;
     const current = units.find((unit) => unit.id === openUnitId);
     if (current && !current.locked) return undefined;
-    const starter = pickStarter(units);
+    const saved = readResumePoint(resumeStorageKey);
+    const resumeUnit = saved && units.find((unit) => unit.id === saved.unitId && !unit.locked);
+    const starter = resumeUnit || pickStarter(units);
+    const sections = orderedSections(starter);
+    const resumeSection = resumeUnit && sections.find((item) => item.id === saved.sectionId);
     setOpenUnitId(starter?.id || '');
-    if (starter) setSection(orderedSections(starter)[0]?.id || '');
+    if (starter) setSection(resumeSection?.id || sections[0]?.id || '');
     return undefined;
-  }, [payload, subjectId, openUnitId, units]);
+  }, [payload, subjectId, openUnitId, units, resumeStorageKey]);
 
   function chooseUnit(unit) {
     if (unit.locked) return;
+    const firstSection = orderedSections(unit)[0]?.id || '';
     setOpenUnitId(unit.id);
-    setSection(orderedSections(unit)[0]?.id || '');
+    setSection(firstSection);
+    saveResumePoint(resumeStorageKey, unit.id, firstSection);
     setSelectedVideoId('');
     setVideoTab('overview');
+    setLessonListOpen(false);
   }
 
   async function markSection(part, itemId = '') {
-    if (!openUnitId) return;
+    if (!openUnitId) return false;
     try {
       const res = await lessonPracticeApi.student.markSection(openUnitId, part, itemId);
       setPayload((prev) => prev && ({
@@ -621,11 +730,16 @@ export default function LessonPracticeUnitsPage() {
         } : unit)),
       }));
       if (res.data.status === 'completed') {
-        loadUnits().catch(() => {});
+        const wasCompleted = units.find((unit) => unit.id === openUnitId)?.status === 'completed';
+        celebrateNextUnlockedUnit(openUnitId, wasCompleted).catch((err) => {
+          setError(err.message || 'Không cập nhật được bài học tiếp theo');
+        });
         window.dispatchEvent(new Event('lesson-practice-progress-updated'));
       }
+      return true;
     } catch (err) {
       setError(err.message || 'Không ghi nhận được phần này');
+      return false;
     }
   }
 
@@ -644,18 +758,64 @@ export default function LessonPracticeUnitsPage() {
             <p className="min-w-0 flex-1 text-sm font-semibold text-amber-900">Bạn đang xem thử các buổi được mở của môn học.</p>
           </div>
         )}
+        {units.length > 0 && (
+          <button
+            type="button"
+            aria-expanded={lessonListOpen}
+            aria-controls="lesson-list"
+            onClick={() => setLessonListOpen((open) => !open)}
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 lg:hidden"
+          >
+            {lessonListOpen ? <X size={16} /> : <Menu size={16} />}
+            {lessonListOpen ? 'Đóng danh sách bài' : 'Danh sách bài học'}
+          </button>
+        )}
       </div>
       {loading && <div className="flex items-center gap-2 text-slate-400"><Loader2 className="animate-spin" size={18} /> Đang tải buổi học...</div>}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!loading && !error && units.length === 0 && <p className="text-sm text-slate-500">Môn này chưa có buổi học.</p>}
       {units.length > 0 && (
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="min-h-0 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-2">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-1 lg:gap-4">
+          <aside id="lesson-list" className={`${lessonListOpen ? 'block' : 'hidden'} max-h-[38vh] min-h-0 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-2 lg:block lg:max-h-none`}>
+            <style>{`
+              .lesson-unlock-burst {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                z-index: 10;
+                width: 6px;
+                height: 9px;
+                border-radius: 2px;
+                pointer-events: none;
+                animation: lesson-unlock-burst 900ms cubic-bezier(.15,.65,.3,1) var(--burst-delay) both;
+              }
+              .lesson-read-burst {
+                animation-duration: 1.2s;
+              }
+              .lesson-unlocked-card {
+                animation: lesson-unlocked-glow 3s ease-out both;
+              }
+              @keyframes lesson-unlock-burst {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(.35) rotate(0); }
+                15% { opacity: 1; }
+                100% { opacity: 0; transform: translate(var(--burst-x), var(--burst-y)) scale(.8) rotate(var(--burst-rotate)); }
+              }
+              @keyframes lesson-unlocked-glow {
+                0%, 15% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+                35% { box-shadow: 0 0 0 4px rgba(245, 158, 11, .35); }
+                100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .lesson-unlock-burst,
+                .lesson-unlocked-card { animation: none; }
+              }
+            `}</style>
             <ol className="space-y-1">
               {units.map((unit, index) => {
                 const opened = openUnit?.id === unit.id;
+                const justUnlocked = unlockCelebrationUnitId === unit.id && !unit.locked;
                 return (
-                  <li key={unit.id} className="pb-2">
+                  <li key={unit.id} className="relative pb-2">
                     {unit.locked ? (
                       <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left" aria-disabled="true">
                         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-400">{index + 1}</span>
@@ -677,7 +837,8 @@ export default function LessonPracticeUnitsPage() {
                     <button
                       type="button"
                       onClick={() => chooseUnit(unit)}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left ${opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                      title={unit.title}
+                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                       <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
                       <span className="min-w-0 flex-1">
@@ -691,6 +852,25 @@ export default function LessonPracticeUnitsPage() {
                       {unit.status === 'completed' && <CheckCircle2 size={16} className="text-emerald-600" />}
                     </button>
                     )}
+                    {justUnlocked && (
+                      <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[4.25rem]" aria-hidden="true">
+                        {UNLOCK_CONFETTI.map(([x, y, color, burstX, burstY, delay], pieceIndex) => (
+                          <i
+                            key={pieceIndex}
+                            className="lesson-unlock-burst"
+                            style={{
+                              backgroundColor: color,
+                              '--burst-x': `${burstX}px`,
+                              '--burst-y': `${burstY}px`,
+                              '--burst-rotate': `${(pieceIndex % 2 ? 1 : -1) * 240}deg`,
+                              '--burst-delay': `${delay}ms`,
+                              left: `calc(50% + ${x}px)`,
+                              top: `calc(50% + ${y}px)`,
+                            }}
+                          />
+                        ))}
+                      </span>
+                    )}
                     {opened && (
                       <div className="mb-1 ml-11 mt-1 space-y-1 pr-2">
                         {orderedSections(unit).map((item) => {
@@ -700,12 +880,17 @@ export default function LessonPracticeUnitsPage() {
                             ? unit.videoDoneIds?.includes(item.itemId) || unit.videoDone
                             : item.kind === 'note'
                               ? unit.noteDoneIds?.includes(item.itemId) || unit.noteDone
-                              : unit.practiceDone;
+                              : unit.practiceDoneGroupIds?.includes(item.itemId) || unit.practiceDone;
                           return (
                             <button
                               key={item.id}
                               type="button"
-                              onClick={() => setSection(item.id)}
+                              onClick={() => {
+                                setSection(item.id);
+                                saveResumePoint(resumeStorageKey, unit.id, item.id);
+                                setLessonListOpen(false);
+                              }}
+                              title={item.label}
                               className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'}`}
                             >
                               <Icon size={15} />
@@ -754,7 +939,7 @@ export default function LessonPracticeUnitsPage() {
                   </div>
                 )}
                 {activeSection?.kind === 'note' && (
-                  <div className="flex min-h-[min(76vh,54rem)] flex-1 flex-col overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
                     <NotePane
                       unit={openUnit}
                       content={selectedContent}
@@ -766,13 +951,21 @@ export default function LessonPracticeUnitsPage() {
                 {activeSection?.kind === 'practice' && (
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     <LessonPracticePlayerPage
-                      key={openUnit.id}
+                      key={`${openUnit.id}-${activeSection.itemId}`}
                       unitId={openUnit.id}
+                      practiceGroupId={activeSection.itemId}
                       embedded
                       onUnitStatus={(status) => {
-                        loadUnits().catch(() => {});
                         if (status === 'completed') {
+                          const wasCompleted = openUnit.status === 'completed';
+                          celebrateNextUnlockedUnit(openUnit.id, wasCompleted).catch((err) => {
+                            setError(err.message || 'Không cập nhật được bài học tiếp theo');
+                          });
                           window.dispatchEvent(new Event('lesson-practice-progress-updated'));
+                        } else {
+                          loadUnits().catch((err) => {
+                            setError(err.message || 'Không cập nhật được tiến độ bài học');
+                          });
                         }
                       }}
                     />

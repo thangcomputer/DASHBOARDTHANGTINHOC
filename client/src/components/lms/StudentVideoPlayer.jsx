@@ -15,6 +15,7 @@ import {
   resolveYouTubeDisplayDuration,
   syncYouTubePlaybackState,
 } from '../../utils/youtubeDuration';
+import { describeYouTubePlayerError } from '../../utils/youtubePlayerError';
 // ─── Helper: Extract YouTube ID ──────────────────────────────────────────────
 export const extractYouTubeId = (url = '') => {
   if (!url) return '';
@@ -274,8 +275,8 @@ export const StudentVideoPlayer = ({
             if (cancelled) return;
             if (event?.data) setYtPlaybackQuality(String(event.data));
           },
-          onError: () => {
-            setPlayerError('Không phát được video. Kiểm tra link YouTube hoặc quyền nhúng.');
+          onError: (event) => {
+            setPlayerError(describeYouTubePlayerError(event?.data));
             setIsReady(false);
             isReadyRef.current = false;
           },

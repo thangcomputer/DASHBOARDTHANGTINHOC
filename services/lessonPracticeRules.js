@@ -35,6 +35,22 @@ function needsExactCorrect(type) {
   return RETRY_TYPES.has(type);
 }
 
+function completedPracticeGroupIds(questions, answersByItem, unitId) {
+  const groups = new Map();
+  questions.forEach((question) => {
+    const groupId = String(question.practiceGroupId || unitId);
+    if (!groups.has(groupId)) groups.set(groupId, []);
+    groups.get(groupId).push(question);
+  });
+  return [...groups.entries()]
+    .filter(([, groupQuestions]) => groupQuestions.every((question) => {
+      const answer = answersByItem.get(String(question._id));
+      if (!answer) return false;
+      return !(needsExactCorrect(question.type) || question.type === 'written') || answer.correct === true;
+    }))
+    .map(([groupId]) => groupId);
+}
+
 function writtenPercent(score) {
   const n = Number(score);
   if (!Number.isFinite(n)) return null;
@@ -98,7 +114,8 @@ function isUnitLocked(units, completedIds, unitId, previewUnitIds = new Set()) {
   const index = ordered.findIndex((u) => String(u._id || u.id) === String(unitId));
   if (index <= 0) return false;
   const done = completedIds instanceof Set ? completedIds : new Set(completedIds || []);
-  return ordered.slice(0, index).some((u) => !done.has(String(u._id || u.id)));
+  const previousUnit = ordered[index - 1];
+  return !done.has(String(previousUnit._id || previousUnit.id));
 }
 
 function normalizeSubjectKey(value) {
@@ -198,12 +215,14 @@ function optionViews(item) {
 function publicItem(item) {
   const base = {
     id: String(item._id || item.id),
+    practiceGroupId: String(item.practiceGroupId || ''),
     videoId: String(item.videoId || ''),
     type: item.type,
     sortOrder: item.sortOrder || 0,
     prompt: item.prompt || '',
     imageUrl: item.imageUrl || '',
     caption: item.caption || '',
+    hint: item.hint || '',
     timeLimitSec: clampTimeLimit(item.timeLimitSec),
   };
   if (item.type === 'mcq' || item.type === 'multi') {
@@ -391,11 +410,13 @@ function normalizeItem(body) {
   const type = String(body.type);
   const item = {
     type,
+    practiceGroupId: String(body.practiceGroupId || '').trim().slice(0, 100),
     videoId: String(body.videoId || ''),
     prompt: String(body.prompt || '').trim(),
     imageUrl: String(body.imageUrl || '').trim(),
     imageName: String(body.imageName || '').trim().slice(0, 255),
     caption: String(body.caption || '').trim(),
+    hint: String(body.hint || '').trim(),
     explanation: String(body.explanation || '').trim(),
     sortOrder: Number(body.sortOrder) || 0,
     timeLimitSec: clampTimeLimit(body.timeLimitSec),
@@ -443,6 +464,7 @@ module.exports = {
   pointInRegion,
   isQuestionType,
   needsExactCorrect,
+  completedPracticeGroupIds,
   writtenPercent,
   writtenPasses,
   compareByOrder,

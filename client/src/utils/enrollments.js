@@ -460,7 +460,8 @@ export function getStudentCourseAccessKeys(enrollments, fallbackCourse) {
 
 export function studentCanAccessTrainingItem(item, accessKeys, enrollments, fallbackCourse) {
   if (!item) return false;
-  const { courseId: cid, courseName: cname } = item;
+  const cid = item.courseId || item.course_id;
+  const cname = item.courseName;
   if (!cid && !cname) return false; // Sửa lỗi: Không tự động cho phép nếu không có khóa cụ thể (để bộ lọc môn xử lý)
   if (cid && accessKeys.has(`id:${String(cid)}`)) return true;
   if (cname && accessKeys.has(`name:${normCourseKey(cname)}`)) return true;
@@ -527,6 +528,12 @@ export function filterStudentTrainingVideos(videos, { enrollments, fallbackCours
   const hasEnrollment = !!(enrollments?.length || fallbackCourse);
 
   return list.filter((v) => {
+    const isAssignedToCourse = Boolean(v.courseId || v.course_id || v.courseName);
+    if (isAssignedToCourse) {
+      if (studentCanAccessTrainingItem(v, accessKeys, enrollments, fallbackCourse)) return true;
+      return Boolean(allowedSubjectIds?.length && itemMatchesSubjectIds(v, allowedSubjectIds, catalog));
+    }
+
     // 1) Khớp môn thi của khóa HV đang học (cách chính để thấy video Admin xuất bản)
     if (allowedSubjectIds?.length && itemMatchesSubjectIds(v, allowedSubjectIds, catalog)) {
       return true;

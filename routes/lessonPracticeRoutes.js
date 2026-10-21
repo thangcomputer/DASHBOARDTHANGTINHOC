@@ -56,7 +56,7 @@ function uploadImage(req, res, next) {
 
 router.get('/backup/export', ...requireAdmin, async (req, res) => {
   try {
-    const data = await service.exportBackup();
+    const data = await service.exportBackup(String(req.query.courseId || ''));
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });
@@ -77,7 +77,7 @@ router.post('/backup/import', ...requireAdmin, (req, res, next) => {
     } catch {
       return res.status(400).json({ success: false, message: 'File không phải JSON hợp lệ' });
     }
-    const data = await service.importBackup(payload);
+    const data = await service.importBackup(payload, String(req.body?.courseId || ''));
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });
@@ -275,7 +275,7 @@ router.post('/my/units/:id/sections/:section', ...requireStudent, async (req, re
 
 router.post('/my/units/:id/reset-practice', ...requireStudent, async (req, res) => {
   try {
-    const data = await service.resetPractice(studentId(req), req.params.id);
+    const data = await service.resetPractice(studentId(req), req.params.id, String(req.body?.practiceGroupId || ''));
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });
