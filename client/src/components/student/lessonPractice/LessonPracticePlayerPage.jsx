@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, Lightbulb, Loader2, Move, Play, Sparkles, Trophy } from 'lucide-react';
-import SupportMascot from '../../SupportMascot';
+import { ArrowLeft, Clock, Lightbulb, Loader2, Move, Play, Sparkles, Trophy, Volume2, VolumeX } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
-import { playLessonCorrectSound, playLessonTick, playLessonWrongSound, unlockAudio } from '../../../utils/sound';
+import { isSoundMuted, playLessonCorrectSound, playLessonTick, playLessonWrongSound, unlockAudio } from '../../../utils/sound';
 import { remainingPracticeSeconds, resolvePracticeClock, resolvePracticeGroupTimeLimit, restorePracticeClockSession } from '../../../utils/lessonPracticeClock';
+import {
+  advancePracticeAttemptStats,
+  claimPracticeSubmission,
+  createPracticeAttemptStats,
+  getPracticeEncouragement,
+  getPracticePraise,
+  isPracticeAttemptComplete,
+  isPerfectTenPracticeResult,
+  normalizePracticeAttemptStats,
+  summarizePracticeAttempt,
+} from '../../../utils/lessonPracticeQuizFeedback';
+import './LessonPracticeQuizFeedback.css';
 
 function eventPercent(event, node) {
   const box = node.getBoundingClientRect();
@@ -65,28 +76,6 @@ function Explanation({ item }) {
   );
 }
 
-function StudentEarPullMascot() {
-  return (
-    <svg className="lesson-feedback-ear-pull" viewBox="0 0 48 48" aria-hidden="true">
-      <circle cx="24" cy="24" r="23" fill="#DC2626" />
-      <path d="M12 42c1-8 5-12 12-12s11 4 12 12" fill="#FEF2F2" />
-      <path d="M20 28h8v7h-8z" fill="#FFE4C8" />
-      <circle cx="24" cy="20" r="10" fill="#FFE4C8" />
-      <path d="M14 19c0-7 4-12 10-12s10 5 10 12c-2-2-5-4-10-4s-8 2-10 4z" fill="#1E293B" />
-      <path d="M15 18c-2 0-3 2-3 4s1 4 3 4M33 18c2 0 3 2 3 4s-1 4-3 4" fill="#FFE4C8" stroke="#FCA5A5" strokeWidth="1.5" />
-      <circle cx="21" cy="21" r="1.2" fill="#0F172A" />
-      <circle cx="27" cy="21" r="1.2" fill="#0F172A" />
-      <path d="M21 27c1.5-1 4.5-1 6 0" stroke="#BE123C" strokeWidth="1.4" strokeLinecap="round" />
-      <g className="lesson-feedback-ear-pull__hand">
-        <path d="M47 13 37 18" stroke="#FFE4C8" strokeWidth="3.5" strokeLinecap="round" />
-        <path d="M38 18c-1-2-3-2-4-1-1 1 0 3 2 4l2 1c1 1 3 0 3-1 0-1-1-2-3-3z" fill="#FFE4C8" stroke="#FCA5A5" strokeWidth="1" />
-        <path d="M35 18c-1-1-2-1-3 0" stroke="#FFE4C8" strokeWidth="2" strokeLinecap="round" />
-      </g>
-      <path d="m11 12-2-2m4-2-1-3m-3 7-3-1" stroke="#FDE68A" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 const PRACTICE_TYPES = new Set(['mcq', 'multi', 'match', 'drag', 'hotspot', 'written']);
 const COOLDOWN_QUESTION_TYPES = new Set(['mcq', 'multi', 'match', 'drag', 'hotspot']);
 
@@ -133,6 +122,24 @@ function clearPracticeStorage(prefix) {
   }
 }
 
+function readPracticeAttemptStats(key) {
+  try {
+    const saved = sessionStorage.getItem(key);
+    return saved ? normalizePracticeAttemptStats(JSON.parse(saved)) : createPracticeAttemptStats();
+  } catch (err) {
+    console.warn('Không đọc được thống kê lượt luyện tập đã lưu', err);
+    return createPracticeAttemptStats();
+  }
+}
+
+function savePracticeAttemptStats(key, stats) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(stats));
+  } catch (err) {
+    console.warn('Không lưu được thống kê lượt luyện tập', err);
+  }
+}
+
 function QuizClock({ remaining, warning }) {
   const hand = (remaining % 60) * 6;
   return (
@@ -168,7 +175,76 @@ function PracticeModalIcon({ timeout = false }) {
   );
 }
 
-function QuestionCard({ item, index, busy, open = true, retry, expired = false, waiting = false, cooldownSeconds = 0, onConfirm, onSkip }) {
+function PracticeFeedbackBanner({ feedback, exiting }) {
+  if (!feedback) return null;
+  return (
+    <div
+      key={`${feedback.itemId}-${feedback.text}`}
+      className={`quiz-feedback quiz-feedback--correct${exiting ? ' quiz-feedback--leaving' : ''}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="quiz-feedback__icon" aria-hidden="true">{feedback.icon}</span>
+      <div>
+        <strong>{feedback.text}</strong>
+        <p>{feedback.streak >= 3 ? `Tuyệt vời! Bạn đã đúng ${feedback.streak} câu liên tiếp!` : 'Tiếp tục phát huy nhé!'}</p>
+      </div>
+    </div>
+  );
+}
+
+function PracticeResult({ result, celebrate }) {
+  const perfect = isPerfectTenPracticeResult(result);
+  const particles = Array.from({ length: 28 }, (_, index) => {
+    const angle = (index / 28) * Math.PI * 2;
+    const distance = 90 + (index % 5) * 24;
+    return {
+      id: index,
+      x: `${Math.cos(angle) * distance}px`,
+      y: `${Math.sin(angle) * distance - 24}px`,
+      rotation: `${(index * 47) % 360}deg`,
+      delay: `${(index % 7) * 45}ms`,
+      color: ['#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'][index % 5],
+    };
+  });
+  return (
+    <section className="quiz-result-card" aria-labelledby="practice-result-title">
+      {perfect && celebrate && (
+        <div className="quiz-confetti" aria-hidden="true">
+          {particles.map((particle) => (
+            <i
+              key={particle.id}
+              className="quiz-confetti__piece"
+              style={{
+                '--quiz-confetti-x': particle.x,
+                '--quiz-confetti-y': particle.y,
+                '--quiz-confetti-rotation': particle.rotation,
+                '--quiz-confetti-delay': particle.delay,
+                '--quiz-confetti-color': particle.color,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      <div className={`quiz-result-card__icon ${perfect ? 'quiz-result-card__icon--perfect' : ''}`} aria-hidden="true">
+        <Trophy size={42} strokeWidth={2.2} />
+      </div>
+      <p className="quiz-result-card__eyebrow">ĐÃ HOÀN THÀNH BÀI LUYỆN TẬP</p>
+      <h2 id="practice-result-title" className="quiz-result-card__title">
+        {perfect ? 'HOÀN HẢO! Bạn là nhà vô địch!' : 'Bạn đã hoàn thành rất tốt!'}
+      </h2>
+      <p className="quiz-result-card__summary">Bạn đã hoàn thành {result.total} câu hỏi.</p>
+      <div className="quiz-result-card__stats">
+        <div><strong>{result.correct}/{result.total}</strong><span>Câu đúng</span></div>
+        <div><strong>{result.wrong}</strong><span>Lượt trả lời sai</span></div>
+        <div><strong>{result.percentage}%</strong><span>Độ chính xác</span></div>
+        <div><strong>{result.bestStreak}</strong><span>Chuỗi đúng dài nhất</span></div>
+      </div>
+    </section>
+  );
+}
+
+function QuestionCard({ item, index, busy, open = true, attemptFeedback, feedbackExiting = false, expired = false, waiting = false, cooldownSeconds = 0, onConfirm }) {
   const [showHint, setShowHint] = useState(false);
   const [choiceId, setChoiceId] = useState(item.answer?.choiceId || '');
   const [choiceIds, setChoiceIds] = useState(item.answer?.choiceIds || []);
@@ -180,17 +256,6 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
   const [dragGhost, setDragGhost] = useState(null);
   const [dropId, setDropId] = useState('');
   const dragListeners = useRef(null);
-
-  useEffect(() => {
-    if (!retry?.n) return;
-    setChoiceId('');
-    setChoiceIds([]);
-    setMatches({});
-    setOrder(item.options || []);
-    setText('');
-    setPoint(null);
-    setHasReordered(false);
-  }, [retry?.n]);
 
   useEffect(() => () => {
     if (!dragListeners.current) return;
@@ -405,49 +470,21 @@ function QuestionCard({ item, index, busy, open = true, retry, expired = false, 
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 disabled:bg-slate-50"
         />
       )}
-      {(retry?.text && !done) || (done && typeof item.correct === 'boolean') || cooldownSeconds > 0 ? (
-        <div
-          aria-live="off"
-          className={`lesson-feedback-card flex items-start gap-3 rounded-2xl border px-4 py-3 ${
-            done && item.correct === true
-              ? 'border-emerald-200 bg-emerald-50'
-              : 'border-rose-200 bg-rose-50'
-          }`}
-        >
-          <div className={`lesson-feedback-mascot relative grid h-11 w-11 shrink-0 place-items-center ${
-            done && item.correct === true ? '' : 'is-ear-pull'
-          }`}>
-            {done && item.correct === true
-              ? <SupportMascot size={44} waving={false} className="lesson-feedback-mascot__icon" />
-              : <StudentEarPullMascot />}
-            {done && item.correct === true && (
-              <span className="absolute -right-0.5 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-sm shadow-sm" aria-hidden="true">👏</span>
-            )}
-          </div>
+      {attemptFeedback && !attemptFeedback.correct && !done && (
+        <div className={`quiz-feedback quiz-feedback--encouragement${feedbackExiting ? ' quiz-feedback--leaving' : ''}`} role="status" aria-live="polite">
+          <span className="quiz-feedback__icon" aria-hidden="true">{attemptFeedback.icon}</span>
           <div className="min-w-0 flex-1">
-            <div aria-live="polite">
-              <p className={`text-sm font-black ${
-                done && item.correct === true ? 'text-emerald-800' : 'text-rose-800'
-              }`}>
-                {done && item.correct === true ? 'Thầy Robo: Chính xác!' : 'Thầy Robo: Mình thử lại nhé!'}
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-slate-700">
-                {retry?.text && !done
-                  ? retry.text
-                  : done && item.correct === true
-                    ? 'Tuyệt lắm, bạn đã hoàn thành câu này.'
-                    : item.feedback || 'Chưa đúng rồi. Hãy xem lại câu hỏi và chọn đáp án khác nhé.'}
-              </p>
-            </div>
-            {waiting && cooldownSeconds > 0 ? (
-              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-800">
-                <Clock size={14} aria-hidden="true" />
-                <span>Thử lại sau {cooldownSeconds} giây</span>
-              </div>
-            ) : null}
+            <strong>{attemptFeedback.text}</strong>
+            <p>{attemptFeedback.detail || 'Mình cùng xem lại câu hỏi rồi thử tiếp nhé.'}</p>
           </div>
         </div>
-      ) : null}
+      )}
+      {!done && cooldownSeconds > 0 && (
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm font-bold text-amber-900" role="status" aria-live="polite">
+          <Clock size={16} aria-hidden="true" />
+          <span>Thử lại sau {cooldownSeconds} giây</span>
+        </div>
+      )}
       <Explanation item={item} />
       </div>
       {!frozen && (
@@ -493,8 +530,10 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
   const params = useParams();
   const unitId = unitIdProp || params.unitId;
   const navigate = useNavigate();
+  const attemptStatsStorageKey = `lesson-practice-quiz-stats:${unitId}:${practiceGroupId || 'all'}`;
   const [payload, setPayload] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedUnitId, setLoadedUnitId] = useState('');
+  const loading = loadedUnitId !== String(unitId || '');
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
   const [unitStatus, setUnitStatus] = useState('');
@@ -502,15 +541,22 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
   const [resetting, setResetting] = useState(false);
   const [practiceRound, setPracticeRound] = useState(0);
   const [focusId, setFocusId] = useState('');
-  const [skipped, setSkipped] = useState({});
   const [clockTry, setClockTry] = useState(0);
   const [remaining, setRemaining] = useState(0);
   const [expired, setExpired] = useState(false);
   const [started, setStarted] = useState(false);
   const [wrongAnswerCooldown, setWrongAnswerCooldown] = useState(0);
   const [celebratingQuestionId, setCelebratingQuestionId] = useState('');
+  const [attemptStats, setAttemptStats] = useState(() => readPracticeAttemptStats(attemptStatsStorageKey));
+  const [attemptFeedback, setAttemptFeedback] = useState(null);
+  const [feedbackExiting, setFeedbackExiting] = useState(false);
+  const [completionCelebration, setCompletionCelebration] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const clockSessionRef = useRef(null);
   const clockPersistenceDisabledRef = useRef(false);
+  const attemptStatsRef = useRef(attemptStats);
+  const submittingItemsRef = useRef(new Set());
+  const completionCelebratedRef = useRef(false);
 
   const items = (payload?.items || []).filter((item) => (
     !practiceGroupId || String(item.practiceGroupId || unitId) === practiceGroupId
@@ -519,8 +565,9 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
   const others = items.filter((item) => !PRACTICE_TYPES.has(item.type));
   const answered = quizzes.filter((item) => item.confirmed).length;
   const progressPercent = quizzes.length ? Math.round((answered / quizzes.length) * 100) : 0;
-  const allCorrect = quizzes.length > 0 && answered === quizzes.length;
-  const firstOpen = quizzes.findIndex((item) => !item.confirmed && !skipped[item.id]);
+  const allCorrect = isPracticeAttemptComplete(quizzes);
+  const result = allCorrect ? summarizePracticeAttempt(quizzes, attemptStats) : null;
+  const firstOpen = quizzes.findIndex((item) => !item.confirmed);
   const lastIndex = Math.max(quizzes.length - 1, 0);
   const openLimit = firstOpen === -1 ? lastIndex : firstOpen;
   const focusIndex = quizzes.findIndex((item) => item.id === focusId);
@@ -552,32 +599,34 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
     lessonPracticeApi.student.unit(unitId)
       .then((res) => {
         if (!alive) return;
+        setError('');
         setWrongAnswerCooldown(0);
         setPayload(res.data);
         setStarted(false);
         setClockTry(0);
-        setSkipped({});
         setRetries({});
         setFocusId('');
+        const savedStats = readPracticeAttemptStats(attemptStatsStorageKey);
+        attemptStatsRef.current = savedStats;
+        setAttemptStats(savedStats);
+        setAttemptFeedback(null);
+        setFeedbackExiting(false);
+        setCompletionCelebration(false);
+        completionCelebratedRef.current = false;
         const status = res.data?.unit?.status || '';
         setUnitStatus(status);
         if (status) onUnitStatus?.(status);
       })
       .catch((err) => { if (alive) setError(err.message || 'Không mở được buổi học'); })
-      .finally(() => { if (alive) setLoading(false); });
+      .finally(() => { if (alive) setLoadedUnitId(String(unitId || '')); });
     return () => { alive = false; };
-  }, [unitId]);
+  }, [unitId, practiceGroupId, attemptStatsStorageKey]);
 
   useEffect(() => {
-    if (!timed || !started) {
-      setRemaining(timed ? clockLimit : 0);
-      setExpired(false);
-      return undefined;
-    }
+    if (!timed || !started) return undefined;
     clockPersistenceDisabledRef.current = false;
     const restoredSeconds = readSavedPracticeSeconds(clockStorageKey, clockLimit);
     clockSessionRef.current = restorePracticeClockSession(
@@ -594,7 +643,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
       const left = remainingPracticeSeconds(clockSessionRef.current);
       setRemaining(Math.max(0, left));
       if (!clockPersistenceDisabledRef.current) savePracticeValue(clockStorageKey, left);
-      if (left > 0 && left <= warnAt) playLessonTick(left % 2 === 0);
+      if (left > 0 && left <= warnAt && soundEnabled && !isSoundMuted()) playLessonTick(left % 2 === 0);
       if (left <= 0) {
         window.clearInterval(timer);
         setExpired(true);
@@ -606,7 +655,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
         savePracticeValue(clockStorageKey, remainingPracticeSeconds(clockSessionRef.current));
       }
     };
-  }, [timed, clockLimit, warnAt, clockSessionKey, clockStorageKey, started]);
+  }, [timed, clockLimit, warnAt, clockSessionKey, clockStorageKey, started, soundEnabled]);
 
   useEffect(() => {
     if (!allCorrect) return;
@@ -629,25 +678,47 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
     return () => window.clearTimeout(timeout);
   }, [celebratingQuestionId]);
 
+  useEffect(() => {
+    if (!attemptFeedback) return undefined;
+    const exitTimeout = window.setTimeout(() => setFeedbackExiting(true), 2500);
+    const clearTimeoutId = window.setTimeout(() => setAttemptFeedback(null), 2900);
+    return () => {
+      window.clearTimeout(exitTimeout);
+      window.clearTimeout(clearTimeoutId);
+    };
+  }, [attemptFeedback]);
+
   async function confirm(item, body) {
+    if (!claimPracticeSubmission(submittingItemsRef.current, item.id, item.confirmed)) return;
     unlockAudio();
     setBusyId(item.id);
     setError('');
     const usesWrongAnswerCooldown = COOLDOWN_QUESTION_TYPES.has(item.type);
     try {
       const res = await lessonPracticeApi.student.confirm(item.id, body);
-      if (res.data.retry || res.data.item?.correct === false) playLessonWrongSound();
-      else if (res.data.item?.correct === true) playLessonCorrectSound();
-      if (res.data.retry) {
+      const answeredItem = res.data?.item;
+      if (!answeredItem) throw new Error('Không nhận được kết quả chấm câu trả lời');
+      if (res.data.retry || answeredItem.correct === false) {
+        const nextStats = advancePracticeAttemptStats(attemptStatsRef.current, false);
+        attemptStatsRef.current = nextStats;
+        setAttemptStats(nextStats);
+        savePracticeAttemptStats(attemptStatsStorageKey, nextStats);
+        const detail = String(answeredItem.feedback || '').trim();
+        setFeedbackExiting(false);
+        setAttemptFeedback({
+          itemId: item.id,
+          correct: false,
+          text: getPracticeEncouragement(nextStats.wrongAttempts),
+          icon: '🌱',
+          detail: detail === 'Bạn sai rồi, vui lòng chọn lại đáp án' ? '' : detail,
+        });
         setRetries((prev) => ({
           ...prev,
-          [item.id]: { text: res.data.item?.feedback || 'Bạn sai rồi, vui lòng chọn lại đáp án', n: (prev[item.id]?.n || 0) + 1 },
+          [item.id]: { n: (prev[item.id]?.n || 0) + 1 },
         }));
+        if (soundEnabled) playLessonWrongSound();
         if (usesWrongAnswerCooldown) setWrongAnswerCooldown(10);
         return;
-      }
-      if (usesWrongAnswerCooldown && res.data.item?.correct === false) {
-        setWrongAnswerCooldown(10);
       }
       setRetries((prev) => {
         if (!prev[item.id]) return prev;
@@ -655,15 +726,37 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
         delete next[item.id];
         return next;
       });
-      setPayload((prev) => ({
-        ...prev,
-        items: (prev?.items || []).map((row) => (row.id === item.id ? res.data.item : row)),
-      }));
-      if (res.data.item?.correct === true) {
+      const nextItems = (payload?.items || []).map((row) => (row.id === item.id ? answeredItem : row));
+      const nextQuizzes = nextItems.filter((row) => (
+        PRACTICE_TYPES.has(row.type)
+        && (!practiceGroupId || String(row.practiceGroupId || unitId) === practiceGroupId)
+      ));
+      const completedBeforeAnswer = isPracticeAttemptComplete(quizzes);
+      const completedAfterAnswer = isPracticeAttemptComplete(nextQuizzes);
+      setPayload((prev) => ({ ...prev, items: nextItems }));
+      if (answeredItem.correct === true && answeredItem.confirmed === true && !res.data.alreadyConfirmed) {
+        const nextStats = advancePracticeAttemptStats(attemptStatsRef.current, true);
+        attemptStatsRef.current = nextStats;
+        setAttemptStats(nextStats);
+        savePracticeAttemptStats(attemptStatsStorageKey, nextStats);
+        const correctCount = nextQuizzes.filter((row) => row.confirmed === true && row.correct === true).length;
+        setFeedbackExiting(false);
+        setAttemptFeedback({
+          itemId: item.id,
+          correct: true,
+          text: getPracticePraise(correctCount).text,
+          icon: getPracticePraise(correctCount).icon,
+          streak: nextStats.streak,
+        });
+        if (soundEnabled) playLessonCorrectSound();
         setFocusId('');
         setCelebratingQuestionId(item.id);
+        if (completedAfterAnswer && !completedBeforeAnswer && !completionCelebratedRef.current) {
+          completionCelebratedRef.current = true;
+          setCompletionCelebration(true);
+        }
       }
-      if (res.data.item?.confirmed) savePracticeValue(startedStorageKey, '1');
+      if (answeredItem.confirmed) savePracticeValue(startedStorageKey, '1');
       if (res.data.unitStatus) {
         setUnitStatus(res.data.unitStatus);
         onUnitStatus?.(res.data.unitStatus);
@@ -671,8 +764,13 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
     } catch (err) {
       setError(err.message || 'Không xác nhận được câu này');
     } finally {
+      submittingItemsRef.current.delete(item.id);
       setBusyId('');
     }
+  }
+
+  function toggleSound() {
+    setSoundEnabled((enabled) => !enabled);
   }
 
   async function resetPractice({ startImmediately = false } = {}) {
@@ -687,8 +785,16 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
       setPayload(res.data);
       setRetries({});
       setFocusId('');
-      setSkipped({});
+      setExpired(false);
       setClockTry(0);
+      const emptyStats = createPracticeAttemptStats();
+      attemptStatsRef.current = emptyStats;
+      setAttemptStats(emptyStats);
+      savePracticeAttemptStats(attemptStatsStorageKey, emptyStats);
+      setAttemptFeedback(null);
+      setFeedbackExiting(false);
+      setCompletionCelebration(false);
+      completionCelebratedRef.current = false;
       if (startImmediately) savePracticeValue(startedStorageKey, '1');
       setStarted(startImmediately);
       setPracticeRound((round) => round + 1);
@@ -742,28 +848,6 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                   50%, 100% { opacity: 0.28; }
                 }
                 .lesson-clock-blink { animation: lesson-clock-blink 0.5s step-end infinite; }
-                @media (prefers-reduced-motion: no-preference) {
-                  .lesson-feedback-card { animation: lesson-feedback-in 180ms ease-out; }
-                }
-                @keyframes lesson-feedback-in {
-                  from { opacity: 0.6; transform: translateY(4px); }
-                  to { opacity: 1; transform: translateY(0); }
-                }
-                .lesson-feedback-ear-pull {
-                  display: block;
-                  width: 44px;
-                  height: 44px;
-                  overflow: visible;
-                }
-                .lesson-feedback-ear-pull__hand {
-                  transform-origin: 38px 19px;
-                  animation: lesson-ear-pull 1.2s ease-in-out infinite;
-                }
-                @keyframes lesson-ear-pull {
-                  0%, 18%, 48%, 100% { transform: translate(0, 0) rotate(0); }
-                  30% { transform: translate(2px, -1px) rotate(8deg); }
-                  38% { transform: translate(0, 0) rotate(0); }
-                }
                 .lesson-progress-marker {
                   position: relative;
                   overflow: visible;
@@ -784,9 +868,6 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                   100% { opacity: 0; transform: translate(var(--burst-x), var(--burst-y)) scale(.85) rotate(var(--burst-rotate)); }
                 }
                 @media (prefers-reduced-motion: reduce) {
-                  .lesson-feedback-ear-pull__hand {
-                    animation: none;
-                  }
                   .lesson-progress-confetti {
                     animation: none;
                     opacity: 0;
@@ -795,23 +876,33 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
               `}</style>
               {quizzes.length > 0 && (
                 <div className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-700">
                       Tiến độ <span className="ml-1 font-bold text-slate-900">{answered}/{quizzes.length}</span>
                     </p>
-                    {timed && (
-                      <QuizClock
-                        remaining={started ? remaining : (savedClockSeconds ?? clockLimit)}
-                        warning={started && remaining > 0 && remaining <= warnAt}
-                      />
-                    )}
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <span className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-amber-50 px-3 text-sm font-bold text-amber-900" aria-label={`Chuỗi đúng hiện tại ${attemptStats.streak}`}>
+                        <Sparkles size={16} className="text-amber-600" aria-hidden="true" />
+                        <span>Chuỗi đúng: {attemptStats.streak}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleSound}
+                        aria-label={soundEnabled ? 'Tắt âm thanh luyện tập' : 'Bật âm thanh luyện tập'}
+                        aria-pressed={soundEnabled}
+                        title={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                      >
+                        {soundEnabled ? <Volume2 size={19} aria-hidden="true" /> : <VolumeX size={19} aria-hidden="true" />}
+                      </button>
+                      {timed && (
+                        <QuizClock
+                          remaining={started ? remaining : (savedClockSeconds ?? clockLimit)}
+                          warning={started && remaining > 0 && remaining <= warnAt}
+                        />
+                      )}
+                    </div>
                   </div>
-                  {allCorrect && (
-                    <p className="mb-2 flex items-center gap-2 text-sm font-black text-amber-800">
-                      <Trophy size={18} className="shrink-0 text-amber-500" />
-                      Chúc mừng! Bạn đã làm đúng tất cả câu hỏi.
-                    </p>
-                  )}
                   <nav
                     aria-label={`Tiến trình câu hỏi, ${answered} trên ${quizzes.length} câu`}
                     className="overflow-x-auto pb-1"
@@ -829,16 +920,14 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                       {quizzes.map((item, index) => {
                         const reachable = started && index <= openLimit;
                         const current = started && index === visibleIndex;
-                        const wrong = Boolean(retries[item.id]?.n) || (item.confirmed && item.correct === false);
+                        const needsRetry = Boolean(retries[item.id]?.n) || (item.confirmed && item.correct === false);
                         const tone = item.confirmed && item.correct === true
                           ? 'bg-emerald-500 text-white'
-                          : wrong
-                            ? 'bg-rose-500 text-white'
+                          : needsRetry
+                            ? 'bg-amber-400 text-amber-950'
                             : current
                               ? 'border-2 border-red-600 bg-white text-red-700'
-                              : skipped[item.id]
-                                ? 'bg-amber-400 text-white'
-                                : 'border border-slate-300 bg-white text-slate-500';
+                              : 'border border-slate-300 bg-white text-slate-500';
                         return (
                           <button
                             key={item.id}
@@ -846,11 +935,11 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                             disabled={!reachable}
                             onClick={() => setFocusId(item.id)}
                             aria-current={current ? 'step' : undefined}
-                            aria-label={`Câu ${index + 1}${wrong ? ', trả lời sai' : item.confirmed ? ', trả lời đúng' : skipped[item.id] ? ', đã bỏ qua' : ', chưa làm'}${current ? ', đang xem' : ''}`}
+                            aria-label={`Câu ${index + 1}${needsRetry ? ', đang luyện tập lại' : item.confirmed ? ', trả lời đúng' : ', chưa làm'}${current ? ', đang xem' : ''}`}
                             className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-1 text-[10px] font-semibold text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <span className={`lesson-progress-marker grid h-4 w-4 place-items-center rounded-full text-[9px] leading-none ${tone}`}>
-                              {item.confirmed && item.correct === true ? '✓' : wrong ? '×' : ''}
+                              {item.confirmed && item.correct === true ? '✓' : needsRetry ? '↻' : ''}
                               {celebratingQuestionId === item.id && item.confirmed && item.correct === true && (
                                 <span className="pointer-events-none absolute inset-0" aria-hidden="true">
                                   {[
@@ -889,7 +978,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                     <p className="text-[10px] font-medium text-slate-500">
                       <span className="text-emerald-700">Đúng</span>
                       <span className="px-1">·</span>
-                      <span className="text-rose-700">Sai</span>
+                      <span className="text-amber-700">Thử lại</span>
                     </p>
                     {(started || allCorrect) && (
                       <button
@@ -905,12 +994,19 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                 </div>
               )}
               <div className={embedded ? 'relative min-h-[15rem] flex-1' : 'relative min-h-[15rem]'}>
+                <PracticeFeedbackBanner
+                  feedback={!allCorrect && attemptFeedback?.correct ? attemptFeedback : null}
+                  exiting={feedbackExiting}
+                />
+                {allCorrect && result && (
+                  <PracticeResult result={result} celebrate={completionCelebration} />
+                )}
                 {quizzes.length === 0 && others.map((item) => (
                   <QuestionCard key={item.id} item={item} index={0} busy={busyId === item.id} waiting={wrongAnswerCooldown > 0} cooldownSeconds={wrongAnswerCooldown} onConfirm={(answer) => confirm(item, answer)} />
                 ))}
-                {started && visibleQuiz && (
+                {started && visibleQuiz && !allCorrect && (
                   <QuestionCard
-                    key={`${visibleQuiz.id}-${practiceRound}-${clockTry}`}
+                    key={`${visibleQuiz.id}-${practiceRound}-${clockTry}-${retries[visibleQuiz.id]?.n || 0}`}
                     item={visibleQuiz}
                     index={visibleIndex + 1}
                     busy={busyId === visibleQuiz.id}
@@ -918,11 +1014,8 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                     waiting={!started || wrongAnswerCooldown > 0}
                     cooldownSeconds={wrongAnswerCooldown}
                     expired={timed && started && expired}
-                    retry={retries[visibleQuiz.id]}
-                    onSkip={() => {
-                      setSkipped((prev) => ({ ...prev, [visibleQuiz.id]: true }));
-                      setFocusId('');
-                    }}
+                    attemptFeedback={attemptFeedback?.itemId === visibleQuiz.id && !attemptFeedback.correct ? attemptFeedback : null}
+                    feedbackExiting={feedbackExiting}
                     onConfirm={(answer) => confirm(visibleQuiz, answer)}
                   />
                 )}
@@ -979,6 +1072,7 @@ export default function LessonPracticePlayerPage({ unitId: unitIdProp, practiceG
                           unlockAudio();
                           clockPersistenceDisabledRef.current = false;
                           savePracticeValue(startedStorageKey, '1');
+                          setExpired(false);
                           setStarted(true);
                           setClockTry(0);
                         }}
