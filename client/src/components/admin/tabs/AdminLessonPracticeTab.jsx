@@ -258,7 +258,7 @@ export default function AdminLessonPracticeTab() {
   useEffect(() => {
     const element = practiceEditorContainers.current.get(selectedPracticeGroupId);
     setPracticeEditorTarget(element ? { groupId: selectedPracticeGroupId, element } : null);
-  }, [selectedPracticeGroupId, unitId]);
+  }, [selectedPracticeGroupId, unitId, isUnitEditing, items]);
   const lessonVideos = selectedUnit?.videos || [];
   const lessonContents = selectedUnit?.contents || [];
   const hasPracticeBlock = practiceGroupIds.length > 0;
@@ -336,7 +336,11 @@ export default function AdminLessonPracticeTab() {
     setNotice('');
     try {
       const res = await lessonPracticeApi.admin.updateUnit(unitId, { practiceTimeLimits });
-      setUnits((rows) => rows.map((unit) => (unit.id === unitId ? res.data : unit)));
+      setUnits((rows) => rows.map((unit) => (
+        unit.id === unitId
+          ? { ...unit, practiceTimeLimits: res.data.practiceTimeLimits || practiceTimeLimits }
+          : unit
+      )));
       setNotice('Đã lưu thời gian cho phần luyện tập.');
     } catch (err) {
       setError(err.message || 'Không lưu được thời gian cho phần luyện tập');
@@ -1046,7 +1050,7 @@ export default function AdminLessonPracticeTab() {
                                             className="font-bold text-slate-700"
                                             onClick={() => {
                                               setActivePracticeGroupId(groupId);
-                                              setDraft({ ...blankItem(), ...item, videoId: '', options: item.options?.length ? item.options : blankItem().options, pairs: item.pairs?.length ? item.pairs : blankItem().pairs, correctOptionIds: item.correctOptionIds || [], region: item.region || null });
+                                              setDraft({ ...blankItem(), ...item, practiceGroupId: groupId, videoId: '', options: item.options?.length ? item.options : blankItem().options, pairs: item.pairs?.length ? item.pairs : blankItem().pairs, correctOptionIds: item.correctOptionIds || [], region: item.region || null });
                                             }}
                                           >
                                             Sửa
@@ -1209,7 +1213,19 @@ export default function AdminLessonPracticeTab() {
                               <textarea value={draft.explanation} onChange={(e) => setDraft({ ...draft, explanation: e.target.value })} rows={1} placeholder="Lời giải (hiện sau khi học viên xác nhận)" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
                               <div className="flex flex-wrap gap-1.5">
                                 {draft.id ? (
-                                  <button type="submit" disabled={saving} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">Cập nhật câu</button>
+                                  <>
+                                    <button type="submit" disabled={saving} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">Cập nhật câu</button>
+                                    <button
+                                      type="submit"
+                                      data-next="1"
+                                      disabled={saving}
+                                      aria-label="Cập nhật câu và thêm câu mới"
+                                      title="Cập nhật câu và thêm câu mới"
+                                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white disabled:opacity-60"
+                                    >
+                                      <Plus size={17} />
+                                    </button>
+                                  </>
                                 ) : (
                                   <button
                                     type="submit"

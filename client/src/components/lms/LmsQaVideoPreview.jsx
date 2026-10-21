@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Play } from 'lucide-react';
+import { ExternalLink, Pause, Play } from 'lucide-react';
 import { formatLmsTimestamp } from '../../utils/lmsLessonUi';
 import { ensureYouTubeApi, extractYouTubeId } from '../../utils/youtubeDuration';
 /**
@@ -17,6 +17,7 @@ export default function LmsQaVideoPreview({
   const playerRef = useRef(null);
   const tickRef = useRef(null);
   const [ready, setReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState('');
   const askAt = Math.max(0, Math.floor(Number(startAtSec) || 0));
   const [current, setCurrent] = useState(askAt);
@@ -25,7 +26,6 @@ export default function LmsQaVideoPreview({
 
   useEffect(() => {
     if (!ytId || !containerRef.current) {
-      if (!ytId) setError('Không tìm thấy video của bài học này');
       setReady(false);
       return undefined;
     }
@@ -33,6 +33,7 @@ export default function LmsQaVideoPreview({
     let cancelled = false;
     setError('');
     setReady(false);
+    setIsPlaying(false);
     setCurrent(askAt);
 
     const startTick = () => {
@@ -64,7 +65,7 @@ export default function LmsQaVideoPreview({
         width: '100%',
         height: '100%',
         playerVars: {
-          controls: 0,
+          controls: 1,
           disablekb: 0,
           rel: 0,
           modestbranding: 1,
@@ -72,6 +73,7 @@ export default function LmsQaVideoPreview({
           fs: 0,
           playsinline: 1,
           enablejsapi: 1,
+          origin: window.location.origin,
           start: askAt,
         },
         events: {
@@ -86,8 +88,19 @@ export default function LmsQaVideoPreview({
             setReady(true);
             startTick();
           },
-          onError: () => {
-            if (!cancelled) setError('Không phát được video YouTube');
+          onStateChange: (event) => {
+            if (!cancelled) {
+              setIsPlaying(event.data === YT.PlayerState.PLAYING);
+              if (event.data === YT.PlayerState.ENDED) setIsPlaying(false);
+            }
+          },
+          onError: (event) => {
+            if (!cancelled) {
+              setIsPlaying(false);
+              setError(event.data === 101 || event.data === 150
+                ? 'Video không cho phép phát trong trang này.'
+                : 'Không phát được video YouTube.');
+            }
           },
         },
       });
@@ -110,6 +123,18 @@ export default function LmsQaVideoPreview({
       playerRef.current?.seekTo?.(t, true);
       playerRef.current?.playVideo?.();
     } catch { /* ignore */ }
+  };
+
+  const togglePlayback = () => {
+    try {
+      if (isPlaying) playerRef.current?.pauseVideo?.();
+      else {
+        playerRef.current?.seekTo?.(current, true);
+        playerRef.current?.playVideo?.();
+      }
+    } catch {
+      setError('Không điều khiển được video. Hãy mở video trực tiếp trên YouTube.');
+    }
   };
 
   const maxDur = Math.max(duration, askAt, current, 1);
@@ -149,9 +174,39 @@ export default function LmsQaVideoPreview({
           </div>
         ) : null}
         {error ? (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-red-200 bg-black/60 px-4 text-center z-10">
-            {error}
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/75 px-4 text-center text-xs text-white">
+            <p>{error}</p>
+            <a
+              href={`https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 font-bold text-slate-900 hover:bg-slate-100"
+            >
+              <ExternalLink size={13} /> Mở trên YouTube
+            </a>
           </div>
+        ) : null}
+        {ready && !isPlaying && !error ? (
+          <button
+            type="button"
+            onClick={togglePlayback}
+            aria-label="Phát video bài học"
+            className="absolute inset-0 z-10 grid place-items-center bg-black/10 transition hover:bg-black/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-emerald-300"
+          >
+            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-red-600 text-white shadow-xl transition hover:scale-105">
+              <Play size={30} fill="currentColor" aria-hidden="true" />
+            </span>
+          </button>
+        ) : null}
+        {ready && isPlaying ? (
+          <button
+            type="button"
+            onClick={togglePlayback}
+            aria-label="Tạm dừng video bài học"
+            className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-black/65 text-white opacity-0 transition hover:opacity-100 focus:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+          >
+            <Pause size={18} fill="currentColor" aria-hidden="true" />
+          </button>
         ) : null}
       </div>
 

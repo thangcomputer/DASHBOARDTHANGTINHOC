@@ -1,14 +1,15 @@
 export const PRACTICE_PRAISES = [
-  { text: 'Bạn giỏi quá!', icon: '🌟' },
-  { text: 'Quá đỉnh!', icon: '⚡' },
-  { text: 'Quá VIP!', icon: '🔥' },
-  { text: 'Xuất sắc luôn!', icon: '🏆' },
-  { text: 'Siêu trí tuệ!', icon: '🧠' },
-  { text: 'Đỉnh của chóp!', icon: '🚀' },
-  { text: 'Không thể tin nổi!', icon: '🤩' },
-  { text: 'Cao thủ xuất hiện!', icon: '👑' },
-  { text: 'Bạn quá tuyệt vời!', icon: '💎' },
-  { text: 'HOÀN HẢO! Bạn là nhà vô địch!', icon: '🥇' },
+  { text: 'Bạn là chuyên gia!', audio: '/audio/lesson-practice/praise-expert-male.mp3', icon: '🧠', detail: 'Kiến thức của bạn ngày càng vững vàng!' },
+  { text: 'Bậc thầy tin học!', audio: '/audio/lesson-practice/praise-computer-master-female.mp3', icon: '👑', detail: 'Bạn đang làm chủ từng kỹ năng!' },
+  { text: 'Chính xác!', audio: '/audio/lesson-practice/praise-correct-male.mp3', icon: '🎯', detail: 'Bạn đã chọn đúng đáp án!' },
+  { text: 'Chính xác!', audio: '/audio/lesson-practice/praise-correct-female.mp3', icon: '🎯', detail: 'Bạn đã chọn đúng đáp án!' },
+  { text: 'Hoàn hảo!', audio: '/audio/lesson-practice/praise-perfect-male.mp3', icon: '✨', detail: 'Câu trả lời thật chuẩn xác!' },
+  { text: 'Hoàn hảo!', audio: '/audio/lesson-practice/praise-perfect-female.mp3', icon: '✨', detail: 'Câu trả lời thật chuẩn xác!' },
+  { text: 'Như chuyên gia!', audio: '/audio/lesson-practice/praise-like-an-expert-female.mp3', icon: '💡', detail: 'Bạn xử lý câu hỏi thật chuyên nghiệp!' },
+  { text: 'Quá chuyên nghiệp!', audio: '/audio/lesson-practice/praise-professional-female.mp3', icon: '🏆', detail: 'Kỹ năng của bạn đang tiến bộ rõ rệt!' },
+  { text: 'Trên cả tuyệt vời!', audio: '/audio/lesson-practice/praise-beyond-wonderful-male.mp3', icon: '🚀', detail: 'Bạn đang tiến xa hơn mỗi ngày!' },
+  { text: 'Tuyệt vời!', audio: '/audio/lesson-practice/praise-wonderful-male.mp3', icon: '🌟', detail: 'Tiếp tục phát huy nhé!' },
+  { text: 'Tuyệt vời!', audio: '/audio/lesson-practice/praise-wonderful-female.mp3', icon: '🌟', detail: 'Tiếp tục phát huy nhé!' },
 ];
 
 export const PRACTICE_ENCOURAGEMENTS = [
@@ -192,9 +193,15 @@ export function advancePracticeAttemptStats(current, correct) {
   };
 }
 
-export function getPracticePraise(correctCount) {
-  const count = Math.max(1, Math.floor(Number(correctCount) || 1));
-  return PRACTICE_PRAISES[(count - 1) % PRACTICE_PRAISES.length];
+export function getPracticePraise(previousText = '', random = Math.random) {
+  const choices = PRACTICE_PRAISES.length > 1
+    ? PRACTICE_PRAISES.filter((praise) => praise.text !== previousText)
+    : PRACTICE_PRAISES;
+  const sample = Number(random());
+  const index = Number.isFinite(sample)
+    ? Math.min(choices.length - 1, Math.max(0, Math.floor(sample * choices.length)))
+    : 0;
+  return choices[index];
 }
 
 export function getPracticeEncouragement(wrongCount) {

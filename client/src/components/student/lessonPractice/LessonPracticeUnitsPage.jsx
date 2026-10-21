@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, Menu, NotebookPen, PartyPopper, PenLine, Trophy, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy, X } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
@@ -401,13 +402,6 @@ function withSessionLocks(units) {
   });
 }
 
-const MOTIVATION = [
-  'Mỗi buổi học xong là một bước tiến lớn. Cố lên, bạn đang làm rất tốt!',
-  'Kiên trì từng ngày, bạn sẽ giỏi hơn chính mình hôm qua!',
-  'Thành công đến từ những bước nhỏ liên tục. Tiếp tục phát huy nhé!',
-  'Bạn đã chứng minh được sự nỗ lực của mình. Buổi tiếp theo đang chờ bạn!',
-];
-
 const UNLOCK_CONFETTI = [
   [-20, -14, '#ef4444', 0, -32, 0],
   [-12, -22, '#f59e0b', -4, -38, 180],
@@ -510,7 +504,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
     return () => clearTimeout(timer);
   }, [onClose]);
 
-  return (
+  return createPortal((
     <div role="dialog" aria-modal="true" aria-label="Chúc mừng hoàn thành môn học" className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <style>{`
         @keyframes lp-cele-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: .9; } }
@@ -548,34 +542,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function CourseCompleteBanner({ title, message, className = 'mt-2' }) {
-  return (
-    <div className={`${className} overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-amber-50 p-4 text-center`}>
-      <style>{`
-        @keyframes lp-medal-pop { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 60% { transform: scale(1.2) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
-        @keyframes lp-medal-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        @keyframes lp-confetti { 0% { transform: translateY(-6px) rotate(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(70px) rotate(360deg); opacity: 0; } }
-        @media (prefers-reduced-motion: reduce) { .lp-anim { animation: none !important; } }
-      `}</style>
-      <div className="relative mx-auto mb-2 h-20 w-20">
-        {[
-          ['8%', '#f59e0b', '0s'], ['28%', '#ef4444', '0.4s'], ['50%', '#10b981', '0.8s'], ['70%', '#3b82f6', '0.2s'], ['90%', '#a855f7', '0.6s'],
-        ].map(([left, color, delay]) => (
-          <span key={left} className="lp-anim absolute top-0 h-2 w-1.5 rounded-sm" style={{ left, background: color, animation: `lp-confetti 1.8s ease-in ${delay} infinite` }} />
-        ))}
-        <span className="lp-anim absolute inset-0 flex items-center justify-center" style={{ animation: 'lp-medal-pop 0.7s ease-out both, lp-medal-float 2.4s ease-in-out 0.7s infinite' }}>
-          <Trophy size={52} className="text-amber-500 drop-shadow" fill="#fde68a" />
-        </span>
-      </div>
-      <p className="flex items-center justify-center gap-1 text-sm font-black text-emerald-700">
-        <PartyPopper size={16} /> {title}
-      </p>
-      <p className="mt-1 text-xs font-bold text-slate-500">{message}</p>
-    </div>
-  );
+  ), document.body);
 }
 
 function pickStarter(units) {
@@ -605,6 +572,23 @@ function saveResumePoint(key, unitId, sectionId) {
   }
 }
 
+function hasSeenCourseCompletionCelebration(key) {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch (err) {
+    console.warn('Không đọc được trạng thái chúc mừng hoàn thành khóa học', err);
+    return false;
+  }
+}
+
+function saveCourseCompletionCelebration(key) {
+  try {
+    localStorage.setItem(key, '1');
+  } catch (err) {
+    console.warn('Không lưu được trạng thái chúc mừng hoàn thành khóa học', err);
+  }
+}
+
 export default function LessonPracticeUnitsPage() {
   const { subjectId } = useParams();
   const [searchParams] = useSearchParams();
@@ -624,6 +608,7 @@ export default function LessonPracticeUnitsPage() {
     catch { return {}; }
   });
   const resumeStorageKey = `lesson-practice-resume:${studentUser.id || studentUser._id || 'student'}:${subjectId}`;
+  const completionCelebrationStorageKey = `lesson-practice-completion-celebrated:v3:${studentUser.id || studentUser._id || 'student'}:${requestedCourseId || subjectId}`;
 
   function loadUnits() {
     return lessonPracticeApi.student.units(subjectId, requestedCourseId).then((res) => {
@@ -632,13 +617,26 @@ export default function LessonPracticeUnitsPage() {
     });
   }
 
-  async function celebrateNextUnlockedUnit(completedUnitId, wasCompleted) {
+  const triggerCourseCompletionCelebration = useCallback(() => {
+    if (celebratedScopes.current.has(completionCelebrationStorageKey)
+      || hasSeenCourseCompletionCelebration(completionCelebrationStorageKey)) return;
+    celebratedScopes.current.add(completionCelebrationStorageKey);
+    saveCourseCompletionCelebration(completionCelebrationStorageKey);
+    setCelebrating(true);
+  }, [completionCelebrationStorageKey]);
+
+  async function celebrateNextUnlockedUnit(completedUnitId, wasAlreadyCompleted) {
     const completedIndex = units.findIndex((unit) => unit.id === completedUnitId);
     const nextUnit = units[completedIndex + 1];
-    if (wasCompleted || !nextUnit?.locked) return;
 
     const updated = await loadUnits();
     const refreshedUnits = withSessionLocks(updated?.units || []);
+    if (refreshedUnits.length > 0 && refreshedUnits.every((unit) => unit.status === 'completed')) {
+      triggerCourseCompletionCelebration();
+    }
+    if (wasAlreadyCompleted) return;
+    if (!nextUnit?.locked) return;
+
     const refreshedNextUnit = refreshedUnits.find((unit) => unit.id === nextUnit.id);
     if (refreshedNextUnit && !refreshedNextUnit.locked) {
       setUnlockCelebrationUnitId(refreshedNextUnit.id);
@@ -676,12 +674,21 @@ export default function LessonPracticeUnitsPage() {
 
   const [celebrating, setCelebrating] = useState(false);
   const wasCompleted = useRef(null);
-  useEffect(() => { wasCompleted.current = null; }, [subjectId]);
+  const completionScope = useRef('');
+  const celebratedScopes = useRef(new Set());
   useEffect(() => {
     if (!payload || payload.subject?.id !== subjectId) return;
-    if (wasCompleted.current === false && allCompleted) setCelebrating(true);
+    if (completionScope.current !== completionCelebrationStorageKey) {
+      completionScope.current = completionCelebrationStorageKey;
+      wasCompleted.current = allCompleted;
+      if (allCompleted) triggerCourseCompletionCelebration();
+      return;
+    }
+    if (wasCompleted.current === false && allCompleted) {
+      triggerCourseCompletionCelebration();
+    }
     wasCompleted.current = allCompleted;
-  }, [payload, subjectId, allCompleted]);
+  }, [payload, subjectId, allCompleted, completionCelebrationStorageKey, triggerCourseCompletionCelebration]);
   const closeCelebration = useCallback(() => setCelebrating(false), []);
 
   useEffect(() => {
@@ -911,7 +918,6 @@ export default function LessonPracticeUnitsPage() {
                 );
               })}
             </ol>
-            {allCompleted && <CourseCompleteBanner title="Chúc mừng bạn đã hoàn thành khóa học!" message={`Bạn đã hoàn thành tất cả các buổi của môn ${payload?.subject?.name || ''}.`} />}
           </aside>
           <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white p-2">
             {openUnit ? (
@@ -979,13 +985,6 @@ export default function LessonPracticeUnitsPage() {
                         }
                       }}
                     />
-                    {openUnit.status === 'completed' && (
-                      <CourseCompleteBanner
-                        className="mt-4"
-                        title={`Chúc mừng bạn đã hoàn thành ${openUnit.title}`}
-                        message={MOTIVATION[units.findIndex((unit) => unit.id === openUnit.id) % MOTIVATION.length]}
-                      />
-                    )}
                   </div>
                 )}
               </>

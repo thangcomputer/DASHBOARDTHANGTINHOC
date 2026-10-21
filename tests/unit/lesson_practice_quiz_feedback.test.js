@@ -2,14 +2,43 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { existsSync } = require('node:fs');
+const { basename, resolve } = require('node:path');
 
-test('practice praise cycles by confirmed correct answer count', async () => {
+test('practice praise matches each supplied recording and avoids repeating the previous phrase', async () => {
   const feedback = await import('../../client/src/utils/lessonPracticeQuizFeedback.js');
-  assert.equal(feedback.PRACTICE_PRAISES.length, 10);
-  assert.equal(new Set(feedback.PRACTICE_PRAISES.map((item) => item.text)).size, 10);
-  assert.equal(feedback.getPracticePraise(1).text, 'Bạn giỏi quá!');
-  assert.equal(feedback.getPracticePraise(10).text, 'HOÀN HẢO! Bạn là nhà vô địch!');
-  assert.equal(feedback.getPracticePraise(11).text, feedback.getPracticePraise(1).text);
+  assert.equal(
+    new Set(feedback.PRACTICE_PRAISES.map((item) => item.audio)).size,
+    feedback.PRACTICE_PRAISES.length,
+  );
+  assert.equal(feedback.PRACTICE_PRAISES.length, 11);
+  for (const praise of feedback.PRACTICE_PRAISES) {
+    assert.ok(praise.audio.startsWith('/audio/lesson-practice/'));
+    assert.ok(existsSync(resolve(process.cwd(), 'client', 'public', praise.audio.slice(1))), praise.audio);
+  }
+  assert.deepEqual(
+    Object.fromEntries(feedback.PRACTICE_PRAISES.map((item) => [basename(item.audio), item.text])),
+    {
+      'praise-expert-male.mp3': 'Bạn là chuyên gia!',
+      'praise-computer-master-female.mp3': 'Bậc thầy tin học!',
+      'praise-correct-male.mp3': 'Chính xác!',
+      'praise-correct-female.mp3': 'Chính xác!',
+      'praise-perfect-male.mp3': 'Hoàn hảo!',
+      'praise-perfect-female.mp3': 'Hoàn hảo!',
+      'praise-like-an-expert-female.mp3': 'Như chuyên gia!',
+      'praise-professional-female.mp3': 'Quá chuyên nghiệp!',
+      'praise-beyond-wonderful-male.mp3': 'Trên cả tuyệt vời!',
+      'praise-wonderful-male.mp3': 'Tuyệt vời!',
+      'praise-wonderful-female.mp3': 'Tuyệt vời!',
+    },
+  );
+  assert.equal(feedback.getPracticePraise('', () => 0).text, feedback.PRACTICE_PRAISES[0].text);
+  assert.equal(feedback.getPracticePraise('', () => 0.99).text, feedback.PRACTICE_PRAISES.at(-1).text);
+  for (const text of new Set(feedback.PRACTICE_PRAISES.map((item) => item.text))) {
+    const nextPraise = feedback.getPracticePraise(text, () => 0);
+    assert.notEqual(nextPraise.text, text);
+    assert.equal(typeof nextPraise.detail, 'string');
+  }
 });
 
 test('wrong attempts reset the streak and correct attempts update its record', async () => {

@@ -183,49 +183,27 @@ function lessonAudio() {
   }
 }
 
-function noiseCrack(ctx, start, duration, volume, freq) {
-  const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
-  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
-  const source = ctx.createBufferSource();
-  source.buffer = buffer;
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(freq, start);
-  filter.frequency.exponentialRampToValueAtTime(160, start + duration);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume, start);
-  gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(ctx.destination);
-  source.start(start);
-  source.stop(start + duration);
-}
+const lessonPraisePlayers = new Map();
 
-/** Tiếng nổ pháo khi chọn đúng. */
-export const playLessonCorrectSound = () => {
-  unlockAudio();
-  const ctx = lessonAudio();
-  if (!ctx) return;
-  const start = ctx.currentTime;
-  noiseCrack(ctx, start, 0.16, 0.5, 1600);
-  noiseCrack(ctx, start + 0.14, 0.12, 0.35, 2200);
-  noiseCrack(ctx, start + 0.28, 0.2, 0.42, 1200);
-  [988, 1318, 1760].forEach((freq, index) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const at = start + index * 0.07;
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, at);
-    gain.gain.setValueAtTime(0.1, at);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(at);
-    osc.stop(at + 0.2);
-  });
+/** Phát đúng bản ghi đã ghép với lời khen đang hiển thị. */
+export const playLessonCorrectSound = (audioUrl) => {
+  if (muted || typeof window === 'undefined' || !audioUrl || typeof window.Audio !== 'function') return;
+
+  let player = lessonPraisePlayers.get(audioUrl);
+  if (!player) {
+    player = new window.Audio(audioUrl);
+    player.preload = 'auto';
+    player.volume = 0.85;
+    lessonPraisePlayers.set(audioUrl, player);
+  }
+
+  player.currentTime = 0;
+  const playback = player.play();
+  if (playback && typeof playback.catch === 'function') {
+    playback.catch((error) => {
+      console.warn('Không phát được âm thanh khen luyện tập', error);
+    });
+  }
 };
 
 /** Tiếng tích tắc khi đồng hồ câu hỏi gần hết giờ. */

@@ -246,10 +246,15 @@ function PracticeFeedbackBanner({ feedback, exiting }) {
       aria-live="polite"
     >
       <span className="quiz-feedback__icon" aria-hidden="true">{feedback.icon}</span>
-      <div>
+      <div className="quiz-feedback__content">
         <strong>{feedback.text}</strong>
-        <p>{feedback.streak >= 3 ? `Tuyệt vời! Bạn đã đúng ${feedback.streak} câu liên tiếp!` : 'Tiếp tục phát huy nhé!'}</p>
+        <p>{feedback.streak >= 3
+          ? `Tuyệt vời! Bạn đã đúng ${feedback.streak} câu liên tiếp!`
+          : feedback.detail || 'Mỗi câu đúng là một bước tiến mới!'}</p>
       </div>
+      <span className="quiz-feedback__sparkle quiz-feedback__sparkle--one" aria-hidden="true">✦</span>
+      <span className="quiz-feedback__sparkle quiz-feedback__sparkle--two" aria-hidden="true">✧</span>
+      <span className="quiz-feedback__sparkle quiz-feedback__sparkle--three" aria-hidden="true">✦</span>
     </div>
   );
 }
@@ -734,6 +739,7 @@ export default function LessonPracticePlayerPage({
   const resettingRef = useRef(false);
   const submittingItemsRef = useRef(new Set());
   const completionCelebratedRef = useRef(false);
+  const lastPraiseRef = useRef('');
 
   const items = (payload?.items || []).filter((item) => (
     !practiceGroupId || String(item.practiceGroupId || unitId) === practiceGroupId
@@ -999,16 +1005,18 @@ export default function LessonPracticePlayerPage({
         attemptStatsRef.current = nextStats;
         setAttemptStats(nextStats);
         savePracticeAttemptStats(attemptStatsStorageKey, nextStats);
-        const correctCount = nextQuizzes.filter((row) => row.confirmed === true && row.correct === true).length;
+        const praise = getPracticePraise(lastPraiseRef.current);
+        lastPraiseRef.current = praise.text;
         setFeedbackExiting(false);
         setAttemptFeedback({
           itemId: item.id,
           correct: true,
-          text: getPracticePraise(correctCount).text,
-          icon: getPracticePraise(correctCount).icon,
+          text: praise.text,
+          detail: praise.detail,
+          icon: praise.icon,
           streak: nextStats.streak,
         });
-        if (soundEnabled) playLessonCorrectSound();
+        if (soundEnabled) playLessonCorrectSound(praise.audio);
         setFocusId('');
         setCelebratingQuestionId(item.id);
         if (completedAfterAnswer && !completedBeforeAnswer && !completionCelebratedRef.current) {
@@ -1053,6 +1061,7 @@ export default function LessonPracticePlayerPage({
       attemptStatsRef.current = emptyStats;
       setAttemptStats(emptyStats);
       savePracticeAttemptStats(attemptStatsStorageKey, emptyStats);
+      lastPraiseRef.current = '';
       wrongQuestionIdsRef.current = [];
       setWrongQuestionIds([]);
       savePracticeWrongQuestionIds(wrongQuestionIdsStorageKey, []);
@@ -1270,7 +1279,7 @@ export default function LessonPracticePlayerPage({
               )}
               <div className={embedded ? 'relative min-h-[15rem] flex-1' : 'relative min-h-[15rem]'}>
                 <PracticeFeedbackBanner
-                  feedback={!allCorrect && attemptFeedback?.correct ? attemptFeedback : null}
+                  feedback={attemptFeedback?.correct ? attemptFeedback : null}
                   exiting={feedbackExiting}
                 />
                 {allCorrect && result && (
