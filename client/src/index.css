@@ -1057,7 +1057,7 @@
     @apply flex items-center gap-2 text-[12px] font-bold underline-offset-2 hover:underline;
   }
   .cms-fm-bubble.is-mine .cms-fm-file {
-    @apply text-white;
+    @apply text-sky-800;
   }
   .cms-fm-link {
     @apply underline underline-offset-2 break-all font-semibold text-sky-700;
@@ -2220,6 +2220,79 @@ html.cms-app-shell #root {
   background: var(--cms-surface);
   border-bottom: 1px solid var(--cms-border);
   flex-shrink: 0;
+}
+.cms-chat-sticker-message {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(128px, 42vw);
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+.cms-chat-sticker-message img {
+  display: block;
+  width: 100%;
+  height: 108px;
+  object-fit: contain;
+}
+.cms-chat-sticker-bubble {
+  padding: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.cms-inbox-file-link {
+  color: #1e3a8a;
+}
+.cms-chat-sticker-meta {
+  margin-top: 5px;
+  padding: 0 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  .cms-chat-sticker-message {
+    gap: 12px;
+    width: min(116px, 38vw);
+    font-size: 13px;
+  }
+  .cms-chat-sticker-message img {
+    height: 98px;
+  }
+}
+.cms-inbox-classroom-button.is-live {
+  animation: cms-classroom-attention 1.35s ease-in-out infinite;
+}
+.cms-inbox-classroom-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 0 rgb(255 255 255 / 70%);
+  animation: cms-classroom-live-dot 1.35s ease-out infinite;
+}
+@keyframes cms-classroom-attention {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgb(220 38 38 / 0%), 0 3px 8px rgb(127 29 29 / 15%);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(220 38 38 / 18%), 0 5px 16px rgb(127 29 29 / 32%);
+    transform: translateY(-1px);
+  }
+}
+@keyframes cms-classroom-live-dot {
+  0% { box-shadow: 0 0 0 0 rgb(255 255 255 / 70%); }
+  70%, 100% { box-shadow: 0 0 0 6px rgb(255 255 255 / 0%); }
 }
 .cms-handoff-transcript {
   max-height: 18rem;

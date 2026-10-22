@@ -2,8 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
-  User, Circle, Image, Paperclip, Smile, Download,
-  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp
+  User, Circle, Image, Paperclip, Download,
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -42,6 +42,9 @@ import {
   isAiIdleStill,
   handoffReasonLabel,
 } from '../utils/aiSupport';
+import { getScheduleDisplayKind, isScheduleOngoingNow, normalizeScheduleDate } from '../utils/scheduleTime';
+import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
+import StickerPicker from './StickerPicker';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 
@@ -157,6 +160,7 @@ function splitHandoffSummary(text) {
 
 // Keep contact/messaging roles canonical — do NOT collapse staff→admin (splits threads).
 const normalizeRole = (role) => (role === 'support' ? 'staff' : role);
+const entityId = (value) => String(value?._id || value?.id || value || '');
 
 const isAttachmentExpired = (msg) =>
   Boolean(msg?.fileExpired) ||
@@ -366,9 +370,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
   const isSuperAdmin = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN';
   const isSupportAgent = currentUser?.adminRole === 'SUPPORT';
+  const [scheduleNow, setScheduleNow] = useState(() => new Date());
   const [aiHandoffSession, setAiHandoffSession] = useState(null);
   const [showPriorAiThread, setShowPriorAiThread] = useState(false);
   const [handoffQueue, setHandoffQueue] = useState([]);
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setScheduleNow(new Date()), 15000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const handoffUserIds = useMemo(
     () => new Set((handoffQueue || []).map((item) => String(item.userId || '')).filter(Boolean)),
     [handoffQueue],
@@ -560,6 +570,64 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const peerRole = String(peerProfile?.role || activeConv?.user?.role || '').toLowerCase();
   const canViewTeacherDetails = ['student', 'admin', 'staff'].includes(String(currentUserRole).toLowerCase());
   const viewerRole = String(currentUserRole || '').toLowerCase();
+  const canShowClassroomButton = !activeConv?.isGroup
+    && ((viewerRole === 'teacher' && peerRole === 'student')
+      || (viewerRole === 'student' && peerRole === 'teacher'));
+  const joinClassUrl = useMemo(() => {
+    if (!canShowClassroomButton || !activeConv?.user) return '';
+
+    const peerId = entityId(activeConv.user);
+    const isTeacher = viewerRole === 'teacher';
+    const studentId = isTeacher ? peerId : String(currentUserId || '');
+    const teacherId = isTeacher ? String(currentUserId || '') : peerId;
+    const matchingSchedules = (Array.isArray(schedules) ? schedules : [])
+      .filter((schedule) => {
+        if (String(schedule?.status || '') !== 'scheduled') return false;
+        if (entityId(schedule.studentId) !== studentId || entityId(schedule.teacherId) !== teacherId) {
+          return false;
+        }
+        const kind = getScheduleDisplayKind(schedule, scheduleNow);
+        return kind === 'upcoming' || kind === 'ongoing';
+      })
+      .sort((a, b) => {
+        const liveDifference = Number(isScheduleOngoingNow(b, scheduleNow))
+          - Number(isScheduleOngoingNow(a, scheduleNow));
+        if (liveDifference) return liveDifference;
+        const dateDifference = normalizeScheduleDate(a.date).localeCompare(normalizeScheduleDate(b.date));
+        return dateDifference || String(a.startTime || '').localeCompare(String(b.startTime || ''));
+      });
+
+    if (!matchingSchedules.length) return '';
+      const schedule = matchingSchedules.find((item) => isScheduleOngoingNow(item, scheduleNow))
+        || matchingSchedules.find((item) => String(item.linkHoc || '').trim())
+        || matchingSchedules[0];
+    const studentProfile = isTeacher
+      ? peerProfile
+      : (students || []).find((student) => entityId(student) === studentId) || currentUser;
+    return String(
+      schedule.linkHoc
+      || studentProfile?.joinClassUrl
+      || studentProfile?.linkHoc
+      || studentProfile?.online_meeting_url
+      || '',
+    ).trim();
+  }, [
+    canShowClassroomButton,
+    activeConv,
+    viewerRole,
+    currentUserId,
+    schedules,
+    scheduleNow,
+    peerProfile,
+    students,
+    currentUser,
+  ]);
+  const isClassTime = canShowClassroomButton && (Array.isArray(schedules) ? schedules : []).some((schedule) => (
+    String(schedule?.status || '') === 'scheduled'
+    && entityId(schedule.studentId) === (viewerRole === 'teacher' ? entityId(activeConv?.user) : String(currentUserId || ''))
+    && entityId(schedule.teacherId) === (viewerRole === 'teacher' ? String(currentUserId || '') : entityId(activeConv?.user))
+    && isScheduleOngoingNow(schedule, scheduleNow)
+  ));
   const shouldMaskPeerPhone = (['student', 'teacher'].includes(viewerRole) && ['admin', 'staff'].includes(peerRole))
     || (viewerRole === 'teacher' && peerRole === 'student')
     || (viewerRole === 'student' && peerRole === 'teacher');
@@ -989,7 +1057,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
-  const [showEmojis, setShowEmojis] = useState(false);
+  const stickerSendingRef = useRef(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [groupName, setGroupName] = useState('');
@@ -1010,8 +1078,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [schedulePreview, setSchedulePreview] = useState(null);
-
-  const EMOJIS = ['😊', '👍', '❤️', '👏', '🔥', '✅', '🆘', '📚', '💻', '💡'];
 
   useEffect(() => {
     if (!imagePreview) return;
@@ -1658,16 +1724,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (res.data?.session) setAiHandoffSession(res.data.session);
   };
 
-  const handleSend = async () => {
-    if ((!newMsg.trim() && !pendingImage) || !activeConv) return;
+  const handleSend = async (messageOverride, payloadOverride = null) => {
+    const hasMessageOverride = typeof messageOverride === 'string' && Boolean(messageOverride);
+    const contentText = hasMessageOverride ? messageOverride.trim() : newMsg.trim();
+    if ((!contentText && !pendingImage) || !activeConv || (hasMessageOverride && pendingImage)) return false;
     stopInboxTyping();
-    const contentText = newMsg.trim();
     const replyPayload = replyMessage
       ? { replyTo: { ...replyMessage } }
       : undefined;
+    const messagePayload = { ...(replyPayload || {}), ...(payloadOverride || {}) };
 
     if (activeConv.isAiHandoff) {
-      if (!contentText && !pendingImage) return;
+      if (!contentText && !pendingImage) return false;
       try {
         await sendHandoffReply({
           content: contentText,
@@ -1675,15 +1743,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           fileName: pendingImage?.fileName || '',
           messageType: pendingImage ? 'image' : 'text',
         });
-        setNewMsg('');
+        if (!hasMessageOverride) setNewMsg('');
         setPendingImage(null);
         setReplyMessage(null);
+        return true;
       } catch (err) {
         toast.error(err.message || 'Không gửi được');
+        return false;
       }
-      return;
     }
 
+    let sendSucceeded = true;
     if (pendingImage) {
       const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
@@ -1700,11 +1770,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         fileName: pendingImage.fileName,
         isGroup: sendIsGroup,
         groupId: sendGroupId,
-        payload: replyPayload,
+        payload: Object.keys(messagePayload).length ? messagePayload : undefined,
       };
       const sentImg = await ctxSendMessage(msgData);
       if (sentImg?.failed) {
         toast.error(sentImg.failReason || 'Không gửi được tin nhắn');
+        sendSucceeded = false;
       }
       setPendingImage(null);
       setNewMsg('');
@@ -1723,18 +1794,47 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         messageType: 'text',
         isGroup: sendIsGroup,
         groupId: sendGroupId,
-        payload: replyPayload,
+        payload: Object.keys(messagePayload).length ? messagePayload : undefined,
       };
       const sent = await ctxSendMessage(msgData);
       if (sent?.failed) {
         toast.error(sent.failReason || 'Không gửi được tin nhắn');
+        sendSucceeded = false;
       }
-      setNewMsg('');
+      if (!hasMessageOverride) setNewMsg('');
       setReplyMessage(null);
     }
 
-    setShowEmojis(false);
     setTimeout(() => inputRef.current?.focus(), 50);
+    return sendSucceeded;
+  };
+
+  const handleStickerSend = async (sticker) => {
+    if (stickerSendingRef.current) return false;
+    const token = buildChatStickerToken(sticker.id);
+    if (!token) return false;
+
+    stickerSendingRef.current = true;
+    try {
+      return await handleSend(token, { type: 'sticker', sticker_id: sticker.id });
+    } catch (err) {
+      toast.error(err.message || 'Không gửi được sticker');
+      return false;
+    } finally {
+      stickerSendingRef.current = false;
+    }
+  };
+
+  const handleEmojiInsert = (emoji) => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? newMsg.length;
+    const end = input?.selectionEnd ?? start;
+    const updatedMessage = `${newMsg.slice(0, start)}${emoji}${newMsg.slice(end)}`;
+    setNewMsg(updatedMessage);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
   };
 
   const handleFileUpload = async (e) => {
@@ -1796,12 +1896,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setIsUploading(false);
       e.target.value = '';
     }
-  };
-
-  const addEmoji = (emoji) => {
-    setNewMsg(prev => prev + emoji);
-    setShowEmojis(false);
-    inputRef.current?.focus();
   };
 
   useEffect(() => {
@@ -2435,6 +2529,33 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
+                {canShowClassroomButton && (
+                  joinClassUrl ? (
+                    <a
+                      href={joinClassUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
+                      aria-label={isClassTime ? 'Lớp học đang diễn ra, vào lớp ngay' : 'Vào lớp học ngay'}
+                      title={isClassTime ? 'Buổi học đang diễn ra — bấm để vào lớp' : 'Vào lớp học ngay'}
+                    >
+                      {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
+                      <Video size={16} aria-hidden="true" />
+                      <span className="hidden sm:inline">{isClassTime ? 'ĐANG DIỄN RA · VÀO LỚP' : 'Vào lớp học ngay'}</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-400 sm:px-3"
+                      aria-label={isClassTime ? 'Lớp học đang diễn ra nhưng chưa có link' : 'Chưa có link lớp học'}
+                      title={isClassTime ? 'Buổi học đang diễn ra nhưng chưa có link lớp' : 'Chưa có lịch học hoặc link lớp học'}
+                    >
+                      <Video size={16} aria-hidden="true" />
+                      <span className="hidden sm:inline">Vào lớp học ngay</span>
+                    </button>
+                  )
+                )}
                 <button
                   type="button"
                   onClick={() => setShowMessageSearch((open) => !open)}
@@ -2841,6 +2962,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     || getMessageDateInfo(nextMessage.time)?.key !== messageDate?.key;
                   const showMessageTimestamp = index === 0 || nextMessageStartsGroup;
                   const role = normalizeRole(msg.senderRole);
+                  const stickerMessage = !msg.isRecalled ? getChatStickerFromMessage(msg) : null;
+                  const isStickerMessage = Boolean(stickerMessage);
                   const badgeLabel = msg.senderDisplayRole
                     ? displayRoleLabel(msg.senderDisplayRole)
                     : (String(msg.senderAdminRole || '').toUpperCase() === 'SUPPORT' ? 'Hỗ trợ'
@@ -2938,7 +3061,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                             {/* Message bubble */}
-                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${reactionCounts.length > 0 && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${reactionCounts.length > 0 && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
                               {!msg.isRecalled && msg.payload?.replyTo && (
                                 <button
                                   type="button"
@@ -2997,8 +3120,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               ) : msg.messageType === 'file' ? (
                                 <div className="space-y-1.5">
-                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
+                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`cms-inbox-file-link flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10' : 'bg-gray-100'}`}>
+                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20 text-sky-800' : 'bg-red-500 text-white'}`}>
                                       <Paperclip size={18} />
                                     </div>
                                     <div className="flex flex-col min-w-0">
@@ -3014,11 +3137,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               ) : (
                                 <div className="whitespace-pre-wrap break-words">
-                                  <MessageRichText text={msg.content} mine={isMine} highlight={normalizedMessageSearch} />
+                                  <MessageRichText text={msg.content} payload={msg.payload} mine={isMine} highlight={normalizedMessageSearch} />
                                 </div>
                               )}
 
-                              {showMessageTimestamp && formatMessageTime(msg.time) && (
+                              {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
                                 <div className={`mt-1 text-left text-[10px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
                                   {formatMessageTime(msg.time)}
                                 </div>
@@ -3270,13 +3393,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         </button>
                       </div>
                     )}
-                    {showEmojis && (
-                      <div className="absolute bottom-full left-0 mb-3 bg-white p-2 rounded-2xl shadow-2xl border border-gray-100 flex gap-2 animate-in fade-in slide-in-from-bottom-2 z-50">
-                        {EMOJIS.map(e => (
-                          <button key={e} onClick={() => addEmoji(e)} className="text-xl hover:scale-125 transition-transform">{e}</button>
-                        ))}
-                      </div>
-                    )}
                     <div className="relative w-full">
                       <input
                         ref={inputRef}
@@ -3292,16 +3408,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         className="cms-input pl-4 pr-10 w-full"
                         placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
                       />
-                      <button
-                        onClick={() => setShowEmojis(!showEmojis)}
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-colors ${showEmojis ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
-                      >
-                        <Smile size={18} />
-                      </button>
+                      <StickerPicker
+                        key={activeConv?.id || 'no-conversation'}
+                        disabled={isUploading || Boolean(pendingImage) || !activeConv}
+                        onPickEmoji={handleEmojiInsert}
+                        onSendSticker={handleStickerSend}
+                      />
                     </div>
                   </div>
                   <button
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={!newMsg.trim() && !pendingImage}
                     className="cms-btn cms-btn-primary cms-btn-icon"
                     title="Gửi tin nhắn"

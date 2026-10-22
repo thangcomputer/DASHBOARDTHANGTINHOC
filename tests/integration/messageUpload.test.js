@@ -6,11 +6,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const allowedMsgExt = /\.(jpe?g|png|gif|webp|pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|mp4|webm|mp3|wav)$/i;
+const allowedMsgMime = /^(image\/(jpeg|png|gif|webp)|application\/pdf|application\/zip|application\/x-zip-compressed|application\/x-rar-compressed|application\/vnd\.rar|application\/x-7z-compressed|application\/vnd\.[a-z0-9.+-]+|application\/msword|application\/x-ole-storage|application\/octet-stream|text\/plain|video\/(mp4|webm)|audio\/(mpeg|mp3|wav|x-wav|wave))$/i;
 
 function fileFilter(file) {
-  const okMime = /^(image\/|application\/pdf|application\/zip|application\/vnd\.|text\/plain|video\/|audio\/)/.test(file.mimetype || '');
+  const okMime = allowedMsgMime.test(file.mimetype || '');
   const okExt = allowedMsgExt.test(file.originalname || '');
-  if (okMime || okExt) return { ok: true };
+  if (okMime && okExt) return { ok: true };
   return { ok: false, err: 'Định dạng file không được phép' };
 }
 
@@ -18,7 +19,11 @@ const accepted = [
   { originalname: 'photo.jpg', mimetype: 'image/jpeg' },
   { originalname: 'doc.pdf', mimetype: 'application/pdf' },
   { originalname: 'report.docx', mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+  { originalname: 'legacy.doc', mimetype: 'application/x-ole-storage' },
+  { originalname: 'legacy.xls', mimetype: 'application/x-ole-storage' },
+  { originalname: 'legacy.ppt', mimetype: 'application/x-ole-storage' },
   { originalname: 'sheet.xlsx', mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  { originalname: 'slides.pptx', mimetype: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
   { originalname: 'archive.zip', mimetype: 'application/zip' },
   { originalname: 'note.txt', mimetype: 'text/plain' },
   { originalname: 'clip.mp4', mimetype: 'video/mp4' },
@@ -37,6 +42,7 @@ const rejected = [
   { originalname: 'page.html', mimetype: 'text/html' },
   { originalname: 'evil.php', mimetype: 'application/x-php' },
   { originalname: 'archive.tar.gz', mimetype: 'application/gzip' },
+  { originalname: 'not-office.doc', mimetype: 'text/html' },
 ];
 
 for (const f of rejected) {

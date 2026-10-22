@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getChatStickerFromMessage, stickerLabelFromToken } from './chatStickers';
 
 /** Deep-link token embedded in chat text: ⟦chat:student:ID|Display Name⟧ */
 export const CHAT_DEEP_LINK_RE = /⟦chat:(student|teacher|admin|staff):([^|⟧]+)\|([^⟧]+)⟧/g;
@@ -272,10 +273,19 @@ function renderTextBlocks(chunk, segIdx, mine, highlight = '') {
 /**
  * Render message text: http(s) links, LMS go-links, chat tokens, **bold** *italic* `FUNC`, markdown tables.
  */
-export function MessageRichText({ text, mine = false, highlight = '' }) {
+export function MessageRichText({ text, mine = false, highlight = '', payload = null }) {
   const navigate = useNavigate();
   const raw = String(text || '');
   if (!raw) return null;
+  const sticker = getChatStickerFromMessage({ content: raw, payload });
+  if (sticker) {
+    return (
+      <span className="cms-chat-sticker-message">
+        <img src={sticker.src} alt="" loading="lazy" draggable={false} />
+        <span>{sticker.name}</span>
+      </span>
+    );
+  }
 
   const segments = [];
   const embedRe = new RegExp(EMBED_RE.source, 'g');
@@ -404,6 +414,8 @@ function stripChatMarks(s) {
 /** Plain text for clipboard: bảng dạng Excel (cột A B C + số hàng), bỏ token chat/LMS. */
 export function copyableTextFromMessage(raw) {
   let t = String(raw || '');
+  const stickerLabel = stickerLabelFromToken(t);
+  if (stickerLabel) return `[Sticker: ${stickerLabel}]`;
   t = t.replace(CHAT_DEEP_LINK_RE, '$3').replace(GO_LINK_RE, '$2');
   const lines = t.replace(/\r\n/g, '\n').split('\n');
   const out = [];

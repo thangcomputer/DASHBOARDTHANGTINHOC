@@ -45,7 +45,9 @@ import {
 } from '../utils/aiSupport';
 import SupportMascot from './SupportMascot';
 import { MessageRichText, copyableTextFromMessage } from '../utils/messageRichText';
+import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
 import ScreenCaptureButton from './ScreenCaptureButton';
+import StickerPicker from './StickerPicker';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -333,6 +335,32 @@ function MessageBubble({
     ? 'text-[10px] font-bold text-violet-700 mb-0.5 px-1'
     : 'text-[10px] font-bold text-emerald-700 mb-0.5 px-1';
 
+  const sticker = getChatStickerFromMessage(m);
+  if (sticker) {
+    const sentAt = new Date(m.time || m.createdAt || '');
+    const timeLabel = Number.isNaN(sentAt.getTime())
+      ? ''
+      : new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(sentAt);
+    const read = Boolean(m.isRead ?? m.read);
+    const status = String(m.id || '').startsWith('temp_') ? 'Đang gửi' : read ? 'Đã xem' : 'Đã gửi';
+
+    return (
+      <div className="w-fit max-w-[88%]">
+        {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
+        <div className="cms-chat-sticker-message">
+          <img src={sticker.src} alt="" loading="lazy" draggable={false} />
+          <span>{sticker.name}</span>
+        </div>
+        {(timeLabel || mine) ? (
+          <p className={`cms-chat-sticker-meta ${mine ? 'text-right' : 'text-left'}`}>
+            {timeLabel}{timeLabel && mine ? ' · ' : ''}{mine ? status : ''}
+          </p>
+        ) : null}
+        <MessageReactions m={m} mine={mine} meId={meId} onReact={onReact} enabled={reactionsEnabled} />
+      </div>
+    );
+  }
+
   if (isImageMessage(m) && m.fileUrl) {
     return (
       <div className="w-fit max-w-[88%]">
@@ -506,6 +534,7 @@ function ChatWindow({
   const inputRef = useRef(null);
   const imageRef = useRef(null);
   const attachmentRef = useRef(null);
+  const stickerSendingRef = useRef(false);
   const typingTimerRef = useRef(null);
   const typingActiveRef = useRef(false);
   const [winSize, setWinSize] = useState(readFmSize);
@@ -844,6 +873,30 @@ function ChatWindow({
     if (!onTypingStart || typingActiveRef.current) return;
     typingActiveRef.current = true;
     onTypingStart(tab.id);
+  };
+
+  const handleEmojiInsert = (emoji) => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? text.length;
+    const end = input?.selectionEnd ?? start;
+    setText(`${text.slice(0, start)}${emoji}${text.slice(end)}`);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const handleStickerSend = async (sticker) => {
+    if (stickerSendingRef.current || uploading || sending || pendingImage || questionBlocked) return false;
+    const token = buildChatStickerToken(sticker.id);
+    if (!token) return false;
+
+    stickerSendingRef.current = true;
+    try {
+      return await onSend(tab, token, { type: 'sticker', sticker_id: sticker.id });
+    } finally {
+      stickerSendingRef.current = false;
+    }
   };
 
   const handleInputBlur = () => {
@@ -1319,6 +1372,13 @@ function ChatWindow({
             }
             disabled={uploading || sending || questionBlocked}
             className="cms-fm-input"
+          />
+          <StickerPicker
+            key={tab.id}
+            inline
+            disabled={uploading || sending || questionBlocked || Boolean(pendingImage)}
+            onPickEmoji={handleEmojiInsert}
+            onSendSticker={handleStickerSend}
           />
           <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading || sending || questionBlocked} className="cms-fm-send" aria-label={sending ? 'Đang xử lý' : 'Gửi'}>
             {uploading || sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
@@ -2049,9 +2109,9 @@ export default function FloatingMessenger({ session, role }) {
 
   if (!meId) return null;
 
-  const handleSend = async (tab, content) => {
+  const handleSend = async (tab, content, payload = null) => {
     const body = String(content || '').trim();
-    if (!body) return;
+    if (!body) return false;
 
     const isAi = isAiSupportPeer(tab.user);
     const isGroup = Boolean(tab.user?.isGroup);
@@ -2059,7 +2119,7 @@ export default function FloatingMessenger({ session, role }) {
       ? (aiStatusMap[tab.id] || AI_SUPPORT_STATUS.AI_ACTIVE)
       : AI_SUPPORT_STATUS.SUPPORT_ACTIVE;
     const aiIsProcessing = isAi && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE;
-    if (sendingMap[tab.id] && aiIsProcessing) return;
+    if (sendingMap[tab.id] && aiIsProcessing) return false;
     if (isAi && !aiIsProcessing && sendingMap[tab.id]) {
       setSendingMap((prev) => {
         const next = { ...prev };
@@ -2071,7 +2131,7 @@ export default function FloatingMessenger({ session, role }) {
       if (aiIsProcessing && !isAiFaqChipLabel(body, meRole)) {
         const lim = Number(aiQuestionQuota.limit) || (meRole === 'teacher' ? 25 : 15);
         toast.error(`Hết ${lim} lượt hỏi AI hôm nay. Bấm Cần nhân viên hỗ trợ nếu vẫn cần giúp.`);
-        return;
+        return false;
       }
     }
     if (isAi) {
@@ -2092,6 +2152,7 @@ export default function FloatingMessenger({ session, role }) {
         messageType: 'text',
         isGroup,
         groupId: isGroup ? tab.user.groupId : null,
+        payload,
       });
       if (sent?.failed) {
         throw new Error(sent.failReason || 'Gửi tin nhắn thất bại');
@@ -2103,7 +2164,7 @@ export default function FloatingMessenger({ session, role }) {
         return next;
       });
       toast.error(err?.message || 'Gửi tin nhắn thất bại');
-      return;
+      return false;
     }
     if (!isAi || !aiIsProcessing) {
       setSendingMap((prev) => {
@@ -2112,6 +2173,7 @@ export default function FloatingMessenger({ session, role }) {
         return next;
       });
     }
+    return true;
   };
 
   const handleSendFile = async (tab, file, caption = '') => {
