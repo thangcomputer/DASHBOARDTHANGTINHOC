@@ -1,14 +1,14 @@
-import { getExamSubjectMeta, resolveTeacherSubjectIds } from './examSubjects';
+import { getExamSubjectMeta, resolveTeacherSubjectIds } from './examSubjects.js';
 import {
   questionMatchesExamSubject,
   isStudentEssayQuestion,
   getEssayQuestionFile,
   getStudentEssayQuestionsForExam,
   isValidMcQuestion,
-} from './htmlContent';
-export { isLegacyTeacherExamSection } from './teacherExamSections';
+} from './htmlContent.js';
+export { isLegacyTeacherExamSection } from './teacherExamSections.js';
 
-const DEFAULT_SUBJECT_ORDER = ['coban', 'word', 'excel', 'powerpoint', 'canva'];
+const DEFAULT_SUBJECT_ORDER = ['mon-kiem-thu'];
 
 export function orderTeacherExamSubjectIds(subjectIds) {
   const ids = Array.isArray(subjectIds) ? subjectIds.filter(Boolean) : [];
@@ -46,19 +46,6 @@ function resolveMinutesForSubject(minutesMap, subjectId, fallback = 90) {
   const direct = Number(minutesMap?.[subjectId]);
   if (Number.isFinite(direct) && direct >= 1) return Math.round(direct);
 
-  const aliasGroups = [
-    ['coban', 'computer', 'maytinh'],
-    ['powerpoint', 'ppt', 'pp'],
-    ['situation', 'supham', 'su-pham'],
-  ];
-  const sid = String(subjectId || '').toLowerCase();
-  for (const group of aliasGroups) {
-    if (!group.includes(sid) && !group.includes(subjectId)) continue;
-    for (const key of group) {
-      const v = Number(minutesMap?.[key]);
-      if (Number.isFinite(v) && v >= 1) return Math.round(v);
-    }
-  }
   return fallback;
 }
 

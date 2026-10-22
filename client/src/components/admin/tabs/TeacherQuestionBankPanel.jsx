@@ -9,36 +9,29 @@ import {
 } from 'lucide-react';
 import { downloadTeacherQuestionsExcelTemplate } from '../../../utils/studentQuestionsExcel';
 import {
-  getStudentMcQuestionsForExam,
-  getStudentEssayQuestionsForExam,
   getEssayQuestionFile,
+  isValidMcQuestion,
+  questionMatchesExamSubject,
 } from '../../../utils/htmlContent';
-import api, { buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
-import { getExamSubjectOptions } from '../../../utils/examSubjects';
-import { isLegacyTeacherExamSection } from '../../../utils/teacherExamSections';
+import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
+import { getExamSubjectMeta } from '../../../utils/examSubjects';
 
 const DIFF_LABELS = { easy: 'Cơ bản', medium: 'TB', hard: 'Nâng cao' };
 
-/** Các section cũ trong DB chưa có trong catalog — vẫn hiện để admin sửa/xóa */
-const LEGACY_SECTION_LABELS = {
-  computer: 'Máy tính & Windows (cũ)',
-  situation: 'Sư phạm (Tình huống)',
-  other: 'Kiến thức khác (cũ)',
-};
+function getTeacherMcQuestionsForExam(teacherQuestions, subjectId) {
+  return (teacherQuestions || []).filter(
+    (question) => isValidMcQuestion(question) && questionMatchesExamSubject(question.section, subjectId),
+  );
+}
 
-function buildTeacherSectionOptions(examSubjectsCatalog, questions) {
-  const fromCatalog = getExamSubjectOptions(examSubjectsCatalog);
-  const known = new Set(fromCatalog.map((o) => o.id));
-  const extras = [];
-  (questions || []).forEach((q) => {
-    const s = String(q?.section || '').trim().toLowerCase();
-    if (!s || known.has(s)) return;
-    if (s === 'computer' && known.has('coban')) return;
-    if (known.has(s)) return;
-    known.add(s);
-    extras.push({ id: s, label: LEGACY_SECTION_LABELS[s] || s });
+function getTeacherEssayQuestionsForExam(teacherQuestions, subjectId) {
+  return (teacherQuestions || []).filter((question) => {
+    const type = String(question?.type || '').toLowerCase();
+    const isEssay = ['essay', 'tu_luan', 'tuluan'].includes(type)
+      || (!['multiple', 'mc', 'tracnghiem'].includes(type)
+        && Boolean(question?.practiceFileName || question?.sampleAnswer || question?.attachedFileUrl || question?.practiceFileUrl));
+    return isEssay && questionMatchesExamSubject(question?.section, subjectId);
   });
-  return [...fromCatalog, ...extras];
 }
 
 function QuestionRow({ q, index, onEdit, onDelete, showImage }) {
@@ -107,6 +100,7 @@ function EmptyState({ icon: Icon, title, hint }) {
 export default function TeacherQuestionBankPanel() {
   const {
     questions,
+    teacherExamConfigLoaded,
     teacherExamMinutes,
     updateTeacherExamMinutes,
     teacherEssayExamMinutes,
@@ -123,11 +117,72 @@ export default function TeacherQuestionBankPanel() {
     qSection, setQSection,
     qForm, examSubjectsCatalog,
   } = useAdminTraining();
-  
-  const sectionOpts = React.useMemo(
-    () => buildTeacherSectionOptions(examSubjectsCatalog, questions),
-    [examSubjectsCatalog, questions],
+  const [courseCatalog, setCourseCatalog] = React.useState([]);
+  const [courseCatalogLoading, setCourseCatalogLoading] = React.useState(true);
+  const [courseCatalogError, setCourseCatalogError] = React.useState('');
+  const [selectedCourseId, setSelectedCourseId] = React.useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiFetch('/courses');
+        const json = await response.json();
+        if (!response.ok || !json?.success) {
+          throw new Error(json?.message || 'Không tải được danh mục khóa học');
+        }
+        if (!cancelled) {
+          setCourseCatalog(Array.isArray(json.data) ? json.data : []);
+          setCourseCatalogError('');
+        }
+      } catch (error) {
+        if (!cancelled) setCourseCatalogError(error.message || 'Không tải được danh mục khóa học');
+      } finally {
+        if (!cancelled) setCourseCatalogLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const inferredCourse = courseCatalog.find((course) => (
+    Array.isArray(course.examSubjects)
+    && course.examSubjects.some((id) => String(id).trim().toLowerCase() === String(qSection || '').trim().toLowerCase())
+  ));
+  const selectedCourse = courseCatalog.find((course) => (
+    String(course._id || course.id) === selectedCourseId
+  )) || inferredCourse || courseCatalog[0] || null;
+  const effectiveCourseId = selectedCourse ? String(selectedCourse._id || selectedCourse.id) : '';
+  const sectionOpts = Array.isArray(selectedCourse?.examSubjects)
+    ? [...new Set(selectedCourse.examSubjects.map((id) => String(id).trim().toLowerCase()).filter(Boolean))]
+      .map((id) => ({ id, label: getExamSubjectMeta(id, examSubjectsCatalog).label }))
+    : [];
+  const courseSubjectIds = React.useMemo(
+    () => [...new Set((courseCatalog || []).flatMap((course) => (
+      Array.isArray(course.examSubjects) ? course.examSubjects.map((id) => String(id).trim().toLowerCase()) : []
+    )).filter(Boolean))],
+    [courseCatalog],
   );
+  const activeSection = sectionOpts.find((section) => section.id === qSection) || sectionOpts[0] || null;
+  const activeSectionId = activeSection?.id || '';
+
+  const cleanupSignatureRef = React.useRef(null);
+  React.useEffect(() => {
+    if (courseCatalogLoading || courseCatalogError || !teacherExamConfigLoaded) return;
+    const signature = [...courseSubjectIds].sort().join('|');
+    if (cleanupSignatureRef.current === signature) return;
+    cleanupSignatureRef.current = signature;
+    api.settings.updateTeacherExamConfig({ allowedTeacherExamSubjectIds: courseSubjectIds })
+      .then((res) => {
+        const removed = Number(res.data?.prunedTeacherQuestions || 0)
+          + Number(res.data?.prunedTeacherExamMinutes || 0)
+          + Number(res.data?.prunedTeacherEssayExamMinutes || 0);
+        if (removed > 0) toast.success(`Đã xóa dữ liệu ngân hàng cũ của ${removed} mục không còn trong khóa học admin.`);
+      })
+      .catch((error) => {
+        cleanupSignatureRef.current = null;
+        toast.error(error.message || 'Không thể xóa dữ liệu ngân hàng cũ.');
+      });
+  }, [courseCatalogLoading, courseCatalogError, teacherExamConfigLoaded, courseSubjectIds, toast]);
 
   const teacherExamMinutesRef = React.useRef(teacherExamMinutes);
   const teacherEssayExamMinutesRef = React.useRef(teacherEssayExamMinutes);
@@ -176,13 +231,10 @@ export default function TeacherQuestionBankPanel() {
     if (minutesSaveTimerRef.current) clearTimeout(minutesSaveTimerRef.current);
   }, []);
 
-  const activeSection = sectionOpts.find((s) => s.id === qSection) || sectionOpts[0];
-
   React.useEffect(() => {
-    if (!sectionOpts.length) return;
-    const valid = sectionOpts.some((o) => o.id === qSection);
-    if (!valid) setQSection(sectionOpts[0].id);
-  }, [sectionOpts, qSection, setQSection]);
+    if (courseCatalogLoading) return;
+    if (activeSectionId && activeSectionId !== qSection) setQSection(activeSectionId);
+  }, [courseCatalogLoading, activeSectionId, qSection, setQSection]);
 
   const [mcSearch, setMcSearch] = React.useState('');
   const [tlSearch, setTlSearch] = React.useState('');
@@ -192,21 +244,21 @@ export default function TeacherQuestionBankPanel() {
   React.useEffect(() => {
     setMcSearch('');
     setTlSearch('');
-  }, [qSection]);
+  }, [activeSectionId]);
 
   const mcQuestions = React.useMemo(() => {
-    const list = getStudentMcQuestionsForExam(questions, qSection);
+    const list = activeSectionId ? getTeacherMcQuestionsForExam(questions, activeSectionId) : [];
     const q = mcSearch.trim().toLowerCase();
     if (!q) return list;
     return list.filter((item) => String(item.q || '').toLowerCase().includes(q));
-  }, [questions, qSection, mcSearch]);
+  }, [questions, activeSectionId, mcSearch]);
 
   const essayQuestions = React.useMemo(() => {
-    const list = getStudentEssayQuestionsForExam(questions, qSection);
+    const list = activeSectionId ? getTeacherEssayQuestionsForExam(questions, activeSectionId) : [];
     const q = tlSearch.trim().toLowerCase();
     if (!q) return list;
     return list.filter((item) => String(item.q || '').toLowerCase().includes(q));
-  }, [questions, qSection, tlSearch]);
+  }, [questions, activeSectionId, tlSearch]);
 
   const handleEssayPdfUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -262,14 +314,14 @@ export default function TeacherQuestionBankPanel() {
   };
 
   const openAddForm = (type) => {
-    if (String(type).toLowerCase() !== 'essay' && qSection === 'other') {
-      toast.error('Phần "Kiến thức khác" là mục cũ — chọn môn chuyên môn hoặc Sư phạm.');
+    if (!activeSectionId) {
+      toast.error('Khóa học này chưa có môn để tạo câu hỏi.');
       return;
     }
     setQForm({
       ...BLANK_Q,
       type,
-      section: qSection,
+      section: activeSectionId,
       imageUrl: '',
       imageName: '',
       attachedFileUrl: '',
@@ -287,7 +339,7 @@ export default function TeacherQuestionBankPanel() {
   };
 
   const handleSaveQuestion = async () => {
-    const section = qForm.section || qSection;
+    const section = qForm.section || activeSectionId;
     const isEssay = String(qForm.type).toLowerCase() === 'essay';
     const fileUrl = String(qForm.attachedFileUrl || '').trim();
     const fileName = String(qForm.attachedFileName || '').trim();
@@ -356,30 +408,60 @@ export default function TeacherQuestionBankPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Header — chọn môn */}
+      {/* Dữ liệu và cấu hình dành riêng cho ngân hàng đề thi giảng viên. */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4">
-        <div className="flex flex-col gap-3">
-          <div className="w-full min-w-0">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[12rem]">
+            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+              Khóa học
+            </label>
+            <CmsSelect
+              value={effectiveCourseId}
+              onChange={(e) => {
+                const nextCourseId = e.target.value;
+                setSelectedCourseId(nextCourseId);
+                const nextCourse = courseCatalog.find((item) => String(item._id || item.id) === nextCourseId);
+                const nextSubjectId = Array.isArray(nextCourse?.examSubjects)
+                  ? String(nextCourse.examSubjects[0] || '').trim().toLowerCase()
+                  : '';
+                setQSection(nextSubjectId);
+              }}
+              disabled={courseCatalogLoading || !courseCatalog.length}
+              className="w-full border-2 border-sky-200 rounded-xl px-3 py-2.5 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
+            >
+              {courseCatalog.map((course) => (
+                <option key={course._id || course.id} value={course._id || course.id}>{course.name}</option>
+              ))}
+            </CmsSelect>
+          </div>
+          <div className="flex-1 min-w-[12rem]">
             <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
             <CmsSelect
-              value={qSection}
+              value={activeSectionId}
               onChange={(e) => setQSection(e.target.value)}
-              className="w-full border-2 border-red-200 rounded-xl px-3 py-2.5 text-sm font-bold text-red-900 bg-red-50/40 outline-none focus:border-red-500"
+              disabled={!sectionOpts.length}
+              className="w-full border-2 border-green-200 rounded-xl px-3 py-2.5 text-sm font-bold text-green-900 bg-green-50/40 outline-none focus:border-green-500 disabled:opacity-60"
             >
               {sectionOpts.map((o) => (
                 <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </CmsSelect>
-            {isLegacyTeacherExamSection(qSection) && (
-              <p className="mt-1.5 text-[11px] font-bold text-amber-700 leading-snug">
-                Phần cũ — không đưa vào đề thi GV. Chuyển câu sang môn chuyên môn hoặc xóa.
-              </p>
+            {courseCatalogLoading && (
+              <p className="mt-1.5 text-[11px] text-slate-500">Đang tải môn từ khóa học admin…</p>
+            )}
+            {courseCatalogError && (
+              <p className="mt-1.5 text-[11px] text-red-600">{courseCatalogError}</p>
+            )}
+            {!courseCatalogLoading && !courseCatalogError && selectedCourse && !sectionOpts.length && (
+              <p className="mt-1.5 text-[11px] text-amber-600">Khóa này chưa có môn trong danh mục admin.</p>
+            )}
+            {!courseCatalogLoading && !courseCatalogError && !courseCatalog.length && (
+              <p className="mt-1.5 text-[11px] text-amber-600">Chưa có khóa học trong danh mục admin.</p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3 w-full">
-          <div className="min-w-0">
+          <div className="w-28">
             <label className="text-[11px] font-bold uppercase tracking-wide text-amber-700 block mb-1.5">
               Phút TN
             </label>
@@ -389,27 +471,28 @@ export default function TeacherQuestionBankPanel() {
                 type="number"
                 min={1}
                 max={600}
-                value={teacherExamMinutes?.[qSection] ?? 90}
+                disabled={!activeSectionId}
+                value={teacherExamMinutes?.[activeSectionId] ?? 90}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  updateTeacherExamMinutes({ [qSection]: raw });
+                  updateTeacherExamMinutes({ [activeSectionId]: raw });
                   const n = Number(raw);
                   if (Number.isFinite(n) && n >= 1 && n <= 600) {
-                    schedulePersistExamMinutes({ [qSection]: n }, null);
+                    schedulePersistExamMinutes({ [activeSectionId]: n }, null);
                   }
                 }}
                 onBlur={(e) => {
                   if (minutesSaveTimerRef.current) clearTimeout(minutesSaveTimerRef.current);
                   const n = Number(e.target.value);
                   if (Number.isFinite(n) && n >= 1 && n <= 600) {
-                    persistExamMinutes({ [qSection]: n }, null);
+                    persistExamMinutes({ [activeSectionId]: n }, null);
                   }
                 }}
-                className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center"
+                className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center disabled:cursor-not-allowed"
               />
             </div>
           </div>
-          <div className="min-w-0">
+          <div className="w-28">
             <label className="text-[11px] font-bold uppercase tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
@@ -419,36 +502,34 @@ export default function TeacherQuestionBankPanel() {
                 type="number"
                 min={1}
                 max={600}
-                value={teacherEssayExamMinutes?.[qSection] ?? 60}
+                disabled={!activeSectionId}
+                value={teacherEssayExamMinutes?.[activeSectionId] ?? 60}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  updateTeacherEssayExamMinutes({ [qSection]: raw });
+                  updateTeacherEssayExamMinutes({ [activeSectionId]: raw });
                   const n = Number(raw);
                   if (Number.isFinite(n) && n >= 1 && n <= 600) {
-                    schedulePersistExamMinutes(null, { [qSection]: n });
+                    schedulePersistExamMinutes(null, { [activeSectionId]: n });
                   }
                 }}
                 onBlur={(e) => {
                   if (minutesSaveTimerRef.current) clearTimeout(minutesSaveTimerRef.current);
                   const n = Number(e.target.value);
                   if (Number.isFinite(n) && n >= 1 && n <= 600) {
-                    persistExamMinutes(null, { [qSection]: n });
+                    persistExamMinutes(null, { [activeSectionId]: n });
                   }
                 }}
-                className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center"
+                className="w-full bg-transparent text-sm font-black text-slate-800 outline-none text-center disabled:cursor-not-allowed"
               />
             </div>
           </div>
-          </div>
-          <div className="flex flex-col min-[400px]:flex-row items-stretch min-[400px]:items-center gap-2 w-full">
-            <span className="text-xs font-bold text-slate-500">
-              {mcQuestions.length} TN · {essayQuestions.length} TL
-            </span>
-            <div className="flex flex-col min-[400px]:flex-row gap-2 min-[400px]:ml-auto w-full min-[400px]:w-auto">
+          <div className="flex w-full flex-col min-[400px]:flex-row min-[400px]:items-center gap-2">
+            <span className="text-xs font-bold text-slate-500">{mcQuestions.length} TN · {essayQuestions.length} TL</span>
+            <div className="flex flex-col min-[400px]:flex-row gap-2 min-[400px]:ml-auto">
             <button
               type="button"
               onClick={() => persistExamMinutes(teacherExamMinutesRef.current, teacherEssayExamMinutesRef.current)}
-              className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100 w-full min-[400px]:w-auto"
+              className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100"
             >
               Lưu thời gian
             </button>
@@ -464,26 +545,13 @@ export default function TeacherQuestionBankPanel() {
                   onConfirm: () => resetQuestions(),
                 });
               }}
-              className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-1.5 w-full min-[400px]:w-auto"
+              className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-1.5"
             >
               <Trash2 size={14} /> Xóa toàn bộ
             </button>
             </div>
           </div>
         </div>
-        <p className="mt-2 text-[11px] font-semibold leading-snug text-slate-500">
-          Thời gian áp dụng cho môn này:{' '}
-          <span className="text-amber-800">{teacherExamMinutes?.[qSection] ?? 90} phút TN</span>
-          {' '}(phần trắc nghiệm)
-          {essayQuestions.length > 0 && (
-            <>
-              {' · '}
-              <span className="text-violet-800">{teacherEssayExamMinutes?.[qSection] ?? 60} phút TL</span>
-              {' '}(phần tự luận — đồng hồ riêng sau khi đạt TN)
-            </>
-          )}
-          . Chỉ tính môn có câu hỏi trong đề, không cộng môn trống.
-        </p>
       </div>
 
       {/* Hai cột: Trắc nghiệm | Tự luận */}
@@ -507,7 +575,7 @@ export default function TeacherQuestionBankPanel() {
             </button>
             <button
               type="button"
-              onClick={() => downloadTeacherQuestionsExcelTemplate(qSection, activeSection?.label, 'multiple')}
+              onClick={() => downloadTeacherQuestionsExcelTemplate(activeSectionId, activeSection?.label, 'multiple')}
               className="bg-white border border-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-blue-50 w-full min-[480px]:w-auto"
             >
               <Download size={14} /> Mẫu Excel
@@ -540,7 +608,6 @@ export default function TeacherQuestionBankPanel() {
               <EmptyState
                 icon={ListChecks}
                 title="Chưa có câu trắc nghiệm"
-                hint="Thêm thủ công hoặc nhập từ Excel"
               />
             ) : (
               mcQuestions.map((q, i) => (
@@ -575,9 +642,6 @@ export default function TeacherQuestionBankPanel() {
               <Plus size={14} /> Thêm câu / đề TH
             </button>
           </div>
-          <p className="px-3 py-1.5 text-[11px] text-violet-700 bg-red-50/60 border-b border-violet-50">
-            Mỗi câu tự luận có file đề riêng — thêm câu mới sẽ không dùng lại file câu trước.
-          </p>
           <div className="px-3 py-2 border-b border-slate-100">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
@@ -595,7 +659,6 @@ export default function TeacherQuestionBankPanel() {
               <EmptyState
                 icon={PenLine}
                 title="Chưa có câu tự luận"
-                hint="Thêm câu và tải file đề riêng cho từng câu"
               />
             ) : (
               essayQuestions.map((q, i) => (
@@ -633,7 +696,7 @@ export default function TeacherQuestionBankPanel() {
                 <div>
                   <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Môn</label>
                   <CmsSelect
-                    value={qForm.section || qSection}
+                    value={qForm.section || activeSectionId}
                     onChange={(e) => setQForm({ ...qForm, section: e.target.value })}
                     className="w-full border-2 border-slate-200 rounded-xl p-2.5 text-sm font-bold outline-none focus:border-blue-400"
                   >

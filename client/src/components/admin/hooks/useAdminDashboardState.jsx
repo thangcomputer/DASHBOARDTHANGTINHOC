@@ -21,7 +21,13 @@ const TAB_PERMISSION = {
   staff: PERMISSIONS.MANAGE_STAFF,
   hr: PERMISSIONS.MANAGE_HR,
   training: PERMISSIONS.MANAGE_TRAINING,
+  'training-videos': PERMISSIONS.MANAGE_TRAINING,
+  'training-guides-evaluations': PERMISSIONS.VIEW_EVALUATIONS,
+  'training-resources': PERMISSIONS.MANAGE_TRAINING,
+  'training-exam-room': PERMISSIONS.MANAGE_TRAINING,
   'student-training': PERMISSIONS.MANAGE_STUDENT_TRAINING,
+  'student-resources': PERMISSIONS.MANAGE_STUDENT_TRAINING,
+  'lesson-practice': PERMISSIONS.MANAGE_STUDENT_TRAINING,
   'cert-prep': PERMISSIONS.MANAGE_CERT_PREP,
   evaluations: PERMISSIONS.VIEW_EVALUATIONS,
   finance: PERMISSIONS.MANAGE_FINANCE,
@@ -118,7 +124,8 @@ export function useAdminDashboardState() {
     // Nếu là Staff (không phải SuperAdmin / HighAdmin) chỉ có quyền Hộp thư (manage_messages)
     if (_sess && !isSuperAdmin && !isHighAdmin) {
       const perms = Array.isArray(_sess.permissions) ? _sess.permissions : [];
-      const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) => perms.includes(p));
+      const hasOtherPerms = Object.values(TAB_PERMISSION).some((p) =>
+        (Array.isArray(p) ? p : [p]).some((permission) => perms.includes(permission)));
       if (!hasOtherPerms && perms.includes(PERMISSIONS.MANAGE_MESSAGES)) {
         if (location.pathname === '/admin' && (activeTab === 'dashboard' || activeTab === 'overview')) {
           navigate('/admin/inbox', { replace: true });
@@ -144,6 +151,12 @@ export function useAdminDashboardState() {
       if (!ok) navigate('/admin#dashboard', { replace: true });
       return undefined;
     }
+    if (activeTab === 'training-guides-evaluations') {
+      const ok = hasPermission(_sess, PERMISSIONS.MANAGE_TRAINING)
+        || hasPermission(_sess, PERMISSIONS.VIEW_EVALUATIONS);
+      if (!ok) navigate('/admin#dashboard', { replace: true });
+      return undefined;
+    }
     const need = TAB_PERMISSION[activeTab];
     if (need && !hasPermission(_sess, need)) {
       navigate('/admin#dashboard', { replace: true });
@@ -154,8 +167,8 @@ export function useAdminDashboardState() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [resetPwModal, setResetPwModal] = useState(null);
   const sTrainingTabRef = useRef('videos');
-  const sqSectionRef = useRef('coban');
-  const qSectionRef = useRef('coban');
+  const sqSectionRef = useRef('mon-kiem-thu');
+  const qSectionRef = useRef('mon-kiem-thu');
 
   const studentsApi = useAdminStudents({ activeTab, setDeleteModal, sqSectionRef });
   const teachersApi = useAdminTeachers({
@@ -471,19 +484,19 @@ export function useAdminDashboardState() {
 
   // Teacher question bank filters
   const BLANK_Q = {
-    type: 'multiple', section: 'excel', q: '', options: ['', '', '', ''], correct: 0,
+    type: 'multiple', section: 'mon-kiem-thu', q: '', options: ['', '', '', ''], correct: 0,
     difficulty: 'medium', sampleAnswer: '', imageUrl: '', imageName: '',
     attachedFileUrl: '', attachedFileName: '',
   };
   const [qSearch, setQSearch] = useState('');
-  const [qSection, setQSection] = useState('coban');
+  const [qSection, setQSection] = useState('mon-kiem-thu');
   const [qDifficulty, setQDifficulty] = useState('all');
   const [qSort, setQSort] = useState('newest');
   const [qForm, setQForm] = useState(null);
 
   // Student question bank / exam results UI
   const [sqSearch, setSqSearch] = useState('');
-  const [sqSection, setSqSectionState] = useState('coban');
+  const [sqSection, setSqSectionState] = useState('mon-kiem-thu');
   const [sqType, setSqType] = useState('all');
   const [sqForm, setSqForm] = useState(null);
   const [erSearch, setErSearch] = useState('');

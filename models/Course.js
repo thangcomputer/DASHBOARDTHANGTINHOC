@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { calculateDiscountPrice, effectiveCoursePrice } = require('../utils/coursePricing');
 
 const courseSchema = new mongoose.Schema({
   name: {
@@ -34,6 +35,16 @@ const courseSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  bannerColorStart: {
+    type: String,
+    default: '',
+    match: [/^$|^#[0-9a-fA-F]{6}$/, 'Màu banner phải là mã HEX hợp lệ'],
+  },
+  bannerColorEnd: {
+    type: String,
+    default: '',
+    match: [/^$|^#[0-9a-fA-F]{6}$/, 'Màu banner phải là mã HEX hợp lệ'],
+  },
   price: {
     type: Number,
     required: [true, 'Giá khóa học không được để trống'],
@@ -48,6 +59,14 @@ const courseSchema = new mongoose.Schema({
     min: 0,
     max: 100,
     default: 0,
+  },
+  discountStartsAt: {
+    type: Date,
+    default: null,
+  },
+  discountEndsAt: {
+    type: Date,
+    default: null,
   },
   totalSessions: {
     type: Number,
@@ -70,6 +89,11 @@ const courseSchema = new mongoose.Schema({
     type: String,
     enum: ['online-1-1', 'online-group', 'offline', 'video'],
     default: 'online-1-1',
+  },
+  deliveryMode: {
+    type: String,
+    enum: ['instructor', 'video'],
+    default: 'instructor',
   },
   // Chương trình học
   curriculum: [{
@@ -135,7 +159,7 @@ courseSchema.pre('save', async function () {
   }
   // Tính giá giảm
   if (this.discountPercent > 0) {
-    this.discountPrice = Math.round(this.price * (1 - this.discountPercent / 100));
+    this.discountPrice = calculateDiscountPrice(this.price, this.discountPercent);
   }
 });
 
@@ -149,7 +173,7 @@ courseSchema.pre('findOneAndUpdate', async function () {
 
   if (price !== undefined || pct !== undefined) {
     if (price !== undefined && pct !== undefined) {
-      const dp = pct > 0 ? Math.round(price * (1 - pct / 100)) : price;
+      const dp = calculateDiscountPrice(price, pct);
       if (!update.$set) update.$set = {};
       update.$set.discountPrice = dp;
     }
@@ -158,7 +182,7 @@ courseSchema.pre('findOneAndUpdate', async function () {
 
 // Virtual helper: giá thực tế thu
 courseSchema.virtual('effectivePrice').get(function () {
-  return this.discountPercent > 0 ? this.discountPrice : this.price;
+  return effectiveCoursePrice(this);
 });
 
 module.exports = mongoose.model('Course', courseSchema);

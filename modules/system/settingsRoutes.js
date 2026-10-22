@@ -18,12 +18,9 @@ const {
   getMergedExamCatalog,
   normalizeCustomList,
   sanitizeCustomExamSubjectEntry,
-  mergeCourseSubjectsIntoCustom,
-  inferExamSubjectsFromCourseName,
   BUILTIN_EXAM_SUBJECT_IDS,
 } = require('../exam/services/examSubjectCatalog');
 const { getCachedSettings, invalidateSettingsCache } = require('./settingsCache');
-const Course = require('../course/models/Course');
 
 /** Chuyển URL đầy đủ http(s)://.../uploads/... → /uploads/... (tránh mixed-content trên HTTPS) */
 function normalizeUploadFileUrl(url) {
@@ -216,8 +213,8 @@ router.put('/student-training-data', authMiddleware, authorize(NEW_PERMISSIONS.C
   }
 });
 
-const DEFAULT_EXAM_MINUTES_SERVER = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 };
-const DEFAULT_ESSAY_EXAM_MINUTES_SERVER = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 };
+const DEFAULT_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 90 };
+const DEFAULT_ESSAY_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 60 };
 
 function sanitizeStudentExamMinutesPayload(body) {
   const out = { ...DEFAULT_EXAM_MINUTES_SERVER };
@@ -257,40 +254,11 @@ function sanitizeStudentExamFilesPayload(body) {
   return out;
 }
 
-/**
- * Catalog môn thi = builtin + custom settings + môn gắn trên Course (đồng bộ DB).
- * Nếu tìm thấy môn còn thiếu → ghi vào examSubjectsCustomRaw để lần sau dùng chung.
- * Khóa học cũ thiếu examSubjects → backfill từ tên/category.
- */
+/** Return the source-controlled test subject only; GET must not generate catalog data. */
 async function examCatalogPayload(settings) {
-  let custom = normalizeCustomList(settings?.examSubjectsCustomRaw);
-  try {
-    const courses = await Course.find({}).select('name category examSubjects').lean();
-
-    // Backfill examSubjects cho khóa học cũ (chỉ những bản ghi đang trống)
-    const toBackfill = courses.filter((c) => !Array.isArray(c.examSubjects) || c.examSubjects.length === 0);
-    if (toBackfill.length) {
-      await Promise.all(toBackfill.map(async (c) => {
-        const ids = inferExamSubjectsFromCourseName(c.name, c.category, custom);
-        if (!ids.length) return;
-        await Course.updateOne({ _id: c._id }, { $set: { examSubjects: ids } });
-        c.examSubjects = ids;
-      }));
-      logger.info(`[EXAM-SUBJECTS] Backfilled examSubjects for ${toBackfill.length} course(s)`);
-    }
-
-    const { custom: mergedCustom, added } = mergeCourseSubjectsIntoCustom(custom, courses);
-    if (added.length) {
-      custom = mergedCustom;
-      await updateMainSettings({ $set: { examSubjectsCustomRaw: custom } });
-      logger.info(`[EXAM-SUBJECTS] Synced ${added.length} subject(s) from courses: ${added.map((s) => s.id).join(', ')}`);
-    }
-  } catch (err) {
-    logger.warn('[EXAM-SUBJECTS] Course sync skipped:', err.message);
-  }
   return {
-    custom,
-    merged: getMergedExamCatalog(custom),
+    custom: [],
+    merged: getMergedExamCatalog([]),
   };
 }
 
@@ -301,8 +269,8 @@ router.get('/student-exam-config', authMiddleware, systemController.get_student_
   }
 });
 
-const DEFAULT_TEACHER_EXAM_MINUTES_SERVER = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90, situation: 90, computer: 90, other: 90 };
-const DEFAULT_TEACHER_ESSAY_EXAM_MINUTES_SERVER = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60, situation: 60, computer: 60, other: 60 };
+const DEFAULT_TEACHER_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 90 };
+const DEFAULT_TEACHER_ESSAY_EXAM_MINUTES_SERVER = { 'mon-kiem-thu': 60 };
 
 function rawTeacherExamMinutesPayload(body) {
   if (!body || typeof body !== 'object') return null;
@@ -432,7 +400,7 @@ router.put('/teacher-exam-config', authMiddleware, authorizeAny(NEW_PERMISSIONS.
   }
 });
 
-// ── GET /api/settings/exam-subjects ── Danh muc mon thi (mac dinh + tuy chinh + sync Course)
+// ── GET /api/settings/exam-subjects ── Danh mục môn kiểm thử
 router.get('/exam-subjects', authMiddleware, systemController.get_exam_subjects17);
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

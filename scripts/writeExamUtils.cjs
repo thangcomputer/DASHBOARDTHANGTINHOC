@@ -4,15 +4,10 @@ const root = path.join(__dirname, '..');
 
 const exam = `/** Catalog mon thi (mac dinh + tuy chinh tu server) */
 export const BUILTIN_EXAM_SUBJECTS = {
-  coban: { id: 'coban', label: 'M\\u00E1y vi t\\u00EDnh (C\\u01A1 b\\u1EA3n)', short: 'C', bg: 'bg-slate-600', minutes: 90 },
-  word: { id: 'word', label: 'Word', short: 'W', bg: 'bg-blue-600', minutes: 90 },
-  excel: { id: 'excel', label: 'Excel', short: 'X', bg: 'bg-green-600', minutes: 90 },
-  powerpoint: { id: 'powerpoint', label: 'PowerPoint', short: 'P', bg: 'bg-orange-500', minutes: 90 },
-  canva: { id: 'canva', label: 'Canva', short: 'CA', bg: 'bg-purple-600', minutes: 90 },
-  situation: { id: 'situation', label: 'S\\u01B0 ph\\u1EA1m (T\\u00ECnh hu\\u1ED1ng)', short: 'SP', bg: 'bg-rose-600', minutes: 90 },
+  'mon-kiem-thu': { id: 'mon-kiem-thu', label: 'Môn kiểm thử', short: 'T', bg: 'bg-gray-600', minutes: 90 },
 };
 export const EXAM_SUBJECTS = BUILTIN_EXAM_SUBJECTS;
-export const OFFICE_EXAM_IDS = ['coban', 'word', 'excel', 'powerpoint'];
+export const OFFICE_EXAM_IDS = [];
 
 export function slugifyExamSubjectId(raw) {
   return String(raw || '')
@@ -73,15 +68,10 @@ export function mapCourseToExamSubjectIds(courseName, catalog) {
   const cat = catalog || BUILTIN_EXAM_SUBJECTS;
   const n = normalizeCourseKey(courseName);
   const pick = (ids) => ids.filter((id) => cat[id]);
-  if (n.includes('canva')) return pick(['canva']);
-  if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick([...OFFICE_EXAM_IDS]);
-  if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
-  if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
-  if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
   for (const sub of Object.values(cat)) {
-    if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
+    if (n === sub.id || n === normalizeCourseKey(sub.label)) return [sub.id];
   }
-  return pick([...OFFICE_EXAM_IDS]);
+  return [];
 }
 
 export function getSubjectIdsForEnrollment(enrollment, catalog) {
@@ -99,7 +89,7 @@ export function getSubjectIdsForStudent(enrollments, fallbackCourse, catalog) {
   } else if (fallbackCourse) {
     mapCourseToExamSubjectIds(fallbackCourse, catalog).forEach((id) => ids.add(id));
   } else {
-    OFFICE_EXAM_IDS.forEach((id) => { if ((catalog || BUILTIN_EXAM_SUBJECTS)[id]) ids.add(id); });
+    Object.keys(catalog || BUILTIN_EXAM_SUBJECTS).forEach((id) => ids.add(id));
   }
   return [...ids];
 }
@@ -112,7 +102,7 @@ export function getSubjectIdsForCourseFilter(enrollments, filterCourse, fallback
 }
 
 export function buildExamSubjectsFromProgress(examProgress, subjectIds) {
-  const ids = subjectIds?.length ? subjectIds : [...OFFICE_EXAM_IDS];
+  const ids = subjectIds?.length ? subjectIds : Object.keys(BUILTIN_EXAM_SUBJECTS);
   return ids.map((id) => {
     const def = { id, status: 'chua_thi', tracNghiem: null, thucHanh: 'chua_nop', lockUntil: null };
     const saved = (examProgress || []).find((s) => s.id === id);
@@ -363,7 +353,7 @@ import {
   getStudentEssayQuestionsForExam,
 } from './htmlContent';
 
-const DEFAULT_SUBJECT_ORDER = ['coban', 'word', 'excel', 'powerpoint', 'canva'];
+const DEFAULT_SUBJECT_ORDER = ['mon-kiem-thu'];
 
 export function orderTeacherExamSubjectIds(subjectIds) {
   const ids = Array.isArray(subjectIds) ? subjectIds.filter(Boolean) : [];
@@ -595,25 +585,15 @@ fs.writeFileSync(path.join(root, 'client/src/components/admin/shared/ExamSubject
 
 const serverAccess = `'use strict';
 const BUILTIN_EXAM_SUBJECTS = {
-  coban: { id: 'coban', label: 'May vi tinh (Co ban)' },
-  word: { id: 'word', label: 'Word' },
-  excel: { id: 'excel', label: 'Excel' },
-  powerpoint: { id: 'powerpoint', label: 'PowerPoint' },
-  canva: { id: 'canva', label: 'Canva' },
+  'mon-kiem-thu': { id: 'mon-kiem-thu', label: 'Mon kiem thu' },
 };
 function normalizeCourseKey(name) {
   return String(name || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\u0111/g, 'd');
 }
 function mapCourseToExamSubjectIds(courseName) {
   const n = normalizeCourseKey(courseName);
-  const pick = (ids) => ids.filter((id) => BUILTIN_EXAM_SUBJECTS[id]);
-  if (n.includes('canva')) return pick(['canva']);
-  if (n.includes('thvp') || n.includes('van phong') || n.includes('tin hoc van phong') || n.includes('microsoft office')) return pick(['coban', 'word', 'excel', 'powerpoint']);
-  if (n.includes('excel') && !n.includes('van phong')) return pick(['coban', 'excel']);
-  if (n.includes('word') && !n.includes('van phong')) return pick(['coban', 'word']);
-  if (n.includes('powerpoint') || n.includes('ppt')) return pick(['coban', 'powerpoint']);
   for (const sub of Object.values(BUILTIN_EXAM_SUBJECTS)) {
-    if (n.includes(sub.id) || n.includes(normalizeCourseKey(sub.label))) return [sub.id];
+    if (n === sub.id || n === normalizeCourseKey(sub.label)) return [sub.id];
   }
   return [];
 }

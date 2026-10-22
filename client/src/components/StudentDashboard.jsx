@@ -797,7 +797,7 @@ const StudentDashboard = ({ onNavigate }) => {
         {currentHash === 'schedule' ? (
           <StudentLazyScheduleTab
             viewStudent={viewStudent}
-            mySchedules={mySchedules}
+            mySchedules={mySchedulesAll}
             enrollments={enrollments}
             activeCourseName={activeCourseName}
             setActiveCourseName={setActiveCourseName}

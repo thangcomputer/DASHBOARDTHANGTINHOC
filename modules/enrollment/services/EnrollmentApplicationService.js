@@ -4,6 +4,7 @@ const Student = require('../../student/models/Student');
 const Schedule = require('../../attendance/models/Schedule');
 const Invoice = require('../../finance/models/Invoice');
 const logger = require('../../../config/logger');
+const { effectiveCoursePrice } = require('../../../utils/coursePricing');
 const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../../finance/services/ledgerService');
 const { applyEnrollmentStats, resolveEnrollmentExamSubjects } = require('./enrollmentService');
 
@@ -63,7 +64,7 @@ class EnrollmentApplicationService {
     }
 
     const sessions = Number(totalSessions) > 0 ? Number(totalSessions) : (catalogCourse?.totalSessions || 12);
-    const resolvedPrice = Number(price) || catalogCourse?.discountPrice || catalogCourse?.price || 0;
+    const resolvedPrice = Number(price) || (catalogCourse ? effectiveCoursePrice(catalogCourse) : 0);
     const isPaid = paid === true || paid === 'true' || paid === 1 || paid === '1';
     const examSubjects = await resolveEnrollmentExamSubjects({
       courseName: resolvedName,

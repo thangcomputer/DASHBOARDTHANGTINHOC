@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
+  Award, CheckCircle, ChevronDown, ChevronUp, Clock, Download,
   ExternalLink, FileBox, Lock, MessageSquare, PlayCircle, Plus, Search, Star, Trash2,
 } from 'lucide-react';
 import { LMS_PLAYER_TABS, formatLessonDisplayTitle, formatLmsTimestamp, getChapterLessonIndex, isLessonFullyWatched } from '../../utils/lmsLessonUi';
@@ -25,30 +25,201 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 86_400_000)} ngày trước`;
 }
 
-export function LmsTabBar({ courseTab, setCourseTab, className = '' }) {
+function qaReadStorageKey({ userId, courseId, lessonId, audience }) {
+  return `lms-qa-read:v1:${audience}:${userId}:${courseId}:${lessonId || 'all'}`;
+}
+
+function qaAnswerMarker(item) {
+  const staffReplies = (Array.isArray(item.thread) ? item.thread : []).filter((message) => (
+    ['admin', 'staff', 'teacher'].includes(String(message.authorRole || '').toLowerCase())
+  ));
+  const latestReply = staffReplies[staffReplies.length - 1];
+  if (latestReply) {
+    return `${latestReply.id || ''}:${latestReply.createdAt || ''}:${String(latestReply.body || '')}`;
+  }
+  if (item.answer || item.status === 'answered') {
+    return `${item.answeredAt || item.updatedAt || ''}:${String(item.answer || '')}`;
+  }
+  return '';
+}
+
+function readQaReadMarkers(storageKey) {
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch (error) {
+    console.error('Failed to read LMS Q&A read markers:', error);
+    return {};
+  }
+}
+
+function markQaItemsAsRead(storageKey, items) {
+  const markers = readQaReadMarkers(storageKey);
+  let changed = false;
+  for (const item of items) {
+    const marker = qaAnswerMarker(item);
+    const id = String(item.id || item._id || '');
+    if (marker && id && markers[id] !== marker) {
+      markers[id] = marker;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(markers));
+    window.dispatchEvent(new CustomEvent('lms-qa-read', { detail: { storageKey } }));
+  } catch (error) {
+    console.error('Failed to save LMS Q&A read marker:', error);
+  }
+}
+
+function markQaAsRead(storageKey, item) {
+  markQaItemsAsRead(storageKey, [item]);
+}
+
+function isQaItemRead(storageKey, item) {
+  const marker = qaAnswerMarker(item);
+  const id = String(item.id || item._id || '');
+  return Boolean(marker && id && readQaReadMarkers(storageKey)[id] === marker);
+}
+
+export function LmsTabBar({
+  courseTab,
+  setCourseTab,
+  className = '',
+  includeLessonList = true,
+  light = false,
+  courseId = '',
+  lessonId = '',
+  audience = 'student',
+  userId = '',
+}) {
+  const { socket } = useSocket() || {};
+  const tabs = includeLessonList ? LMS_PLAYER_TABS : LMS_PLAYER_TABS.filter((tab) => tab.key !== 'list');
+  const [qaItems, setQaItems] = useState([]);
+  const storageKey = qaReadStorageKey({ userId, courseId, lessonId, audience });
+  const { answeredQaCount, unreadQaCount } = useMemo(() => {
+    const readMarkers = readQaReadMarkers(storageKey);
+    let answered = 0;
+    let unread = 0;
+    for (const item of qaItems) {
+      const marker = qaAnswerMarker(item);
+      const id = String(item.id || item._id || '');
+      if (!marker || !id) continue;
+      answered += 1;
+      if (readMarkers[id] !== marker) unread += 1;
+    }
+    return { answeredQaCount: answered, unreadQaCount: unread };
+  }, [qaItems, storageKey]);
+
+  const loadQaItems = useCallback(() => {
+    let active = true;
+    if (!courseId) {
+      setQaItems([]);
+      return () => { active = false; };
+    }
+
+    const params = new URLSearchParams({ courseId: String(courseId) });
+    if (lessonId) params.set('lessonId', String(lessonId));
+    if (audience) params.set('audience', audience);
+
+    apiFetch(`/training-lms/qa?${params.toString()}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (!active) return;
+        if (!json?.success || !Array.isArray(json.data)) {
+          setQaItems([]);
+          return;
+        }
+        setQaItems(json.data);
+      })
+      .catch((error) => {
+        console.error('Failed to load answered LMS questions for tab badge:', error);
+        if (active) setQaItems([]);
+      });
+
+    return () => { active = false; };
+  }, [courseId, lessonId, audience]);
+
+  useEffect(() => loadQaItems(), [loadQaItems]);
+
+  useEffect(() => {
+    const updateReadState = (event) => {
+      if (event.detail?.storageKey === storageKey) setQaItems((items) => [...items]);
+    };
+    window.addEventListener('lms-qa-read', updateReadState);
+    return () => window.removeEventListener('lms-qa-read', updateReadState);
+  }, [storageKey]);
+
+  useEffect(() => {
+    const refreshOnUpdate = (event) => {
+      const detail = event.detail || {};
+      if (detail.courseId && String(detail.courseId) !== String(courseId)) return;
+      if (detail.audience && String(detail.audience) !== String(audience)) return;
+      if (detail.lessonId && String(detail.lessonId) !== String(lessonId || '')) return;
+      loadQaItems();
+    };
+    window.addEventListener('lms-qa-updated', refreshOnUpdate);
+    return () => window.removeEventListener('lms-qa-updated', refreshOnUpdate);
+  }, [courseId, lessonId, audience, loadQaItems]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onQaEvent = (raw) => {
+      const payload = raw?.payload || raw || {};
+      if (String(payload.kind || '') !== 'lms_qa') return;
+      if (courseId && payload.courseId && String(payload.courseId) !== String(courseId)) return;
+      if (audience && payload.audience && String(payload.audience) !== String(audience)) return;
+      loadQaItems();
+    };
+    socket.on('lms_qa:updated', onQaEvent);
+    socket.on('RECEIVE_NOTIFICATION', onQaEvent);
+    return () => {
+      socket.off('lms_qa:updated', onQaEvent);
+      socket.off('RECEIVE_NOTIFICATION', onQaEvent);
+    };
+  }, [socket, courseId, audience, loadQaItems]);
+
   return (
     <div
-      className={`border-b border-white/[0.08] bg-[#0d1117] ${className}`}
+      className={`${light ? 'border-b border-slate-200 bg-white' : 'border-b border-white/[0.08] bg-[#0d1117]'} ${className}`}
       role="tablist"
       aria-label="Tab nội dung bài học"
     >
-      <div className="flex flex-wrap items-stretch gap-0 max-w-3xl mx-auto w-full px-1 sm:px-0">
-        {LMS_PLAYER_TABS.map((t) => (
+      <div className={`flex flex-wrap items-stretch gap-0 w-full px-1 sm:px-0 ${light ? '' : 'max-w-3xl mx-auto'}`}>
+        {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             role="tab"
             aria-selected={courseTab === t.key}
-            onClick={() => setCourseTab(t.key)}
+            onClick={() => {
+              if (t.key === 'qa') markQaItemsAsRead(storageKey, qaItems);
+              setCourseTab(t.key);
+            }}
             className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${
               t.mobileOnly ? 'lg:hidden' : ''
             } ${
               courseTab === t.key
-                ? 'text-white border-emerald-500 bg-white/[0.03]'
-                : 'text-slate-500 border-transparent hover:text-slate-300'
+                ? light
+                  ? 'text-red-700 border-red-600 bg-red-50'
+                  : 'text-white border-emerald-500 bg-white/[0.03]'
+                : light
+                  ? 'text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-800'
+                  : 'text-slate-500 border-transparent hover:text-slate-300'
             }`}
           >
-            {t.label}
+            <span className="inline-flex items-center justify-center gap-1.5">
+              {t.label}
+              {t.key === 'qa' && unreadQaCount > 0 ? (
+                <span
+                  aria-label={`${unreadQaCount} tin nhắn mới chưa đọc`}
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white"
+                >
+                  {unreadQaCount}
+                </span>
+              ) : null}
+            </span>
           </button>
         ))}
       </div>
@@ -61,69 +232,50 @@ function OverviewPanel({
   selectedCourse,
   lessons,
   overallProgress,
-  antiSeekEnabled,
   teacherAntiSeekSlot = null,
+  light = false,
 }) {
   if (!currentLesson) {
-    return <p className="text-slate-500 text-sm">Chọn một bài giảng để xem tổng quan.</p>;
+    return <p className={`${light ? 'text-slate-500' : 'text-slate-500'} text-sm`}>Chọn một bài giảng để xem tổng quan.</p>;
   }
   const idx = getChapterLessonIndex(lessons, currentLesson);
   const courseDesc = selectedCourse?.description || selectedCourse?.desc || '';
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto w-full">
+    <div className={`space-y-5 w-full ${light ? 'mx-0 text-slate-800' : 'max-w-3xl mx-auto'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="inline-block text-[9px] font-black text-emerald-400/80 uppercase tracking-[0.15em] mb-2">
+          <span className={`inline-block text-[9px] font-black uppercase tracking-[0.15em] mb-2 ${light ? 'text-emerald-700' : 'text-emerald-400/80'}`}>
             {currentLesson.chapterTitle || selectedCourse?.title || 'Bài giảng'}
           </span>
-          <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
+          <h1 className={`text-lg sm:text-xl font-bold leading-snug ${light ? 'text-slate-900' : 'text-white'}`}>
             {formatLessonDisplayTitle(currentLesson.title, idx)}
           </h1>
           {Number(currentLesson.duration) > 0 ? (
-            <span className="inline-flex items-center gap-1.5 mt-2 text-slate-400 text-[11px] font-semibold">
+            <span className={`inline-flex items-center gap-1.5 mt-2 text-[11px] font-semibold ${light ? 'text-slate-500' : 'text-slate-400'}`}>
               <Clock size={12} />
               {Math.floor(currentLesson.duration / 60)} phút {String(currentLesson.duration % 60).padStart(2, '0')}s
             </span>
           ) : null}
-          <p className="mt-2 text-[12px] text-slate-500 font-medium">
-            Tiến độ khóa học: <span className="text-emerald-400 font-bold tabular-nums">{overallProgress}%</span>
-          </p>
         </div>
         {currentLesson.isCompleted && (
-          <div className="flex-shrink-0 flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold border border-emerald-500/20">
+          <div className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold ${light ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
             <CheckCircle size={13} /> Đã xong
           </div>
         )}
       </div>
 
-      {antiSeekEnabled ? (
-        <div className="flex items-start gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-3.5 py-3">
-          <AlertCircle size={14} className="text-amber-400/80 flex-shrink-0 mt-0.5" />
-          <p className="text-amber-200/70 text-[11px] sm:text-xs leading-relaxed">
-            <strong className="text-amber-400">Chống tua:</strong> ĐÃ BẬT — cần xem đủ thời lượng yêu cầu để ghi nhận tiến độ.
-          </p>
-        </div>
-      ) : (
-        <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-3">
-          <CheckCircle size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-          <p className="text-emerald-200/80 text-[11px] sm:text-xs leading-relaxed">
-            <strong className="text-emerald-400">Chống tua:</strong> ĐÃ TẮT — có thể tua tự do.
-          </p>
-        </div>
-      )}
-
       {teacherAntiSeekSlot}
 
       <div className="pt-1 space-y-2">
-        <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Mô tả bài giảng</p>
+        <p className={`text-[11px] font-black uppercase tracking-widest ${light ? 'text-slate-500' : 'text-slate-500'}`}>Mô tả bài giảng</p>
         {currentLesson.description && /<[a-z][\s\S]*>/i.test(currentLesson.description) ? (
           <div
-            className="text-slate-400 leading-relaxed text-[13px] break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-emerald-400 [&_a]:underline"
+            className={`${light ? 'text-slate-600 [&_a]:text-emerald-700' : 'text-slate-400 [&_a]:text-emerald-400'} leading-relaxed text-[13px] break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline`}
             dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(currentLesson.description) }}
           />
         ) : (
-          <p className="text-slate-400 leading-relaxed text-[13px] whitespace-pre-wrap">
+          <p className={`${light ? 'text-slate-600' : 'text-slate-400'} leading-relaxed text-[13px] whitespace-pre-wrap`}>
             {htmlToPlainText(currentLesson.description) ||
               'Theo dõi video để nắm kiến thức. Hệ thống ghi nhận tiến độ khi bạn xem đủ thời lượng yêu cầu.'}
           </p>
@@ -131,15 +283,15 @@ function OverviewPanel({
       </div>
 
       {courseDesc ? (
-        <div className="pt-3 border-t border-white/[0.06] space-y-2">
+        <div className={`pt-3 border-t space-y-2 ${light ? 'border-slate-200' : 'border-white/[0.06]'}`}>
           <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Về khóa học</p>
           {/<[a-z][\s\S]*>/i.test(courseDesc) ? (
             <div
-              className="text-slate-400 leading-relaxed text-[13px] break-words [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+              className={`${light ? 'text-slate-600' : 'text-slate-400'} leading-relaxed text-[13px] break-words [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5`}
               dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(courseDesc) }}
             />
           ) : (
-            <p className="text-slate-400 leading-relaxed text-[13px] whitespace-pre-wrap">
+            <p className={`${light ? 'text-slate-600' : 'text-slate-400'} leading-relaxed text-[13px] whitespace-pre-wrap`}>
               {htmlToPlainText(courseDesc)}
             </p>
           )}
@@ -157,7 +309,7 @@ function readNoteTimeSec(getCurrentTime) {
   }
 }
 
-function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
+function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light = false }) {
   const [notes, setNotes] = useLmsLocalStore(storageKey, []);
   const [draft, setDraft] = useState('');
   const [filterLesson, setFilterLesson] = useState('current');
@@ -205,8 +357,8 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
   const removeNote = (id) => setNotes((prev) => (prev || []).filter((n) => n.id !== id));
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto w-full">
-      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+    <div className={`space-y-4 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
+      <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${light ? 'border-slate-300 bg-white shadow-sm' : 'border-white/10 bg-white/[0.03]'}`}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -217,12 +369,12 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
             }
           }}
           placeholder={`Tạo ghi chú mới tại ${formatLmsTimestamp(liveAtSec)}`}
-          className="flex-1 min-w-0 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none"
+          className={`flex-1 min-w-0 bg-transparent text-sm outline-none ${light ? 'text-slate-900 placeholder:text-slate-500' : 'text-slate-200 placeholder:text-slate-500'}`}
         />
         <button
           type="button"
           onClick={addNote}
-          className="shrink-0 w-9 h-9 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center hover:bg-emerald-500/30"
+          className={`shrink-0 w-9 h-9 rounded-full border flex items-center justify-center ${light ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'}`}
           aria-label="Thêm ghi chú"
         >
           <Plus size={16} />
@@ -235,8 +387,8 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
           onClick={() => setFilterLesson('current')}
           className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${
             filterLesson === 'current'
-              ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
-              : 'border-white/10 text-slate-400'
+              ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
+              : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
           }`}
         >
           Bài hiện tại
@@ -246,8 +398,8 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
           onClick={() => setFilterLesson('all')}
           className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${
             filterLesson === 'all'
-              ? 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
-              : 'border-white/10 text-slate-400'
+              ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
+              : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
           }`}
         >
           Tất cả bài giảng
@@ -255,7 +407,7 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center text-slate-500 text-sm py-10 leading-relaxed px-4">
+        <p className={`text-center text-sm py-10 leading-relaxed px-4 ${light ? 'text-slate-600' : 'text-slate-500'}`}>
           Nhấp vào ô &quot;Tạo ghi chú mới&quot; hoặc nút + để tạo ghi chú đầu tiên của bạn.
         </p>
       ) : (
@@ -263,22 +415,22 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime }) {
           {filtered.map((n) => (
             <li
               key={n.id}
-              className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex gap-3"
+              className={`rounded-xl border px-4 py-3 flex gap-3 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'}`}
             >
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-emerald-400/90 font-bold mb-1">
+                <div className={`flex flex-wrap items-center gap-2 text-[11px] font-bold mb-1 ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>
                   <span className="tabular-nums">{formatLmsTimestamp(n.atSec)}</span>
                   {filterLesson === 'all' && n.lessonTitle ? (
-                    <span className="text-slate-500 font-semibold truncate">{n.lessonTitle}</span>
+                    <span className={`${light ? 'text-slate-600' : 'text-slate-500'} font-semibold truncate`}>{n.lessonTitle}</span>
                   ) : null}
-                  <span className="text-slate-600 font-medium">{timeAgo(n.createdAt)}</span>
+                  <span className={`${light ? 'text-slate-500' : 'text-slate-600'} font-medium`}>{timeAgo(n.createdAt)}</span>
                 </div>
-                <p className="text-sm text-slate-300 whitespace-pre-wrap break-words">{n.text}</p>
+                <p className={`text-sm whitespace-pre-wrap break-words ${light ? 'text-slate-800' : 'text-slate-300'}`}>{n.text}</p>
               </div>
               <button
                 type="button"
                 onClick={() => removeNote(n.id)}
-                className="shrink-0 w-8 h-8 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center"
+                className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${light ? 'text-slate-500 hover:text-red-700 hover:bg-red-50' : 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'}`}
                 aria-label="Xóa ghi chú"
               >
                 <Trash2 size={14} />
@@ -304,6 +456,7 @@ function QaPanel({
   videoUrl = '',
   videoDuration = 0,
   currentUserId = '',
+  light = false,
 }) {
   const { socket } = useSocket() || {};
   const [items, setItems] = useState([]);
@@ -314,12 +467,36 @@ function QaPanel({
   const [q, setQ] = useState('');
   const [answerDrafts, setAnswerDrafts] = useState({});
   const [replyDrafts, setReplyDrafts] = useState({});
+  const [expandedQaId, setExpandedQaId] = useState('');
   const [error, setError] = useState('');
   const [liveAtSec, setLiveAtSec] = useState(() => readNoteTimeSec(getCurrentTime));
   const getCurrentTimeRef = useRef(getCurrentTime);
   const liveAtSecRef = useRef(liveAtSec);
+  const readStorageKey = qaReadStorageKey({
+    userId: currentUserId,
+    courseId,
+    lessonId,
+    audience,
+  });
   getCurrentTimeRef.current = getCurrentTime;
   liveAtSecRef.current = liveAtSec;
+
+  useEffect(() => {
+    setExpandedQaId('');
+  }, [lessonId]);
+
+  useEffect(() => {
+    if (!expandedQaId) return undefined;
+    const collapseOnOutsideClick = (event) => {
+      const target = event.target;
+      const clickedQa = target instanceof Element ? target.closest('[data-lms-qa-id]') : null;
+      if (clickedQa?.getAttribute('data-lms-qa-id') !== expandedQaId) {
+        setExpandedQaId('');
+      }
+    };
+    document.addEventListener('pointerdown', collapseOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', collapseOnOutsideClick);
+  }, [expandedQaId]);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -351,6 +528,9 @@ function QaPanel({
       const json = await res.json().catch(() => ({}));
       if (json?.success && Array.isArray(json.data)) {
         setItems(json.data);
+        window.dispatchEvent(new CustomEvent('lms-qa-updated', {
+          detail: { courseId: String(courseId), lessonId: String(lessonId || ''), audience },
+        }));
       } else if (!silent) {
         setError(json?.message || 'Không tải được hỏi đáp');
       }
@@ -388,11 +568,14 @@ function QaPanel({
 
   useEffect(() => {
     if (!highlightQaId) return;
+    setExpandedQaId(String(highlightQaId));
+    const highlightedItem = items.find((item) => String(item.id || item._id) === String(highlightQaId));
+    if (highlightedItem) markQaAsRead(readStorageKey, highlightedItem);
     const el = document.getElementById(`lms-qa-${highlightQaId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [highlightQaId, items]);
+  }, [highlightQaId, items, readStorageKey]);
 
   const filtered = useMemo(() => {
     let list = [...(Array.isArray(items) ? items : [])];
@@ -538,28 +721,23 @@ function QaPanel({
   };
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto w-full">
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-3 text-[12px] text-slate-300">
-        Tab <span className="font-bold text-emerald-300">Hỏi đáp</span> nằm ngay dưới video.
-        Câu hỏi lưu trên server — Admin/Giảng viên nhận thông báo chuông và có thể trả lời.
-      </div>
-
+    <div className={`space-y-4 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
       <div className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+        <div className={`flex-1 flex items-center gap-2 rounded-xl border px-3 py-2 ${light ? 'border-slate-300 bg-white' : 'border-white/10 bg-white/[0.03]'}`}>
           <Search size={14} className="text-slate-500 shrink-0" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm kiếm câu hỏi trong khóa học"
-            className="flex-1 min-w-0 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none"
+            className={`flex-1 min-w-0 bg-transparent text-sm outline-none ${light ? 'text-slate-900 placeholder:text-slate-500' : 'text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-2">
+      <div className={`rounded-xl border p-4 space-y-2 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.08] bg-white/[0.02]'}`}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Đặt câu hỏi</p>
-          <span className="text-[11px] font-semibold tabular-nums text-emerald-400/90">
+          <p className={`text-[11px] font-black uppercase tracking-widest ${light ? 'text-slate-700' : 'text-slate-500'}`}>Đặt câu hỏi</p>
+          <span className={`text-[11px] font-semibold tabular-nums ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>
             Tại {formatLmsTimestamp(liveAtSec)}
           </span>
         </div>
@@ -567,81 +745,116 @@ function QaPanel({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Tiêu đề câu hỏi"
-          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/40"
+          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-emerald-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-emerald-500/40'}`}
         />
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={3}
           placeholder="Mô tả chi tiết (tuỳ chọn)"
-          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/40 resize-y"
+          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none resize-y ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-emerald-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-emerald-500/40'}`}
         />
         <button
           type="button"
           onClick={submit}
           disabled={sending || !title.trim() || !lessonId}
-          className="inline-flex items-center gap-2 px-4 min-h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold"
+          className="inline-flex items-center gap-2 px-4 min-h-10 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold"
         >
           <MessageSquare size={14} /> {sending ? 'Đang gửi...' : 'Gửi câu hỏi'}
         </button>
-        <p className="text-[11px] text-slate-500">
-          Câu hỏi sẽ gắn với thời điểm video hiện tại ({formatLmsTimestamp(liveAtSec)}) để Support xem đúng đoạn.
-        </p>
         {!lessonId ? (
-          <p className="text-[11px] text-amber-400">Chọn một bài học trước khi gửi câu hỏi.</p>
+          <p className={`text-[11px] ${light ? 'text-amber-800' : 'text-amber-400'}`}>Chọn một bài học trước khi gửi câu hỏi.</p>
         ) : null}
-        {error ? <p className="text-[11px] text-red-400">{error}</p> : null}
+        {error ? <p className={`text-[11px] ${light ? 'text-red-700' : 'text-red-400'}`}>{error}</p> : null}
       </div>
 
-      <h3 className="text-sm font-bold text-slate-300">
+      <h3 className={`text-sm font-bold ${light ? 'text-slate-900' : 'text-slate-300'}`}>
         Các câu hỏi trong video này ({filtered.length})
       </h3>
 
       {loading ? (
-        <p className="text-slate-500 text-sm py-8 text-center">Đang tải hỏi đáp...</p>
+        <p className={`text-sm py-8 text-center ${light ? 'text-slate-600' : 'text-slate-500'}`}>Đang tải hỏi đáp...</p>
       ) : filtered.length === 0 ? (
-        <p className="text-slate-500 text-sm py-8 text-center">Chưa có câu hỏi. Hãy là người đầu tiên hỏi!</p>
+        <p className={`text-sm py-8 text-center ${light ? 'text-slate-600' : 'text-slate-500'}`}>Chưa có câu hỏi. Hãy là người đầu tiên hỏi!</p>
       ) : (
         <ul className="space-y-3">
           {filtered.map((it) => {
             const id = String(it.id || it._id);
             const highlighted = highlightQaId && String(highlightQaId) === id;
+            const expanded = expandedQaId === id;
+            const dialogue = dialogueOf(it);
+            const isRead = isQaItemRead(readStorageKey, it);
             return (
               <li
                 key={id}
                 id={`lms-qa-${id}`}
-                className={`rounded-xl border p-4 ${
+                data-lms-qa-id={id}
+                className={`relative rounded-xl border p-4 ${
                   highlighted
-                    ? 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
-                    : 'border-white/[0.06] bg-white/[0.02]'
+                    ? light ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300' : 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
+                    : light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'
                 }`}
               >
+                {dialogue.length > 0 ? (
+                  <button
+                    type="button"
+                    aria-label={`${expanded ? 'Thu gọn' : 'Xem'} ${dialogue.length} tin nhắn trả lời`}
+                    aria-expanded={expanded}
+                    title={`${dialogue.length} tin nhắn trả lời`}
+                    onClick={() => {
+                      if (!expanded) markQaAsRead(readStorageKey, it);
+                      setExpandedQaId((current) => (current === id ? '' : id));
+                    }}
+                    className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${
+                      isRead
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        : 'border-red-700 bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                  >
+                    <MessageSquare size={14} />
+                    <span>{dialogue.length}</span>
+                  </button>
+                ) : null}
                 <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black flex items-center justify-center shrink-0">
+                  <div className={`w-10 h-10 rounded-full text-xs font-black flex items-center justify-center shrink-0 ${light ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-500/20 text-emerald-300'}`}>
                     {initials(it.askerName || it.author)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2 flex-wrap">
-                      <p className="text-sm font-bold text-slate-100">{it.title}</p>
+                    <div className="flex items-start gap-2 flex-wrap pr-12">
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-label={`${expanded ? 'Thu gọn' : 'Xem'} câu hỏi ${it.title}`}
+                        onClick={() => {
+                          if (!expanded) markQaAsRead(readStorageKey, it);
+                          setExpandedQaId((current) => (current === id ? '' : id));
+                        }}
+                        className={`flex min-w-0 items-center gap-1.5 text-left text-sm font-bold ${light ? 'text-slate-900' : 'text-slate-100'}`}
+                      >
+                        <span>{it.title}</span>
+                        <ChevronDown size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                      </button>
                       <span
                         className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                           it.status === 'answered'
-                            ? 'bg-emerald-500/15 text-emerald-300'
-                            : 'bg-amber-500/15 text-amber-300'
+                            ? isRead
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-red-100 text-red-800'
+                            : light ? 'bg-amber-100 text-amber-800' : 'bg-amber-500/15 text-amber-300'
                         }`}
                       >
                         {it.status === 'answered' ? 'Đã trả lời' : 'Chờ trả lời'}
                       </span>
                     </div>
-                    {it.body ? <p className="text-[13px] text-slate-400 mt-1 whitespace-pre-wrap">{it.body}</p> : null}
-                    <p className="text-[11px] text-slate-500 mt-2">
-                      <span className="text-emerald-400/90 font-semibold">{it.askerName || it.author || userName}</span>
+                    {it.body ? <p className={`text-[13px] mt-1 whitespace-pre-wrap ${light ? 'text-slate-700' : 'text-slate-400'}`}>{it.body}</p> : null}
+                    <p className={`text-[11px] mt-2 ${light ? 'text-slate-600' : 'text-slate-500'}`}>
+                      <span className={`font-semibold ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>{it.askerName || it.author || userName}</span>
                       {it.lessonTitle ? ` · ${it.lessonTitle}` : ''}
-                      <span className="text-amber-300/90 font-semibold tabular-nums">{` · ${formatLmsTimestamp(it.atSec)}`}</span>
+                      <span className={`font-semibold tabular-nums ${light ? 'text-amber-800' : 'text-amber-300/90'}`}>{` · ${formatLmsTimestamp(it.atSec)}`}</span>
                       {` · ${timeAgo(it.createdAt)}`}
                     </p>
 
-                    {dialogueOf(it).map((msg, idx) => {
+                    {expanded && dialogue.map((msg, idx) => {
                       const staffish = ['admin', 'staff', 'teacher'].includes(String(msg.authorRole || '').toLowerCase());
                       return (
                         <div
@@ -652,27 +865,27 @@ function QaPanel({
                               : 'border border-emerald-500/20 bg-emerald-500/10'
                           }`}
                         >
-                          <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${staffish ? 'text-red-600' : 'text-emerald-300'}`}>
+                          <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${staffish ? 'text-red-700' : light ? 'text-emerald-800' : 'text-emerald-300'}`}>
                             {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Phản hồi · ${msg.authorName || 'Học viên'}`}
                           </p>
-                          <p className={`text-[13px] whitespace-pre-wrap ${staffish ? 'text-slate-700' : 'text-slate-200'}`}>
+                          <p className={`text-[13px] whitespace-pre-wrap ${staffish || light ? 'text-slate-800' : 'text-slate-200'}`}>
                             {msg.body}
                           </p>
                           {msg.createdAt ? (
-                            <p className="text-[10px] text-slate-400 mt-1">{timeAgo(msg.createdAt)}</p>
+                            <p className={`text-[10px] mt-1 ${light ? 'text-slate-500' : 'text-slate-400'}`}>{timeAgo(msg.createdAt)}</p>
                           ) : null}
                         </div>
                       );
                     })}
 
-                    {canAnswer ? (
+                    {expanded && canAnswer ? (
                       <div className="mt-3 space-y-2">
                         <textarea
                           value={answerDrafts[id] || ''}
                           onChange={(e) => setAnswerDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
                           rows={2}
                           placeholder={it.status === 'answered' ? 'Tiếp tục trả lời trong đối thoại...' : 'Nhập câu trả lời...'}
-                          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-red-500/40 resize-y"
+                          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none resize-y ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-red-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-red-500/40'}`}
                         />
                         <button
                           type="button"
@@ -685,14 +898,14 @@ function QaPanel({
                       </div>
                     ) : null}
 
-                    {!canAnswer && String(it.askerId || '') === String(currentUserId || '') && (it.answer || (Array.isArray(it.thread) && it.thread.length > 0)) ? (
+                    {expanded && !canAnswer && String(it.askerId || '') === String(currentUserId || '') && (it.answer || (Array.isArray(it.thread) && it.thread.length > 0)) ? (
                       <div className="mt-3 space-y-2">
                         <textarea
                           value={replyDrafts[id] || ''}
                           onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [id]: e.target.value }))}
                           rows={2}
                           placeholder="Phản hồi thêm / hỏi lại Support..."
-                          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/40 resize-y"
+                          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none resize-y ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-emerald-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-emerald-500/40'}`}
                         />
                         <button
                           type="button"
@@ -715,7 +928,7 @@ function QaPanel({
   );
 }
 
-function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' }) {
+function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student', light = false }) {
   const [items, setItems] = useState([]);
   const [avg, setAvg] = useState(0);
   const [rating, setRating] = useState(5);
@@ -793,10 +1006,10 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
   const list = [...(Array.isArray(items) ? items : [])].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto w-full">
-      <div className="flex items-center gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+    <div className={`space-y-5 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
+      <div className={`flex items-center gap-4 rounded-xl border p-4 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'}`}>
         <div>
-          <p className="text-3xl font-extrabold text-white tabular-nums">{avg ? avg.toFixed(1) : '—'}</p>
+          <p className={`text-3xl font-extrabold tabular-nums ${light ? 'text-slate-900' : 'text-white'}`}>{avg ? avg.toFixed(1) : '—'}</p>
           <div className="flex gap-0.5 mt-1">
             {[1, 2, 3, 4, 5].map((s) => (
               <Star
@@ -806,11 +1019,11 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
               />
             ))}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">{list.length} đánh giá</p>
+          <p className="text-[11px] text-slate-600 mt-1">{list.length} đánh giá</p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/[0.08] p-4 space-y-3">
+      <div className={`rounded-xl border p-4 space-y-3 ${light ? 'border-slate-200 bg-white' : 'border-white/[0.08]'}`}>
         <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Viết đánh giá</p>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((s) => (
@@ -821,7 +1034,7 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
               className="p-1"
               aria-label={`${s} sao`}
             >
-              <Star size={20} className={rating >= s ? 'text-amber-400 fill-amber-400' : 'text-slate-600'} />
+              <Star size={20} className={rating >= s ? 'text-amber-500 fill-amber-500' : light ? 'text-slate-400' : 'text-slate-600'} />
             </button>
           ))}
         </div>
@@ -830,15 +1043,15 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           placeholder="Chia sẻ trải nghiệm học của bạn..."
-          className="w-full rounded-lg border border-white/10 bg-[#0b1018] px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500/40 resize-y"
+          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none resize-y ${light ? 'border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus:border-emerald-600' : 'border-white/10 bg-[#0b1018] text-slate-200 focus:border-emerald-500/40'}`}
         />
-        {error ? <p className="text-xs text-red-400 font-semibold">{error}</p> : null}
-        {okMsg ? <p className="text-xs text-emerald-400 font-semibold">{okMsg}</p> : null}
+        {error ? <p className={`text-xs font-semibold ${light ? 'text-red-700' : 'text-red-400'}`}>{error}</p> : null}
+        {okMsg ? <p className={`text-xs font-semibold ${light ? 'text-emerald-800' : 'text-emerald-400'}`}>{okMsg}</p> : null}
         <button
           type="button"
           onClick={submit}
           disabled={sending || !comment.trim()}
-          className="px-4 min-h-10 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold"
+          className="px-4 min-h-10 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold"
         >
           {sending ? 'Đang gửi...' : 'Gửi đánh giá'}
         </button>
@@ -849,26 +1062,26 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
       ) : (
         <ul className="space-y-3">
           {list.map((r) => (
-            <li key={r.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <li key={r.id} className={`rounded-xl border p-4 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'}`}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-slate-700 text-[10px] font-bold text-white flex items-center justify-center">
+                <div className={`w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center ${light ? 'bg-slate-200 text-slate-800' : 'bg-slate-700 text-white'}`}>
                   {initials(r.author)}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-200">{r.author}</p>
+                  <p className={`text-sm font-bold ${light ? 'text-slate-900' : 'text-slate-200'}`}>{r.author}</p>
                   <div className="flex gap-0.5">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
                         size={11}
-                        className={r.rating >= s ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}
+                        className={r.rating >= s ? 'text-amber-500 fill-amber-500' : light ? 'text-slate-400' : 'text-slate-600'}
                       />
                     ))}
                   </div>
                 </div>
                 <span className="ml-auto text-[11px] text-slate-500">{timeAgo(r.createdAt)}</span>
               </div>
-              <p className="text-[13px] text-slate-300 whitespace-pre-wrap">{r.comment}</p>
+              <p className={`text-[13px] whitespace-pre-wrap ${light ? 'text-slate-700' : 'text-slate-300'}`}>{r.comment}</p>
             </li>
           ))}
           {!list.length ? (
@@ -880,11 +1093,11 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student' })
   );
 }
 
-function ResourcesPanel({ files }) {
+function ResourcesPanel({ files, light = false }) {
   const list = Array.isArray(files) ? files : [];
   if (!list.length) {
     return (
-      <div className="py-12 text-center text-slate-500 max-w-3xl mx-auto w-full">
+      <div className={`py-12 text-center text-slate-600 w-full ${light ? '' : 'max-w-3xl mx-auto'}`}>
         <FileBox size={36} className="mx-auto mb-3 opacity-40" />
         <p className="text-sm font-semibold">Chưa có tài liệu đính kèm</p>
       </div>
@@ -892,7 +1105,7 @@ function ResourcesPanel({ files }) {
   }
 
   return (
-    <ul className="space-y-3 max-w-3xl mx-auto w-full">
+    <ul className={`space-y-3 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
       {list.map((file, idx) => {
         const rawUrl = file.fileUrl || file.url || '';
         const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK';
@@ -902,10 +1115,10 @@ function ResourcesPanel({ files }) {
         return (
           <li
             key={file._id || file.id || idx}
-            className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+            className={`flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border p-4 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'}`}
           >
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-100 truncate">{file.title || 'Tài liệu'}</p>
+              <p className={`text-sm font-bold truncate ${light ? 'text-slate-900' : 'text-slate-100'}`}>{file.title || 'Tài liệu'}</p>
               <p className="text-[11px] text-slate-500 mt-1">{file.fileSize || file.size || file.fileType || file.type || 'File'}</p>
             </div>
             {href ? (
@@ -914,7 +1127,7 @@ function ResourcesPanel({ files }) {
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold shrink-0 no-underline"
+                  className="inline-flex items-center justify-center gap-2 px-4 min-h-10 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-bold shrink-0 no-underline"
                 >
                   <ExternalLink size={14} /> Mở
                 </a>
@@ -1068,11 +1281,11 @@ export default function LmsPlayerPanels({
   setExpandedChapters,
   onSelectLesson,
   getCurrentTime,
-  antiSeekEnabled = true,
   teacherAntiSeekSlot = null,
   audience = 'student',
   canAnswerQa = false,
   highlightQaId = null,
+  light = false,
 }) {
   const courseId = selectedCourse?._id || selectedCourse?.id || 'course';
   const lessonId = currentLesson?._id;
@@ -1092,8 +1305,8 @@ export default function LmsPlayerPanels({
         selectedCourse={selectedCourse}
         lessons={lessons}
         overallProgress={overallProgress}
-        antiSeekEnabled={antiSeekEnabled}
         teacherAntiSeekSlot={teacherAntiSeekSlot}
+        light={light}
       />
     );
   }
@@ -1104,6 +1317,7 @@ export default function LmsPlayerPanels({
         lessonId={lessonId}
         lessonTitle={lessonTitle}
         getCurrentTime={getCurrentTime}
+        light={light}
       />
     );
   }
@@ -1132,6 +1346,7 @@ export default function LmsPlayerPanels({
           || Number(currentLesson?.duration)
           || 0
         }
+        light={light}
       />
     );
   }
@@ -1142,11 +1357,12 @@ export default function LmsPlayerPanels({
         courseTitle={selectedCourse?.title || ''}
         userName={userName}
         audience={audience}
+        light={light}
       />
     );
   }
   if (courseTab === 'resources') {
-    return <ResourcesPanel files={selectedCourse?.files} />;
+    return <ResourcesPanel files={selectedCourse?.files} light={light} />;
   }
   if (courseTab === 'list') {
     return (

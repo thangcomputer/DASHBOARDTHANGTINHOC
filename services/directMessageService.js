@@ -25,6 +25,11 @@ const {
   newCorrelationId,
 } = require('./messagingObservability');
 
+const VALID_CHAT_STICKER_IDS = new Set([
+  'hello', 'thanks', 'love', 'ok', 'sad', 'cheer', 'cute', 'haha',
+  'thinking', 'congrats', 'like', 'thank-you', 'sorry', 'wave', 'celebrate',
+]);
+
 const isStaffAccount = (u = {}) =>
   u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
@@ -69,6 +74,12 @@ async function sendCanonicalMessageInner({
   io,
 } = {}) {
   if (!sender) return { ok: false, status: 401, message: 'Chua xac thuc', code: 'MESSAGING_AUTH_REQUIRED' };
+  if (
+    payload?.type === 'sticker'
+    && !VALID_CHAT_STICKER_IDS.has(String(payload.sticker_id || ''))
+  ) {
+    return { ok: false, status: 400, message: 'Sticker không hợp lệ', code: 'MESSAGING_INVALID_STICKER' };
+  }
 
   const senderId = String(sender.id || sender._id || '');
   const senderIdentity = resolveMessagingIdentity(sender);

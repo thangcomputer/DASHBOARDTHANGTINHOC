@@ -4,10 +4,9 @@ import { X, Save, KeyRound, Edit3, Loader2 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
+import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
 
-function courseEffectivePrice(c) {
-  return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
-}
+const courseEffectivePrice = getEffectiveCoursePrice;
 
 function courseDefaultSessions(c) {
   const n = Number(c?.totalSessions);

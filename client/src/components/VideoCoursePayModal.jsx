@@ -17,11 +17,16 @@ export default function VideoCoursePayModal({
   onClose,
   onPaid,
   onSessionAlreadyPaid,
+  getPaymentSession = api.trainingLms.getVideoPurchaseSession,
+  simulatePayment,
+  paidEvent = 'videoCourse:paid',
+  paymentTitle = 'Thanh toán khóa video',
 }) {
   const [centerBank, setCenterBank] = useState(null);
   const [loadingBank, setLoadingBank] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [simulatingPayment, setSimulatingPayment] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const pollRef = useRef(null);
   const timerRef = useRef(null);
@@ -89,7 +94,7 @@ export default function VideoCoursePayModal({
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.trainingLms.getVideoPurchaseSession(sessionId);
+        const res = await getPaymentSession(sessionId);
         if (cancelled) return;
         if (res?.paid || res?.status === 'paid') {
           markAlreadyPaid();
@@ -100,7 +105,7 @@ export default function VideoCoursePayModal({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ khi đổi sessionId
-  }, [sessionId]);
+  }, [sessionId, getPaymentSession]);
 
   useEffect(() => {
     if (!sessionId || !sessionReady || firedRef.current) return undefined;
@@ -109,7 +114,7 @@ export default function VideoCoursePayModal({
 
     const tick = async () => {
       try {
-        const res = await api.trainingLms.getVideoPurchaseSession(sessionId);
+        const res = await getPaymentSession(sessionId);
         if (res?.paid || res?.status === 'paid') markPaid();
       } catch { /* ignore */ }
     };
@@ -122,7 +127,7 @@ export default function VideoCoursePayModal({
       if (pollRef.current) clearInterval(pollRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [sessionId, sessionReady]);
+  }, [sessionId, sessionReady, getPaymentSession]);
 
   useEffect(() => {
     if (!socket || !sessionId || !sessionReady) return undefined;
@@ -130,9 +135,9 @@ export default function VideoCoursePayModal({
       if (payload?.sessionId && payload.sessionId !== sessionId) return;
       markPaid();
     };
-    socket.on('videoCourse:paid', onPaidEvt);
-    return () => socket.off('videoCourse:paid', onPaidEvt);
-  }, [socket, sessionId, sessionReady]);
+    socket.on(paidEvent, onPaidEvt);
+    return () => socket.off(paidEvent, onPaidEvt);
+  }, [socket, sessionId, sessionReady, paidEvent]);
 
   const copyRef = async () => {
     try {
@@ -143,7 +148,17 @@ export default function VideoCoursePayModal({
     }
   };
 
-  const handleTestPaid = () => {
+  const handleTestPaid = async () => {
+    if (simulatePayment) {
+      setSimulatingPayment(true);
+      try {
+        await simulatePayment();
+      } catch (err) {
+        toast.error(err.message || 'Không thể giả lập thanh toán');
+        setSimulatingPayment(false);
+        return;
+      }
+    }
     toast.success('Test: giả lập thanh toán thành công');
     markPaid();
   };
@@ -161,7 +176,7 @@ export default function VideoCoursePayModal({
                 <Video size={18} aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h3 className="font-black text-sm tracking-tight">Thanh toán khóa video</h3>
+                <h3 className="font-black text-sm tracking-tight">{paymentTitle}</h3>
                 <p className="text-[10px] text-white/80 font-medium">VietQR · Tự động xác nhận</p>
               </div>
             </div>
@@ -245,9 +260,10 @@ export default function VideoCoursePayModal({
             <button
               type="button"
               onClick={handleTestPaid}
-              className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold hover:bg-amber-100 transition"
+              disabled={simulatingPayment}
+              className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold hover:bg-amber-100 transition disabled:cursor-wait disabled:opacity-60"
             >
-              Đã thanh toán (test — chỉ dev)
+              {simulatingPayment ? 'Đang giả lập thanh toán…' : 'Đã thanh toán (test — chỉ dev)'}
             </button>
           ) : null}
         </div>

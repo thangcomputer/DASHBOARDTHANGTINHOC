@@ -2,8 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft,
-  User, Circle, Image, Paperclip, Smile, Download,
-  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Edit3, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info
+  User, Circle, Image, Paperclip, Download,
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -42,6 +42,10 @@ import {
   isAiIdleStill,
   handoffReasonLabel,
 } from '../utils/aiSupport';
+import { getScheduleDisplayKind, isScheduleOngoingNow, normalizeScheduleDate } from '../utils/scheduleTime';
+import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
+import { getChatFileType } from '../utils/chatFileType';
+import StickerPicker from './StickerPicker';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
 
@@ -81,6 +85,12 @@ const formatTime = (date) => {
   if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   if (diffMs < 86400000 * 7) return d.toLocaleDateString('vi-VN', { weekday: 'short' });
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' });
+};
+
+const formatMessageTime = (date) => {
+  const d = toValidActivityDate(date);
+  if (!d) return '';
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 };
 
 function getMessageDateInfo(date) {
@@ -151,6 +161,7 @@ function splitHandoffSummary(text) {
 
 // Keep contact/messaging roles canonical — do NOT collapse staff→admin (splits threads).
 const normalizeRole = (role) => (role === 'support' ? 'staff' : role);
+const entityId = (value) => String(value?._id || value?.id || value || '');
 
 const isAttachmentExpired = (msg) =>
   Boolean(msg?.fileExpired) ||
@@ -257,60 +268,83 @@ function usePlaceChatMenuBelow(open, estimatedHeight = 48) {
   return [wrapRef, placeBelow];
 }
 
-// ─── Reaction Picker (floating) ────────────────────────────────────────────────
-const ReactionPicker = ({ msgId, isMine, onReact, myReactions }) => {
-  const [open, setOpen] = useState(false);
-  const [ref, placeBelow] = usePlaceChatMenuBelow(open, 48);
+const MESSAGE_REACTIONS = [
+  { type: 'like', emoji: '👍', label: 'Thích' },
+  { type: 'heart', emoji: '❤️', label: 'Yêu thích' },
+  { type: 'laugh', emoji: '😂', label: 'Haha' },
+  { type: 'wow', emoji: '😮', label: 'Ngạc nhiên' },
+  { type: 'sad', emoji: '😭', label: 'Buồn' },
+  { type: 'angry', emoji: '😡', label: 'Phẫn nộ' },
+];
 
-  // Đóng khi click ngoài
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    if (open) document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open, ref]);
-
+function ReactionPicker({ msgId, onReact, myReactions, align = 'right' }) {
   return (
-    <div className="relative flex items-center" ref={ref}>
+    <div className="group/reaction relative shrink-0">
       <button
-        onMouseEnter={() => setOpen(true)}
-        onClick={() => setOpen(v => !v)}
-        className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-pink-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
-        title="Thả cảm xúc"
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onReact(msgId, 'like');
+        }}
+        className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition hover:scale-105 ${
+          myReactions?.includes('like')
+            ? 'border-amber-300 bg-amber-100 text-amber-500 hover:bg-amber-200 hover:text-amber-600'
+            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+        }`}
+        title="Thích"
+        aria-label="Thích"
+        aria-pressed={myReactions?.includes('like') || false}
       >
-        <Smile size={15} />
+        <ThumbsUp
+          size={15}
+          strokeWidth={1.8}
+          fill={myReactions?.includes('like') ? 'currentColor' : 'none'}
+        />
       </button>
-
-      {open && (
-        <div
-          className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${isMine ? 'right-0' : 'left-0'} flex items-center gap-0 bg-white rounded-full px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 z-[9999] animate-in zoom-in-75 duration-150`}
-          onMouseLeave={() => setOpen(false)}
-        >
-          {/* Heart */}
+      <div
+        className={`pointer-events-none absolute bottom-full ${align === 'left' ? 'left-0' : 'right-0'} z-30 flex translate-y-1 items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-1 opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all group-hover/reaction:pointer-events-auto group-hover/reaction:translate-y-0 group-hover/reaction:opacity-100 group-focus-within/reaction:pointer-events-auto group-focus-within/reaction:translate-y-0 group-focus-within/reaction:opacity-100`}
+        role="group"
+        aria-label="Cảm xúc khác"
+      >
+        {MESSAGE_REACTIONS.filter(({ type }) => type !== 'like').map(({ type, emoji, label }) => (
           <button
-            onClick={(e) => { e.stopPropagation(); onReact(msgId, 'heart'); setOpen(false); }}
-            className={`w-8 h-8 flex items-center justify-center text-lg rounded-full transition-all hover:scale-125 hover:bg-red-50 ${myReactions?.includes('heart') ? 'bg-red-50 scale-110' : ''}`}
-            title="Tim"
+            key={type}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReact(msgId, type);
+            }}
+            className={`flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-slate-100 ${
+              myReactions?.includes(type) ? 'bg-blue-50 ring-1 ring-blue-200' : ''
+            }`}
+            title={label}
+            aria-label={label}
+            aria-pressed={myReactions?.includes(type) || false}
           >
-            ❤️
+            {emoji}
           </button>
-          {/* Like */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onReact(msgId, 'like'); setOpen(false); }}
-            className={`w-8 h-8 flex items-center justify-center text-lg rounded-full transition-all hover:scale-125 hover:bg-blue-50 ${myReactions?.includes('like') ? 'bg-blue-50 scale-110' : ''}`}
-            title="Thích"
-          >
-            👍
-          </button>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
-};
+}
 
-function ChatFlipWrap({ open, estimatedHeight = 160, className = 'relative', children }) {
+function ChatFlipWrap({ open, onClose, estimatedHeight = 160, className = 'relative', children }) {
   const [wrapRef, placeBelow] = usePlaceChatMenuBelow(open, estimatedHeight);
+
+  useEffect(() => {
+    if (!open || !onClose) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (!wrapRef.current?.contains(event.target)) onClose();
+    };
+    document.addEventListener('mousedown', closeOnOutsidePointer);
+    document.addEventListener('touchstart', closeOnOutsidePointer);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsidePointer);
+      document.removeEventListener('touchstart', closeOnOutsidePointer);
+    };
+  }, [open, onClose, wrapRef]);
+
   return (
     <div className={className} ref={wrapRef}>
       {typeof children === 'function' ? children(placeBelow) : children}
@@ -335,9 +369,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const isHighAdmin = currentUser?.adminRole === 'HIGH_ADMIN';
   const isSuperAdmin = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN';
   const isSupportAgent = currentUser?.adminRole === 'SUPPORT';
+  const [scheduleNow, setScheduleNow] = useState(() => new Date());
   const [aiHandoffSession, setAiHandoffSession] = useState(null);
   const [showPriorAiThread, setShowPriorAiThread] = useState(false);
   const [handoffQueue, setHandoffQueue] = useState([]);
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setScheduleNow(new Date()), 15000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const handoffUserIds = useMemo(
     () => new Set((handoffQueue || []).map((item) => String(item.userId || '')).filter(Boolean)),
     [handoffQueue],
@@ -488,6 +528,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMsg, setNewMsg] = useState('');
+  const [replyMessage, setReplyMessage] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showPeerInfo, setShowPeerInfo] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
@@ -528,6 +569,64 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const peerRole = String(peerProfile?.role || activeConv?.user?.role || '').toLowerCase();
   const canViewTeacherDetails = ['student', 'admin', 'staff'].includes(String(currentUserRole).toLowerCase());
   const viewerRole = String(currentUserRole || '').toLowerCase();
+  const canShowClassroomButton = !activeConv?.isGroup
+    && ((viewerRole === 'teacher' && peerRole === 'student')
+      || (viewerRole === 'student' && peerRole === 'teacher'));
+  const joinClassUrl = useMemo(() => {
+    if (!canShowClassroomButton || !activeConv?.user) return '';
+
+    const peerId = entityId(activeConv.user);
+    const isTeacher = viewerRole === 'teacher';
+    const studentId = isTeacher ? peerId : String(currentUserId || '');
+    const teacherId = isTeacher ? String(currentUserId || '') : peerId;
+    const matchingSchedules = (Array.isArray(schedules) ? schedules : [])
+      .filter((schedule) => {
+        if (String(schedule?.status || '') !== 'scheduled') return false;
+        if (entityId(schedule.studentId) !== studentId || entityId(schedule.teacherId) !== teacherId) {
+          return false;
+        }
+        const kind = getScheduleDisplayKind(schedule, scheduleNow);
+        return kind === 'upcoming' || kind === 'ongoing';
+      })
+      .sort((a, b) => {
+        const liveDifference = Number(isScheduleOngoingNow(b, scheduleNow))
+          - Number(isScheduleOngoingNow(a, scheduleNow));
+        if (liveDifference) return liveDifference;
+        const dateDifference = normalizeScheduleDate(a.date).localeCompare(normalizeScheduleDate(b.date));
+        return dateDifference || String(a.startTime || '').localeCompare(String(b.startTime || ''));
+      });
+
+    if (!matchingSchedules.length) return '';
+      const schedule = matchingSchedules.find((item) => isScheduleOngoingNow(item, scheduleNow))
+        || matchingSchedules.find((item) => String(item.linkHoc || '').trim())
+        || matchingSchedules[0];
+    const studentProfile = isTeacher
+      ? peerProfile
+      : (students || []).find((student) => entityId(student) === studentId) || currentUser;
+    return String(
+      schedule.linkHoc
+      || studentProfile?.joinClassUrl
+      || studentProfile?.linkHoc
+      || studentProfile?.online_meeting_url
+      || '',
+    ).trim();
+  }, [
+    canShowClassroomButton,
+    activeConv,
+    viewerRole,
+    currentUserId,
+    schedules,
+    scheduleNow,
+    peerProfile,
+    students,
+    currentUser,
+  ]);
+  const isClassTime = canShowClassroomButton && (Array.isArray(schedules) ? schedules : []).some((schedule) => (
+    String(schedule?.status || '') === 'scheduled'
+    && entityId(schedule.studentId) === (viewerRole === 'teacher' ? entityId(activeConv?.user) : String(currentUserId || ''))
+    && entityId(schedule.teacherId) === (viewerRole === 'teacher' ? String(currentUserId || '') : entityId(activeConv?.user))
+    && isScheduleOngoingNow(schedule, scheduleNow)
+  ));
   const shouldMaskPeerPhone = (['student', 'teacher'].includes(viewerRole) && ['admin', 'staff'].includes(peerRole))
     || (viewerRole === 'teacher' && peerRole === 'student')
     || (viewerRole === 'student' && peerRole === 'teacher');
@@ -665,6 +764,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             isGroup: sendIsGroup,
             groupId: sendGroupId,
           };
+
           await ctxSendMessage(properMsg);
         }
       } else {
@@ -673,6 +773,23 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     } catch (err) {
       toast.error('Lỗi khi ghim tin nhắn');
     }
+  };
+
+  const startReply = (msg) => {
+    if (!msg || msg.isRecalled) return;
+    setReplyMessage({
+      id: String(msg.id || msg._id || ''),
+      senderName: msg.senderName || 'Người dùng',
+      content: String(msg.content || '').slice(0, 500),
+      messageType: msg.messageType || 'text',
+    });
+    setShowMessageOptions(null);
+    window.setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const scrollToMessage = (msgId) => {
+    if (!msgId) return;
+    document.getElementById(`msg-${msgId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const notifyInboxScheduleEvent = async (formData, action = 'created') => {
@@ -939,7 +1056,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
-  const [showEmojis, setShowEmojis] = useState(false);
+  const stickerSendingRef = useRef(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [groupName, setGroupName] = useState('');
@@ -960,8 +1077,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [schedulePreview, setSchedulePreview] = useState(null);
-
-  const EMOJIS = ['😊', '👍', '❤️', '👏', '🔥', '✅', '🆘', '📚', '💻', '💡'];
 
   useEffect(() => {
     if (!imagePreview) return;
@@ -1051,6 +1166,24 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       { teachers: teachers || [], students: students || [], staffs: staffs || [] },
     );
   }, [teachers, students, staffs]);
+
+  const resolveMessageAvatar = useCallback((msg) => {
+    const senderId = String(msg?.senderId || '');
+    const peerId = String(activeConv?.user?.id || activeConv?.user?._id || '');
+    if (!activeConv?.isGroup && senderId === peerId) {
+      return activeConv.user;
+    }
+    const senderProfile = [contacts, students, teachers, staffs]
+      .flatMap((list) => Array.isArray(list) ? list : [])
+      .find((person) => String(person.id || person._id || '') === senderId);
+    return senderProfile || msg?.sender || {
+      id: senderId,
+      name: msg?.senderName,
+      role: msg?.senderRole,
+      adminRole: msg?.senderAdminRole,
+      avatar: msg?.senderAvatar,
+    };
+  }, [activeConv, contacts, students, teachers, staffs]);
 
   // ─── Load messages khi chọn conversation (tránh loop: không phụ thuộc identity ctxGetMessages) ──
   const activeConvId = activeConv?.id ? String(activeConv.id) : '';
@@ -1263,6 +1396,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               fileExpired: data.fileExpired || false,
               reactions: data.reactions || [],
               isPinned: data.isPinned || false,
+              payload: data.payload && typeof data.payload === 'object' ? data.payload : null,
             };
             return [...prev, mappedMsg];
           });
@@ -1329,6 +1463,43 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   }, [toast]);
 
+  const handleCopyImage = useCallback(async (url) => {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      toast.error('Trình duyệt không hỗ trợ sao chép ảnh. Bạn có thể tải ảnh về thiết bị.');
+      return;
+    }
+    const imagePromise = fetch(resolveMediaUrl(url))
+      .then((response) => {
+        if (!response.ok) throw new Error('Không thể tải ảnh để sao chép.');
+        return response.blob();
+      })
+      .then(async (blob) => {
+        if (blob.type === 'image/png') return blob;
+        if (!blob.type.startsWith('image/')) throw new Error('Tệp này không phải ảnh hợp lệ.');
+        const bitmap = await createImageBitmap(blob);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          canvas.getContext('2d').drawImage(bitmap, 0, 0);
+          return await new Promise((resolve, reject) => {
+            canvas.toBlob((pngBlob) => {
+              if (pngBlob) resolve(pngBlob);
+              else reject(new Error('Không thể xử lý ảnh để sao chép.'));
+            }, 'image/png');
+          });
+        } finally {
+          bitmap.close();
+        }
+      });
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': imagePromise })]);
+      toast.success('Đã sao chép ảnh. Bạn có thể dán vào nơi cần dùng.');
+    } catch (error) {
+      toast.error(error?.message || 'Không thể sao chép ảnh. Hãy thử tải ảnh về thiết bị.');
+    }
+  }, [toast]);
+
   // ── Thu hồi tin nhắn ──
   const handleRecall = useCallback(async (msgId) => {
     if (recallingId) return; // Chống double click
@@ -1374,12 +1545,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setMessages(prev => prev.map(m => {
       if (String(m.id) !== String(messageId)) return m;
       const reactions = [...(m.reactions || [])];
-      const idx = reactions.findIndex(r => r.userId === currentUserId && r.type === type);
-      if (idx > -1) {
-        return { ...m, reactions: reactions.filter((_, i) => i !== idx) };
-      } else {
-        return { ...m, reactions: [...reactions, { userId: currentUserId, type, userName: currentUserName }] };
-      }
+      const userReactions = reactions.filter((reaction) => String(reaction.userId) === String(currentUserId));
+      const isSameReaction = userReactions.some((reaction) => reaction.type === type);
+      const otherReactions = reactions.filter((reaction) => String(reaction.userId) !== String(currentUserId));
+      return {
+        ...m,
+        reactions: isSameReaction
+          ? otherReactions
+          : [...otherReactions, { userId: currentUserId, type, userName: currentUserName }],
+      };
     }));
 
     try {
@@ -1390,13 +1564,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Gửi tin nhắn ────────────────────────────────────────────────────────────
   const selectConversation = (conv) => {
+    setReplyMessage(null);
     setPinnedMessageObj(null);
-    setMessages([]);
+    const activateConversation = (target) => {
+      if (String(activeConv?.id || '') !== String(target?.id || '')) {
+        setMessages([]);
+      }
+      setActiveConv(target);
+    };
     const { isGroup } = resolveGroupSendFlags(conv);
     // Never rebuild group threads as DM conversationIds
     if (isGroup) {
       const gid = String(conv?.user?.id || conv?.groupId || (String(conv?.id || '').startsWith('group_') ? String(conv.id).slice(6) : ''));
-      setActiveConv({
+      activateConversation({
         ...conv,
         isGroup: true,
         id: gid ? `group_${gid}` : conv.id,
@@ -1417,21 +1597,21 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       // Kiểm tra xem đã có conv này trong dataContext chưa
       const existing = dataContextConvs.find(dc => dc.id === properId);
       if (existing) {
-        setActiveConv(existing);
+        activateConversation(existing);
       } else {
-        setActiveConv({ ...conv, id: properId });
+        activateConversation({ ...conv, id: properId });
       }
     } else {
-      setActiveConv(conv);
+      activateConversation(conv);
     }
   };
 
   const requestedContact = location.state?.selectUser || null;
   const requestedPeerId = String(
     location.state?.selectUserId
-      || requestedContact?.id
-      || location.state?.openPeerId
-      || '',
+    || requestedContact?.id
+    || location.state?.openPeerId
+    || '',
   );
   useEffect(() => {
     if (!requestedPeerId) return;
@@ -1601,13 +1781,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (res.data?.session) setAiHandoffSession(res.data.session);
   };
 
-  const handleSend = async () => {
-    if ((!newMsg.trim() && !pendingImage) || !activeConv) return;
+  const handleSend = async (messageOverride, payloadOverride = null) => {
+    const hasMessageOverride = typeof messageOverride === 'string' && Boolean(messageOverride);
+    const contentText = hasMessageOverride ? messageOverride.trim() : newMsg.trim();
+    if ((!contentText && !pendingImage) || !activeConv || (hasMessageOverride && pendingImage)) return false;
     stopInboxTyping();
-    const contentText = newMsg.trim();
+    const replyPayload = replyMessage
+      ? { replyTo: { ...replyMessage } }
+      : undefined;
+    const messagePayload = { ...(replyPayload || {}), ...(payloadOverride || {}) };
 
     if (activeConv.isAiHandoff) {
-      if (!contentText && !pendingImage) return;
+      if (!contentText && !pendingImage) return false;
       try {
         await sendHandoffReply({
           content: contentText,
@@ -1615,14 +1800,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           fileName: pendingImage?.fileName || '',
           messageType: pendingImage ? 'image' : 'text',
         });
-        setNewMsg('');
+        if (!hasMessageOverride) setNewMsg('');
         setPendingImage(null);
+        setReplyMessage(null);
+        return true;
       } catch (err) {
         toast.error(err.message || 'Không gửi được');
+        return false;
       }
-      return;
     }
 
+    let sendSucceeded = true;
     if (pendingImage) {
       const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
@@ -1639,13 +1827,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         fileName: pendingImage.fileName,
         isGroup: sendIsGroup,
         groupId: sendGroupId,
+        payload: Object.keys(messagePayload).length ? messagePayload : undefined,
       };
       const sentImg = await ctxSendMessage(msgData);
       if (sentImg?.failed) {
         toast.error(sentImg.failReason || 'Không gửi được tin nhắn');
+        sendSucceeded = false;
       }
       setPendingImage(null);
       setNewMsg('');
+      setReplyMessage(null);
     } else if (contentText) {
       const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
@@ -1660,16 +1851,47 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         messageType: 'text',
         isGroup: sendIsGroup,
         groupId: sendGroupId,
+        payload: Object.keys(messagePayload).length ? messagePayload : undefined,
       };
       const sent = await ctxSendMessage(msgData);
       if (sent?.failed) {
         toast.error(sent.failReason || 'Không gửi được tin nhắn');
+        sendSucceeded = false;
       }
-      setNewMsg('');
+      if (!hasMessageOverride) setNewMsg('');
+      setReplyMessage(null);
     }
 
-    setShowEmojis(false);
     setTimeout(() => inputRef.current?.focus(), 50);
+    return sendSucceeded;
+  };
+
+  const handleStickerSend = async (sticker) => {
+    if (stickerSendingRef.current) return false;
+    const token = buildChatStickerToken(sticker.id);
+    if (!token) return false;
+
+    stickerSendingRef.current = true;
+    try {
+      return await handleSend(token, { type: 'sticker', sticker_id: sticker.id });
+    } catch (err) {
+      toast.error(err.message || 'Không gửi được sticker');
+      return false;
+    } finally {
+      stickerSendingRef.current = false;
+    }
+  };
+
+  const handleEmojiInsert = (emoji) => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? newMsg.length;
+    const end = input?.selectionEnd ?? start;
+    const updatedMessage = `${newMsg.slice(0, start)}${emoji}${newMsg.slice(end)}`;
+    setNewMsg(updatedMessage);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
   };
 
   const handleFileUpload = async (e) => {
@@ -1719,9 +1941,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         fileName: file.name,
         isGroup: sendIsGroup,
         groupId: sendGroupId,
+        payload: replyMessage ? { replyTo: { ...replyMessage } } : undefined,
       };
 
       await ctxSendMessage(msgData);
+      setReplyMessage(null);
     } catch (err) {
       setUploadError('Tải tệp thất bại: ' + (err.message || ''));
       setTimeout(() => setUploadError(''), 4000);
@@ -1729,12 +1953,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setIsUploading(false);
       e.target.value = '';
     }
-  };
-
-  const addEmoji = (emoji) => {
-    setNewMsg(prev => prev + emoji);
-    setShowEmojis(false);
-    inputRef.current?.focus();
   };
 
   useEffect(() => {
@@ -2069,6 +2287,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               <SupportAiHandoffPanel
                 onQueueChange={setHandoffQueue}
                 onOpen={async (item) => {
+                  setReplyMessage(null);
                   setActiveConv({
                     id: item.conversationId,
                     isAiHandoff: true,
@@ -2367,6 +2586,33 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
+                {canShowClassroomButton && (
+                  joinClassUrl ? (
+                    <a
+                      href={joinClassUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
+                      aria-label={isClassTime ? 'Lớp học đang diễn ra, vào lớp ngay' : 'Vào lớp học ngay'}
+                      title={isClassTime ? 'Buổi học đang diễn ra — bấm để vào lớp' : 'Vào lớp học ngay'}
+                    >
+                      {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
+                      <Video size={16} aria-hidden="true" />
+                      <span className="hidden sm:inline">{isClassTime ? 'ĐANG DIỄN RA · VÀO LỚP' : 'Vào lớp học ngay'}</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-400 sm:px-3"
+                      aria-label={isClassTime ? 'Lớp học đang diễn ra nhưng chưa có link' : 'Chưa có link lớp học'}
+                      title={isClassTime ? 'Buổi học đang diễn ra nhưng chưa có link lớp' : 'Chưa có lịch học hoặc link lớp học'}
+                    >
+                      <Video size={16} aria-hidden="true" />
+                      <span className="hidden sm:inline">Vào lớp học ngay</span>
+                    </button>
+                  )
+                )}
                 <button
                   type="button"
                   onClick={() => setShowMessageSearch((open) => !open)}
@@ -2761,7 +3007,21 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </div>
                   ) : null;
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
+                  const nextMessage = displayedMessages[index + 1];
+                  const currentTimestamp = new Date(msg.time).getTime();
+                  const nextTimestamp = nextMessage ? new Date(nextMessage.time).getTime() : NaN;
+                  const nextMessageStartsGroup = !nextMessage
+                    || nextMessage.messageType === 'system'
+                    || messageIsFromMe(nextMessage, currentUserId, currentUserRole) !== isMine
+                    || !Number.isFinite(currentTimestamp)
+                    || !Number.isFinite(nextTimestamp)
+                    || nextTimestamp - currentTimestamp >= 5 * 60 * 1000
+                    || getMessageDateInfo(nextMessage.time)?.key !== messageDate?.key;
+                  const showMessageTimestamp = index === 0 || nextMessageStartsGroup;
                   const role = normalizeRole(msg.senderRole);
+                  const messageAvatar = resolveMessageAvatar(msg);
+                  const stickerMessage = !msg.isRecalled ? getChatStickerFromMessage(msg) : null;
+                  const isStickerMessage = Boolean(stickerMessage);
                   const badgeLabel = msg.senderDisplayRole
                     ? displayRoleLabel(msg.senderDisplayRole)
                     : (String(msg.senderAdminRole || '').toUpperCase() === 'SUPPORT' ? 'Hỗ trợ'
@@ -2781,8 +3041,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             ? 'cms-bubble-other-student'
                             : '';
 
-                  const heartCount = (msg.reactions || []).filter(r => r.type === 'heart').length;
-                  const likeCount = (msg.reactions || []).filter(r => r.type === 'like').length;
+                  const reactionCounts = MESSAGE_REACTIONS
+                    .map((reaction) => ({
+                      ...reaction,
+                      count: (msg.reactions || []).filter((item) => item.type === reaction.type).length,
+                    }))
+                    .filter((reaction) => reaction.count > 0);
                   const myReactions = (msg.reactions || []).filter(r => r.userId === currentUserId).map(r => r.type);
 
                   if (msg.messageType === 'system') {
@@ -2840,22 +3104,62 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
                         <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
                           {!isMine && (
-                            <div className="flex items-center gap-2 mb-1 ml-1">
-                              <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
-                                role === 'staff' ? 'bg-amber-600 text-white' :
-                                  role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-                                }`}>
-                                {badgeLabel}
-                              </span>
+                            <div className="mb-1 ml-1 flex min-w-0 items-center gap-1.5">
+                              <img
+                                src={resolveAvatarUrl({
+                                  ...messageAvatar,
+                                  id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
+                                  name: messageAvatar?.name || msg.senderName,
+                                  role: messageAvatar?.role || role,
+                                  avatar: messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar,
+                                })}
+                                alt=""
+                                aria-hidden="true"
+                                className={`h-9 w-9 shrink-0 rounded-full border-2 border-slate-300 object-cover shadow-sm ${isRealAvatar(messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar) ? 'cms-fm-avatar--photo' : ''}`}
+                                onError={(event) => {
+                                  event.currentTarget.onerror = null;
+                                  event.currentTarget.src = resolveAvatarUrl({
+                                    id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
+                                    name: messageAvatar?.name || msg.senderName,
+                                    role: messageAvatar?.role || role,
+                                    adminRole: messageAvatar?.adminRole || msg.senderAdminRole,
+                                    gender: messageAvatar?.gender || messageAvatar?.genderCode,
+                                    avatar: '',
+                                  });
+                                }}
+                              />
+                              {activeConv?.isGroup && (
+                                <>
+                                  <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
+                                    role === 'staff' ? 'bg-amber-600 text-white' :
+                                      role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                                    }`}>
+                                    {badgeLabel}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           )}
 
                           {/* Bubble + action buttons */}
-                          <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                          <div className={`flex min-w-0 items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                             {/* Message bubble */}
-                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : 'px-4 py-2.5'} ${(heartCount > 0 || likeCount > 0) && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                            <div className={`relative min-w-0 text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                              {!msg.isRecalled && msg.payload?.replyTo && (
+                                <button
+                                  type="button"
+                                  onClick={() => scrollToMessage(msg.payload.replyTo.id)}
+                                  className="mb-2 block w-full rounded-lg border-l-2 border-blue-400 bg-black/5 px-2.5 py-1.5 text-left text-xs transition hover:bg-black/10"
+                                  title="Đi đến tin nhắn được trả lời"
+                                >
+                                  <span className="block truncate font-bold">{msg.payload.replyTo.senderName || 'Người dùng'}</span>
+                                  <span className="block line-clamp-2 opacity-80">
+                                    {msg.payload.replyTo.content || (msg.payload.replyTo.messageType === 'image' ? '[Hình ảnh]' : '[Tệp đính kèm]')}
+                                  </span>
+                                </button>
+                              )}
                               {msg.isRecalled ? (
                                 <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
                                   <RotateCcw size={12} /> Tin nhắn đã được thu hồi
@@ -2901,15 +3205,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               ) : msg.messageType === 'file' ? (
                                 <div className="space-y-1.5">
-                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20' : 'bg-red-500 text-white'}`}>
-                                      <Paperclip size={18} />
+                                  {(() => {
+                                    const fileType = getChatFileType(msg.fileName, msg.fileUrl);
+                                    return (
+                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`cms-inbox-file-link flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10' : 'bg-gray-100'}`}>
+                                    <div className={`flex h-10 min-w-10 items-center justify-center rounded-lg px-1.5 text-[10px] font-black tracking-wide shadow-sm ${fileType.badgeClass}`}>
+                                      {fileType.extension}
                                     </div>
                                     <div className="flex flex-col min-w-0">
                                       <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
-                                      <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
+                                      <span className="text-[10px] font-medium opacity-60">{fileType.label}</span>
                                     </div>
                                   </a>
+                                    );
+                                  })()}
                                   {attachmentCaption(msg) ? (
                                     <div className="whitespace-pre-wrap break-words px-0.5">
                                       <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
@@ -2918,95 +3227,104 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               ) : (
                                 <div className="whitespace-pre-wrap break-words">
-                                  <MessageRichText text={msg.content} mine={isMine} highlight={normalizedMessageSearch} />
+                                  <MessageRichText text={msg.content} payload={msg.payload} mine={isMine} highlight={normalizedMessageSearch} />
                                 </div>
                               )}
 
-                              {/* Reaction badge */}
-                              {!msg.isRecalled && (heartCount > 0 || likeCount > 0) && (
-                                <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
-                                  {heartCount > 0 && (
-                                    <span className="flex items-center gap-0.5 text-[11px]">
-                                      <span>❤️</span>
-                                      {heartCount > 1 && <span className="text-gray-500 font-bold">{heartCount}</span>}
-                                    </span>
-                                  )}
-                                  {likeCount > 0 && (
-                                    <span className="flex items-center gap-0.5 text-[11px]">
-                                      <span>👍</span>
-                                      {likeCount > 1 && <span className="text-gray-500 font-bold">{likeCount}</span>}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
                             </div>
 
-                            {/* Reaction picker button */}
-                            {!msg.isRecalled && (
-                              <div className={`opacity-0 group-hover/msg:opacity-100 absolute flex items-center gap-0 ${isMine ? 'right-full mr-1' : 'left-full ml-1'} top-1/2 -translate-y-1/2`}>
-                                <ReactionPicker
-                                  msgId={msg.id}
-                                  isMine={isMine}
-                                  onReact={handleReaction}
-                                  myReactions={myReactions}
-                                />
-                                <button
-                                  onClick={() => handlePinMessage(msg.id)}
-                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all rounded-full hover:bg-white hover:shadow-sm text-base"
-                                  title={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-                                >
-                                  <Pin size={14} className={activeConv?.metadata?.pinnedMessageId === String(msg.id) ? "text-blue-500" : ""} />
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Options/Menu button for Soft Delete */}
-                            <ChatFlipWrap open={showMessageOptions === msg.id} estimatedHeight={180} className="relative">
+                            <ChatFlipWrap
+                              open={showMessageOptions === msg.id}
+                              onClose={() => setShowMessageOptions(null)}
+                              estimatedHeight={240}
+                              className="relative"
+                            >
                               {(placeBelow) => (
                                 <>
-                                  <button
-                                    onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
-                                    className="opacity-0 group-hover/msg:opacity-100 w-7 h-7 flex items-center justify-center bg-white rounded-full text-gray-400 hover:text-slate-600 hover:bg-slate-100 transition-all shadow-sm border border-slate-100 active:scale-90"
-                                    title="Tùy chọn"
-                                  >
-                                    <MoreHorizontal size={14} />
-                                  </button>
+                                  <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover/msg:opacity-100 sm:group-focus-within/msg:opacity-100">
+                                    {!msg.isRecalled && (
+                                      <ReactionPicker
+                                        msgId={msg.id}
+                                        onReact={handleReaction}
+                                        myReactions={myReactions}
+                                        align={isMine ? 'right' : 'left'}
+                                      />
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => startReply(msg)}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800"
+                                      title="Trả lời tin nhắn"
+                                      aria-label="Trả lời tin nhắn"
+                                    >
+                                      <Reply size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 active:scale-90"
+                                      title="Tùy chọn"
+                                      aria-label="Tùy chọn tin nhắn"
+                                    >
+                                      <MoreHorizontal size={14} />
+                                    </button>
+                                  </div>
                                   {showMessageOptions === msg.id && (
-                                    <div className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1 ${isMine ? 'right-0' : 'left-0'}`}>
+                                    <div
+                                      onClick={(event) => event.stopPropagation()}
+                                      className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'left-0' : 'right-0'}`}
+                                    >
+                                      {!msg.isRecalled && (
+                                        <button
+                                          onClick={() => {
+                                            handlePinMessage(msg.id);
+                                            setShowMessageOptions(null);
+                                          }}
+                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                        >
+                                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned
+                                            ? <PinOff size={12} />
+                                            : <Pin size={12} />}
+                                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
+                                        </button>
+                                      )}
                                       {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
                                         <button
                                           onClick={() => {
                                             handleDownload(msg.fileUrl, msg.fileName);
                                             setShowMessageOptions(null);
                                           }}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors"
+                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                         >
                                           <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
                                         </button>
                                       )}
-                                      {!msg.isRecalled && msg.messageType !== 'image' && (
+                                      {isImageMessage(msg) && (
                                         <button
+                                          type="button"
                                           onClick={() => {
-                                            handleCopyText(msg.content);
+                                            handleCopyImage(msg.fileUrl);
                                             setShowMessageOptions(null);
                                           }}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-green-600 hover:bg-green-50 transition-colors"
+                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                         >
-                                          <Copy size={12} /> Sao chép
+                                          <Copy size={12} /> Sao chép ảnh
                                         </button>
                                       )}
-                                      {!msg.isRecalled && msg.messageType !== 'image' && (
-                                        <button
-                                          onClick={() => {
-                                            setNewMsg(msg.content);
-                                            setTimeout(() => inputRef.current?.focus(), 100);
-                                            setShowMessageOptions(null);
-                                          }}
-                                          className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition-colors"
-                                        >
-                                          <Edit3 size={12} /> Chỉnh sửa / Viết lại
-                                        </button>
-                                      )}
+                                      {!msg.isRecalled &&
+                                        !isImageMessage(msg) &&
+                                        !msg.fileUrl &&
+                                        !['file', 'video'].includes(String(msg.messageType || '').toLowerCase()) && (
+                                          <button
+                                            onClick={() => {
+                                              handleCopyText(msg.content || msg.fileName);
+                                              setShowMessageOptions(null);
+                                            }}
+                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                          >
+                                            <Copy size={12} /> Copy tin nhắn
+                                          </button>
+                                        )}
                                       {isMine && !msg.isRecalled && (() => {
                                         const now = new Date();
                                         const sentAt = new Date(msg.time);
@@ -3019,12 +3337,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                               setShowMessageOptions(null);
                                             }}
                                             disabled={recallingId === msg.id}
-                                            className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
                                           >
                                             {recallingId === msg.id
                                               ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
                                               : <RotateCcw size={12} />
-                                            } Thu hồi tin nhắn
+                                            } Thu hồi
                                           </button>
                                         )}
                                       <button
@@ -3032,9 +3350,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                           handleDeleteHistory(msg.id);
                                           setShowMessageOptions(null);
                                         }}
-                                        className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
+                                        className="flex w-full items-center gap-3 whitespace-nowrap border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                                       >
-                                        <Trash2 size={12} /> Xóa lịch sử
+                                        <Trash2 size={12} /> Xóa chỉ ở phía tôi
                                       </button>
                                     </div>
                                   )}
@@ -3043,14 +3361,31 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             </ChatFlipWrap>
                           </div>
 
-                          {/* Time & read status */}
-                          <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
+                          {!msg.isRecalled && reactionCounts.length > 0 && (
+                            <div className={`mt-1 flex w-full ${isMine ? 'justify-end' : 'justify-start'}`}>
+                              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] shadow-sm">
+                                {reactionCounts.map(({ type, emoji, count }) => (
+                                  <span key={type} className="inline-flex items-center gap-0.5">
+                                    <span>{emoji}</span>
+                                    {count > 1 && <span className="font-bold text-gray-500">{count}</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Message time and delivery status stay in normal flow below the message/actions row. */}
+                          <div className={`mt-1 flex w-full items-center gap-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
+                              <span className={`text-[10px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {formatMessageTime(msg.time)}
+                              </span>
+                            )}
                             {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
                               <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
                                 <Pin size={10} className="rotate-45" />
                               </span>
                             )}
-                            <span className="text-[10px] text-slate-400 font-medium tabular-nums">{formatTime(msg.time)}</span>
                             {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
                               <span title="Chưa gửi được (Kết nối yếu)">
                                 <AlertCircle size={10} className="text-red-500 animate-pulse" />
@@ -3089,6 +3424,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <div className="mb-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium flex items-center gap-2">
                     <span>⚠️</span>
                     <span>{uploadError}</span>
+                  </div>
+                )}
+                {replyMessage && (
+                  <div className="mx-auto mb-2 flex max-w-4xl items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2">
+                    <div className="min-w-0 border-l-2 border-blue-500 pl-2.5">
+                      <p className="text-xs font-semibold text-blue-700">Trả lời {replyMessage.senderName}</p>
+                      <p className="truncate text-xs text-slate-600">
+                        {replyMessage.content || (replyMessage.messageType === 'image' ? '[Hình ảnh]' : '[Tệp đính kèm]')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyMessage(null)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-800"
+                      title="Hủy trả lời"
+                      aria-label="Hủy trả lời"
+                    >
+                      <X size={15} />
+                    </button>
                   </div>
                 )}
                 <div className="flex items-center gap-2 relative max-w-4xl mx-auto">
@@ -3146,13 +3500,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         </button>
                       </div>
                     )}
-                    {showEmojis && (
-                      <div className="absolute bottom-full left-0 mb-3 bg-white p-2 rounded-2xl shadow-2xl border border-gray-100 flex gap-2 animate-in fade-in slide-in-from-bottom-2 z-50">
-                        {EMOJIS.map(e => (
-                          <button key={e} onClick={() => addEmoji(e)} className="text-xl hover:scale-125 transition-transform">{e}</button>
-                        ))}
-                      </div>
-                    )}
                     <div className="relative w-full">
                       <input
                         ref={inputRef}
@@ -3168,16 +3515,16 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         className="cms-input pl-4 pr-10 w-full"
                         placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
                       />
-                      <button
-                        onClick={() => setShowEmojis(!showEmojis)}
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-colors ${showEmojis ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`}
-                      >
-                        <Smile size={18} />
-                      </button>
+                      <StickerPicker
+                        key={activeConv?.id || 'no-conversation'}
+                        disabled={isUploading || Boolean(pendingImage) || !activeConv}
+                        onPickEmoji={handleEmojiInsert}
+                        onSendSticker={handleStickerSend}
+                      />
                     </div>
                   </div>
                   <button
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={!newMsg.trim() && !pendingImage}
                     className="cms-btn cms-btn-primary cms-btn-icon"
                     title="Gửi tin nhắn"

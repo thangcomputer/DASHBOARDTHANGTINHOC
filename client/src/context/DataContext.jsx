@@ -91,6 +91,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     setTrainingDataFromSync,
     setStudentTrainingDataFromSync,
     questions, setQuestions,
+    teacherExamConfigLoaded,
     teacherExamTimeLimitMinutes, setTeacherExamTimeLimitMinutes,
     teacherExamMinutes, updateTeacherExamMinutes,
     teacherEssayExamMinutes, updateTeacherEssayExamMinutes,
@@ -197,6 +198,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     trainingData,
     studentTrainingData,
     questions,
+    teacherExamConfigLoaded,
     teacherExamTimeLimitMinutes,
     teacherExamMinutes,
     teacherEssayExamMinutes,
@@ -216,7 +218,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     students, teachers, staffs, transactions, schedules,
     socketNotifications, messages, materials, groups,
     currentUser, studentsPagination, privateEvaluations,
-    trainingData, studentTrainingData, questions,
+    trainingData, studentTrainingData, questions, teacherExamConfigLoaded,
     teacherExamTimeLimitMinutes, teacherExamMinutes, teacherEssayExamMinutes,
     studentQuestions, studentExamMinutes, studentEssayExamMinutes, studentEssayRequired,
     studentExamFiles, examWarningSoundUrl, examSubjectsCatalog, examAdminGroupLabel, systemLogs, isRefetching, RATING_CRITERIA,
@@ -224,6 +226,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
 
   const actionsValue = useMemo(() => ({
     setCurrentUser,
+    setTrainingData: setTrainingDataFromSync,
     addExamResult, updateExamResult, removeExamResult,
     addStudent, addTeacher, removeTeacher, updateTeacher, updateStudent, assignTeacher,
     approveTeacher, manualActivateTeacher, suspendTeacher, reactivateTeacher,
@@ -284,7 +287,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     setStudentExamFile, setExamWarningSoundUrl,
     applyStudentExamConfigFromServer,
     addCustomExamSubject, updateCustomExamSubject, removeCustomExamSubject, updateExamAdminGroupLabel,
-    addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar,
+    addSystemLog, triggerBackgroundSync, toggleMessageReaction, updateUserAvatar, setTrainingDataFromSync,
   ]);
 
   const value = useMemo(

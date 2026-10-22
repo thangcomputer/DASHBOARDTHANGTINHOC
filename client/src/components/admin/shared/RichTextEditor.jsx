@@ -1,6 +1,6 @@
 import React from 'react';
 import CmsSelect from '../../ui/CmsSelect';
-import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
+import { applyAnchorNewTabPolicy, sanitizeRichHtml } from '../../../utils/htmlContent';
 import api, { resolveMediaUrl } from '../../../services/api';
 
 function hydrateEditorHtml(html) {
@@ -19,6 +19,12 @@ function normalizeEditorHtmlForSave(root) {
     if (m) img.setAttribute('src', m[0]);
   });
   return root.innerHTML;
+}
+
+function imageFileFromDataUrl(dataUrl, index) {
+  return fetch(dataUrl).then((response) => response.blob()).then((blob) => (
+    new File([blob], `pasted-image-${index + 1}`, { type: blob.type || 'image/png' })
+  ));
 }
 
 export default function RichTextEditor({ value, onChange, placeholder }) {
@@ -74,6 +80,95 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
     // Không đổi src trên DOM đang hiện — chỉ normalize bản clone khi lưu
     const clone = editorRef.current.cloneNode(true);
     onChange(normalizeEditorHtmlForSave(clone));
+  };
+
+  const handlePaste = async (event) => {
+    const html = event.clipboardData?.getData('text/html') || '';
+    const imageFiles = Array.from(event.clipboardData?.items || [])
+      .filter((item) => item.kind === 'file' && String(item.type || '').startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    const container = document.createElement('div');
+    if (html) container.innerHTML = html;
+    const canInsertHtml = !!html;
+    const pendingUploads = [];
+    const pastedImages = [...container.querySelectorAll('img')];
+
+    for (const [index, image] of pastedImages.entries()) {
+      const clipboardFile = imageFiles[index];
+      if (clipboardFile) {
+        pendingUploads.push({ image, file: Promise.resolve(clipboardFile) });
+        continue;
+      }
+      let src = String(image.getAttribute('src') || '').trim();
+      const lazySrc = image.getAttribute('data-src')
+        || image.getAttribute('data-original')
+        || image.getAttribute('data-lazy-src')
+        || '';
+      if (lazySrc) {
+        src = String(lazySrc).trim();
+        image.setAttribute('src', src);
+      }
+      image.removeAttribute('srcset');
+      if (/^data:image\//i.test(src)) {
+        pendingUploads.push({ image, file: imageFileFromDataUrl(src, pendingUploads.length) });
+      } else if (/^(?:blob|file|cid):/i.test(src) || !src) {
+        image.remove();
+      }
+    }
+    if (pastedImages.length === 0) {
+      for (const file of imageFiles) {
+        pendingUploads.push({ image: null, file: Promise.resolve(file) });
+      }
+    }
+
+    if (!canInsertHtml && pendingUploads.length === 0) return;
+    event.preventDefault();
+    saveSelection();
+
+    let uploadFailed = false;
+    if (pendingUploads.length > 0) {
+      setImageUploading(true);
+      try {
+        for (const pending of pendingUploads) {
+          const file = await pending.file;
+          const data = await api.settings.uploadTrainingFile(file);
+          const storedUrl = String(data?.fileUrl || '').trim();
+          if (!data?.success || !storedUrl) {
+            throw new Error(data?.message || 'Upload ảnh dán thất bại');
+          }
+          const imageUrl = resolveMediaUrl(storedUrl) || storedUrl;
+          if (pending.image) {
+            pending.image.setAttribute('src', imageUrl);
+            pending.image.removeAttribute('srcset');
+          } else {
+            const image = document.createElement('img');
+            image.setAttribute('src', imageUrl);
+            image.setAttribute('alt', '');
+            container.appendChild(image);
+          }
+        }
+      } catch (err) {
+        window.alert?.(err?.message || 'Không tải được ảnh đã dán');
+        uploadFailed = true;
+      } finally {
+        setImageUploading(false);
+      }
+    }
+
+    if (uploadFailed) {
+      container.querySelectorAll('img').forEach((image) => {
+        const src = image.getAttribute('src') || '';
+        if (!/^https?:\/\//i.test(src) && !src.startsWith('/uploads/')) image.remove();
+      });
+    }
+    const safeHtml = sanitizeRichHtml(canInsertHtml || container.childNodes.length ? container.innerHTML : '');
+    if (!safeHtml) return;
+    editorRef.current?.focus();
+    restoreSelection();
+    document.execCommand('insertHTML', false, safeHtml);
+    saveSelection();
+    handleInput();
   };
 
   // Color picker handlers
@@ -237,6 +332,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
       <div ref={editorRef}
         contentEditable
         onInput={handleInput}
+        onPaste={handlePaste}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
         className="min-h-[200px] px-4 py-3 text-sm text-gray-800 leading-relaxed outline-none"

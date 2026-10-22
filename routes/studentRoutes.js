@@ -14,6 +14,8 @@ const { policyShadowStudentMutation } = require('../middleware/policyShadowStude
 const { dataScopeObserve } = require('../middleware/dataScopeObserve');
 const { validateOwnedCertificationFile } = require('../utils/certificationFilePolicy');
 const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
+const { effectiveCoursePrice } = require('../utils/coursePricing');
+const { isExcludedExamSubjectId } = require('../services/examSubjectCatalog');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -2778,7 +2780,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
     }
 
     const sessions = Number(totalSessions) > 0 ? Number(totalSessions) : (catalogCourse?.totalSessions || 12);
-    const resolvedPrice = Number(price) || catalogCourse?.discountPrice || catalogCourse?.price || 0;
+    const resolvedPrice = Number(price) || (catalogCourse ? effectiveCoursePrice(catalogCourse) : 0);
     const isPaid = paid === true || paid === 'true' || paid === 1 || paid === '1';
     const examSubjects = await resolveEnrollmentExamSubjects({
       courseName: resolvedName,
@@ -3447,13 +3449,15 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       const idxPreview = student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId));
       if (idxPreview >= 0) {
         targetCourse = student.enrollments[idxPreview].courseName || targetCourse;
-        targetExamSubjects = student.enrollments[idxPreview].examSubjects || [];
+        targetExamSubjects = (student.enrollments[idxPreview].examSubjects || [])
+          .filter((id) => !isExcludedExamSubjectId(id));
       }
     } else if (student.enrollments?.length) {
       const primaryIdx = student.enrollments.findIndex((e) => e.isPrimary);
       const idx = primaryIdx >= 0 ? primaryIdx : 0;
       targetCourse = student.enrollments[idx]?.courseName || targetCourse;
-      targetExamSubjects = student.enrollments[idx]?.examSubjects || [];
+      targetExamSubjects = (student.enrollments[idx]?.examSubjects || [])
+        .filter((id) => !isExcludedExamSubjectId(id));
     }
 
     if (
@@ -3471,77 +3475,11 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
 
     if (!isUnassign && teacherDoc && targetCourse) {
       const { resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
-      const courseName = String(targetCourse || '').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
-      const specialty = String(teacherDoc.specialty || '').toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
-
-      const courseFocus = (() => {
-        if (courseName.includes('thvp') || courseName.includes('van phong') || courseName.includes('tin hoc van phong') || courseName.includes('microsoft office')) {
-          return ['thvp'];
-        }
-        if (courseName.includes('canva') && (courseName.includes('powerpoint') || courseName.includes('ppt'))) return ['powerpoint', 'canva'];
-        if (courseName.includes('canva')) return ['canva'];
-        if (courseName.includes('excel')) return ['excel'];
-        if (courseName.includes('word')) return ['word'];
-        if (courseName.includes('powerpoint') || courseName.includes('ppt')) return ['powerpoint'];
-        if (Array.isArray(targetExamSubjects) && targetExamSubjects.length) {
-          const office = ['coban', 'word', 'excel', 'powerpoint'];
-          const hits = targetExamSubjects.map(String).filter((id) => office.includes(id) && id !== 'coban');
-          if (hits.length >= 3) return ['thvp'];
-          return [...new Set(targetExamSubjects.map(String).filter((id) => id !== 'coban'))];
-        }
-        return [];
-      })();
-
-      const teacherFocus = (() => {
-        if (specialty.includes('thvp') || specialty.includes('van phong') || specialty.includes('tin hoc van phong') || specialty.includes('microsoft office')) {
-          return ['thvp'];
-        }
-        const focuses = new Set();
-        if (specialty.includes('excel')) focuses.add('excel');
-        if (specialty.includes('word')) focuses.add('word');
-        if (specialty.includes('powerpoint') || specialty.includes('ppt')) focuses.add('powerpoint');
-        if (specialty.includes('canva')) focuses.add('canva');
-        const teacherSubs = resolveTeacherSubjectIds(teacherDoc).map(String);
-        teacherSubs.forEach((id) => {
-          if (id === 'coban') return;
-          focuses.add(id);
-        });
-        // Đủ Word+Excel+PowerPoint → focus THVP (khớp khóa Tin học văn phòng).
-        // Canva không chặn quy đổi — tránh GV Office+Canva bị từ chối gán THVP.
-        const hasFullOffice = ['word', 'excel', 'powerpoint'].every((id) => focuses.has(id));
-        if (hasFullOffice) {
-          focuses.delete('word');
-          focuses.delete('excel');
-          focuses.delete('powerpoint');
-          focuses.delete('coban');
-          focuses.add('thvp');
-        }
-        return [...focuses];
-      })();
-
-      let matched = false;
-      const teacherSubSet = new Set(resolveTeacherSubjectIds(teacherDoc).map(String).filter((id) => id && id !== 'coban'));
-      const courseSubIds = [...new Set((targetExamSubjects || []).map(String).filter((id) => id && id !== 'coban'))];
-      if (courseSubIds.length && courseSubIds.some((id) => teacherSubSet.has(id))) {
-        matched = true;
-      }
-      if (!matched && courseFocus.length && teacherFocus.length) {
-        const set = new Set(teacherFocus);
-        matched = courseFocus.some((f) => set.has(f));
-        if (!matched && courseFocus.includes('thvp')) {
-          const officeHits = ['word', 'excel', 'powerpoint'].filter((id) => set.has(id));
-          matched = officeHits.length >= 2;
-        }
-      }
-      if (!matched && specialty && courseName) {
-        matched = specialty.includes(courseName) || courseName.includes(specialty)
-          || specialty.split(/[,;|/]+/).some((p) => {
-            const part = p.trim();
-            return part.length >= 3 && (courseName.includes(part) || part.includes(courseName));
-          });
-      }
+      const teacherSubSet = new Set(
+        resolveTeacherSubjectIds(teacherDoc).map(String).filter(Boolean),
+      );
+      const courseSubIds = [...new Set((targetExamSubjects || []).map(String).filter(Boolean))];
+      const matched = courseSubIds.length > 0 && courseSubIds.every((id) => teacherSubSet.has(id));
       if (!matched) {
         return res.status(400).json({
           success: false,

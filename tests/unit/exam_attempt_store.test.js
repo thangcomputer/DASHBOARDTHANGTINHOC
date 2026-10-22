@@ -117,7 +117,7 @@ test('rewriteNullSafeTracNghiemFields replaces dotted score/total with whole obj
 });
 
 test('submit $set on null tracNghiem: dotted path fails, rewritten object succeeds', () => {
-  const entry = { id: 'coban', status: 'dang_thi', tracNghiem: null, attemptStatus: 'active' };
+  const entry = { id: 'sample-subject', status: 'dang_thi', tracNghiem: null, attemptStatus: 'active' };
 
   assert.throws(
     () => applyDottedSet(entry, 'tracNghiem.score', 18),
@@ -136,7 +136,7 @@ test('claimStudentAttempt writes whole tracNghiem when parent is null', async ()
   const state = {
     _id: 'student-2',
     examProgress: [{
-      id: 'coban',
+      id: 'sample-subject',
       attemptId: 'attempt-2',
       attemptStatus: 'active',
       tracNghiem: null,
@@ -162,7 +162,7 @@ test('claimStudentAttempt writes whole tracNghiem when parent is null', async ()
 
   const result = await claimStudentAttempt(StudentModel, {
     studentId: 'student-2',
-    subjectId: 'coban',
+    subjectId: 'sample-subject',
     attemptId: 'attempt-2',
     setFields: {
       'examProgress.$.tracNghiem.score': 12,

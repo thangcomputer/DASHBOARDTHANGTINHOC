@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sticker Chat - Thắng Tin Học</title>
+<style>
+*{box-sizing:border-box}
+:root{--primary:#2563eb;--pink:#ef9b9b;--text:#334155;--muted:#94a3b8;--line:#e5e7eb}
+body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#f5f7fb;color:var(--text)}
+.demo{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.chat{width:min(950px,100%);height:620px;background:#fff;border:1px solid #e6eaf0;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.09);display:flex;flex-direction:column;overflow:hidden}
+.header{height:64px;padding:0 22px;display:flex;align-items:center;border-bottom:1px solid #edf0f4;font-weight:750;color:#1e293b}
+.messages{flex:1;padding:22px;overflow:auto;background:#f8fafc;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;justify-content:flex-end}
+.sticker-message{text-align:right;animation:pop .18s ease}
+.sticker-message img{width:116px;height:116px;object-fit:contain;display:block;margin-left:auto}
+.sticker-name{font-size:13px;font-weight:650;color:#334155;text-align:center}
+.meta{font-size:11px;color:#94a3b8;margin-top:4px}
+.composer-wrap{position:relative;padding:12px 16px;background:#fff;border-top:1px solid #e5e7eb}
+.composer{display:flex;align-items:center;gap:10px}
+.input{flex:1;height:48px;border:1px solid #dfe5ec;border-radius:14px;background:#f8fafc;padding:0 54px 0 16px;outline:none;font-size:14px;transition:.15s}
+.input:focus{border-color:#93b4ff;background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.input-box{position:relative;flex:1}
+.icon-btn{position:absolute;right:7px;top:6px;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:#2563eb;cursor:pointer;font-size:21px}
+.icon-btn:hover{background:#eaf1ff}
+.send{width:48px;height:48px;border:0;border-radius:14px;background:#ef9b9b;color:white;cursor:pointer;font-size:20px;box-shadow:0 5px 15px rgba(239,155,155,.25)}
+.send:hover{filter:brightness(.97)}
+.picker{position:absolute;right:74px;bottom:70px;width:min(370px,calc(100vw - 28px));background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:17px;box-shadow:0 20px 55px rgba(15,23,42,.16),0 4px 12px rgba(15,23,42,.05);overflow:hidden;transform-origin:bottom right;animation:pickerIn .15s ease}
+.hidden{display:none}
+.tabs{display:flex;height:50px;border-bottom:1px solid #edf0f4;padding:0 12px}
+.tab{position:relative;flex:1;border:0;background:none;color:#64748b;font-weight:700;cursor:pointer}
+.tab.active{color:#2563eb}
+.tab.active:after{content:"";position:absolute;left:24%;right:24%;bottom:0;height:2px;border-radius:99px;background:#2563eb}
+.picker-title{padding:12px 14px 3px;font-size:12px;font-weight:750;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em}
+.grid{padding:8px 12px 14px;display:grid;grid-template-columns:repeat(4,1fr);gap:7px;max-height:320px;overflow:auto}
+.item{border:0;background:transparent;border-radius:13px;aspect-ratio:1;padding:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:.15s}
+.item:hover{background:#f1f5f9;transform:translateY(-1px)}
+.item:active{transform:scale(.94)}
+.face{font-size:44px;line-height:1;transition:.15s}
+.item:hover .face{transform:scale(1.08)}
+.label{font-size:10px;color:#64748b;white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis}
+.emoji-grid .face{font-size:31px}
+@keyframes pickerIn{from{opacity:0;transform:scale(.96) translateY(5px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+@media(max-width:520px){.demo{padding:0}.chat{height:100vh;border:0;border-radius:0}.picker{right:8px;bottom:70px}.grid{gap:4px}.sticker-message img{width:100px;height:100px}}
+</style>
+</head>
+<body>
+<div class="demo">
+  <section class="chat">
+    <div class="header">💬 Tin nhắn • Thắng Tin Học</div>
+    <div class="messages" id="messages">
+      <div class="row">
+        <div class="sticker-message">
+          <div style="font-size:92px;line-height:1">😻</div>
+          <div class="sticker-name">Yêu thương</div>
+          <div class="meta">16:24 · Đã xem</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="picker hidden" id="picker">
+        <div class="tabs">
+          <button class="tab active" data-tab="sticker">STICKER</button>
+          <button class="tab" data-tab="emoji">EMOJI</button>
+        </div>
+        <div id="stickerPanel">
+          <div class="picker-title">Cảm xúc</div>
+          <div class="grid" id="stickerGrid"></div>
+        </div>
+        <div id="emojiPanel" class="hidden">
+          <div class="picker-title">Emoji</div>
+          <div class="grid emoji-grid" id="emojiGrid"></div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="input-box">
+          <input class="input" id="messageInput" placeholder="Nhập tin nhắn..." autocomplete="off">
+          <button class="icon-btn" id="stickerBtn" aria-label="Mở sticker">☺</button>
+        </div>
+        <button class="send" id="sendBtn" aria-label="Gửi">➤</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const stickers=[
+ ["😊","Xin chào"],["🥰","Cảm ơn nhé"],["😻","Yêu thương"],["😌","OK luôn"],
+ ["😢","Buồn quá"],["😎","Tuyệt vời"],["😇","Dễ thương"],["😆","Haha"],
+ ["🤔","Đang nghĩ"],["🥳","Chúc mừng"],["😍","Thích quá"],["🙏","Cảm ơn"]
+];
+const emojis=["😀","😃","😄","😁","😆","😂","😊","😍","🥰","😘","😎","🤩","🥳","😢","😭","😡","🤔","👍","❤️","🔥","🎉","🙏","👌","💯"];
+
+const picker=document.getElementById("picker");
+const input=document.getElementById("messageInput");
+const messages=document.getElementById("messages");
+
+function draw(){
+ const sg=document.getElementById("stickerGrid");
+ sg.innerHTML=stickers.map((s,i)=>`<button class="item" data-i="${i}" title="${s[1]}"><span class="face">${s[0]}</span><span class="label">${s[1]}</span></button>`).join("");
+ document.getElementById("emojiGrid").innerHTML=emojis.map(e=>`<button class="item emoji-item"><span class="face">${e}</span></button>`).join("");
+}
+draw();
+
+document.getElementById("stickerBtn").onclick=e=>{
+ e.stopPropagation(); picker.classList.toggle("hidden");
+};
+document.addEventListener("click",e=>{
+ if(!picker.contains(e.target) && e.target.id!=="stickerBtn") picker.classList.add("hidden");
+});
+picker.addEventListener("click",e=>e.stopPropagation());
+
+document.querySelectorAll(".tab").forEach(btn=>btn.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+ btn.classList.add("active");
+ const isSticker=btn.dataset.tab==="sticker";
+ document.getElementById("stickerPanel").classList.toggle("hidden",!isSticker);
+ document.getElementById("emojiPanel").classList.toggle("hidden",isSticker);
+});
+
+document.getElementById("stickerGrid").onclick=e=>{
+ const btn=e.target.closest(".item"); if(!btn)return;
+ const [face,name]=stickers[+btn.dataset.i];
+ sendSticker(face,name); picker.classList.add("hidden");
+};
+document.getElementById("emojiGrid").onclick=e=>{
+ const btn=e.target.closest(".emoji-item"); if(!btn)return;
+ input.value+=btn.innerText.trim(); input.focus();
+};
+
+function timeNow(){
+ return new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"});
+}
+function sendSticker(face,name){
+ const row=document.createElement("div"); row.className="row";
+ row.innerHTML=`<div class="sticker-message"><div style="font-size:92px;line-height:1">${face}</div><div class="sticker-name">${name}</div><div class="meta">${timeNow()} · Đã gửi</div></div>`;
+ messages.appendChild(row); messages.scrollTop=messages.scrollHeight;
+ // TÍCH HỢP BACKEND: tại đây gửi {type:"sticker", sticker_id/name...} qua API/WebSocket.
+}
+function sendText(){
+ const text=input.value.trim(); if(!text)return;
+ const row=document.createElement("div"); row.className="row";
+ const bubble=document.createElement("div");
+ bubble.style.cssText="max-width:70%;background:#e7f0ff;padding:10px 14px;border-radius:16px 16px 4px 16px;color:#1e293b";
+ bubble.textContent=text;
+ const meta=document.createElement("div"); meta.className="meta"; meta.textContent=timeNow()+" · Đã gửi";
+ bubble.appendChild(meta); row.appendChild(bubble); messages.appendChild(row);
+ input.value=""; messages.scrollTop=messages.scrollHeight;
+}
+document.getElementById("sendBtn").onclick=sendText;
+input.addEventListener("keydown",e=>{if(e.key==="Enter")sendText()});
+</script>
+</body>
+</html>

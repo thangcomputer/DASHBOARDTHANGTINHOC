@@ -55,6 +55,7 @@ export function useDataTraining(currentUser) {
   // Ngân hàng câu hỏi: khởi tạo rỗng — hydrate từ server (tránh localStorage SoT cũ)
   const [questions, setQuestions] = useState([]);
   const [teacherExamBankHydrated, setTeacherExamBankHydrated] = useState(false);
+  const [teacherExamConfigLoaded, setTeacherExamConfigLoaded] = useState(false);
   const [teacherExamTimeLimitMinutes, setTeacherExamTimeLimitMinutes] = useState(() =>
     loadState(TEACHER_EXAM_TIME_LIMIT_KEY, null),
   );
@@ -167,14 +168,17 @@ export function useDataTraining(currentUser) {
 
     if (!isTeacher && (!isStaff || !hasSystemPerm)) {
       setTeacherExamBankHydrated(false);
+      setTeacherExamConfigLoaded(false);
       return;
     }
     let cancelled = false;
     setTeacherExamBankHydrated(false);
+    setTeacherExamConfigLoaded(false);
     (async () => {
       try {
         const res = await api.settings.getTeacherExamConfig();
         if (cancelled || !res?.success || !res.data) return;
+        setTeacherExamConfigLoaded(true);
         if (isStaff && res.data.hasTeacherExamBank) {
           setQuestions(Array.isArray(res.data.questions) ? res.data.questions : []);
         }
@@ -867,6 +871,7 @@ export function useDataTraining(currentUser) {
     studentTrainingData,
     setStudentTrainingData,
     questions: isExamCandidate ? [] : questions,
+    teacherExamConfigLoaded,
     setQuestions,
     teacherExamTimeLimitMinutes,
     setTeacherExamTimeLimitMinutes,

@@ -412,6 +412,10 @@ function uniqueModels() {
   return out;
 }
 
+function getSupportModelFallbacks() {
+  return uniqueModels();
+}
+
 function isAiSupportEnabled() {
   // Keep the explicit flag as an opt-out, while allowing an already configured
   // AI provider to restore the original automatic-reply behavior.
@@ -2018,6 +2022,7 @@ module.exports = {
   HANDOFF_REASONS,
   isAiSupportEnabled,
   aiSupportConfigured,
+  getSupportModelFallbacks,
   isAiChatUser,
   isSupportAgent,
   isAiSupportConversationId,

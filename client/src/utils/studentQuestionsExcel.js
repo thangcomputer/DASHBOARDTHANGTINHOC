@@ -21,40 +21,8 @@ export const STUDENT_QUESTIONS_TEMPLATE_HEADERS = [
 ];
 
 const SECTION_LABEL_TO_CODE = {
-  'microsoft excel': 'excel',
-  excel: 'excel',
-  'microsoft word': 'word',
-  word: 'word',
-  'microsoft powerpoint': 'powerpoint',
-  powerpoint: 'powerpoint',
-  'may tinh & windows': 'coban',
-  'may vi tinh': 'coban',
-  'may tinh': 'coban',
-  'co ban': 'coban',
-  coban: 'coban',
-  computer: 'coban',
-  windows: 'coban',
-  canva: 'canva',
-  photoshop: 'photoshop',
-  corel: 'corel',
-  autocad: 'autocad',
-  python: 'python',
-  web: 'web',
-  cpp: 'cpp',
-  'c++': 'cpp',
-  'mos-word': 'word',
-  'mos word': 'word',
-  'mos-excel': 'excel',
-  'mos excel': 'excel',
-  'mos-powerpoint': 'powerpoint',
-  'mos powerpoint': 'powerpoint',
-  'ms word': 'word',
-  'ms excel': 'excel',
-  'ms powerpoint': 'powerpoint',
-  'tinh huong su pham': 'situation',
-  situation: 'situation',
-  'kien thuc khac': 'other',
-  other: 'other',
+  'mon kiem thu': 'mon-kiem-thu',
+  'mon-kiem-thu': 'mon-kiem-thu',
 };
 
 const DIFF_LABEL_TO_CODE = {
@@ -97,11 +65,6 @@ function parseSection(val) {
   for (const [label, code] of Object.entries(SECTION_LABEL_TO_CODE)) {
     if (key === stripVi(label)) return code;
   }
-  if (key.includes('powerpoint') || key.includes('power point')) return 'powerpoint';
-  if (key.includes('excel')) return 'excel';
-  if (key.includes('word')) return 'word';
-  if (key.includes('windows') || key.includes('may tinh') || key.includes('may vi tinh')) return 'coban';
-  if (key.includes('su pham') || key.includes('tinh huong')) return 'situation';
   return null;
 }
 
@@ -141,18 +104,18 @@ function parseCorrectIndex(raw) {
 async function buildWorkbook(kind, subjectLabel, questionType) {
   const XLSX = await getXLSX();
   const isTeacher = kind === 'teacher';
-  const sectionLabel = subjectLabel || 'Excel';
+  const sectionLabel = subjectLabel || 'Môn kiểm thử';
   const mcSection = sectionLabel;
   const essaySection = sectionLabel;
   const sampleMc = {
     Loại: 'Trắc nghiệm',
     'Phần thi': mcSection,
     'Độ khó': 'Trung bình',
-    'Câu hỏi': 'Hàm SUM trong Excel dùng để làm gì?',
-    'Đáp án A': 'Đếm ô',
-    'Đáp án B': 'Cộng tổng',
-    'Đáp án C': 'Tìm giá trị lớn nhất',
-    'Đáp án D': 'Lọc dữ liệu',
+    'Câu hỏi': 'Nội dung mẫu kiểm thử?',
+    'Đáp án A': 'Phương án A',
+    'Đáp án B': 'Phương án B',
+    'Đáp án C': 'Phương án C',
+    'Đáp án D': 'Phương án D',
     'Đáp án đúng': 'B',
     'Gợi ý trả lời (tự luận)': '',
   };
@@ -161,16 +124,16 @@ async function buildWorkbook(kind, subjectLabel, questionType) {
     'Phần thi': essaySection,
     'Độ khó': 'Cơ bản',
     'Câu hỏi': isTeacher
-      ? 'Học viên thường xuyên đi trễ, bạn xử lý thế nào?'
-      : 'Trình bày các bước tạo mục lục tự động trong Word.',
+      ? 'Nội dung tự luận mẫu kiểm thử?'
+      : 'Trình bày câu trả lời mẫu kiểm thử.',
     'Đáp án A': '',
     'Đáp án B': '',
     'Đáp án C': '',
     'Đáp án D': '',
     'Đáp án đúng': '',
     'Gợi ý trả lời (tự luận)': isTeacher
-      ? 'Trao doi 1-1, quy uoc lop, ghi nhan...'
-      : 'Dung Heading, References → Table of Contents...',
+      ? 'Gợi ý trả lời mẫu kiểm thử.'
+      : 'Gợi ý trả lời mẫu kiểm thử.',
   };
   const rows = questionType === 'essay' ? [sampleEssay] : questionType === 'multiple' ? [sampleMc] : [sampleMc, sampleEssay];
   const ws = XLSX.utils.json_to_sheet(rows, {
@@ -195,8 +158,8 @@ async function buildWorkbook(kind, subjectLabel, questionType) {
     [`HUONG DAN - ${title}`],
     [],
     ['Loai:', 'Trac nghiem hoac Tu luan'],
-    ['Phan thi:', 'Excel | Word | PowerPoint | May tinh & Windows | Tinh Huong Su Pham | Kien thuc Khac'],
-    ['', 'Hoac ma: excel, word, powerpoint, computer, situation, other'],
+    ['Phan thi:', 'Môn kiểm thử'],
+    ['', 'Hoac ma: mon-kiem-thu'],
     ['Do kho:', 'Co ban | Trung binh | Nang cao'],
     ['Dap an dung (TN):', 'A-D hoac 1-4'],
     ['Goi y:', 'Chi cho cau Tu luan'],
@@ -219,11 +182,11 @@ export async function downloadStudentQuestionsExcelTemplate(subjectId, subjectLa
 
 /** @deprecated use downloadStudentQuestionsExcelTemplate */
 export async function downloadStudentQuestionsExcelTemplateLegacy() {
-  await downloadStudentQuestionsExcelTemplate('excel', 'Excel', 'both');
+  await downloadStudentQuestionsExcelTemplate('mon-kiem-thu', 'Môn kiểm thử', 'both');
 }
 
-export async function downloadTeacherQuestionsExcelTemplate(sectionId = 'excel', sectionLabel = 'Excel', questionType = 'both') {
-  const label = sectionLabel || sectionId || 'Excel';
+export async function downloadTeacherQuestionsExcelTemplate(sectionId = 'mon-kiem-thu', sectionLabel = 'Môn kiểm thử', questionType = 'both') {
+  const label = sectionLabel || sectionId || 'Môn kiểm thử';
   const { XLSX, wb } = await buildWorkbook('teacher', label, questionType);
   const suffix = questionType === 'essay' ? 'TuLuan' : questionType === 'multiple' ? 'TracNghiem' : 'DayDu';
   const safe = String(sectionLabel || sectionId || 'GV').replace(/[^\w\u00C0-\u024F]+/g, '_').slice(0, 40);
@@ -315,10 +278,9 @@ export async function parseStudentQuestionsExcel(bstr, options = {}) {
 
     const type = parseType(pick(row, ['Loại', 'Loai', 'Type']));
     let section = parseSection(pick(row, ['Phần thi', 'Phan thi', 'Section', 'Mon']));
-    if (section === 'computer') section = 'coban';
     if (!section && defaultSection) section = defaultSection;
     if (!section) {
-      errors.push(`Dong ${line}: Phan thi khong hop le (vd: Excel, Word).`);
+      errors.push(`Dong ${line}: Phan thi khong hop le (vd: ${options.defaultSection || 'mon-kiem-thu'}).`);
       return;
     }
 

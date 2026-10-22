@@ -13,7 +13,7 @@ import api from '../services/api';
 import { useModal } from '../utils/Modal.jsx';
 import { useData } from '../context/DataContext';
 import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enrollments';
-import { teacherMatchesCourse } from '../utils/examSubjects';
+import { getExamSubjectMeta, teacherMatchesCourse } from '../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../utils/branchIds';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
 import { useToast } from '../utils/toast';
@@ -1676,23 +1676,14 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             const studentBranchId = data.student?.branchId;
                             const splitTeachers = (courseOrEnr) => {
                               const matched = [];
-                              const other = [];
-                              const currentTeacherId = String(courseOrEnr.teacherId || '');
                               const branchId = toBranchId(studentBranchId);
                               for (const t of activeTeachers) {
-                                const tid = String(t.id || t._id);
-                                const sameBranch = teacherInStudentBranch(t, branchId) || (currentTeacherId && tid === currentTeacherId);
-                                if (!sameBranch) {
-                                  other.push({ ...t, _branchMismatch: true });
-                                  continue;
-                                }
-                                if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog) || (currentTeacherId && tid === currentTeacherId)) {
+                                if (!teacherInStudentBranch(t, branchId)) continue;
+                                if (teacherMatchesCourse(t, courseOrEnr, examSubjectsCatalog)) {
                                   matched.push(t);
-                                } else {
-                                  other.push(t);
                                 }
                               }
-                              return { matched, other };
+                              return matched;
                             };
                             const canDelete = enrollments.length > 1;
                             return (
@@ -1770,21 +1761,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                             >
                                               <option value="">Chưa phân công GV</option>
                                               {(() => {
-                                                const { matched, other } = splitTeachers(enr);
-                                                const allOptions = [...matched, ...other];
-                                                const currentTid = String(enr.teacherId || '');
-                                                const currentInList = currentTid && allOptions.some(t => String(t.id || t._id) === currentTid);
+                                                const matched = splitTeachers(enr);
                                                 return (
                                                   <>
-                                                    {/* Nếu GV hiện tại không có trong danh sách (ID không khớp), thêm option fallback */}
-                                                    {currentTid && !currentInList && (
-                                                      <option value={currentTid}>{enr.teacherName || currentTid}</option>
-                                                    )}
                                                     {matched.map((t) => (
                                                       <option key={t.id || t._id} value={String(t.id || t._id)}>{t.name}</option>
-                                                    ))}
-                                                    {other.map((t) => (
-                                                      <option key={t.id || t._id} value={String(t.id || t._id)} disabled>{t._branchMismatch ? `${t.name} (khác chi nhánh)` : `${t.name} (khác môn)`}</option>
                                                     ))}
                                                   </>
                                                 );
@@ -2415,7 +2396,6 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest italic">Học viên chưa tham gia kỳ thi nào</p>
                             </div>
                           ) : (() => {
-                              const SL = { coban: 'Máy vi tính (Cơ bản)', word: 'Word', excel: 'Excel', powerpoint: 'PowerPoint' };
                               return (data.student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').map(ep => {
                                 const tn = ep.tracNghiem || {};
                                 const pct = tn.total > 0 ? Math.round(((tn.score || 0) / tn.total) * 100) : 0;
@@ -2431,7 +2411,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                            <Trophy size={20} />
                                         </div>
                                         <div>
-                                           <p className="text-sm font-black text-slate-800">{SL[ep.id] || ep.id}</p>
+                                           <p className="text-sm font-black text-slate-800">{getExamSubjectMeta(ep.id, examSubjectsCatalog).label}</p>
                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${isDat ? 'bg-emerald-50 text-emerald-600' : isKhongDat ? 'bg-red-50 text-red-500' : isChoNop ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
                                              {isDat ? 'ĐẠT' : isKhongDat ? 'RỚT' : isChoNop ? 'CHỜ NỘP' : isChoCham ? 'CHỜ CHẤM' : 'ĐANG THI'}
                                            </span>
@@ -2793,6 +2773,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         <AddEnrollmentModal
           student={data.student}
           teachers={teachers || []}
+          examSubjectsCatalog={examSubjectsCatalog}
           onSubmit={handleAddEnrollmentSubmit}
           onClose={() => setShowAddEnrollment(false)}
         />

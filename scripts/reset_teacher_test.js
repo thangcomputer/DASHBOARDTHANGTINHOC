@@ -8,7 +8,7 @@ async function seedExamMinutes() {
   await mongoose.connect(MONGODB_URI);
   const tn = Number(process.argv[3]) || 5;
   const tl = Number(process.argv[4]) || 5;
-  const keys = ['coban', 'word', 'excel', 'powerpoint', 'canva', 'situation', 'computer', 'other'];
+  const keys = ['mon-kiem-thu'];
   await SystemSettings.findOneAndUpdate(
     { _key: 'main' },
     {

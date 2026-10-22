@@ -1,11 +1,13 @@
-const VOLUME_KEY = 'lms_player_volume';
-const MUTED_KEY = 'lms_player_muted';
+const VOLUME_KEY = 'lms_player_volume_v2';
+const MUTED_KEY = 'lms_player_muted_v2';
 
-export function readLmsVolume(defaultVolume = 80) {
+export function readLmsVolume(defaultVolume = 50) {
   try {
     const raw = localStorage.getItem(VOLUME_KEY);
-    const n = Number(raw);
-    if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+    if (raw !== null && raw !== '') {
+      const n = Number(raw);
+      if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+    }
   } catch { /* ignore */ }
   return defaultVolume;
 }

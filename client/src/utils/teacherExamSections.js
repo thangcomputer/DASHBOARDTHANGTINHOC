@@ -1,15 +1,8 @@
 export const TEACHER_EXAM_SECTIONS = [
-  { id: 'excel', label: 'Excel' },
-  { id: 'word', label: 'Word' },
-  { id: 'powerpoint', label: 'PowerPoint' },
-  { id: 'computer', label: 'M\u00e1y t\u00ednh & Windows' },
-  { id: 'situation', label: 'T\u00ecnh Hu\u1ed1ng S\u01b0 Ph\u1ea1m' },
-  { id: 'other', label: 'Ki\u1ebfn th\u1ee9c Kh\u00e1c' },
+  { id: 'mon-kiem-thu', label: 'Môn kiểm thử' },
 ];
 
-const LEGACY_TEACHER_SECTIONS = new Set([
-  'computer', 'situation', 'other', 'supham', 'su-pham', 'ppt', 'pp', 'maytinh',
-]);
+const LEGACY_TEACHER_SECTIONS = new Set();
 
 /** Section cũ trong DB — vẫn hiện để admin sửa/xóa */
 export function isLegacyTeacherExamSection(section) {

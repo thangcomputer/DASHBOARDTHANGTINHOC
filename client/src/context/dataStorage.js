@@ -11,11 +11,11 @@ export const STUDENT_EXAM_FILES_KEY = 'thvp_studentExamFiles';
 export const TEACHER_EXAM_TIME_LIMIT_KEY = 'thvp_teacherExamTimeLimitMinutes';
 export const TEACHER_EXAM_MINUTES_KEY = 'thvp_teacherExamMinutes';
 export const TEACHER_ESSAY_EXAM_MINUTES_KEY = 'thvp_teacherEssayExamMinutes';
-export const DEFAULT_STUDENT_EXAM_MINUTES = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90 };
-export const DEFAULT_STUDENT_ESSAY_EXAM_MINUTES = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60 };
-export const DEFAULT_STUDENT_ESSAY_REQUIRED = { coban: true, word: true, excel: true, powerpoint: true, canva: true };
-export const DEFAULT_TEACHER_EXAM_MINUTES = { coban: 90, word: 90, excel: 90, powerpoint: 90, canva: 90, situation: 90, computer: 90 };
-export const DEFAULT_TEACHER_ESSAY_EXAM_MINUTES = { coban: 60, word: 60, excel: 60, powerpoint: 60, canva: 60, situation: 60, computer: 60 };
+export const DEFAULT_STUDENT_EXAM_MINUTES = { 'mon-kiem-thu': 90 };
+export const DEFAULT_STUDENT_ESSAY_EXAM_MINUTES = { 'mon-kiem-thu': 60 };
+export const DEFAULT_STUDENT_ESSAY_REQUIRED = { 'mon-kiem-thu': true };
+export const DEFAULT_TEACHER_EXAM_MINUTES = { 'mon-kiem-thu': 90 };
+export const DEFAULT_TEACHER_ESSAY_EXAM_MINUTES = { 'mon-kiem-thu': 60 };
 export const INITIAL_TRAINING = { videos: [], guides: [], files: [], softwareLinks: [] };
 
 export function loadState(key, defaultValue) {

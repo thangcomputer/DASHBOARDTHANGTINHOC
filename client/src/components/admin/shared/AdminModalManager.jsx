@@ -44,7 +44,7 @@ export default function AdminModalManager() {
     enrollmentModalStudent, setEnrollmentModalStudent, addEnrollment,
     payoutModal, setPayoutModal, handleGoToQR, handlePayout, handleSaveHoaHongRate, printStudent,
     showTeacherModal, setShowTeacherModal, teacherForm, setTeacherForm,
-    isSuperAdmin, isHighAdmin, safeBranches, ctxAddTeacher, toast,
+    isSuperAdmin, isHighAdmin, safeBranches, ctxAddTeacher, toast, examSubjectsCatalog,
     grantModal, setGrantModal, ctxUpdateTeacher, grantPending,
     deleteModal, setDeleteModal, confirmDelete,
     showStudentDetailId, setShowStudentDetailId, studentDetailTab, studentDetailScheduleId,
@@ -86,6 +86,7 @@ export default function AdminModalManager() {
       {showModal && (
         <AddStudentModal
           teachers={teachers}
+          examSubjectsCatalog={examSubjectsCatalog}
           onAdd={async (d) => {
             // addStudent tự toast — safeRun chỉ chặn double-submit; reject để modal không đóng khi lỗi
             const ok = await safeRun(() => addStudent(d), { skipToast: true });
@@ -100,6 +101,7 @@ export default function AdminModalManager() {
         <AddEnrollmentModal
           student={enrollmentModalStudent}
           teachers={(teachers?.length ? teachers : globalTeachers) || []}
+          examSubjectsCatalog={examSubjectsCatalog}
           onClose={() => setEnrollmentModalStudent(null)}
           onSubmit={async (payload) => {
             // addEnrollment tự toast success/error và trả false (không throw)

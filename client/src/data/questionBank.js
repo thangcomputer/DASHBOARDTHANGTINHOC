@@ -57,11 +57,7 @@ export const gradeAnswers = (questions, answers) => {
   const pass = total >= 80 && sectionFailures.length === 0;
 
   return {
-    excel: bySection.excel || 0,
-    word: bySection.word || 0,
-    powerpoint: bySection.powerpoint || 0,
-    coban: bySection.coban || 0,
-    situation: bySection.situation || 0,
+    bySection,
     total,
     count,
     correctCount: correct,

@@ -7,9 +7,10 @@ import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
+import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
 
 function courseEffectivePrice(c) {
-  return Math.round(Number(c?.price || 0) * (1 - (Number(c?.discountPercent) || 0) / 100));
+  return getEffectiveCoursePrice(c);
 }
 
 function courseDefaultSessions(c) {
@@ -28,7 +29,9 @@ function applyCourseToForm(c) {
 
 const TOTAL_PAYMENT_SECS = 900;
 
-export default function AddEnrollmentModal({ student, teachers, onSubmit, onClose }) {
+export default function AddEnrollmentModal({
+  student, teachers, examSubjectsCatalog, onSubmit, onClose,
+}) {
   const toast = useToast();
   const API = import.meta.env.VITE_API_URL || '';
   const { socket } = useSocket();
@@ -45,6 +48,10 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
     paid: false,
     teacherAlert: '',
   });
+  const selectedCourse = useMemo(
+    () => dbCourses.find((course) => String(course._id) === String(form.courseId)),
+    [dbCourses, form.courseId],
+  );
 
   const [bankInfo, setBankInfo] = useState(null);
   const [timeLeft, setTimeLeft] = useState(TOTAL_PAYMENT_SECS);
@@ -77,7 +84,7 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
   const handleCourseChange = (courseId) => {
     const c = dbCourses.find((x) => String(x._id) === String(courseId));
     if (!c) return;
-    setForm((f) => ({ ...f, ...applyCourseToForm(c) }));
+    setForm((f) => ({ ...f, ...applyCourseToForm(c), teacherId: '' }));
   };
 
   const buildPayload = (paid) => {
@@ -455,20 +462,20 @@ export default function AddEnrollmentModal({ student, teachers, onSubmit, onClos
                   <option value="">Chưa phân công</option>
                   {(teachers || [])
                     .filter((t) => String(t.status || '').toLowerCase() === 'active')
+                    .filter((t) => teacherMatchesCourse(
+                      t,
+                      selectedCourse || form.courseName,
+                      examSubjectsCatalog,
+                    ))
                     .map((t) => {
                       const sameBranch = teacherInStudentBranch(t, student?.branchId);
-                      const match = sameBranch && teacherMatchesCourse(t, form.courseName);
-                      const disabled = !sameBranch || !teacherMatchesCourse(t, form.courseName);
-                      let label = t.name;
-                      if (!sameBranch) label = `${t.name} (khác chi nhánh)`;
-                      else if (!match) label = `${t.name} (khác môn)`;
                       return (
                         <option
                           key={t.id || t._id}
                           value={String(t.id || t._id)}
-                          disabled={disabled}
+                          disabled={!sameBranch}
                         >
-                          {label}
+                          {sameBranch ? t.name : `${t.name} (khác chi nhánh)`}
                         </option>
                       );
                     })}

@@ -256,7 +256,7 @@ const StudentSchema = new mongoose.Schema(
 
     // ── Tiến độ thi tốt nghiệp (per-subject) ────────────────────
     examProgress: [{
-      id:         { type: String },                        // 'coban', 'word', 'excel', 'powerpoint'
+      id:         { type: String },                        // Configured exam subject ID
       status:     { type: String, default: 'chua_thi' },   // 'chua_thi' | 'dang_thi' | 'dat' | 'khong_dat'
       tracNghiem: {
         score: { type: Number, default: 0 },

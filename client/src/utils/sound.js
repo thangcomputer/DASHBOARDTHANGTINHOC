@@ -169,6 +169,83 @@ export const playExamWarningSound = (customUrl = '') => {
   }
 };
 
+function lessonAudio() {
+  if (muted) return null;
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioUnlocked = true;
+    }
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+    return audioCtx;
+  } catch {
+    return null;
+  }
+}
+
+const lessonPraisePlayers = new Map();
+
+/** Phát đúng bản ghi đã ghép với lời khen đang hiển thị. */
+export const playLessonCorrectSound = (audioUrl) => {
+  if (muted || typeof window === 'undefined' || !audioUrl || typeof window.Audio !== 'function') return;
+
+  let player = lessonPraisePlayers.get(audioUrl);
+  if (!player) {
+    player = new window.Audio(audioUrl);
+    player.preload = 'auto';
+    player.volume = 0.85;
+    lessonPraisePlayers.set(audioUrl, player);
+  }
+
+  player.currentTime = 0;
+  const playback = player.play();
+  if (playback && typeof playback.catch === 'function') {
+    playback.catch((error) => {
+      console.warn('Không phát được âm thanh khen luyện tập', error);
+    });
+  }
+};
+
+/** Tiếng tích tắc khi đồng hồ câu hỏi gần hết giờ. */
+export const playLessonTick = (tock = false) => {
+  unlockAudio();
+  const ctx = lessonAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const start = ctx.currentTime;
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(tock ? 620 : 980, start);
+  gain.gain.setValueAtTime(0.045, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + 0.045);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + 0.05);
+};
+
+/** Tiếng trầm khi chọn sai, khác hẳn tiếng nổ. */
+export const playLessonWrongSound = () => {
+  unlockAudio();
+  const ctx = lessonAudio();
+  if (!ctx) return;
+  const start = ctx.currentTime;
+  [196, 130].forEach((freq, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const at = start + index * 0.14;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, at);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, at + 0.16);
+    gain.gain.setValueAtTime(0.22, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + 0.2);
+  });
+};
+
 export const stopExamWarningSound = () => {
   warningPlaybackToken += 1;
   if (currentWarningAudio) {

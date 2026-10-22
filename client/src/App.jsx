@@ -37,6 +37,9 @@ const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/Cer
 const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
 const CertPrepStudentPlayer = lazy(() => import('./components/student/certPrep/CertPrepStudentPlayer'));
 const CertPrepResult = lazy(() => import('./components/student/certPrep/CertPrepResult'));
+const LessonPracticeCatalogPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeCatalogPage'));
+const LessonPracticeUnitsPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeUnitsPage'));
+const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonPractice/LessonPracticePlayerPage'));
 import DashboardLayout                       from './components/DashboardLayout';
 import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
 import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
@@ -102,6 +105,7 @@ const saveSession = (user) => {
   const key = user.adminRole === 'STAFF' || user.role === 'staff' ? 'staff' : (user.role || 'admin');
   localStorage.setItem(`${key}_user`, JSON.stringify(user));
 };
+const ACTIVE_TAB_SESSION_KEY = 'cms_active_login_session_v1';
 
 // ── Protected Route ───────────────────────────────────────────────────────────
 const Guard = ({ allowedRoles, session, children }) => {
@@ -217,7 +221,7 @@ function StudentTestWrapper({ session }) {
     <ErrorBoundary>
       <div className="h-[100dvh] max-h-[100dvh] overflow-hidden">
         <StudentTest
-          subjectId={subjectId || 'word'}
+          subjectId={subjectId}
           studentSbd={session?.phone || session?.sbd || '---'}
           studentName={session?.name || 'Học viên'}
           onBack={() => nav('/student/exam')}
@@ -453,6 +457,21 @@ function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout 
             <CertPrepResult />
           </ErrorBoundary>
         } />
+        <Route path="/student/lesson-practice" element={
+          <ErrorBoundary inline>
+            <LessonPracticeCatalogPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/lesson-practice/subjects/:subjectId" element={
+          <ErrorBoundary inline>
+            <LessonPracticeUnitsPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/lesson-practice/units/:unitId" element={
+          <ErrorBoundary inline>
+            <LessonPracticePlayerPage />
+          </ErrorBoundary>
+        } />
       </Route>
 
       {/* ═══ Fullscreen Exam (chỉ khi vào làm bài) ═══ */}
@@ -587,6 +606,10 @@ function App() {
   // ── Khôi phục session khi reload ──────────────────────────────────────────
   useEffect(() => {
     const restoreSession = async () => {
+      if (sessionStorage.getItem(ACTIVE_TAB_SESSION_KEY) !== '1') {
+        setIsAuthLoading(false);
+        return;
+      }
       const savedUser = loadSession();
 
       if (!savedUser) {
@@ -689,6 +712,7 @@ function App() {
     // Xóa thời gian không hoạt động cũ để tránh bị văng ngay lần đăng nhập đầu tiên
     localStorage.removeItem('last_activity_at');
 
+    sessionStorage.setItem(ACTIVE_TAB_SESSION_KEY, '1');
     saveSession(account);
     setSession(account);
     const teacherHome = String(account.status || '').toLowerCase() === 'active' ? '/teacher' : '/teacher/test';

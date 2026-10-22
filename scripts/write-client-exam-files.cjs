@@ -1,16 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const examSubjects = `/** Catalog mon thi + map khoa hoc -> mon (fallback khi chua co examSubjects tren enrollment) */
+const examSubjects = `/** Catalog mon thi + map ten/ID mon duoc khai bao sang subject ID */
 export const EXAM_SUBJECTS = {
-  coban: { id: 'coban', label: 'M\u00E1y vi t\u00EDnh (C\u01A1 b\u1EA3n)', short: 'C', bg: 'bg-slate-600' },
-  word: { id: 'word', label: 'Microsoft Word', short: 'W', bg: 'bg-blue-600' },
-  excel: { id: 'excel', label: 'Microsoft Excel', short: 'X', bg: 'bg-green-600' },
-  powerpoint: { id: 'powerpoint', label: 'Microsoft PowerPoint', short: 'P', bg: 'bg-orange-500' },
-  canva: { id: 'canva', label: 'Canva', short: 'V', bg: 'bg-purple-600' },
+  'mon-kiem-thu': { id: 'mon-kiem-thu', label: 'Môn kiểm thử', short: 'T', bg: 'bg-gray-600' },
 };
 
-export const OFFICE_EXAM_IDS = ['coban', 'word', 'excel', 'powerpoint'];
+export const OFFICE_EXAM_IDS = [];
 
 export function normalizeCourseKey(name) {
   return String(name || '')
@@ -23,22 +19,11 @@ export function normalizeCourseKey(name) {
 /** Fallback: doan ten khoa khi enrollment chua co examSubjects */
 export function mapCourseToExamSubjectIds(courseName) {
   const n = normalizeCourseKey(courseName);
-  if (n.includes('canva')) return ['canva'];
-  if (
-    n.includes('thvp')
-    || n.includes('van phong')
-    || n.includes('tin hoc van phong')
-    || n.includes('microsoft office')
-  ) {
-    return [...OFFICE_EXAM_IDS];
-  }
-  if (n.includes('excel') && !n.includes('van phong')) return ['coban', 'excel'];
-  if (n.includes('word') && !n.includes('van phong')) return ['coban', 'word'];
-  if (n.includes('powerpoint') || n.includes('ppt')) return ['coban', 'powerpoint'];
   for (const id of Object.keys(EXAM_SUBJECTS)) {
-    if (n.includes(id)) return [id];
+    const label = normalizeCourseKey(EXAM_SUBJECTS[id].label);
+    if (n === id || n === label) return [id];
   }
-  return [...OFFICE_EXAM_IDS];
+  return [];
 }
 
 export function getSubjectIdsForEnrollment(enrollment) {
@@ -57,7 +42,7 @@ export function getSubjectIdsForStudent(enrollments, fallbackCourse) {
   } else if (fallbackCourse) {
     mapCourseToExamSubjectIds(fallbackCourse).forEach((id) => ids.add(id));
   } else {
-    OFFICE_EXAM_IDS.forEach((id) => ids.add(id));
+    Object.keys(EXAM_SUBJECTS).forEach((id) => ids.add(id));
   }
   return [...ids];
 }
@@ -72,7 +57,7 @@ export function getSubjectIdsForCourseFilter(enrollments, filterCourse, fallback
 }
 
 export function buildExamSubjectsFromProgress(examProgress, subjectIds) {
-  const ids = subjectIds?.length ? subjectIds : [...OFFICE_EXAM_IDS];
+  const ids = subjectIds?.length ? subjectIds : Object.keys(EXAM_SUBJECTS);
   return ids.map((id) => {
     const def = { id, status: 'chua_thi', tracNghiem: null, thucHanh: 'chua_nop', lockUntil: null };
     const saved = (examProgress || []).find((s) => s.id === id);
