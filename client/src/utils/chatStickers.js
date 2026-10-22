@@ -3,6 +3,7 @@ export const CHAT_STICKERS = [
   { id: 'thanks', name: 'Cảm ơn nhé', category: 'emotion', src: '/stickers/thanks.svg?v=3' },
   { id: 'love', name: 'Yêu thương', category: 'emotion', src: '/stickers/love.svg?v=3' },
   { id: 'ok', name: 'OK luôn', category: 'work', src: '/stickers/ok.svg?v=3' },
+  { id: 'sorry', name: 'Xin lỗi', category: 'emotion', src: '/stickers/sorry.svg?v=3' },
   { id: 'sad', name: 'Buồn quá', category: 'emotion', src: '/stickers/sad.svg' },
   { id: 'cheer', name: 'Tuyệt vời', category: 'emotion', src: '/stickers/cheer.svg?v=3' },
   { id: 'cute', name: 'Dễ thương', category: 'emotion', src: '/stickers/cute.svg' },
@@ -14,7 +15,6 @@ export const CHAT_STICKERS = [
 ];
 
 const LEGACY_CHAT_STICKERS = [
-  { id: 'sorry', name: 'Xin lỗi nha', category: 'emotion', src: '/stickers/sorry.svg?v=3' },
   { id: 'wave', name: 'Chào bạn', category: 'greeting', src: '/stickers/wave.svg?v=3' },
   { id: 'celebrate', name: 'Tuyệt vời!', category: 'emotion', src: '/stickers/celebrate.svg?v=3' },
 ];

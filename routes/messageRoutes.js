@@ -683,14 +683,10 @@ router.patch('/:messageId/reaction', messagesGuard('reaction'), async (req, res)
       }
     }
 
-    // Kiểm tra đã có reaction chưa
-    const existingIdx = message.reactions.findIndex(r => r.userId === userId && r.type === type);
-    
-    if (existingIdx >= 0) {
-      // Bỏ reaction
-      message.reactions.splice(existingIdx, 1);
-    } else {
-      // Thêm reaction
+    const userReactions = message.reactions.filter(r => String(r.userId) === String(userId));
+    const isSameReaction = userReactions.some(r => r.type === type);
+    message.reactions = message.reactions.filter(r => String(r.userId) !== String(userId));
+    if (!isSameReaction) {
       message.reactions.push({ type, userId, userName });
     }
 

@@ -187,7 +187,7 @@ function StickerGrid({ stickers, disabled, onSelect }) {
           data-picker-item="true"
           disabled={disabled}
           onClick={() => onSelect(sticker)}
-          className="group flex min-h-[6.6rem] flex-col items-center justify-center gap-2 rounded-xl p-2 transition-colors hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="cms-sticker-label-stack group flex min-h-[6.6rem] flex-col items-center justify-center rounded-xl p-2 transition-colors hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`Gửi sticker: ${sticker.name}`}
           title={sticker.name}
         >
@@ -196,7 +196,7 @@ function StickerGrid({ stickers, disabled, onSelect }) {
             alt=""
             loading="lazy"
             draggable={false}
-            className="h-14 w-full object-contain transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
+            className="h-16 w-full object-contain transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
           />
           <span className="w-full truncate text-center text-xs font-semibold leading-5 text-slate-700">
             {sticker.name}

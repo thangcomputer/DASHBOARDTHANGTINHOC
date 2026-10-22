@@ -2221,14 +2221,16 @@ html.cms-app-shell #root {
   border-bottom: 1px solid var(--cms-border);
   flex-shrink: 0;
 }
+.cms-sticker-label-stack {
+  gap: 4px;
+}
 .cms-chat-sticker-message {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
   width: min(128px, 42vw);
   color: #334155;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: 0.02em;
@@ -2261,9 +2263,8 @@ html.cms-app-shell #root {
 }
 @media (max-width: 480px) {
   .cms-chat-sticker-message {
-    gap: 12px;
     width: min(116px, 38vw);
-    font-size: 13px;
+    font-size: 14px;
   }
   .cms-chat-sticker-message img {
     height: 98px;

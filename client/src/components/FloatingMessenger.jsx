@@ -46,6 +46,7 @@ import {
 import SupportMascot from './SupportMascot';
 import { MessageRichText, copyableTextFromMessage } from '../utils/messageRichText';
 import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
+import { getChatFileType } from '../utils/chatFileType';
 import ScreenCaptureButton from './ScreenCaptureButton';
 import StickerPicker from './StickerPicker';
 
@@ -347,7 +348,7 @@ function MessageBubble({
     return (
       <div className="w-fit max-w-[88%]">
         {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
-        <div className="cms-chat-sticker-message">
+        <div className="cms-chat-sticker-message cms-sticker-label-stack">
           <img src={sticker.src} alt="" loading="lazy" draggable={false} />
           <span>{sticker.name}</span>
         </div>
@@ -393,6 +394,7 @@ function MessageBubble({
   }
 
   if (m.messageType === 'file' && m.fileUrl) {
+    const fileType = getChatFileType(m.fileName, m.fileUrl);
     return (
       <div className="w-fit max-w-[88%]">
         {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
@@ -403,7 +405,13 @@ function MessageBubble({
             rel="noreferrer"
             className={`cms-fm-file ${mine ? 'is-mine' : ''}`}
           >
-            <span className="truncate">{m.fileName || 'Tệp đính kèm'}</span>
+            <span className={`mr-2 inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md px-1 text-[9px] font-black tracking-wide ${fileType.badgeClass}`}>
+              {fileType.extension}
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate">{m.fileName || 'Tệp đính kèm'}</span>
+              <span className="text-[10px] opacity-60">{fileType.label}</span>
+            </span>
           </a>
         </div>
         <MessageReactions m={m} mine={mine} meId={meId} onReact={onReact} enabled={reactionsEnabled} />

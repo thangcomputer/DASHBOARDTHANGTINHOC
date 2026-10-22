@@ -44,6 +44,7 @@ import {
 } from '../utils/aiSupport';
 import { getScheduleDisplayKind, isScheduleOngoingNow, normalizeScheduleDate } from '../utils/scheduleTime';
 import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
+import { getChatFileType } from '../utils/chatFileType';
 import StickerPicker from './StickerPicker';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
@@ -278,53 +279,51 @@ const MESSAGE_REACTIONS = [
 
 function ReactionPicker({ msgId, onReact, myReactions, align = 'right' }) {
   return (
-    <div className="pointer-events-none absolute -bottom-2 -right-2 z-20 opacity-0 transition-opacity group-hover/msg:pointer-events-auto group-hover/msg:opacity-100 group-focus-within/msg:pointer-events-auto group-focus-within/msg:opacity-100">
-      <div className="group/reaction relative">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onReact(msgId, 'like');
-          }}
-          className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(15,23,42,0.2)] transition hover:scale-110 ${
-            myReactions?.includes('like')
-              ? 'border-amber-300 bg-amber-100 text-amber-500 hover:bg-amber-200 hover:text-amber-600'
-              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-          }`}
-          title="Thích"
-          aria-label="Thích"
-          aria-pressed={myReactions?.includes('like') || false}
-        >
-          <ThumbsUp
-            size={15}
-            strokeWidth={1.8}
-            fill={myReactions?.includes('like') ? 'currentColor' : 'none'}
-          />
-        </button>
-        <div
-          className={`pointer-events-none absolute bottom-full ${align === 'left' ? 'left-0' : 'right-0'} flex translate-y-1 items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-1 opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all group-hover/reaction:pointer-events-auto group-hover/reaction:translate-y-0 group-hover/reaction:opacity-100 group-focus-within/reaction:pointer-events-auto group-focus-within/reaction:translate-y-0 group-focus-within/reaction:opacity-100`}
-          role="group"
-          aria-label="Cảm xúc khác"
-        >
-          {MESSAGE_REACTIONS.filter(({ type }) => type !== 'like').map(({ type, emoji, label }) => (
-            <button
-              key={type}
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onReact(msgId, type);
-              }}
-              className={`flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-slate-100 ${
-                myReactions?.includes(type) ? 'bg-blue-50 ring-1 ring-blue-200' : ''
-              }`}
-              title={label}
-              aria-label={label}
-              aria-pressed={myReactions?.includes(type) || false}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
+    <div className="group/reaction relative shrink-0">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onReact(msgId, 'like');
+        }}
+        className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition hover:scale-105 ${
+          myReactions?.includes('like')
+            ? 'border-amber-300 bg-amber-100 text-amber-500 hover:bg-amber-200 hover:text-amber-600'
+            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+        }`}
+        title="Thích"
+        aria-label="Thích"
+        aria-pressed={myReactions?.includes('like') || false}
+      >
+        <ThumbsUp
+          size={15}
+          strokeWidth={1.8}
+          fill={myReactions?.includes('like') ? 'currentColor' : 'none'}
+        />
+      </button>
+      <div
+        className={`pointer-events-none absolute bottom-full ${align === 'left' ? 'left-0' : 'right-0'} z-30 flex translate-y-1 items-center gap-0.5 rounded-full border border-slate-200 bg-white/95 px-1.5 py-1 opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.18)] transition-all group-hover/reaction:pointer-events-auto group-hover/reaction:translate-y-0 group-hover/reaction:opacity-100 group-focus-within/reaction:pointer-events-auto group-focus-within/reaction:translate-y-0 group-focus-within/reaction:opacity-100`}
+        role="group"
+        aria-label="Cảm xúc khác"
+      >
+        {MESSAGE_REACTIONS.filter(({ type }) => type !== 'like').map(({ type, emoji, label }) => (
+          <button
+            key={type}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReact(msgId, type);
+            }}
+            className={`flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-slate-100 ${
+              myReactions?.includes(type) ? 'bg-blue-50 ring-1 ring-blue-200' : ''
+            }`}
+            title={label}
+            aria-label={label}
+            aria-pressed={myReactions?.includes(type) || false}
+          >
+            {emoji}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -1168,6 +1167,24 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     );
   }, [teachers, students, staffs]);
 
+  const resolveMessageAvatar = useCallback((msg) => {
+    const senderId = String(msg?.senderId || '');
+    const peerId = String(activeConv?.user?.id || activeConv?.user?._id || '');
+    if (!activeConv?.isGroup && senderId === peerId) {
+      return activeConv.user;
+    }
+    const senderProfile = [contacts, students, teachers, staffs]
+      .flatMap((list) => Array.isArray(list) ? list : [])
+      .find((person) => String(person.id || person._id || '') === senderId);
+    return senderProfile || msg?.sender || {
+      id: senderId,
+      name: msg?.senderName,
+      role: msg?.senderRole,
+      adminRole: msg?.senderAdminRole,
+      avatar: msg?.senderAvatar,
+    };
+  }, [activeConv, contacts, students, teachers, staffs]);
+
   // ─── Load messages khi chọn conversation (tránh loop: không phụ thuộc identity ctxGetMessages) ──
   const activeConvId = activeConv?.id ? String(activeConv.id) : '';
   const activeConvMsgKey = useMemo(() => {
@@ -1446,6 +1463,43 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   }, [toast]);
 
+  const handleCopyImage = useCallback(async (url) => {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      toast.error('Trình duyệt không hỗ trợ sao chép ảnh. Bạn có thể tải ảnh về thiết bị.');
+      return;
+    }
+    const imagePromise = fetch(resolveMediaUrl(url))
+      .then((response) => {
+        if (!response.ok) throw new Error('Không thể tải ảnh để sao chép.');
+        return response.blob();
+      })
+      .then(async (blob) => {
+        if (blob.type === 'image/png') return blob;
+        if (!blob.type.startsWith('image/')) throw new Error('Tệp này không phải ảnh hợp lệ.');
+        const bitmap = await createImageBitmap(blob);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          canvas.getContext('2d').drawImage(bitmap, 0, 0);
+          return await new Promise((resolve, reject) => {
+            canvas.toBlob((pngBlob) => {
+              if (pngBlob) resolve(pngBlob);
+              else reject(new Error('Không thể xử lý ảnh để sao chép.'));
+            }, 'image/png');
+          });
+        } finally {
+          bitmap.close();
+        }
+      });
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': imagePromise })]);
+      toast.success('Đã sao chép ảnh. Bạn có thể dán vào nơi cần dùng.');
+    } catch (error) {
+      toast.error(error?.message || 'Không thể sao chép ảnh. Hãy thử tải ảnh về thiết bị.');
+    }
+  }, [toast]);
+
   // ── Thu hồi tin nhắn ──
   const handleRecall = useCallback(async (msgId) => {
     if (recallingId) return; // Chống double click
@@ -1491,12 +1545,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setMessages(prev => prev.map(m => {
       if (String(m.id) !== String(messageId)) return m;
       const reactions = [...(m.reactions || [])];
-      const idx = reactions.findIndex(r => r.userId === currentUserId && r.type === type);
-      if (idx > -1) {
-        return { ...m, reactions: reactions.filter((_, i) => i !== idx) };
-      } else {
-        return { ...m, reactions: [...reactions, { userId: currentUserId, type, userName: currentUserName }] };
-      }
+      const userReactions = reactions.filter((reaction) => String(reaction.userId) === String(currentUserId));
+      const isSameReaction = userReactions.some((reaction) => reaction.type === type);
+      const otherReactions = reactions.filter((reaction) => String(reaction.userId) !== String(currentUserId));
+      return {
+        ...m,
+        reactions: isSameReaction
+          ? otherReactions
+          : [...otherReactions, { userId: currentUserId, type, userName: currentUserName }],
+      };
     }));
 
     try {
@@ -2962,6 +3019,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     || getMessageDateInfo(nextMessage.time)?.key !== messageDate?.key;
                   const showMessageTimestamp = index === 0 || nextMessageStartsGroup;
                   const role = normalizeRole(msg.senderRole);
+                  const messageAvatar = resolveMessageAvatar(msg);
                   const stickerMessage = !msg.isRecalled ? getChatStickerFromMessage(msg) : null;
                   const isStickerMessage = Boolean(stickerMessage);
                   const badgeLabel = msg.senderDisplayRole
@@ -3046,22 +3104,49 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
                         <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
                           {!isMine && (
-                            <div className="flex items-center gap-2 mb-1 ml-1">
-                              <p className="text-xs text-gray-500 font-semibold">{msg.senderName}</p>
-                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
-                                role === 'staff' ? 'bg-amber-600 text-white' :
-                                  role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-                                }`}>
-                                {badgeLabel}
-                              </span>
+                            <div className="mb-1 ml-1 flex min-w-0 items-center gap-1.5">
+                              <img
+                                src={resolveAvatarUrl({
+                                  ...messageAvatar,
+                                  id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
+                                  name: messageAvatar?.name || msg.senderName,
+                                  role: messageAvatar?.role || role,
+                                  avatar: messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar,
+                                })}
+                                alt=""
+                                aria-hidden="true"
+                                className={`h-9 w-9 shrink-0 rounded-full border-2 border-slate-300 object-cover shadow-sm ${isRealAvatar(messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar) ? 'cms-fm-avatar--photo' : ''}`}
+                                onError={(event) => {
+                                  event.currentTarget.onerror = null;
+                                  event.currentTarget.src = resolveAvatarUrl({
+                                    id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
+                                    name: messageAvatar?.name || msg.senderName,
+                                    role: messageAvatar?.role || role,
+                                    adminRole: messageAvatar?.adminRole || msg.senderAdminRole,
+                                    gender: messageAvatar?.gender || messageAvatar?.genderCode,
+                                    avatar: '',
+                                  });
+                                }}
+                              />
+                              {activeConv?.isGroup && (
+                                <>
+                                  <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
+                                    role === 'staff' ? 'bg-amber-600 text-white' :
+                                      role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                                    }`}>
+                                    {badgeLabel}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           )}
 
                           {/* Bubble + action buttons */}
-                          <div className={`flex items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                          <div className={`flex min-w-0 items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
                             {/* Message bubble */}
-                            <div className={`relative text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${reactionCounts.length > 0 && !msg.isRecalled ? 'mb-4' : ''} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                            <div className={`relative min-w-0 text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
                               {!msg.isRecalled && msg.payload?.replyTo && (
                                 <button
                                   type="button"
@@ -3120,15 +3205,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               ) : msg.messageType === 'file' ? (
                                 <div className="space-y-1.5">
+                                  {(() => {
+                                    const fileType = getChatFileType(msg.fileName, msg.fileUrl);
+                                    return (
                                   <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`cms-inbox-file-link flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10' : 'bg-gray-100'}`}>
-                                    <div className={`p-2 rounded-lg ${isMine ? 'bg-white/20 text-sky-800' : 'bg-red-500 text-white'}`}>
-                                      <Paperclip size={18} />
+                                    <div className={`flex h-10 min-w-10 items-center justify-center rounded-lg px-1.5 text-[10px] font-black tracking-wide shadow-sm ${fileType.badgeClass}`}>
+                                      {fileType.extension}
                                     </div>
                                     <div className="flex flex-col min-w-0">
                                       <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
-                                      <span className="text-[10px] font-medium opacity-50">Tài liệu đính kèm</span>
+                                      <span className="text-[10px] font-medium opacity-60">{fileType.label}</span>
                                     </div>
                                   </a>
+                                    );
+                                  })()}
                                   {attachmentCaption(msg) ? (
                                     <div className="whitespace-pre-wrap break-words px-0.5">
                                       <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
@@ -3141,33 +3231,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 </div>
                               )}
 
-                              {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
-                                <div className={`mt-1 text-left text-[10px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  {formatMessageTime(msg.time)}
-                                </div>
-                              )}
-
-                              {/* Reaction badge */}
-                              {!msg.isRecalled && reactionCounts.length > 0 && (
-                                <div className={`cms-bubble-reactions absolute -bottom-5 ${isMine ? 'right-2' : 'left-2'}`}>
-                                  {reactionCounts.map(({ type, emoji, count }) => (
-                                    <span key={type} className="flex items-center gap-0.5 text-[11px]">
-                                      <span>{emoji}</span>
-                                      {count > 1 && <span className="text-gray-500 font-bold">{count}</span>}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {!msg.isRecalled && (
-                                <ReactionPicker
-                                  msgId={msg.id}
-                                  onReact={handleReaction}
-                                  myReactions={myReactions}
-                                  align={isMine ? 'right' : 'left'}
-                                />
-                              )}
-
                             </div>
 
                             <ChatFlipWrap
@@ -3178,8 +3241,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             >
                               {(placeBelow) => (
                                 <>
-                                  <div className={`flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                                  <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover/msg:opacity-100 sm:group-focus-within/msg:opacity-100">
+                                    {!msg.isRecalled && (
+                                      <ReactionPicker
+                                        msgId={msg.id}
+                                        onReact={handleReaction}
+                                        myReactions={myReactions}
+                                        align={isMine ? 'right' : 'left'}
+                                      />
+                                    )}
                                     <button
+                                      type="button"
                                       onClick={() => startReply(msg)}
                                       className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800"
                                       title="Trả lời tin nhắn"
@@ -3188,9 +3260,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                       <Reply size={14} />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
                                       className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 active:scale-90"
                                       title="Tùy chọn"
+                                      aria-label="Tùy chọn tin nhắn"
                                     >
                                       <MoreHorizontal size={14} />
                                     </button>
@@ -3198,7 +3272,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                   {showMessageOptions === msg.id && (
                                     <div
                                       onClick={(event) => event.stopPropagation()}
-                                      className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'right-0' : 'left-0'}`}
+                                      className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'left-0' : 'right-0'}`}
                                     >
                                       {!msg.isRecalled && (
                                         <button
@@ -3225,17 +3299,32 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                           <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
                                         </button>
                                       )}
-                                      {!msg.isRecalled && (
+                                      {isImageMessage(msg) && (
                                         <button
+                                          type="button"
                                           onClick={() => {
-                                            handleCopyText(msg.content || msg.fileName);
+                                            handleCopyImage(msg.fileUrl);
                                             setShowMessageOptions(null);
                                           }}
                                           className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                         >
-                                          <Copy size={12} /> Copy tin nhắn
+                                          <Copy size={12} /> Sao chép ảnh
                                         </button>
                                       )}
+                                      {!msg.isRecalled &&
+                                        !isImageMessage(msg) &&
+                                        !msg.fileUrl &&
+                                        !['file', 'video'].includes(String(msg.messageType || '').toLowerCase()) && (
+                                          <button
+                                            onClick={() => {
+                                              handleCopyText(msg.content || msg.fileName);
+                                              setShowMessageOptions(null);
+                                            }}
+                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                          >
+                                            <Copy size={12} /> Copy tin nhắn
+                                          </button>
+                                        )}
                                       {isMine && !msg.isRecalled && (() => {
                                         const now = new Date();
                                         const sentAt = new Date(msg.time);
@@ -3272,8 +3361,26 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             </ChatFlipWrap>
                           </div>
 
-                          {/* Time & read status */}
-                          <div className={`flex items-center gap-1.5 mt-1.5 ${isMine ? 'justify-end' : ''}`}>
+                          {!msg.isRecalled && reactionCounts.length > 0 && (
+                            <div className={`mt-1 flex w-full ${isMine ? 'justify-end' : 'justify-start'}`}>
+                              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] shadow-sm">
+                                {reactionCounts.map(({ type, emoji, count }) => (
+                                  <span key={type} className="inline-flex items-center gap-0.5">
+                                    <span>{emoji}</span>
+                                    {count > 1 && <span className="font-bold text-gray-500">{count}</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Message time and delivery status stay in normal flow below the message/actions row. */}
+                          <div className={`mt-1 flex w-full items-center gap-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
+                              <span className={`text-[10px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {formatMessageTime(msg.time)}
+                              </span>
+                            )}
                             {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
                               <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
                                 <Pin size={10} className="rotate-45" />
