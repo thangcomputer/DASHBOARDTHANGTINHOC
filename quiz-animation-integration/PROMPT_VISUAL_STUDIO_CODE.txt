@@ -1,0 +1,32 @@
+Bạn là senior engineer chuyên React/Next.js. Hãy tích hợp bộ animation trắc nghiệm trong thư mục `components/quiz/` vào DỰ ÁN HIỆN TẠI của tôi.
+
+MỤC TIÊU
+- Khi trả lời đúng: hiển thị 10 lời khen luân phiên theo SỐ CÂU TRẢ LỜI ĐÚNG: “Bạn giỏi quá!”, “Quá đỉnh!”, “Quá VIP!”, “Xuất sắc luôn!”, “Siêu trí tuệ!”, “Đỉnh của chóp!”, “Không thể tin nổi!”, “Cao thủ xuất hiện!”, “Bạn quá tuyệt vời!”, “HOÀN HẢO! Bạn là nhà vô địch!”, kèm emoji/icon animation.
+- Khi trả lời sai: hiện lời động viên tích cực, không làm học viên xấu hổ; nếu hệ thống đã có giải thích đáp án thì giữ nguyên và hiển thị đúng cách.
+- Có chuỗi trả lời đúng (streak), reset chuỗi khi trả lời sai.
+- Có âm thanh đúng/sai tùy chọn bật/tắt; không tự phát âm thanh trước tương tác người dùng.
+- Kết thúc bài: hiện tổng điểm, số đúng/sai và chuỗi đúng dài nhất. Nếu đạt điểm tuyệt đối 10/10 thì có pháo giấy/confetti và lời chúc mừng.
+- Hiệu ứng responsive, dễ đọc với người lớn tuổi, hỗ trợ `prefers-reduced-motion`, không làm chậm website.
+
+QUY TẮC BẮT BUỘC
+1. Trước khi sửa, kiểm tra cấu trúc repo, `package.json`, router (App Router hay Pages Router), component trắc nghiệm, định dạng JSON/cấu trúc câu hỏi, loại câu hỏi, cách tính điểm, trạng thái bài làm, API lưu kết quả và CSS/UI hiện có.
+2. Tìm nơi render câu hỏi trắc nghiệm và xác định các loại câu hỏi được hỗ trợ. Giữ nguyên dữ liệu và toàn bộ tính năng hiện hữu.
+3. Không thay toàn bộ trang trắc nghiệm bằng ví dụ mẫu nếu dự án đã có giao diện. Hãy tích hợp phản hồi animation vào luồng chấm điểm hiện tại với thay đổi nhỏ nhất có thể.
+4. Giữ nguyên mọi dạng câu hỏi và cách chấm điểm hiện tại, bao gồm các loại trắc nghiệm khác nhau, thứ tự câu, giải thích, tiến độ, kết quả, điều hướng, dữ liệu JSON và API. Không đổi schema dữ liệu trừ khi thực sự cần; nếu cần, giải thích trước.
+5. Nếu đáp án được kiểm tra qua API/backend, dùng kết quả đã xác nhận của backend. Không tự tạo hoặc đoán trường dữ liệu.
+6. Tận dụng thư viện đã cài. Chỉ cài `canvas-confetti` nếu chưa có thư viện tương đương và việc thêm package phù hợp.
+7. Tránh tạo CSS global có thể ảnh hưởng các trang khác; ưu tiên CSS module hoặc namespace class `quiz-`.
+8. Đảm bảo câu trả lời được ghi nhận đúng một lần, tránh double-click làm cộng điểm hai lần, không phát confetti lặp lại. Lời khen dựa trên số câu trả lời đúng chứ không dựa vào index câu hỏi.
+9. Pháo giấy chỉ xuất hiện khi đã xác nhận hoàn thành bài và đạt điểm tuyệt đối 10/10 (hoặc bài có 10 câu và tất cả đúng). Không kích hoạt trước khi kết quả cuối cùng được chốt. Nếu bài có số câu khác 10, không gọi đó là 10/10; có thể dùng hiệu ứng hoàn hảo tương ứng theo cấu hình hiện hữu.
+10. Không tự ý commit, push, merge, rebase, xóa file hoặc sửa các phần không liên quan. Không làm lộ đáp án đúng nếu kiến trúc hiện tại không gửi đáp án về client.
+11. Đọc và áp dụng các file trong `components/quiz/`, nhưng điều chỉnh cho phù hợp kiến trúc dự án. Nếu component mẫu không khớp model hiện tại, viết adapter thay vì thay đổi dữ liệu gốc.
+12. Không tuyên bố test thành công nếu chưa chạy test.
+
+CÁCH THỰC HIỆN
+- Bước 1: kiểm tra repo và báo ngắn gọn những file liên quan cùng kế hoạch.
+- Bước 2: triển khai tích hợp tối thiểu, giữ thay đổi tập trung.
+- Bước 3: thêm/chỉnh test cho đúng/sai, 10 lời khen, streak reset, câu cuối, hoàn thành 10/10, bật/tắt âm thanh và tránh chấm điểm trùng nếu phù hợp với test framework hiện có.
+- Bước 4: chạy lint, typecheck, test và build theo scripts thực tế trong `package.json`.
+- Bước 5: báo rõ file nào đã sửa, dependency nào thêm, lệnh test và kết quả thật, điểm nào còn chưa kiểm chứng.
+
+Nếu repo có thay đổi chưa commit của tôi, không ghi đè hoặc xóa chúng. Nếu phát hiện điều gì buộc phải thay đổi schema/API hoặc có nguy cơ làm hỏng hành vi hiện tại, dừng trước bước đó và giải thích lựa chọn.
