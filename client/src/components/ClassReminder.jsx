@@ -3,6 +3,7 @@ import { BellRing, Video, Clock, X, Wifi } from 'lucide-react';
 
 const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
   const [minutesLeft, setMinutesLeft] = useState(null);
+  const [classStarted, setClassStarted] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -13,9 +14,10 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
       const now = new Date();
       const classTime = new Date(nextClassTime);
       const diffInMs = classTime - now;
-      const diffInMins = Math.floor(diffInMs / 60000);
+      const diffInMins = Math.ceil(diffInMs / 60000);
 
       setMinutesLeft(diffInMins);
+      setClassStarted(diffInMs <= 0);
 
       // Hiện banner nếu còn ≤30 phút và chưa quá 15 phút
       if (diffInMins <= 30 && diffInMins > -15) {
@@ -34,7 +36,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
   if (!showBanner || dismissed) return null;
 
   const isUrgent = minutesLeft !== null && minutesLeft <= 5;
-  const isLive   = minutesLeft !== null && minutesLeft <= 0;
+  const isLive = classStarted;
 
   return (
     <div className="fixed top-0 left-0 w-full z-[9999]"
@@ -79,7 +81,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
 
           {/* Right */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {linkHoc && (
+            {linkHoc && isLive && (
               <a
                 href={linkHoc}
                 target="_blank"

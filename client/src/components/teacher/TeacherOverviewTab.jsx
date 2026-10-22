@@ -597,7 +597,7 @@ export default function TeacherOverviewTab({
                         {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
                       </p>
                     </div>
-                    {joinUrl ? (
+                    {live && joinUrl ? (
                       <a
                         href={joinUrl}
                         target="_blank"
@@ -612,11 +612,11 @@ export default function TeacherOverviewTab({
                         <ExternalLink size={11} aria-hidden="true" />
                         Vào lớp
                       </a>
-                    ) : (
+                    ) : live ? (
                       <span className={`shrink-0 text-[11px] font-semibold ${live ? 'text-red-100' : 'text-slate-400'}`}>
                         Chưa có link
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );
