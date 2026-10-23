@@ -272,31 +272,6 @@ function CourseModal({
     setImportCourseId('');
   };
 
-  const handleToggleCourseStatus = async (course) => {
-    const nextStatus = course.status === 'published' ? 'draft' : 'published';
-    setUpdatingStatus(course._id);
-    try {
-      const response = await apiFetch(`/courses/${course._id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Không thể cập nhật trạng thái khóa học');
-      }
-      setCourses((previous) => previous.map((item) =>
-        item._id === course._id ? result.data : item,
-      ));
-      toast.success(nextStatus === 'published'
-        ? `Đã kích hoạt "${course.name}"`
-        : `Đã ngưng hoạt động "${course.name}"`);
-    } catch (error) {
-      toast.error(error.message || 'Không thể cập nhật trạng thái khóa học');
-    } finally {
-      setUpdatingStatus(null);
-    }
-  };
-
   const openDeleteSubject = (id, label) => {
     if (typeof removeCustomExamSubject !== 'function') {
       toast.error('Chưa kết nối API xóa môn thi');
@@ -1379,6 +1354,31 @@ export default function CoursePricingTab() {
         }
       }
     });
+  };
+
+  const handleToggleCourseStatus = async (course) => {
+    const nextStatus = course.status === 'published' ? 'draft' : 'published';
+    setUpdatingStatus(course._id);
+    try {
+      const response = await apiFetch(`/courses/${course._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Không thể cập nhật trạng thái khóa học');
+      }
+      setCourses((previous) => previous.map((item) =>
+        item._id === course._id ? result.data : item,
+      ));
+      toast.success(nextStatus === 'published'
+        ? `Đã kích hoạt "${course.name}"`
+        : `Đã ngưng hoạt động "${course.name}"`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể cập nhật trạng thái khóa học');
+    } finally {
+      setUpdatingStatus(null);
+    }
   };
 
   const handleSaved = (updatedCourse) => {
