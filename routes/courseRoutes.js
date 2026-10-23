@@ -81,7 +81,8 @@ router.get('/', courseReadGuard('list'), async (req, res) => {
     };
 
     if (category) filter.category = category;
-    if (status)   filter.status = status;
+    if (status && status !== 'all') filter.status = status;
+    else if (!status) filter.status = 'published';
     if (featured) filter.featured = featured === 'true';
     if (search) {
       const safe = sanitizeRegex(search, 200);
@@ -98,7 +99,7 @@ router.get('/', courseReadGuard('list'), async (req, res) => {
     const courses = search
       ? await loadCourses()
       : await cache.wrap(
-        `courses:list:${category || ''}:${status || ''}:${featured || ''}:${includeDeleted || ''}`,
+        `courses:list:${category || ''}:${status || 'published'}:${featured || ''}:${includeDeleted || ''}`,
         COURSE_TTL,
         loadCourses,
       );

@@ -628,8 +628,8 @@ async function listSubjectsForStudent(studentId) {
     LessonUnit.find({ subjectId: { $in: subjectIds }, isActive: true }).select('subjectId').lean(),
     LessonUnitProgress.find({ studentId, subjectId: { $in: subjectIds }, status: 'completed' }).select('subjectId').lean(),
     Student.findById(studentId).select('course courseId teacherId enrollments').lean(),
-    Course.find({ status: 'published', deletedAt: null })
-      .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects deliveryMode')
+    Course.find({ deletedAt: null })
+      .select('name description thumbnail bannerColorStart bannerColorEnd price discountPrice discountPercent discountStartsAt discountEndsAt totalSessions examSubjects deliveryMode status')
       .sort({ createdAt: -1 })
       .lean(),
   ]);
@@ -708,6 +708,7 @@ async function listSubjectsForStudent(studentId) {
       discountEndsAt: hasDiscount && course.discountEndsAt ? course.discountEndsAt : null,
       totalSessions: course.totalSessions || 0,
       offerType: examSubjectIds.length === 1 ? 'single' : 'bundle',
+      availableForEnrollment: course.status === 'published',
       subjectKeys: [...new Set(examSubjectIds.map(rules.normalizeSubjectKey).filter(Boolean))],
       subjects: courseSubjects,
       lessonCount,
@@ -721,14 +722,16 @@ async function listSubjectsForStudent(studentId) {
       .filter((course) => course.enrolled)
       .flatMap((course) => course.subjectKeys),
   );
-  const visibleCourseCatalog = courseCatalog.map((course) => {
-    const { subjectKeys, ...publicCourse } = course;
-    return {
-      ...publicCourse,
-      hiddenByEnrollment: !course.enrolled
-        && rules.courseSubjectsCovered(subjectKeys, ownedSubjectKeys),
-    };
-  });
+  const visibleCourseCatalog = courseCatalog
+    .filter((course) => course.enrolled || course.availableForEnrollment)
+    .map((course) => {
+      const { subjectKeys, ...publicCourse } = course;
+      return {
+        ...publicCourse,
+        hiddenByEnrollment: !course.enrolled
+          && rules.courseSubjectsCovered(subjectKeys, ownedSubjectKeys),
+      };
+    });
   return { subjects: studentSubjects, courses: visibleCourseCatalog };
 }
 
