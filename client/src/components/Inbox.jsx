@@ -777,10 +777,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const startReply = (msg) => {
     if (!msg || msg.isRecalled) return;
+    const sticker = getChatStickerFromMessage(msg);
     setReplyMessage({
       id: String(msg.id || msg._id || ''),
       senderName: msg.senderName || 'Người dùng',
-      content: String(msg.content || '').slice(0, 500),
+      content: sticker ? `[Sticker: ${sticker.name}]` : String(msg.content || '').slice(0, 500),
       messageType: msg.messageType || 'text',
     });
     setShowMessageOptions(null);
@@ -2586,7 +2587,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
-                {canShowClassroomButton && (
+                {canShowClassroomButton && isClassTime && (
                   joinClassUrl ? (
                     <a
                       href={joinClassUrl}
@@ -2605,8 +2606,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       type="button"
                       disabled
                       className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-400 sm:px-3"
-                      aria-label={isClassTime ? 'Lớp học đang diễn ra nhưng chưa có link' : 'Chưa có link lớp học'}
-                      title={isClassTime ? 'Buổi học đang diễn ra nhưng chưa có link lớp' : 'Chưa có lịch học hoặc link lớp học'}
+                      aria-label="Lớp học đang diễn ra nhưng chưa có link"
+                      title="Buổi học đang diễn ra nhưng chưa có link lớp"
                     >
                       <Video size={16} aria-hidden="true" />
                       <span className="hidden sm:inline">Vào lớp học ngay</span>

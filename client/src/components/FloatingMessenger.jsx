@@ -49,6 +49,7 @@ import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatS
 import { getChatFileType } from '../utils/chatFileType';
 import ScreenCaptureButton from './ScreenCaptureButton';
 import StickerPicker from './StickerPicker';
+import ChatStickerImage from './ChatStickerImage';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -348,9 +349,8 @@ function MessageBubble({
     return (
       <div className="w-fit max-w-[88%]">
         {nameLabel ? <p className={nameLabelClass}>{nameLabel}</p> : null}
-        <div className="cms-chat-sticker-message cms-sticker-label-stack">
-          <img src={sticker.src} alt="" loading="lazy" draggable={false} />
-          <span>{sticker.name}</span>
+        <div className="cms-chat-sticker-message">
+          <ChatStickerImage sticker={sticker} allowFallback className="cms-chat-sticker-image" />
         </div>
         {(timeLabel || mine) ? (
           <p className={`cms-chat-sticker-meta ${mine ? 'text-right' : 'text-left'}`}>
@@ -1096,7 +1096,7 @@ function ChatWindow({
                   onChip={(chip) => onSend(tab, chip.label)}
                   onSchedulePreview={setSchedulePreview}
                 />
-                {!m.isRecalled && m.messageType !== 'system' ? (
+                {!isAiPeer && !m.isRecalled && m.messageType !== 'system' ? (
                   <CopyHoverButton text={m.content} />
                 ) : null}
               </div>

@@ -24,11 +24,9 @@ const {
   getCorrelation,
   newCorrelationId,
 } = require('./messagingObservability');
+const CHAT_STICKER_CATALOG = require('../shared/messaging/chatStickers.json');
 
-const VALID_CHAT_STICKER_IDS = new Set([
-  'hello', 'thanks', 'love', 'ok', 'sad', 'cheer', 'cute', 'haha',
-  'thinking', 'congrats', 'like', 'thank-you', 'sorry', 'wave', 'celebrate',
-]);
+const VALID_CHAT_STICKER_IDS = new Set(CHAT_STICKER_CATALOG.map((sticker) => sticker.id));
 
 const isStaffAccount = (u = {}) =>
   u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';

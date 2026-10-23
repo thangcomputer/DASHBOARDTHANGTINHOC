@@ -1065,6 +1065,9 @@
   .cms-fm-link.is-mine {
     @apply text-white;
   }
+  .cms-bubble-mine .cms-fm-link.is-mine {
+    @apply text-blue-700 hover:text-blue-900;
+  }
   .cms-fm-typing {
     @apply flex items-center gap-2 px-2 py-1.5;
   }
@@ -2226,20 +2229,14 @@ html.cms-app-shell #root {
 }
 .cms-chat-sticker-message {
   display: inline-flex;
-  flex-direction: column;
+  max-width: 100%;
   align-items: center;
-  width: min(128px, 42vw);
-  color: #334155;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  text-align: center;
 }
-.cms-chat-sticker-message img {
+.cms-chat-sticker-image {
   display: block;
-  width: 100%;
-  height: 108px;
+  width: min(160px, 42vw);
+  height: auto;
+  max-height: 160px;
   object-fit: contain;
 }
 .cms-chat-sticker-bubble {
@@ -2262,12 +2259,9 @@ html.cms-app-shell #root {
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 480px) {
-  .cms-chat-sticker-message {
-    width: min(116px, 38vw);
-    font-size: 14px;
-  }
-  .cms-chat-sticker-message img {
-    height: 98px;
+  .cms-chat-sticker-image {
+    width: min(128px, 38vw);
+    max-height: 128px;
   }
 }
 .cms-inbox-classroom-button.is-live {

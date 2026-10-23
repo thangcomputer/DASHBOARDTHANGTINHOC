@@ -53,10 +53,10 @@ const MENU_CONFIG = {
     brand: { label: 'GIẢNG VIÊN', color: 'from-slate-900 to-indigo-950' },
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/teacher' },
-      { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/teacher/feed' },
-      { key: 'schedule', icon: Calendar, label: 'Lịch dạy', path: '/teacher', hash: 'schedule' },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/teacher/inbox' },
+      { key: 'schedule', icon: Calendar, label: 'Lịch dạy', path: '/teacher', hash: 'schedule' },
       { key: 'students', icon: Users, label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
+      { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/teacher/feed' },
       { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', path: '/teacher', hash: 'assignments' },
       { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
       { key: 'finance', icon: DollarSign, label: 'Tài chính', path: '/teacher/finance' },

@@ -369,7 +369,7 @@ export default function StudentOverviewTab({
                       </span>
                     </p>
                   </div>
-                  {hasUpcomingClass && joinUrl ? (
+                  {isLive && joinUrl ? (
                     <a
                       href={joinUrl}
                       target="_blank"
@@ -383,7 +383,7 @@ export default function StudentOverviewTab({
                       <Video size={20} aria-hidden="true" />
                       VÀO LỚP NGAY
                     </a>
-                  ) : hasUpcomingClass ? (
+                  ) : isLive ? (
                     <span className="cms-sd-btn w-full md:w-auto bg-white/20 text-white cursor-default">
                       <Video size={20} aria-hidden="true" />
                       Chưa có link học
