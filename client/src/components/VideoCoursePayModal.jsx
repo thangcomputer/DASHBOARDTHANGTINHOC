@@ -5,7 +5,6 @@ import { generateVietQRUrl } from './BankSelect';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
 import api from '../services/api';
-
 const POLL_MS = 3000;
 const IS_DEV = import.meta.env.DEV;
 

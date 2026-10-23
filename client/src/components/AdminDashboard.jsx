@@ -1,5 +1,4 @@
 import React from 'react';
-import { mutate } from 'swr';
 import { AdminTabProvider } from './admin/AdminTabContext';
 import {
   AdminLazyExternalTab,

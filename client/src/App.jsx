@@ -5,7 +5,7 @@ import { StudentsProvider }                  from './context/StudentsContext';
 import { TeachersProvider }                  from './context/TeachersContext';
 import { ScheduleProvider }                  from './context/ScheduleContext';
 import { FinanceProvider }                   from './context/FinanceContext';
-import { DataProvider, useData }             from './context/DataContext';
+import { DataProvider }                      from './context/DataContext';
 import { ToastProvider }                     from './utils/toast.jsx';
 import ErrorBoundary                         from './components/ErrorBoundary';
 import LoginPage                             from './components/LoginPage';
@@ -42,7 +42,7 @@ const LessonPracticeUnitsPage = lazy(() => import('./components/student/lessonPr
 const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonPractice/LessonPracticePlayerPage'));
 import DashboardLayout                       from './components/DashboardLayout';
 import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
-import api, { clearTokens, getRolePrefix, NetworkOfflineError } from './services/api';
+import api, { clearTokens, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { useIsDesktopExamDevice } from './utils/examDevice';
 import { BranchProvider }                    from './context/BranchContext';
@@ -180,7 +180,7 @@ const PermissionGuard = ({ session, permission, anyOf, superAdminOnly, children,
 };
 
 // ── Student exam wrappers ─────────────────────────────────────────────────────
-function StudentExamWrapper({ session }) {
+function StudentExamWrapper() {
   const nav = useNavigate();
   return (
     <ErrorBoundary inline>
@@ -232,7 +232,7 @@ function StudentTestWrapper({ session }) {
 }
 
 // ── Main Routes ───────────────────────────────────────────────────────────────
-function AppRoutes({ session, onSessionChange, isAuthLoading, onLogin, onLogout }) {
+function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
   const nav = useNavigate();
 
   const go = useCallback((page, data) => {

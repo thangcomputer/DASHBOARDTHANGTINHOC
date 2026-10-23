@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+import fs from 'node:fs';
 let content = fs.readFileSync('client/src/components/AdminDashboard.jsx', 'utf8');
 
 const replacements = [
