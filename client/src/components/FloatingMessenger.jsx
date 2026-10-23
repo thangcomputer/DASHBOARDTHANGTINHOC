@@ -1096,7 +1096,7 @@ function ChatWindow({
                   onChip={(chip) => onSend(tab, chip.label)}
                   onSchedulePreview={setSchedulePreview}
                 />
-                {!m.isRecalled && m.messageType !== 'system' ? (
+                {!isAiPeer && !m.isRecalled && m.messageType !== 'system' ? (
                   <CopyHoverButton text={m.content} />
                 ) : null}
               </div>
