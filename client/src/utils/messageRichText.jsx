@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChatStickerFromMessage, stickerLabelFromToken } from './chatStickers';
+import ChatStickerImage from '../components/ChatStickerImage';
 
 /** Deep-link token embedded in chat text: ⟦chat:student:ID|Display Name⟧ */
 export const CHAT_DEEP_LINK_RE = /⟦chat:(student|teacher|admin|staff):([^|⟧]+)\|([^⟧]+)⟧/g;
@@ -280,9 +281,8 @@ export function MessageRichText({ text, mine = false, highlight = '', payload = 
   const sticker = getChatStickerFromMessage({ content: raw, payload });
   if (sticker) {
     return (
-      <span className="cms-chat-sticker-message cms-sticker-label-stack">
-        <img src={sticker.src} alt="" loading="lazy" draggable={false} />
-        <span>{sticker.name}</span>
+      <span className="cms-chat-sticker-message">
+        <ChatStickerImage sticker={sticker} allowFallback className="cms-chat-sticker-image" />
       </span>
     );
   }

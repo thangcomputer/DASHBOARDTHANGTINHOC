@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Smile } from 'lucide-react';
-import { CHAT_STICKERS } from '../utils/chatStickers';
+import { Search, Smile } from 'lucide-react';
+import { CHAT_STICKERS, matchesChatStickerSearch } from '../utils/chatStickers';
+import ChatStickerImage from './ChatStickerImage';
 
 const EMOJIS = [
   '😀', '😃', '😄', '😁', '😆', '😂', '😊', '😍',
@@ -10,15 +11,30 @@ const EMOJIS = [
   '✅', '📚', '💡', '💕', '💖', '💔', '🙄', '🤗',
   '😴', '😣', '🤧', '😒', '😚', '😳', '🙁', '😤',
 ];
+const STICKER_CATEGORIES = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'greetings', label: 'Chào hỏi' },
+  { id: 'thanks', label: 'Cảm ơn' },
+  { id: 'confirm', label: 'Xác nhận' },
+  { id: 'emotions', label: 'Cảm xúc' },
+  { id: 'study', label: 'Học tập' },
+  { id: 'teacher', label: 'Giáo viên' },
+  { id: 'celebration', label: 'Chúc mừng' },
+  { id: 'work', label: 'Công việc' },
+  ...(CHAT_STICKERS.some((sticker) => sticker.category === 'other')
+    ? [{ id: 'other', label: 'Khác' }]
+    : []),
+];
 const RECENT_STICKERS_KEY = 'thvp_recent_chat_stickers_v1';
-const MAX_RECENT_STICKERS = 10;
+const MAX_RECENT_STICKERS = 16;
 
 function readRecentStickers() {
   if (typeof window === 'undefined') return [];
   try {
     const value = JSON.parse(window.localStorage.getItem(RECENT_STICKERS_KEY) || '[]');
     return Array.isArray(value)
-      ? value.filter((id) => CHAT_STICKERS.some((sticker) => sticker.id === id)).slice(0, MAX_RECENT_STICKERS)
+      ? [...new Set(value.filter((id) => CHAT_STICKERS.some((sticker) => sticker.id === id)))]
+        .slice(0, MAX_RECENT_STICKERS)
       : [];
   } catch {
     return [];
@@ -33,7 +49,10 @@ export default function StickerPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('stickers');
+  const [category, setCategory] = useState('all');
+  const [search, setSearch] = useState('');
   const [recentIds, setRecentIds] = useState(readRecentStickers);
+  const [missingStickerSources, setMissingStickerSources] = useState(() => new Set());
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const pickerRef = useRef(null);
@@ -42,7 +61,27 @@ export default function StickerPicker({
     () => new Map(CHAT_STICKERS.map((sticker) => [sticker.id, sticker])),
     [],
   );
-  const recentStickers = recentIds.map((id) => stickersById.get(id)).filter(Boolean);
+  const hideUnavailableSticker = (stickerSrc) => {
+    setMissingStickerSources((current) => new Set(current).add(stickerSrc));
+  };
+  const recentStickers = recentIds
+    .map((id) => stickersById.get(id))
+    .filter((sticker) => sticker && !missingStickerSources.has(sticker.src));
+  const filteredStickers = useMemo(
+    () => CHAT_STICKERS.filter((sticker) => (
+      !missingStickerSources.has(sticker.src)
+      && (category === 'all' || sticker.category === category)
+      && matchesChatStickerSearch(sticker, search)
+    )),
+    [category, missingStickerSources, search],
+  );
+  const filteredRecentStickers = recentStickers.filter((sticker) => (
+    (category === 'all' || sticker.category === category)
+    && matchesChatStickerSearch(sticker, search)
+  ));
+  const visibleCategories = STICKER_CATEGORIES.slice(1).filter((item) => (
+    category === 'all' || item.id === category
+  ));
 
   useEffect(() => {
     if (!open) return undefined;
@@ -84,7 +123,7 @@ export default function StickerPicker({
   };
 
   const sendSticker = async (sticker) => {
-    if (disabled) return;
+    if (disabled || typeof onSendSticker !== 'function') return;
     const sent = await onSendSticker(sticker);
     if (sent) {
       rememberSticker(sticker.id);
@@ -100,16 +139,17 @@ export default function StickerPicker({
       {open ? (
         <section
           ref={pickerRef}
-          className={`cms-sticker-picker absolute bottom-full right-0 z-[60] mb-3 ${
-            inline ? 'w-[min(368px,calc(100vw-56px))]' : 'w-[min(368px,calc(100vw-24px))]'
+          className={`cms-sticker-picker absolute bottom-full right-0 z-[60] mb-3 flex h-[min(480px,calc(100dvh-100px))] flex-col ${
+            inline ? 'w-[min(392px,calc(100vw-56px))]' : 'w-[min(392px,calc(100vw-24px))]'
           } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.18)] animate-in fade-in slide-in-from-bottom-2 duration-150`}
           role="dialog"
-          aria-label="Bảng chọn sticker và emoji"
+          aria-label="Bảng chọn emoji, sticker và GIF"
         >
-          <div className="grid grid-cols-2 border-b border-slate-100" role="tablist" aria-label="Loại nội dung">
+          <div className="grid shrink-0 grid-cols-3 border-b border-slate-100" role="tablist" aria-label="Loại nội dung">
             {[
-              { id: 'stickers', label: 'STICKER' },
-              { id: 'emoji', label: 'EMOJI' },
+              { id: 'emoji', label: 'Emoji' },
+              { id: 'stickers', label: 'Sticker' },
+              { id: 'gif', label: 'GIF' },
             ].map((item) => (
               <button
                 key={item.id}
@@ -129,18 +169,73 @@ export default function StickerPicker({
           </div>
 
           {tab === 'stickers' ? (
-            <div key={tab} className="max-h-[min(360px,55vh)] overflow-y-auto p-2.5 animate-in fade-in duration-150">
-              {recentStickers.length > 0 ? (
-                <>
-                  <p className="px-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Gần đây</p>
-                  <StickerGrid stickers={recentStickers} disabled={disabled} onSelect={sendSticker} />
-                  <p className="px-1 pb-1.5 pt-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Sticker</p>
-                </>
-              ) : null}
-              <StickerGrid stickers={CHAT_STICKERS} disabled={disabled} onSelect={sendSticker} />
+            <div key={tab} className="min-h-0 flex-1 overflow-y-auto p-2.5 animate-in fade-in duration-150">
+              <label className="relative mb-3 block">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Tìm sticker..."
+                  aria-label="Tìm sticker"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <div className="cms-sticker-categories mb-3 flex w-full min-w-0 flex-nowrap gap-1.5 overflow-x-auto whitespace-nowrap pb-1" aria-label="Danh mục sticker">
+                {STICKER_CATEGORIES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setCategory(item.id)}
+                    aria-pressed={category === item.id}
+                    className={`shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition ${
+                      category === item.id
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {filteredRecentStickers.length > 0 && (
+                <StickerSection
+                  label="Gần đây"
+                  stickers={filteredRecentStickers}
+                  disabled={disabled}
+                  onSelect={sendSticker}
+                  onMissing={hideUnavailableSticker}
+                />
+              )}
+
+              {visibleCategories.map((item) => {
+                const stickers = filteredStickers.filter((sticker) => sticker.category === item.id);
+                if (stickers.length === 0) return null;
+                return (
+                  <StickerSection
+                    key={item.id}
+                    label={item.label}
+                    stickers={stickers}
+                    disabled={disabled}
+                    onSelect={sendSticker}
+                    onMissing={hideUnavailableSticker}
+                  />
+                );
+              })}
+
+              {filteredStickers.length === 0 && (
+                <p className="px-2 py-8 text-center text-sm text-slate-500">
+                  {search.trim()
+                    ? 'Không tìm thấy sticker phù hợp.'
+                    : category === 'all'
+                      ? 'Chưa có sticker.'
+                      : 'Danh mục này chưa có sticker.'}
+                </p>
+              )}
             </div>
-          ) : (
-            <div key={tab} className="grid max-h-[min(300px,50vh)] grid-cols-6 gap-1 overflow-y-auto p-2.5 animate-in fade-in duration-150">
+          ) : tab === 'emoji' ? (
+            <div key={tab} className="grid min-h-0 flex-1 content-start grid-cols-6 gap-1 overflow-y-auto p-2.5 animate-in fade-in duration-150">
               {EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
@@ -155,6 +250,14 @@ export default function StickerPicker({
                 </button>
               ))}
             </div>
+          ) : (
+            <div key={tab} className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-5 py-8 text-center">
+              <span className="rounded-2xl bg-slate-100 p-3 text-2xl" aria-hidden="true">GIF</span>
+              <p className="text-sm font-semibold text-slate-700">Thư viện GIF đang trống</p>
+              <p className="max-w-xs text-xs leading-relaxed text-slate-500">
+                Có thể thêm GIF vào thư mục public/gifs khi bộ ảnh được cung cấp.
+              </p>
+            </div>
           )}
         </section>
       ) : null}
@@ -166,10 +269,10 @@ export default function StickerPicker({
         className={`flex ${inline ? 'h-9 w-9' : 'h-8 w-8'} items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
           open ? 'text-blue-600' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600'
         }`}
-        aria-label={open ? 'Đóng bảng sticker và emoji' : 'Mở bảng sticker và emoji'}
+        aria-label={open ? 'Đóng bảng emoji, sticker và GIF' : 'Mở bảng emoji, sticker và GIF'}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title="Sticker và emoji"
+        title="Emoji, sticker và GIF"
       >
         <Smile size={18} />
       </button>
@@ -177,32 +280,31 @@ export default function StickerPicker({
   );
 }
 
-function StickerGrid({ stickers, disabled, onSelect }) {
+function StickerSection({ label, stickers, disabled, onSelect, onMissing }) {
   return (
-    <div className="grid grid-cols-3 min-[340px]:grid-cols-4 gap-1">
-      {stickers.map((sticker) => (
-        <button
-          key={sticker.id}
-          type="button"
-          data-picker-item="true"
-          disabled={disabled}
-          onClick={() => onSelect(sticker)}
-          className="cms-sticker-label-stack group flex min-h-[6.6rem] flex-col items-center justify-center rounded-xl p-2 transition-colors hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Gửi sticker: ${sticker.name}`}
-          title={sticker.name}
-        >
-          <img
-            src={sticker.src}
-            alt=""
-            loading="lazy"
-            draggable={false}
-            className="h-16 w-full object-contain transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
-          />
-          <span className="w-full truncate text-center text-xs font-semibold leading-5 text-slate-700">
-            {sticker.name}
-          </span>
-        </button>
-      ))}
-    </div>
+    <section className="mb-2 last:mb-0">
+      <h3 className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</h3>
+      <div className="grid grid-cols-3 gap-2 min-[420px]:grid-cols-4">
+        {stickers.map((sticker) => (
+          <button
+            key={sticker.id}
+            type="button"
+            data-picker-item="true"
+            disabled={disabled}
+            onClick={() => onSelect(sticker)}
+            className="group flex aspect-square min-w-0 items-center justify-center rounded-xl p-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={`Gửi sticker: ${sticker.name}`}
+            title={sticker.name}
+          >
+            <ChatStickerImage
+              sticker={sticker}
+              decorative
+              onMissing={onMissing}
+              className="h-20 w-20 max-w-full object-contain transition-transform duration-150 group-hover:scale-105 group-active:scale-95"
+            />
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

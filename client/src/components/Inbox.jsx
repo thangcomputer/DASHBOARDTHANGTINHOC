@@ -777,10 +777,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const startReply = (msg) => {
     if (!msg || msg.isRecalled) return;
+    const sticker = getChatStickerFromMessage(msg);
     setReplyMessage({
       id: String(msg.id || msg._id || ''),
       senderName: msg.senderName || 'Người dùng',
-      content: String(msg.content || '').slice(0, 500),
+      content: sticker ? `[Sticker: ${sticker.name}]` : String(msg.content || '').slice(0, 500),
       messageType: msg.messageType || 'text',
     });
     setShowMessageOptions(null);
