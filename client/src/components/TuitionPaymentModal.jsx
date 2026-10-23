@@ -10,9 +10,10 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Loader2, CheckCircle2, QrCode, RefreshCw, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
 import { generateVietQRUrl } from './BankSelect';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
+import TransferPaymentHeader from './shared/TransferPaymentHeader';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
@@ -173,28 +174,10 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
       className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <TransferPaymentHeader title="Thanh toán học phí" onClose={onClose} />
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-5 text-white relative">
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"
-          >
-            <X size={16} strokeWidth={2.5} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <QrCode size={20} />
-            </div>
-            <div>
-              <h3 className="font-black text-lg leading-tight">Đóng học phí</h3>
-              <p className="text-blue-100 text-xs">{student?.name}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 space-y-4">
+        <div className="space-y-3 p-3">
           {/* Paid success state */}
           {paid && (
             <div className="text-center py-6 space-y-3 animate-in fade-in zoom-in-95">
@@ -236,7 +219,7 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
               />
 
               {/* Polling indicator */}
-              <div className="flex items-center justify-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-xl py-2.5">
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-100 bg-slate-50 py-2.5 text-xs text-slate-500">
                 <RefreshCw size={12} className={polling ? 'animate-spin text-blue-400' : ''} />
                 {polling
                   ? `Đang tự động kiểm tra... (${seconds}s)`
