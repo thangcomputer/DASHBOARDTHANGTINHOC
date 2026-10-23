@@ -1191,6 +1191,10 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       const mapped = rawScoped.map((line) => {
         const signed = Number(line.signedAmount != null ? line.signedAmount : (line.type === 'refund' ? -line.amount : line.amount)) || 0;
         const isRefund = line.type === 'refund' || signed < 0;
+        const isSePayCoursePurchase = line.source === 'sepay_session'
+          && (line.metadata?.purchaseType === 'lesson_practice_course'
+            || line.metadata?.paymentType === 'admin_enrollment');
+        const paymentRef = String(line.metadata?.ref || '').trim();
 
         let code;
         if (isRefund) {
@@ -1203,10 +1207,12 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
           }) || `HOÀN-${String(rCounter).padStart(4, '0')}`;
         } else {
           hdCounter += 1;
-          code = resolveInvoiceDisplayCode({
-            maHoaDon: line.maHoaDon,
-            sourceRef: line.sourceRef,
-          }) || `HĐ-${String(hdCounter).padStart(4, '0')}`;
+          code = (isSePayCoursePurchase && paymentRef
+            ? `DH-${paymentRef.toUpperCase()}`
+            : resolveInvoiceDisplayCode({
+              maHoaDon: line.maHoaDon,
+              sourceRef: line.sourceRef,
+            })) || `HĐ-${String(hdCounter).padStart(4, '0')}`;
         }
 
         return {
@@ -1214,13 +1220,17 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
           maHoaDon: code,
           createdAt: line.postedAt || line.createdAt,
           khoaHoc: line.courseName || '—',
-          ghiChu: line.note || (isRefund ? 'Hoàn học phí' : 'Thanh toán'),
+          ghiChu: isSePayCoursePurchase
+            ? 'Thanh toán khóa học qua SePay'
+            : (line.note || (isRefund ? 'Hoàn học phí' : 'Thanh toán')),
           hocPhi: signed,
           isRefund,
           synthetic: false,
           ledgerType: line.type,
           enrollmentId: line.enrollmentId ? String(line.enrollmentId) : '',
-          paymentMethod: line.metadata?.paymentMethod || line.paymentMethod || data?.student?.paymentMethod || 'transfer',
+          paymentMethod: String(line.source || '').startsWith('sepay')
+            ? 'transfer'
+            : (line.metadata?.paymentMethod || line.paymentMethod || 'transfer'),
         };
       });
 

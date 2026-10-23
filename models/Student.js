@@ -92,6 +92,7 @@ const StudentSchema = new mongoose.Schema(
       examUnlocked: { type: Boolean, default: false },
       /** Lưu ý Admin gửi GV khi đăng ký khóa — hiện banner trên hồ sơ HV */
       teacherAlert: { type: String, default: '', maxlength: 500 },
+      paymentSessionId: { type: String, default: '' },
       /** Đã xem pháo hoa hoàn thành khóa. false = vừa hoàn thành chưa xem. thiếu field = đã cũ, không hiện. */
       courseCelebrationSeen: { type: Boolean },
       // Soft-cancel enrollment

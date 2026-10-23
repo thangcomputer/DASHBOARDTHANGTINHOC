@@ -137,12 +137,13 @@ async function fulfillCoursePurchase({ session, amount }) {
     sourceRef: session.sessionId,
     idempotencyKey: `payment:sepay:course-purchase:${session.sessionId}`,
     actor: { id: 'sepay', role: 'system' },
-    note: `Thanh toán mua khóa học · ${session.ref}`,
+    note: 'Thanh toán khóa học qua SePay',
     metadata: {
       sessionId: session.sessionId,
       ref: session.ref,
       studentName: session.studentName || student.name || '',
       purchaseType: 'lesson_practice_course',
+      paymentMethod: 'transfer',
     },
     reqMeta: { ip: '', userAgent: 'sepay-webhook', branchId: session.branchId || student.branchId || null },
   });
