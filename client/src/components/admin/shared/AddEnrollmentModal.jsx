@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { generateVietQRUrl } from '../../BankSelect';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
+import TransferPaymentHeader from '../../shared/TransferPaymentHeader';
 import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
@@ -372,7 +373,6 @@ export default function AddEnrollmentModal({
 
   if (step === 'qr') {
     const expired = timeLeft === 0;
-    const isUrgent = timeLeft < 60;
     return (
       <>
         <div className="fixed inset-0 z-[130000] bg-slate-950/70 backdrop-blur-sm" onClick={handleClosePayment} aria-hidden="true" />
@@ -383,24 +383,8 @@ export default function AddEnrollmentModal({
           className="fixed inset-0 z-[130001] flex items-center justify-center p-2 sm:p-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex max-h-[90dvh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.4)]">
-            <div className="relative flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-rose-600 via-fuchsia-700 to-indigo-600 px-3 py-2.5 text-white">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/20">
-                <CreditCard size={17} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-black tracking-tight">Thanh toán mua khóa học</h3>
-                <p className="text-[10px] font-semibold text-white/85">VietQR · Thanh toán nhanh, tự động xác nhận</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClosePayment}
-                aria-label="Đóng"
-                className="rounded-xl p-1.5 text-white/90 transition hover:bg-white/15 hover:text-white"
-              >
-                <X size={20} />
-              </button>
-            </div>
+          <div className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.4)]">
+            <TransferPaymentHeader title="Thanh toán mua khóa học" onClose={handleClosePayment} />
 
             <div className="overflow-y-auto p-3 sm:p-4">
                 {expired ? (
@@ -424,18 +408,9 @@ export default function AddEnrollmentModal({
 
               {!expired && (
                 <>
-                  <div className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2 ${isUrgent ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-rose-100 bg-gradient-to-r from-rose-50 to-red-50 text-red-600'}`}>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/80">
-                      <Clock3 size={20} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold">Thời gian chờ thanh toán</p>
-                      <p className="font-mono text-xl font-black leading-tight tabular-nums">{formatTime(timeLeft)}</p>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-slate-500">
-                      <Loader2 size={14} className="animate-spin text-blue-500" />
-                      Tự động kiểm tra
-                    </div>
+                  <div className="mt-2 flex items-center justify-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+                    <Loader2 size={14} className="animate-spin text-indigo-500" />
+                    Đang tự động kiểm tra thanh toán... ({formatTime(timeLeft)})
                   </div>
 
                 </>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CmsSelect from './ui/CmsSelect';
 import {
-  CreditCard, User, Phone, BookOpen, GraduationCap, CheckCircle,
+  User, Phone, BookOpen, GraduationCap, CheckCircle,
   Printer, Download, Camera, LayoutDashboard, ArrowLeft, Loader2, AlertCircle,
   Clock, RefreshCw, XCircle
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import InvoicePreviewFrame from './InvoicePreviewFrame';
 import exportPDF, { printInvoice, captureAndSendZalo } from '../utils/exportPDF';
 import { generateVietQRUrl } from './BankSelect';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
+import TransferPaymentHeader from './shared/TransferPaymentHeader';
 import { useModal } from '../utils/Modal.jsx';
 import { useToast } from '../utils/toast.jsx';
 import { isValidVNPhone } from '../utils/validators';
@@ -661,9 +662,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   {!expired && <Countdown seconds={timeLeft} total={TOTAL} />}
                 </div>
 
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
-                  <CreditCard size={28} /> THANH TOÁN HỌC PHÍ
-                </h2>
+                <TransferPaymentHeader title="Thanh toán học phí" />
 
                 <TransferPaymentDetails
                   courseName={formData.course}
@@ -682,7 +681,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                     <CheckCircle size={18} /> Đã xác nhận thanh toán! Đang chuyển...
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-xl py-3">
+                  <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-100 bg-slate-50 py-2.5 text-xs text-slate-500">
                     <RefreshCw size={12} className="animate-spin text-blue-400" />
                     Đang tự động kiểm tra thanh toán... ({pollSeconds}s)
                   </div>

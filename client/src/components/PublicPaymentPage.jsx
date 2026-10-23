@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react';
 import { generateVietQRUrl } from './BankSelect';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
+import TransferPaymentHeader from './shared/TransferPaymentHeader';
 
 const PublicPaymentPage = () => {
   const { sessionId } = useParams();
@@ -160,22 +161,10 @@ const PublicPaymentPage = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-md bg-white rounded-[48px] shadow-[0_20px_70px_rgba(0,0,0,0.08)] overflow-hidden relative border border-white">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white bg-white shadow-2xl">
+        <TransferPaymentHeader title="Thanh toán học phí" />
 
-        {/* Header Decor */}
-        <div className="bg-gradient-to-br from-red-600 via-red-600 to-rose-700 px-8 py-10 text-white text-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-10 -mb-10 blur-xl" />
-
-          <div className="relative z-10 flex flex-col items-center gap-3">
-            <div className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-1">
-              Trung Tâm Thắng Tin Học
-            </div>
-            <h1 className="text-2xl font-black tracking-tight leading-tight">Thanh Toán Học Phí</h1>
-          </div>
-        </div>
-
-        <div className="space-y-4 p-4 sm:p-5">
+        <div className="space-y-3 p-3">
           <TransferPaymentDetails
             courseName={session?.courseName || session?.studentName || 'Học phí'}
             amount={session?.amount || 0}
@@ -186,33 +175,17 @@ const PublicPaymentPage = () => {
             error="Chưa cấu hình tài khoản ngân hàng trung tâm."
           />
 
-          <div>
-            {/* Countdown & Progress */}
-            <div className="w-full space-y-2">
-              <div className="flex justify-between items-end px-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Thời gian còn lại</span>
-                </div>
-                <span className={`text-xl font-mono font-black ${timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>
-                  {formatTime(timeLeft)}
-                </span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-50">
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ${timeLeft < 60 ? 'bg-gradient-to-r from-red-500 to-rose-600' : 'bg-gradient-to-r from-emerald-500 to-teal-600'}`}
-                  style={{ width: `${(timeLeft / 900) * 100}%` }}
-                />
-              </div>
-            </div>
+          <div className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs ${timeLeft < 60 ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-slate-100 bg-slate-50 text-slate-500'}`}>
+            <span className="font-semibold">Thời gian chờ thanh toán</span>
+            <span className="font-mono text-base font-black tabular-nums">{formatTime(timeLeft)}</span>
           </div>
 
         </div>
 
         {/* Polling Label Floating */}
-        <div className="bg-slate-900 py-3 text-center flex items-center justify-center gap-3">
-          <Loader2 size={14} className="animate-spin text-emerald-400" />
-          <span className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">Đang kiểm tra giao dịch tự động...</span>
+        <div className="flex items-center justify-center gap-2 border-t border-slate-100 bg-slate-50 py-2.5 text-xs font-medium text-slate-500">
+          <Loader2 size={14} className="animate-spin text-indigo-500" />
+          <span>Đang tự động kiểm tra thanh toán...</span>
         </div>
       </div>
     </div>

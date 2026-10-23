@@ -10,6 +10,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { apiFetch, getAccessToken } from '../../../services/api';
 import { generateVietQRUrl } from '../../BankSelect';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
+import TransferPaymentHeader from '../../shared/TransferPaymentHeader';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
@@ -481,7 +482,6 @@ export default function AddStudentModal({
   // ── STEP: QR payment ─────────────────────────────────────────────────────
   if (step === 'qr') {
     const expired = timeLeft === 0;
-    const pct     = (timeLeft / TOTAL_PAYMENT_SECS) * 100;
     const isUrgent = timeLeft < 60;
 
     return (
@@ -491,17 +491,10 @@ export default function AddStudentModal({
           role="dialog"
           aria-modal="true"
           aria-label="Quét QR thanh toán"
-          className="fixed left-1/2 top-1/2 z-[130001] flex max-h-[94dvh] w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+          className="fixed left-1/2 top-1/2 z-[130001] flex max-h-[94dvh] w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-3 bg-gradient-to-r from-red-600 via-rose-600 to-orange-500 px-5 py-4 text-white">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15">
-              <CreditCard size={22} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-bold leading-tight">Thanh toán học phí</h3>
-              <p className="mt-1 truncate text-xs text-white/80">{form.name} · {form.course}</p>
-            </div>
+          <TransferPaymentHeader title="Thanh toán học phí" onClose={onClose}>
             {sessionId && (
               <button
                 type="button"
@@ -512,22 +505,14 @@ export default function AddStudentModal({
                 }}
                 aria-label="Sao chép link thanh toán"
                 title="Sao chép link thanh toán"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 hover:bg-white/25"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 hover:bg-white/25"
               >
                 <Share2 size={16} />
               </button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Đóng"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 hover:bg-white/25"
-            >
-              <X size={19} />
-            </button>
-          </div>
+          </TransferPaymentHeader>
 
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+          <div className="flex-1 space-y-3 overflow-y-auto p-3">
             {expired ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
                 <Clock3 className="mx-auto mb-3 text-amber-600" size={32} />
@@ -536,7 +521,7 @@ export default function AddStudentModal({
               </div>
             ) : (
               <>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <TransferPaymentDetails
                     courseName={form.course || 'Khóa học'}
                     amount={form.price}
@@ -547,31 +532,32 @@ export default function AddStudentModal({
                     loading={bankLoading || (!sessionId && !paymentSetupError)}
                     error={paymentSetupError || 'Chưa cấu hình tài khoản ngân hàng trung tâm.'}
                   />
-                  <div className="mt-4 flex items-center gap-2 border-t border-slate-200 pt-3 text-xs">
-                    <Clock3 size={14} className={isUrgent ? 'text-red-500' : 'text-slate-400'} />
-                    <span className={isUrgent ? 'font-semibold text-red-600' : 'text-slate-500'}>Thời gian giữ phiên</span>
-                    <span className={`ml-auto font-mono font-bold ${isUrgent ? 'text-red-600' : 'text-slate-700'}`}>
-                      {formatTime(timeLeft)}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                    <div className={`h-full rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+                  <div className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 ${isUrgent ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-slate-100 bg-slate-50 text-slate-500'}`}>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/80">
+                      <Clock3 size={17} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold">Thời gian chờ thanh toán</p>
+                      <p className="font-mono text-lg font-black leading-tight tabular-nums">{formatTime(timeLeft)}</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+                      <Loader2 size={13} className="animate-spin text-blue-500" />
+                      Tự động kiểm tra
+                    </div>
                   </div>
                 </div>
 
-                <div className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium ${pollError ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
-                  {pollError
-                    ? <AlertCircle size={14} className="text-amber-600" />
-                    : <Loader2 size={14} className="animate-spin text-emerald-600" />}
-                  {pollError
-                    ? 'Không kiểm tra được trạng thái. Hệ thống sẽ tự thử lại.'
-                    : 'Đang chờ xác nhận thanh toán tự động'}
-                </div>
+                {pollError && (
+                  <div className="flex items-center justify-center gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-medium text-amber-800">
+                    <AlertCircle size={14} className="text-amber-600" />
+                    Không kiểm tra được trạng thái. Hệ thống sẽ tự thử lại.
+                  </div>
+                )}
               </>
             )}
           </div>
 
-          <div className="border-t border-slate-100 bg-white p-4">
+          <div className="border-t border-slate-100 bg-white p-3">
             {expired ? (
               <button type="button" onClick={() => { setStep('form'); }} className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700">
                 Quay lại

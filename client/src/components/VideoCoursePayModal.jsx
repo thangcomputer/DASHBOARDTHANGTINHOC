@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, RefreshCw, Video } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { generateVietQRUrl } from './BankSelect';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
+import TransferPaymentHeader from './shared/TransferPaymentHeader';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
 import api from '../services/api';
@@ -158,26 +159,10 @@ export default function VideoCoursePayModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[140000] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200/80">
-        <div className="relative px-4 py-3.5 bg-gradient-to-r from-red-600 via-rose-600 to-indigo-700 text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.15),transparent_55%)] pointer-events-none" aria-hidden="true" />
-          <div className="relative flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                <Video size={18} aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-black text-sm tracking-tight">{paymentTitle}</h3>
-                <p className="text-[10px] text-white/80 font-medium">VietQR · Tự động xác nhận</p>
-              </div>
-            </div>
-            <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/15 text-white/90 shrink-0" aria-label="Đóng">
-              <X size={18} />
-            </button>
-          </div>
-        </div>
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl">
+        <TransferPaymentHeader title={paymentTitle} onClose={onClose} />
 
-        <div className="p-5">
+        <div className="space-y-2.5 p-3">
           {loadingBank ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
               <Loader2 className="animate-spin" size={28} />
@@ -197,7 +182,7 @@ export default function VideoCoursePayModal({
           )}
 
           {qrUrl && !loadingBank ? (
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl py-2.5 px-3">
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
               <RefreshCw size={12} className={polling ? 'animate-spin text-indigo-500 shrink-0' : 'shrink-0'} />
               {polling
                 ? `Đang tự động kiểm tra thanh toán… (${seconds}s)`
