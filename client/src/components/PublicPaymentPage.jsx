@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { CheckCircle2, Clock, Loader2, XCircle, CreditCard, Landmark, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react';
+import { generateVietQRUrl } from './BankSelect';
+import TransferPaymentDetails from './shared/TransferPaymentDetails';
 
 const PublicPaymentPage = () => {
   const { sessionId } = useParams();
@@ -68,7 +70,9 @@ const PublicPaymentPage = () => {
           clearInterval(pollRef.current);
           setStatus('expired');
         }
-      } catch { }
+      } catch (error) {
+        console.error('[PublicPaymentPage] Payment status polling failed:', error);
+      }
     }, 3000);
 
     return () => {
@@ -145,7 +149,13 @@ const PublicPaymentPage = () => {
   }
 
   const qrUrl = bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber && session
-    ? `https://img.vietqr.io/image/${bankInfo.centerBankCode}-${bankInfo.centerBankAccountNumber}-compact2.png?amount=${session.amount}&addInfo=${encodeURIComponent(session.ref)}&accountName=${encodeURIComponent(bankInfo.centerBankAccountName || '')}`
+    ? generateVietQRUrl(
+      bankInfo.centerBankCode,
+      bankInfo.centerBankAccountNumber,
+      session.amount,
+      session.ref,
+      bankInfo.centerBankAccountName || '',
+    )
     : null;
 
   return (
@@ -162,39 +172,23 @@ const PublicPaymentPage = () => {
               Trung Tâm Thắng Tin Học
             </div>
             <h1 className="text-2xl font-black tracking-tight leading-tight">Thanh Toán Học Phí</h1>
-            <p className="text-white/80 text-xs font-bold uppercase tracking-widest">{session?.studentName} — {session?.courseName?.slice(0, 30)}</p>
           </div>
         </div>
 
-        <div className="p-8 space-y-8">
-          {/* Amount Card */}
-          <div className="bg-red-50/50 border-2 border-red-100 rounded-[32px] p-6 text-center shadow-inner">
-            <p className="text-xs text-red-400 font-black uppercase tracking-widest mb-1">Số tiền cần thanh toán</p>
-            <p className="text-4xl font-black text-red-600">{(session?.amount || 0).toLocaleString('vi-VN')}<span className="text-2xl ml-1">đ</span></p>
-          </div>
+        <div className="space-y-4 p-4 sm:p-5">
+          <TransferPaymentDetails
+            courseName={session?.courseName || session?.studentName || 'Học phí'}
+            amount={session?.amount || 0}
+            qrUrl={qrUrl}
+            bankName={bankInfo?.centerBankName || bankInfo?.centerBankCode}
+            accountNumber={bankInfo?.centerBankAccountNumber}
+            accountName={bankInfo?.centerBankAccountName}
+            error="Chưa cấu hình tài khoản ngân hàng trung tâm."
+          />
 
-          {/* QR Code Section */}
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-emerald-500 rounded-[40px] blur-2xl opacity-10 group-hover:opacity-20 transition-opacity" />
-              <div className="relative bg-white border-4 border-emerald-500/20 p-4 rounded-[40px] shadow-2xl">
-                {qrUrl ? (
-                  <img src={qrUrl} alt="VietQR" className="w-56 h-56 object-contain rounded-3xl" />
-                ) : (
-                  <div className="w-56 h-56 flex items-center justify-center text-slate-300">
-                    <Loader2 size={32} className="animate-spin" />
-                  </div>
-                )}
-
-                {/* Logo Overlays */}
-                <div className="absolute -top-3 -right-3 w-12 h-12 bg-white rounded-2xl shadow-lg flex items-center justify-center p-2 border border-slate-50">
-                  <img src="https://img.vietqr.io/image/logo-vietqr.png" alt="VietQR Logo" className="object-contain" />
-                </div>
-              </div>
-            </div>
-
+          <div>
             {/* Countdown & Progress */}
-            <div className="w-full space-y-3">
+            <div className="w-full space-y-2">
               <div className="flex justify-between items-end px-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -204,7 +198,7 @@ const PublicPaymentPage = () => {
                   {formatTime(timeLeft)}
                 </span>
               </div>
-              <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-50">
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-50">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ${timeLeft < 60 ? 'bg-gradient-to-r from-red-500 to-rose-600' : 'bg-gradient-to-r from-emerald-500 to-teal-600'}`}
                   style={{ width: `${(timeLeft / 900) * 100}%` }}
@@ -213,51 +207,6 @@ const PublicPaymentPage = () => {
             </div>
           </div>
 
-          {/* Info Rows */}
-          <div className="space-y-3 pt-4">
-            <div className="bg-slate-50 rounded-3xl p-4 flex items-center justify-between border border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-600">
-                  <Landmark size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tài khoản nhận</p>
-                  <p className="text-sm font-black text-slate-700">{bankInfo?.centerBankAccountNumber}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ngân hàng</p>
-                <p className="text-sm font-black text-slate-700 uppercase">{bankInfo?.centerBankCode}</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 rounded-3xl p-4 flex items-center justify-between border border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-2xl shadow-sm flex items-center justify-center text-emerald-600">
-                  <CreditCard size={20} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Nội dung chuyển khoản</p>
-                  <p className="text-sm font-mono font-black text-slate-700">{session?.ref}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(session?.ref || '');
-                  window.cmsAlert('Đã copy nội dung chuyển khoản!', 'success');
-                }}
-                className="p-2 bg-white rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-slate-100"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Footer Security Note */}
-          <div className="flex items-center justify-center gap-2 pt-4 opacity-50">
-            <ShieldCheck size={14} className="text-emerald-600" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hệ thống thanh toán bảo mật 256-bit</span>
-          </div>
         </div>
 
         {/* Polling Label Floating */}

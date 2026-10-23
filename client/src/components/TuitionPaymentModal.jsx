@@ -10,8 +10,9 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Loader2, CheckCircle2, QrCode, Copy, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, Loader2, CheckCircle2, QrCode, RefreshCw, AlertCircle } from 'lucide-react';
 import { generateVietQRUrl } from './BankSelect';
+import TransferPaymentDetails from './shared/TransferPaymentDetails';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
@@ -147,15 +148,6 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
       )
     : null;
 
-  const handleCopyDesc = () => {
-    if (!description) {
-      toast.error('Chưa có mã học viên từ server');
-      return;
-    }
-    navigator.clipboard.writeText(description);
-    toast.success('Đã copy nội dung chuyển khoản!');
-  };
-
   if (!studentCode) {
     return (
       <div
@@ -234,51 +226,14 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
           {/* QR + Info */}
           {!paid && !loadingBank && centerBank && (
             <>
-              {/* Số tiền */}
-              <div className="text-center">
-                <p className="text-3xl font-black text-blue-700">
-                  {amount.toLocaleString('vi-VN')}₫
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">Học phí khóa <strong>{courseName}</strong></p>
-              </div>
-
-              {/* QR */}
-              {qrUrl ? (
-                <div className="flex justify-center">
-                  <div className="p-2 bg-white border-2 border-blue-100 rounded-2xl shadow-sm">
-                    <img src={qrUrl} alt="QR học phí" className="w-48 h-48 object-contain" />
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-gray-400 text-sm py-4">Không tạo được mã QR</div>
-              )}
-
-              {/* Thông tin CK */}
-              <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Ngân hàng</span>
-                  <span className="font-bold">{centerBank.bankName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Số tài khoản</span>
-                  <span className="font-mono font-bold tracking-wider">{centerBank.accountNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Chủ tài khoản</span>
-                  <span className="font-bold uppercase">{centerBank.accountName}</span>
-                </div>
-                <div className="flex justify-between items-center pt-1 border-t border-gray-200">
-                  <span className="text-gray-500">Nội dung CK</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg">
-                      {description}
-                    </span>
-                    <button onClick={handleCopyDesc} className="text-gray-400 hover:text-blue-600 transition">
-                      <Copy size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <TransferPaymentDetails
+                courseName={courseName}
+                amount={amount}
+                qrUrl={qrUrl}
+                bankName={centerBank.bankName || centerBank.bankCode}
+                accountNumber={centerBank.accountNumber}
+                accountName={centerBank.accountName}
+              />
 
               {/* Polling indicator */}
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-xl py-2.5">
@@ -289,9 +244,6 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
                 }
               </div>
 
-              <p className="text-[11px] text-center text-gray-400 leading-relaxed">
-                💡 Sau khi chuyển khoản, hệ thống sẽ <strong>tự động xác nhận</strong> và cập nhật trạng thái học phí của bạn.
-              </p>
             </>
           )}
         </div>

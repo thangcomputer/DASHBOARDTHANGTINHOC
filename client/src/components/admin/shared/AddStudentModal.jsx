@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import {
   X, CheckCircle2, CreditCard, AlertCircle, MapPin, Loader2,
-  Plus, Share2, UserPlus,
+  Plus, Share2, UserPlus, Clock3,
 } from 'lucide-react';
 import { useToast } from '../../../utils/toast.jsx';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
 import { apiFetch, getAccessToken } from '../../../services/api';
+import { generateVietQRUrl } from '../../BankSelect';
+import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
@@ -19,9 +21,9 @@ function readPortalAccessToken() {
     || (() => {
       try {
         for (const key of ['admin_user', 'staff_user']) {
-          const u = JSON.parse(localStorage.getItem(key) || 'null');
-          const t = u?.token || u?.accessToken;
-          if (t) return t;
+          const user = JSON.parse(localStorage.getItem(key) || 'null');
+          const token = user?.token || user?.accessToken;
+          if (token) return token;
         }
       } catch { /* ignore */ }
       return '';
@@ -37,7 +39,7 @@ export default function AddStudentModal({
   onAdd, onClose, teachers, examSubjectsCatalog, isSubmitting,
 }) {
   const toast    = useToast();
-  const API      = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+  const API      = import.meta.env.VITE_API_URL || '';
   const TOTAL_PAYMENT_SECS = 900; // 15 phút
 
   const {
@@ -49,14 +51,19 @@ export default function AddStudentModal({
   const [step, setStep] = useState('form');
   const [submitting, setSubmitting] = useState(false);
   const [loadedBranches, setLoadedBranches] = useState(null);
-  const [branchesLoading, setBranchesLoading] = useState(false);
   const [branchesError, setBranchesError] = useState('');
-  const branches = loadedBranches?.length
-    ? loadedBranches
-    : (contextBranches?.length ? contextBranches : loadedBranches || []);
+  const branches = useMemo(
+    () => loadedBranches?.length
+      ? loadedBranches
+      : (contextBranches?.length ? contextBranches : loadedBranches || []),
+    [loadedBranches, contextBranches],
+  );
+  const branchesLoading = loadedBranches === null && !contextBranches?.length && !branchesError;
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [dbCourses, setDbCourses] = useState([]);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [paymentSetupError, setPaymentSetupError] = useState('');
   const [form, setForm] = useState({
     name: '', age: '', phone: '', zalo: '', gender: 'male',
     courseId: '', course: '', price: 0, totalSessions: 12,
@@ -81,8 +88,6 @@ export default function AddStudentModal({
 
   useEffect(() => {
     let cancelled = false;
-    setBranchesLoading(true);
-    setBranchesError('');
     apiFetch('/branches')
       .then(async (response) => {
         const result = await response.json();
@@ -90,6 +95,7 @@ export default function AddStudentModal({
           throw new Error(result?.message || 'Không tải được danh sách chi nhánh');
         }
         if (!cancelled) {
+          setBranchesError('');
           setLoadedBranches(Array.isArray(result.data) ? result.data : []);
         }
       })
@@ -97,9 +103,6 @@ export default function AddStudentModal({
         if (!cancelled) {
           setBranchesError(error.message || 'Không tải được danh sách chi nhánh');
         }
-      })
-      .finally(() => {
-        if (!cancelled) setBranchesLoading(false);
       });
     return () => { cancelled = true; };
   }, [selectedTenantId]);
@@ -216,9 +219,10 @@ export default function AddStudentModal({
   const [pollStatus, setPollStatus] = useState('pending'); // 'pending' | 'paid'
   const [sessionId, setSessionId]   = useState(null);
   const [reservedStudentCode, setReservedStudentCode] = useState('');
-  const [codeReady, setCodeReady] = useState(false);
+  const [pollError, setPollError] = useState(false);
   const pollRef                     = React.useRef(null);
   const timerRef                    = React.useRef(null);
+  const paidProcessedRef            = React.useRef(false);
 
   const ckContent = useMemo(() => {
     if (!reservedStudentCode) return '';
@@ -230,15 +234,22 @@ export default function AddStudentModal({
   useEffect(() => {
     if (step !== 'qr') return;
     let cancelled = false;
-    setTimeLeft(TOTAL_PAYMENT_SECS);
-    setPollStatus('pending');
-    setCodeReady(false);
-    setReservedStudentCode('');
 
     fetch(`${API}/api/settings/bank`)
       .then(r => r.json())
-      .then(res => { if (!cancelled && res.success) setBankInfo(res.data); })
-      .catch(() => {});
+      .then(res => {
+        if (!res.success) throw new Error(res.message || 'Không tải được thông tin ngân hàng');
+        if (!cancelled) setBankInfo(res.data);
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setBankInfo(null);
+          toast.error(error.message || 'Không tải được thông tin ngân hàng');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBankLoading(false);
+      });
 
     const token = readPortalAccessToken();
     const selectedBranch = branches.find(
@@ -248,7 +259,7 @@ export default function AddStudentModal({
 
     (async () => {
       try {
-        const codeRes = await fetch(`${API}/api/students/reserve-code`, {
+        const codeRes = await apiFetch('/students/reserve-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           credentials: 'include',
@@ -256,15 +267,16 @@ export default function AddStudentModal({
         }).then((r) => r.json());
         if (cancelled) return;
         const code = codeRes?.data?.studentCode || codeRes?.studentCode;
-        if (!code) {
-          toast.error(codeRes?.message || 'Không cấp được mã học viên từ server');
+        if (!codeRes.success || !code) {
+          const message = codeRes?.message || 'Không cấp được mã học viên từ server';
+          setPaymentSetupError(message);
+          toast.error(message);
           return;
         }
         setReservedStudentCode(code);
-        setCodeReady(true);
         const namePart = form.name.replace(/\s+/g, '').slice(0, 8) || 'HV';
         const content = `${namePart} ${code} Nop hoc phi`.trim();
-        const sess = await fetch(`${API}/api/webhooks/create-session`, {
+        const sess = await apiFetch('/webhooks/create-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           credentials: 'include',
@@ -277,10 +289,18 @@ export default function AddStudentModal({
           }),
         }).then((r) => r.json());
         if (cancelled) return;
-        if (sess.sessionId) setSessionId(sess.sessionId);
-        else if (sess.message) toast.error(sess.message || 'Không tạo được phiên QR thanh toán');
-      } catch {
-        if (!cancelled) toast.error('Không tạo được phiên QR — thử "Lưu chưa thanh toán" hoặc tích tiền mặt');
+        if (sess.success && sess.sessionId) setSessionId(sess.sessionId);
+        else {
+          const message = sess.message || 'Không tạo được phiên QR thanh toán';
+          setPaymentSetupError(message);
+          toast.error(message);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = error?.message || 'Không tạo được phiên QR thanh toán';
+          setPaymentSetupError(message);
+          toast.error(message);
+        }
       }
     })();
 
@@ -303,7 +323,8 @@ export default function AddStudentModal({
     if (step !== 'qr' || pollStatus === 'paid' || !socket) return;
     
     const handlePaid = (data) => {
-      if (data.sessionId === sessionId || (data.content && data.content.toLowerCase().includes(ckContent.toLowerCase()))) {
+      if (sessionId && data.sessionId === sessionId && !paidProcessedRef.current) {
+        paidProcessedRef.current = true;
         clearInterval(pollRef.current);
         clearInterval(timerRef.current);
         setPollStatus('paid');
@@ -334,10 +355,13 @@ export default function AddStudentModal({
     if (step !== 'qr' || pollStatus === 'paid') return;
     const sid = sessionId;
     pollRef.current = setInterval(async () => {
-      if (!sid && !ckContent) return;
+      if (!sid || paidProcessedRef.current) return;
       try {
-        const r = await fetch(`${API}/api/webhooks/payment-status?sessionId=${sid || ''}&content=${encodeURIComponent(ckContent)}`).then(x => x.json());
-        if (r.paid || r.status === 'paid') {
+        const response = await apiFetch(`/webhooks/payment-status?sessionId=${encodeURIComponent(sid)}`);
+        const result = await response.json();
+        setPollError(!response.ok);
+        if (response.ok && (result.paid || result.status === 'paid') && !paidProcessedRef.current) {
+          paidProcessedRef.current = true;
           clearInterval(pollRef.current);
           clearInterval(timerRef.current);
           setPollStatus('paid');
@@ -356,7 +380,9 @@ export default function AddStudentModal({
               .catch((err) => toast.error(err?.message || 'Lỗi thêm học viên sau thanh toán'));
           }, 2500);
         }
-      } catch {}
+      } catch {
+        setPollError(true);
+      }
     }, 3000);
     return () => clearInterval(pollRef.current);
   }, [step, sessionId, pollStatus, ckContent, reservedStudentCode]);
@@ -371,6 +397,7 @@ export default function AddStudentModal({
   });
 
   const submitStudent = async (paid) => {
+    if (submitting || isSubmitting) return false;
     if (!form.name.trim() || !form.phone.trim()) {
       toast.error('Vui lòng nhập họ tên và số điện thoại!');
       return false;
@@ -399,6 +426,15 @@ export default function AddStudentModal({
       await submitStudent(true);
       return;
     }
+    setTimeLeft(TOTAL_PAYMENT_SECS);
+    setPollStatus('pending');
+    setPollError(false);
+    setBankInfo(null);
+    setBankLoading(true);
+    setPaymentSetupError('');
+    setReservedStudentCode('');
+    setSessionId(null);
+    paidProcessedRef.current = false;
     setStep('qr');
   };
 
@@ -407,8 +443,14 @@ export default function AddStudentModal({
   };
 
   const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-  const qrUrl = bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber
-    ? `https://img.vietqr.io/image/${bankInfo.centerBankCode}-${bankInfo.centerBankAccountNumber}-compact2.png?amount=${form.price}&addInfo=${encodeURIComponent(ckContent)}&accountName=${encodeURIComponent(bankInfo.centerBankAccountName || '')}`
+  const qrUrl = sessionId && bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber
+    ? generateVietQRUrl(
+      bankInfo.centerBankCode,
+      bankInfo.centerBankAccountNumber,
+      form.price,
+      ckContent,
+      bankInfo.centerBankAccountName || '',
+    )
     : null;
 
   // ── STEP: success ─────────────────────────────────────────────────────────
@@ -444,108 +486,98 @@ export default function AddStudentModal({
 
     return (
       <>
-        <div className="cms-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+        <div className="fixed inset-0 z-[130000] bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Quét QR thanh toán"
-          className="cms-sheet w-full"
+          className="fixed left-1/2 top-1/2 z-[130001] flex max-h-[94dvh] w-[calc(100%-1.5rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
-          <div className="cms-sheet-header">
-            {sessionId ? (
+          <div className="flex items-center gap-3 bg-gradient-to-r from-red-600 via-rose-600 to-orange-500 px-5 py-4 text-white">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15">
+              <CreditCard size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg font-bold leading-tight">Thanh toán học phí</h3>
+              <p className="mt-1 truncate text-xs text-white/80">{form.name} · {form.course}</p>
+            </div>
+            {sessionId && (
               <button
                 type="button"
                 onClick={() => {
-                  const shareUrl = `${window.location.origin}/pay/${sessionId}`;
-                  navigator.clipboard.writeText(shareUrl);
-                  toast.success('Đã copy link thanh toán! Bạn có thể gửi qua Zalo/Facebook cho học viên.');
+                  navigator.clipboard.writeText(`${window.location.origin}/pay/${sessionId}`)
+                    .then(() => toast.success('Đã sao chép link thanh toán'))
+                    .catch(() => toast.error('Không thể sao chép link thanh toán'));
                 }}
-                aria-label="Chia sẻ link thanh toán"
-                title="Chia sẻ link thanh toán"
-                className="cms-sheet-header__side bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                aria-label="Sao chép link thanh toán"
+                title="Sao chép link thanh toán"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 hover:bg-white/25"
               >
                 <Share2 size={16} />
               </button>
-            ) : (
-              <span className="cms-sheet-header__side bg-red-50 text-red-600" aria-hidden="true">
-                <CreditCard size={18} />
-              </span>
             )}
-            <div className="min-w-0">
-              <h3 className="cms-sheet-header__title">Quét QR thanh toán</h3>
-              <p className="text-center text-[11px] text-slate-500 truncate mt-0.5">
-                {form.name} — {form.course?.slice(0, 28)}
-              </p>
-            </div>
             <button
               type="button"
               onClick={onClose}
               aria-label="Đóng"
-              className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/15 hover:bg-white/25"
             >
-              <X size={18} />
+              <X size={19} />
             </button>
           </div>
 
-          <div className="cms-sheet-body space-y-4">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
             {expired ? (
-              <div className="cms-empty">
-                <div className="cms-empty__icon text-2xl" aria-hidden="true">⏰</div>
-                <p className="cms-empty__title text-red-600">Phiên thanh toán hết hạn</p>
-                <p className="cms-empty__desc">Vui lòng thử lại</p>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+                <Clock3 className="mx-auto mb-3 text-amber-600" size={32} />
+                <p className="font-bold text-amber-800">Phiên thanh toán đã hết hạn</p>
+                <p className="mt-1 text-sm text-amber-700">Quay lại và tạo phiên QR mới để tiếp tục.</p>
               </div>
             ) : (
               <>
-                <div>
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className={isUrgent ? 'text-red-500 animate-pulse' : 'text-slate-500'}>Còn lại</span>
-                    <span className={`font-mono font-bold ${isUrgent ? 'text-red-500' : 'text-slate-700'}`}>{formatTime(timeLeft)}</span>
+                <div className="space-y-3">
+                  <TransferPaymentDetails
+                    courseName={form.course || 'Khóa học'}
+                    amount={form.price}
+                    qrUrl={qrUrl}
+                    bankName={bankInfo?.centerBankName || bankInfo?.centerBankCode}
+                    accountNumber={bankInfo?.centerBankAccountNumber}
+                    accountName={bankInfo?.centerBankAccountName}
+                    loading={bankLoading || (!sessionId && !paymentSetupError)}
+                    error={paymentSetupError || 'Chưa cấu hình tài khoản ngân hàng trung tâm.'}
+                  />
+                  <div className="mt-4 flex items-center gap-2 border-t border-slate-200 pt-3 text-xs">
+                    <Clock3 size={14} className={isUrgent ? 'text-red-500' : 'text-slate-400'} />
+                    <span className={isUrgent ? 'font-semibold text-red-600' : 'text-slate-500'}>Thời gian giữ phiên</span>
+                    <span className={`ml-auto font-mono font-bold ${isUrgent ? 'text-red-600' : 'text-slate-700'}`}>
+                      {formatTime(timeLeft)}
+                    </span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                     <div className={`h-full rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-center">
-                  <p className="text-xs text-slate-500 font-medium">Số tiền cần thanh toán</p>
-                  <p className="text-2xl font-bold text-red-600 mt-1">{form.price.toLocaleString('vi-VN')}đ</p>
-                </div>
-
-                {qrUrl ? (
-                  <div className="flex justify-center">
-                    <div className="border-2 border-emerald-300 rounded-2xl p-2 shadow-sm">
-                      <img src={qrUrl} alt="VietQR" className="w-44 h-44 object-contain rounded-xl" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="cms-empty py-8">
-                    <Loader2 size={22} className="animate-spin text-slate-400" />
-                    <p className="cms-empty__desc">Đang tải mã QR...</p>
-                  </div>
-                )}
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
-                  <p className="text-xs text-slate-400 mb-0.5">Nội dung chuyển khoản</p>
-                  <p className="font-mono font-semibold text-slate-800 text-sm">{ckContent}</p>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
-                  <Loader2 size={12} className="animate-spin text-emerald-500" />
-                  Đang kiểm tra thanh toán tự động mỗi 3 giây...
+                <div className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-medium ${pollError ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
+                  {pollError
+                    ? <AlertCircle size={14} className="text-amber-600" />
+                    : <Loader2 size={14} className="animate-spin text-emerald-600" />}
+                  {pollError
+                    ? 'Không kiểm tra được trạng thái. Hệ thống sẽ tự thử lại.'
+                    : 'Đang chờ xác nhận thanh toán tự động'}
                 </div>
               </>
             )}
           </div>
 
-          <div className="cms-sheet-footer">
+          <div className="border-t border-slate-100 bg-white p-4">
             {expired ? (
-              <button type="button" onClick={() => { setStep('form'); }} className="cms-btn cms-btn-primary">
+              <button type="button" onClick={() => { setStep('form'); }} className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700">
                 Quay lại
               </button>
             ) : (
-              <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">
+              <button type="button" onClick={onClose} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50">
                 Đóng (thanh toán sau)
               </button>
             )}

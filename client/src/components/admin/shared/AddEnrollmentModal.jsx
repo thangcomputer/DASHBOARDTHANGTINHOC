@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import {
   X, BookOpen, Loader2, CheckCircle2, CreditCard, DollarSign,
-  Clock3, Copy, GraduationCap, ChevronRight,
+  Clock3,
 } from 'lucide-react';
+import { generateVietQRUrl } from '../../BankSelect';
+import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
 import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
@@ -55,6 +57,8 @@ export default function AddEnrollmentModal({
   );
 
   const [bankInfo, setBankInfo] = useState(null);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [paymentSetupError, setPaymentSetupError] = useState('');
   const [timeLeft, setTimeLeft] = useState(TOTAL_PAYMENT_SECS);
   const [pollStatus, setPollStatus] = useState('pending');
   const [sessionId, setSessionId] = useState(null);
@@ -128,11 +132,23 @@ export default function AddEnrollmentModal({
   // QR: bank + session + countdown
   useEffect(() => {
     if (step !== 'qr') return;
+    let cancelled = false;
 
     fetch(`${API}/api/settings/bank`)
       .then((r) => r.json())
-      .then((res) => { if (res.success) setBankInfo(res.data); })
-      .catch(() => {});
+      .then((res) => {
+        if (!res.success) throw new Error(res.message || 'Không tải được thông tin ngân hàng');
+        if (!cancelled) setBankInfo(res.data);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBankInfo(null);
+          toast.error(error.message || 'Không tải được thông tin ngân hàng');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBankLoading(false);
+      });
 
     const token = (() => {
       try { return JSON.parse(localStorage.getItem('admin_user') || '{}').token || ''; }
@@ -161,10 +177,17 @@ export default function AddEnrollmentModal({
           if (!res.success || !res.sessionId || !res.ref) {
             throw new Error(res.message || 'Không thể tạo phiên thanh toán');
           }
-          setSessionId(res.sessionId);
-          setSessionRef(res.ref);
+          if (!cancelled) {
+            setSessionId(res.sessionId);
+            setSessionRef(res.ref);
+          }
         })
-        .catch((error) => toast.error(error.message || 'Không thể tạo phiên thanh toán'));
+        .catch((error) => {
+          if (!cancelled) {
+            setPaymentSetupError(error.message || 'Không thể tạo phiên thanh toán');
+            toast.error(error.message || 'Không thể tạo phiên thanh toán');
+          }
+        });
 
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
@@ -174,6 +197,7 @@ export default function AddEnrollmentModal({
     }, 1000);
 
     return () => {
+      cancelled = true;
       clearInterval(timerRef.current);
       clearInterval(pollRef.current);
     };
@@ -242,6 +266,9 @@ export default function AddEnrollmentModal({
     }
     setTimeLeft(TOTAL_PAYMENT_SECS);
     setPollStatus('pending');
+    setBankInfo(null);
+    setBankLoading(true);
+    setPaymentSetupError('');
     setSessionId(null);
     setSessionRef('');
     submittedRef.current = false;
@@ -317,7 +344,13 @@ export default function AddEnrollmentModal({
 
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const qrUrl = bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber && sessionRef
-    ? `https://img.vietqr.io/image/${bankInfo.centerBankCode}-${bankInfo.centerBankAccountNumber}-compact2.png?amount=${Number(form.price) || 0}&addInfo=${encodeURIComponent(sessionRef)}&accountName=${encodeURIComponent(bankInfo.centerBankAccountName || '')}`
+    ? generateVietQRUrl(
+      bankInfo.centerBankCode,
+      bankInfo.centerBankAccountNumber,
+      Number(form.price) || 0,
+      sessionRef,
+      bankInfo.centerBankAccountName || '',
+    )
     : null;
 
   if (step === 'success') {
@@ -340,15 +373,6 @@ export default function AddEnrollmentModal({
   if (step === 'qr') {
     const expired = timeLeft === 0;
     const isUrgent = timeLeft < 60;
-    const copyPaymentRef = async () => {
-      try {
-        await navigator.clipboard.writeText(sessionRef);
-        toast.success('Đã sao chép nội dung chuyển khoản');
-      } catch {
-        toast.error('Không sao chép được nội dung chuyển khoản');
-      }
-    };
-
     return (
       <>
         <div className="fixed inset-0 z-[130000] bg-slate-950/70 backdrop-blur-sm" onClick={handleClosePayment} aria-hidden="true" />
@@ -356,116 +380,57 @@ export default function AddEnrollmentModal({
           role="dialog"
           aria-modal="true"
           aria-label="Thanh toán mua khóa học"
-          className="fixed inset-0 z-[130001] flex items-center justify-center p-2 sm:p-5"
+          className="fixed inset-0 z-[130001] flex items-center justify-center p-2 sm:p-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex max-h-[96dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.4)]">
-            <div className="relative flex shrink-0 items-center gap-3 bg-gradient-to-r from-rose-600 via-fuchsia-700 to-indigo-600 px-5 py-4 text-white sm:px-7">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 shadow-inner shadow-white/10">
-                <CreditCard size={24} />
+          <div className="flex max-h-[90dvh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.4)]">
+            <div className="relative flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-rose-600 via-fuchsia-700 to-indigo-600 px-3 py-2.5 text-white">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                <CreditCard size={17} />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-black tracking-tight sm:text-xl">Thanh toán mua khóa học</h3>
-                <p className="mt-0.5 text-xs font-medium text-white/80 sm:text-sm">VietQR · Thanh toán nhanh, tự động xác nhận</p>
+                <h3 className="text-sm font-black tracking-tight">Thanh toán mua khóa học</h3>
+                <p className="text-[10px] font-semibold text-white/85">VietQR · Thanh toán nhanh, tự động xác nhận</p>
               </div>
               <button
                 type="button"
                 onClick={handleClosePayment}
                 aria-label="Đóng"
-                className="rounded-xl p-2 text-white/90 transition hover:bg-white/15 hover:text-white"
+                className="rounded-xl p-1.5 text-white/90 transition hover:bg-white/15 hover:text-white"
               >
-                <X size={23} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="overflow-y-auto p-4 sm:p-6">
-              <div className="relative mb-4 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-slate-50 to-indigo-50/70 p-4 sm:p-5">
-                <div className="absolute right-4 top-1/2 flex h-16 w-16 -translate-y-1/2 items-center justify-center rounded-full bg-rose-100 text-rose-600 sm:right-6 sm:h-20 sm:w-20">
-                  <GraduationCap size={37} strokeWidth={2.3} />
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Khóa học</p>
-                <p className="mt-1 max-w-[78%] text-base font-black leading-snug text-slate-900 sm:text-lg">{form.courseName}</p>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Số tiền thanh toán</p>
-                <p className="mt-0.5 text-3xl font-black leading-none tracking-tight text-red-600 tabular-nums sm:text-4xl">
-                  {Number(form.price || 0).toLocaleString('vi-VN')}đ
-                </p>
-              </div>
-
-              {expired ? (
-                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-8 text-center">
+            <div className="overflow-y-auto p-3 sm:p-4">
+                {expired ? (
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-8 text-center">
                   <Clock3 className="mx-auto text-rose-500" size={34} />
                   <p className="mt-2 text-lg font-black text-rose-700">Phiên thanh toán đã hết hạn</p>
                   <p className="mt-1 text-sm text-slate-600">Tạo phiên mới để tiếp tục thanh toán an toàn.</p>
                 </div>
               ) : (
-                <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgba(37,99,235,0.08)] sm:p-5">
-                  <div className="mb-2 text-center text-3xl font-black tracking-tight">
-                    <span className="text-rose-600">Viet</span><span className="text-blue-800">QR</span>
-                  </div>
-
-                  {qrUrl ? (
-                    <div className="flex flex-col items-center">
-                      <div className="rounded-xl border-2 border-blue-500 bg-white p-1 shadow-sm">
-                        <img src={qrUrl} alt="Mã VietQR thanh toán" className="h-48 w-48 object-contain sm:h-52 sm:w-52" />
-                      </div>
-                      <div className="mt-3 flex items-center justify-center gap-3 text-sm font-extrabold">
-                        <span className="italic text-blue-800">napas<span className="text-emerald-500">247</span></span>
-                        <span className="h-5 border-l border-slate-300" />
-                        <span className="text-lg text-blue-700">{bankInfo?.centerBankName || bankInfo?.centerBankCode || 'Ngân hàng'}</span>
-                      </div>
-                      {bankInfo?.centerBankAccountName && (
-                        <p className="mt-2 max-w-full text-center text-xs font-black uppercase leading-relaxed text-slate-800 sm:text-sm">
-                          {bankInfo.centerBankAccountName}
-                        </p>
-                      )}
-                      {bankInfo?.centerBankAccountNumber && (
-                        <p className="mt-1 font-mono text-xs font-semibold text-slate-500">
-                          STK: {bankInfo.centerBankAccountNumber}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-center">
-                      {bankInfo ? (
-                        <>
-                          <Loader2 size={28} className="animate-spin text-blue-500" />
-                          <p className="text-sm font-medium text-slate-500">
-                            {sessionRef ? 'Đang tải mã QR thanh toán...' : 'Đang tạo mã thanh toán riêng...'}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="max-w-sm rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                          Chưa cấu hình tài khoản ngân hàng trung tâm. Vui lòng kiểm tra mục Cài đặt thanh toán.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-4 border-t border-slate-100 pt-3 text-center">
-                    <p className="text-sm leading-relaxed text-slate-600">Mở ứng dụng ngân hàng hoặc MoMo để quét mã QR thanh toán.</p>
-                    <p className="text-sm font-bold text-blue-600">Hệ thống sẽ tự động xác nhận sau vài giây.</p>
-                  </div>
-
-                  {sessionRef && (
-                    <div className="mt-3 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                      <span className="min-w-0 flex-1 text-center font-mono text-sm font-bold text-blue-900">{sessionRef}</span>
-                      <button type="button" onClick={copyPaymentRef} aria-label="Sao chép nội dung chuyển khoản" className="rounded-lg p-2 text-blue-700 transition hover:bg-white">
-                        <Copy size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <TransferPaymentDetails
+                  courseName={form.courseName}
+                  amount={form.price}
+                  qrUrl={qrUrl}
+                  bankName={bankInfo?.centerBankName || bankInfo?.centerBankCode}
+                  accountNumber={bankInfo?.centerBankAccountNumber}
+                  accountName={bankInfo?.centerBankAccountName}
+                  loading={bankLoading || (!sessionRef && !paymentSetupError)}
+                  error={paymentSetupError || 'Chưa cấu hình tài khoản ngân hàng trung tâm. Vui lòng kiểm tra mục Cài đặt thanh toán.'}
+                />
               )}
 
               {!expired && (
                 <>
-                  <div className={`mt-3 flex items-center gap-3 rounded-2xl border px-4 py-3 ${isUrgent ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-rose-100 bg-gradient-to-r from-rose-50 to-red-50 text-red-600'}`}>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/80">
-                      <Clock3 size={26} />
+                  <div className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2 ${isUrgent ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-rose-100 bg-gradient-to-r from-rose-50 to-red-50 text-red-600'}`}>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/80">
+                      <Clock3 size={20} />
                     </div>
                     <div>
                       <p className="text-xs font-bold">Thời gian chờ thanh toán</p>
-                      <p className="font-mono text-2xl font-black leading-tight tabular-nums">{formatTime(timeLeft)}</p>
+                      <p className="font-mono text-xl font-black leading-tight tabular-nums">{formatTime(timeLeft)}</p>
                     </div>
                     <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-slate-500">
                       <Loader2 size={14} className="animate-spin text-blue-500" />
@@ -473,27 +438,11 @@ export default function AddEnrollmentModal({
                     </div>
                   </div>
 
-                  <div className="mt-3 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-sky-50 px-4 py-3">
-                    <p className="mb-3 text-sm font-black text-slate-800">Hướng dẫn thanh toán</p>
-                    <div className="grid grid-cols-1 gap-3 text-xs text-slate-600 sm:grid-cols-3 sm:gap-2">
-                      {[
-                        'Mở app ngân hàng hoặc MoMo',
-                        'Quét mã QR ở trên',
-                        <>Thanh toán đúng số tiền <strong className="text-red-600">{Number(form.price || 0).toLocaleString('vi-VN')}đ</strong></>,
-                      ].map((instruction, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white shadow-sm">{index + 1}</span>
-                          <span className="leading-snug">{instruction}</span>
-                          {index < 2 && <ChevronRight size={16} className="ml-auto hidden shrink-0 text-blue-500 sm:block" />}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </>
               )}
             </div>
 
-            <div className="flex shrink-0 flex-col gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:px-6">
+            <div className="flex shrink-0 flex-col gap-2 border-t border-slate-100 bg-white px-3 py-2 sm:flex-row sm:justify-end sm:px-4">
               {expired ? (
                 <button type="button" onClick={handleBackToForm} className="cms-btn cms-btn-primary w-full sm:w-auto">
                   Tạo phiên mới

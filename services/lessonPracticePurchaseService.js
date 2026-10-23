@@ -46,10 +46,10 @@ function studentHasCourse(student, course) {
   });
 }
 
-function makePurchaseRef(studentCode, courseId) {
-  const studentPart = String(studentCode || 'hv').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toLowerCase() || 'hv';
-  const coursePart = String(courseId || '').replace(/[^a-zA-Z0-9]/g, '').slice(-5).toLowerCase() || 'c';
-  return `lp${studentPart}${coursePart}${crypto.randomBytes(3).toString('hex')}`.slice(0, 25);
+function makePurchaseRef(studentCode) {
+  const studentPart = String(studentCode || 'HV').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'HV';
+  const suffix = String(crypto.randomInt(10000, 100000));
+  return `${studentPart} KHOA TAP ${suffix}`;
 }
 
 async function checkoutCourse({ user, courseId }) {
@@ -94,7 +94,7 @@ async function checkoutCourse({ user, courseId }) {
   }
 
   const sessionId = `ps_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-  const ref = makePurchaseRef(student.studentCode, course._id);
+  const ref = makePurchaseRef(student.studentCode);
   await PaymentSession.create({
     sessionId,
     ref,

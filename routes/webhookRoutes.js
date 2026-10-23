@@ -82,10 +82,12 @@ const handleCreateSession = async (req, res) => {
     const sessionKind = String(kind || 'tuition');
     let resolvedBranchId = branchId || null;
     let resolvedBranchCode = branchCode || '';
-    const finalRef = sessionKind === 'admin_enrollment'
-      ? `adm${crypto.randomBytes(5).toString('hex')}`
+    let finalRef = sessionKind === 'admin_enrollment'
+      ? ''
       : String(ref || content || '').toLowerCase().trim();
-    if (!finalRef) return res.status(400).json({ success: false, message: 'Thiếu nội dung chuyển khoản (ref/content)' });
+    if (sessionKind !== 'admin_enrollment' && !finalRef) {
+      return res.status(400).json({ success: false, message: 'Thiếu nội dung chuyển khoản (ref/content)' });
+    }
     if (sessionKind === 'admin_enrollment' && (!studentId || !courseId || !(Number(amount) > 0))) {
       return res.status(400).json({ success: false, message: 'Thiếu thông tin học viên, khóa học hoặc học phí' });
     }
@@ -104,11 +106,26 @@ const handleCreateSession = async (req, res) => {
       const Course = require('../models/Course');
       const Teacher = require('../models/Teacher');
       const [student, course] = await Promise.all([
-        Student.findById(studentId).select('enrollments branchId branchCode').lean(),
+        Student.findById(studentId).select('studentCode enrollments branchId branchCode').lean(),
         Course.findById(courseId).select('name').lean(),
       ]);
       if (!student || !course) {
         return res.status(404).json({ success: false, message: 'Không tìm thấy học viên hoặc khóa học' });
+      }
+      const readableStudentCode = String(student.studentCode || `HV${String(student._id).slice(-6)}`)
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase();
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const suffix = String(crypto.randomInt(10000, 100000));
+        const candidate = `${readableStudentCode} HOC PHI ${suffix}`;
+        const existing = await PaymentSession.exists({ ref: candidate, status: 'pending' });
+        if (!existing) {
+          finalRef = candidate;
+          break;
+        }
+      }
+      if (!finalRef) {
+        throw new Error('Không tạo được nội dung chuyển khoản duy nhất');
       }
       if (
         req.userBranchId

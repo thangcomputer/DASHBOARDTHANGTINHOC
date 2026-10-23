@@ -8,11 +8,10 @@ const logger = require('../config/logger');
 const NotificationService = require('./NotificationService');
 const { coursePriceOf, studentOwnsVideoCourse } = require('../utils/videoCourseAccess');
 
-function makeRef(studentCode, courseId) {
-  const code = String(studentCode || 'hv').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toLowerCase() || 'hv';
-  const cid = String(courseId || '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toLowerCase() || 'c';
-  const rnd = crypto.randomBytes(2).toString('hex');
-  return `vc${code}${cid}${rnd}`.slice(0, 25).toLowerCase();
+function makeRef(studentCode) {
+  const code = String(studentCode || 'HV').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'HV';
+  const suffix = String(crypto.randomInt(10000, 100000));
+  return `${code} VIDEO ${suffix}`;
 }
 
 async function checkoutVideoCourse({ user, course }) {
@@ -51,7 +50,7 @@ async function checkoutVideoCourse({ user, course }) {
     }
   }
 
-  const ref = makeRef(student?.studentCode, courseId);
+  const ref = makeRef(student?.studentCode);
 
   const purchase = await VideoCoursePurchase.create({
     studentId,
