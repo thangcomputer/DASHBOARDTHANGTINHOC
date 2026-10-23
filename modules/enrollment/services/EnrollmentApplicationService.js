@@ -359,7 +359,13 @@ class EnrollmentApplicationService {
 
     // Cho phép hủy cả khóa active cuối cùng — HV vẫn giữ hồ sơ (dòng danh sách mờ)
 
-    const cancelReason = String(data.body?.cancelReason || '').trim() || 'Admin hủy khóa';
+    const actorRole = String(data.currentUser?.role || '').toLowerCase();
+    const submittedCancelReason = String(data.body?.cancelReason || '').trim();
+    const cancelReason = actorRole === 'teacher'
+      ? (submittedCancelReason && !/^admin hủy khóa$/i.test(submittedCancelReason)
+        ? submittedCancelReason
+        : 'Giảng viên hủy khóa')
+      : (submittedCancelReason || 'Admin hủy khóa');
     const courseName = enr.courseName;
     const wasPaid = enr.paid === true;
     const paidAmt = Number(enr.price || 0);

@@ -3200,7 +3200,13 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
 
     // Cho phép hủy cả khóa active cuối cùng — HV vẫn giữ hồ sơ (dòng danh sách mờ)
 
-    const cancelReason = String(req.body?.cancelReason || '').trim() || 'Admin hủy khóa';
+    const actorRole = String(req.user?.role || '').toLowerCase();
+    const submittedCancelReason = String(req.body?.cancelReason || '').trim();
+    const cancelReason = actorRole === 'teacher'
+      ? (submittedCancelReason && !/^admin hủy khóa$/i.test(submittedCancelReason)
+        ? submittedCancelReason
+        : 'Giảng viên hủy khóa')
+      : (submittedCancelReason || 'Admin hủy khóa');
     const courseName = enr.courseName;
     const wasPaid = enr.paid === true;
     const paidAmt = Number(enr.price || 0);
@@ -3313,9 +3319,9 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
         {
           $set: {
             status: 'cancelled',
-            note: cancelReason
-              ? `Hủy khóa: ${cancelReason}`
-              : 'Hủy khóa / hoàn học phí — ca chưa học',
+            note: actorRole === 'teacher'
+              ? `Giảng viên hủy lịch${cancelReason === 'Giảng viên hủy khóa' ? '' : `: ${cancelReason}`}`
+              : `Hủy khóa: ${cancelReason}`,
           },
         },
       );
