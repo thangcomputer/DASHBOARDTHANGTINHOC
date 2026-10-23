@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import {
-  X, BookOpen, Loader2, CheckCircle2, CreditCard, DollarSign, Share2,
+  X, BookOpen, Loader2, CheckCircle2, CreditCard, DollarSign,
+  Clock3,
 } from 'lucide-react';
+import { generateVietQRUrl } from '../../BankSelect';
+import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
 import { useToast } from '../../../utils/toast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
-import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
+import { teacherInStudentBranch } from '../../../utils/branchIds';
 import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
 
 function courseEffectivePrice(c) {
@@ -54,19 +57,15 @@ export default function AddEnrollmentModal({
   );
 
   const [bankInfo, setBankInfo] = useState(null);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [paymentSetupError, setPaymentSetupError] = useState('');
   const [timeLeft, setTimeLeft] = useState(TOTAL_PAYMENT_SECS);
   const [pollStatus, setPollStatus] = useState('pending');
   const [sessionId, setSessionId] = useState(null);
+  const [sessionRef, setSessionRef] = useState('');
   const pollRef = React.useRef(null);
   const timerRef = React.useRef(null);
   const submittedRef = React.useRef(false);
-
-  const payCode = String(student?.studentCode || '').trim();
-  const ckContent = useMemo(() => {
-    if (!payCode) return '';
-    const namePart = String(student?.name || 'HV').replace(/\s+/g, '').slice(0, 8);
-    return `${namePart} ${payCode} Nop hoc phi`.trim();
-  }, [student?.name, payCode]);
 
   useEffect(() => {
     fetch(`${API}/api/courses`)
@@ -133,39 +132,62 @@ export default function AddEnrollmentModal({
   // QR: bank + session + countdown
   useEffect(() => {
     if (step !== 'qr') return;
-    setTimeLeft(TOTAL_PAYMENT_SECS);
-    setPollStatus('pending');
-    submittedRef.current = false;
+    let cancelled = false;
 
     fetch(`${API}/api/settings/bank`)
       .then((r) => r.json())
-      .then((res) => { if (res.success) setBankInfo(res.data); })
-      .catch(() => {});
+      .then((res) => {
+        if (!res.success) throw new Error(res.message || 'Không tải được thông tin ngân hàng');
+        if (!cancelled) setBankInfo(res.data);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBankInfo(null);
+          toast.error(error.message || 'Không tải được thông tin ngân hàng');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBankLoading(false);
+      });
 
     const token = (() => {
       try { return JSON.parse(localStorage.getItem('admin_user') || '{}').token || ''; }
       catch { return ''; }
     })();
 
-    if (!ckContent) {
-      toast.error('Học viên chưa có mã HV từ server — không thể tạo QR');
-    } else {
-      fetch(`${API}/api/webhooks/create-session`, {
+    fetch(`${API}/api/webhooks/create-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           amount: Number(form.price) || 0,
-          content: ckContent,
+          kind: 'admin_enrollment',
           studentName: student?.name || '',
           courseName: form.courseName,
+          courseId: form.courseId,
+          teacherId: form.teacherId || null,
+          totalSessions: Number(form.totalSessions) || 12,
+          teacherAlert: String(form.teacherAlert || '').trim(),
           branchCode: student?.branchCode || '',
+          branchId: student?.branchId || null,
           studentId: student?.id || student?._id,
         }),
       })
         .then((r) => r.json())
-        .then((res) => { if (res.sessionId) setSessionId(res.sessionId); })
-        .catch(() => {});
-    }
+        .then((res) => {
+          if (!res.success || !res.sessionId || !res.ref) {
+            throw new Error(res.message || 'Không thể tạo phiên thanh toán');
+          }
+          if (!cancelled) {
+            setSessionId(res.sessionId);
+            setSessionRef(res.ref);
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setPaymentSetupError(error.message || 'Không thể tạo phiên thanh toán');
+            toast.error(error.message || 'Không thể tạo phiên thanh toán');
+          }
+        });
 
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
@@ -175,25 +197,24 @@ export default function AddEnrollmentModal({
     }, 1000);
 
     return () => {
+      cancelled = true;
       clearInterval(timerRef.current);
       clearInterval(pollRef.current);
     };
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const finishPaid = async () => {
+  const finishPaid = () => {
     if (pollStatus === 'paid') return;
     setPollStatus('paid');
     setStep('success');
-    const ok = await saveEnrollment(true);
-    setTimeout(() => { if (ok !== false) onClose(); }, 1800);
+    setTimeout(() => onClose(), 1800);
   };
 
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid' || !socket) return;
     const handlePaid = (data) => {
       if (
-        data.sessionId === sessionId
-        || (data.content && data.content.toLowerCase().includes(ckContent.toLowerCase()))
+        sessionId && data.sessionId === sessionId
       ) {
         clearInterval(pollRef.current);
         clearInterval(timerRef.current);
@@ -202,16 +223,21 @@ export default function AddEnrollmentModal({
     };
     socket.on('tuition:paid', handlePaid);
     return () => socket.off('tuition:paid', handlePaid);
-  }, [step, sessionId, pollStatus, socket, ckContent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, sessionId, pollStatus, socket]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid') return;
     const sid = sessionId;
     pollRef.current = setInterval(async () => {
-      if (!sid && !ckContent) return;
+      if (!sid) return;
       try {
         const r = await fetch(
-          `${API}/api/webhooks/payment-status?sessionId=${sid || ''}&content=${encodeURIComponent(ckContent)}`,
+          `${API}/api/webhooks/payment-status?sessionId=${sid}`,
+          {
+            headers: {
+              Authorization: `Bearer ${JSON.parse(localStorage.getItem('admin_user') || '{}').token || ''}`,
+            },
+          },
         ).then((x) => x.json());
         if (r.paid || r.status === 'paid') {
           clearInterval(pollRef.current);
@@ -221,7 +247,7 @@ export default function AddEnrollmentModal({
       } catch { /* ignore */ }
     }, 3000);
     return () => clearInterval(pollRef.current);
-  }, [step, sessionId, pollStatus, ckContent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, sessionId, pollStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmitForm = async (e) => {
     e?.preventDefault?.();
@@ -234,17 +260,97 @@ export default function AddEnrollmentModal({
       if (ok !== false) onClose();
       return;
     }
+    if (!(Number(form.price) > 0)) {
+      toast.error('Học phí phải lớn hơn 0 để tạo QR thanh toán');
+      return;
+    }
+    setTimeLeft(TOTAL_PAYMENT_SECS);
+    setPollStatus('pending');
+    setBankInfo(null);
+    setBankLoading(true);
+    setPaymentSetupError('');
+    setSessionId(null);
+    setSessionRef('');
+    submittedRef.current = false;
     setStep('qr');
   };
 
   const handlePayLater = async () => {
+    if (sessionId) {
+      try {
+        const token = JSON.parse(localStorage.getItem('admin_user') || '{}').token || '';
+        const response = await fetch(`${API}/api/webhooks/cancel-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ sessionId }),
+        });
+        const result = await response.json();
+        if (result.status === 'paid') {
+          finishPaid();
+          return;
+        }
+        if (!response.ok || result.success !== true) {
+          throw new Error(result.message || 'Không thể hủy phiên thanh toán');
+        }
+      } catch (error) {
+        toast.error(error.message || 'Không thể hủy phiên thanh toán');
+        return;
+      }
+    }
     const ok = await saveEnrollment(false);
     if (ok !== false) onClose();
   };
 
+  const cancelPaymentSession = async () => {
+    if (!sessionId) return true;
+    const token = (() => {
+      try { return JSON.parse(localStorage.getItem('admin_user') || '{}').token || ''; }
+      catch { return ''; }
+    })();
+    const response = await fetch(`${API}/api/webhooks/cancel-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ sessionId }),
+    });
+    const result = await response.json();
+    if (result.status === 'paid') {
+      finishPaid();
+      return false;
+    }
+    if (!response.ok || result.success !== true) {
+      throw new Error(result.message || 'Không thể hủy phiên thanh toán');
+    }
+    return true;
+  };
+
+  const handleClosePayment = async () => {
+    try {
+      if (await cancelPaymentSession()) onClose();
+    } catch (error) {
+      toast.error(error.message || 'Không thể đóng phiên thanh toán');
+    }
+  };
+
+  const handleBackToForm = async () => {
+    try {
+      if (!(await cancelPaymentSession())) return;
+      setSessionId(null);
+      setSessionRef('');
+      setStep('form');
+    } catch (error) {
+      toast.error(error.message || 'Không thể hủy phiên thanh toán');
+    }
+  };
+
   const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  const qrUrl = bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber
-    ? `https://img.vietqr.io/image/${bankInfo.centerBankCode}-${bankInfo.centerBankAccountNumber}-compact2.png?amount=${Number(form.price) || 0}&addInfo=${encodeURIComponent(ckContent)}&accountName=${encodeURIComponent(bankInfo.centerBankAccountName || '')}`
+  const qrUrl = bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber && sessionRef
+    ? generateVietQRUrl(
+      bankInfo.centerBankCode,
+      bankInfo.centerBankAccountNumber,
+      Number(form.price) || 0,
+      sessionRef,
+      bankInfo.centerBankAccountName || '',
+    )
     : null;
 
   if (step === 'success') {
@@ -266,123 +372,97 @@ export default function AddEnrollmentModal({
 
   if (step === 'qr') {
     const expired = timeLeft === 0;
-    const pct = (timeLeft / TOTAL_PAYMENT_SECS) * 100;
     const isUrgent = timeLeft < 60;
-
     return (
       <>
-        <div className="cms-sheet-backdrop" onClick={onClose} aria-hidden="true" />
+        <div className="fixed inset-0 z-[130000] bg-slate-950/70 backdrop-blur-sm" onClick={handleClosePayment} aria-hidden="true" />
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Quét QR thanh toán"
-          className="cms-sheet w-full"
+          aria-label="Thanh toán mua khóa học"
+          className="fixed inset-0 z-[130001] flex items-center justify-center p-2 sm:p-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="cms-sheet-handle md:hidden" aria-hidden="true" />
-          <div className="cms-sheet-header">
-            {sessionId ? (
+          <div className="flex max-h-[90dvh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.4)]">
+            <div className="relative flex shrink-0 items-center gap-2.5 bg-gradient-to-r from-rose-600 via-fuchsia-700 to-indigo-600 px-3 py-2.5 text-white">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                <CreditCard size={17} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black tracking-tight">Thanh toán mua khóa học</h3>
+                <p className="text-[10px] font-semibold text-white/85">VietQR · Thanh toán nhanh, tự động xác nhận</p>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/pay/${sessionId}`);
-                  toast.success('Đã copy link thanh toán!');
-                }}
-                aria-label="Chia sẻ link"
-                title="Chia sẻ link"
-                className="cms-sheet-header__side bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
+                onClick={handleClosePayment}
+                aria-label="Đóng"
+                className="rounded-xl p-1.5 text-white/90 transition hover:bg-white/15 hover:text-white"
               >
-                <Share2 size={16} />
+                <X size={20} />
               </button>
-            ) : (
-              <span className="cms-sheet-header__side bg-sky-50 text-sky-600" aria-hidden="true">
-                <CreditCard size={18} />
-              </span>
-            )}
-            <div className="min-w-0">
-              <h3 className="cms-sheet-header__title">Quét QR thanh toán</h3>
-              <p className="text-center text-[11px] text-slate-500 truncate mt-0.5">
-                {student?.name} — {form.courseName?.slice(0, 28)}
-              </p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Đóng"
-              className="cms-sheet-header__side bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </div>
 
-          <div className="cms-sheet-body space-y-4">
-            {expired ? (
-              <div className="cms-empty">
-                <p className="cms-empty__title text-red-600">Phiên thanh toán hết hạn</p>
-              </div>
-            ) : (
-              <>
-                <div>
-                  <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className={isUrgent ? 'text-red-500 animate-pulse' : 'text-slate-500'}>Còn lại</span>
-                    <span className={`font-mono font-bold ${isUrgent ? 'text-red-500' : 'text-slate-700'}`}>{formatTime(timeLeft)}</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-1000 ${isUrgent ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
-                  </div>
+            <div className="overflow-y-auto p-3 sm:p-4">
+                {expired ? (
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-8 text-center">
+                  <Clock3 className="mx-auto text-rose-500" size={34} />
+                  <p className="mt-2 text-lg font-black text-rose-700">Phiên thanh toán đã hết hạn</p>
+                  <p className="mt-1 text-sm text-slate-600">Tạo phiên mới để tiếp tục thanh toán an toàn.</p>
                 </div>
+              ) : (
+                <TransferPaymentDetails
+                  courseName={form.courseName}
+                  amount={form.price}
+                  qrUrl={qrUrl}
+                  bankName={bankInfo?.centerBankName || bankInfo?.centerBankCode}
+                  accountNumber={bankInfo?.centerBankAccountNumber}
+                  accountName={bankInfo?.centerBankAccountName}
+                  loading={bankLoading || (!sessionRef && !paymentSetupError)}
+                  error={paymentSetupError || 'Chưa cấu hình tài khoản ngân hàng trung tâm. Vui lòng kiểm tra mục Cài đặt thanh toán.'}
+                />
+              )}
 
-                <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-center">
-                  <p className="text-xs text-slate-500 font-medium">Số tiền cần thanh toán</p>
-                  <p className="text-2xl font-bold text-sky-700 mt-1">{Number(form.price || 0).toLocaleString('vi-VN')}đ</p>
-                </div>
-
-                {qrUrl ? (
-                  <div className="flex justify-center">
-                    <div className="border-2 border-emerald-300 rounded-2xl p-2 shadow-sm">
-                      <img src={qrUrl} alt="VietQR" className="w-44 h-44 object-contain rounded-xl" />
+              {!expired && (
+                <>
+                  <div className={`mt-2 flex items-center gap-3 rounded-xl border px-3 py-2 ${isUrgent ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-rose-100 bg-gradient-to-r from-rose-50 to-red-50 text-red-600'}`}>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/80">
+                      <Clock3 size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold">Thời gian chờ thanh toán</p>
+                      <p className="font-mono text-xl font-black leading-tight tabular-nums">{formatTime(timeLeft)}</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-slate-500">
+                      <Loader2 size={14} className="animate-spin text-blue-500" />
+                      Tự động kiểm tra
                     </div>
                   </div>
-                ) : (
-                  <div className="cms-empty py-8">
-                    <Loader2 size={22} className="animate-spin text-slate-400" />
-                    <p className="cms-empty__desc">Đang tải mã QR...</p>
-                  </div>
-                )}
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
-                  <p className="text-xs text-slate-400 mb-0.5">Nội dung chuyển khoản</p>
-                  <p className="font-mono font-semibold text-slate-800 text-sm">{ckContent}</p>
-                </div>
+                </>
+              )}
+            </div>
 
-                <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
-                  <Loader2 size={12} className="animate-spin text-emerald-500" />
-                  Đang kiểm tra thanh toán tự động...
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="cms-sheet-footer" style={{ flexDirection: 'column' }}>
-            {expired ? (
-              <button type="button" onClick={() => setStep('form')} className="cms-btn cms-btn-primary">
-                Quay lại
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handlePayLater}
-                  className="cms-btn cms-btn-outline w-full"
-                >
-                  {loading ? 'Đang lưu...' : 'Thêm khóa — thanh toán sau'}
+            <div className="flex shrink-0 flex-col gap-2 border-t border-slate-100 bg-white px-3 py-2 sm:flex-row sm:justify-end sm:px-4">
+              {expired ? (
+                <button type="button" onClick={handleBackToForm} className="cms-btn cms-btn-primary w-full sm:w-auto">
+                  Tạo phiên mới
                 </button>
-                <button type="button" onClick={() => setStep('form')} className="cms-btn cms-btn-outline w-full text-slate-500">
-                  Quay lại form
-                </button>
-              </>
-            )}
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={handlePayLater}
+                    className="cms-btn cms-btn-outline w-full sm:w-auto"
+                  >
+                    {loading ? 'Đang lưu...' : 'Thêm khóa — thanh toán sau'}
+                  </button>
+                  <button type="button" onClick={handleBackToForm} className="cms-btn cms-btn-outline w-full text-slate-500 sm:w-auto">
+                    Quay lại form
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </>

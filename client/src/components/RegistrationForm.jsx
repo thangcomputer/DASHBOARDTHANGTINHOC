@@ -12,6 +12,7 @@ import InvoiceTemplate from './InvoiceTemplate';
 import InvoicePreviewFrame from './InvoicePreviewFrame';
 import exportPDF, { printInvoice, captureAndSendZalo } from '../utils/exportPDF';
 import { generateVietQRUrl } from './BankSelect';
+import TransferPaymentDetails from './shared/TransferPaymentDetails';
 import { useModal } from '../utils/Modal.jsx';
 import { useToast } from '../utils/toast.jsx';
 import { isValidVNPhone } from '../utils/validators';
@@ -104,7 +105,6 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
   // Countdown + Session + Polling
   const [timeLeft, setTimeLeft]     = useState(TOTAL);
   const [expired, setExpired]       = useState(false);
-  const [sessionId, setSessionId]   = useState(null);
   const [pollStatus, setPollStatus] = useState('pending'); // pending | paid | expired
   const [pollSeconds, setPollSeconds] = useState(0);
 
@@ -235,7 +235,6 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
         .then(r => r.json())
         .then(res => {
           if (res.success) {
-            setSessionId(res.sessionId);
             sessionRef.current = res.sessionId;
           }
         })
@@ -666,56 +665,16 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   <CreditCard size={28} /> THANH TOÁN HỌC PHÍ
                 </h2>
 
-                {/* Tóm tắt */}
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-5 space-y-2">
-                  <div className="flex justify-between"><span className="text-gray-600">Học viên:</span><span className="font-bold">{formData.name}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Khóa học:</span><span className="font-semibold text-blue-700 text-sm">{formData.course}</span></div>
-                  <hr className="border-yellow-200" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 font-medium">Số tiền:</span>
-                    <span className="text-2xl font-bold text-red-700">{(formData.effectivePrice || formData.price).toLocaleString('vi-VN')} VNĐ</span>
-                  </div>
-                </div>
-
-                {/* QR */}
-                {bankLoading ? (
-                  <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
-                    <Loader2 size={22} className="animate-spin text-blue-400" />
-                    <span className="text-sm">Đang tải thông tin ngân hàng...</span>
-                  </div>
-                ) : !centerBank ? (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                    <AlertCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-amber-800 text-sm">Chưa cấu hình ngân hàng</p>
-                      <p className="text-amber-600 text-xs mt-1">Admin vào <strong>Cài đặt hệ thống › Tài khoản Thu học phí</strong>.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-center">
-                      <div className="bg-white p-3 border-2 border-dashed border-blue-200 rounded-2xl inline-block">
-                        <img src={qrUrl} alt="QR Thanh Toán" className="w-52 h-52 mx-auto object-contain"
-                          onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                        <div className="w-52 h-52 mx-auto bg-gray-100 rounded-xl items-center justify-center text-gray-400 text-sm" style={{display:'none'}}>
-                          <div className="text-center"><CreditCard size={36} className="mx-auto mb-2 opacity-30" /><p>Lỗi tải QR</p></div>
-                        </div>
-                        <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500">Quét mã để đóng học phí</p>
-                      </div>
-                    </div>
-
-                    {/* Thông tin ngân hàng */}
-                    <div className="text-sm bg-gray-50 rounded-xl p-4 space-y-1.5">
-                      <div className="flex justify-between"><span className="text-gray-500">Ngân hàng</span><span className="font-bold">{centerBank.bankName}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Số tài khoản</span><span className="font-mono font-bold tracking-wider">{centerBank.accountNumber}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Chủ tài khoản</span><span className="font-bold uppercase text-right max-w-[60%] leading-tight">{centerBank.accountName}</span></div>
-                    </div>
-                  </>
-                )}
-
-                <p className="text-center text-sm text-gray-500 italic">
-                  Nội dung CK: <span className="font-semibold text-gray-700">{ckContent}</span>
-                </p>
+                <TransferPaymentDetails
+                  courseName={formData.course}
+                  amount={formData.effectivePrice || formData.price}
+                  qrUrl={qrUrl}
+                  bankName={centerBank?.bankName || centerBank?.bankCode}
+                  accountNumber={centerBank?.accountNumber}
+                  accountName={centerBank?.accountName}
+                  loading={bankLoading}
+                  error="Chưa cấu hình tài khoản ngân hàng trung tâm."
+                />
 
                 {/* Trạng thái polling */}
                 {pollStatus === 'paid' ? (

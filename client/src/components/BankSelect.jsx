@@ -50,7 +50,7 @@ export function generateVietQRUrl(bankCode, accountNumber, amount, description =
     addInfo: description,
     accountName: accountName,
   });
-  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?${params.toString()}`;
+  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-qr_only.png?${params.toString()}`;
 }
 
 // ── BankSelect component ─────────────────────────────────────────────────────

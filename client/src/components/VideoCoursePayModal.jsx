@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Loader2, Copy, QrCode, RefreshCw, Video, Sparkles } from 'lucide-react';
+import { X, Loader2, RefreshCw, Video } from 'lucide-react';
 import { generateVietQRUrl } from './BankSelect';
+import TransferPaymentDetails from './shared/TransferPaymentDetails';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
 import api from '../services/api';
-
 const POLL_MS = 3000;
 const IS_DEV = import.meta.env.DEV;
 
@@ -139,15 +139,6 @@ export default function VideoCoursePayModal({
     return () => socket.off(paidEvent, onPaidEvt);
   }, [socket, sessionId, sessionReady, paidEvent]);
 
-  const copyRef = async () => {
-    try {
-      await navigator.clipboard.writeText(refCode || '');
-      toast.success('Đã sao chép nội dung CK');
-    } catch {
-      toast.error('Không sao chép được');
-    }
-  };
-
   const handleTestPaid = async () => {
     if (simulatePayment) {
       setSimulatingPayment(true);
@@ -187,59 +178,22 @@ export default function VideoCoursePayModal({
         </div>
 
         <div className="p-5">
-          <div className="rounded-xl bg-gradient-to-br from-slate-50 to-indigo-50/60 border border-slate-100 p-3.5 mb-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Khóa học</p>
-            <p className="text-sm font-bold text-slate-800 line-clamp-2">{courseTitle}</p>
-            <p className="text-2xl font-black text-red-600 tabular-nums mt-2">
-              {Number(amount || 0).toLocaleString('vi-VN')}đ
-            </p>
-          </div>
-
           {loadingBank ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
               <Loader2 className="animate-spin" size={28} />
               <span className="text-xs font-medium">Đang tải thông tin thanh toán…</span>
             </div>
-          ) : !qrUrl ? (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-              Chưa cấu hình tài khoản ngân hàng trung tâm (Admin › Cài đặt). Không tạo được QR.
-            </p>
           ) : (
-            <div className="flex flex-col items-center">
-              <div className="p-2.5 rounded-2xl bg-gradient-to-br from-white to-slate-50 border-2 border-indigo-100 shadow-md shadow-indigo-100/50">
-                <img src={qrUrl} alt="VietQR" className="w-52 h-52 sm:w-56 sm:h-56 rounded-xl bg-white object-contain" />
-              </div>
-              <p className="text-[11px] text-slate-500 mt-3 text-center leading-relaxed max-w-xs">
-                Quét bằng app ngân hàng hoặc MoMo (VietQR). <strong className="text-slate-700">Nội dung CK phải khớp.</strong>
-              </p>
-
-              {centerBank ? (
-                <div className="mt-3 w-full rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-1.5 text-xs">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-500 shrink-0">Ngân hàng</span>
-                    <span className="font-bold text-slate-800 text-right">{centerBank.bankName || centerBank.bankCode}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-500 shrink-0">Số TK</span>
-                    <span className="font-mono font-bold text-slate-800">{centerBank.accountNumber}</span>
-                  </div>
-                  {centerBank.accountName ? (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-slate-500 shrink-0">Chủ TK</span>
-                      <span className="font-bold text-slate-800 text-right uppercase">{centerBank.accountName}</span>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="mt-3 w-full flex items-center gap-2 bg-indigo-50/80 border border-indigo-100 rounded-xl px-3 py-2.5">
-                <QrCode size={14} className="text-indigo-500 shrink-0" />
-                <code className="text-xs font-bold text-indigo-900 flex-1 break-all">{refCode}</code>
-                <button type="button" onClick={copyRef} className="p-1.5 rounded-lg hover:bg-white text-indigo-600 shrink-0" title="Sao chép">
-                  <Copy size={14} />
-                </button>
-              </div>
-            </div>
+            <TransferPaymentDetails
+              courseName={courseTitle}
+              amount={amount}
+              qrUrl={qrUrl}
+              bankName={centerBank?.bankName || centerBank?.bankCode}
+              accountNumber={centerBank?.accountNumber}
+              accountName={centerBank?.accountName}
+              loading={loadingBank}
+              error="Chưa cấu hình tài khoản ngân hàng trung tâm. Không tạo được mã QR."
+            />
           )}
 
           {qrUrl && !loadingBank ? (
@@ -250,11 +204,6 @@ export default function VideoCoursePayModal({
                 : 'Chờ xác nhận thanh toán'}
             </div>
           ) : null}
-
-          <p className="mt-3 text-[11px] text-center text-slate-400 leading-relaxed flex items-start justify-center gap-1">
-            <Sparkles size={12} className="text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
-            <span>Sau khi chuyển khoản, hệ thống <strong className="text-slate-600">tự quét mỗi 3 giây</strong> và mở khóa khi nhận được tiền.</span>
-          </p>
 
           {IS_DEV && qrUrl && !loadingBank ? (
             <button

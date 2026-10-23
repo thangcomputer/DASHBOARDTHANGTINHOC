@@ -10,39 +10,38 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, checkPermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const { policyShadowFinance } = require('../middleware/policyShadowFinance');
 const { policyShadowWebhook } = require('../middleware/policyShadowWebhook');
 
 const PaymentSession = require('../models/PaymentSession');
 const logger = require('../config/logger');
 const { emitFinanceEvent } = require('../utils/realtimeEmit');
-
-function timingSafeEqualString(a, b) {
-  const left = Buffer.from(String(a || ''), 'utf8');
-  const right = Buffer.from(String(b || ''), 'utf8');
-  if (left.length !== right.length) return false;
-  return crypto.timingSafeEqual(left, right);
-}
+const { verifySepayRequest } = require('../services/sepayWebhookAuth');
 
 // ── SePay Webhook verification ────────────────────────────────────────────────
 // SePay hỗ trợ 2 kiểu chứng thực:
 // 1. API Key: Authorization: Apikey <KEY>
-// 2. HMAC: x-sepay-token = HMAC-SHA256(rawBody, SECRET_KEY)
+// 2. HMAC-SHA256: X-SePay-Signature + X-SePay-Timestamp
 function verifySepaySignature(req, res, next) {
   logger.info('[SEPAY] Incoming webhook', {
     hasAuthorization: Boolean(req.headers['authorization']),
     hasSepayToken: Boolean(req.headers['x-sepay-token']),
+    hasSepaySignature: Boolean(req.headers['x-sepay-signature']),
     hasApiKeyHeader: Boolean(req.headers['x-api-key']),
   });
 
-  const apiKey = process.env.SEPAY_API_KEY;
-  const hmacSecret = process.env.SEPAY_SECRET_KEY;
+  const apiKey = String(process.env.SEPAY_API_KEY || '').trim();
+  const hmacSecret = String(
+    process.env.SEPAY_WEBHOOK_SECRET || process.env.SEPAY_SECRET_KEY || '',
+  ).trim();
 
   if (!apiKey && !hmacSecret) {
     if (process.env.NODE_ENV === 'production') {
-      logger.error('[SEPAY] Webhook rejected — SEPAY_API_KEY / SEPAY_SECRET_KEY not configured');
+      logger.error('[SEPAY] Webhook rejected — API Key / HMAC secret not configured');
       return res.status(503).json({ success: false, message: 'Webhook payment not configured' });
     }
     logger.warn('[SEPAY] Dev mode — webhook verification skipped (no SEPAY keys)');
@@ -50,41 +49,25 @@ function verifySepaySignature(req, res, next) {
     return next();
   }
 
-  if (apiKey) {
-    const authHeader = req.headers['authorization'] || '';
-    const incomingKey = authHeader.replace(/^Apikey\s+/i, '').trim();
-    const headerKey = String(req.headers['x-api-key'] || '').trim();
-    if (timingSafeEqualString(incomingKey, apiKey) || timingSafeEqualString(headerKey, apiKey)) {
-      logger.info('[SEPAY] ✅ API Key verified');
-      req.sepayVerificationStatus = 'verified';
-      return next();
-    }
-    // Fall through to HMAC if configured; otherwise reject
-    if (!hmacSecret) {
-      logger.warn('[SEPAY] ❌ API Key mismatch — rejected');
-      return res.status(401).json({ success: false, message: 'Invalid API Key' });
-    }
-  }
-
-  if (hmacSecret) {
-    const signature = req.headers['x-sepay-token'];
-    if (!signature) {
-      logger.warn('[SEPAY] Missing HMAC signature — rejected');
-      return res.status(401).json({ success: false, message: 'Missing webhook signature' });
-    }
-    const rawBody = Buffer.isBuffer(req.rawBody)
-      ? req.rawBody
-      : Buffer.from(JSON.stringify(req.body || {}), 'utf8');
-    const expected = crypto.createHmac('sha256', hmacSecret).update(rawBody).digest('hex');
-    if (!timingSafeEqualString(signature, expected)) {
-      logger.warn('[SEPAY] Invalid HMAC signature — rejected');
-      return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
-    }
+  const result = verifySepayRequest({
+    headers: req.headers,
+    rawBody: req.rawBody,
+    apiKey,
+    hmacSecret,
+  });
+  if (result.valid) {
+    logger.info(`[SEPAY] ${result.mechanism} verified`);
     req.sepayVerificationStatus = 'verified';
     return next();
   }
 
-  return res.status(401).json({ success: false, message: 'Invalid webhook credentials' });
+  logger.warn(`[SEPAY] Webhook authentication rejected: ${result.reason}`);
+  return res.status(result.reason === 'not_configured' ? 503 : 401).json({
+    success: false,
+    message: result.reason === 'expired_timestamp'
+      ? 'Expired webhook timestamp'
+      : 'Invalid webhook credentials',
+  });
 }
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 phút
@@ -92,11 +75,81 @@ const SESSION_TTL_MS = 15 * 60 * 1000; // 15 phút
 // ── POST /api/webhooks/payment-session & /api/webhooks/create-session ──
 const handleCreateSession = async (req, res) => {
   try {
-    const { ref, content, amount, studentName, courseName, courseId, branchId, branchCode, studentId } = req.body;
-    const finalRef = (ref || content || '').toLowerCase().trim();
-    if (!finalRef) return res.status(400).json({ success: false, message: 'Thiếu nội dung chuyển khoản (ref/content)' });
+    const {
+      ref, content, amount, studentName, courseName, courseId, branchId,
+      branchCode, studentId, kind, teacherId, totalSessions, teacherAlert,
+    } = req.body;
+    const sessionKind = String(kind || 'tuition');
+    let resolvedBranchId = branchId || null;
+    let resolvedBranchCode = branchCode || '';
+    let finalRef = sessionKind === 'admin_enrollment'
+      ? ''
+      : String(ref || content || '').toLowerCase().trim();
+    if (sessionKind !== 'admin_enrollment' && !finalRef) {
+      return res.status(400).json({ success: false, message: 'Thiếu nội dung chuyển khoản (ref/content)' });
+    }
+    if (sessionKind === 'admin_enrollment' && (!studentId || !courseId || !(Number(amount) > 0))) {
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin học viên, khóa học hoặc học phí' });
+    }
+    if (
+      sessionKind === 'admin_enrollment'
+      && (!mongoose.Types.ObjectId.isValid(studentId)
+        || !mongoose.Types.ObjectId.isValid(courseId)
+        || (teacherId && !mongoose.Types.ObjectId.isValid(teacherId)))
+    ) {
+      return res.status(400).json({ success: false, message: 'Mã học viên, khóa học hoặc giảng viên không hợp lệ' });
+    }
+    if (!['tuition', 'video_course', 'course_purchase', 'admin_enrollment'].includes(sessionKind)) {
+      return res.status(400).json({ success: false, message: 'Loại phiên thanh toán không hợp lệ' });
+    }
+    if (sessionKind === 'admin_enrollment') {
+      const Course = require('../models/Course');
+      const Teacher = require('../models/Teacher');
+      const [student, course] = await Promise.all([
+        Student.findById(studentId).select('studentCode enrollments branchId branchCode').lean(),
+        Course.findById(courseId).select('name').lean(),
+      ]);
+      if (!student || !course) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy học viên hoặc khóa học' });
+      }
+      const readableStudentCode = String(student.studentCode || `HV${String(student._id).slice(-6)}`)
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase();
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const suffix = String(crypto.randomInt(10000, 100000));
+        const candidate = `${readableStudentCode} HOC PHI ${suffix}`;
+        const existing = await PaymentSession.exists({ ref: candidate, status: 'pending' });
+        if (!existing) {
+          finalRef = candidate;
+          break;
+        }
+      }
+      if (!finalRef) {
+        throw new Error('Không tạo được nội dung chuyển khoản duy nhất');
+      }
+      if (
+        req.userBranchId
+        && student.branchId
+        && String(req.userBranchId) !== String(student.branchId)
+      ) {
+        return res.status(403).json({ success: false, message: 'Không có quyền thao tác học viên chi nhánh khác' });
+      }
+      resolvedBranchId = student.branchId || req.userBranchId || null;
+      resolvedBranchCode = student.branchCode || '';
+      if (teacherId && !(await Teacher.exists({ _id: teacherId }))) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+      }
+      const duplicate = (student.enrollments || []).some((enrollment) => {
+        if (['cancelled', 'refunded'].includes(String(enrollment.status || '').toLowerCase())) return false;
+        if (enrollment.courseId && String(enrollment.courseId) === String(courseId)) return true;
+        return String(enrollment.courseName || '').toLowerCase() === String(course.name || '').toLowerCase();
+      });
+      if (duplicate) {
+        return res.status(409).json({ success: false, message: 'Học viên đã đăng ký khóa học này' });
+      }
+    }
 
-    const sessionId = `ps_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const sessionId = `ps_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     
     await PaymentSession.create({
       sessionId,
@@ -106,9 +159,13 @@ const handleCreateSession = async (req, res) => {
       studentName: studentName || '',
       courseName: courseName || '',
       courseId: courseId || null,
-      branchId: branchId || null,
-      branchCode: branchCode || '',
+      branchId: resolvedBranchId,
+      branchCode: resolvedBranchCode,
       studentId: studentId || null,
+      kind: sessionKind,
+      teacherId: teacherId || null,
+      totalSessions: Number(totalSessions) > 0 ? Number(totalSessions) : 12,
+      teacherAlert: String(teacherAlert || '').slice(0, 500),
     });
 
     logger.info(`[PAYMENT SESSION] Tạo mới (DB): ${sessionId} — ref: "${finalRef}"`);
@@ -124,8 +181,51 @@ const handleCreateSession = async (req, res) => {
   }
 };
 
-router.post('/payment-session', authMiddleware, policyShadowFinance('wh_payment_session'), handleCreateSession);
-router.post('/create-session', authMiddleware, policyShadowFinance('wh_payment_session'), handleCreateSession);
+router.post(
+  '/payment-session',
+  authMiddleware,
+  (req, res, next) => req.body?.kind === 'admin_enrollment'
+    ? checkPermission(PERMISSIONS.MANAGE_STUDENTS)(req, res, next)
+    : next(),
+  policyShadowFinance('wh_payment_session'),
+  handleCreateSession,
+);
+router.post(
+  '/create-session',
+  authMiddleware,
+  (req, res, next) => req.body?.kind === 'admin_enrollment'
+    ? checkPermission(PERMISSIONS.MANAGE_STUDENTS)(req, res, next)
+    : next(),
+  policyShadowFinance('wh_payment_session'),
+  handleCreateSession,
+);
+
+router.post('/cancel-session', authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), policyShadowFinance('wh_payment_session'), async (req, res) => {
+  try {
+    const sessionId = String(req.body?.sessionId || '').trim();
+    if (!sessionId) return res.status(400).json({ success: false, message: 'Thiếu sessionId' });
+    const cancelled = await PaymentSession.findOneAndUpdate(
+      { sessionId, kind: 'admin_enrollment', status: 'pending' },
+      { $set: { status: 'expired' } },
+      { returnDocument: 'after' },
+    );
+    if (cancelled) return res.json({ success: true, status: 'expired' });
+    const current = await PaymentSession.findOne({ sessionId }).select('status').lean();
+    if (current?.status === 'paid' || current?.status === 'processing') {
+      return res.status(409).json({
+        success: false,
+        status: current.status,
+        message: current.status === 'paid'
+          ? 'Thanh toán đã được xác nhận'
+          : 'Giao dịch đang được xử lý, vui lòng chờ xác nhận',
+      });
+    }
+    return res.json({ success: true, status: current?.status || 'not_found' });
+  } catch (error) {
+    logger.error('[CANCEL PAYMENT SESSION ERROR]', error);
+    return res.status(500).json({ success: false, message: 'Không thể hủy phiên thanh toán' });
+  }
+});
 
 // ── GET /api/webhooks/payment-session/:id & /api/webhooks/payment-status ── Polling
 const handleCheckSession = async (req, res) => {
@@ -206,7 +306,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
     });
 
     if (!content || amount <= 0) {
-      return res.json({ success: false, message: 'Thiếu thông tin giao dịch' });
+      return res.status(400).json({ success: false, message: 'Thiếu thông tin giao dịch' });
     }
 
     // Idempotency theo mã giao dịch cổng
@@ -257,7 +357,12 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
     if (pendingSession) {
       const claimed = await PaymentSession.findOneAndUpdate(
         { _id: pendingSession._id, status: 'pending' },
-        { $set: { status: 'paid', paidAmount: amount } },
+        {
+          $set: {
+            status: String(pendingSession.kind || '') === 'admin_enrollment' ? 'processing' : 'paid',
+            paidAmount: amount,
+          },
+        },
         { returnDocument: 'after' }
       );
 
@@ -291,6 +396,37 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matchedRef = claimed.ref;
             logger.info(
               `[SEPAY] Course-purchase session ${claimed.sessionId} — student ${purchase.studentId} course ${purchase.courseId} — ${amount}đ`,
+            );
+          } else if (String(claimed.kind || 'tuition') === 'admin_enrollment') {
+            const { fulfillAdminEnrollmentPayment } = require('../services/adminEnrollmentPaymentService');
+            const enrollment = await fulfillAdminEnrollmentPayment({
+              session: claimed,
+              amount,
+              transferContent: String(body.content || ''),
+            });
+            const paidSession = await PaymentSession.findOneAndUpdate(
+              { _id: claimed._id, status: 'processing' },
+              { $set: { status: 'paid' } },
+              { returnDocument: 'after' },
+            );
+            if (!paidSession) {
+              throw new Error(`Could not finalize payment session ${claimed.sessionId}`);
+            }
+            const io = req.app.get('io');
+            if (io) {
+              emitFinanceEvent(io, {
+                branchId: claimed.branchId || null,
+                userIds: claimed.studentId ? [claimed.studentId] : [],
+              }, 'tuition:paid', {
+                sessionId: claimed.sessionId,
+                amount,
+                message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+              });
+            }
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(
+              `[SEPAY] Admin enrollment session ${claimed.sessionId} — student ${claimed.studentId} enrollment ${enrollment._id} — ${amount}đ`,
             );
           } else {
             const { settlePayment } = require('../services/ledgerService');
@@ -623,11 +759,11 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
       logger.warn('[SEPAY] Không match được — contentLen=', content.length);
     }
 
-    return res.json({ success: true, matched });
+    return res.json({ success: true });
 
   } catch (err) {
     logger.error('[SEPAY WEBHOOK ERROR]', err);
-    return res.json({ success: false, message: 'Lỗi server: ' + err.message });
+    return res.status(500).json({ success: false, message: 'Lỗi server khi xử lý webhook' });
   }
 });
 

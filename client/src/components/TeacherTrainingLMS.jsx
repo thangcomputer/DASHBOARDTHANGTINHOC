@@ -6,7 +6,6 @@ import {
   FileBox, Video, Download, FileText, Plus, Pencil, ExternalLink, Link2
 } from 'lucide-react';
 import SoftwareLinksTable from './SoftwareLinksTable';
-
 import { useData } from '../context/DataContext';
 import {
   filterTrainingItemsBySubject,
