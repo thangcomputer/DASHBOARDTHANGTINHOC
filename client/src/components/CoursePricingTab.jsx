@@ -161,6 +161,29 @@ function resolveExamSubjectId(inputId, label) {
   return fromLabel;
 }
 
+function CourseStatusToggle({ course, busy, onToggle }) {
+  const isActive = course.status === 'published';
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={isActive}
+      aria-label={`${isActive ? 'Ngưng hoạt động' : 'Kích hoạt'} khóa học ${course.name}`}
+      disabled={busy}
+      onClick={() => onToggle(course)}
+      className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-slate-600 transition disabled:cursor-wait disabled:opacity-60"
+      title={isActive ? 'Ngưng hoạt động khóa học' : 'Kích hoạt khóa học'}
+    >
+      <span className={`relative h-5 w-9 rounded-full transition-colors ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isActive ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      </span>
+      <span className={isActive ? 'text-emerald-700' : 'text-slate-500'}>
+        {busy ? 'Đang lưu...' : isActive ? 'Đang hoạt động' : 'Ngưng hoạt động'}
+      </span>
+    </button>
+  );
+}
+
 // ── Modal Thêm/Sửa ────────────────────────────────────────────────────────────
 function CourseModal({
   course,
@@ -247,6 +270,31 @@ function CourseModal({
     });
     toast.success(`Đã gộp ${ids.length} môn từ "${sourceCourse.name}"`);
     setImportCourseId('');
+  };
+
+  const handleToggleCourseStatus = async (course) => {
+    const nextStatus = course.status === 'published' ? 'draft' : 'published';
+    setUpdatingStatus(course._id);
+    try {
+      const response = await apiFetch(`/courses/${course._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Không thể cập nhật trạng thái khóa học');
+      }
+      setCourses((previous) => previous.map((item) =>
+        item._id === course._id ? result.data : item,
+      ));
+      toast.success(nextStatus === 'published'
+        ? `Đã kích hoạt "${course.name}"`
+        : `Đã ngưng hoạt động "${course.name}"`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể cập nhật trạng thái khóa học');
+    } finally {
+      setUpdatingStatus(null);
+    }
   };
 
   const openDeleteSubject = (id, label) => {
@@ -398,7 +446,7 @@ function CourseModal({
         thumbnail:       form.thumbnail || '',
         bannerColorStart: form.bannerColorStart,
         bannerColorEnd:   form.bannerColorEnd,
-        status:          'published',
+        status:          isEdit ? (course.status || 'published') : 'published',
       };
 
       const res = await apiFetch(endpoint, {
@@ -1078,12 +1126,13 @@ export default function CoursePricingTab() {
   const [loading, setLoading]       = useState(true);
   const [modalCourse, setModalCourse] = useState(undefined); // undefined=closed, null=add, obj=edit
   const [deleting, setDeleting]     = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(null);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef(null);
 
   const fetchCourses = useCallback(() => {
     setLoading(true);
-    fetch(`${API}/api/courses`)
+    fetch(`${API}/api/courses?status=all`)
       .then(async (response) => {
         const res = await response.json();
         if (!response.ok || !res.success) {
@@ -1456,7 +1505,7 @@ export default function CoursePricingTab() {
               const hasDiscount = isCourseDiscountActive(course);
               const ep = hasDiscount ? calcEffective(course.price, course.discountPercent) : Number(course.price) || 0;
               return (
-                <article key={course._id} className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                <article key={course._id} className={`rounded-xl border p-3.5 space-y-3 ${course.status === 'published' ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 leading-snug break-words">{course.name}</p>
@@ -1465,6 +1514,11 @@ export default function CoursePricingTab() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <CourseStatusToggle
+                        course={course}
+                        busy={updatingStatus === course._id}
+                        onToggle={handleToggleCourseStatus}
+                      />
                       <button
                         type="button"
                         onClick={() => setModalCourse(course)}
@@ -1530,7 +1584,7 @@ export default function CoursePricingTab() {
 
           {/* Desktop table */}
           <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[850px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-4 py-3 font-semibold text-slate-500 text-[12px]">Tên khóa học</th>
@@ -1539,6 +1593,7 @@ export default function CoursePricingTab() {
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 text-[12px]">Giá áp dụng</th>
                   <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Môn thi</th>
                   <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Buổi</th>
+                  <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Trạng thái</th>
                   <th className="text-center px-4 py-3 font-semibold text-slate-500 text-[12px]">Thao tác</th>
                 </tr>
               </thead>
@@ -1547,7 +1602,7 @@ export default function CoursePricingTab() {
                   const hasDiscount = isCourseDiscountActive(course);
                   const ep = hasDiscount ? calcEffective(course.price, course.discountPercent) : Number(course.price) || 0;
                   return (
-                    <tr key={course._id} className={`border-b border-slate-100 hover:bg-blue-50/30 transition ${idx % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
+                    <tr key={course._id} className={`border-b border-slate-100 hover:bg-blue-50/30 transition ${course.status === 'published' ? (idx % 2 === 0 ? '' : 'bg-slate-50/50') : 'bg-slate-100/70'}`}>
                       <td className="px-4 py-3.5">
                         <p className="font-semibold text-slate-800 text-sm leading-snug">
                           {course.name}
@@ -1588,6 +1643,13 @@ export default function CoursePricingTab() {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <span className="text-[13px] font-medium text-slate-600">{course.totalSessions}</span>
+                      </td>
+                      <td className="px-2 py-3 text-center">
+                        <CourseStatusToggle
+                          course={course}
+                          busy={updatingStatus === course._id}
+                          onToggle={handleToggleCourseStatus}
+                        />
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-2">
