@@ -1877,16 +1877,6 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
 router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')], async (req, res) => {
   try {
     const { reason = '' } = req.body;
-    const actorRole = String(req.user?.role || '').toLowerCase();
-    const rawReason = typeof reason === 'string' ? reason.trim() : '';
-    const isLegacyAdminPlaceholder = /^admin hủy (?:khóa|lịch)$/i.test(rawReason);
-    const displayReason = actorRole === 'teacher'
-      ? (isLegacyAdminPlaceholder
-        ? 'Giảng viên hủy lịch'
-        : (/^(?:giảng viên hủy lịch|gv hủy ca)\b/i.test(rawReason)
-          ? rawReason
-          : (rawReason ? `Giảng viên hủy lịch: ${rawReason}` : 'Giảng viên hủy lịch')))
-      : rawReason;
     const schedule = await Schedule.findById(req.params.scheduleId);
     if (!schedule) return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
 
@@ -1910,8 +1900,8 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
     const oldValue = { status: schedule.status, note: schedule.note || '' };
     schedule.status = 'cancelled';
     // Persist reason so Student UI can show it (frontend currently renders `sch.note`)
-    if (displayReason) {
-      schedule.note = displayReason;
+    if (typeof reason === 'string' && reason.trim()) {
+      schedule.note = reason.trim();
     }
     await schedule.save();
 
@@ -1920,7 +1910,7 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       try {
         const d = new Date(schedule.date).toLocaleDateString('vi-VN');
         const timeRange = [schedule.startTime, schedule.endTime].filter(Boolean).join('–');
-        const reasonBit = displayReason ? ` — ${displayReason}` : '';
+        const reasonBit = (typeof reason === 'string' && reason.trim()) ? ` — ${reason.trim()}` : '';
         const cancelCaNote = timeRange
           ? `Hủy ca ngày ${d} · ${timeRange}${reasonBit}`
           : `Hủy ca ngày ${d}${reasonBit}`;
@@ -1951,7 +1941,7 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       actorName: actor.name || schedule.teacherName || 'Unknown',
       actorRole: actor.role || 'teacher',
       action: 'CANCELLED',
-      reason: displayReason,
+      reason,
       oldValue: { ...oldValue, startTime: schedule.startTime, endTime: schedule.endTime },
       newValue: { status: 'cancelled', startTime: schedule.startTime, endTime: schedule.endTime },
       studentName: schedule.studentName,
@@ -1974,7 +1964,7 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
         id: String(schedule._id),
         scheduleId: String(schedule._id),
         status: 'cancelled',
-        reason: displayReason,
+        reason: String(reason || ''),
         teacherId: schedule.teacherId,
         studentId: schedule.studentId,
       };
@@ -1993,11 +1983,11 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
           await NotificationService.send(io, {
             type: 'SCHEDULE',
             title: '❌ Lịch học bị hủy',
-            content: displayReason
-              ? `Lịch học ngày ${d} đã bị hủy. Lý do: ${displayReason}`
+            content: reason && String(reason).trim()
+              ? `Lịch học ngày ${d} đã bị hủy. Lý do: ${String(reason).trim()}`
               : `Lịch học ngày ${d} đã bị hủy.`,
             receivers: schedule.studentId.toString(),
-            payload: { scheduleId: schedule._id.toString(), type: 'schedule', reason: displayReason },
+            payload: { scheduleId: schedule._id.toString(), type: 'schedule', reason: String(reason || '') },
             link: '/student#schedule'
           });
         } catch (e) {

@@ -362,9 +362,11 @@ class EnrollmentApplicationService {
     const actorRole = String(data.currentUser?.role || '').toLowerCase();
     const submittedCancelReason = String(data.body?.cancelReason || '').trim();
     const cancelReason = actorRole === 'teacher'
-      ? (submittedCancelReason && !/^admin hủy khóa$/i.test(submittedCancelReason)
-        ? submittedCancelReason
-        : 'Giảng viên hủy khóa')
+      ? (!submittedCancelReason || /^admin hủy khóa$/i.test(submittedCancelReason)
+        ? 'Giảng viên hủy khóa'
+        : (/^giảng viên hủy khóa(?:\s*:|$)/i.test(submittedCancelReason)
+          ? submittedCancelReason
+          : `Giảng viên hủy khóa: ${submittedCancelReason}`))
       : (submittedCancelReason || 'Admin hủy khóa');
     const courseName = enr.courseName;
     const wasPaid = enr.paid === true;

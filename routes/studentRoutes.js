@@ -3203,9 +3203,11 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
     const actorRole = String(req.user?.role || '').toLowerCase();
     const submittedCancelReason = String(req.body?.cancelReason || '').trim();
     const cancelReason = actorRole === 'teacher'
-      ? (submittedCancelReason && !/^admin hủy khóa$/i.test(submittedCancelReason)
-        ? submittedCancelReason
-        : 'Giảng viên hủy khóa')
+      ? (!submittedCancelReason || /^admin hủy khóa$/i.test(submittedCancelReason)
+        ? 'Giảng viên hủy khóa'
+        : (/^giảng viên hủy khóa(?:\s*:|$)/i.test(submittedCancelReason)
+          ? submittedCancelReason
+          : `Giảng viên hủy khóa: ${submittedCancelReason}`))
       : (submittedCancelReason || 'Admin hủy khóa');
     const courseName = enr.courseName;
     const wasPaid = enr.paid === true;
@@ -3319,9 +3321,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
         {
           $set: {
             status: 'cancelled',
-            note: actorRole === 'teacher'
-              ? `Giảng viên hủy lịch${cancelReason === 'Giảng viên hủy khóa' ? '' : `: ${cancelReason}`}`
-              : `Hủy khóa: ${cancelReason}`,
+            note: `Hủy khóa: ${cancelReason}`,
           },
         },
       );
