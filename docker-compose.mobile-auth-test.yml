@@ -1,0 +1,39 @@
+services:
+  mongo-auth-test:
+    image: mongo:7
+    container_name: thang-tin-hoc-mobile-auth-mongo-test
+    command: ["mongod", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "127.0.0.1:27019:27017"
+    volumes:
+      - mobile_auth_mongo_test_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    labels:
+      app: thang-tin-hoc
+      purpose: isolated-mobile-auth-test
+
+  redis-auth-test:
+    image: redis:7-alpine
+    container_name: thang-tin-hoc-mobile-auth-redis-test
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6382:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    labels:
+      app: thang-tin-hoc
+      purpose: isolated-mobile-auth-test
+
+volumes:
+  mobile_auth_mongo_test_data:
+    name: thang-tin-hoc-mobile-auth-mongo-test-data
+    labels:
+      app: thang-tin-hoc
+      purpose: isolated-mobile-auth-test

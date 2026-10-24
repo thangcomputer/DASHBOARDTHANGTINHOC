@@ -362,6 +362,7 @@ io.on('connection', (socket) => {
     const uid = socketUserId(socket.user);
     const mRole = getMessagingRole(socket.user);
     if (uid) socket.join(uid);
+    if (socket.sessionId) socket.join(`session:${socket.sessionId}`);
     socket.join('feed_room');
     if (mRole) {
       const uRole = mRole.toUpperCase();
@@ -384,17 +385,21 @@ io.on('connection', (socket) => {
     const resolvedBranchId = socket.user.branchId || null;
     const resolvedBranchCode = socket.user.branchCode || '';
 
-    await presenceStore.upsertPresence(key, {
-      socketId: socket.id,
-      userId,
-      role: messagingRole,
-      adminRole: socket.user.adminRole || null,
-      name,
-      avatar: socket.user.avatar || '',
-      branchId: resolvedBranchId,
-      branchCode: resolvedBranchCode,
-      connectedAt: new Date().toISOString(),
-    });
+    // The legacy presence store keeps one socket per user. Do not let a mobile
+    // session overwrite a live web socket until presence supports many sockets.
+    if (!socket.sessionId) {
+      await presenceStore.upsertPresence(key, {
+        socketId: socket.id,
+        userId,
+        role: messagingRole,
+        adminRole: socket.user.adminRole || null,
+        name,
+        avatar: socket.user.avatar || '',
+        branchId: resolvedBranchId,
+        branchCode: resolvedBranchCode,
+        connectedAt: new Date().toISOString(),
+      });
+    }
 
     console.log(`👤 Online (Verified): ${name} (${messagingRole}) - ${key}`);
 

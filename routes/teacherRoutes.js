@@ -55,6 +55,7 @@ const { claimTeacherAttempt } = require('../services/examAttemptStore');
 const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
 const { normalizeVoiceRegion } = require('../constants/voiceRegions');
 const { attemptedTeacherExamFields } = require('../utils/teacherExamFields');
+const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 
 const router = express.Router();
 
@@ -966,6 +967,24 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
 
+    if (locking) {
+      try {
+        await revokeMobileSessionsForUser({
+          userId: teacher._id,
+          role: 'teacher',
+          reason: 'account_disabled',
+          io: req.app.get('io'),
+        });
+      } catch (revokeError) {
+        logger.error('[TEACHERS] Account disabled but mobile session revocation failed:', revokeError);
+        return res.status(503).json({
+          success: false,
+          code: 'MOBILE_SESSION_REVOCATION_FAILED',
+          message: 'Tài khoản đã bị vô hiệu hóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+        });
+      }
+    }
+
     const io = req.app.get('io');
     if (io) {
       emitDataRefresh(io, { type: 'teacher', id: teacher._id }, {
@@ -1229,6 +1248,21 @@ router.put('/:id/grant-exam-access', [
       faceViolationCount: 0,
     }, { returnDocument: 'after', runValidators: true }).select('-password -refreshToken');
     if (!teacher) return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    try {
+      await revokeMobileSessionsForUser({
+        userId: teacher._id,
+        role: 'teacher',
+        reason: 'exam_access_reset',
+        io: req.app.get('io'),
+      });
+    } catch (revokeError) {
+      logger.error('[TEACHERS] Exam access reset but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Quyền thi đã được cập nhật nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
     const io = req.app.get('io');
     if (io) emitTeacherEvent(io, teacher, 'teacher:updated', {
       teacherId: String(teacher._id),
@@ -1604,6 +1638,21 @@ router.delete('/:id', [authMiddleware, ...teacherRouteGuard('delete')], async (r
     }
     const cascade = await purgeTeacherSideEffects(teacher._id, { teacherName: teacher.name });
     await Teacher.findByIdAndDelete(teacher._id);
+    try {
+      await revokeMobileSessionsForUser({
+        userId: teacher._id,
+        role: 'teacher',
+        reason: 'account_deleted',
+        io: req.app.get('io'),
+      });
+    } catch (revokeError) {
+      logger.error('[TEACHERS] Account deleted but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị xóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
     return res.json({
       success: true,
       message: `Đã xóa giảng viên ${teacher.name}`,
