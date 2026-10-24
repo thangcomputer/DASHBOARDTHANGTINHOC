@@ -1,4 +1,5 @@
 import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -26,7 +27,15 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
 export function RootNavigator() {
-  const { user } = useAuth();
+  const { user, status } = useAuth();
+  if (status === 'initializing') {
+    return (
+      <View style={styles.initializing}>
+        <ActivityIndicator color={colors.brand} />
+        <Text style={styles.initializingText}>Đang khôi phục phiên đăng nhập…</Text>
+      </View>
+    );
+  }
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
       {user ? (
@@ -68,6 +77,11 @@ export function RootNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  initializing: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, backgroundColor: colors.canvas },
+  initializingText: { color: colors.muted, fontSize: typography.small },
+});
 
 function MainTabs() {
   const { user } = useAuth();
