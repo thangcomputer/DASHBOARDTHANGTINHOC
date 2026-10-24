@@ -73,7 +73,7 @@ export function AppHeader({
         <Text style={styles.headerTitle}>{title}</Text>
         {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
       </View>
-      {user?.role === 'student' ? (
+      {user?.role === 'student' && !['Notifications', 'NotificationCenter'].includes(route.name) ? (
         <Pressable
           onPress={() => {
             if (isMainTab) navigation.navigate('Notifications' as never);

@@ -3,7 +3,7 @@
 ## Implementation status
 
 - Branch: `feature/mobile-notifications-api`
-- Previous/base HEAD: `6769343271847ee8de99cc79fe951e70b4ee481d`
+- Starting HEAD for this integration checkpoint: `9765cfb73e380429fb3bd28ca6558b5d94ad59df`
 - Scope: Mobile REST Notifications only; no Learning work started
 - Feature flag: `EXPO_PUBLIC_MOBILE_NOTIFICATIONS_API=false` by default
 - Backend/Web/exam-bank files modified: none
@@ -23,6 +23,7 @@
 - Mapper: `src/features/notifications/notificationMapper.ts` maps backend rows to `AppNotification`; raw DB rows do not enter UI.
 - Destination resolver: `src/features/notifications/notificationRouting.ts` routes only supported destinations; unknown and Web-only exam destinations stay in detail.
 - API errors are surfaced; real mode does not silently fall back to mock.
+- Expo Web QA found that `AppHeader` hid supplied right-side controls for Student notification screens. The header now shows those screen actions on `Notifications` and `NotificationCenter`, preserving the notification shortcut elsewhere.
 
 ## Test coverage and validation evidence
 
@@ -34,21 +35,32 @@
 
 ### Expo Web smoke
 
+- Authenticated Expo Web QA used the real feature-flagged Notifications repository and the isolated test API (not mock notifications).
+- Student: real login, 25-fixture pagination (20 + 5), unread filter, mark-one, mark-all, dismiss, notification detail, known Schedule route, unknown-route detail retention, and EXAM Web-only messaging: PASS.
+- Teacher: real login, 25-fixture pagination (20 + 5), and Schedule category filter: PASS.
 - `npm run typecheck`: PASS
 - `npx expo install --check`: PASS
 - `npx expo export --platform web`: PASS
-- Expo Web export validates bundling only; it is not evidence of authenticated Notifications API integration against a running backend.
 
 ### Isolated backend integration
 
-- Notifications endpoint integration against a running isolated backend: `NOT RUN`
-- Test ports `27019`, `6382`, and `8081` were free at inspection; unrelated existing Docker services on ports `6379` and `6381` were not touched.
-- Do not report `NOTIFICATIONS BACKEND INTEGRATION PASS`.
+- Command: `npm run test:notifications:integration` (with `MOBILE_TEST_BACKEND_ROOT` pointing to the separate auth-backend source worktree and `NODE_PATH` pointing to installed dependencies).
+- Result: PASS; real Auth and Notifications route/middleware/model/service modules were mounted in an isolated Express test app. This was not a launch of production `server.js`.
+- Test database: `dashboardthangtinhoc_mobile_notifications_test`; Mongo `127.0.0.1:27019`; Redis `127.0.0.1:6382`, database 15.
+- Only the isolated test process enabled `MOBILE_MULTI_SESSION_AUTH=true`; disposable generated credentials were not written to the report.
+- Fixtures: 3 disposable users (Student A, Student B for ownership isolation, Teacher) and 50 notifications (25 each for Student A and Teacher; one Student notification was shared with Student B).
+- Student and Teacher login/list isolation: PASS. Pagination: page 1 = 20, page 2 = 5 with no duplicates or gaps; custom limit and totals/pages: PASS.
+- All seven backend-supported type filters (`SYSTEM`, `COURSE`, `FINANCE`, `EVALUATION`, `MESSAGE`, `EXAM`, `SCHEDULE`): PASS. Student/Teacher unread filters and user-scoped count: PASS.
+- Mark-one, mark-all, and dismiss mutations: PASS. Cross-user mark-read/dismiss returned 404; dismiss did not affect the other recipient: PASS.
+- Missing CSRF rejected with 403; shared Auth refresh/retry with expired access token and revoked-session invalidation: PASS.
+- Known Schedule route, unknown-path safe detail, and EXAM Web-only mapping: PASS.
+- No requests were sent to protected Mongo/Redis ports `27017`, `6379`, or `6381`; no existing unrelated containers were changed.
 
 ### Native
 
 - Android/iOS Notifications QA: `BLOCKED / NOT RUN`
 - Native QA is a release gate, not an implementation commit blocker by itself.
+- Socket.IO, push, FCM/APNs: not connected.
 
 ## Validation
 
@@ -59,19 +71,19 @@
 - `npx expo export --platform web`: PASS
 - `git diff --check`: PASS
 - Profile/schedule tests: no mobile scripts/tests configured; not run
-- Isolated Notifications backend integration: `NOT RUN`
+- `npm run test:notifications:integration`: PASS (isolated backend route/Auth integration and interactive Student/Teacher Expo Web QA)
 
 ## Readiness
 
 - Mock Notifications mode: `PASS`
-- Real Notifications REST client implementation: `PASS` (feature-flagged and uses shared authenticated transport; backend integration remains unverified)
+- Real Notifications REST client implementation and isolated backend integration: `PASS`
 - Mobile Notifications API implementation: `READY`
-- Expo Web QA: `PASS` for build/export only; authenticated backend integration not claimed
+- Expo Web authenticated Notifications QA: `PASS`
 - Native Notifications QA: `BLOCKED / NOT RUN`
 - Production ready: `NO`
 
 ## Release gates
 
-- Run disposable Student and Teacher notification integration tests against an isolated backend.
 - Perform native Android/iOS QA, including CSRF cookie behavior, app restart, and real SecureStore.
+- This integration used a local isolated route/Auth harness, not the production `server.js`; full deployment/runtime validation remains outstanding.
 - No Learning API work is included in this checkpoint.
