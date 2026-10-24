@@ -30,6 +30,7 @@
     "typecheck": "tsc --noEmit",
     "test:auth": "node tests/mobileAuthClient.test.cjs",
     "test:notifications": "node --test tests/notifications.test.cjs",
+    "test:learning": "node --test tests/learning.test.cjs",
     "test:notifications:integration": "node --test --test-force-exit tests/notifications.integration.test.cjs"
   },
   "private": true

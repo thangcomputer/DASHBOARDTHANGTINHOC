@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,9 +13,10 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  evaluationService, feedService, financeService, learningService, quizService,
+  evaluationService, feedService, financeService, quizService,
   softwareService, studentProfileService, studentService, trainingService,
 } from '../services/mockService';
+import { useStudentLearning } from '../features/learning/useStudentLearning';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import type {
@@ -100,9 +101,7 @@ function MenuIcon({ label }: { label: string }) {
 
 export function StudentLearningScreen() {
   const navigation = useNavigation<Navigation>();
-  const loader = useCallback(() => learningService.courses(), []);
-  const resource = useMockResource(loader);
-  const courses = resource.data || [];
+  const { courses, loading, error, refresh } = useStudentLearning();
   const [expanded, setExpanded] = useState<string[]>([]);
   const [filter, setFilter] = useState('Tất cả');
   const visibleCourses = courses.filter((course) => {
@@ -123,9 +122,9 @@ export function StudentLearningScreen() {
           </Pressable>
         ))}
       </View>
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {!resource.loading && !resource.error && visibleCourses.length === 0 ? <EmptyState title="Chưa có khóa học" message="Khóa học sẽ hiển thị tại đây." /> : null}
+      {loading ? <LoadingSkeleton /> : null}
+      {error ? <ErrorState onRetry={refresh} /> : null}
+      {!loading && !error && visibleCourses.length === 0 ? <EmptyState title="Chưa có khóa học" message="Khóa học sẽ hiển thị tại đây." /> : null}
       {enrolledCourses.length ? <SectionHeading title="LỘ TRÌNH CỦA BẠN · Khóa đã đăng ký" /> : null}
       {enrolledCourses.map((course) => (
         <View key={course._id}>
@@ -222,17 +221,16 @@ function LessonRow({ lesson, onPress }: { lesson: LearningLesson; onPress: () =>
 
 export function LearningLessonScreen() {
   const route = useRoute<NativeStackScreenProps<AppStackParamList, 'LearningLesson'>['route']>();
-  const loader = useCallback(() => learningService.courses(), []);
-  const resource = useMockResource(loader);
+  const { courses, loading, error, refresh } = useStudentLearning();
   const [completed, setCompleted] = useState(false);
-  const course = resource.data?.find((item) => item._id === route.params.courseId);
+  const course = courses.find((item) => item._id === route.params.courseId);
   const unit = course?.units.find((item) => item._id === route.params.unitId);
   const lesson = unit?.sections.find((item) => item._id === route.params.lessonId);
   return (
     <AppScreen>
       <AppHeader title={lesson?.title || 'Bài học'} subtitle={`${course?.title || ''} · ${unit?.title || ''}`} />
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+      {loading ? <LoadingSkeleton /> : null}
+      {error ? <ErrorState onRetry={refresh} /> : null}
       {lesson ? (
         <>
           <Card style={styles.player}>
@@ -247,7 +245,7 @@ export function LearningLessonScreen() {
             <PrimaryButton title={completed || lesson.completed ? 'Đã hoàn thành' : 'Đánh dấu đã học'} onPress={() => setCompleted(true)} disabled={completed || lesson.completed} />
           </Card>
         </>
-      ) : (!resource.loading ? <EmptyState title="Không tìm thấy bài học" message="Bài học này không có trong dữ liệu demo." /> : null)}
+      ) : (!loading ? <EmptyState title="Không tìm thấy bài học" message="Bài học này không có trong dữ liệu demo." /> : null)}
     </AppScreen>
   );
 }
