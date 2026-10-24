@@ -36,7 +36,7 @@
 ### Expo Web smoke
 
 - Authenticated Expo Web QA used the real feature-flagged Notifications repository and the isolated test API (not mock notifications).
-- Student: real login, 25-fixture pagination (20 + 5), unread filter, mark-one, mark-all, dismiss, notification detail, known Schedule route, unknown-route detail retention, and EXAM Web-only messaging: PASS.
+- Student: real login, Notifications and page navigation (20 + 4 visible after the integration suite's user-specific dismiss; backend pagination independently passed at 20 + 5), unread filter, mark-one, mark-all, dismiss, notification detail, known Schedule route, unknown-route detail retention, and EXAM Web-only messaging: PASS.
 - Teacher: real login, 25-fixture pagination (20 + 5), and Schedule category filter: PASS.
 - `npm run typecheck`: PASS
 - `npx expo install --check`: PASS
