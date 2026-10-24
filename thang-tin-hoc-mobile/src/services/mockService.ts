@@ -26,10 +26,103 @@ import {
   mockTeacherStudents,
   mockTeacherThreads,
 } from '../mocks/data';
-import type { DemoUser, UserRole } from '../types';
+import type { DemoUser, ScheduleItem, UserRole } from '../types';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
+const mobileScheduleApiEnabled = String(process.env.EXPO_PUBLIC_MOBILE_SCHEDULE_API || '').toLowerCase() === 'true';
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
+
+function formatScheduleDateLabel(rawDate?: string | null) {
+  if (!rawDate) return 'Chưa xác định';
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return 'Chưa xác định';
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatScheduleTime(startTime?: string | null, endTime?: string | null) {
+  const start = String(startTime || '').trim();
+  const end = String(endTime || '').trim();
+  if (!start && !end) return 'Chưa xác định';
+  if (start && end) return `${start} – ${end}`;
+  return start || end;
+}
+
+function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleItem {
+  const id = String(raw?._id || raw?.id || `${raw?.date || Date.now()}-${raw?.course || raw?.teacherName || role}`);
+  const course = String(raw?.course || raw?.subject || raw?.title || 'Buổi học').trim() || 'Buổi học';
+  const dateValue = raw?.date ? new Date(raw.date) : null;
+  const dateKey = dateValue && !Number.isNaN(dateValue.getTime())
+    ? `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, '0')}-${String(dateValue.getDate()).padStart(2, '0')}`
+    : raw?.date || undefined;
+  const startTime = String(raw?.startTime || raw?.start || '').trim();
+  const endTime = String(raw?.endTime || raw?.end || '').trim();
+  const teacherName = String(raw?.teacherName || raw?.teacherId?.name || 'Giảng viên').trim();
+  const studentName = String(raw?.studentName || raw?.studentId?.name || 'Học viên').trim();
+  const person = role === 'student' ? teacherName : studentName;
+  const status = raw?.status === 'completed' ? 'completed' : raw?.status === 'cancelled' || raw?.status === 'no_show' ? 'cancelled' : 'upcoming';
+  const attendanceStatus = raw?.studentConfirmStatus === 'pending'
+    ? 'pending'
+    : raw?.studentConfirmStatus === 'accepted' || raw?.status === 'completed'
+      ? 'present'
+      : raw?.status === 'no_show'
+        ? 'absent'
+        : 'pending';
+
+  return {
+    id,
+    title: course,
+    subject: course,
+    person,
+    dateLabel: formatScheduleDateLabel(raw?.date),
+    time: formatScheduleTime(startTime, endTime),
+    location: String(raw?.linkHoc || raw?.location || 'Trực tuyến').trim() || 'Trực tuyến',
+    status,
+    date: dateKey,
+    courseName: course,
+    teacherName,
+    studentName,
+    studentId: raw?.studentId && typeof raw.studentId === 'object' ? String(raw.studentId._id || raw.studentId.id || '') : String(raw?.studentId || ''),
+    note: String(raw?.note || raw?.studentNote || '').trim(),
+    attendanceStatus,
+    learningMode: raw?.linkHoc ? 'Trực tuyến' : 'Trực tiếp',
+    meetingUrl: String(raw?.linkHoc || raw?.meetingUrl || '').trim(),
+    confirmedByStudent: ['accepted', 'pending', 'admin_approved'].includes(String(raw?.studentConfirmStatus || '')),
+    confirmedByTeacher: String(raw?.status || '') === 'completed' || String(raw?.studentConfirmStatus || '') === 'admin_approved',
+    grade: raw?.attendancePendingGrade ?? null,
+    color: '#3B82F6',
+  };
+}
+
+async function readRealScheduleList(role: UserRole): Promise<ScheduleItem[]> {
+  const baseUrl = String(process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
+  const envStudentId = String(process.env.EXPO_PUBLIC_MOBILE_STUDENT_ID || '').trim();
+  const envTeacherId = String(process.env.EXPO_PUBLIC_MOBILE_TEACHER_ID || '').trim();
+  const userId = role === 'teacher' ? envTeacherId : envStudentId;
+
+  if (!userId) {
+    return [];
+  }
+
+  const query = new URLSearchParams({
+    ...(role === 'teacher' ? { teacherId: userId } : { studentId: userId }),
+  });
+
+  const response = await fetch(`${baseUrl}/api/schedules?${query.toString()}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+            Authorization: 'Bearer ' + String(process.env.EXPO_PUBLIC_MOBILE_API_TOKEN || '').trim(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Schedule API error (${response.status})`);
+  }
+
+  const payload = await response.json();
+  const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
+  return rows.map((row: Record<string, any>) => mapRealScheduleRow(row, role));
+}
 
 async function readMockList<T>(items: T[]): Promise<T[]> {
   await delay();
@@ -56,6 +149,15 @@ export const authService = {
 
 export const scheduleService = {
   async list(role: UserRole = 'student') {
+    if (mobileScheduleApiEnabled) {
+      try {
+        const realItems = await readRealScheduleList(role);
+        if (realItems.length) return realItems;
+      } catch (error) {
+        console.warn('[mobile:schedule] backend fallback to mock:', error);
+      }
+    }
+
     if (role === 'teacher' && ['attendance-overdue', 'attendance-pending'].includes(qaState || '')) {
       const timing = dateTimeHoursAgo(qaState === 'attendance-overdue' ? 3 : 2);
       const item = {
