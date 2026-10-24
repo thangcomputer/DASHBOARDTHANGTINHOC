@@ -26,12 +26,19 @@ import {
   mockTeacherStudents,
   mockTeacherThreads,
 } from '../mocks/data';
-import type { DemoUser, ScheduleItem, UserRole } from '../types';
+import type { AppNotification, DemoUser, ScheduleItem, UserRole } from '../types';
+import {
+  notificationCategoryForType,
+  notificationTypeForCategory,
+} from '../features/notifications/notificationMapper';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
 const mobileScheduleApiEnabled = String(process.env.EXPO_PUBLIC_MOBILE_SCHEDULE_API || '').toLowerCase() === 'true';
-const mobileNotificationsApiEnabled = String(process.env.EXPO_PUBLIC_MOBILE_NOTIFICATIONS_API || '').toLowerCase() === 'true';
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
+const mockNotificationReadIds: Record<UserRole, Set<string>> = {
+  student: new Set(),
+  teacher: new Set(),
+};
 
 function formatScheduleDateLabel(rawDate?: string | null) {
   if (!rawDate) return 'Chưa xác định';
@@ -195,23 +202,67 @@ export const materialService = {
   async list() { return readMockList(mockMaterials); },
 };
 
-export const notificationService = {
-  async list(role: UserRole = 'student') {
-    if (mobileNotificationsApiEnabled) {
-      throw new Error('Notifications REST is disabled until the authenticated mobile API client is available.');
-    }
-
-    if (qaState === 'notification-25-items') {
-      const source = role === 'teacher' ? mockTeacherNotifications : mockNotifications;
-      const fixture = Array.from({ length: 25 }, (_, index) => {
-        const item = source[index % source.length];
-        return { ...item, id: `qa-notice-${index + 1}`, title: `${item.title} · ${index + 1}`, unread: index % 2 === 0 };
-      });
-      return readMockList(fixture);
-    }
-    return readMockList(role === 'teacher' ? mockTeacherNotifications : mockNotifications);
+export const notificationMockRepository = {
+  async list(
+    role: UserRole = 'student',
+    options: { page?: number; limit?: number; type?: string; category?: string; unreadOnly?: boolean; readOnly?: boolean } = {},
+  ) {
+    const readIds = mockNotificationReadIds[role];
+    const source = getMockNotifications(role).map((item) => (
+      readIds.has(item.id) ? { ...item, unread: false } : item
+    ));
+    return paginateMockNotifications(source, options);
+  },
+  async markRead(role: UserRole, notificationId: string) {
+    mockNotificationReadIds[role].add(notificationId);
+    return { success: true };
+  },
+  async markAllRead(role: UserRole) {
+    for (const item of getMockNotifications(role)) mockNotificationReadIds[role].add(item.id);
+    return { success: true };
   },
 };
+
+function getMockNotifications(role: UserRole) {
+  if (qaState === 'notification-25-items') {
+    const source = role === 'teacher' ? mockTeacherNotifications : mockNotifications;
+    return Array.from({ length: 25 }, (_, index) => {
+      const item = source[index % source.length];
+      return { ...item, id: `qa-notice-${index + 1}`, title: `${item.title} · ${index + 1}`, unread: index % 2 === 0 };
+    });
+  }
+  return role === 'teacher' ? mockTeacherNotifications : mockNotifications;
+}
+
+async function paginateMockNotifications(
+  source: AppNotification[],
+  options: { page?: number; limit?: number; type?: string; category?: string; unreadOnly?: boolean; readOnly?: boolean },
+) {
+  const items = await readMockList(source);
+  const filtered = items.filter((item) => {
+    if (
+      options.type
+      && item.type !== options.type
+      && notificationTypeForCategory(notificationCategoryForType(item.type || item.category)) !== options.type
+    ) return false;
+    if (options.category && notificationCategoryForType(item.type || item.category) !== options.category) return false;
+    if (options.unreadOnly && !item.unread) return false;
+    if (options.readOnly && item.unread) return false;
+    return true;
+  });
+  const page = Math.max(1, Math.floor(options.page || 1));
+  const limit = Math.max(1, Math.floor(options.limit || 20));
+  return {
+    items: filtered.slice((page - 1) * limit, page * limit),
+    unread: items.filter((item) => item.unread).length,
+    pagination: {
+      page,
+      limit,
+      total: filtered.length,
+      pages: Math.max(1, Math.ceil(filtered.length / limit)),
+    },
+  };
+}
 
 export const messageService = {
   async conversations(role: UserRole = 'student') {

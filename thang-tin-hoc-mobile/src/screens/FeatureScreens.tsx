@@ -15,8 +15,11 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  assignmentService, gradeService, learningService, materialService, notificationService, scheduleService, studentProfileService, studentService,
+  assignmentService, gradeService, learningService, materialService, scheduleService, studentProfileService, studentService,
 } from '../services/mockService';
+import { notificationService } from '../features/notifications/notificationService';
+import { notificationCategoryForType, notificationTypeForCategory } from '../features/notifications/notificationMapper';
+import { resolveNotificationDestination } from '../features/notifications/notificationRouting';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import type { AppNotification, Assignment, DemoGradeRecord, DemoStudent, LearningMaterial, ScheduleItem } from '../types';
@@ -834,107 +837,111 @@ function MaterialRow({ item }: { item: LearningMaterial }) {
 }
 
 function notificationCategory(item: AppNotification) {
-  const labels: Record<string, string> = {
-    SYSTEM: 'Hệ thống',
-    COURSE: 'Khóa học',
-    STUDENT: 'Khóa học',
-    FINANCE: 'Tài chính',
-    SCHEDULE: 'Lịch dạy',
-    EXAM: 'Thi',
-    EVALUATION: 'Đánh giá',
-    GRADE: 'Đánh giá',
-    MESSAGE: 'Tin nhắn',
-    ADMIN: 'Admin',
-    NEWS: 'Tin tức',
-    TRAINING: 'Đào tạo',
-    ASSIGNMENT: 'Khóa học',
-    LESSON: 'Khóa học',
-  };
-  const raw = String(item.type || item.payload?.type || item.category || '').trim();
-  const normalized = raw.toUpperCase();
-  if (labels[normalized]) return labels[normalized];
-  const aliases: Record<string, string> = {
-    'LỊCH HỌC': 'Lịch dạy',
-    'HỌC PHÍ': 'Tài chính',
-    'BÀI TẬP': 'Khóa học',
-    'BÀI KIỂM TRA': 'Thi',
-  };
-  return aliases[normalized] || item.category || 'Thông báo';
+  return notificationCategoryForType(item.type || String(item.payload?.type || item.category || ''));
 }
 
 export function NotificationsScreen() {
   const navigation = useNavigation<Navigation>();
-  const { user } = useAuth();
-  const loader = useCallback(() => notificationService.list(user?.role === 'teacher' ? 'teacher' : 'student'), [user?.role]);
-  const resource = useMockResource(loader);
-  const [readIds, setReadIds] = useState<string[]>([]);
-  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const { user, request } = useAuth();
+  const role = user?.role === 'teacher' ? 'teacher' : 'student';
   const [filter, setFilter] = useState('Tất cả');
   const [category, setCategory] = useState('Tất cả');
   const [page, setPage] = useState(1);
+  const selectedType = category === 'Tất cả' ? undefined : notificationTypeForCategory(category);
+  const loader = useCallback(() => notificationService.list(role, {
+    page,
+    limit: 20,
+    type: selectedType,
+    category: category === 'Tất cả' ? undefined : category,
+    unreadOnly: filter === 'Chưa đọc',
+    readOnly: filter === 'Đã đọc',
+  }, request), [category, filter, page, request, role, selectedType]);
+  const resource = useMockResource(loader);
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
   const [routeMessage, setRouteMessage] = useState('');
-  const notifications = (resource.data || []).filter((item) => !hiddenIds.includes(item.id));
-  const webCategories = ['Hệ thống', 'Khóa học', 'Tài chính', 'Lịch dạy', 'Thi', 'Đánh giá', 'Tin nhắn', 'Admin', 'Tin tức', 'Đào tạo', 'Thông báo'];
-  const categories = ['Tất cả', ...new Set([...webCategories, ...notifications.map(notificationCategory)])];
-  const categoryItems = notifications.filter((item) => category === 'Tất cả' || notificationCategory(item) === category);
-  const matchingItems = categoryItems.filter((item) => {
-    const isUnread = item.unread && !readIds.includes(item.id);
-    return filter === 'Tất cả' || (filter === 'Chưa đọc' ? isUnread : !isUnread);
-  });
-  const pageCount = Math.max(1, Math.ceil(matchingItems.length / 20));
-  const currentPage = Math.min(page, pageCount);
-  const pageItems = matchingItems.slice((currentPage - 1) * 20, currentPage * 20);
+  const notifications = (resource.data?.items || []).filter((item) => !hiddenIds.includes(item.id));
+  const webCategories = ['Hệ thống', 'Khóa học', 'Tài chính', 'Đánh giá', 'Tin nhắn', 'Thi', 'Lịch dạy'];
+  const categories = ['Tất cả', ...new Set([...webCategories, 'Khác', ...notifications.map(notificationCategory)])];
+  const pageItems = notifications;
+  const pageCount = resource.data?.pagination.pages || 1;
+  const currentPage = resource.data?.pagination.page || page;
   const visibleUnread = pageItems.filter((item) => item.unread && !readIds.includes(item.id));
   const visibleRead = pageItems.filter((item) => !item.unread || readIds.includes(item.id));
+  const unreadCount = Math.max(
+    0,
+    (resource.data?.unread ?? visibleUnread.length)
+      - notifications.filter((item) => item.unread && readIds.includes(item.id)).length,
+  );
+  const totalCount = resource.data?.pagination.total ?? notifications.length;
 
-  const markAll = () => setReadIds((current) => [...new Set([...current, ...notifications.map((item) => item.id)])]);
-  const toggle = (id: string) => setReadIds((current) => (
-    current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
-  ));
+  const markOneRead = async (id: string) => {
+    try {
+      await notificationService.markRead(role, id, request);
+      setReadIds((current) => [...new Set([...current, id])]);
+      setSelectedNotification((current) => current?.id === id ? { ...current, unread: false } : current);
+      resource.reload();
+    } catch (error) {
+      Alert.alert('Không thể cập nhật', error instanceof Error ? error.message : 'Không thể đánh dấu thông báo đã đọc.');
+    }
+  };
+  const markAll = async () => {
+    try {
+      await notificationService.markAllRead(role, request);
+      setReadIds((current) => [...new Set([...current, ...notifications.map((item) => item.id)])]);
+      resource.reload();
+    } catch (error) {
+      Alert.alert('Không thể cập nhật', error instanceof Error ? error.message : 'Không thể đánh dấu tất cả đã đọc.');
+    }
+  };
   const openRelated = (item: AppNotification) => {
-    const type = String(item.type || item.payload?.type || item.category).trim().toUpperCase();
-    const path = String(item.targetPath || '').toLowerCase();
-    const target = path.includes('inbox') || type === 'MESSAGE'
-      ? { tab: 'Messages' as const }
-      : path.includes('schedule') || type === 'SCHEDULE' || notificationCategory(item) === 'Lịch dạy'
-        ? { tab: 'Schedule' as const }
-        : path.includes('assignment') || type === 'ASSIGNMENT' || item.category === 'Bài tập'
-          ? { screen: 'Assignments' as const }
-          : path.includes('finance') || type === 'FINANCE' || notificationCategory(item) === 'Tài chính'
-            ? user?.role === 'teacher' ? { screen: 'TeacherFinance' as const } : { screen: 'Tuition' as const }
-            : path.includes('exam') || type === 'EXAM'
-              ? user?.role === 'student' ? { screen: 'StudentExam' as const } : { screen: 'TeacherQuizzes' as const }
-              : path.includes('evaluation') || type === 'EVALUATION' || type === 'GRADE'
-                ? user?.role === 'student' ? { screen: 'Evaluations' as const } : { screen: 'Assignments' as const }
-                : path.includes('training') || type === 'TRAINING'
-                  ? user?.role === 'teacher' ? { screen: 'TeacherTraining' as const } : null
-                  : path.includes('news') || type === 'NEWS'
-                    ? { screen: 'News' as const }
-                    : type === 'COURSE' || type === 'STUDENT'
-                      ? user?.role === 'student' ? { screen: 'Materials' as const } : { screen: 'TeacherTraining' as const }
-                      : path.includes('center') || path.includes('profile')
-                        ? { screen: 'CenterInfo' as const }
-                        : null;
-    if (!target) {
-      setRouteMessage('Chưa có màn hình mobile phù hợp cho loại thông báo này. Chi tiết vẫn được giữ để xem.');
+    const destination = resolveNotificationDestination(item, role);
+    if (destination.kind === 'unsupported') {
+      setRouteMessage(destination.reason === 'web-only'
+        ? 'Thông báo này dẫn đến chức năng chỉ có trên Web. Chi tiết vẫn được giữ để xem.'
+        : 'Chưa có màn hình mobile phù hợp cho loại thông báo này. Chi tiết vẫn được giữ để xem.');
       return;
     }
     setSelectedNotification(null);
     setRouteMessage('');
-    if ('tab' in target) navigation.navigate('MainTabs', target.tab === 'Messages' ? { screen: 'Messages' } : { screen: 'Schedule' });
-    else navigation.navigate(target.screen);
+    if (destination.kind === 'tab') {
+      navigation.navigate('MainTabs', destination.name === 'Messages' ? { screen: 'Messages' } : { screen: 'Schedule' });
+      return;
+    }
+    switch (destination.name) {
+      case 'Assignments': navigation.navigate('Assignments'); break;
+      case 'Materials': navigation.navigate('Materials'); break;
+      case 'TeacherFinance': navigation.navigate('TeacherFinance'); break;
+      case 'Tuition': navigation.navigate('Tuition'); break;
+      case 'Evaluations': navigation.navigate('Evaluations'); break;
+      case 'News': navigation.navigate('News'); break;
+      case 'TeacherTraining': navigation.navigate('TeacherTraining'); break;
+      case 'CenterInfo': navigation.navigate('CenterInfo'); break;
+      default: setRouteMessage('Chưa có màn hình mobile phù hợp. Chi tiết vẫn được giữ để xem.');
+    }
   };
-  const hideNotification = (id: string) => {
-    setHiddenIds((current) => [...current, id]);
-    if (selectedNotification?.id === id) setSelectedNotification(null);
+  const hideNotification = async (id: string) => {
+    try {
+      await notificationService.hide(id, request);
+      setHiddenIds((current) => [...new Set([...current, id])]);
+      if (selectedNotification?.id === id) setSelectedNotification(null);
+      resource.reload();
+    } catch (error) {
+      Alert.alert('Không thể ẩn thông báo', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    }
+  };
+  const openNotification = async (item: AppNotification) => {
+    setSelectedNotification(item);
+    setRouteMessage('');
+    if (item.unread && !readIds.includes(item.id)) await markOneRead(item.id);
   };
 
   return (
     <AppScreen>
       <AppHeader
         title="Thông báo"
-        subtitle={`${notifications.filter((item) => item.unread && !readIds.includes(item.id)).length} chưa đọc · ${notifications.length} tổng cộng`}
+        subtitle={`${unreadCount} chưa đọc · ${totalCount} tổng cộng`}
         right={<View style={styles.headerActions}>
           <Pressable onPress={resource.reload} style={styles.readAll} accessibilityRole="button" accessibilityLabel="Làm mới thông báo">
             <Text style={styles.readAllText}>Làm mới</Text>
@@ -963,10 +970,7 @@ export function NotificationsScreen() {
           <Text style={styles.muted}>{selectedNotification.message}</Text>
           {routeMessage ? <Text style={styles.notificationRouteNote}>{routeMessage}</Text> : null}
           {selectedNotification.unread && !readIds.includes(selectedNotification.id) ? (
-            <PrimaryButton title="Đánh dấu đã đọc" variant="secondary" onPress={() => {
-              toggle(selectedNotification.id);
-              setSelectedNotification({ ...selectedNotification, unread: false });
-            }} />
+            <PrimaryButton title="Đánh dấu đã đọc" variant="secondary" onPress={() => markOneRead(selectedNotification.id)} />
           ) : null}
           <View style={styles.modalActions}>
             <PrimaryButton title="Ẩn thông báo" variant="quiet" onPress={() => hideNotification(selectedNotification.id)} />
@@ -977,13 +981,13 @@ export function NotificationsScreen() {
       {visibleUnread.length ? (
         <View style={styles.group}>
           <SectionHeading title="Mới" />
-          {visibleUnread.map((item) => <NotificationCard key={item.id} item={item} onPress={() => { setSelectedNotification(item); setRouteMessage(''); toggle(item.id); }} onDismiss={() => hideNotification(item.id)} />)}
+          {visibleUnread.map((item) => <NotificationCard key={item.id} item={item} onPress={() => openNotification(item)} onDismiss={() => hideNotification(item.id)} />)}
         </View>
       ) : null}
       {visibleRead.length ? (
         <View style={styles.group}>
           <SectionHeading title="Trước đó" />
-          {visibleRead.map((item) => <NotificationCard key={item.id} item={item} onPress={() => { setSelectedNotification(item); setRouteMessage(''); }} onDismiss={() => hideNotification(item.id)} />)}
+          {visibleRead.map((item) => <NotificationCard key={item.id} item={item} onPress={() => openNotification(item)} onDismiss={() => hideNotification(item.id)} />)}
         </View>
       ) : null}
       {!resource.loading && !resource.error && notifications.length > 0 && !visibleUnread.length && !visibleRead.length ? <EmptyState title="Không có thông báo" message="Không có thông báo trong bộ lọc đã chọn." /> : null}

@@ -10,6 +10,11 @@ import type {
 } from './mobileAuthTypes';
 import type { UserRole } from '../types';
 
+export type MobileAuthenticatedRequestOptions = {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: unknown;
+};
+
 type MobileAuthDependencies = {
   api?: typeof mobileAuthApi;
   storage?: typeof mobileAuthStorage;
@@ -231,7 +236,7 @@ export function createMobileAuthService({
 
   async function authenticatedRequest<T>(
     path: string,
-    options: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {},
+    options: MobileAuthenticatedRequestOptions = {},
   ): Promise<T> {
     if (!accessToken) {
       throw new MobileAuthApiError('Cần đăng nhập để tiếp tục.', 401, 'AUTH_REQUIRED');
@@ -273,6 +278,9 @@ export function createMobileAuthService({
   return {
     async signIn(role: UserRole, identifier: string, password: string) {
       return signIn(role, identifier, password);
+    },
+    request<T>(path: string, options: MobileAuthenticatedRequestOptions = {}) {
+      return authenticatedRequest<T>(path, options);
     },
     restore,
     signOut,

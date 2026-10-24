@@ -72,9 +72,11 @@ Read and dismissed state is per-user; dismiss marks the notification read and ad
 
 ## Mobile implementation status
 
-`EXPO_PUBLIC_MOBILE_NOTIFICATIONS_API=false` remains the default. Mock mode continues to use the existing mock fixtures. If the flag is enabled on this branch, the mobile service fails explicitly because this branch does not contain the authenticated mobile API transport. It does not call an unauthenticated endpoint or silently fall back to mock data.
+`EXPO_PUBLIC_MOBILE_NOTIFICATIONS_API=false` remains the default. Mock mode continues to use the existing mock fixtures. If real mode is enabled without the authenticated request callback, the service fails explicitly; it does not call an unauthenticated endpoint or silently fall back to mock data.
 
-The real REST repository, authenticated transport wiring, mapper, mutations, pagination UI, and route resolver are not yet implemented on this branch. The auth client exists on `feature/mobile-auth-client-poc`, but is not an ancestor of the required schedule base commit `6769343271847ee8de99cc79fe951e70b4ee481d`.
+The Notifications REST repository now uses the authenticated request exposed by the integrated Mobile Auth Client. Real mode also requires `EXPO_PUBLIC_MOBILE_AUTH_POC=true` and a configured API base URL; otherwise the Auth Client fails explicitly without a mock fallback. The Auth Client supplies bearer access tokens, refresh/single-flight behavior, CSRF for mutations, and revoked-session cleanup. List, server pagination, type/unread filters, read-only pagination, mark-one, mark-all, and per-user dismiss are implemented in the mobile feature layer.
+
+Backend rows are mapped from the actual response fields (`id`, `type`, `title`, `content`, `createdAt`, `read`, `payload`, and `path`). Unknown types map to `Khác`; unknown routes remain in notification detail. `EXAM` destinations remain Web-only.
 
 ## Out of scope
 

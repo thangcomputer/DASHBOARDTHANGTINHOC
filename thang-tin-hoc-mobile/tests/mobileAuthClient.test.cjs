@@ -196,6 +196,30 @@ test('session API methods use bearer auth and backend contract paths', async () 
   assert.equal(calls[2].options.accessToken, 'access-login');
 });
 
+test('shared authenticated request supports PUT and retains bearer credentials', async () => {
+  const storage = makeStorage();
+  const calls = [];
+  const api = {
+    async request(path, options) {
+      calls.push({ path, options });
+      if (path === '/api/auth/login/mobile') return loginResponse();
+      return { success: true };
+    },
+  };
+  const service = createMobileAuthService({ api, storage, platform: 'android' });
+  await service.signIn('student', '0901234567', 'mobile-test-password');
+
+  await service.request('/api/notifications/mark-read', {
+    method: 'PUT',
+    body: { notificationId: 'notice-1' },
+  });
+
+  assert.equal(calls[1].path, '/api/notifications/mark-read');
+  assert.equal(calls[1].options.method, 'PUT');
+  assert.deepEqual(calls[1].options.body, { notificationId: 'notice-1' });
+  assert.equal(calls[1].options.accessToken, 'access-login');
+});
+
 test('refresh replay clears local auth state', async () => {
   const storage = makeStorage(storedSession);
   let invalidations = 0;

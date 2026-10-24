@@ -16,7 +16,7 @@ export class MobileAuthApiError extends Error {
 }
 
 type ApiRequestOptions = {
-  method?: 'GET' | 'POST' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   accessToken?: string;
   csrf?: boolean;
@@ -89,7 +89,7 @@ export class MobileAuthApi {
 
   private async send(
     path: string,
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     options: ApiRequestOptions,
     csrfToken: string | null,
   ): Promise<Response> {

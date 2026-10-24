@@ -12,27 +12,38 @@
 
 ## Architecture findings
 
-- `NotificationsScreen` calls `notificationService` from `src/services/mockService.ts`.
-- Before this review, `mockService.ts` contained a direct unauthenticated `fetch()` for real notifications and caught errors by falling back to mock data. It also exposed mutation methods that returned success without making requests.
-- The required shared authenticated mobile API client is not present on the schedule base commit. The mobile Auth Client files exist on `feature/mobile-auth-client-poc`, which is not an ancestor of this branch.
-- The direct fetch, silent fallback, and fake-success mutation methods have been removed from `mockService.ts`.
-- Current behavior:
-  - Flag OFF: mock notifications and mock UI interactions remain available.
-  - Flag ON: the service fails explicitly with an authenticated-transport-unavailable error; no request is made and no mock fallback occurs.
-- There is no functioning Notifications REST path on this branch yet. The API contract is documented separately in [MOBILE_NOTIFICATIONS_API_CONTRACT.md](./MOBILE_NOTIFICATIONS_API_CONTRACT.md).
+- Before the refactor, `mockService.ts` contained unauthenticated Notifications `fetch()` logic, silent mock fallback, and fake-success mutation handlers; those paths were removed.
+- Screen: `NotificationsScreen` and the Home unread badge.
+- Coordinator: `src/features/notifications/notificationService.ts` chooses the repository centrally using the default-off feature flag.
+- Mock path: `notificationMockRepository` in `src/services/mockService.ts` reads Student/Teacher fixtures and applies local pagination/filters.
+- `mockService.ts` still contains the pre-existing Schedule API integration; that Schedule code was not refactored as part of Notifications.
+- Real path: `src/features/notifications/notificationApiRepository.ts` sends REST requests through the AuthContext request function; it does not call `fetch()` directly.
+- Shared Auth transport: `mobileAuthService.request()` calls the existing `MobileAuthApi`, preserving bearer tokens, refresh/single-flight, CSRF for PUT/DELETE, and revoked-session handling.
+- Real mode also requires `EXPO_PUBLIC_MOBILE_AUTH_POC=true` and a configured API base URL; otherwise the Auth Client fails explicitly without a mock fallback.
+- Mapper: `src/features/notifications/notificationMapper.ts` maps backend rows to `AppNotification`; raw DB rows do not enter UI.
+- Destination resolver: `src/features/notifications/notificationRouting.ts` routes only supported destinations; unknown and Web-only exam destinations stay in detail.
+- API errors are surfaced; real mode does not silently fall back to mock.
 
 ## Test coverage and validation evidence
 
 ### Unit/service tests
 
-- `npm run test:notifications`: PASS (1/1). Covers mock mode selection and explicit failure when real mode is enabled without authenticated transport.
-- No mapper, route resolver, API repository, or real mutation service remains implemented here to test.
-- `npm run test:auth`, `npm run test:profile`, and schedule test scripts are not defined in this mobile package.
-- No backend integration test was run for the Notifications endpoints.
+- `npm run test:notifications`: PASS (9/9). Covers mock/real flag selection, mapper/type/category/read/unread, mock and backend pagination, duplicate removal while filtering, known/unknown/Web-only destinations, all three mutations, and API error/fail-closed behavior.
+- `npm run test:auth`: PASS (17/17), including authenticated PUT support and the existing refresh, CSRF, single-flight, session invalidation, and storage regression cases.
+- Profile/schedule test scripts are not configured in this mobile package; no such tests were found in the mobile test directory.
 
 ### Expo Web smoke
 
-Validation of the mobile project is reported separately below. Expo Web export is not evidence that authenticated Notifications REST requests work.
+- `npm run typecheck`: PASS
+- `npx expo install --check`: PASS
+- `npx expo export --platform web`: PASS
+- Expo Web export validates bundling only; it is not evidence of authenticated Notifications API integration against a running backend.
+
+### Isolated backend integration
+
+- Notifications endpoint integration against a running isolated backend: `NOT RUN`
+- Test ports `27019`, `6382`, and `8081` were free at inspection; unrelated existing Docker services on ports `6379` and `6381` were not touched.
+- Do not report `NOTIFICATIONS BACKEND INTEGRATION PASS`.
 
 ### Native
 
@@ -41,23 +52,26 @@ Validation of the mobile project is reported separately below. Expo Web export i
 
 ## Validation
 
+- `npm run test:notifications`: PASS (9/9)
+- `npm run test:auth`: PASS (17/17)
 - `npm run typecheck`: PASS
 - `npx expo install --check`: PASS
 - `npx expo export --platform web`: PASS
 - `git diff --check`: PASS
-- Auth/profile/schedule test commands: not configured in the mobile package; not run
-- Notification service regression: `1/1 PASS` (mock/default and fail-closed real flag behavior only)
+- Profile/schedule tests: no mobile scripts/tests configured; not run
 - Isolated Notifications backend integration: `NOT RUN`
 
 ## Readiness
 
-- Mock Notifications mode: `PASS` (mock-data path retained; no focused regression test available)
-- Real Notifications REST mode: `NOT READY` (authenticated mobile transport absent on this base)
-- Mobile Notifications API implementation: `NOT READY`
-- Expo Web QA: `PASS` for export/build only; not authenticated API integration evidence
+- Mock Notifications mode: `PASS`
+- Real Notifications REST client implementation: `PASS` (feature-flagged and uses shared authenticated transport; backend integration remains unverified)
+- Mobile Notifications API implementation: `READY`
+- Expo Web QA: `PASS` for build/export only; authenticated backend integration not claimed
 - Native Notifications QA: `BLOCKED / NOT RUN`
 - Production ready: `NO`
 
-## Required next prerequisite
+## Release gates
 
-Integrate the already validated mobile Auth Client into this schedule-based branch (or create a new base that contains it), expose/reuse its authenticated request method, and then implement Notifications API/mock repositories, service selection, mutations, route resolution, and focused tests. Do not reintroduce direct `fetch()` in `mockService.ts` or mock success responses for real mutations.
+- Run disposable Student and Teacher notification integration tests against an isolated backend.
+- Perform native Android/iOS QA, including CSRF cookie behavior, app restart, and real SecureStore.
+- No Learning API work is included in this checkpoint.

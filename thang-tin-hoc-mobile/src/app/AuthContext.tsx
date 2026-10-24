@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { createMobileAuthService } from '../services/mobileAuthService';
+import type { MobileAuthenticatedRequestOptions } from '../services/mobileAuthService';
 import { authService } from '../services/mockService';
 import type { DemoUser, UserRole } from '../types';
 
@@ -22,6 +23,7 @@ type AuthContextValue = {
   isSigningIn: boolean;
   signIn: (role: UserRole, phone: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  request: <T>(path: string, options?: MobileAuthenticatedRequestOptions) => Promise<T>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -96,6 +98,12 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setUser(null);
         setStatus('unauthenticated');
       }
+    },
+    request<T>(path: string, options?: MobileAuthenticatedRequestOptions) {
+      if (!isMobileAuthPocEnabled) {
+        throw new Error('Real authenticated API requests require EXPO_PUBLIC_MOBILE_AUTH_POC=true.');
+      }
+      return mobileAuth.request<T>(path, options);
     },
   }), [user, status]);
 

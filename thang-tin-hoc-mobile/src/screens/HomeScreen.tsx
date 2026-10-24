@@ -1,18 +1,19 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
   ArrowRight, Award, Bell, BookOpen, CalendarDays, ClipboardCheck, FileText, GraduationCap,
   MessageCircle, Star, Users, WalletCards, UserPlus,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../app/AuthContext';
 import { Avatar, AppScreen, Card, ErrorState, LoadingSkeleton, ScheduleCard, SectionHeading, StatusBadge, ProgressBar } from '../components/ui';
 import {
   assignmentService, financeService, learningService, materialService, messageService,
-  notificationService, quizService, scheduleService, studentService,
+  quizService, scheduleService, studentService,
 } from '../services/mockService';
+import { notificationService } from '../features/notifications/notificationService';
 import { useMockResource } from '../hooks/useMockResource';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
@@ -21,7 +22,7 @@ type RootNavigation = NativeStackNavigationProp<AppStackParamList>;
 type TabNavigation = BottomTabNavigationProp<MainTabsParamList>;
 
 export function HomeScreen() {
-  const { user } = useAuth();
+  const { user, request } = useAuth();
   const tabNavigation = useNavigation<TabNavigation>();
   const navigation = tabNavigation.getParent<RootNavigation>();
   const { width } = useWindowDimensions();
@@ -29,7 +30,10 @@ export function HomeScreen() {
   const schedulesLoader = useCallback(() => scheduleService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const assignmentsLoader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const learningLoader = useCallback(() => learningService.courses(), []);
-  const notificationsLoader = useCallback(() => notificationService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
+  const notificationsLoader = useCallback(
+    () => notificationService.list(isTeacher ? 'teacher' : 'student', { page: 1, limit: 20 }, request),
+    [isTeacher, request],
+  );
   const studentsLoader = useCallback(() => studentService.assigned(), []);
   const financeLoader = useCallback(() => financeService.list(), []);
   const materialsLoader = useCallback(() => materialService.list(), []);
@@ -44,12 +48,18 @@ export function HomeScreen() {
   const materials = useMockResource(materialsLoader);
   const quizzes = useMockResource(quizzesLoader);
   const messages = useMockResource(messagesLoader);
+  const wasHomeFocused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (wasHomeFocused.current) notifications.reload();
+    wasHomeFocused.current = true;
+  }, [notifications.reload]));
 
   const firstSchedule = schedules.data?.find((item) => item.status === 'upcoming');
-  const unreadNotifications = notifications.data?.filter((item) => item.unread) || [];
+  const notificationItems = notifications.data?.items || [];
+  const unreadNotifications = notificationItems.filter((item) => item.unread);
   const firstUnreadNotification = unreadNotifications[0];
   const assignmentsToGrade = assignments.data?.filter((item) => item.status === 'Cần chấm') || [];
-  const unreadCount = unreadNotifications.length;
+  const unreadCount = notifications.data?.unread ?? unreadNotifications.length;
   const pendingAssignments = assignments.data?.filter((item) => item.status === 'Chưa làm' || item.status === 'Quá hạn') || [];
   const unreadMessages = messages.data?.reduce((count, item) => count + item.unread, 0);
   const gradeEntries = schedules.data?.filter((item) => item.grade != null) || [];
