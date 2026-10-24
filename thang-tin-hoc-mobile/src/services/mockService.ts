@@ -30,6 +30,7 @@ import type { DemoUser, ScheduleItem, UserRole } from '../types';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
 const mobileScheduleApiEnabled = String(process.env.EXPO_PUBLIC_MOBILE_SCHEDULE_API || '').toLowerCase() === 'true';
+const mobileNotificationsApiEnabled = String(process.env.EXPO_PUBLIC_MOBILE_NOTIFICATIONS_API || '').toLowerCase() === 'true';
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
 
 function formatScheduleDateLabel(rawDate?: string | null) {
@@ -196,6 +197,10 @@ export const materialService = {
 
 export const notificationService = {
   async list(role: UserRole = 'student') {
+    if (mobileNotificationsApiEnabled) {
+      throw new Error('Notifications REST is disabled until the authenticated mobile API client is available.');
+    }
+
     if (qaState === 'notification-25-items') {
       const source = role === 'teacher' ? mockTeacherNotifications : mockNotifications;
       const fixture = Array.from({ length: 25 }, (_, index) => {
