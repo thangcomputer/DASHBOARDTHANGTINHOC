@@ -65,10 +65,10 @@ export function HomeScreen() {
         { title: 'Khóa đào tạo', icon: GraduationCap, route: 'TeacherTraining' as const, tint: colors.purpleSoft },
         { title: 'Tài chính', icon: WalletCards, route: 'TeacherFinance' as const, tint: colors.greenSoft },
       ] : [
-        { title: 'Video khóa học', icon: BookOpen, route: 'StudentLearning' as const, tint: colors.purpleSoft },
-        { title: 'Bài tập và tài nguyên', icon: FileText, route: 'Materials' as const, tint: colors.blueSoft },
-        { title: 'Đánh giá GV', icon: Star, route: 'Evaluations' as const, tint: colors.goldSoft },
-        { title: 'Phòng thi', icon: GraduationCap, route: 'StudentExam' as const, tint: colors.redSoft },
+        { title: 'Bài học', icon: BookOpen, route: 'StudentLearning' as const, tint: colors.purpleSoft },
+        { title: 'Lịch học', icon: CalendarDays, route: 'Schedule' as const, tint: colors.blueSoft },
+        { title: 'Tài liệu', icon: FileText, route: 'Materials' as const, tint: colors.goldSoft },
+        { title: 'Thông báo', icon: Bell, route: 'NotificationCenter' as const, tint: colors.redSoft },
       ];
 
   return (
@@ -250,7 +250,7 @@ export function HomeScreen() {
             <SectionHeading title="Việc cần làm hôm nay" />
             <Text style={styles.muted}>Các hoạt động đang chờ bạn</Text>
             {[
-              { title: 'Trắc nghiệm buổi học', detail: quizzes.loading ? '—' : quizzes.data?.length ? `${quizzes.data.length} bài được giao` : 'Không có bài chờ', icon: ClipboardCheck, route: 'StudentExam' as const },
+              { title: 'Lộ trình học tập', detail: learning.loading ? '—' : learning.data?.length ? `${learning.data.length} khóa đang theo dõi` : 'Không có khóa đang theo dõi', icon: BookOpen, route: 'StudentLearning' as const },
               { title: 'Bài tập về nhà', detail: assignments.loading ? '—' : `${pendingAssignments.length} bài cần nộp`, icon: FileText, route: 'Assignments' as const },
               { title: 'Lịch học sắp tới', detail: schedules.loading ? '—' : `${schedules.data?.filter((item) => item.status === 'upcoming').length ?? '—'} buổi sắp tới`, icon: CalendarDays, route: 'Schedule' as const },
               { title: 'Tin nhắn & Phản hồi', detail: messages.loading ? '—' : `${unreadMessages ?? '—'} tin nhắn mới`, icon: MessageCircle, route: 'Messages' as const },
@@ -328,14 +328,38 @@ export function HomeScreen() {
             <Pressable
               key={title}
               onPress={() => {
-                if (route === 'Assignments') navigation?.navigate('Assignments');
-                else if (route === 'Materials') navigation?.navigate('Materials');
-                else if (route === 'TeacherTraining') navigation?.navigate('TeacherTraining');
-                else if (route === 'TeacherFinance') navigation?.navigate('TeacherFinance');
-                else if (route === 'Feed') navigation?.navigate('Feed');
-                else if (route === 'StudentLearning') navigation?.navigate('StudentLearning');
-                else if (route === 'Evaluations') navigation?.navigate('Evaluations');
-                else if (route === 'StudentExam') navigation?.navigate('StudentExam');
+                const routeName = route as string;
+                switch (routeName) {
+                  case 'Assignments':
+                    navigation?.navigate('Assignments');
+                    break;
+                  case 'Materials':
+                    navigation?.navigate('Materials');
+                    break;
+                  case 'TeacherTraining':
+                    navigation?.navigate('TeacherTraining');
+                    break;
+                  case 'TeacherFinance':
+                    navigation?.navigate('TeacherFinance');
+                    break;
+                  case 'Feed':
+                    navigation?.navigate('Feed');
+                    break;
+                  case 'StudentLearning':
+                    navigation?.navigate('StudentLearning');
+                    break;
+                  case 'Evaluations':
+                    navigation?.navigate('Evaluations');
+                    break;
+                  case 'Schedule':
+                    tabNavigation.navigate('Schedule');
+                    break;
+                  case 'NotificationCenter':
+                    navigation?.navigate('NotificationCenter');
+                    break;
+                  default:
+                    break;
+                }
               }}
               style={[styles.quickAction, width < 360 && styles.quickActionSmall]}
               accessibilityRole="button"
