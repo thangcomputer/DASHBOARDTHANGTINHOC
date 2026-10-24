@@ -231,7 +231,7 @@ export function createMobileAuthService({
 
   async function authenticatedRequest<T>(
     path: string,
-    options: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {},
+    options: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {},
   ): Promise<T> {
     if (!accessToken) {
       throw new MobileAuthApiError('Cần đăng nhập để tiếp tục.', 401, 'AUTH_REQUIRED');
@@ -276,6 +276,12 @@ export function createMobileAuthService({
     },
     restore,
     signOut,
+    async request<T>(
+      path: string,
+      options: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {},
+    ) {
+      return authenticatedRequest<T>(path, options);
+    },
     async getSessions() {
       const response = await authenticatedRequest<{ success: true; data: MobileSessionInfo[] }>('/api/auth/sessions');
       return response.data;

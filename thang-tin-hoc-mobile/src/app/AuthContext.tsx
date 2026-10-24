@@ -20,6 +20,10 @@ type AuthContextValue = {
   status: AuthStatus;
   authMode: 'mock' | 'real';
   isSigningIn: boolean;
+  apiRequest: <T>(
+    path: string,
+    options?: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown },
+  ) => Promise<T>;
   signIn: (role: UserRole, phone: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -46,6 +50,10 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     });
   }
   const mobileAuth = authServiceRef.current;
+  const apiRequest = React.useCallback(<T,>(
+    path: string,
+    options?: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown },
+  ) => mobileAuth.request<T>(path, options), [mobileAuth]);
 
   React.useEffect(() => {
     if (!isMobileAuthPocEnabled) return undefined;
@@ -69,6 +77,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     status,
     authMode: isMobileAuthPocEnabled ? 'real' : 'mock',
     isSigningIn: status === 'authenticating',
+    apiRequest,
     async signIn(role, phone, password) {
       setStatus('authenticating');
       try {
@@ -97,7 +106,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setStatus('unauthenticated');
       }
     },
-  }), [user, status]);
+  }), [user, status, apiRequest]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

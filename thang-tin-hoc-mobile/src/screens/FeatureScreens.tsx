@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BookOpen, CalendarDays, Check, Clock3, FileSpreadsheet, FileText, Film, GraduationCap, Link2,
   Eye, EyeOff, MapPin, MessageCircle, UserRound, Users, WalletCards,
@@ -14,6 +14,9 @@ import {
   SectionHeading, StatusBadge, uiStyles,
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
+import { useProfile } from '../hooks/useProfile';
+import { isMobileProfileApiEnabled } from '../services/mobileProfileConfig';
+import type { StudentProfileUpdate, TeacherProfileUpdate } from '../services/profileTypes';
 import {
   assignmentService, gradeService, learningService, materialService, notificationService, scheduleService, studentProfileService, studentService,
 } from '../services/mockService';
@@ -22,6 +25,17 @@ import type { AppStackParamList } from '../navigation/types';
 import type { AppNotification, Assignment, DemoGradeRecord, DemoStudent, LearningMaterial, ScheduleItem } from '../types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
+
+const voiceRegionOptions = [
+  { value: 'bac', label: 'Miền Bắc' },
+  { value: 'trung', label: 'Miền Trung' },
+  { value: 'nam', label: 'Miền Nam' },
+  { value: 'tay', label: 'Miền Tây' },
+];
+
+function voiceRegionLabel(value: string) {
+  return voiceRegionOptions.find((option) => option.value === value)?.label || value;
+}
 
 function isOverdueAttendance(item: ScheduleItem) {
   if (!item.date || !item.attendanceStatus || item.attendanceStatus !== 'pending' || item.status === 'cancelled') return false;
@@ -1275,6 +1289,235 @@ export function GradesScreen() {
 }
 
 export function ProfileScreen() {
+  return isMobileProfileApiEnabled ? <RealProfileScreen /> : <MockProfileScreen />;
+}
+
+function RealProfileScreen() {
+  const { user, signOut } = useAuth();
+  const { profile, loading, saving, error, refresh, update } = useProfile();
+  const [showEditor, setShowEditor] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [form, setForm] = useState({
+    email: '',
+    zalo: '',
+    address: '',
+    bio: '',
+    voiceRegion: '',
+    age: '',
+  });
+  const isTeacher = user?.role === 'teacher';
+
+  React.useEffect(() => {
+    if (!profile) return;
+    setForm({
+      email: profile.email,
+      zalo: profile.zalo,
+      address: profile.address,
+      bio: profile.bio,
+      voiceRegion: profile.voiceRegion,
+      age: profile.age,
+    });
+  }, [profile]);
+
+  const save = async () => {
+    setFormError('');
+    try {
+      if (isTeacher) {
+        const age = form.age.trim() ? Number(form.age) : null;
+        if (age !== null && (!Number.isInteger(age) || age < 18 || age > 100)) {
+          setFormError('Tuổi giảng viên phải là số nguyên từ 18 đến 100.');
+          return;
+        }
+        const payload: TeacherProfileUpdate = {
+          email: form.email.trim(),
+          zalo: form.zalo.trim(),
+          address: form.address.trim(),
+          bio: form.bio.trim(),
+          voiceRegion: form.voiceRegion.trim(),
+          age,
+        };
+        await update(payload);
+      } else {
+        const payload: StudentProfileUpdate = {
+          email: form.email.trim(),
+          zalo: form.zalo.trim(),
+          address: form.address.trim(),
+        };
+        await update(payload);
+      }
+      setShowEditor(false);
+    } catch (saveError) {
+      setFormError(saveError instanceof Error ? saveError.message : 'Không thể lưu thay đổi. Vui lòng thử lại.');
+    }
+  };
+
+  if (loading && !profile) {
+    return (
+      <AppScreen>
+        <AppHeader title="Hồ sơ" subtitle="Đang tải hồ sơ từ máy chủ" />
+        <LoadingSkeleton rows={2} />
+      </AppScreen>
+    );
+  }
+
+  if (error && !profile) {
+    return (
+      <AppScreen>
+        <AppHeader title={isTeacher ? 'Hồ sơ' : 'Cá nhân'} subtitle="Hồ sơ tài khoản" />
+        <Card style={styles.realProfileState}>
+          <Text style={styles.realProfileError}>{error}</Text>
+          <PrimaryButton title="Thử lại" variant="secondary" onPress={() => { void refresh(); }} loading={loading} />
+        </Card>
+      </AppScreen>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <AppScreen>
+        <AppHeader title="Hồ sơ" subtitle="Hồ sơ tài khoản" />
+        <EmptyState title="Chưa có hồ sơ" message="Không có dữ liệu hồ sơ cho tài khoản đang đăng nhập." />
+      </AppScreen>
+    );
+  }
+
+  const fields: Array<[string, string]> = profile.role === 'student'
+    ? [
+      ['Họ và tên', profile.name],
+      ['Mã học viên', profile.code],
+      ['Số điện thoại', profile.phone],
+      ['Email', profile.email],
+      ['Zalo', profile.zalo],
+      ['Địa chỉ', profile.address],
+      ['Giới tính', profile.gender],
+      ['Trạng thái', profile.status],
+      ['Khóa học', profile.course],
+    ]
+    : [
+      ['Họ và tên', profile.name],
+      ['Mã giảng viên', profile.code],
+      ['Số điện thoại', profile.phone],
+      ['Email', profile.email],
+      ['Zalo', profile.zalo],
+      ['Địa chỉ', profile.address],
+      ['Tuổi', profile.age],
+      ['Chuyên môn', profile.specialty],
+      ['Khu vực giọng nói', voiceRegionLabel(profile.voiceRegion)],
+      ['Giới thiệu', profile.bio],
+      ['Trạng thái', profile.status],
+      ['Số tài khoản', profile.bankAccount],
+    ];
+
+  return (
+    <AppScreen>
+      <AppHeader title={isTeacher ? 'Hồ sơ' : 'Cá nhân'} subtitle="Thông tin hồ sơ từ tài khoản" />
+      <View style={styles.realProfileActions}>
+        <Pressable
+          onPress={() => { void refresh(); }}
+          disabled={loading}
+          style={styles.realProfileAction}
+          accessibilityRole="button"
+          accessibilityLabel="Tải lại hồ sơ"
+        >
+          <Text style={styles.realProfileActionText}>{loading ? 'Đang tải…' : 'Tải lại'}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => { setFormError(''); setShowEditor(true); }}
+          style={styles.realProfileAction}
+          accessibilityRole="button"
+          accessibilityLabel="Chỉnh sửa hồ sơ"
+        >
+          <Text style={styles.realProfileActionText}>Chỉnh sửa</Text>
+        </Pressable>
+      </View>
+      {error ? <Text style={styles.realProfileError}>{error}</Text> : null}
+      <Card style={styles.realProfileHero}>
+        <Avatar name={profile.name} color={user?.avatarColor} size={68} />
+        <Text style={styles.profileName}>{profile.name}</Text>
+        <Text style={styles.muted}>{isTeacher ? 'Giảng viên' : 'Học viên'} · {profile.code || '—'}</Text>
+        {profile.status ? <StatusBadge label={profile.status} /> : null}
+      </Card>
+      <Card style={styles.profileDetails}>
+        <SectionHeading title="Thông tin cá nhân" />
+        {fields.map(([label, value]) => (
+          <View key={label} style={styles.teacherProfileField}>
+            <Text style={styles.teacherProfileLabel}>{label}</Text>
+            <Text style={styles.teacherProfileValue}>{value || '—'}</Text>
+          </View>
+        ))}
+      </Card>
+      <Card style={styles.realProfileState}>
+        <Text style={styles.metaText}>Thông tin hồ sơ được tải trực tiếp từ API. Ảnh đại diện và đổi mật khẩu chưa được kết nối.</Text>
+        <PrimaryButton
+          title="Đăng xuất"
+          variant="quiet"
+          onPress={() => {
+            void signOut().catch((signOutError: unknown) => {
+              Alert.alert(
+                'Đã đăng xuất khỏi thiết bị',
+                signOutError instanceof Error ? signOutError.message : 'Không thể xác nhận đăng xuất với máy chủ.',
+              );
+            });
+          }}
+        />
+      </Card>
+      <Modal visible={showEditor} transparent animationType="slide" onRequestClose={() => setShowEditor(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView
+            style={styles.realProfileModalScroll}
+            contentContainerStyle={styles.realProfileModalContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.cardTitle}>Cập nhật thông tin cá nhân</Text>
+            <Text style={styles.metaText}>Họ tên và số điện thoại chính không thể chỉnh sửa tại đây.</Text>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <TextInput value={form.email} onChangeText={(email) => setForm((current) => ({ ...current, email }))} placeholder="Email" keyboardType="email-address" autoCapitalize="none" style={styles.formInput} />
+            <Text style={styles.fieldLabel}>Zalo</Text>
+            <TextInput value={form.zalo} onChangeText={(zalo) => setForm((current) => ({ ...current, zalo }))} placeholder="Zalo" keyboardType="phone-pad" style={styles.formInput} />
+            <Text style={styles.fieldLabel}>Địa chỉ</Text>
+            <TextInput value={form.address} onChangeText={(address) => setForm((current) => ({ ...current, address }))} placeholder="Địa chỉ" style={styles.formInput} />
+            {isTeacher ? (
+              <>
+                <Text style={styles.fieldLabel}>Giới thiệu</Text>
+                <TextInput value={form.bio} onChangeText={(bio) => setForm((current) => ({ ...current, bio }))} placeholder="Giới thiệu" multiline style={[styles.formInput, styles.formTextarea]} />
+                <Text style={styles.fieldLabel}>Khu vực giọng nói</Text>
+                <View style={styles.realProfileVoiceOptions}>
+                  {voiceRegionOptions.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setForm((current) => ({ ...current, voiceRegion: option.value }))}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: form.voiceRegion === option.value }}
+                      style={[
+                        styles.realProfileVoiceOption,
+                        form.voiceRegion === option.value && styles.realProfileVoiceOptionSelected,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.realProfileVoiceOptionText,
+                        form.voiceRegion === option.value && styles.realProfileVoiceOptionTextSelected,
+                      ]}>{option.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.fieldLabel}>Tuổi</Text>
+                <TextInput value={form.age} onChangeText={(age) => setForm((current) => ({ ...current, age }))} placeholder="Tuổi (18–100)" keyboardType="number-pad" style={styles.formInput} />
+              </>
+            ) : null}
+            {formError || error ? <Text style={styles.realProfileError}>{formError || error}</Text> : null}
+            <PrimaryButton title="Lưu thay đổi" onPress={() => { void save(); }} loading={saving} />
+            <PrimaryButton title="Hủy" variant="quiet" disabled={saving} onPress={() => setShowEditor(false)} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </AppScreen>
+  );
+}
+
+function MockProfileScreen() {
   const { user, signOut, authMode } = useAuth();
   const navigation = useNavigation<Navigation>();
   const isTeacher = user?.role === 'teacher';
@@ -1714,6 +1957,19 @@ const styles = StyleSheet.create({
   examNotice: { backgroundColor: colors.goldSoft, borderColor: '#F3E4BE' },
   profileCard: { alignItems: 'center', paddingVertical: spacing.xxl },
   profileDetails: { gap: spacing.md },
+  realProfileHero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
+  realProfileActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  realProfileAction: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  realProfileActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
+  realProfileError: { color: colors.red, fontSize: typography.small, lineHeight: 20 },
+  realProfileState: { gap: spacing.md },
+  realProfileModalScroll: { maxHeight: '90%', backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  realProfileModalContent: { padding: spacing.lg, gap: spacing.md },
+  realProfileVoiceOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  realProfileVoiceOption: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface },
+  realProfileVoiceOptionSelected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
+  realProfileVoiceOptionText: { color: colors.muted, fontSize: typography.caption, fontWeight: '600' },
+  realProfileVoiceOptionTextSelected: { color: colors.brandDark },
   profileStats: { alignSelf: 'stretch', flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
   profileStat: { alignItems: 'center', backgroundColor: colors.canvas, borderRadius: radius.md, flex: 1, minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm },
   profileStatValue: { color: colors.ink, fontSize: typography.title, fontWeight: '700' },

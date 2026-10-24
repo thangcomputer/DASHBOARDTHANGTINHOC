@@ -28,7 +28,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:auth": "node tests/mobileAuthClient.test.cjs"
+    "test:auth": "node tests/mobileAuthClient.test.cjs",
+    "test:profile": "node tests/mobileProfileApi.test.cjs",
+    "test:profile:integration": "node tests/mobileProfileApi.integration.cjs"
   },
   "private": true
 }
