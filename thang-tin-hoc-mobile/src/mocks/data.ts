@@ -7,6 +7,7 @@ import type {
   DemoEvaluation,
   DemoFeedPost,
   DemoFinanceTransaction,
+  DemoGradeRecord,
   DemoNewsItem,
   DemoQuiz,
   DemoSoftwareLink,
@@ -31,6 +32,16 @@ export const mockStudent: DemoUser = {
   branch: 'Trung tâm Thắng Tin Học',
   avatarColor: '#DDF1EB',
 };
+
+export const mockStudentProfileQaEnrollments: NonNullable<DemoUser['enrollments']> = [
+  { id: 'qa-enrollment-completed', courseName: 'Khóa học mẫu đã hoàn thành', teacherName: 'Giảng viên mẫu', registeredAt: 'QA fixture', progress: 100, completedSessions: 8, totalSessions: 8, avgGrade: 8.6, status: 'Hoàn thành', tuitionAmount: 2400000, paidAmount: 2400000 },
+  { id: 'qa-enrollment-active', courseName: 'Khóa học mẫu đang học', teacherName: '—', registeredAt: 'QA fixture', progress: 42, completedSessions: 5, totalSessions: 12, avgGrade: 7.8, status: 'Đang học', tuitionAmount: 1800000, paidAmount: 900000 },
+];
+
+export const mockStudentProfileQaVideoOrders: NonNullable<DemoUser['videoOrders']> = [
+  { id: 'qa-video-order-paid', courseName: 'Khóa video mẫu đã thanh toán', amount: 450000, status: 'Đã thanh toán', date: 'QA fixture' },
+  { id: 'qa-video-order-pending', courseName: 'Khóa video mẫu chờ thanh toán', amount: 350000, status: 'Chờ thanh toán', date: 'QA fixture' },
+];
 
 export const mockTeacher: DemoUser = {
   id: 'teacher-demo',
@@ -140,7 +151,7 @@ export const mockTeacherSchedule: ScheduleItem[] = [
 
 export const mockAssignments: Assignment[] = [
   { id: 'task-1', title: 'Bảng tính chi tiêu gia đình', subject: 'Microsoft Excel', teacher: 'Thầy Hoàng Nam', deadline: 'Hạn nộp hôm nay, 22:00', status: 'Chưa làm', description: 'Thực hành theo nội dung được giao trong khóa học.' },
-  { id: 'task-2', title: 'Định dạng báo cáo tháng', subject: 'Microsoft Word', teacher: 'Cô Ngọc Hà', deadline: 'Hạn nộp 29/10/2026', status: 'Đã nộp', description: 'Hoàn thiện định dạng báo cáo theo yêu cầu.' },
+  { id: 'task-2', title: 'Định dạng báo cáo tháng', subject: 'Microsoft Word', teacher: 'Cô Ngọc Hà', deadline: 'Hạn nộp 29/10/2026', status: 'Đã nộp', description: 'Hoàn thiện định dạng báo cáo theo yêu cầu.', attachedFileName: 'Bao-cao-thang.docx' },
   { id: 'task-3', title: 'Thiết kế slide giới thiệu', subject: 'Microsoft PowerPoint', teacher: 'Cô Ngọc Hà', deadline: 'Quá hạn 1 ngày', status: 'Quá hạn', description: 'Tạo bài trình bày theo chủ đề được giao.' },
   { id: 'task-4', title: 'Hàm IF và VLOOKUP', subject: 'Microsoft Excel', teacher: 'Thầy Hoàng Nam', deadline: 'Hạn nộp 02/11/2026', status: 'Chưa làm', description: 'Bài thực hành hàm trong Microsoft Excel.' },
 ];
@@ -254,6 +265,7 @@ export const mockFeedPosts: DemoFeedPost[] = [
     audience: 'Học viên và giảng viên',
     comments: [{ id: 'comment-1', author: 'Minh Anh', text: 'Em đã xem thông tin.' }],
     reactionCount: 3,
+    authorId: 'center',
   },
 ];
 
@@ -268,7 +280,14 @@ export const mockNews: DemoNewsItem[] = [
     content: 'Các thông tin về lịch học, tài liệu và bài tập được hiển thị trong các mục tương ứng của tài khoản học viên.',
     views: 24,
     attachments: [],
+    author: 'Trung tâm Thắng Tin Học',
   },
+];
+
+export const mockGradeQaFixtureRecords: DemoGradeRecord[] = [
+  { id: 'grade-word-assignment', courseName: 'TIN HỌC VĂN PHÒNG CB (1 KÈM 1)', assessment: 'Bài tập Word: Định dạng văn bản', score: '8.5/10', status: 'Đạt', date: '20/10/2026' },
+  { id: 'grade-word-quiz', courseName: 'TIN HỌC VĂN PHÒNG CB (1 KÈM 1)', assessment: 'Trắc nghiệm Word buổi 6', score: '9/10', status: 'Đạt', date: '18/10/2026' },
+  { id: 'grade-excel-practice', courseName: 'Microsoft Excel thực hành', assessment: 'Bài thực hành Excel', score: '7.5/10', status: 'Hoàn thành', date: '22/10/2026' },
 ];
 
 export const mockSoftwareLinks: DemoSoftwareLink[] = [

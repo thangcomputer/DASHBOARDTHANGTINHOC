@@ -3,6 +3,7 @@ import {
   mockEvaluations,
   mockFeedPosts,
   mockFinanceTransactions,
+  mockGradeQaFixtureRecords,
   mockLearningCourses,
   mockNews,
   mockQuizzes,
@@ -16,6 +17,8 @@ import {
   mockSchedule,
   mockTeacherSchedule,
   mockStudent,
+  mockStudentProfileQaEnrollments,
+  mockStudentProfileQaVideoOrders,
   mockTeacher,
   mockTeacherAssignments,
   mockTeacherConversations,
@@ -23,7 +26,7 @@ import {
   mockTeacherStudents,
   mockTeacherThreads,
 } from '../mocks/data';
-import type { UserRole } from '../types';
+import type { DemoUser, UserRole } from '../types';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
@@ -132,6 +135,29 @@ export const learningService = {
   },
 };
 
+export const gradeService = {
+  async list() {
+    if (qaState === 'grades-no-grade') return readMockList([]);
+    if (qaState === 'grades-completed') {
+      return readMockList(mockGradeQaFixtureRecords.map((record) => ({ ...record, status: 'Hoàn thành' as const, qaFixture: true })));
+    }
+    return readMockList([]);
+  },
+};
+
+export const studentProfileService = {
+  async get(user: DemoUser | null | undefined) {
+    await delay();
+    if (qaState === 'error') throw new Error('Mock UI QA error state');
+    const qaFixture = qaState === 'student-profile-populated';
+    return {
+      enrollments: qaFixture ? mockStudentProfileQaEnrollments : user?.enrollments || [],
+      videoOrders: qaFixture ? mockStudentProfileQaVideoOrders : user?.videoOrders || [],
+      qaFixture,
+    };
+  },
+};
+
 export const evaluationService = {
   async list() {
     if (qaState === 'evaluation-not-eligible') {
@@ -190,6 +216,15 @@ export const feedService = {
         slug: `qa-news-${index + 1}`,
         title: `Tin tức demo ${index + 1}`,
         views: 24 + index,
+        author: index % 2 ? 'Giảng viên demo' : 'Trung tâm Thắng Tin Học',
+        excerpt: `Tóm tắt nội dung bản tin demo ${index + 1}.`,
+        attachments: index === 1
+          ? [{ id: 'qa-image', name: 'Anh-minh-hoa.jpg', type: 'image' as const }]
+          : index === 2
+            ? [{ id: 'qa-video', name: 'Video-gioi-thieu.mp4', type: 'video' as const }]
+            : index === 3
+              ? [{ id: 'qa-file', name: 'Tai-lieu.pdf', type: 'file' as const }]
+              : [],
       })));
     }
     return readMockList(mockNews);

@@ -19,6 +19,30 @@ export type DemoUser = {
   zalo?: string;
   enrollmentStatus?: 'active' | 'completed' | 'cancelled';
   paid?: boolean;
+  enrollments?: DemoEnrollment[];
+  videoOrders?: DemoVideoOrder[];
+};
+
+export type DemoEnrollment = {
+  id: string;
+  courseName: string;
+  teacherName?: string;
+  registeredAt?: string;
+  progress?: number;
+  completedSessions?: number;
+  totalSessions?: number;
+  avgGrade?: number;
+  status: 'Đang học' | 'Hoàn thành' | 'Thôi học';
+  tuitionAmount?: number;
+  paidAmount?: number;
+};
+
+export type DemoVideoOrder = {
+  id: string;
+  courseName: string;
+  amount: number;
+  status: 'Đã thanh toán' | 'Chờ thanh toán';
+  date: string;
 };
 
 export type ScheduleItem = {
@@ -54,6 +78,7 @@ export type Assignment = {
   status: 'Chưa làm' | 'Đã nộp' | 'Quá hạn' | 'Cần chấm' | 'Đã chấm';
   description?: string;
   attachedFileUrl?: string;
+  attachedFileName?: string;
   assignedStudentNames?: string[];
   submissions?: AssignmentSubmission[];
   grade?: number;
@@ -84,7 +109,10 @@ export type AppNotification = {
   title: string;
   message: string;
   time: string;
-  category: 'Lịch học' | 'Bài tập' | 'Trung tâm' | 'Tin nhắn' | 'Học phí';
+  category: string;
+  type?: string;
+  targetPath?: string;
+  payload?: Record<string, string | number | boolean | undefined>;
   unread: boolean;
 };
 
@@ -111,6 +139,8 @@ export type ChatMessage = {
   reaction?: string;
   recalled?: boolean;
   attachmentName?: string;
+  attachmentType?: 'image' | 'file' | 'gif';
+  gifLabel?: string;
   replyToText?: string;
 };
 
@@ -191,6 +221,15 @@ export type DemoFeedPost = {
   audience: string;
   comments: Array<{ id: string; author: string; text: string }>;
   reactionCount: number;
+  authorId?: string;
+  replies?: Array<{ id: string; parentId: string; author: string; text: string }>;
+};
+
+export type DemoNewsAttachment = {
+  id: string;
+  name: string;
+  type: 'image' | 'video' | 'file' | 'link';
+  url?: string;
 };
 
 export type DemoNewsItem = {
@@ -202,7 +241,19 @@ export type DemoNewsItem = {
   excerpt: string;
   content: string;
   views: number;
-  attachments: string[];
+  attachments: DemoNewsAttachment[];
+  author?: string;
+  thumbnailUrl?: string;
+};
+
+export type DemoGradeRecord = {
+  id: string;
+  courseName: string;
+  assessment: string;
+  score: string;
+  status: 'Đạt' | 'Hoàn thành' | 'Đang học';
+  date?: string;
+  qaFixture?: boolean;
 };
 
 export type DemoSoftwareLink = {

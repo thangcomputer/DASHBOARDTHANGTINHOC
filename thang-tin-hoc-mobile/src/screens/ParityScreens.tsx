@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
 import {
   BookOpen, Building2, CheckCircle2, ChevronRight, CircleDollarSign,
-  ClipboardList, GraduationCap, ImagePlus, MessageSquareText, Newspaper, Radio, Star, WalletCards,
+  ClipboardList, GraduationCap, ImagePlus, MessageSquareText, Newspaper, Paperclip, Radio, Star, WalletCards,
 } from 'lucide-react-native';
 import {
   AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton,
@@ -14,7 +14,7 @@ import {
 import { useMockResource } from '../hooks/useMockResource';
 import {
   evaluationService, feedService, financeService, learningService, quizService,
-  softwareService, studentService, trainingService,
+  softwareService, studentProfileService, studentService, trainingService,
 } from '../services/mockService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
@@ -415,25 +415,37 @@ export function FeedScreen() {
   const [draft, setDraft] = useState('');
   const [audience, setAudience] = useState('Công khai');
   const [attachImage, setAttachImage] = useState(false);
+  const [visiblePostCount, setVisiblePostCount] = useState(3);
+  const [replyTarget, setReplyTarget] = useState<{ postId: string; parentId: string; author: string } | null>(null);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
   const items = posts || resource.data || [];
+  const visiblePosts = items.slice(0, visiblePostCount);
+  const roleLabel = isTeacher ? 'Giảng viên' : 'Học viên';
+  const ownPost = (post: DemoFeedPost) => post.authorId === user?.id;
+  const updatePost = (postId: string, update: (post: DemoFeedPost) => DemoFeedPost) => {
+    setPosts(items.map((post) => post.id === postId ? update(post) : post));
+  };
   return (
     <AppScreen>
       <AppHeader title={isTeacher ? 'Bảng tin trao đổi & Hỏi bài' : 'Bảng tin'} subtitle="Bài đăng dành cho lớp học" />
-      {isTeacher ? <Card style={styles.feedComposer}>
+      <Card style={styles.feedComposer}>
         <View style={styles.feedAuthorRow}>
-          <Avatar name={user?.name || 'Giảng viên'} color={user?.avatarColor} size={42} />
+          <Avatar name={user?.name || roleLabel} color={user?.avatarColor} size={42} />
           <View style={styles.flex}>
-            <Text style={styles.cardTitle}>{user?.name || 'Giảng viên'}</Text>
-            <Text style={styles.caption}>Giảng viên</Text>
+            <Text style={styles.cardTitle}>{user?.name || roleLabel}</Text>
+            <Text style={styles.caption}>{roleLabel}</Text>
           </View>
-        <Pressable onPress={() => Alert.alert('Quyền riêng tư / Đối tượng xem', 'Chọn đối tượng xem bài viết.', [
-          { text: 'Công khai', onPress: () => setAudience('Công khai') },
-          { text: 'Chỉ Giảng viên & Admin', onPress: () => setAudience('Chỉ Giảng viên & Admin') },
-          { text: 'Chỉ Học viên & Admin', onPress: () => setAudience('Chỉ Học viên & Admin') },
-          { text: 'Hủy', style: 'cancel' },
-        ])} style={styles.privacyButton} accessibilityRole="button" accessibilityLabel="Chọn quyền riêng tư bài đăng">
-          <Text style={styles.privacyText}>{audience}</Text>
-        </Pressable>
+          <Pressable onPress={() => Alert.alert('Quyền riêng tư / Đối tượng xem', 'Chọn đối tượng xem bài viết.', [
+            { text: 'Công khai', onPress: () => setAudience('Công khai') },
+            ...(isTeacher ? [
+              { text: 'Chỉ Giảng viên', onPress: () => setAudience('Chỉ Giảng viên') },
+              { text: 'Chỉ Học viên', onPress: () => setAudience('Chỉ Học viên') },
+            ] : [{ text: 'Chỉ Học viên', onPress: () => setAudience('Chỉ Học viên') }]),
+            { text: 'Hủy', style: 'cancel' },
+          ])} style={styles.privacyButton} accessibilityRole="button" accessibilityLabel="Chọn quyền riêng tư bài đăng">
+            <Text style={styles.privacyText}>{audience}</Text>
+          </Pressable>
         </View>
         <TextInput value={draft} onChangeText={setDraft} placeholder="Bạn muốn chia sẻ điều gì?" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng demo" />
         {attachImage ? <View style={styles.feedImagePlaceholder}><ImagePlus size={22} color={colors.muted} /><Text style={styles.metaText}>Ảnh demo · Không tải lên</Text></View> : null}
@@ -445,9 +457,9 @@ export function FeedScreen() {
             const content = draft.trim();
             if (!content) return;
             setPosts([{
-              id: `feed-${Date.now()}`, author: user?.name || 'Giảng viên', role: 'Giảng viên',
+              id: `feed-${Date.now()}`, authorId: user?.id, author: user?.name || roleLabel, role: roleLabel,
               time: 'Vừa xong', content, audience, mediaType: attachImage ? 'image' : undefined,
-              comments: [], reactionCount: 0,
+              comments: [], replies: [], reactionCount: 0,
             }, ...items]);
             setDraft('');
             setAttachImage(false);
@@ -455,33 +467,63 @@ export function FeedScreen() {
         </View>
         <Text style={styles.note}>Bài đăng và ảnh chỉ được giữ cục bộ trong bản demo.</Text>
       </Card>
-        : null}
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {items.map((post) => (
+      {visiblePosts.map((post) => (
         <Card key={post.id}>
-          <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View></View>
+          <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
+            {ownPost(post) ? <View style={styles.feedOwnerActions}>
+              <Pressable onPress={() => { setEditingPostId(post.id); setEditDraft(post.content); }} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel="Sửa bài đăng của bạn"><Text style={styles.feedInlineActionText}>Sửa</Text></Pressable>
+              <Pressable onPress={() => Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị xóa khỏi bản demo.', [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Xóa', style: 'destructive', onPress: () => setPosts(items.filter((item) => item.id !== post.id)) },
+              ])} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel="Xóa bài đăng của bạn"><Text style={styles.feedDeleteText}>Xóa</Text></Pressable>
+            </View> : null}
+          </View>
           {isTeacher ? <Text style={styles.feedAudience}>{post.audience}</Text> : null}
-          <Text style={styles.body}>{post.content}</Text>
+          {editingPostId === post.id ? (
+            <View style={styles.feedEditBox}>
+              <TextInput value={editDraft} onChangeText={setEditDraft} multiline style={styles.feedDraft} accessibilityLabel="Chỉnh sửa bài đăng demo" />
+              <View style={styles.rowBetween}>
+                <Pressable onPress={() => setEditingPostId(null)} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Hủy</Text></Pressable>
+                <Pressable onPress={() => {
+                  const content = editDraft.trim();
+                  if (!content) { Alert.alert('Nội dung trống', 'Nhập nội dung trước khi lưu.'); return; }
+                  updatePost(post.id, (item) => ({ ...item, content }));
+                  setEditingPostId(null);
+                }} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Lưu thay đổi</Text></Pressable>
+              </View>
+            </View>
+          ) : <Text style={styles.body}>{post.content}</Text>}
           {post.mediaType === 'image' ? <View style={styles.feedImagePlaceholder}><ImagePlus size={22} color={colors.muted} /><Text style={styles.metaText}>Ảnh đính kèm demo</Text></View> : null}
           <View style={styles.row}>
-            <Pressable onPress={() => setPosts(items.map((item) => item.id === post.id ? { ...item, reactionCount: item.reactionCount + 1 } : item))} style={styles.action}><Star size={16} color={colors.brand} /><Text style={styles.actionText}>Quan tâm {post.reactionCount}</Text></Pressable>
+            <Pressable onPress={() => updatePost(post.id, (item) => ({ ...item, reactionCount: item.reactionCount + 1 }))} style={styles.action}><Star size={16} color={colors.brand} /><Text style={styles.actionText}>Quan tâm {post.reactionCount}</Text></Pressable>
             <Text style={styles.actionText}>{post.comments.length} bình luận</Text>
           </View>
-          {post.comments.map((item) => <Text key={item.id} style={styles.comment}><Text style={styles.strong}>{item.author}: </Text>{item.text}</Text>)}
+          {post.comments.map((item) => (
+            <View key={item.id} style={styles.feedComment}>
+              <Text style={styles.comment}><Text style={styles.strong}>{item.author}: </Text>{item.text}</Text>
+              {isTeacher ? <Pressable onPress={() => setReplyTarget({ postId: post.id, parentId: item.id, author: item.author })} style={styles.feedInlineAction} accessibilityRole="button"><Text style={styles.feedInlineActionText}>Trả lời</Text></Pressable> : null}
+              {(post.replies || []).filter((reply) => reply.parentId === item.id).map((reply) => <Text key={reply.id} style={styles.feedReply}><Text style={styles.strong}>{reply.author}: </Text>{reply.text}</Text>)}
+            </View>
+          ))}
           <View style={styles.commentComposer}>
-            <TextInput value={comment} onChangeText={setComment} placeholder="Viết bình luận" style={styles.commentInput} />
+            <TextInput value={comment} onChangeText={setComment} placeholder={replyTarget?.postId === post.id ? `Trả lời ${replyTarget.author}` : 'Viết bình luận'} style={styles.commentInput} />
             <Pressable onPress={() => {
               const text = comment.trim();
               if (!text) return;
-              setPosts(items.map((item) => item.id === post.id ? { ...item, comments: [...item.comments, { id: `comment-${Date.now()}`, author: 'Bạn', text }] } : item));
+              updatePost(post.id, (item) => replyTarget?.postId === post.id
+                ? { ...item, replies: [...(item.replies || []), { id: `reply-${Date.now()}`, parentId: replyTarget.parentId, author: user?.name || 'Bạn', text }] }
+                : { ...item, comments: [...item.comments, { id: `comment-${Date.now()}`, author: user?.name || 'Bạn', text }] });
               setComment('');
+              setReplyTarget(null);
             }} accessibilityRole="button" accessibilityLabel="Gửi bình luận demo">
               <MessageSquareText size={20} color={colors.brand} />
             </Pressable>
           </View>
         </Card>
       ))}
+      {items.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
       {!resource.loading && !resource.error && !items.length ? <EmptyState title="Chưa có bài đăng" message="Bài đăng mới sẽ hiển thị tại đây." /> : null}
     </AppScreen>
   );
@@ -489,8 +531,6 @@ export function FeedScreen() {
 
 export function NewsScreen() {
   const navigation = useNavigation<Navigation>();
-  const { user } = useAuth();
-  const isTeacher = user?.role === 'teacher';
   const loader = useCallback(() => feedService.news(), []);
   const resource = useMockResource(loader);
   const [draft, setDraft] = useState('');
@@ -512,8 +552,7 @@ export function NewsScreen() {
   return (
     <AppScreen>
       <AppHeader title="Tin tức" subtitle="Tin tức và thông báo của trung tâm" />
-      {isTeacher ? (
-        <>
+      <>
           <View style={styles.newsSearch}>
             <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={() => setQuery(draft.trim())} returnKeyType="search" placeholder="Tìm kiếm tin tức" style={styles.newsSearchInput} />
             <Pressable onPress={() => setQuery(draft.trim())} style={styles.newsSearchButton} accessibilityRole="button"><Text style={styles.newsSearchButtonText}>Tìm</Text></Pressable>
@@ -535,19 +574,18 @@ export function NewsScreen() {
         ])} style={styles.newsControl} accessibilityRole="button"><Text style={styles.newsControlText}>Thời gian: {time}</Text></Pressable>
           </View>
           <View style={styles.chips}>{topics.map((item) => <Pressable key={item} onPress={() => setTopic(item)} style={[styles.choice, topic === item && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: topic === item }}><Text style={[styles.choiceText, topic === item && styles.choiceTextActive]}>{item}</Text></Pressable>)}</View>
-        </>
-      ) : <SearchField value={query} onChangeText={setQuery} placeholder="Tìm tin tức" />}
+      </>
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      <View style={isTeacher && layout === 'grid' ? styles.newsGrid : undefined}>
+      <View style={layout === 'grid' ? styles.newsGrid : undefined}>
         {articles.map((news) => (
-          <Pressable key={news.id} onPress={() => navigation.navigate('NewsDetail', { newsId: news.id })} style={isTeacher && layout === 'grid' ? styles.newsGridItem : undefined} accessibilityRole="button">
-            <Card style={isTeacher && layout === 'grid' ? styles.newsGridCard : undefined}>
-              {isTeacher ? <View style={styles.newsThumbnail}><Newspaper size={24} color={colors.muted} /><Text style={styles.metaText}>—</Text></View> : null}
+          <Pressable key={news.id} onPress={() => navigation.navigate('NewsDetail', { newsId: news.id })} style={layout === 'grid' ? styles.newsGridItem : undefined} accessibilityRole="button">
+            <Card style={layout === 'grid' ? styles.newsGridCard : undefined}>
+              <View style={styles.newsThumbnail}><Newspaper size={24} color={colors.muted} /><Text style={styles.metaText}>{news.thumbnailUrl ? 'Ảnh minh họa' : '—'}</Text></View>
               <Text style={styles.caption}>{news.topic} · {news.publishedAt}</Text>
               <Text style={styles.cardTitle}>{news.title}</Text>
-              {!isTeacher || layout === 'list' ? <Text style={styles.body}>{news.excerpt}</Text> : null}
-              {isTeacher ? <Text style={styles.metaText}>Tác giả: — · {news.views} lượt xem · {news.publishedAt}</Text> : null}
+              {layout === 'list' ? <Text style={styles.body}>{news.excerpt}</Text> : null}
+              <Text style={styles.metaText}>Tác giả: {news.author || '—'} · {news.views} lượt xem · {news.publishedAt}</Text>
               <Text style={styles.link}>Xem chi tiết</Text>
             </Card>
           </Pressable>
@@ -570,9 +608,15 @@ export function NewsDetailScreen() {
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {news ? <Card>
         <Text style={styles.title}>{news.title}</Text>
-        <Text style={styles.caption}>{news.publishedAt} · {news.views} lượt xem</Text>
+        <Text style={styles.caption}>{news.author || '—'} · {news.publishedAt} · {news.views} lượt xem</Text>
+        {news.excerpt ? <Text style={styles.muted}>{news.excerpt}</Text> : null}
         <Text style={styles.body}>{news.content}</Text>
-        {news.attachments.map((file) => <Text key={file} style={styles.link}>{file}</Text>)}
+        {news.attachments.map((file) => (
+          <Pressable key={file.id} onPress={() => Alert.alert(file.name, 'url' in file && file.url ? 'Liên kết đính kèm chỉ hiển thị trong bản demo.' : 'Tệp này chưa có liên kết để mở trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={`Mở tệp đính kèm ${file.name}`}>
+            <Paperclip size={17} color={colors.brand} />
+            <Text style={styles.newsAttachmentText}>{file.name} · {file.type}</Text><Text style={styles.newsAttachmentAction}>{'url' in file && file.url ? 'Mở' : '—'}</Text>
+          </Pressable>
+        ))}
       </Card> : null}
     </AppScreen>
   );
@@ -584,9 +628,10 @@ export function CenterInfoScreen() {
   const loader = useCallback(() => feedService.centerInfo(), []);
   const resource = useMockResource(loader);
   const center = resource.data;
-  const centerSections = isTeacher
-    ? center?.sections || []
-    : [{ title: 'Nhân sự' }, { title: 'Chi nhánh' }, { title: 'Dịch vụ' }, { title: 'Địa điểm thi' }, { title: 'Chứng chỉ' }];
+  const centerSections = (center?.sections || [
+    { title: 'Tổng quan' }, { title: 'Nhân sự' }, { title: 'Chi nhánh' }, { title: 'Mạng xã hội' },
+    { title: 'Dịch vụ đào tạo' }, { title: 'Địa điểm thi' }, { title: 'Chứng chỉ' },
+  ]).filter((item: { title: string }) => item.title !== 'Tổng quan');
   const [section, setSection] = useState('Tổng quan');
   return (
     <AppScreen>
@@ -637,6 +682,14 @@ export function CenterInfoScreen() {
           </View>
           </> : (
             <>
+              <Pressable onPress={() => Alert.alert('Thông tin Trung tâm', 'Chọn mục cần xem.', [
+                { text: 'Tổng quan', onPress: () => setSection('Tổng quan') },
+                ...centerSections.map((item: { title: string }) => ({ text: item.title, onPress: () => setSection(item.title) })),
+                { text: 'Hủy', style: 'cancel' as const },
+              ])} style={styles.centerDropdown} accessibilityRole="button" accessibilityLabel={`Mục đang chọn: ${section}`}>
+                <Text style={styles.centerDropdownText}>{section}  ▾</Text>
+              </Pressable>
+              {section === 'Tổng quan' ? (
               <Card>
                 <Text style={styles.title}>{center.name}</Text>
                 <Text style={styles.body}>{center.intro || 'Nội dung giới thiệu chưa có trong dữ liệu demo.'}</Text>
@@ -646,14 +699,25 @@ export function CenterInfoScreen() {
                   ['Email', center.contactEmail],
                   ['Website', center.website],
                 ].map(([label, value]) => <Text key={label} style={styles.muted}>{label}: {value || 'Chưa có dữ liệu'}</Text>)}
+                <Text style={styles.muted}>Thành lập: —</Text>
+                <Text style={styles.muted}>Sứ mệnh: {center.mission || '—'}</Text>
+                <Text style={styles.muted}>Tầm nhìn: {center.vision || '—'}</Text>
+                <Text style={styles.muted}>Giá trị cốt lõi: {center.coreValues || '—'}</Text>
               </Card>
-              {centerSections.map((item: { title: string }) => (
-                <Card key={item.title} style={styles.unitRow}>
-                  <Building2 size={18} color={colors.brand} />
-                  <Text style={[styles.cardTitle, styles.flex]}>{item.title}</Text>
-                  <ChevronRight size={18} color={colors.muted} />
+              ) : (
+                <Card>
+                  <Text style={styles.cardTitle}>{section}</Text>
+                  <Text style={styles.muted}>Chưa có nội dung cho mục này trong dữ liệu demo.</Text>
                 </Card>
-              ))}
+              )}
+              <SectionHeading title="Các mục Trung tâm" />
+              <View style={styles.centerSections}>
+                {centerSections.map((item: { title: string }) => (
+                  <Pressable key={item.title} onPress={() => setSection(item.title)} style={styles.centerSection} accessibilityRole="button">
+                    <Text style={styles.centerSectionText}>{item.title}</Text><ChevronRight size={17} color={colors.muted} />
+                  </Pressable>
+                ))}
+              </View>
             </>
           )}
         </>
@@ -675,7 +739,9 @@ export function SoftwareLinksScreen() {
           <Text style={styles.cardTitle}>{item.name}</Text>
           <Text style={styles.caption}>{item.category}</Text>
           <Text style={styles.body}>{item.description}</Text>
-          <Text style={styles.muted}>{item.url ? 'Liên kết phần mềm có sẵn' : 'Chưa có liên kết được cung cấp'}</Text>
+          <Pressable onPress={() => Alert.alert(item.name, item.url ? 'Liên kết chỉ được hiển thị trong bản demo; không mở website bên ngoài.' : 'Chưa có liên kết phần mềm trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}>
+            <Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text>
+          </Pressable>
         </Card>
       ))}
       {!resource.loading && !resource.error && !resource.data?.length ? <EmptyState title="Chưa có phần mềm" message="Phần mềm sẽ hiển thị theo khóa học." /> : null}
@@ -695,6 +761,7 @@ export function TeacherQuizzesScreen() {
   const [courseName, setCourseName] = useState('');
   const [targetAll, setTargetAll] = useState(true);
   const [targetStudentIds, setTargetStudentIds] = useState<string[]>([]);
+  const [targetSearch, setTargetSearch] = useState('');
   const [timeLimit, setTimeLimit] = useState('20');
   const [startTime, setStartTime] = useState('');
   const [deadline, setDeadline] = useState('');
@@ -708,6 +775,7 @@ export function TeacherQuizzesScreen() {
   const students = studentsResource.data || [];
   const courses = [...new Set(students.map((student) => student.course).filter(Boolean))];
   const courseStudents = students.filter((student) => !courseName || student.course === courseName);
+  const visibleTargetStudents = courseStudents.filter((student) => `${student.name} ${student.course}`.toLowerCase().includes(targetSearch.trim().toLowerCase()));
   const updateQuestion = (questionIndex: number, update: (question: typeof questions[number]) => typeof questions[number]) => {
     setQuestions((current) => current.map((question, index) => index === questionIndex ? update(question) : question));
   };
@@ -715,6 +783,7 @@ export function TeacherQuizzesScreen() {
     setTitle('');
     setTargetAll(true);
     setTargetStudentIds([]);
+    setTargetSearch('');
     setTimeLimit('20');
     setStartTime('');
     setDeadline('');
@@ -746,11 +815,16 @@ export function TeacherQuizzesScreen() {
           </View>
           {!targetAll ? (
             <View style={styles.studentTargetList}>
-              {courseStudents.map((student) => {
+              <TextInput value={targetSearch} onChangeText={setTargetSearch} placeholder="Tìm học viên" style={styles.input} accessibilityLabel="Tìm học viên để giao trắc nghiệm" />
+              <View style={styles.quizActions}>
+                <Pressable onPress={() => setTargetStudentIds((current) => [...new Set([...current, ...visibleTargetStudents.map((student) => student.id)])])} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Chọn tất cả đang hiển thị</Text></Pressable>
+                <Pressable onPress={() => setTargetStudentIds([])} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Bỏ chọn</Text></Pressable>
+              </View>
+              {visibleTargetStudents.map((student) => {
                 const selected = targetStudentIds.includes(student.id);
                 return <Pressable key={student.id} onPress={() => setTargetStudentIds((current) => selected ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.studentTarget, selected && styles.studentTargetSelected]} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><Text style={styles.studentTargetText}>{selected ? '✓  ' : ''}{student.name} · {student.course}</Text></Pressable>;
               })}
-              {!courseStudents.length ? <Text style={styles.note}>Không có học viên demo cho khóa này.</Text> : null}
+              {!visibleTargetStudents.length ? <Text style={styles.note}>{courseStudents.length ? 'Không tìm thấy học viên phù hợp.' : 'Không có học viên demo cho khóa này.'}</Text> : null}
             </View>
           ) : null}
           <TextInput value={timeLimit} onChangeText={setTimeLimit} keyboardType="number-pad" placeholder="Thời gian (phút)" style={styles.input} />
@@ -922,11 +996,17 @@ export function TeacherTrainingScreen() {
         <>
           {software.loading ? <LoadingSkeleton /> : null}
           {software.error ? <ErrorState onRetry={software.reload} /> : null}
-          {(software.data || []).map((item) => <Card key={item.id}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.metaText}>{item.category}</Text><Text style={styles.muted}>{item.description}</Text></Card>)}
+          {(software.data || []).map((item) => <Card key={item.id}>
+            <Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.metaText}>{item.category}</Text><Text style={styles.muted}>{item.description}</Text>
+            <Pressable onPress={() => Alert.alert(item.name, item.url ? 'Liên kết chỉ được hiển thị trong bản demo; không mở website bên ngoài.' : 'Chưa có liên kết phần mềm trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}><Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text></Pressable>
+          </Card>)}
           {!software.loading && !software.error && !software.data?.length ? <EmptyState title="Chưa có phần mềm" message="Chưa có dữ liệu phần mềm trong bản demo." /> : null}
         </>
       ) : tab === 'Tài liệu' ? (
-        courses.flatMap((course) => course.files.map((file) => <Card key={`${course.id}-${file}`} style={styles.unitRow}><BookOpen size={18} color={colors.brand} /><View style={styles.flex}><Text style={styles.cardTitle}>{file}</Text><Text style={styles.metaText}>{course.title}</Text></View></Card>))
+        courses.flatMap((course) => course.files.map((file) => <Card key={`${course.id}-${file}`} style={styles.unitRow}>
+          <BookOpen size={18} color={colors.brand} /><View style={styles.flex}><Text style={styles.cardTitle}>{file}</Text><Text style={styles.metaText}>{course.title}</Text></View>
+          <Pressable onPress={() => Alert.alert(file, 'Tệp học liệu chưa có liên kết mở/tải trong dữ liệu demo.')} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel={`Mở tài liệu ${file}`}><Text style={styles.feedInlineActionText}>Mở</Text></Pressable>
+        </Card>))
       ) : (
         courses.map((course) => <TrainingCard key={course.id} course={course} expanded={expanded.includes(course.id)} tab={tab} onToggle={() => setExpanded(expanded.includes(course.id) ? expanded.filter((id) => id !== course.id) : [...expanded, course.id])} />)
       )}
@@ -955,7 +1035,7 @@ function TrainingCard({ course, expanded, tab, onToggle }: { course: DemoTrainin
           {tab !== 'Quy trình' ? (
             <>
               <SectionHeading title="Tài liệu" />
-              {course.files.map((file) => <Text key={file} style={styles.muted}>{file}</Text>)}
+              {course.files.map((file) => <Pressable key={file} onPress={() => Alert.alert(file, 'Tệp học liệu chưa có liên kết mở/tải trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button"><Text style={styles.newsAttachmentText}>{file}</Text><Text style={styles.newsAttachmentAction}>Mở</Text></Pressable>)}
             </>
           ) : null}
           {course.notices.map((notice) => <Text key={notice} style={styles.note}>{notice}</Text>)}
@@ -1051,21 +1131,53 @@ export function TeacherFinanceScreen() {
 }
 
 export function TuitionScreen() {
-  const loader = useCallback(() => learningService.courses(), []);
-  const resource = useMockResource(loader);
+  const { user } = useAuth();
+  const [paidEnrollmentIds, setPaidEnrollmentIds] = useState<string[]>([]);
+  const [confirmPaymentEnrollmentId, setConfirmPaymentEnrollmentId] = useState<string | null>(null);
+  const profileLoader = useCallback(() => studentProfileService.get(user), [user]);
+  const profileResource = useMockResource(profileLoader);
+  const enrollments = profileResource.data?.enrollments || [];
+  const confirmPaymentEnrollment = enrollments.find((enrollment) => enrollment.id === confirmPaymentEnrollmentId);
   return (
     <AppScreen>
       <AppHeader title="Học phí theo khóa" subtitle="Thông tin học phí trên hồ sơ học viên" />
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {(resource.data || []).map((course) => (
-        <Card key={course._id}>
-          <Text style={styles.cardTitle}>{course.title}</Text>
-          <Text style={styles.muted}>Trạng thái thanh toán được xác nhận trên website.</Text>
-          <PrimaryButton title="Thanh toán" onPress={() => Alert.alert('Thanh toán', 'Thanh toán chỉ được thực hiện trên website.')} variant="secondary" />
+      {profileResource.data?.qaFixture ? <Text style={styles.note}>QA fixture — dữ liệu minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
+      {profileResource.loading ? <LoadingSkeleton /> : null}
+      {profileResource.error ? <ErrorState onRetry={profileResource.reload} /> : null}
+      {!profileResource.loading && !profileResource.error ? enrollments.map((enrollment) => {
+        const paid = paidEnrollmentIds.includes(enrollment.id) || (enrollment.tuitionAmount != null && (enrollment.paidAmount || 0) >= enrollment.tuitionAmount);
+        const amount = enrollment.tuitionAmount;
+        const paidAmount = paid ? amount : enrollment.paidAmount;
+        const remaining = amount != null && paidAmount != null ? Math.max(amount - paidAmount, 0) : null;
+        return <Card key={enrollment.id}>
+          <Text style={styles.cardTitle}>{enrollment.courseName}</Text>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Trạng thái khóa học</Text><StatusBadge label={enrollment.status} /></View>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Học phí</Text><Text style={styles.infoValue}>{amount != null ? formatCurrency(amount) : '—'}</Text></View>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Đã thanh toán</Text><Text style={styles.infoValue}>{paidAmount != null ? formatCurrency(paidAmount) : '—'}</Text></View>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Còn lại</Text><Text style={styles.infoValue}>{remaining != null ? formatCurrency(remaining) : '—'}</Text></View>
+          <PrimaryButton title={paid ? 'Đã thanh toán' : 'Tiếp tục thanh toán'} disabled={paid || amount == null || amount <= (enrollment.paidAmount || 0)} onPress={() => setConfirmPaymentEnrollmentId(enrollment.id)} variant="secondary" />
+          <Text style={styles.note}>Thao tác chỉ cập nhật trạng thái tạm thời trên màn hình này; không xử lý thanh toán thật.</Text>
         </Card>
-      ))}
-      {!resource.loading && !resource.error && !resource.data?.length ? <EmptyState title="Chưa có khóa học" message="Thông tin học phí sẽ xuất hiện theo khóa học." /> : null}
+      }) : null}
+      {!profileResource.loading && !profileResource.error && !enrollments.length ? <EmptyState title="Chưa có khóa học" message="Thông tin học phí sẽ xuất hiện theo khóa học." /> : null}
+      <Modal visible={!!confirmPaymentEnrollment} transparent animationType="slide" onRequestClose={() => setConfirmPaymentEnrollmentId(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.cardTitle}>Xác nhận thanh toán demo</Text>
+            <Text style={styles.muted}>{confirmPaymentEnrollment?.courseName || '—'}</Text>
+            <Text style={styles.metaText}>Số tiền: {confirmPaymentEnrollment?.tuitionAmount != null ? formatCurrency(confirmPaymentEnrollment.tuitionAmount) : '—'}</Text>
+            <Text style={styles.note}>Không xử lý giao dịch thật; chỉ cập nhật trạng thái tạm thời trên màn hình.</Text>
+            <View style={styles.modalActions}>
+              <PrimaryButton title="Hủy" variant="quiet" onPress={() => setConfirmPaymentEnrollmentId(null)} />
+              <PrimaryButton title="Xác nhận demo" onPress={() => {
+                if (!confirmPaymentEnrollment) return;
+                setPaidEnrollmentIds((ids) => ids.includes(confirmPaymentEnrollment.id) ? ids : [...ids, confirmPaymentEnrollment.id]);
+                setConfirmPaymentEnrollmentId(null);
+              }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -1098,6 +1210,21 @@ const styles = StyleSheet.create({
   feedComposerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   feedImageAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm },
   feedAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  feedOwnerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  feedInlineAction: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.xs },
+  feedInlineActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
+  feedDeleteText: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
+  feedEditBox: { gap: spacing.xs },
+  feedComment: { paddingTop: spacing.xs, paddingLeft: spacing.sm, borderLeftWidth: 2, borderLeftColor: colors.line },
+  feedReply: { marginLeft: spacing.md, paddingVertical: spacing.xs, color: colors.muted, fontSize: typography.caption },
+  newsAttachment: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas },
+  newsAttachmentText: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  newsAttachmentAction: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
+  infoValue: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
+  tuitionAmountRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
+  modalCard: { gap: spacing.md, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   feedAudience: { alignSelf: 'flex-start', color: colors.muted, fontSize: typography.caption, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.canvas },
   newsSearch: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   newsSearchInput: { flex: 1, minWidth: 0, minHeight: 46, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.ink },

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Paperclip, Plus, Send, Smile } from 'lucide-react-native';
+import { FileText, ImagePlus, Paperclip, Plus, Send, Smile } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { messageService } from '../services/mockService';
@@ -186,26 +186,38 @@ export function ConversationScreen() {
   const [draft, setDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [picker, setPicker] = useState<'sticker' | 'gif' | 'reaction' | 'attachment' | null>(null);
+  const [selectedAttachment, setSelectedAttachment] = useState<{ name: string; type: 'image' | 'file' } | null>(null);
   const threadRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const thread = messages || resource.data || [];
   const conversationName = route.params.conversationName || 'Cuộc trò chuyện';
 
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text && !selectedAttachment) return;
     setMessages((current) => [
       ...(current || resource.data || []),
-      { id: `local-${Date.now()}`, text, time: 'Vừa xong', mine: true, ...(isTeacher ? { state: 'sent' as const } : {}), replyToText: replyingTo?.text },
+      {
+        id: `local-${Date.now()}`,
+        text,
+        time: 'Vừa xong',
+        mine: true,
+        ...(isTeacher ? { state: 'sent' as const } : {}),
+        replyToText: replyingTo?.text,
+        ...(selectedAttachment ? { attachmentName: selectedAttachment.name, attachmentType: selectedAttachment.type } : {}),
+      },
     ]);
     setDraft('');
     setReplyingTo(null);
+    setSelectedAttachment(null);
   };
 
-  const addDemoAttachment = () => {
+  const addDemoAttachment = (name: string, type: 'image' | 'file') => {
     setMessages((current) => [
       ...(current || resource.data || []),
-      { id: `local-file-${Date.now()}`, text: 'Đã gửi tệp đính kèm demo', time: 'Vừa xong', mine: true, attachmentName: 'Tai-lieu-demo.pdf', state: 'sent' },
+      { id: `local-file-${Date.now()}`, text: '', time: 'Vừa xong', mine: true, attachmentName: name, attachmentType: type, state: 'sent' },
     ]);
+    setPicker(null);
   };
 
   const addDemoSticker = () => {
@@ -213,6 +225,28 @@ export function ConversationScreen() {
       ...(current || resource.data || []),
       { id: `local-sticker-${Date.now()}`, text: '', sticker: '👍', time: 'Vừa xong', mine: true, state: 'sent' },
     ]);
+    setPicker(null);
+  };
+
+  const addDemoGif = (label: string) => {
+    setMessages((current) => [
+      ...(current || resource.data || []),
+      { id: `local-gif-${Date.now()}`, text: '', time: 'Vừa xong', mine: true, gifLabel: label, attachmentType: 'gif', state: 'sent' },
+    ]);
+    setPicker(null);
+  };
+
+  const reactToLatest = (reaction: string) => {
+    const latest = [...thread].reverse().find((message) => !message.mine);
+    if (!latest) {
+      Alert.alert('Chưa có tin nhắn', 'Cần có tin nhắn nhận được để thả cảm xúc.');
+      setPicker(null);
+      return;
+    }
+    setMessages((current) => (current || resource.data || []).map((message) => (
+      message.id === latest.id ? { ...message, reaction } : message
+    )));
+    setPicker(null);
   };
 
   const handleMessageMenu = (message: ChatMessage) => {
@@ -254,8 +288,9 @@ export function ConversationScreen() {
               <View style={[styles.bubble, message.mine ? styles.bubbleMine : styles.bubbleOther, pinnedId === message.id && styles.pinnedBubble]}>
                 {message.replyToText ? <Text style={[styles.replyPreview, message.mine && styles.messageTimeMine]}>↪ {message.replyToText}</Text> : null}
                 {message.sticker ? <Text style={styles.sticker}>{message.sticker}</Text> : null}
+                {message.gifLabel ? <View style={styles.chatGif}><Text style={styles.chatGifText}>GIF</Text><Text style={styles.messageText}>{message.gifLabel}</Text></View> : null}
                 {message.text ? <Text style={[styles.messageText, message.mine && styles.messageTextMine]}>{message.recalled ? 'Tin nhắn đã được thu hồi' : message.text}</Text> : null}
-                {message.attachmentName ? <Text style={[styles.attachmentName, message.mine && styles.messageTextMine]}>📎 {message.attachmentName}</Text> : null}
+                {message.attachmentName ? <View style={styles.chatAttachment}>{message.attachmentType === 'image' ? <ImagePlus size={18} color={message.mine ? '#FFFFFF' : colors.brand} /> : <FileText size={18} color={message.mine ? '#FFFFFF' : colors.brand} />}<Text style={[styles.attachmentName, message.mine && styles.messageTextMine]}>{message.attachmentName}</Text></View> : null}
                 {message.reaction ? <Text style={styles.reaction}>{message.reaction}</Text> : null}
                 <Text style={[styles.messageTime, message.mine && styles.messageTimeMine]}>{message.time}{isTeacher && message.state ? ` · ${message.state === 'read' ? 'Đã xem' : message.state === 'delivered' ? 'Đã nhận' : 'Đã gửi'}` : ''}</Text>
               </View>
@@ -269,29 +304,33 @@ export function ConversationScreen() {
             <Pressable onPress={() => setReplyingTo(null)} accessibilityRole="button" accessibilityLabel="Hủy trả lời"><Text style={styles.cancelReply}>×</Text></Pressable>
           </View>
         ) : null}
+        {selectedAttachment ? (
+          <View style={styles.replyBar}>
+            <Text numberOfLines={1} style={styles.replyBarText}>Tệp đã chọn: {selectedAttachment.name}</Text>
+            <Pressable onPress={() => setSelectedAttachment(null)} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.cancelReply}>×</Text></Pressable>
+          </View>
+        ) : null}
         <View style={styles.composer}>
           <Pressable
-            onPress={() => Alert.alert('Tệp đính kèm demo', 'Thêm một tên tệp mẫu vào cuộc trò chuyện?', [
-              { text: 'Thêm tệp mẫu', onPress: addDemoAttachment },
-              { text: 'Hủy', style: 'cancel' },
-            ])}
+            onPress={() => setPicker('attachment')}
             style={styles.attachButton}
             accessibilityRole="button"
-            accessibilityLabel="Đính kèm tệp demo"
+            accessibilityLabel="Chọn ảnh hoặc tệp demo"
           >
             <Paperclip size={19} color={colors.muted} />
           </Pressable>
-          {isTeacher ? <Pressable
-            onPress={() => Alert.alert('Sticker demo', 'Gửi sticker mẫu vào hội thoại?', [
-              { text: '👍 Gửi sticker', onPress: addDemoSticker },
-              { text: 'Hủy', style: 'cancel' },
-            ])}
+          <Pressable onPress={() => setPicker('reaction')} style={styles.attachButton} accessibilityRole="button" accessibilityLabel="Thả cảm xúc">
+            <Smile size={19} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => setPicker('sticker')}
             style={styles.attachButton}
             accessibilityRole="button"
             accessibilityLabel="Chọn sticker demo"
           >
             <Smile size={19} color={colors.muted} />
-          </Pressable> : null}
+          </Pressable>
+          <Pressable onPress={() => setPicker('gif')} style={styles.gifButton} accessibilityRole="button" accessibilityLabel="Chọn GIF demo"><Text style={styles.gifButtonText}>GIF</Text></Pressable>
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -304,15 +343,33 @@ export function ConversationScreen() {
           />
           <Pressable
             onPress={send}
-            disabled={!draft.trim()}
-            style={[styles.sendButton, !draft.trim() && styles.sendButtonDisabled]}
+            disabled={!draft.trim() && !selectedAttachment}
+            style={[styles.sendButton, !draft.trim() && !selectedAttachment && styles.sendButtonDisabled]}
             accessibilityRole="button"
             accessibilityLabel="Gửi tin nhắn demo"
-            accessibilityState={{ disabled: !draft.trim() }}
+            accessibilityState={{ disabled: !draft.trim() && !selectedAttachment }}
           >
             <Send size={18} color="#FFFFFF" />
           </Pressable>
         </View>
+        <Modal visible={picker !== null} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
+          <View style={styles.pickerBackdrop}>
+            <View style={styles.pickerCard}>
+              <View style={styles.rowBetween}><Text style={styles.title}>{picker === 'attachment' ? 'Ảnh và tệp đính kèm' : picker === 'reaction' ? 'Thả cảm xúc' : picker === 'gif' ? 'GIF demo' : 'Sticker demo'}</Text><Pressable onPress={() => setPicker(null)} accessibilityRole="button"><Text style={styles.createGroupText}>Đóng</Text></Pressable></View>
+              {picker === 'attachment' ? (
+                <>
+                  <Pressable style={styles.pickerOption} onPress={() => { setSelectedAttachment({ name: 'Anh-minh-hoa-demo.jpg', type: 'image' }); setPicker(null); }}><ImagePlus size={18} color={colors.brand} /><Text style={styles.role}>Chọn ảnh mẫu</Text></Pressable>
+                  <Pressable style={styles.pickerOption} onPress={() => { setSelectedAttachment({ name: 'Tai-lieu-demo.pdf', type: 'file' }); setPicker(null); }}><FileText size={18} color={colors.brand} /><Text style={styles.role}>Chọn tệp mẫu</Text></Pressable>
+                  {selectedAttachment ? <Pressable style={styles.pickerOption} onPress={() => setSelectedAttachment(null)}><Text style={styles.role}>Bỏ tệp đang chọn</Text></Pressable> : null}
+                </>
+              ) : null}
+              {picker === 'sticker' ? <View style={styles.pickerOptions}>{['👍', '😊', '🎉', '❤️'].map((sticker) => <Pressable key={sticker} style={styles.stickerOption} onPress={() => { addDemoSticker(); setMessages((current) => (current || resource.data || []).map((message, index, all) => index === all.length - 1 ? { ...message, sticker } : message)); }}><Text style={styles.sticker}>{sticker}</Text></Pressable>)}</View> : null}
+              {picker === 'gif' ? <View style={styles.pickerOptions}>{['Vỗ tay', 'Chúc mừng', 'Cảm ơn'].map((gif) => <Pressable key={gif} style={styles.gifOption} onPress={() => addDemoGif(gif)}><Text style={styles.chatGifText}>GIF</Text><Text style={styles.role}>{gif} · minh họa</Text></Pressable>)}</View> : null}
+              {picker === 'reaction' ? <View style={styles.pickerOptions}>{['👍', '❤️', '😂', '😮', '😢', '🙏'].map((reaction) => <Pressable key={reaction} style={styles.stickerOption} onPress={() => reactToLatest(reaction)}><Text style={styles.sticker}>{reaction}</Text></Pressable>)}</View> : null}
+              <Text style={styles.note}>Chỉ là lựa chọn cục bộ trong bản demo; không tải hoặc truyền tệp/GIF thật.</Text>
+            </View>
+          </View>
+        </Modal>
       </AppScreen>
     </KeyboardAvoidingView>
   );
@@ -371,4 +428,15 @@ const styles = StyleSheet.create({
   replyBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.brandSoft, borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
   replyBarText: { flex: 1, color: colors.brandDark, fontSize: typography.caption, fontWeight: '600' },
   cancelReply: { color: colors.brandDark, fontSize: 24, paddingHorizontal: spacing.sm },
+  gifButton: { height: 40, minWidth: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.canvas },
+  gifButtonText: { color: colors.brand, fontSize: 10, fontWeight: '900' },
+  pickerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
+  pickerCard: { gap: spacing.md, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
+  pickerOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  pickerOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.canvas },
+  stickerOption: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.canvas },
+  gifOption: { minWidth: 90, minHeight: 76, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas },
+  chatGif: { minWidth: 112, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.goldSoft },
+  chatGifText: { color: colors.brand, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  chatAttachment: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
 });

@@ -2,6 +2,8 @@
 
 **Phạm vi:** rà soát prototype React Native/Expo cho Student/Teacher, đối chiếu UI với source web, chỉ dùng mock. Không kết nối API/auth thật, MongoDB, Redis, Socket.IO, push, payment hoặc exam; không bật `MOBILE_MULTI_SESSION_AUTH`. Không sửa website/backend.
 
+**Lưu ý cập nhật:** Các kết quả giai đoạn ban đầu bên dưới được giữ làm lịch sử; phần 20 là QA parity mới nhất và thay thế các số lượng/gap cũ ở những mục trước.
+
 ## 1. Screens reviewed
 
 ### Mobile prototype screens
@@ -165,12 +167,14 @@ The Teacher Home root document did not overflow horizontally at 320, 375, 430 an
 ## 16. Remaining UI issues and parity gaps
 
 - Native Android and iOS layout/keyboard/safe-area/back behavior remains unverified.
-- The parity matrix identifies web functionality that remains partial. Important gaps include actual video/LMS progress, enrollment-based schedule and learner data, file upload/download, result/grade history, evaluation milestones, feed/news/center content, attendance gates, complete quiz authoring/results, training media, finance records and profile persistence.
+- The Prompt 11 closure and current UI-only classification are in `MOBILE_PARITY_SCREEN_MATRIX.md`: Student 23 ALIGNED / 0 PARTIAL / 1 WEB-ONLY; Teacher 30 ALIGNED / 0 PARTIAL / 1 WEB-ONLY.
+- All 22 concrete UI gaps from the previous matrix were implemented and reclassified; no current row is PARTIAL or MISSING.
+- Backend persistence, live data, upload/download, export and native QA remain separate from UI classification.
 - Student/Teacher exams remain **WEB-ONLY TẠM THỜI**. This includes attempts, camera/proctor/fullscreen behavior and certification exam player.
-- Mock values and copy are illustrative and do not come from the live website/backend; review the parity matrix before treating data/content as approved.
-- The Teacher mobile screen named `Grades` is not confirmed as an independent web screen; the web's related grades/progress are distributed across overview, students and assignments.
-- Local attendance choices and demo profile/sign-out are not equivalent to web business actions.
-- The development error fixture uses a generic error state; individual screens' recovery and state transitions should be checked on device after UI scope is approved.
+- Mock values remain local demo data; they are not production account data.
+- The mobile grade-history view aggregates web-visible grade/progress information from overview, student and assignment surfaces; it does not claim a separate web route.
+- Local attendance choices and demo profile/sign-out remain backend limitations, not UI/UX parity gaps.
+- Route review found no orphan or wrong-role route in the registered role-gated stack/menu inventory. Unknown notification destinations remain on safe notification detail.
 
 ## 17. Screenshots / test notes
 
@@ -178,14 +182,46 @@ Visual inspection was performed through the integrated browser. Browser checks e
 
 ## 18. Recommendation before API integration
 
-1. Review and approve the WEB → MOBILE FUNCTION PARITY status table in `MOBILE_UI_PHASE1.md`; decide which web gaps belong to a later UI phase.
-2. Keep exam and proctor flows on web until a separate native design and device POC are approved.
-3. Run native Android and iOS smoke tests on supported devices, specifically keyboard/composer, safe areas, back navigation, touch targets and font scaling.
-4. Assess the Expo CLI dependency advisories through a compatible Expo SDK maintenance path before release; do not use the suggested Expo 44 downgrade or forced audit fix.
-5. Only after UI and authentication integration are explicitly approved, plan a separate API integration phase.
+1. Keep the two explicitly WEB-ONLY exam/onboarding flows on the web until a separate native design and device POC are approved.
+2. Run native Android and iOS smoke tests separately, specifically keyboard/composer, safe areas, back navigation, touch targets and font scaling.
+3. Assess Expo CLI dependency advisories through a compatible Expo SDK maintenance path before release; do not use the suggested Expo 44 downgrade or forced audit fix.
+4. Do not begin backend integration as part of this UI parity task.
 
 ## 19. Readiness
 
-**UI NEEDS MORE WORK before backend integration.**
+**`MOBILE UI/UX PARITY READY`** — current matrix: 53 ALIGNED, 0 PARTIAL, 0 MISSING, 2 WEB-ONLY. Backend remains `NOT CONNECTED`; Android/iOS native QA remains `NOT RUN`, and neither status is used to determine the UI parity result.
 
-The implemented mock prototype typechecks and passes Expo Web smoke checks, but it is not parity-complete with the current web app, has unresolved Expo toolchain High advisories, and has not been tested on native Android/iOS devices. This is not a production-readiness statement.
+This is a web-to-mobile UI/UX classification, not a production-readiness statement.
+
+## 20. Prompt 11 parity closure QA
+
+### Results
+
+- Student: 23 ALIGNED, 0 PARTIAL, 1 WEB-ONLY.
+- Teacher: 30 ALIGNED, 0 PARTIAL, 1 WEB-ONLY.
+- Previous PARTIAL rows moved to ALIGNED: 22.
+- WEB-ONLY remains Student exam/certification attempts and Teacher onboarding test.
+- Backend connected: **NO**. Website/backend modified: **NO**. Dependency files changed: **NO**.
+- Android/iOS native QA: **NOT RUN**.
+
+### Flows exercised in Expo Web
+
+- Teacher chat: local GIF picker selection and sent-state rendering.
+- Teacher feed fixture: older-post pagination, threaded reply and locally created owned post with edit/delete controls.
+- Student assignment: file picker, selected-file state, demo submit and submitted/disabled state.
+- News fixture: search/topic/sort/period and list/grid controls; author/excerpt and attachment detail rendering.
+- Teacher quiz form: course-based targets, learner search, select-all-visible and clear selection.
+- 25-item notifications: page 1/page 2 (20 + 5) and category controls.
+- Student Profile/Tuition: `student-profile-populated` shows multiple explicitly labelled QA-only enrollments, tuition amounts and paid/pending video orders; payment confirmation updates only local UI state. Default mode displays no fixture amounts/orders, uses `—` for unknown tuition and shows the empty video-order state.
+- Student grade history: `grades-completed` shows explicitly labelled QA-only results; default mode returns no grade records.
+- Student Profile/Tuition and payment confirmation modal: default and populated QA states at 320/360/375/390/412/430/768 CSS px; document/body widths matched every viewport.
+- Password form: mismatch error and local matching-password completion.
+- Responsive widths 320/360/375/390/412/430/768 CSS px: Feed, NewsDetail and Conversation document/body widths matched the viewport.
+- `npm run typecheck`: **PASS**.
+- `npx expo install --check`: **PASS** — dependencies up to date.
+- `git diff --check` and explicit trailing-whitespace scan of edited mobile source/docs: **PASS**.
+- Full all-screen responsive traversal and all-55-row screenshot comparison: **NOT RUN**.
+
+QA monetary values, enrollments and scores are isolated behind `EXPO_PUBLIC_MOBILE_UI_QA_STATE` and are not part of the default Student mock account.
+
+The final summary and classifications are maintained in `MOBILE_WEB_UI_UX_FINAL_AUDIT.md`.

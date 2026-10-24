@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BookOpen, CalendarDays, Check, Clock3, FileSpreadsheet, FileText, Film, GraduationCap, Link2,
-  MapPin, MessageCircle, UserRound, Users, WalletCards,
+  Eye, EyeOff, MapPin, MessageCircle, UserRound, Users, WalletCards,
 } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -15,11 +15,11 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  assignmentService, learningService, materialService, notificationService, scheduleService, studentService,
+  assignmentService, gradeService, learningService, materialService, notificationService, scheduleService, studentProfileService, studentService,
 } from '../services/mockService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
-import type { AppNotification, Assignment, DemoStudent, LearningMaterial, ScheduleItem } from '../types';
+import type { AppNotification, Assignment, DemoGradeRecord, DemoStudent, LearningMaterial, ScheduleItem } from '../types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
@@ -554,11 +554,15 @@ export function AssignmentsScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [course, setCourse] = useState('');
+  const [attachedFileUrl, setAttachedFileUrl] = useState('');
   const [deadline, setDeadline] = useState('');
   const [assignToAll, setAssignToAll] = useState(true);
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
   const [grade, setGrade] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [submissionFile, setSubmissionFile] = useState<string | null>(null);
+  const [filePickerVisible, setFilePickerVisible] = useState(false);
+  const [localSubmittedIds, setLocalSubmittedIds] = useState<string[]>([]);
   const loader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const resource = useMockResource(loader);
   const studentsLoader = useCallback(() => studentService.assigned(), []);
@@ -623,7 +627,7 @@ export function AssignmentsScreen() {
       {!resource.loading && !resource.error && items.map((item) => (
         <Pressable
           key={item.id}
-          onPress={() => setSelected(item)}
+          onPress={() => { setSelected(item); setSubmissionFile(null); }}
           accessibilityRole="button"
         >
           <AssignmentCard item={item} />
@@ -637,6 +641,11 @@ export function AssignmentsScreen() {
           </View>
           <Text style={styles.muted}>{selected.subject} · Hạn: {selected.deadline}</Text>
           <Text style={styles.muted}>{selected.description || 'Không có mô tả.'}</Text>
+          {selected.attachedFileName || selected.attachedFileUrl ? (
+            <Pressable onPress={() => Alert.alert('Tệp đề bài demo', selected.attachedFileUrl ? `Liên kết mẫu: ${selected.attachedFileUrl}` : selected.attachedFileName || '—')} style={styles.fileLinkRow} accessibilityRole="button" accessibilityLabel="Mở tệp đề bài">
+              <FileText size={18} color={colors.brand} /><Text style={styles.fileLinkText}>{selected.attachedFileName || 'Tệp đề bài'}</Text><Text style={styles.fileLinkAction}>Mở</Text>
+            </Pressable>
+          ) : null}
           {selected.assignedStudentNames?.length ? <Text style={styles.metaText}>Học viên được giao: {selected.assignedStudentNames.join(', ')}</Text> : null}
           {isTeacher ? (
             <>
@@ -644,7 +653,12 @@ export function AssignmentsScreen() {
               {(selected.submissions || []).map((submission) => (
                 <Card key={submission.id} style={styles.submissionCard}>
                   <Text style={styles.cardTitle}>{submission.studentName}</Text>
-                  <Text style={styles.metaText}>{submission.submittedAt} · {submission.submittedFileUrl}</Text>
+                  <Text style={styles.metaText}>{submission.submittedAt}</Text>
+                  <Pressable onPress={() => Alert.alert('Tệp bài nộp demo', submission.submittedFileUrl ? `Mở tệp mẫu: ${submission.submittedFileUrl}` : 'Không có tệp đính kèm.')} style={styles.fileLinkRow} accessibilityRole="button" accessibilityLabel={`Mở tệp ${submission.submittedFileUrl || 'bài nộp'}`}>
+                    <FileText size={18} color={colors.brand} />
+                    <Text style={styles.fileLinkText}>{submission.submittedFileUrl || 'Không có file'}</Text>
+                    <Text style={styles.fileLinkAction}>Mở</Text>
+                  </Pressable>
                   {submission.grade != null ? <Text style={styles.metaText}>Điểm: {submission.grade}/10 · {submission.teacherFeedback || ''}</Text> : null}
                 </Card>
               ))}
@@ -656,16 +670,25 @@ export function AssignmentsScreen() {
           ) : (
             <>
               {selected.grade != null ? <Text style={styles.metaText}>Điểm: {selected.grade}/10 · {selected.teacherFeedback || ''}</Text> : null}
+              {submissionFile ? (
+                <View style={styles.fileSelection}>
+                  <FileText size={18} color={colors.brand} />
+                  <Text numberOfLines={1} style={styles.flex}>{submissionFile}</Text>
+                  {!localSubmittedIds.includes(selected.id) ? <Pressable onPress={() => { setSubmissionFile(null); setLocalSubmittedIds((current) => current.filter((id) => id !== selected.id)); }} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.fileLinkAction}>Bỏ</Text></Pressable> : null}
+                </View>
+              ) : null}
+              <PrimaryButton title={submissionFile ? 'Đổi tệp' : 'Chọn tệp nộp bài'} variant="secondary" disabled={localSubmittedIds.includes(selected.id) || selected.status === 'Đã nộp' || selected.status === 'Đã chấm'} onPress={() => setFilePickerVisible(true)} />
               <PrimaryButton
-                title={selected.status === 'Đã nộp' || selected.status === 'Đã chấm' ? 'Đã nộp bài' : 'Đánh dấu đã nộp demo'}
-                disabled={selected.status === 'Đã nộp' || selected.status === 'Đã chấm'}
+                title={selected.status === 'Đã nộp' || selected.status === 'Đã chấm' || localSubmittedIds.includes(selected.id) ? 'Đã nộp bài demo' : 'Nộp bài demo'}
+                disabled={!submissionFile || selected.status === 'Đã nộp' || selected.status === 'Đã chấm' || localSubmittedIds.includes(selected.id)}
                 onPress={() => {
                   const updated = allItems.map((item) => item.id === selected.id ? { ...item, status: 'Đã nộp' as const } : item);
                   setOverrides(updated);
                   setSelected({ ...selected, status: 'Đã nộp' });
+                  setLocalSubmittedIds((current) => [...current, selected.id]);
                 }}
               />
-              <Text style={styles.note}>Thao tác chỉ đổi trạng thái demo, không upload tệp.</Text>
+              <Text style={styles.note}>Chọn tệp mẫu và nộp để xem trạng thái demo. Không upload tệp.</Text>
             </>
           )}
         </Card>
@@ -676,6 +699,9 @@ export function AssignmentsScreen() {
             <Text style={styles.cardTitle}>Tạo bài tập demo</Text>
             <TextInput value={title} onChangeText={setTitle} placeholder="Tên bài tập" style={styles.formInput} />
             <TextInput value={description} onChangeText={setDescription} placeholder="Mô tả / yêu cầu" multiline style={[styles.formInput, styles.formTextarea]} />
+            <Text style={styles.fieldLabel}>Link File đề bài (Google Drive...)</Text>
+            <TextInput value={attachedFileUrl} onChangeText={setAttachedFileUrl} placeholder="https://..." autoCapitalize="none" keyboardType="url" style={styles.formInput} accessibilityLabel="Link File đề bài Google Drive" />
+            {attachedFileUrl.trim() ? <Pressable onPress={() => Alert.alert('Liên kết demo', attachedFileUrl.trim())} style={styles.fileLinkRow} accessibilityRole="button"><Link2 size={17} color={colors.brand} /><Text numberOfLines={1} style={styles.fileLinkText}>Xem trước liên kết</Text></Pressable> : null}
             <Text style={styles.fieldLabel}>Khóa học</Text>
             {studentsResource.loading ? <Text style={styles.note}>Đang tải khóa học demo…</Text> : null}
             {studentsResource.error ? <Text style={styles.note}>Không tải được khóa học demo: {studentsResource.error}</Text> : null}
@@ -717,10 +743,11 @@ export function AssignmentsScreen() {
               setOverrides([{
                 id: `task-${Date.now()}`, title: title.trim(), subject: course || user?.course || 'Khóa học',
                 teacher: user?.name || 'Giảng viên', deadline: deadline.trim() || '—',
-                status: 'Chưa làm', description: description.trim(), assignedStudentNames: assignedStudents.map((student) => student.name),
+                status: 'Chưa làm', description: description.trim(), attachedFileUrl: attachedFileUrl.trim() || undefined, assignedStudentNames: assignedStudents.map((student) => student.name),
               }, ...allItems]);
               setTitle('');
               setDescription('');
+              setAttachedFileUrl('');
               setDeadline('');
               setCourse('');
               setAssignToAll(true);
@@ -730,6 +757,13 @@ export function AssignmentsScreen() {
             <PrimaryButton title="Đóng" variant="quiet" onPress={() => setShowCreate(false)} />
           </View>
         </View>
+      </Modal>
+      <Modal visible={filePickerVisible} transparent animationType="slide" onRequestClose={() => setFilePickerVisible(false)}>
+        <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+          <View style={styles.rowBetween}><Text style={styles.cardTitle}>Chọn tệp mẫu để nộp</Text><Pressable onPress={() => setFilePickerVisible(false)} accessibilityRole="button"><Text style={styles.closeText}>Đóng</Text></Pressable></View>
+          {['Bai-lam-Excel-demo.xlsx', 'Bai-tap-Word-demo.docx', 'Anh-bai-lam-demo.jpg'].map((file) => <Pressable key={file} style={styles.filePickerOption} onPress={() => { setSubmissionFile(file); setFilePickerVisible(false); }} accessibilityRole="button"><FileText size={18} color={colors.brand} /><Text style={styles.flex}>{file}</Text><Text style={styles.fileLinkAction}>Chọn</Text></Pressable>)}
+          <Text style={styles.note}>Chỉ chọn tệp mẫu cục bộ; không truy cập thư viện thiết bị hoặc tải tệp lên.</Text>
+        </View></View>
       </Modal>
       <Text style={styles.footnote}>Không upload, nộp bài hoặc chấm điểm thật trong bản demo.</Text>
     </AppScreen>
@@ -799,6 +833,35 @@ function MaterialRow({ item }: { item: LearningMaterial }) {
   );
 }
 
+function notificationCategory(item: AppNotification) {
+  const labels: Record<string, string> = {
+    SYSTEM: 'Hệ thống',
+    COURSE: 'Khóa học',
+    STUDENT: 'Khóa học',
+    FINANCE: 'Tài chính',
+    SCHEDULE: 'Lịch dạy',
+    EXAM: 'Thi',
+    EVALUATION: 'Đánh giá',
+    GRADE: 'Đánh giá',
+    MESSAGE: 'Tin nhắn',
+    ADMIN: 'Admin',
+    NEWS: 'Tin tức',
+    TRAINING: 'Đào tạo',
+    ASSIGNMENT: 'Khóa học',
+    LESSON: 'Khóa học',
+  };
+  const raw = String(item.type || item.payload?.type || item.category || '').trim();
+  const normalized = raw.toUpperCase();
+  if (labels[normalized]) return labels[normalized];
+  const aliases: Record<string, string> = {
+    'LỊCH HỌC': 'Lịch dạy',
+    'HỌC PHÍ': 'Tài chính',
+    'BÀI TẬP': 'Khóa học',
+    'BÀI KIỂM TRA': 'Thi',
+  };
+  return aliases[normalized] || item.category || 'Thông báo';
+}
+
 export function NotificationsScreen() {
   const navigation = useNavigation<Navigation>();
   const { user } = useAuth();
@@ -810,9 +873,11 @@ export function NotificationsScreen() {
   const [category, setCategory] = useState('Tất cả');
   const [page, setPage] = useState(1);
   const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
+  const [routeMessage, setRouteMessage] = useState('');
   const notifications = (resource.data || []).filter((item) => !hiddenIds.includes(item.id));
-  const categories = ['Tất cả', ...new Set(notifications.map((item) => item.category))];
-  const categoryItems = notifications.filter((item) => category === 'Tất cả' || item.category === category);
+  const webCategories = ['Hệ thống', 'Khóa học', 'Tài chính', 'Lịch dạy', 'Thi', 'Đánh giá', 'Tin nhắn', 'Admin', 'Tin tức', 'Đào tạo', 'Thông báo'];
+  const categories = ['Tất cả', ...new Set([...webCategories, ...notifications.map(notificationCategory)])];
+  const categoryItems = notifications.filter((item) => category === 'Tất cả' || notificationCategory(item) === category);
   const matchingItems = categoryItems.filter((item) => {
     const isUnread = item.unread && !readIds.includes(item.id);
     return filter === 'Tất cả' || (filter === 'Chưa đọc' ? isUnread : !isUnread);
@@ -828,13 +893,37 @@ export function NotificationsScreen() {
     current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
   ));
   const openRelated = (item: AppNotification) => {
+    const type = String(item.type || item.payload?.type || item.category).trim().toUpperCase();
+    const path = String(item.targetPath || '').toLowerCase();
+    const target = path.includes('inbox') || type === 'MESSAGE'
+      ? { tab: 'Messages' as const }
+      : path.includes('schedule') || type === 'SCHEDULE' || notificationCategory(item) === 'Lịch dạy'
+        ? { tab: 'Schedule' as const }
+        : path.includes('assignment') || type === 'ASSIGNMENT' || item.category === 'Bài tập'
+          ? { screen: 'Assignments' as const }
+          : path.includes('finance') || type === 'FINANCE' || notificationCategory(item) === 'Tài chính'
+            ? user?.role === 'teacher' ? { screen: 'TeacherFinance' as const } : { screen: 'Tuition' as const }
+            : path.includes('exam') || type === 'EXAM'
+              ? user?.role === 'student' ? { screen: 'StudentExam' as const } : { screen: 'TeacherQuizzes' as const }
+              : path.includes('evaluation') || type === 'EVALUATION' || type === 'GRADE'
+                ? user?.role === 'student' ? { screen: 'Evaluations' as const } : { screen: 'Assignments' as const }
+                : path.includes('training') || type === 'TRAINING'
+                  ? user?.role === 'teacher' ? { screen: 'TeacherTraining' as const } : null
+                  : path.includes('news') || type === 'NEWS'
+                    ? { screen: 'News' as const }
+                    : type === 'COURSE' || type === 'STUDENT'
+                      ? user?.role === 'student' ? { screen: 'Materials' as const } : { screen: 'TeacherTraining' as const }
+                      : path.includes('center') || path.includes('profile')
+                        ? { screen: 'CenterInfo' as const }
+                        : null;
+    if (!target) {
+      setRouteMessage('Chưa có màn hình mobile phù hợp cho loại thông báo này. Chi tiết vẫn được giữ để xem.');
+      return;
+    }
     setSelectedNotification(null);
-    if (item.category === 'Lịch học') navigation.navigate('MainTabs', { screen: 'Schedule' });
-    else if (item.category === 'Bài tập') navigation.navigate('Assignments');
-    else if (item.category === 'Tin nhắn') navigation.navigate('MainTabs', { screen: 'Messages' });
-    else if (item.category === 'Học phí' && user?.role === 'student') navigation.navigate('Tuition');
-    else if (item.category === 'Học phí' && user?.role === 'teacher') navigation.navigate('TeacherFinance');
-    else navigation.navigate('CenterInfo');
+    setRouteMessage('');
+    if ('tab' in target) navigation.navigate('MainTabs', target.tab === 'Messages' ? { screen: 'Messages' } : { screen: 'Schedule' });
+    else navigation.navigate(target.screen);
   };
   const hideNotification = (id: string) => {
     setHiddenIds((current) => [...current, id]);
@@ -872,6 +961,7 @@ export function NotificationsScreen() {
           </View>
           <Text style={styles.metaText}>{selectedNotification.category} · {selectedNotification.time}</Text>
           <Text style={styles.muted}>{selectedNotification.message}</Text>
+          {routeMessage ? <Text style={styles.notificationRouteNote}>{routeMessage}</Text> : null}
           {selectedNotification.unread && !readIds.includes(selectedNotification.id) ? (
             <PrimaryButton title="Đánh dấu đã đọc" variant="secondary" onPress={() => {
               toggle(selectedNotification.id);
@@ -887,13 +977,13 @@ export function NotificationsScreen() {
       {visibleUnread.length ? (
         <View style={styles.group}>
           <SectionHeading title="Mới" />
-          {visibleUnread.map((item) => <NotificationCard key={item.id} item={item} onPress={() => { setSelectedNotification(item); toggle(item.id); }} onDismiss={() => hideNotification(item.id)} />)}
+          {visibleUnread.map((item) => <NotificationCard key={item.id} item={item} onPress={() => { setSelectedNotification(item); setRouteMessage(''); toggle(item.id); }} onDismiss={() => hideNotification(item.id)} />)}
         </View>
       ) : null}
       {visibleRead.length ? (
         <View style={styles.group}>
           <SectionHeading title="Trước đó" />
-          {visibleRead.map((item) => <NotificationCard key={item.id} item={item} onPress={() => setSelectedNotification(item)} onDismiss={() => hideNotification(item.id)} />)}
+          {visibleRead.map((item) => <NotificationCard key={item.id} item={item} onPress={() => { setSelectedNotification(item); setRouteMessage(''); }} onDismiss={() => hideNotification(item.id)} />)}
         </View>
       ) : null}
       {!resource.loading && !resource.error && notifications.length > 0 && !visibleUnread.length && !visibleRead.length ? <EmptyState title="Không có thông báo" message="Không có thông báo trong bộ lọc đã chọn." /> : null}
@@ -1140,30 +1230,37 @@ export function AttendanceScreen() {
 }
 
 export function GradesScreen() {
-  const loader = useCallback(() => learningService.courses(), []);
+  const loader = useCallback(() => gradeService.list(), []);
   const resource = useMockResource(loader);
+  const records: DemoGradeRecord[] = resource.data || [];
+  const courses = [...new Set(records.map((record) => record.courseName))];
   return (
     <AppScreen>
-      <AppHeader title="Kết quả học tập" subtitle="Tiến độ khóa học và kết quả nội dung học tập" />
+      <AppHeader title="Nhật ký học tập & Điểm số" subtitle="Bài nộp, trắc nghiệm và điểm theo khóa học" />
       <Card style={styles.resultSummary}>
         <View style={styles.summaryIcon}><WalletCards size={20} color={colors.brand} /></View>
         <View style={styles.rowCopy}>
-          <Text style={styles.cardTitle}>Tiến độ theo khóa học</Text>
-          <Text style={styles.metaText}>Được tổng hợp từ nội dung khóa học demo</Text>
+          <Text style={styles.cardTitle}>Lịch sử kết quả</Text>
+          <Text style={styles.metaText}>{courses.length || '—'} khóa học · {records.length || '—'} kết quả</Text>
         </View>
         <GraduationCap size={22} color={colors.brand} />
       </Card>
+      {records.some((record) => record.qaFixture) ? <Text style={styles.note}>QA fixture — điểm minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {(resource.data || []).map((course) => (
-        <Card key={course._id} style={styles.subjectCard}>
-          <Text style={styles.cardTitle}>{course.title}</Text>
-          <Text style={styles.metaText}>{course.subject}</Text>
-          <View style={styles.progressRow}><ProgressBar value={course.progress} /><Text style={styles.progressLabel}>{course.progress}%</Text></View>
-          {course.units.flatMap((unit) => unit.sections).map((lesson) => (
-            <View key={lesson._id} style={styles.rowBetween}>
-              <Text style={styles.metaText}>{lesson.title}</Text>
-              <StatusBadge label={lesson.completed ? 'Hoàn thành' : 'Đang học'} />
+      {courses.map((course) => (
+        <Card key={course} style={styles.subjectCard}>
+          <SectionHeading title={course} />
+          {records.filter((record) => record.courseName === course).map((record) => (
+            <View key={record.id} style={styles.gradeHistoryRow}>
+              <View style={styles.rowCopy}>
+                <Text style={styles.cardTitle}>{record.assessment}</Text>
+                <Text style={styles.metaText}>{record.date || '—'}</Text>
+              </View>
+              <View style={styles.gradeResult}>
+                <Text style={styles.gradeScore}>{record.score}</Text>
+                <StatusBadge label={record.status} />
+              </View>
             </View>
           ))}
         </Card>
@@ -1172,7 +1269,7 @@ export function GradesScreen() {
         <Text style={styles.cardTitle}>Phòng thi / Điểm thi</Text>
         <Text style={styles.muted}>WEB-ONLY TẠM THỜI — vui lòng thực hiện bài thi và xem kết quả thi trên website.</Text>
       </Card>
-      {!resource.loading && !resource.error && !resource.data?.length ? <EmptyState title="Chưa có kết quả học tập" message="Khóa học và tiến độ sẽ hiển thị tại đây." /> : null}
+      {!resource.loading && !resource.error && !records.length ? <EmptyState title="Chưa có dữ liệu điểm số" message="Bài nộp, trắc nghiệm và điểm sẽ hiển thị tại đây." /> : null}
     </AppScreen>
   );
 }
@@ -1185,11 +1282,34 @@ export function ProfileScreen() {
     ? Math.round((user.completedSessions / user.totalSessions) * 100)
     : null;
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [profileValues, setProfileValues] = useState({ email: '', bio: '', specialty: '', address: '', zalo: '', voiceRegion: '', age: '', bankName: '', bankAccount: '', accountHolder: '', bankBranch: '' });
   const [savedProfile, setSavedProfile] = useState(false);
+  const studentProfileLoader = useCallback(
+    () => isTeacher
+      ? Promise.resolve({ enrollments: [], videoOrders: [], qaFixture: false })
+      : studentProfileService.get(user),
+    [isTeacher, user],
+  );
+  const studentProfileResource = useMockResource(studentProfileLoader);
+  const studentProfile = studentProfileResource.data;
+  const enrollments = studentProfile?.enrollments.length ? studentProfile.enrollments : (user?.course ? [{
+    id: 'primary-course',
+    courseName: user.course,
+    teacherName: user.teacherName,
+    progress: courseProgress || 0,
+    completedSessions: user.completedSessions,
+    totalSessions: user.totalSessions,
+    avgGrade: user.avgGrade,
+    status: 'Đang học' as const,
+    tuitionAmount: undefined,
+    paidAmount: undefined,
+  }] : []);
+  const videoOrders = studentProfile?.videoOrders || [];
   return (
     <AppScreen>
       <AppHeader title={isTeacher ? 'Hồ sơ' : 'Cá nhân'} subtitle={isTeacher ? 'Thông tin hồ sơ giảng viên' : 'Thông tin tài khoản demo'} />
+      {!isTeacher && studentProfileResource.error ? <ErrorState onRetry={studentProfileResource.reload} /> : null}
       {isTeacher ? (
         <>
           <Card style={styles.teacherProfileHero}>
@@ -1257,6 +1377,7 @@ export function ProfileScreen() {
         </>
       ) : (
         <>
+          {studentProfile?.qaFixture ? <Text style={styles.note}>QA fixture — dữ liệu minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
           <Card style={styles.profileCard}>
             <Avatar name={user?.name || 'Demo User'} color={user?.avatarColor} size={68} />
             <Text style={styles.profileName}>{user?.name || '—'}</Text>
@@ -1293,18 +1414,22 @@ export function ProfileScreen() {
           </Card>
           <Card style={styles.profileDetails}>
             <SectionHeading title="Tóm tắt học tập" />
-            {user?.course ? (
-              <View style={styles.profileCourse}>
-                <Text style={styles.cardTitle}>{user.course}</Text>
-                <Text style={styles.metaText}>Giảng viên: {user.teacherName || '—'} · {user.totalSessions ?? '—'} buổi</Text>
-                {courseProgress != null ? <ProgressBar value={courseProgress} /> : null}
+            {enrollments.length ? enrollments.map((enrollment) => (
+              <View key={enrollment.id} style={styles.profileCourse}>
+                <View style={styles.rowBetween}><Text style={styles.cardTitle}>{enrollment.courseName}</Text><StatusBadge label={enrollment.status} /></View>
+                <Text style={styles.metaText}>Giảng viên: {enrollment.teacherName || '—'}{enrollment.registeredAt ? ` · Đăng ký ${enrollment.registeredAt}` : ''}</Text>
+                {enrollment.progress != null ? <ProgressBar value={enrollment.progress} /> : null}
                 <Text style={styles.metaText}>
-                  {courseProgress != null ? `Tiến độ ${courseProgress}%` : 'Tiến độ —'}
-                  {' · '}Đã học {user.completedSessions ?? '—'}/{user.totalSessions ?? '—'} buổi
-                  {' · '}Điểm: {user.avgGrade ?? '—'}
+                  Tiến độ {enrollment.progress != null ? `${enrollment.progress}%` : '—'}
+                  {' · '}Đã học {enrollment.completedSessions ?? '—'}/{enrollment.totalSessions ?? '—'} buổi
+                  {' · '}Điểm: {enrollment.avgGrade ?? '—'}
+                </Text>
+                <Text style={styles.metaText}>
+                  Học phí: {enrollment.tuitionAmount != null ? formatCurrency(enrollment.tuitionAmount) : '—'}
+                  {' · '}Đã thanh toán: {enrollment.paidAmount != null ? formatCurrency(enrollment.paidAmount) : '—'}
                 </Text>
               </View>
-            ) : <EmptyState title="Chưa có khóa học" message="Khóa học được phân công sẽ hiển thị tại đây." />}
+            )) : <EmptyState title="Chưa có khóa học" message="Khóa học được phân công sẽ hiển thị tại đây." />}
           </Card>
           <Card style={styles.profileDetails}>
             <SectionHeading title="Học phí & thanh toán" action="Chi tiết" onPress={() => navigation.navigate('Tuition')} />
@@ -1312,18 +1437,30 @@ export function ProfileScreen() {
               <Text style={styles.teacherProfileLabel}>Tình trạng học phí</Text>
               <Text style={styles.teacherProfileValue}>{user?.paid == null ? '—' : user.paid ? 'Đã thanh toán' : 'Chưa thanh toán'}</Text>
             </View>
-            <Text style={styles.note}>Thông tin thanh toán và lịch sử giao dịch sẽ hiển thị khi có dữ liệu xác minh.</Text>
+            <Text style={styles.note}>Mở chi tiết để xem số tiền và trạng thái theo từng khóa học.</Text>
           </Card>
           <Card style={styles.profileDetails}>
             <SectionHeading title="Đơn hàng video" />
-            <EmptyState title="Chưa có đơn hàng video" message="Đơn hàng khóa học video sẽ được hiển thị tại đây." />
+            {videoOrders.length ? videoOrders.map((order) => (
+              <View key={order.id} style={styles.videoOrderRow}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.cardTitle}>{order.courseName}</Text>
+                  <Text style={styles.metaText}>{order.date} · {formatCurrency(order.amount)}</Text>
+                </View>
+                <View style={styles.videoOrderActions}>
+                  <StatusBadge label={order.status} />
+                  <Pressable onPress={() => Alert.alert(order.status === 'Đã thanh toán' ? 'Tiếp tục học demo' : 'Tiếp tục thanh toán demo', `${order.courseName}: thao tác này chỉ minh họa, không phát sinh thanh toán hoặc mở nội dung thật.`)} style={styles.fileLinkRow} accessibilityRole="button">
+                    <Text style={styles.fileLinkAction}>{order.status === 'Đã thanh toán' ? 'Tiếp tục học' : 'Tiếp tục thanh toán'}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )) : <EmptyState title="Chưa có đơn hàng video" message="Đơn hàng khóa học video sẽ được hiển thị tại đây." />}
           </Card>
         </>
       )}
       <Card style={styles.menuCard}>
         {!isTeacher ? <MenuRow icon={<UserRound size={18} color={colors.brand} />} title="Thông tin cá nhân" subtitle="Cập nhật thông tin liên hệ trong bản demo" onPress={() => setShowProfileForm(true)} /> : null}
-        {!isTeacher ? <MenuRow icon={<UserRound size={18} color={colors.brand} />} title="Đổi mật khẩu" subtitle="Bảo mật tài khoản đăng nhập" onPress={() => Alert.alert('Đổi mật khẩu', 'Thao tác tài khoản được giữ trên website; mobile chưa kết nối authentication.')} /> : null}
-        {isTeacher ? <MenuRow icon={<UserRound size={18} color={colors.brand} />} title="Đổi mật khẩu" subtitle="Bảo mật tài khoản đăng nhập" onPress={() => Alert.alert('Đổi mật khẩu', 'Thao tác tài khoản được giữ trên website; mobile chưa kết nối authentication.')} /> : null}
+        <MenuRow icon={<UserRound size={18} color={colors.brand} />} title="Đổi mật khẩu" subtitle="Bảo mật tài khoản đăng nhập" onPress={() => setShowPasswordForm(true)} />
         <MenuRow icon={<BookOpen size={18} color={colors.brand} />} title="Danh mục theo vai trò" subtitle="Chức năng hiện có trên web" onPress={() => navigation.navigate('MobileMenu')} />
         {!isTeacher ? <MenuRow icon={<BookOpen size={18} color={colors.brand} />} title="Tài liệu học tập" onPress={() => navigation.navigate('Materials')} /> : null}
         {!isTeacher ? <MenuRow icon={<GraduationCap size={18} color={colors.brand} />} title="Kết quả học tập" onPress={() => navigation.navigate('Grades')} /> : null}
@@ -1362,8 +1499,65 @@ export function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      <PasswordChangeModal visible={showPasswordForm} onClose={() => setShowPasswordForm(false)} />
       <Text style={styles.footnote}>Không có thông tin cá nhân thật được lưu hoặc gửi đi.</Text>
     </AppScreen>
+  );
+}
+
+function PasswordChangeModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState('');
+
+  const save = () => {
+    if (!currentPassword || !newPassword || !confirmation) {
+      setError('Vui lòng nhập đầy đủ mật khẩu hiện tại, mật khẩu mới và xác nhận.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('Mật khẩu mới phải có ít nhất 8 ký tự.');
+      return;
+    }
+    if (newPassword !== confirmation) {
+      setError('Mật khẩu xác nhận chưa khớp.');
+      return;
+    }
+    Alert.alert('Đã đổi mật khẩu demo', 'Không có mật khẩu thật được gửi hoặc thay đổi.');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmation('');
+    setError('');
+    onClose();
+  };
+
+  const passwordField = (key: string, label: string, value: string, onChangeText: (value: string) => void) => (
+    <View key={key} style={styles.passwordField}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.passwordInputRow}>
+        <TextInput value={value} onChangeText={(next) => { onChangeText(next); setError(''); }} placeholder={label} secureTextEntry={!visibleFields[key]} autoCapitalize="none" style={styles.passwordInput} accessibilityLabel={label} />
+        <Pressable onPress={() => setVisibleFields((current) => ({ ...current, [key]: !current[key] }))} accessibilityRole="button" accessibilityLabel={visibleFields[key] ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+          {visibleFields[key] ? <EyeOff size={18} color={colors.muted} /> : <Eye size={18} color={colors.muted} />}
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+        <View style={styles.rowBetween}><Text style={styles.cardTitle}>Đổi mật khẩu</Text><Pressable onPress={onClose} accessibilityRole="button"><Text style={styles.closeText}>Đóng</Text></Pressable></View>
+        {passwordField('current', 'Mật khẩu hiện tại', currentPassword, setCurrentPassword)}
+        {passwordField('new', 'Mật khẩu mới', newPassword, setNewPassword)}
+        {passwordField('confirm', 'Xác nhận mật khẩu mới', confirmation, setConfirmation)}
+        <Text style={styles.note}>Yêu cầu tối thiểu 8 ký tự. Thao tác chỉ mô phỏng trên thiết bị.</Text>
+        {error ? <Text style={styles.passwordError}>{error}</Text> : null}
+        <PrimaryButton title="Xác nhận demo" onPress={save} />
+        <PrimaryButton title="Hủy" variant="quiet" onPress={onClose} />
+      </View></View>
+    </Modal>
   );
 }
 
@@ -1377,6 +1571,10 @@ function InfoLine({ icon, label, value }: { icon: React.ReactNode; label: string
       </View>
     </View>
   );
+}
+
+function formatCurrency(value: number) {
+  return `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 }
 
 function FilterChips({ items, selected, onSelect }: { items: string[]; selected: string; onSelect: (item: string) => void }) {
@@ -1398,6 +1596,7 @@ function FilterChips({ items, selected, onSelect }: { items: string[]; selected:
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   group: { gap: spacing.md },
   scheduleStats: { flexDirection: 'row', gap: spacing.sm },
   assignmentTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
@@ -1468,6 +1667,7 @@ const styles = StyleSheet.create({
   notificationPagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   notificationMain: { flex: 1, minWidth: 0 },
   notificationDismiss: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
+  notificationRouteNote: { padding: spacing.sm, color: colors.brandDark, backgroundColor: colors.goldSoft, borderRadius: radius.md, fontSize: typography.caption },
   notificationCard: { flexDirection: 'row', alignItems: 'flex-start' },
   noticeIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand, marginTop: 6 },
@@ -1496,6 +1696,9 @@ const styles = StyleSheet.create({
   resultSummary: { flexDirection: 'row', alignItems: 'center' },
   summaryScore: { color: colors.brand, fontSize: typography.title, fontWeight: '800' },
   subjectCard: { gap: spacing.md },
+  gradeHistoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  gradeResult: { alignItems: 'flex-end', gap: spacing.xs },
+  gradeScore: { color: colors.brandDark, fontSize: typography.body, fontWeight: '800' },
   examNotice: { backgroundColor: colors.goldSoft, borderColor: '#F3E4BE' },
   profileCard: { alignItems: 'center', paddingVertical: spacing.xxl },
   profileDetails: { gap: spacing.md },
@@ -1504,6 +1707,8 @@ const styles = StyleSheet.create({
   profileStatValue: { color: colors.ink, fontSize: typography.title, fontWeight: '700' },
   profileStatLabel: { color: colors.muted, fontSize: typography.small, textAlign: 'center' },
   profileCourse: { gap: spacing.sm, borderBottomColor: colors.line, borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: spacing.md },
+  videoOrderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  videoOrderActions: { alignItems: 'flex-end', gap: spacing.xs },
   teacherProfileHero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl, backgroundColor: colors.brandDark, borderColor: colors.brandDark },
   teacherProfileEyebrow: { color: '#FEE2E2', fontSize: typography.caption, fontWeight: '800', letterSpacing: 1 },
   teacherProfileName: { color: '#FFFFFF', fontSize: typography.heading, fontWeight: '800', textAlign: 'center' },
@@ -1527,6 +1732,16 @@ const styles = StyleSheet.create({
   formInput: { minHeight: 46, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.surface },
   formTextarea: { minHeight: 90, textAlignVertical: 'top', paddingTop: spacing.md },
   submissionCard: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, backgroundColor: colors.canvas },
+  fileLinkRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs },
+  fileLinkText: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  fileLinkAction: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
+  fileSelection: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.brandSoft },
+  filePickerOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
+  tuitionAmountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  passwordField: { gap: spacing.xs },
+  passwordInputRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
+  passwordInput: { flex: 1, minWidth: 0, color: colors.ink },
+  passwordError: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
   fieldLabel: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
   note: { color: colors.muted, fontSize: typography.caption, lineHeight: 18, fontStyle: 'italic' },
   savedText: { color: colors.green, fontSize: typography.small, fontWeight: '700' },
