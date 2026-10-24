@@ -1275,7 +1275,7 @@ export function GradesScreen() {
 }
 
 export function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, authMode } = useAuth();
   const navigation = useNavigation<Navigation>();
   const isTeacher = user?.role === 'teacher';
   const courseProgress = user?.completedSessions != null && user.totalSessions
@@ -1465,7 +1465,19 @@ export function ProfileScreen() {
         {!isTeacher ? <MenuRow icon={<BookOpen size={18} color={colors.brand} />} title="Tài liệu học tập" onPress={() => navigation.navigate('Materials')} /> : null}
         {!isTeacher ? <MenuRow icon={<GraduationCap size={18} color={colors.brand} />} title="Kết quả học tập" onPress={() => navigation.navigate('Grades')} /> : null}
         <MenuRow icon={<Users size={18} color={colors.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
-        <MenuRow icon={<Clock3 size={18} color={colors.red} />} title="Đăng xuất demo" destructive onPress={signOut} />
+        <MenuRow
+          icon={<Clock3 size={18} color={colors.red} />}
+          title={authMode === 'real' ? 'Đăng xuất' : 'Đăng xuất demo'}
+          destructive
+          onPress={() => {
+            void signOut().catch((error: unknown) => {
+              Alert.alert(
+                'Đã đăng xuất khỏi thiết bị',
+                error instanceof Error ? error.message : 'Không thể xác nhận đăng xuất với máy chủ.',
+              );
+            });
+          }}
+        />
       </Card>
       <Modal visible={showProfileForm} transparent animationType="slide" onRequestClose={() => setShowProfileForm(false)}>
         <View style={styles.modalBackdrop}>

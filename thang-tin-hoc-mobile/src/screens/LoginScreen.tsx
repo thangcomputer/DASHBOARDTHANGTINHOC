@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookOpen, Eye, EyeOff, GraduationCap, UserRound } from 'lucide-react-native';
 import { FormField, PrimaryButton } from '../components/ui';
-import { useAuth } from '../app/AuthContext';
+import { isMobileAuthPocEnabled, useAuth } from '../app/AuthContext';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { UserRole } from '../types';
 
@@ -26,8 +26,8 @@ export function LoginScreen() {
 
   const chooseRole = (nextRole: UserRole) => {
     setRole(nextRole);
-    setPhone(nextRole === 'student' ? '0901 234 567' : '0912 345 678');
-    setPassword('demo123');
+    setPhone(isMobileAuthPocEnabled ? '' : nextRole === 'student' ? '0901 234 567' : '0912 345 678');
+    setPassword(isMobileAuthPocEnabled ? '' : 'demo123');
     setError('');
   };
 
@@ -36,7 +36,7 @@ export function LoginScreen() {
     try {
       await signIn(role, phone, password);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập demo.');
+      setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập.');
     }
   };
 
@@ -69,7 +69,7 @@ export function LoginScreen() {
               keyboardType="phone-pad"
               autoComplete="tel"
               textContentType="telephoneNumber"
-              accessibilityLabel="Số điện thoại demo"
+              accessibilityLabel="Số điện thoại"
             />
             <View style={styles.passwordField}>
               <FormField
@@ -80,7 +80,7 @@ export function LoginScreen() {
                 secureTextEntry={!showPassword}
                 autoComplete="password"
                 textContentType="password"
-                accessibilityLabel="Mật khẩu demo"
+                accessibilityLabel="Mật khẩu"
               />
               <Pressable
                 style={styles.eyeButton}
@@ -92,11 +92,15 @@ export function LoginScreen() {
               </Pressable>
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <PrimaryButton title="Đăng nhập demo" onPress={submit} loading={isSigningIn} />
+            <PrimaryButton title={isMobileAuthPocEnabled ? 'Đăng nhập' : 'Đăng nhập demo'} onPress={submit} loading={isSigningIn} />
 
             <View style={styles.demoNote}>
-              <Text style={styles.demoTitle}>Chế độ xem trước</Text>
-              <Text style={styles.demoCopy}>Dữ liệu chỉ là minh họa. Bạn có thể chọn vai trò để mở giao diện mẫu.</Text>
+              <Text style={styles.demoTitle}>{isMobileAuthPocEnabled ? 'AUTH = REAL · FEATURE DATA = MOCK' : 'Chế độ xem trước'}</Text>
+              <Text style={styles.demoCopy}>
+                {isMobileAuthPocEnabled
+                  ? 'Đăng nhập dùng hệ thống xác thực thật. Các màn hình và dữ liệu nghiệp vụ vẫn là minh họa.'
+                  : 'Dữ liệu chỉ là minh họa. Bạn có thể chọn vai trò để mở giao diện mẫu.'}
+              </Text>
             </View>
             <Pressable
               onPress={() => Alert.alert('Quên mật khẩu', 'Đây là giao diện demo. Hãy liên hệ trung tâm trên website.')}
@@ -107,7 +111,9 @@ export function LoginScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.footer}>Phiên bản giao diện demo · Không kết nối hệ thống thật</Text>
+          <Text style={styles.footer}>
+            {isMobileAuthPocEnabled ? 'Mobile Auth POC · Không kết nối API nghiệp vụ' : 'Phiên bản giao diện demo · Không kết nối hệ thống thật'}
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
