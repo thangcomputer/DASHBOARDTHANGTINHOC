@@ -15,6 +15,9 @@ export const SOCKET_EVENTS = {
   LAST_SEEN_USERS: 'socket:last_seen_users',
   NOTIFICATION: 'socket:notification',
   DATA_REFRESH: 'socket:data_refresh',
+  SCHEDULE_NEW: 'socket:schedule:new',
+  SCHEDULE_UPDATED: 'socket:schedule:updated',
+  SCHEDULE_CANCELLED: 'socket:schedule:cancelled',
   GROUP_NEW: 'socket:group:new',
   GROUP_DELETE: 'socket:group:delete',
   CONTACT_UPDATED: 'socket:contact:updated',
@@ -39,6 +42,7 @@ export const SOCKET_EVENTS = {
   ATTENDANCE_CONFIRMED: 'socket:attendance:confirmed',
   ATTENDANCE_REJECTED: 'socket:attendance:rejected',
   ATTENDANCE_ADMIN_MAKEUP_COMPLETED: 'socket:attendance:admin-makeup-completed',
+  LMS_QA_UPDATED: 'socket:lms_qa:updated',
 } as const;
 
 let socket: Socket | null = null;
@@ -92,10 +96,14 @@ function bindSocketEvents(instance: Socket) {
     }
   });
   instance.on('new-notification', (data) => emitDeviceEvent(SOCKET_EVENTS.NOTIFICATION, data));
+  instance.on('lms_qa:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.LMS_QA_UPDATED, data));
   instance.on('group:new', (data) => emitDeviceEvent(SOCKET_EVENTS.GROUP_NEW, data));
   instance.on('group:deleted', (data) => emitDeviceEvent(SOCKET_EVENTS.GROUP_DELETE, data));
   instance.on('CONTACT_LIST_UPDATED', (data) => emitDeviceEvent(SOCKET_EVENTS.CONTACT_UPDATED, data));
   instance.on('data:refresh', (data) => emitDeviceEvent(SOCKET_EVENTS.DATA_REFRESH, data));
+  instance.on('schedule:new', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_NEW, data));
+  instance.on('schedule:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_UPDATED, data));
+  instance.on('schedule:cancelled', (data) => emitDeviceEvent(SOCKET_EVENTS.SCHEDULE_CANCELLED, data));
   instance.on('attendance:awaiting-confirm', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_AWAITING_CONFIRM, data));
   instance.on('attendance:disputed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_DISPUTED, data));
   instance.on('attendance:confirmed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_CONFIRMED, data));

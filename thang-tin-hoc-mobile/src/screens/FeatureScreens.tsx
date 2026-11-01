@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, DeviceEventEmitter, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import {
-  Ban, Bell, BookOpen, BookText, CalendarDays, Check, CheckCircle, ChevronDown, Clock3, FileSpreadsheet,
-  FileText, Film, GraduationCap, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, RefreshCw, Settings, Table2, Trash2, UserRound, Users, WalletCards, X,
+  Ban, Bell, BookOpen, BookText, CalendarDays, Camera, Check, CheckCircle, ChevronDown, Clock3, Download, FileSpreadsheet,
+  FileText, Film, GraduationCap, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, RefreshCw, Save, Settings, Table2, Trash2, UserRound, Users, WalletCards, X,
 } from 'lucide-react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
@@ -15,11 +17,14 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  assignmentService, gradeService, learningService, materialService, messageService, notificationService, scheduleService, studentProfileService, studentService, teacherProfileService,
+  assignmentService, gradeService, learningService, materialService, messageService, notificationService, scheduleService, softwareService, studentProfileService, studentService, teacherProfileService,
 } from '../services/mockService';
 import { SOCKET_EVENTS } from '../services/socketService';
-import { PartialAssignmentCreationError } from '../services/assignmentApi';
+import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
+import { uploadAndUpdateAvatar } from '../services/avatarApi';
+import { PartialAssignmentCreationError, uploadStudentAssignmentFile } from '../services/assignmentApi';
 import { colors, radius, spacing, typography } from '../theme/tokens';
+import type { DemoSoftwareLink } from '../types';
 import type { AppStackParamList } from '../navigation/types';
 import type { AppNotification, Assignment, Conversation, DemoGradeRecord, DemoStudent, DemoUser, LearningMaterial, ScheduleItem } from '../types';
 import type { TeacherProfile, TeacherProfileUpdate } from '../services/teacherApi';
@@ -43,6 +48,19 @@ function isOverdueAttendance(item: ScheduleItem, now = Date.now()) {
   if (!item.attendanceStatus || item.attendanceStatus !== 'pending') return false;
   const bounds = getAttendanceBounds(item);
   return Boolean(bounds && now > bounds.deadline);
+}
+
+function getStudentDiaryStatus(item: ScheduleItem, now = Date.now()) {
+  if (item.status === 'completed') return { label: 'ĐÃ HỌC', tone: 'completed' as const };
+  if (item.status === 'cancelled') return { label: 'ĐÃ HỦY', tone: 'cancelled' as const };
+  const bounds = getAttendanceBounds(item);
+  if (bounds && now >= bounds.startAt && now <= bounds.endAt) return { label: 'ĐANG DIỄN RA', tone: 'ongoing' as const };
+  if (bounds && now > bounds.endAt) {
+    return now <= bounds.deadline
+      ? { label: 'CHƯA ĐIỂM DANH', tone: 'pending' as const }
+      : { label: 'QUÁ HẠN ĐIỂM DANH', tone: 'overdue' as const };
+  }
+  return { label: 'SẮP TỚI', tone: 'upcoming' as const };
 }
 
 function canTeacherMarkAttendance(item: ScheduleItem | undefined, now = Date.now()) {
@@ -124,6 +142,44 @@ export function ScheduleScreen() {
   const [classDate, setClassDate] = useState('');
   const loader = useCallback(() => scheduleService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const resource = useMockResource(loader);
+  useFocusEffect(useCallback(() => {
+    resource.reload();
+  }, [resource.reload]));
+  useEffect(() => {
+    const scheduleEvents = [
+      SOCKET_EVENTS.SCHEDULE_NEW,
+      SOCKET_EVENTS.SCHEDULE_UPDATED,
+      SOCKET_EVENTS.SCHEDULE_CANCELLED,
+    ];
+    const idOf = (value: unknown) => {
+      if (value && typeof value === 'object') {
+        const record = value as Record<string, unknown>;
+        return String(record._id || record.id || '');
+      }
+      return String(value || '');
+    };
+    const subscriptions = scheduleEvents.map((eventName) => DeviceEventEmitter.addListener(eventName, (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const event = payload as Record<string, unknown>;
+      const schedule = event.schedule && typeof event.schedule === 'object'
+        ? event.schedule as Record<string, unknown>
+        : event;
+      const ownerId = isTeacher
+        ? idOf(schedule.teacherId || event.teacherId)
+        : idOf(schedule.studentId || event.studentId);
+      if (ownerId && ownerId !== user?.id) return;
+      resource.reload();
+    }));
+    const refreshSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.DATA_REFRESH, (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const type = String((payload as Record<string, unknown>).type || '').toLowerCase();
+      if (type === 'schedule' || type === 'schedules') resource.reload();
+    });
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+      refreshSubscription.remove();
+    };
+  }, [isTeacher, resource.reload, user?.id]);
   const courseProfileLoader = useCallback(
     () => user?.role === 'student' && !user.previewMode ? studentProfileService.get(user) : Promise.resolve(null),
     [user],
@@ -205,12 +261,11 @@ export function ScheduleScreen() {
     return itemDate.getMonth() === new Date().getMonth() && itemDate.getFullYear() === new Date().getFullYear();
   });
   const studentDiaryItems = allScheduleItems.filter((item) => {
-    if (activeStudentCourse && !matchesScheduleCourse(item, activeStudentCourse, user?.course)) return false;
     const date = item.date ? new Date(`${item.date}T00:00:00`) : null;
     if (studentDiaryFilter === 'Ngày' && (!date || date.toDateString() !== new Date().toDateString())) return false;
     if (studentDiaryFilter === 'Tuần' && (!date || date < weekStart || date > weekEnd)) return false;
     if (studentDiaryFilter === 'Tháng' && (!date || date.getMonth() !== new Date().getMonth() || date.getFullYear() !== new Date().getFullYear())) return false;
-    if (studentDiaryFilter === 'Chưa điểm danh' && item.attendanceStatus !== 'pending' && !isOverdueAttendance(item)) return false;
+    if (studentDiaryFilter === 'Chưa điểm danh' && !['pending', 'overdue'].includes(getStudentDiaryStatus(item).tone)) return false;
     if (studentDiaryFilter === 'Lịch hủy' && item.status !== 'cancelled') return false;
     return true;
   }).sort((a, b) => `${b.date || ''} ${b.time || ''}`.localeCompare(`${a.date || ''} ${a.time || ''}`));
@@ -446,6 +501,17 @@ export function ScheduleScreen() {
 
   return (
     <AppScreen>
+      <Card style={styles.scheduleHero}>
+        <View style={styles.scheduleHeroIcon}>
+          <CalendarDays size={22} color={colors.brand} />
+        </View>
+        <View style={styles.rowCopy}>
+          <Text style={styles.scheduleHeroTitle}>
+            {isTeacher ? 'Quản lý Lịch dạy & Điểm danh' : 'Quản lý Lịch học & Điểm danh'}
+          </Text>
+          {isTeacher ? <Text style={styles.metaText}>Xếp lịch theo tuần và xem nhật ký giảng dạy</Text> : null}
+        </View>
+      </Card>
       {!isTeacher && resource.loading ? <LoadingSkeleton rows={1} /> : null}
       {!isTeacher && !resource.loading ? (
         <>
@@ -521,7 +587,7 @@ export function ScheduleScreen() {
             </View>
             {activeStudentCourse ? (
               <View style={styles.weekCourseLabel}>
-                <Text style={styles.weekCourseLabelCaption}>KHÓA HỌC</Text>
+                <Text style={styles.weekCourseLabelCaption}>Khóa học:</Text>
                 <Text numberOfLines={1} style={styles.weekCourseLabelName}>{activeStudentCourse}</Text>
               </View>
             ) : null}
@@ -578,14 +644,29 @@ export function ScheduleScreen() {
         <>
           <View style={styles.scheduleStats}>
             {[
-              { label: 'Đã dạy tháng này', value: String(teacherMonthItems.filter((item) => item.status === 'completed').length) },
-              { label: 'Buổi sắp tới', value: String(teacherMonthItems.filter((item) => item.status === 'upcoming').length) },
-              { label: 'Đã hủy', value: String(teacherMonthItems.filter((item) => item.status === 'cancelled').length) },
-            ].map((stat) => <Card key={stat.label} style={styles.scheduleStat}><Text style={styles.scheduleStatValue}>{stat.value}</Text><Text style={styles.metaText}>{stat.label}</Text></Card>)}
+              { label: 'Đã dạy tháng này', value: teacherMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: colors.green },
+              { label: 'Buổi sắp tới', value: teacherMonthItems.filter((item) => item.status === 'upcoming').length, icon: Clock3, color: '#D97706' },
+              { label: 'Đã hủy', value: teacherMonthItems.filter((item) => item.status === 'cancelled').length, icon: Ban, color: colors.red },
+            ].map((stat) => (
+              <Card key={stat.label} style={styles.scheduleStat}>
+                <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft }]}>
+                  <stat.icon size={17} color={stat.color} />
+                </View>
+                <Text style={styles.scheduleStatLabel}>{stat.label}</Text>
+                <Text style={[styles.scheduleStatValue, { color: stat.color }]}>
+                  {stat.value} <Text style={styles.scheduleStatUnit}>buổi</Text>
+                </Text>
+              </Card>
+            ))}
           </View>
           <Card style={styles.weeklyGridCard}>
-            <SectionHeading title="Xếp lịch dạy theo tuần" />
-            <Text style={styles.metaText}>Chọn khung giờ trong ô. Khung trùng giờ sẽ không được xếp.</Text>
+            <View style={styles.weeklyGridHeading}>
+              <View style={styles.scheduleOverviewIcon}><Table2 size={18} color={colors.brand} /></View>
+              <View style={styles.weeklyGridHeadingCopy}>
+                <Text style={styles.weeklyGridTitle}>Xếp lịch dạy theo tuần</Text>
+                <Text style={styles.metaText}>Chọn khung giờ trong ô. Khung trùng giờ sẽ không được xếp.</Text>
+              </View>
+            </View>
             <View style={styles.weekNavigator}>
               <Pressable onPress={() => setWeekOffset((value) => value - 1)} style={styles.weekArrow} accessibilityRole="button" accessibilityLabel="Tuần trước"><Text style={styles.weekArrowText}>‹</Text></Pressable>
               <Pressable onPress={() => setWeekOffset(0)} accessibilityRole="button" accessibilityLabel="Về tuần hiện tại"><Text style={styles.weekLabel}>{weekLabel}</Text></Pressable>
@@ -684,31 +765,105 @@ export function ScheduleScreen() {
             <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
             <View style={styles.weeklyGridHeadingCopy}>
               <Text style={styles.weeklyGridTitle}>Nhật ký học tập</Text>
-
             </View>
           </View>
-          <FilterChips compact items={['Tất cả', 'Ngày', 'Tuần', 'Tháng', 'Chưa điểm danh', 'Lịch hủy']} selected={studentDiaryFilter} onSelect={setStudentDiaryFilter} />
-          {studentDiaryItems.map((item) => (
-            <Pressable key={`log-${item.id}`} onPress={() => setSelectedId(item.id)} accessibilityRole="button" accessibilityLabel={`Mở chi tiết ${item.title}`}>
-              <Card style={styles.learningLogRow}>
-                <View style={styles.summaryIcon}><Check size={18} color={colors.green} /></View>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.metaText}>{item.dateLabel || item.date || '—'} · {item.time || '—'}</Text>
-                  <Text style={styles.metaText}>Giảng viên: {item.person || '—'} · {attendanceStatusLabel(item)}</Text>
-                  {item.grade != null ? <Text style={styles.metaText}>Điểm: {item.grade}/10</Text> : null}
-                  {item.note ? <Text style={styles.metaText}>Ghi chú: {item.note}</Text> : null}
+          <View style={styles.studentDiaryFilterContainer}>
+            <View style={styles.studentDiaryFilterRow} accessibilityRole="tablist">
+              {['Ngày', 'Tuần', 'Tháng', 'Chưa điểm danh', 'Lịch hủy'].map((filterOption) => {
+                const selected = studentDiaryFilter === filterOption;
+                return (
+                  <Pressable
+                    key={filterOption}
+                    onPress={() => setStudentDiaryFilter(filterOption)}
+                    style={[styles.studentDiaryFilter, selected && styles.studentDiaryFilterActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.studentDiaryFilterText, selected && styles.studentDiaryFilterTextActive]} numberOfLines={2}>{filterOption}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          {studentDiaryItems.map((item) => {
+            const diaryStatus = getStudentDiaryStatus(item);
+            return (
+              <Card key={`log-${item.id}`} style={styles.studentDiaryLogRow}>
+                <Pressable onPress={() => setSelectedId(item.id)} accessibilityRole="button" accessibilityLabel={`Mở chi tiết ${item.title}`}>
+                  <Text numberOfLines={1} style={styles.studentDiaryLogTitle}>
+                    {item.courseName || item.subject || item.title}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.studentDiaryLogMeta}>
+                    {item.person || item.teacherName || 'Giảng viên'} · {item.dateLabel || item.date || '—'} · {item.time || '—'}
+                  </Text>
+                </Pressable>
+                <View style={styles.studentDiaryFooter}>
+                  <View style={[
+                    styles.studentDiaryStatus,
+                    diaryStatus.tone === 'completed' ? styles.studentDiaryStatusCompleted
+                      : diaryStatus.tone === 'cancelled' ? styles.studentDiaryStatusCancelled
+                        : diaryStatus.tone === 'ongoing' ? styles.studentDiaryStatusOngoing
+                          : diaryStatus.tone === 'pending' ? styles.studentDiaryStatusPending
+                            : diaryStatus.tone === 'overdue' ? styles.studentDiaryStatusOverdue
+                              : styles.studentDiaryStatusUpcoming,
+                  ]}>
+                    <Text style={[
+                      styles.studentDiaryStatusText,
+                      diaryStatus.tone === 'completed' ? styles.studentDiaryStatusTextCompleted
+                        : diaryStatus.tone === 'cancelled' ? styles.studentDiaryStatusTextCancelled
+                          : diaryStatus.tone === 'ongoing' ? styles.studentDiaryStatusTextOngoing
+                            : diaryStatus.tone === 'pending' ? styles.studentDiaryStatusTextPending
+                              : diaryStatus.tone === 'overdue' ? styles.studentDiaryStatusTextOverdue
+                                : styles.studentDiaryStatusTextUpcoming,
+                    ]}>{diaryStatus.label}</Text>
+                  </View>
+                  {item.status === 'upcoming' ? (
+                    <View style={styles.studentDiaryActions}>
+                      {item.meetingUrl ? (
+                        <Pressable onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }} style={styles.studentDiaryJoinButton} accessibilityRole="button">
+                          <Text style={styles.studentDiaryJoinButtonText}>Vào lớp</Text>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        onPress={() => {
+                          setSelectedId(item.id);
+                          setStudentNote(item.note || '');
+                          setShowStudentNote(true);
+                        }}
+                        style={styles.studentDiaryNoteButton}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.studentDiaryNoteButtonText}>Ghi chú / Đổi lịch</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
                 </View>
+                {item.note ? <Text style={styles.studentDiaryNote} numberOfLines={2}>Ghi chú: {item.note}</Text> : null}
+                {item.grade != null ? <Text style={styles.metaText}>Điểm: {item.grade}/10</Text> : null}
               </Card>
-            </Pressable>
-          ))}
-          {!studentDiaryItems.length ? <Text style={styles.diaryEmpty}>Không có ca học phù hợp với bộ lọc đã chọn.</Text> : null}
+            );
+          })}
+          {!studentDiaryItems.length ? (
+            <Text style={styles.diaryEmpty}>
+              {studentDiaryFilter === 'Ngày' ? 'Không có ca học trong ngày hôm nay.'
+                : studentDiaryFilter === 'Tuần' ? 'Không có ca học trong tuần này.'
+                  : studentDiaryFilter === 'Tháng' ? 'Không có ca học trong tháng này.'
+                    : studentDiaryFilter === 'Chưa điểm danh' ? 'Không có ca chưa điểm danh.'
+                      : studentDiaryFilter === 'Lịch hủy' ? 'Không có lịch hủy.'
+                        : 'Chưa có ca học.'}
+            </Text>
+          ) : null}
         </Card>
       ) : null}
       {isTeacher && !resource.loading && !resource.error ? (
-        <View style={styles.group}>
-          <SectionHeading title="Nhật ký giảng dạy" />
-          <Text style={styles.metaText}>Xem các ca dạy theo ngày, tuần, tháng, chưa điểm danh hoặc đã hủy.</Text>
+        <Card style={styles.studentDiaryCard}>
+          <View style={styles.studentDiaryHeading}>
+            <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
+            <View style={styles.weeklyGridHeadingCopy}>
+              <Text style={styles.weeklyGridTitle}>Nhật ký giảng dạy</Text>
+              <Text style={styles.metaText}>Xem toàn bộ ca dạy theo thời gian và trạng thái điểm danh.</Text>
+            </View>
+          </View>
           <FilterChips items={['Tất cả', 'Ngày', 'Tuần', 'Tháng', 'Chưa điểm danh', 'Lịch hủy']} selected={diaryFilter} onSelect={setDiaryFilter} />
           {diaryItems.map((item) => (
             <Card key={`teacher-log-${item.id}`} style={styles.learningLogRow}>
@@ -727,7 +882,7 @@ export function ScheduleScreen() {
             </Card>
           ))}
           {!diaryItems.length ? <EmptyState title="Chưa có ca dạy" message="Nhật ký giảng dạy sẽ hiển thị sau khi có dữ liệu." /> : null}
-        </View>
+        </Card>
       ) : null}
       {selectedItem && !isTeacher ? (
         <Card style={styles.studentDetail}>
@@ -870,7 +1025,7 @@ export function ScheduleScreen() {
   );
 }
 
-export function AssignmentsScreen() {
+export function AssignmentsScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const { user } = useAuth();
   const navigation = useNavigation<Navigation>();
   const isTeacher = user?.role === 'teacher';
@@ -888,6 +1043,7 @@ export function AssignmentsScreen() {
   const [grade, setGrade] = useState('');
   const [feedback, setFeedback] = useState('');
   const [submissionLink, setSubmissionLink] = useState('');
+  const [submissionFile, setSubmissionFile] = useState<{ uri: string; name: string; mimeType?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingGrade, setIsSavingGrade] = useState(false);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
@@ -1026,18 +1182,34 @@ export function AssignmentsScreen() {
       setIsCreatingAssignment(false);
     }
   };
+  const pickSubmissionFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+      if (!result.canceled) {
+        const file = result.assets[0];
+        setSubmissionLink('');
+        setSubmissionFile({ uri: file.uri, name: file.name, mimeType: file.mimeType || undefined });
+      }
+    } catch (error) {
+      Alert.alert('Không thể chọn tệp', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    }
+  };
   const submitSelected = async () => {
     if (!selected || !user || user.role !== 'student') return;
     const url = submissionLink.trim();
-    if (!/^https?:\/\/\S+$/i.test(url)) {
+    if (!submissionFile && !/^https?:\/\/\S+$/i.test(url)) {
       Alert.alert('Liên kết chưa hợp lệ', 'Nhập liên kết bài làm bắt đầu bằng http:// hoặc https://.');
       return;
     }
     setIsSubmitting(true);
     try {
-      await assignmentService.submit(selected.id, user.id, url);
+      const submissionUrl = submissionFile
+        ? await uploadStudentAssignmentFile(submissionFile)
+        : url;
+      await assignmentService.submit(selected.id, user.id, submissionUrl);
       setSelected({ ...selected, status: 'Đã nộp' });
       setSubmissionLink('');
+      setSubmissionFile(null);
       setOverrides(null);
       resource.reload();
       Alert.alert('Đã nộp bài', 'Bài làm đã được gửi đến hệ thống.');
@@ -1048,14 +1220,16 @@ export function AssignmentsScreen() {
     }
   };
 
-  return (
-    <AppScreen>
-      <AppHeader
+  const content = (
+    <>
+      {!embedded ? <AppHeader
         title={isTeacher ? 'Giao bài tập & kiểm tra' : 'Bài tập'}
         subtitle={isTeacher ? 'Theo dõi bài đã giao và cần chấm' : 'Bài tập trong các khóa học của bạn'}
+        showBackButton={false}
+        centered={!isTeacher}
         right={
           <View style={styles.headerActions}>
-            {!isTeacher ? (
+            {!isTeacher && !embedded ? (
               <Pressable onPress={() => navigation.navigate('Materials')} style={styles.readAll} accessibilityRole="button">
                 <Text style={styles.readAllText}>Tài liệu</Text>
               </Pressable>
@@ -1066,7 +1240,7 @@ export function AssignmentsScreen() {
             )}
           </View>
         }
-      />
+      /> : null}
       <FilterChips items={filters} selected={filter} onSelect={setFilter} variant="tabs" />
       {isTeacher ? (
         <View style={styles.assignmentTabs}>
@@ -1086,6 +1260,7 @@ export function AssignmentsScreen() {
             setSelected(item);
             setSelectedSubmissionId(item.submissions?.find((submission) => submission.status !== 'graded')?.id || item.submissions?.[0]?.id || null);
             setSubmissionLink(item.submissions?.[0]?.submittedFileUrl || '');
+            setSubmissionFile(null);
           }}
           accessibilityRole="button"
         >
@@ -1142,21 +1317,34 @@ export function AssignmentsScreen() {
               <Text style={styles.fieldLabel}>Liên kết bài làm</Text>
               <TextInput
                 value={submissionLink}
-                onChangeText={setSubmissionLink}
+                onChangeText={(value) => {
+                  setSubmissionLink(value);
+                  if (value.trim()) setSubmissionFile(null);
+                }}
                 placeholder="https://drive.google.com/..."
                 autoCapitalize="none"
                 keyboardType="url"
                 style={styles.formInput}
                 accessibilityLabel="Liên kết bài làm"
               />
+              <Pressable onPress={() => { void pickSubmissionFile(); }} style={styles.fileLinkRow} accessibilityRole="button">
+                <FileText size={18} color={colors.brand} />
+                <Text style={styles.fileLinkText}>{submissionFile?.name || 'Chọn tệp bài làm'}</Text>
+                <Text style={styles.fileLinkAction}>{submissionFile ? 'Đổi tệp' : 'Chọn tệp'}</Text>
+              </Pressable>
+              {submissionFile ? (
+                <Pressable onPress={() => setSubmissionFile(null)} style={styles.fileLinkRow} accessibilityRole="button">
+                  <X size={16} color={colors.muted} /><Text style={styles.note}>Bỏ tệp đã chọn</Text>
+                </Pressable>
+              ) : null}
               <PrimaryButton
                 title={isSubmitting ? 'Đang nộp…' : selected.status === 'Đã chấm' ? 'Đã chấm bài' : selected.status === 'Đã nộp' ? 'Nộp lại bài' : 'Nộp bài'}
-                disabled={!submissionLink.trim() || isSubmitting || selected.status === 'Đã chấm'}
+                disabled={(!submissionFile && !submissionLink.trim()) || isSubmitting || selected.status === 'Đã chấm'}
                 loading={isSubmitting}
                 onPress={() => { void submitSelected(); }}
               />
-              <Text style={styles.note}>Hiện hỗ trợ gửi liên kết bài làm. Tải tệp trực tiếp sẽ được bổ sung sau khi hoàn tất luồng upload native.</Text>
-            </>
+                <Text style={styles.note}>Có thể gửi liên kết hoặc tải tệp bài làm trực tiếp.</Text>
+              </>
           )}
         </Card>
       ) : null}
@@ -1194,8 +1382,9 @@ export function AssignmentsScreen() {
         </View>
       </Modal>
       {isTeacher && user?.previewMode ? <Text style={styles.footnote}>Bản xem trước không gửi dữ liệu lên hệ thống.</Text> : null}
-    </AppScreen>
+    </>
   );
+  return embedded ? <View>{content}</View> : <AppScreen>{content}</AppScreen>;
 }
 
 export function MaterialsScreen() {
@@ -1209,6 +1398,8 @@ export function MaterialsScreen() {
       <AppHeader
         title="Tài liệu học tập"
         subtitle="Tài nguyên từ các lớp của bạn"
+        showBackButton={false}
+        centered
         compact
       />
       {resource.loading ? <LoadingSkeleton /> : null}
@@ -1217,6 +1408,76 @@ export function MaterialsScreen() {
       {!resource.loading && !resource.error && visibleMaterials.map((item) => (
         <MaterialRow key={item.id} item={item} />
       ))}
+    </AppScreen>
+  );
+}
+
+type StudentResourceTab = 'files' | 'software' | 'assignments';
+
+export function StudentResourcesScreen() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<StudentResourceTab>('files');
+  const materialsLoader = useCallback(() => materialService.list(user), [user]);
+  const softwareLoader = useCallback(() => softwareService.list(user), [user]);
+  const assignmentsLoader = useCallback(() => assignmentService.list('student', user), [user]);
+  const materialsResource = useMockResource(materialsLoader);
+  const softwareResource = useMockResource(softwareLoader);
+  const assignmentsResource = useMockResource(assignmentsLoader);
+  const materials = (materialsResource.data || []).filter((item) => item.type !== 'VIDEO');
+  const software = softwareResource.data || [];
+  const pendingAssignments = (assignmentsResource.data || []).filter((item) => ['Chưa làm', 'Cần chấm'].includes(item.status)).length;
+  const tabs: Array<{ id: StudentResourceTab; label: string; count: number }> = [
+    { id: 'files', label: 'Tài liệu', count: materials.length },
+    { id: 'software', label: 'Phần mềm', count: software.length },
+    { id: 'assignments', label: 'Bài tập', count: pendingAssignments },
+  ];
+  return (
+    <AppScreen>
+      <AppHeader title="Bài tập và tài nguyên" subtitle="Tài liệu, phần mềm và bài tập trong khóa học" showBackButton={false} centered compact />
+      <View style={styles.assignmentTabs} accessibilityRole="tablist">
+        {tabs.map((tab) => (
+          <Pressable
+            key={tab.id}
+            onPress={() => setActiveTab(tab.id)}
+            style={[styles.assignmentTab, activeTab === tab.id && styles.assignmentTabActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab.id }}
+          >
+            <Text style={activeTab === tab.id ? styles.assignmentTabActiveText : styles.assignmentTabText}>
+              {tab.label}{tab.count ? ` (${tab.count})` : ''}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {activeTab === 'files' ? (
+        <>
+          {materialsResource.loading ? <LoadingSkeleton /> : null}
+          {materialsResource.error ? <ErrorState onRetry={materialsResource.reload} /> : null}
+          {!materialsResource.loading && !materialsResource.error && !materials.length ? <EmptyState title="Chưa có tài liệu" message="Nội dung mới sẽ được hiển thị tại đây." /> : null}
+          {!materialsResource.loading && !materialsResource.error && materials.map((item) => <MaterialRow key={item.id} item={item} />)}
+        </>
+      ) : null}
+      {activeTab === 'software' ? (
+        <>
+          {softwareResource.loading ? <LoadingSkeleton /> : null}
+          {softwareResource.error ? <ErrorState onRetry={softwareResource.reload} /> : null}
+          {!softwareResource.loading && !softwareResource.error && !software.length ? <EmptyState title="Chưa có phần mềm" message="Phần mềm của khóa học sẽ hiển thị tại đây." /> : null}
+          {!softwareResource.loading && !softwareResource.error && software.map((item: DemoSoftwareLink) => (
+            <Card key={item.id} style={styles.materialRow}>
+              <View style={styles.fileIcon}><Download size={20} color={colors.brand} /></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.metaText}>{item.category}</Text>
+                {item.description ? <Text style={styles.muted}>{item.description}</Text> : null}
+                <Pressable onPress={() => { void openAssignmentLink(item.url, item.name); }} style={styles.fileLinkRow} accessibilityRole="button">
+                  <Text style={styles.fileLinkAction}>Mở phần mềm</Text>
+                </Pressable>
+              </View>
+            </Card>
+          ))}
+        </>
+      ) : null}
+      {activeTab === 'assignments' ? <AssignmentsScreen embedded /> : null}
     </AppScreen>
   );
 }
@@ -2133,7 +2394,12 @@ export function ProfileScreen() {
       {isTeacher ? (
         <>
           <Card style={styles.teacherProfileHero}>
-            <Avatar name={teacherText('name', user?.name || 'Giảng viên')} color={user?.avatarColor} size={72} />
+            <EditableMobileAvatar
+              name={teacherText('name', user?.name || 'Giảng viên')}
+              avatar={user?.avatar || (typeof profileTeacher?.avatar === 'string' ? profileTeacher.avatar : undefined)}
+              size={72}
+              color={user?.avatarColor}
+            />
             <Text style={styles.teacherProfileEyebrow}>HỒ SƠ CÁ NHÂN</Text>
             <Text style={styles.teacherProfileName}>{teacherText('name', user?.name || '—')}</Text>
             <Text style={styles.teacherProfileSubtitle}>Thông tin cá nhân, ngân hàng và bảo mật · {user?.branch || '—'}</Text>
@@ -2195,6 +2461,19 @@ export function ProfileScreen() {
         </>
       ) : (
         <>
+          <Card style={styles.studentProfileHero}>
+            <EditableMobileAvatar
+              name={studentText('name', user?.name || 'Học viên')}
+              avatar={user?.avatar || (typeof profileStudent?.avatar === 'string' ? profileStudent.avatar : undefined)}
+              size={76}
+              color={user?.avatarColor}
+            />
+            <View style={styles.studentProfileHeroCopy}>
+              <Text style={styles.studentProfileHeroEyebrow}>HỒ SƠ CÁ NHÂN</Text>
+              <Text style={styles.studentProfileHeroName}>{studentText('name', user?.name || 'Học viên')}</Text>
+              <Text style={styles.studentProfileHeroSubtitle}>Chạm vào ảnh để thay đổi ảnh đại diện</Text>
+            </View>
+          </Card>
           <Card style={styles.studentProfileSection}>
             <View style={styles.studentProfileSectionHeader}>
               <View style={styles.studentProfileSectionTitle}>
@@ -2291,6 +2570,89 @@ export function ProfileScreen() {
   );
 }
 
+function EditableMobileAvatar({
+  name,
+  avatar,
+  size,
+  color,
+}: {
+  name: string;
+  avatar?: string;
+  size: number;
+  color?: string;
+}) {
+  const { user, updateAvatar } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const chooseAvatar = async () => {
+    if (uploading) return;
+    try {
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Cần quyền truy cập ảnh', 'Cho phép ứng dụng truy cập thư viện ảnh để đổi ảnh đại diện.');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.92,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
+      if (result.canceled) return;
+      const image = result.assets[0];
+      if (image.mimeType && !image.mimeType.toLowerCase().startsWith('image/')) {
+        Alert.alert('Ảnh chưa hợp lệ', 'Vui lòng chọn ảnh JPG, PNG hoặc WEBP.');
+        return;
+      }
+      if (image.fileSize != null && image.fileSize > 5 * 1024 * 1024) {
+        Alert.alert('Ảnh quá lớn', 'Kích thước ảnh đại diện tối đa là 5MB.');
+        return;
+      }
+      if (user?.previewMode) {
+        Alert.alert('Bản xem trước', 'Không thể tải ảnh đại diện lên máy chủ trong bản xem trước.');
+        return;
+      }
+      setUploading(true);
+      const extensionByMimeType: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif',
+      };
+      const updatedAvatar = await uploadAndUpdateAvatar({
+        uri: image.uri,
+        name: image.fileName || `avatar-${Date.now()}.${extensionByMimeType[image.mimeType || 'image/jpeg'] || 'jpg'}`,
+        mimeType: image.mimeType,
+        size: image.fileSize,
+        file: image.file,
+      });
+      await updateAvatar(updatedAvatar);
+      Alert.alert('Đã đổi ảnh', 'Ảnh đại diện của bạn đã được cập nhật.');
+    } catch (error) {
+      Alert.alert('Không thể đổi ảnh đại diện', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setUploading(false);
+    }
+  };
+  const imageSource = avatar ? getMobileImageSource(resolveMobilePublicUrl(avatar)) : undefined;
+  return (
+    <Pressable
+      onPress={() => { void chooseAvatar(); }}
+      style={[styles.editableAvatar, { width: size, height: size, borderRadius: size / 2 }]}
+      accessibilityRole="button"
+      accessibilityLabel={uploading ? 'Đang tải ảnh đại diện' : 'Đổi ảnh đại diện'}
+      accessibilityState={{ disabled: uploading }}
+    >
+      <Avatar name={name} color={color} size={size} imageSource={imageSource} />
+      <View style={styles.editableAvatarCamera}>
+        {uploading ? <Text style={styles.editableAvatarLoading}>…</Text> : <Camera size={14} color="#FFFFFF" />}
+      </View>
+    </Pressable>
+  );
+}
+
 function StudentProfileEditModal({
   user,
   profile,
@@ -2302,8 +2664,10 @@ function StudentProfileEditModal({
   onClose: () => void;
   onSaved: (updates: StudentProfileUpdate) => void;
 }) {
+  const name = typeof profile?.name === 'string' ? profile.name : user?.name || '';
+  const phone = typeof profile?.phone === 'string' ? profile.phone : user?.phone || '';
   const [email, setEmail] = useState(typeof profile?.email === 'string' ? profile.email : '');
-  const [zalo, setZalo] = useState(typeof profile?.zalo === 'string' ? profile.zalo : '');
+  const [zalo, setZalo] = useState(typeof profile?.zalo === 'string' ? profile.zalo : user?.zalo || '');
   const [address, setAddress] = useState(typeof profile?.address === 'string' ? profile.address : '');
   const [gender, setGender] = useState<'male' | 'female'>(profile?.gender === 'female' || profile?.gender === 'Nữ' ? 'female' : 'male');
   const [saving, setSaving] = useState(false);
@@ -2311,6 +2675,10 @@ function StudentProfileEditModal({
   const save = async () => {
     if (!user) {
       Alert.alert('Không thể lưu hồ sơ', 'Vui lòng đăng nhập lại rồi thử lần nữa.');
+      return;
+    }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      Alert.alert('Email chưa hợp lệ', 'Kiểm tra lại địa chỉ email rồi thử lưu lần nữa.');
       return;
     }
     const updates: StudentProfileUpdate = {
@@ -2332,39 +2700,88 @@ function StudentProfileEditModal({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <ScrollView contentContainerStyle={styles.modalCard} keyboardShouldPersistTaps="handled">
-          <View style={styles.rowBetween}>
-            <Text style={styles.cardTitle}>Chỉnh sửa thông tin</Text>
-            <Pressable onPress={onClose} accessibilityRole="button"><Text style={styles.closeText}>Đóng</Text></Pressable>
+      <View style={[styles.modalBackdrop, styles.studentProfileModalBackdrop]}>
+        <View style={styles.studentProfileModal}>
+          <View style={styles.studentProfileModalHeader}>
+            <View style={styles.studentProfileModalTitle}>
+              <UserRound size={18} color="#0F766E" />
+              <Text style={styles.studentProfileModalTitleText}>Cập nhật Hồ sơ Cá nhân</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.studentProfileModalClose} accessibilityRole="button" accessibilityLabel="Đóng cập nhật hồ sơ">
+              <X size={17} color={colors.muted} />
+            </Pressable>
           </View>
-          <Text style={styles.fieldLabel}>Email</Text>
-          <TextInput value={email} onChangeText={setEmail} placeholder="Nhập email" keyboardType="email-address" autoCapitalize="none" style={styles.formInput} />
-          <Text style={styles.fieldLabel}>Số điện thoại khác</Text>
-          <TextInput value={zalo} onChangeText={setZalo} placeholder="Nhập số điện thoại liên hệ" keyboardType="phone-pad" style={styles.formInput} />
-          <Text style={styles.fieldLabel}>Địa chỉ</Text>
-          <TextInput value={address} onChangeText={setAddress} placeholder="Nhập địa chỉ" style={styles.formInput} />
-          <Text style={styles.fieldLabel}>Giới tính</Text>
-          <View style={styles.choiceWrap}>
-            {(['male', 'female'] as const).map((value) => {
-              const selected = gender === value;
-              return (
-                <Pressable
-                  key={value}
-                  onPress={() => setGender(value)}
-                  style={[styles.choice, selected && styles.choiceActive]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                >
-                  <Text style={[styles.choiceText, selected && styles.choiceTextActive]}>{value === 'male' ? 'Nam' : 'Nữ'}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={styles.note}>Họ tên và số điện thoại đăng nhập do trung tâm quản lý.</Text>
-          <PrimaryButton title={saving ? 'Đang lưu…' : 'Lưu thay đổi'} disabled={saving} onPress={() => { void save(); }} />
-          <PrimaryButton title="Hủy" variant="quiet" disabled={saving} onPress={onClose} />
-        </ScrollView>
+          <ScrollView contentContainerStyle={styles.studentProfileModalBody} keyboardShouldPersistTaps="handled">
+            <View style={styles.studentProfileModalField}>
+              <Text style={styles.studentProfileModalLabel}>Họ và tên</Text>
+              <TextInput value={name} editable={false} style={[styles.formInput, styles.studentProfileReadOnlyInput]} accessibilityLabel="Họ và tên, không thể chỉnh sửa" />
+              <Text style={styles.studentProfileReadonlyNote}>* Tên không thể tự sửa. Vui lòng liên hệ Admin.</Text>
+            </View>
+            <View style={styles.studentProfileModalField}>
+              <Text style={styles.studentProfileModalLabel}>Giới tính chọn ảnh đại diện</Text>
+              <View style={styles.studentProfileGenderRow}>
+                {([
+                  { value: 'male', label: '👨 Nam (Cartoon Nam)' },
+                  { value: 'female', label: '👩 Nữ (Cartoon Nữ)' },
+                ] as const).map((option) => {
+                  const selected = gender === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setGender(option.value)}
+                      style={[styles.studentProfileGenderOption, selected && styles.studentProfileGenderOptionSelected]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[styles.studentProfileGenderText, selected && styles.studentProfileGenderTextSelected]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            <View style={styles.studentProfilePhoneRow}>
+              <View style={[styles.studentProfileModalField, styles.studentProfilePhoneField]}>
+                <Text style={styles.studentProfileModalLabel}>Số điện thoại</Text>
+                <View style={styles.studentProfileInputWithIcon}>
+                  <Phone size={15} color="#94A3B8" />
+                  <TextInput value={phone} editable={false} style={[styles.studentProfileIconInput, styles.studentProfileReadOnlyInput]} accessibilityLabel="Số điện thoại đăng nhập, không thể chỉnh sửa" />
+                </View>
+                <Text style={styles.studentProfileReadonlyNote}>* Liên hệ Admin để đổi SĐT.</Text>
+              </View>
+              <View style={[styles.studentProfileModalField, styles.studentProfilePhoneField]}>
+                <Text style={styles.studentProfileModalLabel}>SĐT liên hệ 2</Text>
+                <View style={styles.studentProfileInputWithIcon}>
+                  <Phone size={15} color="#3B82F6" />
+                  <TextInput value={zalo} onChangeText={setZalo} placeholder="Số điện thoại" keyboardType="phone-pad" style={styles.studentProfileIconInput} accessibilityLabel="Số điện thoại liên hệ thứ hai" />
+                </View>
+              </View>
+            </View>
+            <View style={styles.studentProfileModalField}>
+              <Text style={styles.studentProfileModalLabel}>Email</Text>
+              <View style={styles.studentProfileInputWithIcon}>
+                <Mail size={15} color="#94A3B8" />
+                <TextInput value={email} onChangeText={setEmail} placeholder="Ví dụ: nguyenvan@gmail.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} style={styles.studentProfileIconInput} accessibilityLabel="Email" />
+              </View>
+            </View>
+            <View style={styles.studentProfileModalField}>
+              <Text style={styles.studentProfileModalLabel}>Địa chỉ</Text>
+              <View style={styles.studentProfileInputWithIcon}>
+                <MapPin size={15} color="#94A3B8" />
+                <TextInput value={address} onChangeText={setAddress} placeholder="Nhập địa chỉ của bạn" style={styles.studentProfileIconInput} accessibilityLabel="Địa chỉ" />
+              </View>
+            </View>
+            <Pressable
+              onPress={() => { void save(); }}
+              disabled={saving}
+              style={[styles.studentProfileSaveButton, saving && styles.studentProfileSaveButtonDisabled]}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: saving }}
+            >
+              <Save size={16} color="#FFFFFF" />
+              <Text style={styles.studentProfileSaveButtonText}>{saving ? 'ĐANG LƯU...' : 'LƯU THÔNG TIN'}</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -2530,6 +2947,9 @@ function FilterChips({ items, selected, onSelect, compact = false, variant = 'ch
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   group: { gap: spacing.md },
+  scheduleHero: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderColor: '#F1D7D8' },
+  scheduleHeroIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: '#FECACA' },
+  scheduleHeroTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '900', letterSpacing: -0.2 },
   scheduleStats: { flexDirection: 'row', gap: spacing.sm },
   studentCourseSection: { gap: spacing.sm },
   studentCoursesLabel: { color: colors.muted, fontSize: typography.caption, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: spacing.xs },
@@ -2562,7 +2982,7 @@ const styles = StyleSheet.create({
   studentWeekArrowText: { color: '#3F454D', fontSize: typography.micro, fontWeight: '800' },
   studentWeekCurrent: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center' },
   weekArrow: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  weekArrowText: { fontSize: 28, lineHeight: 30, color: colors.brandDark, fontWeight: '700' },
+  weekArrowText: { fontSize: typography.display, lineHeight: 30, color: colors.brandDark, fontWeight: '700' },
   weekLabel: { color: colors.brandDark, fontSize: typography.caption, fontWeight: '700' },
   scheduleDays: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
   scheduleDay: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', gap: 2, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
@@ -2577,9 +2997,39 @@ const styles = StyleSheet.create({
   diaryHeadingIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
   diaryDescription: { color: colors.muted, fontSize: typography.caption, lineHeight: 15 },
   studentDiaryHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md },
-  weekCourseLabel: { gap: 2, paddingHorizontal: spacing.xs },
-  weekCourseLabelCaption: { color: colors.muted, fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.4 },
-  weekCourseLabelName: { color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
+  studentDiaryFilterContainer: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  studentDiaryFilterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  studentDiaryFilter: { flexBasis: '30%', flexGrow: 1, minWidth: 88, minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.md, backgroundColor: colors.surface },
+  studentDiaryFilterActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  studentDiaryFilterText: { color: colors.brand, fontSize: typography.micro, fontWeight: '800' },
+  studentDiaryFilterTextActive: { color: colors.surface },
+  studentDiaryLogRow: { marginHorizontal: spacing.md, marginBottom: spacing.xs, padding: spacing.md, gap: spacing.xs, borderColor: '#EEF2F7', borderRadius: radius.md, backgroundColor: '#F8FAFC' },
+  studentDiaryLogTitle: { color: '#334155', fontSize: typography.caption, lineHeight: 17, fontWeight: '800' },
+  studentDiaryLogMeta: { color: colors.muted, fontSize: typography.micro, lineHeight: 16 },
+  studentDiaryFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.xs },
+  studentDiaryStatus: { alignSelf: 'flex-start', paddingHorizontal: spacing.xs, paddingVertical: 3, borderRadius: 6 },
+  studentDiaryStatusText: { fontSize: typography.micro, lineHeight: 14, fontWeight: '900' },
+  studentDiaryStatusCompleted: { backgroundColor: '#ECFDF5' },
+  studentDiaryStatusTextCompleted: { color: '#047857' },
+  studentDiaryStatusCancelled: { backgroundColor: '#FFF1F2' },
+  studentDiaryStatusTextCancelled: { color: '#E11D48' },
+  studentDiaryStatusOngoing: { backgroundColor: '#ECFDF5' },
+  studentDiaryStatusTextOngoing: { color: '#15803D' },
+  studentDiaryStatusPending: { backgroundColor: '#FFF7ED' },
+  studentDiaryStatusTextPending: { color: '#C2410C' },
+  studentDiaryStatusOverdue: { backgroundColor: '#FEF2F2' },
+  studentDiaryStatusTextOverdue: { color: '#DC2626' },
+  studentDiaryStatusUpcoming: { backgroundColor: '#FFF7ED' },
+  studentDiaryStatusTextUpcoming: { color: '#B45309' },
+  studentDiaryNote: { color: colors.muted, fontSize: typography.caption, lineHeight: 17 },
+  studentDiaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  studentDiaryJoinButton: { minHeight: 36, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: 8, backgroundColor: colors.brand },
+  studentDiaryJoinButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900' },
+  studentDiaryNoteButton: { minHeight: 36, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1.5, borderColor: colors.brand, borderRadius: 8, backgroundColor: colors.surface },
+  studentDiaryNoteButtonText: { color: colors.brand, fontSize: typography.micro, fontWeight: '800' },
+  weekCourseLabel: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs, paddingHorizontal: spacing.xs },
+  weekCourseLabelCaption: { color: colors.muted, fontSize: typography.micro, fontWeight: '600' },
+  weekCourseLabelName: { flex: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '700', textTransform: 'uppercase' },
   compactWeekGrid: { width: '100%', borderTopWidth: 1, borderLeftWidth: 1, borderColor: colors.line },
   compactWeekRow: { flexDirection: 'row' },
   compactWeekCell: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.line },
@@ -2717,18 +3167,18 @@ const styles = StyleSheet.create({
   attendanceStatBlue: { backgroundColor: '#F4F9FF', borderColor: '#D5E6FF' },
   attendanceStatGold: { backgroundColor: '#FFFCF2', borderColor: '#FDE9AE' },
   attendanceStatPurple: { backgroundColor: '#FCF8FF', borderColor: '#EBD8FF' },
-  attendanceStatLabel: { color: colors.muted, fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  attendanceStatValue: { fontSize: 28, lineHeight: 34, fontWeight: '900' },
-  attendanceStatFoot: { color: colors.muted, fontSize: 9, textAlign: 'center', fontWeight: '700' },
+  attendanceStatLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
+  attendanceStatValue: { fontSize: typography.display, lineHeight: 34, fontWeight: '900' },
+  attendanceStatFoot: { color: colors.muted, fontSize: typography.micro, textAlign: 'center', fontWeight: '700' },
   attendanceStatSuffix: { fontSize: typography.micro, fontWeight: '800' },
   attendancePendingNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#BFDBFE', borderRadius: radius.md, backgroundColor: '#EFF6FF' },
   attendancePendingText: { flex: 1, color: '#1E3A8A', fontSize: typography.caption, lineHeight: 20, fontWeight: '600' },
   attendanceNoticeClose: { width: 30, height: 34, alignItems: 'center', justifyContent: 'center' },
   attendanceUndoButton: { minHeight: 48, flex: 1.15, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: '#DC2626' },
-  attendanceUndoText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  attendanceUndoText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
   attendanceSubmittedRow: { flexDirection: 'row', gap: spacing.sm },
   attendanceWaitingButton: { minHeight: 48, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: '#F1F5F9' },
-  attendanceWaitingText: { color: '#94A3B8', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  attendanceWaitingText: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
   attendanceSessionNote: { color: colors.muted, fontSize: typography.caption, lineHeight: 18 },
   attendanceModalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.md, backgroundColor: 'rgba(15, 23, 42, 0.62)' },
   attendanceModalCard: { width: '100%', maxWidth: 440, maxHeight: '90%', overflow: 'hidden', borderRadius: 30, backgroundColor: '#FFFFFF' },
@@ -2791,6 +3241,14 @@ const styles = StyleSheet.create({
   profileStatValue: { color: colors.ink, fontSize: typography.title, fontWeight: '700' },
   profileStatLabel: { color: colors.muted, fontSize: typography.small, textAlign: 'center' },
   profileCourse: { gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomColor: colors.line, borderBottomWidth: StyleSheet.hairlineWidth },
+  studentProfileHero: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, padding: spacing.lg, backgroundColor: '#F0FDFA', borderColor: '#CCFBF1' },
+  studentProfileHeroCopy: { flex: 1, gap: spacing.xs },
+  studentProfileHeroEyebrow: { color: '#0F766E', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.8 },
+  studentProfileHeroName: { color: colors.ink, fontSize: typography.heading, fontWeight: '900' },
+  studentProfileHeroSubtitle: { color: colors.muted, fontSize: typography.caption },
+  editableAvatar: { position: 'relative', overflow: 'visible', alignItems: 'center', justifyContent: 'center' },
+  editableAvatarCamera: { position: 'absolute', right: 0, bottom: 0, width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface, borderRadius: radius.pill, backgroundColor: '#0FAF9F' },
+  editableAvatarLoading: { color: colors.surface, fontSize: typography.caption, fontWeight: '900' },
   teacherProfileHero: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl, backgroundColor: colors.brandDark, borderColor: colors.brandDark },
   teacherProfileEyebrow: { color: '#FEE2E2', fontSize: typography.caption, fontWeight: '800', letterSpacing: 1 },
   teacherProfileName: { color: '#FFFFFF', fontSize: typography.heading, fontWeight: '800', textAlign: 'center' },
@@ -2810,6 +3268,29 @@ const styles = StyleSheet.create({
   menuCard: { paddingVertical: spacing.xs, paddingHorizontal: spacing.lg },
   modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  studentProfileModalBackdrop: { justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(15, 23, 42, 0.6)' },
+  studentProfileModal: { width: '100%', maxWidth: 440, maxHeight: '94%', alignSelf: 'center', overflow: 'hidden', backgroundColor: colors.surface, borderRadius: 28 },
+  studentProfileModalHeader: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, backgroundColor: '#F0FDFA', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  studentProfileModalTitle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  studentProfileModalTitleText: { color: '#115E59', fontSize: typography.small, fontWeight: '900' },
+  studentProfileModalClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.surface },
+  studentProfileModalBody: { padding: spacing.lg, gap: spacing.md },
+  studentProfileModalField: { gap: spacing.xs },
+  studentProfileModalLabel: { paddingLeft: spacing.xs, color: '#64748B', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
+  studentProfileReadOnlyInput: { backgroundColor: '#F8FAFC', color: '#334155' },
+  studentProfileReadonlyNote: { paddingLeft: spacing.xs, color: colors.red, fontSize: typography.micro, fontStyle: 'italic' },
+  studentProfileGenderRow: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
+  studentProfileGenderOption: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#F8FAFC' },
+  studentProfileGenderOptionSelected: { borderColor: '#2DD4BF', backgroundColor: '#F0FDFA' },
+  studentProfileGenderText: { color: '#475569', fontSize: typography.micro, fontWeight: '700', textAlign: 'center' },
+  studentProfileGenderTextSelected: { color: '#0F766E' },
+  studentProfilePhoneRow: { flexDirection: 'row', gap: spacing.sm },
+  studentProfilePhoneField: { flex: 1, minWidth: 0 },
+  studentProfileInputWithIcon: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  studentProfileIconInput: { flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 0, color: colors.ink, fontSize: typography.small, fontWeight: '600' },
+  studentProfileSaveButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.xs, borderRadius: radius.md, backgroundColor: '#0FAF9F' },
+  studentProfileSaveButtonDisabled: { opacity: 0.6 },
+  studentProfileSaveButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900', letterSpacing: 1 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   formInput: { minHeight: 46, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.ink, backgroundColor: colors.surface },
   formTextarea: { minHeight: 90, textAlignVertical: 'top', paddingTop: spacing.md },

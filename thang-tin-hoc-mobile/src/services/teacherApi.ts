@@ -66,6 +66,20 @@ export type TeacherFinanceOverview = {
   }>;
 };
 
+export type TeacherDashboardMetrics = {
+  monthlyIncome: number;
+  ratingAverage: number;
+  ratingCount: number;
+  fiveStarStudentCount: number;
+  recentRatings: Array<{
+    id: string;
+    studentName: string;
+    stars: number;
+    comment: string;
+    createdAt: string;
+  }>;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -79,6 +93,92 @@ function asText(value: unknown, fallback = '') {
 function asNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function dateValue(value: unknown) {
+  const raw = asText(value);
+  if (!raw) return null;
+  const localDate = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const date = localDate
+    ? new Date(Number(localDate[3]), Number(localDate[2]) - 1, Number(localDate[1]))
+    : new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export async function getTeacherDashboardMetrics(user: DemoUser): Promise<TeacherDashboardMetrics> {
+  if (user.role !== 'teacher' || !user.id) {
+    throw new Error('Không thể tải tổng quan giảng viên: tài khoản không hợp lệ.');
+  }
+  if (user.previewMode) {
+    return {
+      monthlyIncome: 0,
+      ratingAverage: 0,
+      ratingCount: 0,
+      fiveStarStudentCount: 0,
+      recentRatings: [],
+    };
+  }
+
+  const [transactionsResponse, ratingsResponse] = await Promise.all([
+    mobileApiRequest<{ data?: unknown }>(
+      `/transactions/teacher/${encodeURIComponent(user.id)}`,
+    ),
+    mobileApiRequest<{ data?: unknown }>(
+      `/evaluations/teacher/${encodeURIComponent(user.id)}`,
+    ),
+  ]);
+  if (!Array.isArray(transactionsResponse.data) || !Array.isArray(ratingsResponse.data)) {
+    throw new Error('Máy chủ trả về dữ liệu tổng quan giảng viên không hợp lệ.');
+  }
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthlyIncome = transactionsResponse.data.reduce((total, entry) => {
+    const transaction = asRecord(entry);
+    const date = dateValue(transaction.date || transaction.createdAt);
+    if (!date || date.getFullYear() !== year || date.getMonth() !== month) return total;
+    return total + asNumber(transaction.amount);
+  }, 0);
+
+  const ratings = ratingsResponse.data.map((entry) => {
+    const rating = asRecord(entry);
+    const criteria = asRecord(rating.criteria);
+    return {
+      id: asText(rating.id || rating._id),
+      studentId: asText(rating.studentId),
+      studentName: asText(rating.studentName, 'Học viên'),
+      stars: asNumber(criteria.stars),
+      comment: asText(rating.content || rating.comment),
+      createdAt: asText(rating.createdAt || rating.updatedAt),
+    };
+  }).filter((rating) => rating.stars > 0);
+  const ratingAverage = ratings.length
+    ? Math.round((ratings.reduce((sum, rating) => sum + rating.stars, 0) / ratings.length) * 10) / 10
+    : 0;
+  const monthStart = new Date(year, month, 1).getTime();
+  const nextMonthStart = new Date(year, month + 1, 1).getTime();
+  const fiveStarStudentCount = new Set(ratings.filter((rating) => {
+    const date = dateValue(rating.createdAt);
+    return rating.stars >= 5
+      && date != null
+      && date.getTime() >= monthStart
+      && date.getTime() < nextMonthStart;
+  }).map((rating) => rating.studentId).filter(Boolean)).size;
+
+  return {
+    monthlyIncome,
+    ratingAverage,
+    ratingCount: ratings.length,
+    fiveStarStudentCount,
+    recentRatings: ratings.slice(0, 5).map(({ id, studentName, stars, comment, createdAt }) => ({
+      id,
+      studentName,
+      stars,
+      comment,
+      createdAt,
+    })),
+  };
 }
 
 export async function getTeacherProfile(user: DemoUser): Promise<TeacherProfile> {

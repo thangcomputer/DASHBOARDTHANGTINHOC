@@ -314,5 +314,5 @@ const styles = StyleSheet.create({
   action: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center', gap: 4 },
   actionMuted: { backgroundColor: '#475569' },
   endAction: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  actionLabel: { color: '#FFFFFF', fontSize: 10, fontWeight: '600' },
+  actionLabel: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '600' },
 });

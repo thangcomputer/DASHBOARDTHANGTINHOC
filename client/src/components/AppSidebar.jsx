@@ -33,7 +33,7 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/student', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
-      { key: 'lesson-practice', icon: BookOpen, label: 'Video khóa học', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+      { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập kỹ năng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
       { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
@@ -98,7 +98,7 @@ const MENU_CONFIG = {
               { key: 'students', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
               { key: 'student-training', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'student-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'lesson-practice', icon: BookOpen, label: 'Bài học HV', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập kỹ năng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'cert-prep', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
             ],
           },
@@ -109,7 +109,7 @@ const MENU_CONFIG = {
             isGroup: true,
             children: [
               { key: 'teachers', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-              { key: 'training-videos', icon: Video, label: 'Video khóa học', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
+              { key: 'training-videos', icon: Video, label: 'Luyện tập kỹ năng', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
               { key: 'training-guides-evaluations', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
               { key: 'training-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
               { key: 'training-exam-room', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },

@@ -57,13 +57,11 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
     <button
       type="button"
       onClick={() => onOpen(post)}
-      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 w-full ${
-        isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
-      }`}
+      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 w-full ${isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
+        }`}
     >
-      <div className={`relative bg-slate-100 overflow-hidden shrink-0 ${
-        isList ? 'w-[7.5rem] sm:w-40 self-stretch min-h-[7.5rem]' : 'aspect-video w-full'
-      }`}
+      <div className={`relative bg-slate-100 overflow-hidden shrink-0 ${isList ? 'w-[7.5rem] sm:w-40 self-stretch min-h-[7.5rem]' : 'aspect-video w-full'
+        }`}
       >
         {thumb ? (
           <img
@@ -356,11 +354,10 @@ function EditorForm({ initial, onSaved, onCancel }) {
                   key={opt.key}
                   type="button"
                   onClick={() => setTargetAudience(opt.key)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                    targetAudience === opt.key
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${targetAudience === opt.key
                       ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   {opt.label}
                 </button>
@@ -376,9 +373,8 @@ function EditorForm({ initial, onSaved, onCancel }) {
               <button
                 type="button"
                 onClick={() => setTopicId('')}
-                className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
-                  !topicId ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
+                className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${!topicId ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
               >
                 Không chọn
               </button>
@@ -387,9 +383,8 @@ function EditorForm({ initial, onSaved, onCancel }) {
                   key={t.id}
                   type="button"
                   onClick={() => setTopicId(t.id)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
-                    topicId === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${topicId === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
                 >
                   {t.name}
                 </button>
@@ -949,7 +944,7 @@ export default function NewsPage({ session, role = 'admin' }) {
           <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2 truncate">
             <Newspaper className="text-red-600 shrink-0" size={22} /> Tin tức
           </h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">Tin tức &amp; thông báo từ trung tâm</p>
+
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button

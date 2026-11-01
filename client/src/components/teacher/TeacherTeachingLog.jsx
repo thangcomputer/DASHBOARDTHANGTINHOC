@@ -41,7 +41,6 @@ const COPY = {
   },
   student: {
     title: 'Nhật ký học tập',
-    subtitle: 'Xem toàn bộ ca học, theo ngày / tuần / tháng, chưa điểm danh hoặc đã hủy.',
     tabs: [
       { id: 'all', label: 'Tất cả' },
       { id: 'day', label: 'Ngày' },
@@ -201,11 +200,10 @@ export default function TeacherTeachingLog({
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`px-3 h-9 rounded-xl text-[11px] sm:text-xs font-bold transition ${
-                tab === item.id
+              className={`px-3 h-9 rounded-xl text-[11px] sm:text-xs font-bold transition ${tab === item.id
                   ? 'bg-red-600 text-white shadow-sm'
                   : 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
-              }`}
+                }`}
             >
               {item.label}
             </button>

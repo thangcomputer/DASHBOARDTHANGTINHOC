@@ -256,9 +256,7 @@ export default function CenterInfoPage({ session, role = 'student' }) {
             <Building2 className="text-red-600 shrink-0" size={22} />
             Thông tin trung tâm
           </h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            Giới thiệu, chi nhánh, dịch vụ và chứng chỉ của trung tâm
-          </p>
+
         </div>
         {canManage && managePath ? (
           <Link
@@ -295,11 +293,10 @@ export default function CenterInfoPage({ session, role = 'student' }) {
                   key={s.key}
                   type="button"
                   onClick={() => setSection(s.key)}
-                  className={`w-full flex items-center gap-2.5 px-3 min-h-11 rounded-xl text-sm font-bold transition-colors text-left ${
-                    active
+                  className={`w-full flex items-center gap-2.5 px-3 min-h-11 rounded-xl text-sm font-bold transition-colors text-left ${active
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <Icon size={16} className="shrink-0" />
                   {s.label}
@@ -316,9 +313,8 @@ export default function CenterInfoPage({ session, role = 'student' }) {
               key={s.key}
               type="button"
               onClick={() => setSection(s.key)}
-              className={`shrink-0 min-h-10 px-3 rounded-xl text-xs font-bold ${
-                section === s.key ? 'bg-red-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
-              }`}
+              className={`shrink-0 min-h-10 px-3 rounded-xl text-xs font-bold ${section === s.key ? 'bg-red-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
+                }`}
             >
               {s.label}
             </button>

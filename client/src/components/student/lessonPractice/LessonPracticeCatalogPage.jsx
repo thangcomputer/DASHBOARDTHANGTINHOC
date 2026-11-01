@@ -77,9 +77,8 @@ function CourseCatalogCard({
         className={`flex min-h-0 w-full flex-1 flex-col rounded-t-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${blockUnregisteredInstructorPreview ? 'cursor-default' : ''}`}
       >
         <span
-          className={`relative flex h-24 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-3 sm:h-28 sm:p-4 ${
-            course.bannerColorStart || course.bannerColorEnd ? '' : 'bg-gradient-to-br from-rose-700 via-red-700 to-red-900'
-          }`}
+          className={`relative flex h-24 w-full shrink-0 items-start justify-between overflow-hidden rounded-t-2xl p-3 sm:h-28 sm:p-4 ${course.bannerColorStart || course.bannerColorEnd ? '' : 'bg-gradient-to-br from-rose-700 via-red-700 to-red-900'
+            }`}
           style={course.bannerColorStart || course.bannerColorEnd ? {
             background: `linear-gradient(135deg, ${course.bannerColorStart || '#be123c'}, ${course.bannerColorEnd || '#7f1d1d'})`,
           } : undefined}
@@ -102,9 +101,8 @@ function CourseCatalogCard({
               title={course.deliveryMode === 'instructor' ? 'Học cùng giảng viên' : 'Khóa tự học'}
               className="inline-grid w-fit max-w-full grid-cols-[28px_max-content] items-center gap-2 rounded-full border border-white/80 bg-white/95 py-1.5 pl-1.5 pr-4 text-[9px] font-black tracking-[0.05em] text-slate-800 shadow-lg shadow-slate-950/15 ring-4 ring-white/15 backdrop-blur-sm transition sm:grid-cols-[32px_max-content] sm:gap-2.5 sm:py-2 sm:pl-2 sm:pr-5 sm:text-[10px]"
             >
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8 ${
-                course.deliveryMode === 'instructor' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-              }`}>
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8 ${course.deliveryMode === 'instructor' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                }`}>
                 {course.deliveryMode === 'instructor'
                   ? <GraduationCap size={17} strokeWidth={2.4} />
                   : <Clapperboard size={16} strokeWidth={2.4} />}
@@ -128,14 +126,13 @@ function CourseCatalogCard({
                   <span
                     key={`${subject.id || subject.name}-${index}`}
                     title={subject.name}
-                    className={`inline-flex w-fit max-w-[calc(100%-2rem)] truncate rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-4 sm:px-2 sm:py-1 sm:text-[10px] ${
-                      [
+                    className={`inline-flex w-fit max-w-[calc(100%-2rem)] truncate rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-4 sm:px-2 sm:py-1 sm:text-[10px] ${[
                         'border-sky-100 bg-sky-50 text-sky-700',
                         'border-rose-100 bg-rose-50 text-rose-700',
                         'border-violet-100 bg-violet-50 text-violet-700',
                         'border-amber-100 bg-amber-50 text-amber-700',
                       ][index % 4]
-                    }`}
+                      }`}
                   >
                     {formatSubjectName(subject.name)}
                   </span>
@@ -182,11 +179,10 @@ function CourseCatalogCard({
                     Đã đăng ký
                   </span>
                 ) : (
-                  <span className={`flex min-w-0 flex-col items-end rounded-lg border px-2 py-1.5 ${
-                    saleActive
+                  <span className={`flex min-w-0 flex-col items-end rounded-lg border px-2 py-1.5 ${saleActive
                       ? 'border-rose-100 bg-rose-50/70'
                       : 'border-slate-200 bg-slate-50'
-                  }`}>
+                    }`}>
                     <span className="flex max-w-full items-center gap-1">
                       {saleActive && (
                         <>
@@ -201,9 +197,8 @@ function CourseCatalogCard({
                         </>
                       )}
                     </span>
-                    <span className={`whitespace-nowrap text-sm font-black leading-tight tracking-tight sm:text-base ${
-                      saleActive ? 'text-rose-700' : 'text-slate-800'
-                    }`}>
+                    <span className={`whitespace-nowrap text-sm font-black leading-tight tracking-tight sm:text-base ${saleActive ? 'text-rose-700' : 'text-slate-800'
+                      }`}>
                       {Number(displayPrice || 0).toLocaleString('vi-VN')}đ
                     </span>
                     {countdown && (
@@ -251,9 +246,8 @@ function CourseCatalogCard({
           </span>
         </span>
       </button>
-      <div className={`flex items-center gap-2 border-t border-slate-100 px-4 pb-3 pt-2 ${
-        blockUnregisteredInstructorPreview ? 'justify-center' : 'justify-between'
-      }`}>
+      <div className={`flex items-center gap-2 border-t border-slate-100 px-4 pb-3 pt-2 ${blockUnregisteredInstructorPreview ? 'justify-center' : 'justify-between'
+        }`}>
         {!course.enrolled && !isInstructorCourse ? (
           <button
             type="button"
@@ -383,11 +377,10 @@ function CourseSubjectsModal({
                   const total = progress?.totalUnitCount || 0;
                   const progressPercent = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
                   const canOpen = subject.id && (subject.opened || !course.enrolled);
-                  const cardClassName = `group relative flex min-h-40 w-full flex-col justify-between overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition duration-200 ${
-                    canOpen
+                  const cardClassName = `group relative flex min-h-40 w-full flex-col justify-between overflow-hidden rounded-2xl border bg-white p-4 text-left shadow-sm transition duration-200 ${canOpen
                       ? 'border-slate-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md'
                       : 'border-slate-100 opacity-75'
-                  }`;
+                    }`;
                   const content = (
                     <>
                       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400" />
@@ -424,11 +417,10 @@ function CourseSubjectsModal({
                         </span>
                       </span>
                       {canOpen && (
-                        <span className={`relative z-10 mt-5 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold text-white shadow-sm transition ${
-                          subject.opened
+                        <span className={`relative z-10 mt-5 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold text-white shadow-sm transition ${subject.opened
                             ? 'bg-emerald-600 group-hover:bg-emerald-700'
                             : 'bg-amber-500 group-hover:bg-amber-600'
-                        }`}>
+                          }`}>
                           {subject.opened
                             ? done > 0 && done < total
                               ? 'Tiếp tục học'
@@ -476,7 +468,6 @@ function CourseCollection({
     registered: {
       icon: CheckCircle2,
       eyebrow: 'LỘ TRÌNH CỦA BẠN',
-      description: 'Các khóa học bạn đã đăng ký và có thể tiếp tục học.',
       iconClass: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
       countClass: 'bg-emerald-100 text-emerald-800',
       lineClass: 'from-emerald-300 via-emerald-200 to-transparent',
@@ -718,8 +709,8 @@ export default function LessonPracticeCatalogPage() {
                   aria-pressed={filter === filterOption.id}
                   onClick={() => { setFilter(filterOption.id); setSelectedCourseId(''); }}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold transition sm:px-4 ${filter === filterOption.id
-                      ? 'bg-red-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                 >
                   <filterOption.icon size={16} />

@@ -227,6 +227,7 @@ function mapMessage(raw: RawMessage, user: DemoUser, index: number): ChatMessage
   const timestampMs = timestamp(raw.createdAt);
   return {
     id: text(raw._id || raw.id, `message-${index}`),
+    messageType,
     text: stickerId
       || (messageType === 'image' && content === '[Hình ảnh]')
       || (messageType === 'file' && content.startsWith('Đã gửi tệp:'))

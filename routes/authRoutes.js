@@ -343,7 +343,7 @@ async function issueAdminTokens(sysSettings, audience = 'public') {
 // ─── GET /api/auth/csrf-token ────────────────────────────────────────────────
 // Legacy remains PRIMARY; Policy is SHADOW ONLY (observational).
 router.get('/csrf-token', policyShadowAuth('csrf_token'), (req, res) => {
-  const token = issueCsrfToken(res);
+  const token = issueCsrfToken(res, req.cookies?.csrf_token);
   res.json({ success: true, csrfToken: token });
 });
 

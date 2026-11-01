@@ -167,9 +167,14 @@ export async function getTeacherAssignedStudents(user: DemoUser): Promise<DemoSt
 function mapEnrollment(raw: Record<string, unknown>, index: number): DemoEnrollment {
   const courseName = text(raw.courseName || raw.course, `Khóa học ${index + 1}`);
   const totalSessions = number(raw.totalSessions);
-  const completedSessions = totalSessions > 0
-    ? Math.max(0, totalSessions - number(raw.remainingSessions))
-    : number(raw.completedSessions);
+  const course = raw.courseId && typeof raw.courseId === 'object'
+    ? raw.courseId as Record<string, unknown>
+    : {};
+  const completedSessions = raw.completedSessions != null
+    ? number(raw.completedSessions)
+    : totalSessions > 0 && raw.remainingSessions != null
+      ? Math.max(0, totalSessions - number(raw.remainingSessions))
+      : 0;
   const status = text(raw.status).toLowerCase();
   const mappedStatus: DemoEnrollment['status'] = ['completed', 'hoàn thành'].includes(status)
     ? 'Hoàn thành'
@@ -181,7 +186,9 @@ function mapEnrollment(raw: Record<string, unknown>, index: number): DemoEnrollm
     : '';
   return {
     id: text(raw._id || raw.id, `${courseName}-${index}`),
+    courseId: text(course._id || course.id || raw.courseId),
     courseName,
+    subjectIds: Array.isArray(raw.subjectIds) ? raw.subjectIds.map(String) : [],
     teacherName: text(raw.teacherName, teacher || 'Chưa phân công'),
     registeredAt: toDateLabel(raw.registeredAt),
     progress: totalSessions > 0 ? Math.min(100, Math.round(completedSessions / totalSessions * 100)) : 0,
@@ -313,7 +320,21 @@ function mapSubmission(raw: Record<string, unknown> | null | undefined): Assignm
 }
 
 function mapAssignment(raw: Record<string, unknown>): Assignment {
-  const submission = mapSubmission(raw.mySubmission as Record<string, unknown> | null | undefined);
+  const rawSubmission = raw.mySubmission && typeof raw.mySubmission === 'object'
+    ? raw.mySubmission as Record<string, unknown>
+    : undefined;
+  const submission = mapSubmission(rawSubmission);
+  const gradeHistory = Array.isArray(rawSubmission?.gradeHistory)
+    ? rawSubmission.gradeHistory.map((entry) => {
+        const history = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
+        return {
+          at: text(history.at || history.createdAt),
+          oldGrade: history.oldGrade == null ? undefined : number(history.oldGrade),
+          newGrade: history.newGrade == null ? undefined : number(history.newGrade),
+          note: text(history.note),
+        };
+      })
+    : [];
   const deadlineDate = raw.deadline ? new Date(String(raw.deadline)) : null;
   const isOverdue = !!deadlineDate && !Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() < Date.now();
   const status: Assignment['status'] = submission?.status === 'graded'
@@ -328,7 +349,8 @@ function mapAssignment(raw: Record<string, unknown>): Assignment {
   return {
     id,
     title: text(raw.title, 'Bài tập'),
-    subject: text(raw.courseId, 'Khóa học'),
+    subject: text(raw.courseName || raw.course || raw.courseId, 'Khóa học'),
+    courseName: text(raw.courseName || raw.course) || undefined,
     teacher: text(raw.assignedByName || raw.teacherName, 'Giảng viên'),
     deadline: toDateLabel(raw.deadline),
     status,
@@ -338,6 +360,13 @@ function mapAssignment(raw: Record<string, unknown>): Assignment {
     grade: submission?.grade,
     teacherFeedback: submission?.teacherFeedback,
     submissions: submission ? [submission] : [],
+    mySubmission: rawSubmission ? {
+      submittedAt: text(rawSubmission.createdAt || rawSubmission.submittedAt || rawSubmission.updatedAt),
+      status: rawSubmission.status === 'graded' ? 'graded' : 'submitted',
+      grade: rawSubmission.grade == null ? undefined : number(rawSubmission.grade),
+      forfeit: rawSubmission.forfeit === true,
+      gradeHistory,
+    } : undefined,
   };
 }
 

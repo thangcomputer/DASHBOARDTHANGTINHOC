@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Switch, Text, View } from 'react-native';
 import { Card, SectionHeading } from './ui';
-import { colors, spacing } from '../theme/tokens';
+import { colors, spacing, typography } from '../theme/tokens';
 import {
   getCommunicationPreferences,
   updateCommunicationPreferences,
@@ -84,8 +84,8 @@ export function CommunicationPreferencesCard({ role }: { role: 'student' | 'teac
           }}
         >
           <View style={{ flex: 1, gap: 3 }}>
-            <Text style={{ color: '#1E293B', fontSize: 14, fontWeight: '700' }}>{row.title}</Text>
-            <Text style={{ color: '#64748B', fontSize: 12 }}>{row.description}</Text>
+            <Text style={{ color: '#1E293B', fontSize: typography.small, fontWeight: '700' }}>{row.title}</Text>
+            <Text style={{ color: '#64748B', fontSize: typography.micro }}>{row.description}</Text>
           </View>
           <Switch
             value={preferences[row.key]}
@@ -96,7 +96,7 @@ export function CommunicationPreferencesCard({ role }: { role: 'student' | 'teac
           />
         </View>
       ))}
-      {error ? <Text accessibilityRole="alert" style={{ color: colors.red, fontSize: 12 }}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={{ color: colors.red, fontSize: typography.micro }}>{error}</Text> : null}
     </Card>
   );
 }

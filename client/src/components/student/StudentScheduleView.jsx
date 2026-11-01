@@ -49,9 +49,7 @@ export const ScheduleView = ({
             <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
               Quản lý Lịch học &amp; Điểm danh
             </h2>
-            <p className="text-xs text-slate-500 font-medium">
-              Xem lịch học theo tuần và nhật ký học tập · Giờ Việt Nam (UTC+7)
-            </p>
+
           </div>
         </div>
       </div>

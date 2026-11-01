@@ -70,6 +70,7 @@ import {
   submitPrivateEvaluation,
   submitTeacherRating,
 } from './evaluationApi';
+import { getStudentEvaluationActivity, getStudentQuizzes } from './studentQuizApi';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
@@ -219,22 +220,47 @@ async function readMockList<T>(items: T[]): Promise<T[]> {
 
 type CenterInfoSectionItem = {
   id: string;
+  section: string;
   title: string;
   subtitle: string;
   description: string;
+  detailHtml: string;
+  imageUrl: string;
+  icon: string;
+  code: string;
+  managerName: string;
+  department: string;
+  expertise: string;
+  experience: string;
+  city: string;
+  showEmail: boolean;
   email: string;
   phone: string;
   address: string;
   url: string;
   mapsUrl: string;
   hours: string;
-  detailHtml: string;
+  duration: string;
+  learningMode: string;
+  priceInfo: string;
+  examType: string;
+  scheduleInfo: string;
+  capacity: string;
+  issuer: string;
+  requirements: string;
+  relatedExam: string;
+  validity: string;
+  verifyInfo: string;
+  verifyUrl: string;
 };
 
 type CenterInfoSection = { title: string; items: CenterInfoSectionItem[] };
 
 type CenterInfo = {
+  published: boolean;
   name: string;
+  logoUrl: string;
+  bannerUrl: string;
   intro: string;
   mission: string;
   vision: string;
@@ -244,6 +270,9 @@ type CenterInfo = {
   contactPhone: string;
   contactEmail: string;
   website: string;
+  detailHtml: string;
+  galleryUrls: string[];
+  introVideoUrl: string;
   sections: CenterInfoSection[];
 };
 
@@ -310,6 +339,7 @@ function mapRealNews(raw: Record<string, unknown>): DemoNewsItem {
     };
   }) : [];
   const thumbnail = rawText(raw.thumbnailUrl);
+  const contentHtml = rawText(raw.contentHtml || raw.content);
   return {
     id,
     slug: rawText(raw.slug) || id,
@@ -317,11 +347,17 @@ function mapRealNews(raw: Record<string, unknown>): DemoNewsItem {
     topic: rawText(raw.topicName) || 'Tin tức',
     publishedAt: newsDate(raw.publishedAt || raw.createdAt),
     excerpt: plainNewsContent(raw.excerpt),
-    content: plainNewsContent(raw.contentHtml || raw.content || raw.excerpt),
+    content: plainNewsContent(contentHtml || raw.excerpt),
+    contentHtml,
     views: Number(raw.viewCount) || 0,
     attachments,
     author: rawText(raw.authorName) || 'Trung tâm Thắng Tin Học',
     thumbnailUrl: thumbnail ? resolveMobilePublicUrl(thumbnail) : undefined,
+    topicId: rawText(raw.topicId),
+    targetAudience: ['teacher', 'student'].includes(rawText(raw.targetAudience))
+      ? rawText(raw.targetAudience) as DemoNewsItem['targetAudience']
+      : 'all',
+    isNew: raw.isNew === true,
   };
 }
 
@@ -329,25 +365,44 @@ function mapCenterInfoItem(value: unknown, index: number): CenterInfoSectionItem
   const item = rawRecord(value);
   return {
     id: rawText(item.id || item._id) || `center-info-${index + 1}`,
+    section: rawText(item.section),
     title: rawText(item.title) || 'Thông tin',
     subtitle: rawText(item.subtitle),
     description: rawText(item.description),
+    detailHtml: rawText(item.detailHtml),
+    imageUrl: item.imageUrl ? resolveMobilePublicUrl(rawText(item.imageUrl)) : '',
+    icon: rawText(item.icon),
+    code: rawText(item.code),
+    managerName: rawText(item.managerName),
+    department: rawText(item.department),
+    expertise: rawText(item.expertise),
+    experience: rawText(item.experience),
+    city: rawText(item.city),
+    showEmail: item.showEmail === true,
     email: rawText(item.email),
     phone: rawText(item.phone),
     address: rawText(item.address),
     url: centerLink(item.url),
     mapsUrl: centerLink(item.mapsUrl),
     hours: rawText(item.hours),
-    detailHtml: plainNewsContent(item.detailHtml),
+    duration: rawText(item.duration),
+    learningMode: rawText(item.learningMode),
+    priceInfo: rawText(item.priceInfo),
+    examType: rawText(item.examType),
+    scheduleInfo: rawText(item.scheduleInfo),
+    capacity: rawText(item.capacity),
+    issuer: rawText(item.issuer),
+    requirements: rawText(item.requirements),
+    relatedExam: rawText(item.relatedExam),
+    validity: rawText(item.validity),
+    verifyInfo: rawText(item.verifyInfo),
+    verifyUrl: centerLink(item.verifyUrl),
   };
 }
 
 function mapCenterInfo(payload: Record<string, unknown>): CenterInfo {
   const data = rawRecord(payload.data);
   const overview = rawRecord(data.overview);
-  if (data.published !== true || !Object.keys(overview).length) {
-    throw new Error('Thông tin Trung tâm chưa được công bố trên hệ thống.');
-  }
   const rawSections = rawRecord(data.sections);
   const labels: Record<string, string> = {
     staff: 'Nhân sự',
@@ -362,7 +417,10 @@ function mapCenterInfo(payload: Record<string, unknown>): CenterInfo {
     items: (Array.isArray(rawSections[key]) ? rawSections[key] as unknown[] : []).map(mapCenterInfoItem),
   }));
   return {
+    published: data.published === true,
     name: rawText(overview.name) || 'Trung tâm',
+    logoUrl: overview.logoUrl ? resolveMobilePublicUrl(rawText(overview.logoUrl)) : '',
+    bannerUrl: overview.bannerUrl ? resolveMobilePublicUrl(rawText(overview.bannerUrl)) : '',
     intro: rawText(overview.intro),
     mission: rawText(overview.mission),
     vision: rawText(overview.vision),
@@ -371,7 +429,12 @@ function mapCenterInfo(payload: Record<string, unknown>): CenterInfo {
     headquartersAddress: rawText(overview.headquartersAddress),
     contactPhone: rawText(overview.contactPhone),
     contactEmail: rawText(overview.contactEmail),
-    website: rawText(overview.website),
+    website: centerLink(overview.website),
+    detailHtml: rawText(overview.detailHtml),
+    galleryUrls: Array.isArray(overview.galleryUrls)
+      ? overview.galleryUrls.map((url) => resolveMobilePublicUrl(rawText(url))).filter(Boolean)
+      : [],
+    introVideoUrl: centerLink(overview.introVideoUrl),
     sections,
   };
 }
@@ -405,10 +468,15 @@ function mapMaterial(value: unknown, index: number, fallbackType = ''): Learning
           : 'LINK';
   const dateValue = raw.publishedAt || raw.createdAt || raw.updatedAt;
   const date = dateValue ? new Date(String(dateValue)) : null;
+  const courseId = rawRecord(raw.courseId);
+  const subjectIds = Array.isArray(raw.subjectIds) ? raw.subjectIds.map(String) : [];
   return {
     id: rawText(raw.id || raw._id) || `material-${fallbackType || 'file'}-${index + 1}`,
     title,
     subject: rawText(raw.courseName || raw.course || raw.subject || raw.category) || 'Tài nguyên khóa học',
+    courseId: rawText(courseId._id || courseId.id || raw.courseId) || undefined,
+    courseName: rawText(courseId.name || raw.courseName || raw.course) || undefined,
+    subjectIds,
     type,
     date: date && !Number.isNaN(date.getTime())
       ? date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -470,11 +538,13 @@ export const authService = {
       id,
       name,
       role: returnedRole,
+      adminRole: typeof rawUser.adminRole === 'string' ? rawUser.adminRole : null,
       phone: String(rawUser.phone || phone).trim(),
       code: String(rawUser.code || rawUser.studentCode || rawUser.teacherCode || ''),
       course: String(rawUser.course || rawUser.specialty || ''),
       branch: String(rawUser.branchName || rawUser.branchCode || ''),
       avatarColor: returnedRole === 'teacher' ? '#E9E5FA' : '#DDF1EB',
+      avatar: typeof rawUser.avatar === 'string' ? rawUser.avatar : undefined,
       completedSessions: typeof rawUser.completedSessions === 'number' ? rawUser.completedSessions : undefined,
       totalSessions: typeof rawUser.totalSessions === 'number' ? rawUser.totalSessions : undefined,
       avgGrade: typeof rawUser.avgGrade === 'number' ? rawUser.avgGrade : undefined,
@@ -598,6 +668,7 @@ export const scheduleService = {
     if (response.success !== true || !response.data) {
       throw new Error('Máy chủ không xác nhận lịch học đã được tạo.');
     }
+    return response.data;
   },
   async update(
     scheduleId: string,
@@ -622,6 +693,7 @@ export const scheduleService = {
     if (response.success !== true || !response.data) {
       throw new Error('Máy chủ không xác nhận lịch học đã được cập nhật.');
     }
+    return response.data;
   },
   async markAttendance(
     scheduleId: string,
@@ -886,8 +958,11 @@ export const gradeService = {
     if (__DEV__ && qaState) return readMockList([]);
     if (user?.previewMode) return readMockList([]);
     if (!user || user.role !== 'student') throw new Error('Không thể tải điểm: tài khoản học viên không hợp lệ.');
-    const assignments = await getStudentAssignments(user);
-    return assignments.flatMap((assignment) => assignment.grade == null ? [] : [{
+    const [assignments, quizzes] = await Promise.all([
+      getStudentAssignments(user),
+      getStudentQuizzes(user),
+    ]);
+    const assignmentRecords = assignments.flatMap((assignment) => assignment.grade == null ? [] : [{
       id: assignment.id,
       courseName: assignment.subject,
       assessment: assignment.title,
@@ -896,6 +971,24 @@ export const gradeService = {
       date: assignment.submissions?.[0]?.submittedAt,
       feedback: assignment.teacherFeedback,
     }]);
+    const quizRecords = quizzes.flatMap((quiz) => {
+      const submission = quiz.mySubmission;
+      if (!submission || submission.score == null) return [];
+      const correctCount = submission.correctCount;
+      const totalQuestions = submission.totalQuestions;
+      return [{
+        id: `quiz-${quiz.id}`,
+        courseName: quiz.courseName || 'Trắc nghiệm',
+        assessment: `Trắc nghiệm: ${quiz.title}`,
+        score: `${submission.score}%`,
+        status: submission.passed ? 'Đạt' as const : 'Chưa đạt' as const,
+        date: submission.submittedAt,
+        feedback: correctCount != null && totalQuestions != null
+          ? `${correctCount}/${totalQuestions} câu đúng`
+          : undefined,
+      }];
+    });
+    return [...assignmentRecords, ...quizRecords];
   },
 };
 
@@ -989,6 +1082,13 @@ export const teacherProfileService = {
 };
 
 export const evaluationService = {
+  async activity(user?: DemoUser | null) {
+    if (!user || user.role !== 'student') throw new Error('Không thể tải nhật ký: tài khoản học viên không hợp lệ.');
+    if (qaState || user.previewMode) {
+      return readMockList([] as Awaited<ReturnType<typeof getStudentEvaluationActivity>>);
+    }
+    return getStudentEvaluationActivity(user);
+  },
   async list(user?: DemoUser | null) {
     if (qaState === 'evaluation-not-eligible') {
       return readMockList(mockEvaluations.map((item) => item.public ? { ...item, completedSessions: 4, totalSessions: 12 } : item));
@@ -1048,10 +1148,16 @@ export const feedService = {
     }
     return readMockList(mockFeedPosts);
   },
-  async news(): Promise<DemoNewsItem[]> {
+  async news(filters: {
+    query?: string;
+    topicId?: string;
+    sort?: 'newest' | 'oldest' | 'views';
+    period?: 'today' | 'this_month' | 'last_month' | 'oldest_month';
+  } = {}): Promise<DemoNewsItem[]> {
+    let rows: DemoNewsItem[] | null = null;
     if (qaState === 'news-empty') return readMockList([]);
     if (qaState === 'news-multiple') {
-      return readMockList(Array.from({ length: 12 }, (_, index) => ({
+      rows = Array.from({ length: 12 }, (_, index) => ({
         ...mockNews[0],
         id: `qa-news-${index + 1}`,
         slug: `qa-news-${index + 1}`,
@@ -1066,12 +1172,38 @@ export const feedService = {
             : index === 3
               ? [{ id: 'qa-file', name: 'Tai-lieu.pdf', type: 'file' as const }]
               : [],
-      })));
+      }));
     }
-    if (__DEV__ && qaState) return readMockList(mockNews);
-    const response = await mobileApiRequest<{ data?: Record<string, unknown>[] }>('/blog/posts?page=1&limit=40');
-    if (!Array.isArray(response.data)) throw new Error('Phản hồi danh sách tin tức không hợp lệ.');
-    return response.data.map(mapRealNews);
+    if (!rows && __DEV__ && qaState) rows = mockNews;
+    if (!rows) {
+      const params = new URLSearchParams({ page: '1', limit: '40' });
+      if (filters.query?.trim()) params.set('q', filters.query.trim());
+      if (filters.topicId && filters.topicId !== 'all') params.set('topic', filters.topicId);
+      if (filters.sort) params.set('sort', filters.sort);
+      if (filters.period) params.set('period', filters.period);
+      const response = await mobileApiRequest<{ data?: Record<string, unknown>[] }>(`/blog/posts?${params.toString()}`);
+      if (!Array.isArray(response.data)) throw new Error('Phản hồi danh sách tin tức không hợp lệ.');
+      return response.data.map(mapRealNews);
+    }
+
+    const query = filters.query?.trim().toLocaleLowerCase('vi-VN') || '';
+    const filtered = rows.filter((item) => (
+      (!query || `${item.title} ${item.topic} ${item.excerpt}`.toLocaleLowerCase('vi-VN').includes(query))
+      && (!filters.topicId || filters.topicId === 'all' || item.topicId === filters.topicId || item.topic === filters.topicId)
+    ));
+    if (filters.sort === 'views') filtered.sort((a, b) => b.views - a.views);
+    else if (filters.sort === 'oldest') filtered.reverse();
+    return readMockList(filtered);
+  },
+  async newsTopics(): Promise<Array<{ id: string; name: string }>> {
+    if (__DEV__ && qaState) {
+      return readMockList([...new Map(mockNews.map((item) => [item.topic, { id: item.topicId || item.topic, name: item.topic }])).values()]);
+    }
+    const response = await mobileApiRequest<{ data?: Array<{ id?: string; name?: string }> }>('/blog/topics');
+    if (!Array.isArray(response.data)) throw new Error('Phản hồi danh mục tin tức không hợp lệ.');
+    return response.data
+      .filter((topic) => typeof topic.id === 'string' && typeof topic.name === 'string')
+      .map((topic) => ({ id: topic.id!, name: topic.name! }));
   },
   async newsDetail(newsId: string): Promise<DemoNewsItem> {
     if (!newsId.trim()) throw new Error('Không thể tải tin tức: thiếu mã bài viết.');
@@ -1091,7 +1223,10 @@ export const feedService = {
       await delay();
       if (qaState === 'error') throw new Error('Mock UI QA error state');
       return {
+        published: true,
         name: 'Trung tâm Thắng Tin Học',
+        logoUrl: '',
+        bannerUrl: '',
         intro: '',
         mission: '',
         vision: '',
@@ -1101,6 +1236,9 @@ export const feedService = {
         contactPhone: '',
         contactEmail: '',
         website: '',
+        detailHtml: '',
+        galleryUrls: [],
+        introVideoUrl: '',
         sections: [
           { title: 'Nhân sự', items: [] },
           { title: 'Chi nhánh', items: [] },
@@ -1144,7 +1282,25 @@ export const quizService = {
     if (qaState === 'quiz-results') return readMockList(mockQuizzes.map((quiz) => ({ ...quiz, submissions: [...quiz.submissions, { studentName: 'Học viên demo 3', score: 90, status: 'passed' as const }] })));
     return readMockList(mockQuizzes);
   },
-  async studentList() { return readMockList(mockStudentQuizzes); },
+  async studentList(user?: DemoUser | null) {
+    if (!user || user.role !== 'student') throw new Error('Không thể tải bài trắc nghiệm: tài khoản học viên không hợp lệ.');
+    if (qaState === 'quiz-empty') return readMockList([]);
+    if (qaState || user.previewMode) {
+      return readMockList(mockStudentQuizzes.map((quiz) => ({
+        id: quiz.id,
+        title: quiz.title,
+        courseName: quiz.courseName,
+        teacherName: 'Giảng viên',
+        timeLimitMinutes: quiz.timeLimitMinutes,
+        startTime: quiz.startTime || '',
+        deadline: quiz.deadline,
+        questionsCount: quiz.questions,
+        targetStudentIds: [],
+        mySubmission: null,
+      })));
+    }
+    return getStudentQuizzes(user);
+  },
 };
 
 export const trainingService = {

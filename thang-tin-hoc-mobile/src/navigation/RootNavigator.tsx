@@ -1,26 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, DeviceEventEmitter, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Alert, DeviceEventEmitter, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput,
   useWindowDimensions, View,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Svg, { Path } from 'react-native-svg';
 import {
-  Bell, BookOpen, CalendarDays, CheckSquare, Clapperboard, FileText, GraduationCap,
-  House, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, WalletCards, X,
+  Bell, BookOpen, Building2, CalendarDays, CheckSquare, Clapperboard, FileBox, FileText, GraduationCap,
+  House, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../app/AuthContext';
 import { emit, SOCKET_EVENTS } from '../services/socketService';
-import { colors, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography } from '../theme/tokens';
+import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
+import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CallScreen } from '../screens/CallScreen';
 import { CallHistoryScreen } from '../screens/CallHistoryScreen';
 import {
-  AssignmentsScreen, AttendanceScreen, GradesScreen, MaterialsScreen,
+  AssignmentsScreen, AttendanceScreen, GradesScreen, MaterialsScreen, StudentResourcesScreen,
   NotificationsScreen, ProfileScreen, ScheduleScreen, StudentsScreen,
 } from '../screens/FeatureScreens';
 import { ConversationScreen, MessagesScreen } from '../screens/MessageScreens';
@@ -56,6 +58,7 @@ export function RootNavigator() {
   const [notificationOverlayVisible, setNotificationOverlayVisible] = useState(false);
   const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCallPrompt | null>(null);
+  const [examRoomActive, setExamRoomActive] = useState(false);
   const [stackRouteName, setStackRouteName] = useState<string | undefined>(() => {
     if (!navigationRef.isReady()) return undefined;
     const state = navigationRef.getRootState();
@@ -67,6 +70,10 @@ export function RootNavigator() {
   }, []);
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:open-search', () => setSearchOverlayVisible(true));
+    return () => subscription.remove();
+  }, []);
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('mobile:exam-room-active', setExamRoomActive);
     return () => subscription.remove();
   }, []);
   useEffect(() => {
@@ -154,7 +161,7 @@ export function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="Assignments" component={AssignmentsScreen} />
+          <Stack.Screen name="Assignments" component={user.role === 'student' ? StudentResourcesScreen : AssignmentsScreen} />
           <Stack.Screen name="NotificationCenter" component={NotificationsScreen} />
           <Stack.Screen name="Conversation" component={ConversationScreen} />
           <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
@@ -194,14 +201,16 @@ export function RootNavigator() {
           ) : null}
         </>
       </Stack.Navigator>
-      <FloatingNavigationMenu
-        onSignOut={() => {
-          void signOut().catch((error: unknown) => {
-            Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
-          });
-        }}
-      />
-      {stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? <PersistentTabBar role={user.role} /> : null}
+      {!examRoomActive ? (
+        <FloatingNavigationMenu
+          onSignOut={() => {
+            void signOut().catch((error: unknown) => {
+              Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
+            });
+          }}
+        />
+      ) : null}
+      {!examRoomActive && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? <PersistentTabBar role={user.role} /> : null}
       {notificationOverlayVisible ? (
         <NotificationsScreen
           overlay
@@ -321,29 +330,29 @@ function PersistentTabBar({ role }: { role: 'student' | 'teacher' }) {
       { name: 'Schedule' as const, label: 'Lịch học', icon: CalendarDays },
       { name: 'Messages' as const, label: 'Hộp thư', icon: MessageCircle },
       { name: 'Home' as const, label: 'Trang chủ', icon: House },
-      { name: 'CourseVideos' as const, label: 'Video khóa học', icon: Clapperboard },
+      { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', icon: Clapperboard },
       { name: 'Profile' as const, label: 'Cá nhân', icon: UserRound },
     ];
-  const barHeight = (isTeacher ? 64 : 76) + insets.bottom;
+  const tabOrder = ['Schedule', 'Messages', 'Home', 'Students', 'CourseVideos', 'Profile'];
+  const orderedItems = [...items].sort((left, right) => tabOrder.indexOf(left.name) - tabOrder.indexOf(right.name));
+  const barHeight = 76 + insets.bottom;
   return (
-    <View style={[styles.persistentTabBar, { height: barHeight, paddingBottom: Math.max(insets.bottom, spacing.xs) }, isTeacher && styles.persistentTabBarTeacher]}>
-      {!isTeacher ? (
-        <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
-          <Path d="M0 30 H145 C145 13 169 0 200 0 C231 0 255 13 255 30 H400 V100 H0 Z" fill={colors.brandSoft} />
-          <Path d="M151 30 C151 11 173 2 200 2 C227 2 249 11 249 30 Z" fill={colors.redSoft} />
-        </Svg>
-      ) : null}
-      {items.map(({ name, label, icon: Icon }) => {
+    <View style={[styles.persistentTabBar, { height: barHeight, paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+      <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
+        <Path d="M0 30 H145 C145 13 169 0 200 0 C231 0 255 13 255 30 H400 V100 H0 Z" fill={colors.brandSoft} />
+        <Path d="M151 30 C151 11 173 2 200 2 C227 2 249 11 249 30 Z" fill={colors.redSoft} />
+      </Svg>
+      {orderedItems.map(({ name, label, icon: Icon }) => {
         const selected = name === activeTab;
         return (
           <Pressable
             key={name}
             onPress={() => navigationRef.navigate('MainTabs', { screen: name })}
-            style={[styles.persistentTabItem, selected && name === 'Home' && !isTeacher && styles.persistentHomeItem]}
+            style={[styles.persistentTabItem, selected && name === 'Home' && styles.persistentHomeItem]}
             accessibilityRole="button"
             accessibilityLabel={label}
           >
-            {selected && name === 'Home' && !isTeacher ? (
+            {selected && name === 'Home' ? (
               <View style={styles.homeArcButton}><House size={23} color="#FFFFFF" strokeWidth={2.5} /></View>
             ) : (
               <Icon size={22} color={selected ? colors.brand : colors.muted} strokeWidth={2.2} />
@@ -369,9 +378,11 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   const [menuVisible, setMenuVisible] = useState(false);
   const [handleHovered, setHandleHovered] = useState(false);
   const isTeacher = user?.role === 'teacher';
+  const [activeDestination, setActiveDestination] = useState<MenuDestination | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const handleHeight = 48;
   const headerBottom = insets.top + 58;
-  const bottomNavigationHeight = (isTeacher ? 64 : 76) + insets.bottom;
+  const bottomNavigationHeight = 76 + insets.bottom;
   const minMenuTop = headerBottom + 8;
   const maxMenuTop = Math.max(minMenuTop, windowHeight - bottomNavigationHeight - handleHeight - 8);
   const [menuTop, setMenuTop] = useState((minMenuTop + maxMenuTop) / 2);
@@ -396,18 +407,41 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     : [
       { label: 'Tổng quan', destination: 'Home', icon: House },
       { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-      { label: 'Video khóa học', destination: 'CourseVideos', icon: Clapperboard },
+      { label: 'Luyện tập kỹ năng', destination: 'CourseVideos', icon: Clapperboard },
       { label: 'Lịch học', destination: 'Schedule', icon: CalendarDays },
-      { label: 'Bài tập & tài nguyên', destination: 'Assignments', icon: FileText },
-      { label: 'Tài liệu học tập', destination: 'Materials', icon: BookOpen },
+      { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
       { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
       { label: 'Bảng tin', destination: 'Feed', icon: Radio },
       { label: 'Tin tức', destination: 'News', icon: Newspaper },
       { label: 'Đánh giá giảng viên', destination: 'Evaluations', icon: Star },
-      { label: 'Thông báo', destination: 'NotificationCenter', icon: Bell },
       { label: 'Thông tin học phí', destination: 'Tuition', icon: WalletCards },
-      { label: 'Liên hệ Trung tâm', destination: 'CenterInfo', icon: FileText },
+      { label: 'Liên hệ Trung tâm', destination: 'CenterInfo', icon: Building2 },
     ];
+  useEffect(() => {
+    let active = true;
+    getMobileSoundEnabled()
+      .then((enabled) => { if (active) setSoundEnabled(enabled); })
+      .catch(() => undefined);
+    const unsubscribe = subscribeToMobileSoundPreference(setSoundEnabled);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    const updateActiveDestination = () => {
+      const currentRoute = navigationRef.getCurrentRoute()?.name;
+      const activeItem = menuItems.find((item) => item.destination === currentRoute);
+      const activeAlias = currentRoute === 'Notifications'
+        ? 'NotificationCenter'
+        : currentRoute === 'Profile'
+          ? 'Profile'
+          : null;
+      setActiveDestination(activeItem?.destination || activeAlias);
+    };
+    updateActiveDestination();
+    return navigationRef.addListener('state', updateActiveDestination);
+  }, [isTeacher]);
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderMove: (_event, gesture) => {
@@ -437,6 +471,14 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     else if (destination === 'TeacherFinance') navigationRef.navigate('TeacherFinance');
   };
 
+  const toggleSound = () => {
+    void setMobileSoundEnabled(!soundEnabled)
+      .then(() => setSoundEnabled(!soundEnabled))
+      .catch((error: unknown) => {
+        Alert.alert('Không thể đổi âm thanh', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      });
+  };
+
   return (
     <>
       <View {...panResponder.panHandlers} style={[styles.floatingMenuHandle, { top: menuTop }]}>
@@ -459,7 +501,11 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
           <Pressable style={styles.drawerDismiss} onPress={() => setMenuVisible(false)} accessibilityLabel="Đóng danh mục" />
           <View style={styles.drawer}>
             <View style={styles.drawerHeader}>
-              <View style={styles.drawerAvatar}><UserRound size={22} color="#FFFFFF" /></View>
+              <View style={styles.drawerAvatar}>
+                {user?.avatar
+                  ? <Image source={getMobileImageSource(resolveMobilePublicUrl(user.avatar))} style={styles.drawerAvatarImage} />
+                  : <UserRound size={22} color="#FFFFFF" />}
+              </View>
               <View style={styles.drawerIdentity}>
                 <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
                 <Text style={styles.drawerRole}>{isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}</Text>
@@ -473,22 +519,36 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                 <Pressable
                   key={destination}
                   onPress={() => openDestination(destination)}
-                  style={({ pressed }) => [styles.drawerItem, pressed && styles.drawerItemPressed]}
+                  style={({ pressed }) => [
+                    styles.drawerItem,
+                    activeDestination === destination && styles.drawerItemActive,
+                    pressed && styles.drawerItemPressed,
+                  ]}
                   accessibilityRole="button"
+                  accessibilityState={{ selected: activeDestination === destination }}
                 >
-                  <Icon size={17} color="#C7D2FE" />
-                  <Text style={styles.drawerItemText}>{label}</Text>
+                  <Icon size={17} color={activeDestination === destination ? '#FFFFFF' : '#C7D2FE'} />
+                  <Text style={[styles.drawerItemText, activeDestination === destination && styles.drawerItemTextActive]}>{label}</Text>
                 </Pressable>
               ))}
             </ScrollView>
             <View style={styles.drawerFooter}>
-              <Pressable onPress={() => openDestination('Profile')} style={styles.drawerItem} accessibilityRole="button">
-                <UserRound size={17} color="#C7D2FE" />
-                <Text style={styles.drawerItemText}>Hồ sơ</Text>
+              <Pressable
+                onPress={() => openDestination('Profile')}
+                style={[styles.drawerItem, activeDestination === 'Profile' && styles.drawerItemActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeDestination === 'Profile' }}
+              >
+                <UserRound size={17} color={activeDestination === 'Profile' ? '#FFFFFF' : '#C7D2FE'} />
+                <Text style={[styles.drawerItemText, activeDestination === 'Profile' && styles.drawerItemTextActive]}>Hồ sơ</Text>
               </Pressable>
               <Pressable onPress={() => { setMenuVisible(false); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button">
                 <LogOut size={17} color="#C7D2FE" />
                 <Text style={styles.drawerItemText}>Đăng xuất</Text>
+              </Pressable>
+              <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityState={{ checked: !soundEnabled }}>
+                {soundEnabled ? <Volume2 size={17} color="#C7D2FE" /> : <VolumeX size={17} color="#C7D2FE" />}
+                <Text style={styles.drawerItemText}>{soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}</Text>
               </Pressable>
             </View>
           </View>
@@ -502,6 +562,13 @@ function MainTabs() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const isTeacher = user?.role === 'teacher';
+  const teacherTabPositions: Record<string, number> = {
+    Schedule: 0,
+    Messages: 1,
+    Home: 2,
+    Students: 3,
+    Profile: 4,
+  };
 
   return (
     <Tab.Navigator
@@ -511,14 +578,14 @@ function MainTabs() {
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          backgroundColor: isTeacher ? colors.surface : 'transparent',
+          backgroundColor: 'transparent',
           borderTopColor: 'transparent',
-          height: (isTeacher ? 64 : 76) + insets.bottom,
-          paddingTop: isTeacher ? spacing.sm : spacing.md,
+          height: 76 + insets.bottom,
+          paddingTop: spacing.md,
           paddingBottom: Math.max(insets.bottom, spacing.xs),
-          elevation: isTeacher ? 8 : 0,
+          elevation: 0,
         },
-        tabBarBackground: isTeacher ? undefined : () => (
+        tabBarBackground: () => (
           <Svg
             width="100%"
             height="100%"
@@ -530,11 +597,19 @@ function MainTabs() {
             <Path d="M151 30 C151 11 173 2 200 2 C227 2 249 11 249 30 Z" fill={colors.redSoft} />
           </Svg>
         ),
-        tabBarItemStyle: !isTeacher && route.name === 'Home'
-          ? { transform: [{ translateY: -12 }] }
-          : undefined,
+        tabBarItemStyle: isTeacher
+          ? {
+            position: 'absolute',
+            left: `${(teacherTabPositions[route.name] ?? 0) * 20}%`,
+            width: '20%',
+            height: '100%',
+            ...(route.name === 'Home' ? { transform: [{ translateY: -12 }] } : {}),
+          }
+          : route.name === 'Home'
+            ? { transform: [{ translateY: -12 }] }
+            : undefined,
         tabBarIcon: ({ color, size }) => {
-          if (route.name === 'Home' && !isTeacher) {
+          if (route.name === 'Home') {
             return (
               <View style={styles.homeArcButton}>
                 <House size={23} color="#FFFFFF" strokeWidth={2.5} />
@@ -543,7 +618,6 @@ function MainTabs() {
           }
           const common = { size: size - 2, color, strokeWidth: 2.2 };
           switch (route.name) {
-            case 'Home': return <House {...common} />;
             case 'Schedule': return <CalendarDays {...common} />;
             case 'Messages': return <MessageCircle {...common} />;
             case 'CourseVideos': return <Clapperboard {...common} />;
@@ -566,7 +640,7 @@ function MainTabs() {
           <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Lịch học' }} />
           <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Tin nhắn' }} />
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Video khóa học' }} />
+          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập kỹ năng' }} />
         </>
       )}
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: isTeacher ? 'Hồ sơ' : 'Cá nhân' }} />
@@ -596,25 +670,27 @@ const styles = StyleSheet.create({
   acceptCallButton: { backgroundColor: '#16A34A' },
   incomingCallButtonText: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '700' },
   persistentTabBar: { position: 'absolute', zIndex: 15, left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingTop: spacing.md },
-  persistentTabBarTeacher: { alignItems: 'center', paddingTop: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line, elevation: 8 },
   persistentTabItem: { flex: 1, height: 42, alignItems: 'center', justifyContent: 'center' },
   persistentHomeItem: { transform: [{ translateY: -12 }] },
-  floatingMenuHandle: { position: 'absolute', left: 0, zIndex: 20 },
-  floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 12, borderBottomRightRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 2, height: 2 }, elevation: 6 },
+  floatingMenuHandle: { position: 'absolute', right: 0, zIndex: 20 },
+  floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopLeftRadius: 12, borderBottomLeftRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: -2, height: 2 }, elevation: 6 },
   drawerOverlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(2, 6, 23, 0.58)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
-  drawer: { width: '82%', maxWidth: 320, height: '100%', backgroundColor: '#111827', paddingTop: spacing.xl, paddingBottom: spacing.md, borderRightWidth: 2, borderRightColor: '#2DD4BF' },
+  drawer: { width: '82%', maxWidth: 320, height: '100%', backgroundColor: '#111827', paddingTop: spacing.xl, paddingBottom: spacing.md },
   drawerHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(148, 163, 184, 0.2)' },
-  drawerAvatar: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: '#334155' },
+  drawerAvatar: { width: 38, height: 38, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: '#334155' },
+  drawerAvatarImage: { width: 38, height: 38, borderRadius: 19 },
   drawerIdentity: { flex: 1, minWidth: 0, gap: 4 },
   drawerName: { color: '#FFFFFF', fontSize: typography.small, fontWeight: '800' },
   drawerRole: { color: '#A5B4FC', fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.8 },
   drawerClose: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   drawerScroll: { flex: 1 },
-  drawerItems: { paddingVertical: spacing.sm },
-  drawerItem: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(148, 163, 184, 0.14)' },
-  drawerItemPressed: { backgroundColor: 'rgba(148, 163, 184, 0.2)' },
+  drawerItems: { paddingVertical: spacing.sm, gap: 2 },
+  drawerItem: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(148, 163, 184, 0.14)' },
+  drawerItemActive: { borderBottomWidth: 0, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.15)' },
+  drawerItemPressed: { borderRadius: radius.md, backgroundColor: 'rgba(148, 163, 184, 0.2)' },
   drawerItemText: { color: '#E2E8F0', fontSize: typography.caption, fontWeight: '600' },
+  drawerItemTextActive: { color: '#FFFFFF', fontWeight: '800' },
   drawerFooter: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.2)' },
   homeArcButton: {
     width: 58,

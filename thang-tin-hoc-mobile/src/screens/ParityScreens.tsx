@@ -1,11 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
+import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScreen';
+import { CourseVideosScreen } from './CourseVideosScreen';
 import {
-  ArrowDownWideNarrow, BookOpen, Building2, CalendarDays, CheckCircle2, ChevronRight, ClipboardList,
-  GraduationCap, Grid2X2, ImagePlus, List, MessageSquareText, Newspaper, Paperclip, Radio, Search, Star, WalletCards,
+  BookOpen, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Frown, Globe,
+  EyeOff, GraduationCap, Grid2X2, Heart, ImagePlus, Laugh, List, MessageCircle, MoreVertical,
+  Newspaper, Paperclip, Pencil, Radio, Reply, Search, Send, Sparkles, Star, ThumbsUp, Trash2, WalletCards,
+  Users,
 } from 'lucide-react-native';
 import {
   AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton,
@@ -13,17 +19,19 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  commentFeedPost, createFeedPost, deleteFeedPost, fetchFeedPosts, reactFeedPost, updateFeedPost,
+  commentFeedPost, createFeedPost, deleteFeedComment, deleteFeedPost, fetchFeedPosts, reactFeedPost, updateFeedPost, uploadFeedImages,
 } from '../services/feedApi';
 import {
-  evaluationService, feedService, learningService, quizService,
+  evaluationService, feedService, quizService,
   softwareService, studentProfileService, studentService, teacherFinanceService, trainingService,
 } from '../services/mockService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
+import { getMobileApiBaseUrl, getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
+import RenderHtml from '@native-html/render';
+import { WebView } from 'react-native-webview';
 import type { AppStackParamList } from '../navigation/types';
 import type {
   DemoEvaluation, DemoFeedPost, DemoNewsItem, DemoQuiz, DemoStudent, DemoTrainingCourse,
-  LearningCourse, LearningLesson,
 } from '../types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -121,157 +129,15 @@ function MenuIcon({ label }: { label: string }) {
 }
 
 export function StudentLearningScreen() {
-  const navigation = useNavigation<Navigation>();
-  const loader = useCallback(() => learningService.courses(), []);
-  const resource = useMockResource(loader);
-  const courses = resource.data || [];
-  const [expanded, setExpanded] = useState<string[]>([]);
-  const [filter, setFilter] = useState('Tất cả');
-  const visibleCourses = courses.filter((course) => {
-    if (filter === 'Khóa đã đăng ký') return course.enrolled;
-    if (filter === 'Tự học qua video') return course.deliveryMode === 'video';
-    return true;
-  });
-  const enrolledCourses = visibleCourses.filter((course) => course.enrolled);
-  const otherCourses = visibleCourses.filter((course) => !course.enrolled);
-  const toggle = (id: string) => setExpanded((items) => items.includes(id) ? items.filter((value) => value !== id) : [...items, id]);
-  return (
-    <AppScreen>
-      <AppHeader title="Bài học" subtitle="Khóa đã đăng ký và tự học qua video" />
-      <View style={styles.chips}>
-        {['Tất cả', 'Khóa đã đăng ký', 'Tự học qua video'].map((item) => (
-          <Pressable key={item} onPress={() => setFilter(item)} style={[styles.choice, filter === item && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: filter === item }}>
-            <Text style={[styles.choiceText, filter === item && styles.choiceTextActive]}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {!resource.loading && !resource.error && visibleCourses.length === 0 ? <EmptyState title="Chưa có khóa học" message="Khóa học sẽ hiển thị tại đây." /> : null}
-      {enrolledCourses.length ? <SectionHeading title="LỘ TRÌNH CỦA BẠN · Khóa đã đăng ký" /> : null}
-      {enrolledCourses.map((course) => (
-        <View key={course._id}>
-          <Card style={styles.courseCard}>
-            <StatusBadge label="Đã đăng ký" />
-            <Text style={styles.title}>{course.title}</Text>
-            <Text style={styles.muted}>{course.subject} · {course.software}</Text>
-            <ProgressBar value={course.progress} />
-            <Text style={styles.caption}>Tiến độ khóa học: {course.progress}%</Text>
-            {course.units.length ? (
-              <PrimaryButton title={expanded.includes(`${course._id}-all`) ? 'Thu gọn nội dung' : 'Vào học'} variant="secondary" onPress={() => toggle(`${course._id}-all`)} />
-            ) : null}
-          </Card>
-          {expanded.includes(`${course._id}-all`) ? course.units.map((unit) => (
-            <View key={unit._id}>
-              <Pressable onPress={() => toggle(unit._id)} accessibilityRole="button">
-                <Card style={styles.unitRow}>
-                  <BookOpen size={18} color={colors.brand} />
-                  <Text style={[styles.title, styles.flex]}>{unit.title}</Text>
-                  <Text style={styles.muted}>{unit.sections.length} bài học</Text>
-                </Card>
-              </Pressable>
-              {expanded.includes(unit._id) ? unit.sections.map((lesson) => (
-                <LessonRow
-                  key={lesson._id}
-                  lesson={lesson}
-                  onPress={() => navigation.navigate('LearningLesson', {
-                    courseId: course._id, unitId: unit._id, lessonId: lesson._id,
-                  })}
-                />
-              )) : null}
-            </View>
-          )) : null}
-        </View>
-      ))}
-      {otherCourses.length ? <SectionHeading title="Khóa học cùng với giảng viên" /> : null}
-      {otherCourses.map((course) => (
-        <Card key={course._id} style={styles.availableCourse}>
-          <View style={styles.courseRibbon}><Text style={styles.courseRibbonText}>{course.deliveryMode === 'video' ? 'TỰ HỌC QUA VIDEO' : 'KHÓA HỌC CÙNG GIẢNG VIÊN'}</Text></View>
-          <Text style={styles.cardTitle}>{course.title}</Text>
-          <Text style={styles.muted}>{course.subject} · {course.totalSessions || 0} buổi {course.price ? `· ${formatCurrency(course.price)}` : ''}</Text>
-          <Text style={styles.caption}>{course.description}</Text>
-          <StatusBadge label="Chưa đăng ký" />
-          <PrimaryButton title="Xem thông tin khóa học" variant="secondary" onPress={() => Alert.alert('Khóa học', 'Thông tin đăng ký và thanh toán khóa học tiếp tục trên website.')} />
-        </Card>
-      ))}
-      <Text style={styles.note}>Video được giữ ở dạng placeholder; không tải media hoặc gọi dịch vụ web.</Text>
-    </AppScreen>
-  );
+  return <CourseVideosScreen />;
 }
 
 export function StudentExamScreen() {
-  return (
-    <AppScreen>
-      <AppHeader title="Phòng thi" subtitle="Các bài thi và kết quả học tập" compact />
-      <View style={styles.examEntryGrid}>
-        {[
-          { title: 'MOS / IC3', description: 'Thi chứng nhận tiếp tục trên website.' },
-          { title: 'Thi chứng nhận môn học', description: 'Chức năng này hiện được thực hiện trên website.' },
-          { title: 'Xem điểm của tôi', description: 'Điểm thi chính thức xem trên website.' },
-        ].map((item) => (
-          <Pressable key={item.title} onPress={() => Alert.alert(item.title, 'Chức năng này hiện được thực hiện trên website.')} accessibilityRole="button">
-            <Card style={styles.examEntry}>
-              <View style={styles.menuIcon}><GraduationCap size={20} color={colors.brand} /></View>
-              <View style={styles.flex}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.muted}>{item.description}</Text></View>
-              <ChevronRight size={18} color={colors.muted} />
-            </Card>
-          </Pressable>
-        ))}
-      </View>
-      <SectionHeading title="Thi và trắc nghiệm — WEB-ONLY TẠM THỜI" />
-      <Card>
-        <Text style={styles.cardTitle}>Thực hiện trên website</Text>
-        <Text style={styles.body}>Bài thi, bài trắc nghiệm được giao và điểm chính thức vẫn được giữ trong inventory chức năng web. Mobile hiện không mở attempt, làm bài, camera/proctoring hoặc gửi kết quả.</Text>
-      </Card>
-    </AppScreen>
-  );
-}
-
-function LessonRow({ lesson, onPress }: { lesson: LearningLesson; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} disabled={lesson.locked} accessibilityRole="button">
-      <Card style={{ ...styles.lessonRow, ...(lesson.locked ? styles.dimmed : {}) }}>
-        {lesson.completed ? <CheckCircle2 size={19} color={colors.green} /> : <BookOpen size={19} color={colors.brand} />}
-        <View style={styles.flex}>
-          <Text style={styles.cardTitle}>{lesson.title}</Text>
-          <Text style={styles.caption}>{lesson.duration} · {lesson.locked ? 'Đang khóa' : lesson.completed ? 'Hoàn thành' : `${lesson.progress}%`}</Text>
-        </View>
-        <ChevronRight size={18} color={colors.muted} />
-      </Card>
-    </Pressable>
-  );
+  return <MobileStudentExamScreen />;
 }
 
 export function LearningLessonScreen() {
-  const route = useRoute<NativeStackScreenProps<AppStackParamList, 'LearningLesson'>['route']>();
-  const loader = useCallback(() => learningService.courses(), []);
-  const resource = useMockResource(loader);
-  const [completed, setCompleted] = useState(false);
-  const course = resource.data?.find((item) => item._id === route.params.courseId);
-  const unit = course?.units.find((item) => item._id === route.params.unitId);
-  const lesson = unit?.sections.find((item) => item._id === route.params.lessonId);
-  return (
-    <AppScreen>
-      <AppHeader title={lesson?.title || 'Bài học'} subtitle={`${course?.title || ''} · ${unit?.title || ''}`} />
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {lesson ? (
-        <>
-          <Card style={styles.player}>
-            <BookOpen size={38} color={colors.brand} />
-            <Text style={styles.title}>Nội dung bài học</Text>
-            <Text style={styles.muted}>Trình phát video sẽ được tích hợp theo nguồn nội dung khóa học ở giai đoạn phù hợp.</Text>
-          </Card>
-          <Card>
-            <Text style={styles.cardTitle}>{lesson.title}</Text>
-            <Text style={styles.muted}>Thời lượng: {lesson.duration}</Text>
-            <Text style={styles.body}>{course?.description}</Text>
-            <PrimaryButton title={completed || lesson.completed ? 'Đã hoàn thành' : 'Đánh dấu đã học'} onPress={() => setCompleted(true)} disabled={completed || lesson.completed} />
-          </Card>
-        </>
-      ) : (!resource.loading ? <EmptyState title="Không tìm thấy bài học" message="Bài học này không có trong dữ liệu demo." /> : null)}
-    </AppScreen>
-  );
+  return <CourseVideosScreen />;
 }
 
 export function EvaluationsScreen() {
@@ -369,7 +235,7 @@ export function EvaluationsScreen() {
   ] as const;
   return (
     <AppScreen>
-      <AppHeader title="Đánh giá" subtitle="Phản hồi khóa học và giảng viên" />
+      <AppHeader title="Đánh giá" subtitle="Phản hồi khóa học và giảng viên" showBackButton={false} centered />
       <Card style={styles.evaluationIntro}>
         <Star size={24} color={colors.gold} />
         <View style={styles.rowCopy}>
@@ -469,11 +335,47 @@ export function FeedScreen() {
   const isTeacher = user?.role === 'teacher';
   const [posts, setPosts] = useState<DemoFeedPost[] | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([]);
+  const [postMenuId, setPostMenuId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshError, setRefreshError] = useState('');
+  const [feedActionError, setFeedActionError] = useState('');
   const live = !!user && !user.previewMode;
   const loader = useCallback(() => (live ? fetchFeedPosts() : feedService.posts()), [live]);
   const resource = useMockResource(loader);
+  const hiddenPostsStorageKey = `mobile-feed-hidden:${user?.id || 'preview'}`;
+  useEffect(() => {
+    if (!postMenuId || Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest('#feed-post-menu')) return;
+      setPostMenuId(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPostMenuId(null);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [postMenuId]);
+  useEffect(() => {
+    let active = true;
+    const loadHiddenPosts = async () => {
+      try {
+        const stored = Platform.OS === 'web'
+          ? globalThis.localStorage.getItem(hiddenPostsStorageKey)
+          : await AsyncStorage.getItem(hiddenPostsStorageKey);
+        const ids: unknown = stored ? JSON.parse(stored) : [];
+        if (active) setHiddenPostIds(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []);
+      } catch (error) {
+        if (active) Alert.alert('Bảng tin', error instanceof Error ? `Không thể tải danh sách bài đã ẩn: ${error.message}` : 'Không thể tải danh sách bài đã ẩn.');
+      }
+    };
+    void loadHiddenPosts();
+    return () => { active = false; };
+  }, [hiddenPostsStorageKey]);
   useEffect(() => {
     if (!live) return undefined;
     const timer = setInterval(() => {
@@ -489,32 +391,225 @@ export function FeedScreen() {
     }, 8000);
     return () => clearInterval(timer);
   }, [live, busy, editingPostId]);
-  const apiRun = async (fn: () => Promise<unknown>) => {
+  const apiRun = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     try {
       await fn();
       setPosts(await fetchFeedPosts());
       setRefreshError('');
+      setFeedActionError('');
+      return true;
     } catch (error) {
-      Alert.alert('Bảng tin', error instanceof Error ? error.message : 'Thao tác thất bại, vui lòng thử lại.');
+      const message = error instanceof Error ? error.message : 'Thao tác thất bại, vui lòng thử lại.';
+      setFeedActionError(message);
+      if (Platform.OS !== 'web') Alert.alert('Bảng tin', message);
+      return false;
     } finally {
       setBusy(false);
     }
   };
-  const [comment, setComment] = useState('');
+  const selectFeedImages = async () => {
+    if (busy) return;
+    try {
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Cần quyền truy cập ảnh', 'Cho phép ứng dụng truy cập thư viện ảnh để đính kèm ảnh.');
+          return;
+        }
+      }
+      const remaining = 6 - selectedImages.length;
+      if (remaining <= 0) {
+        Alert.alert('Đã đủ ảnh', 'Mỗi bài đăng tối đa 6 ảnh.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.85,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
+      if (result.canceled) return;
+      const accepted = result.assets.filter((asset) => (
+        (!asset.mimeType || asset.mimeType.toLowerCase().startsWith('image/'))
+        && (asset.fileSize == null || asset.fileSize <= 5 * 1024 * 1024)
+      ));
+      if (accepted.length !== result.assets.length) {
+        Alert.alert('Một số ảnh không hợp lệ', 'Chỉ nhận ảnh tối đa 5MB mỗi ảnh.');
+      }
+      setSelectedImages((current) => [...current, ...accepted].slice(0, 6));
+    } catch (error) {
+      Alert.alert('Không thể chọn ảnh', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    }
+  };
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState('');
   const [audience, setAudience] = useState('Công khai');
-  const [attachImage, setAttachImage] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [visiblePostCount, setVisiblePostCount] = useState(3);
   const [replyTarget, setReplyTarget] = useState<{ postId: string; parentId: string; author: string } | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState<Record<string, boolean>>({});
+  const [expandedReplyThreads, setExpandedReplyThreads] = useState<Record<string, boolean>>({});
+  const [reactionPickerPostId, setReactionPickerPostId] = useState<string | null>(null);
+  const reactionPickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showAudienceMenu, setShowAudienceMenu] = useState(false);
   const [editDraft, setEditDraft] = useState('');
+  useEffect(() => () => {
+    if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
+  }, []);
   const items = posts || resource.data || [];
-  const visiblePosts = items.slice(0, visiblePostCount);
+  const visibleItems = items.filter((post) => !hiddenPostIds.includes(post.id));
+  const visiblePosts = visibleItems.slice(0, visiblePostCount);
   const roleLabel = isTeacher ? 'Giảng viên' : 'Học viên';
+  const audienceOptions = [
+    { value: 'Công khai', title: 'Công khai', description: 'Tất cả mọi người đều xem được', icon: Globe },
+    ...(isTeacher ? [{ value: 'Chỉ Giảng viên & Admin', title: 'Chỉ Giảng viên & Admin', description: 'Học viên không xem được', icon: GraduationCap }] : []),
+    { value: 'Chỉ Học viên & Admin', title: 'Chỉ Học viên & Admin', description: 'Giảng viên không xem được', icon: Users },
+  ];
   const ownPost = (post: DemoFeedPost) => post.authorId === user?.id;
   const updatePost = (postId: string, update: (post: DemoFeedPost) => DemoFeedPost) => {
     setPosts(items.map((post) => post.id === postId ? update(post) : post));
   };
+  const setLocalReaction = (postId: string, type: NonNullable<DemoFeedPost['myReaction']>) => {
+    updatePost(postId, (post) => {
+      const wasSelected = post.myReaction === type;
+      return {
+        ...post,
+        myReaction: wasSelected ? null : type,
+        reactionCount: Math.max(0, post.reactionCount + (wasSelected ? -1 : post.myReaction ? 0 : 1)),
+        reactions: {
+          heart: Math.max(0, (post.reactions?.heart || 0) - (post.myReaction === 'heart' ? 1 : 0) + (!wasSelected && type === 'heart' ? 1 : 0)),
+          like: Math.max(0, (post.reactions?.like || 0) - (post.myReaction === 'like' ? 1 : 0) + (!wasSelected && type === 'like' ? 1 : 0)),
+          haha: Math.max(0, (post.reactions?.haha || 0) - (post.myReaction === 'haha' ? 1 : 0) + (!wasSelected && type === 'haha' ? 1 : 0)),
+          wow: Math.max(0, (post.reactions?.wow || 0) - (post.myReaction === 'wow' ? 1 : 0) + (!wasSelected && type === 'wow' ? 1 : 0)),
+          sad: Math.max(0, (post.reactions?.sad || 0) - (post.myReaction === 'sad' ? 1 : 0) + (!wasSelected && type === 'sad' ? 1 : 0)),
+        },
+      };
+    });
+  };
+  const toggleComments = (postId: string) => {
+    const opening = !commentsOpen[postId];
+    setCommentsOpen((current) => ({ ...current, [postId]: opening }));
+    if (!opening && replyTarget?.postId === postId) setReplyTarget(null);
+    setReactionPickerPostId(null);
+  };
+  const openReactionPicker = (postId: string) => {
+    if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
+    setReactionPickerPostId(postId);
+  };
+  const scheduleReactionPickerClose = () => {
+    if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
+    reactionPickerCloseTimer.current = setTimeout(() => {
+      setReactionPickerPostId(null);
+      reactionPickerCloseTimer.current = null;
+    }, 250);
+  };
+  const selectReaction = (postId: string, type: NonNullable<DemoFeedPost['myReaction']>) => {
+    if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
+    if (live) void apiRun(() => reactFeedPost(postId, type));
+    else setLocalReaction(postId, type);
+    setReactionPickerPostId(null);
+  };
+  const handleDeleteComment = (post: DemoFeedPost, commentId: string) => {
+    const removeComment = () => {
+      if (live) {
+        void apiRun(() => deleteFeedComment(post.id, commentId));
+        return;
+      }
+      updatePost(post.id, (current) => ({
+        ...current,
+        comments: current.comments.filter((entry) => entry.id !== commentId),
+        replies: (current.replies || []).filter((entry) => entry.parentId !== commentId),
+      }));
+    };
+    if (Platform.OS === 'web') {
+      removeComment();
+      return;
+    }
+    Alert.alert('Xóa bình luận?', 'Bình luận và các phản hồi sẽ bị xóa.', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: removeComment },
+    ]);
+  };
+  const persistHiddenPostIds = async (ids: string[]) => {
+    const serialized = JSON.stringify(ids);
+    if (Platform.OS === 'web') globalThis.localStorage.setItem(hiddenPostsStorageKey, serialized);
+    else await AsyncStorage.setItem(hiddenPostsStorageKey, serialized);
+  };
+  const hidePost = (postId: string) => {
+    const next = [...new Set([...hiddenPostIds, postId])];
+    setHiddenPostIds(next);
+    setPostMenuId(null);
+    void persistHiddenPostIds(next).then(() => {
+      Alert.alert('Bài viết đã được ẩn', 'Bài viết sẽ không còn hiển thị trong bảng tin của bạn trên thiết bị này.', [
+        { text: 'Đóng' },
+        {
+          text: 'Hoàn tác', onPress: () => {
+            const restored = next.filter((id) => id !== postId);
+            setHiddenPostIds(restored);
+            void persistHiddenPostIds(restored).catch((error: unknown) => {
+              Alert.alert('Không thể hoàn tác', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+            });
+          }
+        },
+      ]);
+    }).catch((error: unknown) => {
+      setHiddenPostIds(hiddenPostIds);
+      Alert.alert('Không thể ẩn bài viết', error instanceof Error ? error.message : 'Không lưu được thay đổi trên thiết bị.');
+    });
+  };
+  const renderCommentComposer = (post: DemoFeedPost) => (
+    <View style={styles.commentComposer}>
+      {replyTarget?.postId === post.id ? (
+        <View style={styles.feedReplyingTo}>
+          <Text style={styles.feedReplyingText}>Đang trả lời {replyTarget.author}</Text>
+          <Pressable onPress={() => setReplyTarget(null)} accessibilityRole="button" accessibilityLabel="Hủy trả lời"><Text style={styles.feedReplyCancel}>×</Text></Pressable>
+        </View>
+      ) : null}
+      <View style={styles.commentComposerInputRow}>
+        <TextInput
+          value={commentDrafts[post.id] || ''}
+          onChangeText={(text) => setCommentDrafts((current) => ({ ...current, [post.id]: text }))}
+          placeholder={replyTarget?.postId === post.id ? `Trả lời ${replyTarget.author}...` : 'Viết bình luận thảo luận...'}
+          style={styles.commentInput}
+          onFocus={() => setCommentsOpen((current) => ({ ...current, [post.id]: true }))}
+          accessibilityLabel="Nội dung bình luận"
+        />
+        <Pressable onPress={() => {
+          const text = (commentDrafts[post.id] || '').trim();
+          if (!text || busy) return;
+          const parentId = replyTarget?.postId === post.id ? replyTarget.parentId : undefined;
+          if (live) {
+            void apiRun(() => commentFeedPost(post.id, text, parentId)).then((success) => {
+              if (success) {
+                setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
+                setReplyTarget(null);
+                setCommentsOpen((current) => ({ ...current, [post.id]: true }));
+              }
+            });
+            return;
+          }
+          updatePost(post.id, (current) => {
+            if (parentId) return {
+              ...current,
+              commentsCount: (current.commentsCount ?? current.comments.length + (current.replies || []).length) + 1,
+              replies: [...(current.replies || []), { id: `reply-${Date.now()}`, parentId, author: user?.name || 'Bạn', authorId: user?.id, text }],
+            };
+            return {
+              ...current,
+              commentsCount: (current.commentsCount ?? current.comments.length + (current.replies || []).length) + 1,
+              comments: [...current.comments, { id: `comment-${Date.now()}`, author: user?.name || 'Bạn', authorId: user?.id, text }],
+            };
+          });
+          setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
+          setReplyTarget(null);
+        }} accessibilityRole="button" accessibilityLabel="Gửi bình luận">
+          <Send size={18} color={colors.red} />
+        </Pressable>
+      </View>
+    </View>
+  );
   return (
     <AppScreen>
       <AppHeader title={isTeacher ? 'Bảng tin trao đổi & Hỏi bài' : 'Bảng tin'} subtitle="Bài đăng dành cho lớp học" icon={Newspaper} />
@@ -525,56 +620,145 @@ export function FeedScreen() {
             <Text style={styles.cardTitle}>{user?.name || roleLabel}</Text>
             <Text style={styles.caption}>{roleLabel}</Text>
           </View>
-          <Pressable onPress={() => Alert.alert('Quyền riêng tư / Đối tượng xem', 'Chọn đối tượng xem bài viết.', [
-            { text: 'Công khai', onPress: () => setAudience('Công khai') },
-            ...(isTeacher ? [
-              { text: 'Chỉ Giảng viên', onPress: () => setAudience('Chỉ Giảng viên') },
-              { text: 'Chỉ Học viên', onPress: () => setAudience('Chỉ Học viên') },
-            ] : [{ text: 'Chỉ Học viên', onPress: () => setAudience('Chỉ Học viên') }]),
-            { text: 'Hủy', style: 'cancel' },
-          ])} style={styles.privacyButton} accessibilityRole="button" accessibilityLabel="Chọn quyền riêng tư bài đăng">
-            <Text style={styles.privacyText}>{audience}</Text>
-          </Pressable>
+          <View style={styles.privacyMenuAnchor}>
+            <Pressable
+              onPress={() => setShowAudienceMenu((visible) => !visible)}
+              style={styles.privacyButton}
+              accessibilityRole="button"
+              accessibilityLabel="Chọn quyền riêng tư bài đăng"
+              accessibilityState={{ expanded: showAudienceMenu }}
+            >
+              <Globe size={13} color={colors.green} />
+              <Text numberOfLines={1} style={styles.privacyText}>{audience}</Text>
+              <ChevronDown size={12} color={colors.green} />
+            </Pressable>
+            {showAudienceMenu ? (
+              <View style={styles.privacyMenu}>
+                <Text style={styles.privacyMenuTitle}>AI CÓ THỂ XEM BÀI VIẾT?</Text>
+                {audienceOptions.map((option) => {
+                  const OptionIcon = option.icon;
+                  const selected = audience === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => {
+                        setAudience(option.value);
+                        setShowAudienceMenu(false);
+                      }}
+                      style={[styles.privacyOption, selected && styles.privacyOptionSelected]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${option.title}. ${option.description}`}
+                      accessibilityState={{ selected }}
+                    >
+                      <OptionIcon size={15} color={selected ? colors.brand : colors.muted} />
+                      <View style={styles.privacyOptionCopy}>
+                        <View style={styles.privacyOptionTitleRow}>
+                          <Text numberOfLines={1} style={styles.privacyOptionTitle}>{option.title}</Text>
+                          {selected ? <Check size={14} color={colors.brand} /> : null}
+                        </View>
+                        <Text style={styles.privacyOptionDescription}>{option.description}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
         </View>
-        <TextInput value={draft} onChangeText={setDraft} placeholder="Bạn muốn chia sẻ điều gì?" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng demo" />
-        {attachImage ? <View style={styles.feedImagePlaceholder}><ImagePlus size={22} color={colors.muted} /><Text style={styles.metaText}>Ảnh demo · Không tải lên</Text></View> : null}
+        <TextInput value={draft} onChangeText={setDraft} placeholder="Bạn muốn chia sẻ điều gì?" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng" />
+        {selectedImages.length ? (
+          <View style={styles.feedImagePreviewList}>
+            {selectedImages.map((asset, index) => (
+              <View key={`${asset.uri}-${index}`} style={styles.feedImagePreview}>
+                <Image source={{ uri: asset.uri }} style={styles.feedImagePreviewImage} />
+                <Pressable onPress={() => setSelectedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.feedImageRemove} accessibilityRole="button" accessibilityLabel={`Bỏ ảnh ${index + 1}`}>
+                  <Text style={styles.feedImageRemoveText}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
         <View style={styles.feedComposerActions}>
-          <Pressable onPress={() => setAttachImage((value) => !value)} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh demo">
-            <ImagePlus size={19} color={colors.green} /><Text style={styles.actionText}>{attachImage ? 'Bỏ ảnh' : 'Thêm ảnh'}</Text>
+          <Pressable onPress={() => { void selectFeedImages(); }} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh">
+            <ImagePlus size={19} color={colors.green} /><Text style={styles.actionText}>Thêm ảnh ({selectedImages.length}/6)</Text>
           </Pressable>
-          <PrimaryButton title="Đăng bài" disabled={!draft.trim() || busy} onPress={() => {
+          <PrimaryButton title="Đăng bài" disabled={(!draft.trim() && !selectedImages.length) || busy} onPress={() => {
             const content = draft.trim();
-            if (!content) return;
+            if (!content && !selectedImages.length) return;
             if (live) {
-              setDraft('');
-              setAttachImage(false);
-              void apiRun(() => createFeedPost(content, audience));
+              void apiRun(async () => {
+                const images = await uploadFeedImages(selectedImages.map((asset, index) => ({
+                  uri: asset.uri,
+                  name: asset.fileName || `feed-${Date.now()}-${index + 1}.jpg`,
+                  mimeType: asset.mimeType || 'image/jpeg',
+                  file: asset.file || undefined,
+                })));
+                await createFeedPost(content, audience, images);
+              }).then((success) => {
+                if (success) {
+                  setDraft('');
+                  setSelectedImages([]);
+                }
+              });
               return;
             }
             setPosts([{
               id: `feed-${Date.now()}`, authorId: user?.id, author: user?.name || roleLabel, role: roleLabel,
-              time: 'Vừa xong', content, audience, mediaType: attachImage ? 'image' : undefined,
+              time: 'Vừa xong', content, audience, images: selectedImages.map((asset) => asset.uri),
+              mediaType: selectedImages.length ? 'image' : undefined,
               comments: [], replies: [], reactionCount: 0,
             }, ...items]);
             setDraft('');
-            setAttachImage(false);
+            setSelectedImages([]);
           }} />
         </View>
-        <Text style={styles.note}>{live ? 'Bài đăng và tương tác được đồng bộ với hệ thống; tải ảnh lên chưa được hỗ trợ.' : 'Bài đăng và ảnh chỉ được giữ cục bộ trong bản xem trước.'}</Text>
+        {!live ? <Text style={styles.note}>Bài đăng và ảnh chỉ được giữ cục bộ trong bản xem trước.</Text> : null}
       </Card>
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {refreshError ? <Text style={styles.note}>Không thể cập nhật bảng tin: {refreshError}</Text> : null}
+      {feedActionError ? <Text style={styles.note}>Không thể hoàn tất thao tác: {feedActionError}</Text> : null}
       {visiblePosts.map((post) => (
         <Card key={post.id}>
-          <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
-            {ownPost(post) ? <View style={styles.feedOwnerActions}>
-              <Pressable onPress={() => { setEditingPostId(post.id); setEditDraft(post.content); }} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel="Sửa bài đăng của bạn"><Text style={styles.feedInlineActionText}>Sửa</Text></Pressable>
-              <Pressable onPress={() => Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị xóa khỏi bản demo.', [
-                { text: 'Hủy', style: 'cancel' },
-                { text: 'Xóa', style: 'destructive', onPress: () => (live ? void apiRun(() => deleteFeedPost(post.id)) : setPosts(items.filter((item) => item.id !== post.id))) },
-              ])} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel="Xóa bài đăng của bạn"><Text style={styles.feedDeleteText}>Xóa</Text></Pressable>
-            </View> : null}
+          <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} imageSource={post.authorAvatar ? getMobileImageSource(post.authorAvatar) : undefined} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
+            <View nativeID="feed-post-menu" style={styles.feedPostMenuAnchor}>
+              <Pressable
+                onPress={() => setPostMenuId((current) => current === post.id ? null : post.id)}
+                style={styles.feedPostMenuButton}
+                accessibilityRole="button"
+                accessibilityLabel="Tùy chọn bài viết"
+                accessibilityState={{ expanded: postMenuId === post.id }}
+              >
+                <MoreVertical size={18} color={colors.muted} />
+              </Pressable>
+              {postMenuId === post.id ? (
+                <View style={styles.feedPostMenu}>
+                  {ownPost(post) ? (
+                    <>
+                      <Pressable onPress={() => {
+                        setEditingPostId(post.id);
+                        setEditDraft(post.content);
+                        setPostMenuId(null);
+                      }} style={styles.feedPostMenuItem} accessibilityRole="button">
+                        <Pencil size={15} color={colors.brand} /><Text style={styles.feedPostMenuText}>Chỉnh sửa</Text>
+                      </Pressable>
+                      <Pressable onPress={() => {
+                        setPostMenuId(null);
+                        Alert.alert('Xóa bài viết?', live ? 'Bài viết sẽ bị xóa khỏi bảng tin.' : 'Bài viết sẽ bị xóa khỏi bản xem trước.', [
+                          { text: 'Hủy', style: 'cancel' },
+                          { text: 'Xóa', style: 'destructive', onPress: () => (live ? void apiRun(() => deleteFeedPost(post.id)) : setPosts(items.filter((item) => item.id !== post.id))) },
+                        ]);
+                      }} style={styles.feedPostMenuItem} accessibilityRole="button">
+                        <Trash2 size={15} color={colors.red} /><Text style={[styles.feedPostMenuText, styles.feedPostMenuDelete]}>Xóa</Text>
+                      </Pressable>
+                    </>
+                  ) : null}
+                  <Pressable onPress={() => hidePost(post.id)} style={styles.feedPostMenuItem} accessibilityRole="button">
+                    <EyeOff size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Ẩn bài viết</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
           </View>
           {isTeacher ? <Text style={styles.feedAudience}>{post.audience}</Text> : null}
           {editingPostId === post.id ? (
@@ -592,136 +776,292 @@ export function FeedScreen() {
               </View>
             </View>
           ) : <Text style={styles.body}>{post.content}</Text>}
-          {post.mediaType === 'image' ? <View style={styles.feedImagePlaceholder}><ImagePlus size={22} color={colors.muted} /><Text style={styles.metaText}>Ảnh đính kèm demo</Text></View> : null}
-          <View style={styles.row}>
-            <Pressable onPress={() => (live ? void apiRun(() => reactFeedPost(post.id)) : updatePost(post.id, (item) => ({ ...item, reactionCount: item.reactionCount + 1 })))} style={styles.action}><Star size={16} color={colors.brand} /><Text style={styles.actionText}>Quan tâm {post.reactionCount}</Text></Pressable>
-            <Text style={styles.actionText}>{post.comments.length} bình luận</Text>
-          </View>
-          {post.comments.map((item) => (
-            <View key={item.id} style={styles.feedComment}>
-              <Text style={styles.comment}><Text style={styles.strong}>{item.author}: </Text>{item.text}</Text>
-              {isTeacher ? <Pressable onPress={() => setReplyTarget({ postId: post.id, parentId: item.id, author: item.author })} style={styles.feedInlineAction} accessibilityRole="button"><Text style={styles.feedInlineActionText}>Trả lời</Text></Pressable> : null}
-              {(post.replies || []).filter((reply) => reply.parentId === item.id).map((reply) => <Text key={reply.id} style={styles.feedReply}><Text style={styles.strong}>{reply.author}: </Text>{reply.text}</Text>)}
+          {post.images?.length ? (
+            <View style={styles.feedPostImages}>
+              {post.images.map((image, index) => (
+                <Pressable key={`${image}-${index}`} onPress={() => { void openExternalUrl(resolveMobilePublicUrl(image), 'Ảnh bài đăng'); }} style={[styles.feedPostImageFrame, post.images?.length === 1 && styles.feedPostImageSingle]} accessibilityRole="button" accessibilityLabel={`Mở ảnh ${index + 1} trong bài đăng`}>
+                  <Image source={getMobileImageSource(image)} style={styles.feedPostImage} resizeMode="cover" />
+                </Pressable>
+              ))}
             </View>
-          ))}
-          <View style={styles.commentComposer}>
-            <TextInput value={comment} onChangeText={setComment} placeholder={replyTarget?.postId === post.id ? `Trả lời ${replyTarget.author}` : 'Viết bình luận'} style={styles.commentInput} />
-            <Pressable onPress={() => {
-              const text = comment.trim();
-              if (!text) return;
-              if (live) {
-                const parentId = replyTarget?.postId === post.id ? replyTarget.parentId : undefined;
-                setComment('');
-                setReplyTarget(null);
-                void apiRun(() => commentFeedPost(post.id, text, parentId));
-                return;
-              }
-              updatePost(post.id, (item) => replyTarget?.postId === post.id
-                ? { ...item, replies: [...(item.replies || []), { id: `reply-${Date.now()}`, parentId: replyTarget.parentId, author: user?.name || 'Bạn', text }] }
-                : { ...item, comments: [...item.comments, { id: `comment-${Date.now()}`, author: user?.name || 'Bạn', text }] });
-              setComment('');
-              setReplyTarget(null);
-            }} accessibilityRole="button" accessibilityLabel="Gửi bình luận">
-              <MessageSquareText size={20} color={colors.brand} />
+          ) : null}
+          <View style={styles.feedActionBar}>
+            <View style={styles.feedReactionActionWrap}>
+              {reactionPickerPostId === post.id ? (
+                <View style={styles.feedReactionPicker}>
+                  {([
+                    ['heart', '❤️'], ['like', '👍'], ['haha', '😄'], ['wow', '😮'], ['sad', '😢'],
+                  ] as const).map(([type, emoji]) => (
+                    <Pressable key={type} onHoverIn={() => openReactionPicker(post.id)} onPress={() => selectReaction(post.id, type)} style={styles.feedReactionOption} accessibilityRole="button" accessibilityLabel={`Cảm xúc ${type}`}>
+                      <Text style={styles.feedReactionEmoji}>{emoji}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <Pressable
+                onHoverIn={() => openReactionPicker(post.id)}
+                onHoverOut={scheduleReactionPickerClose}
+                onPress={() => setReactionPickerPostId((current) => {
+                  if (current === post.id) return Platform.OS === 'web' ? current : null;
+                  return post.id;
+                })}
+                style={[styles.feedActionButton, post.myReaction ? styles.feedActionButtonActive : null]}
+                accessibilityRole="button"
+                accessibilityLabel={post.myReaction ? 'Đổi cảm xúc' : 'Thả cảm xúc'}
+              >
+                {post.myReaction === 'heart' ? <Heart size={15} color={colors.red} fill={colors.red} />
+                  : post.myReaction === 'like' ? <ThumbsUp size={15} color={colors.brand} fill={colors.brand} />
+                    : post.myReaction === 'haha' ? <Laugh size={15} color={colors.gold} />
+                      : post.myReaction === 'wow' ? <Sparkles size={15} color={colors.brand} />
+                        : post.myReaction === 'sad' ? <Frown size={15} color={colors.muted} />
+                          : <Heart size={15} color={colors.muted} />}
+                <Text numberOfLines={1} style={styles.feedActionButtonText}>{post.myReaction ? ({ heart: 'Tim', like: 'Like', haha: 'Haha', wow: 'Wow', sad: 'Buồn' })[post.myReaction] : 'Thích'}</Text>
+                {post.reactionCount > 0 ? <Text style={styles.feedActionCount}>{post.reactionCount}</Text> : null}
+              </Pressable>
+            </View>
+            <Pressable
+              onPress={() => toggleComments(post.id)}
+              style={[styles.feedActionButton, commentsOpen[post.id] ? styles.feedActionButtonActive : null]}
+              accessibilityRole="button"
+              accessibilityLabel={commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}
+            >
+              <MessageCircle size={15} color={commentsOpen[post.id] ? colors.brand : colors.muted} />
+              <Text numberOfLines={1} style={styles.feedActionButtonText}>{commentsOpen[post.id]
+                ? `Ẩn bình luận${(post.commentsCount ?? post.comments.length + (post.replies || []).length) ? ` (${post.commentsCount ?? post.comments.length + (post.replies || []).length})` : ''}`
+                : (post.commentsCount ?? post.comments.length + (post.replies || []).length) > 0
+                  ? `Bình luận (${post.commentsCount ?? post.comments.length + (post.replies || []).length})`
+                  : 'Viết bình luận'}</Text>
             </Pressable>
           </View>
+          {commentsOpen[post.id] ? (
+            <View style={styles.feedCommentsSection}>
+              {(post.comments || []).map((item) => (
+                <View key={item.id} style={styles.feedCommentThread}>
+                  <View style={styles.feedCommentRow}>
+                    <Avatar name={item.author} size={30} color={colors.brandSoft} imageSource={item.avatar ? getMobileImageSource(item.avatar) : undefined} />
+                    <View style={styles.feedCommentHeader}>
+                      <View style={styles.feedCommentContent}>
+                        <View style={styles.feedCommentTitleLine}>
+                          <Text style={styles.feedCommentAuthor}>{item.author}</Text>
+                          {item.role ? <Text style={styles.feedCommentRole}>{item.role}</Text> : null}
+                          <Text style={styles.feedCommentDot}>·</Text>
+                          <Text style={styles.feedCommentTime}>{item.time || ''}</Text>
+                        </View>
+                        <Text style={styles.feedCommentText}>{item.text}</Text>
+                        <View style={styles.feedCommentActions}>
+                          <Pressable onPress={() => {
+                            setReplyTarget({ postId: post.id, parentId: item.id, author: item.author });
+                            setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
+                          }} style={styles.feedReplyAction} accessibilityRole="button">
+                            <Text style={styles.feedCommentActionText}>Trả lời</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                      {(item.authorId === user?.id || ownPost(post)) ? (
+                        <Pressable onPress={() => handleDeleteComment(post, item.id)} style={styles.feedCommentDelete} accessibilityRole="button" accessibilityLabel="Xóa bình luận">
+                          <Trash2 size={13} color={colors.muted} />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                  {(() => {
+                    const replies = (post.replies || []).filter((reply) => reply.parentId === item.id);
+                    if (!replies.length) {
+                      return replyTarget?.postId === post.id && replyTarget.parentId === item.id
+                        ? <View style={styles.feedReplyBranch}>{renderCommentComposer(post)}</View>
+                        : null;
+                    }
+                    const expanded = expandedReplyThreads[item.id] === true;
+                    const visibleReplies = expanded ? replies : replies.slice(0, 2);
+                    return (
+                      <>
+                        <View style={styles.feedReplyBranch}>
+                          {visibleReplies.map((reply) => (
+                            <View key={reply.id} style={styles.feedReplyRow}>
+                              <Avatar name={reply.author} size={26} color={colors.brandSoft} imageSource={reply.avatar ? getMobileImageSource(reply.avatar) : undefined} />
+                              <View style={styles.feedReplyContent}>
+                                <View style={styles.feedCommentTitleLine}>
+                                  <Text style={styles.feedCommentAuthor}>{reply.author}</Text>
+                                  {reply.role ? <Text style={styles.feedCommentRole}>{reply.role}</Text> : null}
+                                  <Text style={styles.feedCommentDot}>·</Text>
+                                  <Text style={styles.feedCommentTime}>{reply.time || ''}</Text>
+                                </View>
+                                <Text style={styles.feedCommentText}>{reply.text}</Text>
+                                <View style={styles.feedCommentActions}>
+                                  <Pressable onPress={() => {
+                                    setReplyTarget({ postId: post.id, parentId: item.id, author: reply.author });
+                                    setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
+                                  }} style={styles.feedReplyAction} accessibilityRole="button">
+                                    <Text style={styles.feedCommentActionText}>Trả lời</Text>
+                                  </Pressable>
+                                </View>
+                              </View>
+                            </View>
+                          ))}
+                          {replies.length > 2 ? (
+                            <Pressable onPress={() => setExpandedReplyThreads((current) => ({ ...current, [item.id]: !expanded }))} style={styles.feedExpandReplies} accessibilityRole="button">
+                              <Text style={styles.feedExpandRepliesText}>{expanded ? 'Ẩn câu trả lời' : `Xem ${replies.length - visibleReplies.length} câu trả lời`}</Text>
+                            </Pressable>
+                          ) : null}
+                          {replyTarget?.postId === post.id && replyTarget.parentId === item.id ? renderCommentComposer(post) : null}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </View>
+              ))}
+              {!replyTarget ? renderCommentComposer(post) : null}
+            </View>
+          ) : null}
         </Card>
       ))}
-      {items.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
-      {!resource.loading && !resource.error && !items.length ? <EmptyState title="Chưa có bài đăng" message="Bài đăng mới sẽ hiển thị tại đây." /> : null}
+      {visibleItems.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
+      {!resource.loading && !resource.error && !visibleItems.length ? <EmptyState title={items.length ? 'Bạn đã ẩn tất cả bài viết' : 'Chưa có bài đăng'} message={items.length ? 'Bài viết mới sẽ hiển thị tại đây.' : 'Bài đăng mới sẽ hiển thị tại đây.'} /> : null}
     </AppScreen>
   );
 }
 
 export function NewsScreen() {
   const navigation = useNavigation<Navigation>();
-  const loader = useCallback(() => feedService.news(), []);
-  const resource = useMockResource(loader);
-  const [draft, setDraft] = useState('');
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
-  const [topic, setTopic] = useState('Tất cả');
-  const [sort, setSort] = useState('Mới nhất');
-  const [time, setTime] = useState('Tất cả');
-  const [layout, setLayout] = useState<'list' | 'grid'>('list');
-  const topics = ['Tất cả', ...new Set((resource.data || []).map((news) => news.topic))];
-  const articles = useMemo(() => {
-    const filtered = (resource.data || []).filter((news) => (
-      `${news.title} ${news.topic} ${news.excerpt}`.toLowerCase().includes(query.toLowerCase())
-      && (topic === 'Tất cả' || news.topic === topic)
-      && (time === 'Tất cả' || news.publishedAt.toLowerCase().includes('hôm nay'))
-    ));
-    if (sort === 'Xem nhiều') return filtered.sort((a, b) => b.views - a.views);
-    return sort === 'Cũ nhất' ? filtered.reverse() : filtered;
-  }, [resource.data, query, sort, time, topic]);
+  const [draft, setDraft] = useState('');
+  const [topic, setTopic] = useState('all');
+  const [sort, setSort] = useState<'newest' | 'oldest' | 'views'>('newest');
+  const [period, setPeriod] = useState<'today' | 'this_month' | 'last_month' | 'oldest_month' | ''>('');
+  const [layout, setLayout] = useState<'list' | 'grid'>('grid');
+  const [openNewsFilter, setOpenNewsFilter] = useState<'topic' | 'sort' | 'period' | null>(null);
+  const loader = useCallback(() => feedService.news({
+    query,
+    topicId: topic,
+    sort,
+    period: period || undefined,
+  }), [period, query, sort, topic]);
+  const resource = useMockResource(loader);
+  const topicsLoader = useCallback(() => feedService.newsTopics(), []);
+  const topicsResource = useMockResource(topicsLoader);
+  const topics = [{ id: 'all', name: 'Chủ đề: Tất cả' }, ...(topicsResource.data || [])];
+  const selectedTopic = topic === 'all' ? 'Chủ đề: Tất cả' : topics.find((item) => item.id === topic)?.name || 'Chủ đề: Tất cả';
+  const sortLabel = sort === 'oldest' ? 'Tin cũ nhất' : sort === 'views' ? 'Xem nhiều' : 'Tin mới nhất';
+  const periodLabel = period === 'today' ? 'Hôm nay'
+    : period === 'this_month' ? 'Tháng này'
+      : period === 'last_month' ? 'Tháng trước'
+        : period === 'oldest_month' ? 'Tháng cũ nhất'
+          : 'Thời gian: Mọi lúc';
+  const renderNewsFilter = (
+    filter: 'topic' | 'sort' | 'period',
+    label: string,
+    options: { label: string; selected: boolean; onSelect: () => void }[],
+  ) => (
+    <View style={[styles.newsControlWrap, openNewsFilter === filter && styles.newsControlWrapOpen]}>
+      <Pressable
+        onPress={() => setOpenNewsFilter((current) => current === filter ? null : filter)}
+        style={[styles.newsControl, openNewsFilter === filter && styles.newsControlOpen]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ expanded: openNewsFilter === filter }}
+      >
+        <Text numberOfLines={1} style={styles.newsControlText}>{label}</Text>
+        <ChevronDown size={14} color={colors.muted} />
+      </Pressable>
+      {openNewsFilter === filter ? (
+        <View style={[styles.newsDropdown, filter === 'period' && styles.newsDropdownAlignRight]}>
+          {options.map((option) => (
+            <Pressable
+              key={option.label}
+              onPress={() => {
+                option.onSelect();
+                setOpenNewsFilter(null);
+              }}
+              style={[styles.newsDropdownOption, option.selected && styles.newsDropdownOptionSelected]}
+              accessibilityRole="button"
+            >
+              <Text numberOfLines={1} style={[styles.newsDropdownOptionText, option.selected && styles.newsDropdownOptionTextSelected]}>{option.label}</Text>
+              {option.selected ? <Check size={14} color="#FFFFFF" /> : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+  const articles = resource.data || [];
+  const visibleArticles = user?.previewMode
+    ? articles.filter((news) => `${news.title} ${news.topic} ${news.excerpt}`.toLocaleLowerCase('vi-VN').includes(query.toLocaleLowerCase('vi-VN')))
+    : articles;
   return (
     <AppScreen contentStyle={styles.newsScreen}>
-      <AppHeader title="Tin tức" subtitle="Tin tức và thông báo của trung tâm" />
-      <View style={styles.newsSearch}>
-        <Search size={17} color={colors.muted} />
-        <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={() => setQuery(draft.trim())} returnKeyType="search" placeholder="Tìm kiếm tin tức" placeholderTextColor={colors.muted} style={styles.newsSearchInput} />
-        {draft ? <Pressable onPress={() => { setDraft(''); setQuery(''); }} accessibilityRole="button" accessibilityLabel="Xóa từ khóa tìm kiếm"><Text style={styles.newsSearchClear}>×</Text></Pressable> : null}
-        <Pressable onPress={() => setQuery(draft.trim())} style={styles.newsSearchButton} accessibilityRole="button" accessibilityLabel="Tìm tin tức"><Search size={17} color="#FFFFFF" /></Pressable>
-      </View>
+      <AppHeader title="Tin tức" showBackButton={false} centered />
       <View style={styles.newsToolbar}>
+        <View style={styles.newsSearch}>
+          <Search size={17} color={colors.muted} />
+          <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={() => setQuery(draft.trim())} returnKeyType="search" placeholder="Tìm bài viết..." placeholderTextColor={colors.muted} style={styles.newsSearchInput} />
+          {draft ? <Pressable onPress={() => { setDraft(''); setQuery(''); }} accessibilityRole="button" accessibilityLabel="Xóa từ khóa tìm kiếm"><Text style={styles.newsSearchClear}>×</Text></Pressable> : null}
+          <Pressable onPress={() => setQuery(draft.trim())} style={styles.newsSearchButton} accessibilityRole="button" accessibilityLabel="Tìm tin tức"><Text style={styles.newsSearchButtonText}>Tìm</Text></Pressable>
+        </View>
         <Pressable onPress={() => setLayout((current) => current === 'list' ? 'grid' : 'list')} style={styles.newsLayoutButton} accessibilityRole="button" accessibilityLabel={`Chuyển sang chế độ ${layout === 'list' ? 'lưới' : 'danh sách'}`}>
           {layout === 'list' ? <Grid2X2 size={17} color={colors.brand} /> : <List size={17} color={colors.brand} />}
         </Pressable>
-        <Pressable onPress={() => Alert.alert('Sắp xếp', 'Chọn thứ tự hiển thị.', [
-          { text: 'Mới nhất', onPress: () => setSort('Mới nhất') },
-          { text: 'Cũ nhất', onPress: () => setSort('Cũ nhất') },
-          { text: 'Xem nhiều', onPress: () => setSort('Xem nhiều') },
-          { text: 'Hủy', style: 'cancel' },
-        ])} style={styles.newsControl} accessibilityRole="button">
-          <ArrowDownWideNarrow size={15} color={colors.muted} />
-          <Text numberOfLines={1} style={styles.newsControlText}>{sort}</Text>
-        </Pressable>
-        <Pressable onPress={() => Alert.alert('Thời gian', 'Lọc tin được đăng hôm nay.', [
-          { text: 'Tất cả', onPress: () => setTime('Tất cả') },
-          { text: 'Hôm nay', onPress: () => setTime('Hôm nay') },
-          { text: 'Hủy', style: 'cancel' },
-        ])} style={styles.newsControl} accessibilityRole="button">
-          <CalendarDays size={15} color={colors.muted} />
-          <Text numberOfLines={1} style={styles.newsControlText}>{time}</Text>
-        </Pressable>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.newsTopics} contentContainerStyle={styles.newsTopicsContent}>
-        {topics.map((item) => {
-          const active = topic === item;
-          return (
-            <Pressable key={item} onPress={() => setTopic(item)} style={[styles.newsTopic, active && styles.newsTopicActive]} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-              <Text style={[styles.newsTopicText, active && styles.newsTopicTextActive]}>{item}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.newsFilters}>
+        {renderNewsFilter('topic', selectedTopic, [
+          { label: 'Chủ đề: Tất cả', selected: topic === 'all', onSelect: () => setTopic('all') },
+          ...(topicsResource.data || []).map((item) => ({
+            label: item.name,
+            selected: topic === item.id,
+            onSelect: () => setTopic(item.id),
+          })),
+        ])}
+        {renderNewsFilter('sort', sortLabel, [
+          { label: 'Tin mới nhất', selected: sort === 'newest', onSelect: () => setSort('newest') },
+          { label: 'Tin cũ nhất', selected: sort === 'oldest', onSelect: () => setSort('oldest') },
+          { label: 'Xem nhiều', selected: sort === 'views', onSelect: () => setSort('views') },
+        ])}
+        {renderNewsFilter('period', periodLabel, [
+          { label: 'Mọi lúc', selected: period === '', onSelect: () => setPeriod('') },
+          { label: 'Hôm nay', selected: period === 'today', onSelect: () => setPeriod('today') },
+          { label: 'Tháng này', selected: period === 'this_month', onSelect: () => setPeriod('this_month') },
+          { label: 'Tháng trước', selected: period === 'last_month', onSelect: () => setPeriod('last_month') },
+          { label: 'Tháng cũ nhất', selected: period === 'oldest_month', onSelect: () => setPeriod('oldest_month') },
+        ])}
+      </View>
+      {topicsResource.error ? <ErrorState onRetry={topicsResource.reload} /> : null}
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       <View style={layout === 'grid' ? styles.newsGrid : undefined}>
-        {articles.map((news) => (
+        {visibleArticles.map((news) => (
           <Pressable key={news.id} onPress={() => navigation.navigate('NewsDetail', { newsId: news.id })} style={layout === 'grid' ? styles.newsGridItem : undefined} accessibilityRole="button">
-            <Card style={{ ...styles.newsCard, ...(layout === 'grid' ? styles.newsGridCard : {}) }}>
-              <View style={styles.newsThumbnail}>
-                <Newspaper size={22} color={colors.brand} />
-                <Text style={styles.newsThumbnailLabel}>{news.thumbnailUrl ? 'Ảnh minh họa' : 'Tin tức'}</Text>
+            <Card style={{ ...styles.newsCard, ...(layout === 'grid' ? styles.newsGridCard : styles.newsListCard) }}>
+              <View style={[styles.newsThumbnail, layout === 'list' && styles.newsThumbnailList]}>
+                {news.thumbnailUrl ? (
+                  <Image source={getMobileImageSource(news.thumbnailUrl)} style={styles.newsThumbnailImage} resizeMode="cover" />
+                ) : <Newspaper size={22} color={colors.brand} />}
+                <View style={styles.newsAudienceBadge}>
+                  <Text style={styles.newsAudienceBadgeText}>{news.targetAudience === 'teacher' ? 'Giảng viên' : news.targetAudience === 'student' ? 'Học viên' : 'Tất cả'}</Text>
+                </View>
+                {news.isNew ? <View style={styles.newsNewBadge}><Text style={styles.newsNewBadgeText}>MỚI</Text></View> : null}
               </View>
               <View style={styles.newsCardContent}>
-                <Text style={styles.newsMeta}>{news.topic} · {news.publishedAt}</Text>
-                <Text style={styles.newsTitle}>{news.title}</Text>
-                {layout === 'list' ? <Text style={styles.newsExcerpt}>{news.excerpt}</Text> : null}
-                <Text style={styles.newsByline}>{news.author || 'Trung tâm Thắng Tin Học'} · {news.views} lượt xem</Text>
-                <Text style={styles.link}>Xem chi tiết  ›</Text>
+                <Text style={styles.newsTitle} numberOfLines={2}>{news.title}</Text>
+                {layout === 'list' && news.excerpt ? <Text style={styles.newsExcerpt} numberOfLines={3}>{news.excerpt}</Text> : null}
+                <Text style={styles.newsMeta} numberOfLines={1}>{news.topic || 'Tin tức'}</Text>
+                <View style={styles.newsBylineRow}>
+                  <Text style={styles.newsByline} numberOfLines={1}>{news.author || 'Trung tâm Thắng Tin Học'}</Text>
+                  <Text style={styles.newsViews}>◉ {news.views}</Text>
+                  <Text style={styles.newsByline}>{news.publishedAt}</Text>
+                </View>
               </View>
             </Card>
           </Pressable>
         ))}
       </View>
-      {!resource.loading && !resource.error && !articles.length ? <EmptyState title="Không có tin phù hợp" message="Thử từ khóa khác." /> : null}
+      {!resource.loading && !resource.error && !visibleArticles.length ? <EmptyState title="Không có tin phù hợp" message="Thử từ khóa hoặc bộ lọc khác." /> : null}
     </AppScreen>
   );
 }
 
 export function NewsDetailScreen() {
   const route = useRoute<NativeStackScreenProps<AppStackParamList, 'NewsDetail'>['route']>();
+  const { width } = useWindowDimensions();
   const loader = useCallback(() => feedService.newsDetail(route.params.newsId), [route.params.newsId]);
   const resource = useMockResource(loader);
   const news = resource.data;
@@ -734,7 +1074,12 @@ export function NewsDetailScreen() {
         <Text style={styles.title}>{news.title}</Text>
         <Text style={styles.caption}>{news.author || '—'} · {news.publishedAt} · {news.views} lượt xem</Text>
         {news.excerpt ? <Text style={styles.muted}>{news.excerpt}</Text> : null}
-        <Text style={styles.body}>{news.content}</Text>
+        {news.contentHtml ? (
+          <RenderHtml
+            contentWidth={Math.max(1, width - spacing.lg * 2 - spacing.md * 2)}
+            source={{ html: news.contentHtml, baseUrl: getMobileApiBaseUrl() }}
+          />
+        ) : <Text style={styles.body}>{news.content}</Text>}
         {news.attachments.map((file) => (
           <Pressable key={file.id} onPress={() => { void openExternalUrl(file.url, file.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={`Mở tệp đính kèm ${file.name}`}>
             <Paperclip size={17} color={colors.brand} />
@@ -747,8 +1092,6 @@ export function NewsDetailScreen() {
 }
 
 export function CenterInfoScreen() {
-  const { user } = useAuth();
-  const isTeacher = user?.role === 'teacher';
   const loader = useCallback(() => feedService.centerInfo(), []);
   const resource = useMockResource(loader);
   const center = resource.data;
@@ -757,108 +1100,144 @@ export function CenterInfoScreen() {
     { title: 'Dịch vụ đào tạo', items: [] }, { title: 'Địa điểm thi', items: [] }, { title: 'Chứng chỉ', items: [] },
   ]).filter((item: { title: string }) => item.title !== 'Tổng quan');
   const [section, setSection] = useState('Tổng quan');
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
+  const { width } = useWindowDimensions();
+  const sectionOptions = [{ title: 'Tổng quan' }, ...centerSections];
   const selectedSection = centerSections.find((item) => item.title === section);
-  const renderCenterItems = () => selectedSection?.items.length ? selectedSection.items.map((item) => (
-    <View key={item.id} style={styles.centerInfoRow}>
-      <View style={styles.flex}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        {[item.subtitle, item.description, item.address, item.phone, item.email, item.hours, item.detailHtml].filter(Boolean).map((text) => (
-          <Text key={text} style={styles.muted}>{text}</Text>
-        ))}
-      </View>
-      {item.url || item.mapsUrl ? (
-        <Pressable onPress={() => { void openExternalUrl(item.url || item.mapsUrl, item.title); }} accessibilityRole="button">
-          <Text style={styles.link}>Mở</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  )) : <Text style={styles.muted}>Chưa có nội dung cho mục này.</Text>;
+  const renderCenterItems = () => selectedSection?.items.length ? (
+    <>
+      {section === 'Chi nhánh' ? <Text style={styles.centerBranchCount}>Tổng số chi nhánh: {selectedSection.items.length}</Text> : null}
+      {selectedSection.items.map((item) => (
+        <Card key={item.id} style={styles.centerItemCard}>
+          <View style={styles.centerItemHeader}>
+            {item.imageUrl ? <Image source={getMobileImageSource(item.imageUrl)} style={styles.centerItemImage} resizeMode="cover" /> : item.icon ? <View style={styles.centerItemIconBox}><Text style={styles.centerItemIcon}>{item.icon}</Text></View> : null}
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              {item.subtitle ? <Text style={styles.muted}>{item.subtitle}</Text> : null}
+              {item.code ? <Text style={styles.centerItemCode}>Mã: {item.code}</Text> : null}
+            </View>
+          </View>
+          {item.description ? <Text style={styles.centerItemDescription}>{item.description}</Text> : null}
+          {item.detailHtml ? <RenderHtml contentWidth={Math.max(1, width - spacing.lg * 2 - spacing.md * 2)} source={{ html: item.detailHtml, baseUrl: getMobileApiBaseUrl() }} /> : null}
+          <View style={styles.centerItemMetadata}>
+            {[
+              item.department && `Bộ phận: ${item.department}`,
+              item.expertise && `Chuyên môn: ${item.expertise}`,
+              item.experience && `Kinh nghiệm: ${item.experience}`,
+              item.address && `📍 ${item.address}${item.city ? `, ${item.city}` : ''}`,
+              item.phone && `☎ ${item.phone}`,
+              item.showEmail && item.email && `✉ ${item.email}`,
+              item.managerName && `Phụ trách: ${item.managerName}`,
+              item.hours && `Giờ: ${item.hours}`,
+              item.duration && `Thời lượng: ${item.duration}`,
+              item.learningMode && `Hình thức: ${item.learningMode}`,
+              item.priceInfo && `Học phí: ${item.priceInfo}`,
+              item.examType && `Loại kỳ thi: ${item.examType}`,
+              item.capacity && `Sức chứa: ${item.capacity}`,
+              item.issuer && `Đơn vị cấp: ${item.issuer}`,
+              item.validity && `Thời hạn: ${item.validity}`,
+            ].filter((text): text is string => Boolean(text)).map((text) => <Text key={text} style={styles.centerItemMetadataText}>{text}</Text>)}
+          </View>
+          <View style={styles.centerItemActions}>
+            {item.url ? <Pressable onPress={() => { void openExternalUrl(item.url, item.title); }} style={styles.centerItemPrimaryAction} accessibilityRole="button"><Text style={styles.centerItemPrimaryActionText}>{section === 'Mạng xã hội' ? 'Mở trang' : 'Mở link'}</Text></Pressable> : null}
+            {item.mapsUrl ? <Pressable onPress={() => { void openExternalUrl(item.mapsUrl, 'Bản đồ'); }} style={styles.centerItemSecondaryAction} accessibilityRole="button"><Text style={styles.centerItemSecondaryText}>Xem bản đồ</Text></Pressable> : null}
+            {item.verifyUrl ? <Pressable onPress={() => { void openExternalUrl(item.verifyUrl, 'Xác minh chứng chỉ'); }} style={styles.centerItemSecondaryAction} accessibilityRole="button"><Text style={styles.centerItemSecondaryText}>Xác minh chứng chỉ</Text></Pressable> : null}
+          </View>
+        </Card>
+      ))}
+    </>
+  ) : <Text style={styles.muted}>Chưa có mục nào trong phần này.</Text>;
   return (
     <AppScreen>
-      <AppHeader title="Thông tin Trung tâm" subtitle="Thông tin và các mục của trung tâm" />
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {center ? (
-        <>
-          {isTeacher ? <><Pressable onPress={() => Alert.alert('Thông tin Trung tâm', 'Chọn mục cần xem.', [
-            { text: 'Tổng quan', onPress: () => setSection('Tổng quan') },
-            ...centerSections.map((item: { title: string }) => ({ text: item.title, onPress: () => setSection(item.title) })),
-            { text: 'Hủy', style: 'cancel' as const },
-          ])} style={styles.centerDropdown} accessibilityRole="button">
-            <Text style={styles.centerDropdownText}>{section}  ▾</Text>
-          </Pressable>
-          <Card style={styles.centerBanner}>
-            <View style={styles.centerLogo}><Building2 size={30} color={colors.brand} /></View>
-            <Text style={styles.title}>{center.name}</Text>
-            <Text style={styles.body}>{center.intro || '—'}</Text>
-          </Card>
-          {section === 'Tổng quan' ? (
-            <Card>
-              <SectionHeading title="Thông tin Trung tâm" />
-              {[
-                ['Thành lập', center.foundedYear || '—'],
-                ['Địa chỉ', center.headquartersAddress || '—'],
-                ['Điện thoại', center.contactPhone || '—'],
-                ['Email', center.contactEmail || '—'],
-                ['Website', center.website || '—'],
-                ['Sứ mệnh', center.mission || '—'],
-                ['Tầm nhìn', center.vision || '—'],
-                ['Giá trị cốt lõi', center.coreValues || '—'],
-              ].map(([label, value]) => <View key={label} style={styles.centerInfoRow}><Text style={styles.metaText}>{label}</Text><Text style={styles.centerInfoValue}>{value}</Text></View>)}
-            </Card>
-          ) : (
-            <Card>
-              <View style={styles.rowBetween}><Building2 size={18} color={colors.brand} /><Text style={[styles.cardTitle, styles.flex]}>{section}</Text></View>
-              {renderCenterItems()}
-            </Card>
-          )}
-          <SectionHeading title="Các mục Trung tâm" />
-          <View style={styles.centerSections}>
-            {centerSections.map((item: { title: string }) => (
-              <Pressable key={item.title} onPress={() => setSection(item.title)} style={styles.centerSection} accessibilityRole="button">
-                <Text style={styles.centerSectionText}>{item.title}</Text><ChevronRight size={17} color={colors.muted} />
+      <AppHeader title="Thông tin trung tâm" showBackButton={false} centered />
+      <View style={[styles.centerPickerWrap, sectionPickerOpen && styles.centerPickerWrapOpen]}>
+        <Pressable
+          onPress={() => setSectionPickerOpen((open) => !open)}
+          style={[styles.centerDropdown, sectionPickerOpen && styles.centerDropdownOpen]}
+          accessibilityRole="button"
+          accessibilityLabel={`Mục đang chọn: ${section}`}
+          accessibilityState={{ expanded: sectionPickerOpen }}
+        >
+          <Text style={styles.centerDropdownText}>{section}</Text>
+          <ChevronDown size={16} color={colors.muted} />
+        </Pressable>
+        {sectionPickerOpen ? (
+          <View style={styles.centerDropdownMenu}>
+            {sectionOptions.map((option) => (
+              <Pressable
+                key={option.title}
+                onPress={() => {
+                  setSection(option.title);
+                  setSectionPickerOpen(false);
+                }}
+                style={[styles.centerDropdownOption, section === option.title && styles.centerDropdownOptionSelected]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: section === option.title }}
+              >
+                <Text style={[styles.centerDropdownOptionText, section === option.title && styles.centerDropdownOptionTextSelected]}>{option.title}</Text>
+                {section === option.title ? <Check size={14} color="#FFFFFF" /> : null}
               </Pressable>
             ))}
           </View>
-          </> : (
-            <>
-              <Pressable onPress={() => Alert.alert('Thông tin Trung tâm', 'Chọn mục cần xem.', [
-                { text: 'Tổng quan', onPress: () => setSection('Tổng quan') },
-                ...centerSections.map((item: { title: string }) => ({ text: item.title, onPress: () => setSection(item.title) })),
-                { text: 'Hủy', style: 'cancel' as const },
-              ])} style={styles.centerDropdown} accessibilityRole="button" accessibilityLabel={`Mục đang chọn: ${section}`}>
-                <Text style={styles.centerDropdownText}>{section}  ▾</Text>
-              </Pressable>
-              {section === 'Tổng quan' ? (
-              <Card>
+        ) : null}
+      </View>
+      {resource.loading ? <LoadingSkeleton /> : null}
+      {resource.error ? <ErrorState message={resource.errorMessage} onRetry={resource.reload} /> : null}
+      {center && !center.published ? <EmptyState title="Chưa có nội dung tổng quan đã xuất bản." message="Thông tin trung tâm sẽ hiển thị sau khi được công bố." /> : null}
+      {center?.published ? (
+        <>
+          {center.bannerUrl ? <Image source={getMobileImageSource(center.bannerUrl)} style={styles.centerBannerImage} resizeMode="cover" /> : null}
+          <View style={styles.centerOverview}>
+            <View style={styles.centerOverviewHeader}>
+              {center.logoUrl ? <Image source={getMobileImageSource(center.logoUrl)} style={styles.centerLogoImage} resizeMode="contain" /> : null}
+              <View style={styles.flex}>
                 <Text style={styles.title}>{center.name}</Text>
-                <Text style={styles.body}>{center.intro || 'Nội dung giới thiệu chưa có trong dữ liệu demo.'}</Text>
-                {[
-                  ['Địa chỉ', center.headquartersAddress],
-                  ['Điện thoại', center.contactPhone],
-                  ['Email', center.contactEmail],
-                  ['Website', center.website],
-                ].map(([label, value]) => <Text key={label} style={styles.muted}>{label}: {value || 'Chưa có dữ liệu'}</Text>)}
-                <Text style={styles.muted}>Thành lập: {center.foundedYear || '—'}</Text>
-                <Text style={styles.muted}>Sứ mệnh: {center.mission || '—'}</Text>
-                <Text style={styles.muted}>Tầm nhìn: {center.vision || '—'}</Text>
-                <Text style={styles.muted}>Giá trị cốt lõi: {center.coreValues || '—'}</Text>
-              </Card>
-              ) : (
-                <Card>
-                  <Text style={styles.cardTitle}>{section}</Text>
-                  {renderCenterItems()}
-                </Card>
-              )}
-              <SectionHeading title="Các mục Trung tâm" />
-              <View style={styles.centerSections}>
-                {centerSections.map((item: { title: string }) => (
-                  <Pressable key={item.title} onPress={() => setSection(item.title)} style={styles.centerSection} accessibilityRole="button">
-                    <Text style={styles.centerSectionText}>{item.title}</Text><ChevronRight size={17} color={colors.muted} />
-                  </Pressable>
-                ))}
+                {center.foundedYear ? <Text style={styles.centerFounded}>Thành lập {center.foundedYear}</Text> : null}
               </View>
+            </View>
+            {center.intro ? <Text style={styles.body}>{center.intro}</Text> : null}
+          </View>
+          {section === 'Tổng quan' ? (
+            <>
+              {[
+                ['Sứ mệnh', center.mission],
+                ['Tầm nhìn', center.vision],
+                ['Giá trị cốt lõi', center.coreValues],
+              ].filter(([, value]) => value).map(([label, value]) => (
+                <Card key={label}>
+                  <Text style={styles.centerPillarTitle}>{label}</Text>
+                  <Text style={styles.body}>{value}</Text>
+                </Card>
+              ))}
+              {center.headquartersAddress || center.contactPhone || center.contactEmail || center.website ? (
+                <Card style={styles.centerContactCard}>
+                  <Text style={styles.centerContactHeading}>Liên hệ</Text>
+                  {center.headquartersAddress ? <Text style={styles.centerContactText}>📍 {center.headquartersAddress}</Text> : null}
+                  {center.contactPhone ? <Pressable onPress={() => { void openExternalUrl(`tel:${center.contactPhone}`, 'Số điện thoại'); }} accessibilityRole="button"><Text style={styles.link}>☎ {center.contactPhone}</Text></Pressable> : null}
+                  {center.contactEmail ? <Pressable onPress={() => { void openExternalUrl(`mailto:${center.contactEmail}`, 'Email'); }} accessibilityRole="button"><Text style={styles.link}>✉ {center.contactEmail}</Text></Pressable> : null}
+                  {center.website ? <Pressable onPress={() => { void openExternalUrl(center.website, 'Website'); }} accessibilityRole="button"><Text style={styles.link}>↗ {center.website}</Text></Pressable> : null}
+                </Card>
+              ) : null}
+              {center.detailHtml ? (
+                <Card>
+                  <RenderHtml contentWidth={Math.max(1, width - spacing.lg * 2 - spacing.md * 2)} source={{ html: center.detailHtml, baseUrl: getMobileApiBaseUrl() }} />
+                </Card>
+              ) : null}
+              {center.galleryUrls.length ? (
+                <View style={styles.centerGallery}>
+                  {center.galleryUrls.map((url) => <Image key={url} source={getMobileImageSource(url)} style={styles.centerGalleryImage} resizeMode="cover" />)}
+                </View>
+              ) : null}
+              {center.introVideoUrl ? (
+                Platform.OS === 'web'
+                  ? <Pressable onPress={() => { void openExternalUrl(center.introVideoUrl, 'Video giới thiệu'); }} style={styles.centerVideoButton} accessibilityRole="button"><Text style={styles.link}>Xem video giới thiệu</Text></Pressable>
+                  : <View style={styles.centerVideoFrame}><WebView source={{ uri: center.introVideoUrl }} allowsFullscreenVideo style={styles.centerWebVideo} /></View>
+              ) : null}
             </>
+          ) : (
+            <View style={styles.centerSectionContent}>
+              {renderCenterItems()}
+            </View>
           )}
         </>
       ) : null}
@@ -1240,7 +1619,7 @@ export function TuitionScreen() {
   const enrollments = profileResource.data?.enrollments || [];
   return (
     <AppScreen>
-      <AppHeader title="Học phí theo khóa" subtitle="Thông tin học phí trên hồ sơ học viên" />
+      <AppHeader title="Học phí theo khóa" subtitle="Thông tin học phí trên hồ sơ học viên" showBackButton={false} centered />
       {profileResource.data?.qaFixture ? <Text style={styles.note}>QA fixture — dữ liệu minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
       {profileResource.loading ? <LoadingSkeleton /> : null}
       {profileResource.error ? <ErrorState onRetry={profileResource.reload} /> : null}
@@ -1283,20 +1662,72 @@ const styles = StyleSheet.create({
   evaluationLocked: { marginVertical: spacing.sm, backgroundColor: colors.canvas },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   feedComposer: { gap: spacing.md },
-  privacyButton: { maxWidth: '45%', minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.canvas },
-  privacyText: { color: colors.brandDark, fontSize: typography.caption, fontWeight: '700' },
+  privacyMenuAnchor: { position: 'relative', zIndex: 30, alignItems: 'flex-end' },
+  privacyButton: { maxWidth: 190, minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#86EFAC', borderRadius: radius.md, backgroundColor: '#ECFDF5' },
+  privacyText: { flexShrink: 1, color: '#047857', fontSize: typography.micro, fontWeight: '700' },
+  privacyMenu: { position: 'absolute', top: 42, right: 0, zIndex: 40, width: 252, maxWidth: 286, gap: 3, padding: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
+  privacyMenuTitle: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 0.45, paddingHorizontal: spacing.xs, paddingVertical: 5 },
+  privacyOption: { minHeight: 48, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.xs, paddingVertical: 7, borderRadius: radius.sm },
+  privacyOptionSelected: { backgroundColor: '#EEF2FF' },
+  privacyOptionCopy: { flex: 1, minWidth: 0 },
+  privacyOptionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
+  privacyOptionTitle: { flexShrink: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
+  privacyOptionDescription: { color: colors.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
   feedDraft: { minHeight: 92, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
-  feedImagePlaceholder: { minHeight: 82, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas },
+  feedImagePreviewList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  feedImagePreview: { position: 'relative', width: 76, height: 76, overflow: 'hidden', borderRadius: radius.sm, backgroundColor: colors.canvas },
+  feedImagePreviewImage: { width: '100%', height: '100%' },
+  feedImageRemove: { position: 'absolute', top: 3, right: 3, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(15, 23, 42, 0.75)' },
+  feedImageRemoveText: { color: '#FFFFFF', fontSize: typography.body, lineHeight: 22, fontWeight: '800' },
   feedComposerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   feedImageAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm },
-  feedAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  feedOwnerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  feedAuthorRow: { position: 'relative', zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  feedPostImages: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  feedPostImageFrame: { width: '48%', aspectRatio: 1.35, overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.canvas },
+  feedPostImageSingle: { width: '100%', aspectRatio: 1.6 },
+  feedPostImage: { width: '100%', height: '100%' },
+  feedPostMenuAnchor: { position: 'relative', zIndex: 20, alignItems: 'flex-end' },
+  feedPostMenuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+  feedPostMenu: { position: 'absolute', top: 38, right: 0, zIndex: 30, width: 174, padding: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
+  feedPostMenuItem: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.sm },
+  feedPostMenuText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  feedPostMenuDelete: { color: colors.red },
   feedInlineAction: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.xs },
   feedInlineActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
   feedDeleteText: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
   feedEditBox: { gap: spacing.xs },
-  feedComment: { paddingTop: spacing.xs, paddingLeft: spacing.sm, borderLeftWidth: 2, borderLeftColor: colors.line },
-  feedReply: { marginLeft: spacing.md, paddingVertical: spacing.xs, color: colors.muted, fontSize: typography.caption },
+  feedActionBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  feedReactionActionWrap: { position: 'relative', flex: 1, minWidth: 0 },
+  feedReactionPicker: { position: 'absolute', zIndex: 5, bottom: 42, left: 0, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs, paddingVertical: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 5 },
+  feedReactionOption: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+  feedReactionEmoji: { fontSize: 20 },
+  feedActionButton: { minWidth: 0, minHeight: 36, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: 'transparent' },
+  feedActionButtonActive: { backgroundColor: '#EEF2FF' },
+  feedActionButtonText: { flexShrink: 1, color: colors.muted, fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  feedActionCount: { color: colors.muted, fontSize: 10, fontWeight: '600' },
+  feedCommentsSection: { gap: spacing.md, marginTop: spacing.sm, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  feedCommentThread: { gap: 0 },
+  feedCommentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  feedCommentContent: { flex: 1, minWidth: 0 },
+  feedCommentHeader: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  feedCommentTitleLine: { minHeight: 24, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
+  feedCommentDot: { color: colors.muted, fontSize: typography.micro },
+  feedCommentAuthor: { flexShrink: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
+  feedCommentRole: { overflow: 'hidden', color: colors.brand, fontSize: 9, fontWeight: '700' },
+  feedCommentTime: { color: colors.muted, fontSize: 9 },
+  feedCommentDelete: { padding: 3 },
+  feedCommentText: { color: colors.ink, fontSize: typography.caption, lineHeight: 18 },
+  feedCommentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 },
+  feedReplyAction: { minHeight: 22, justifyContent: 'center', paddingHorizontal: 2 },
+  feedCommentActionText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  feedReplyBranch: { gap: spacing.xs, marginLeft: 15, marginTop: spacing.xs, paddingLeft: spacing.sm, borderLeftWidth: 2, borderLeftColor: '#DDE2E8' },
+  feedReplyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  feedReplyContent: { flex: 1, minWidth: 0 },
+  feedExpandReplies: { minHeight: 28, justifyContent: 'center', paddingLeft: 2 },
+  feedExpandRepliesText: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  feedReplyingTo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  feedReplyingText: { color: colors.muted, fontSize: typography.micro, fontWeight: '600' },
+  feedReplyCancel: { color: colors.muted, fontSize: typography.title, lineHeight: 24, paddingHorizontal: spacing.xs },
   newsAttachment: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas },
   newsAttachmentText: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
   newsAttachmentAction: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
@@ -1307,40 +1738,84 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   feedAudience: { alignSelf: 'flex-start', color: colors.muted, fontSize: typography.caption, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.canvas },
   newsScreen: { gap: spacing.md },
-  newsSearch: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.md, paddingRight: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  newsSearch: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.md, paddingRight: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
   newsSearchInput: { flex: 1, minWidth: 0, minHeight: 42, paddingVertical: 0, color: colors.ink, fontSize: typography.small },
-  newsSearchClear: { color: colors.muted, fontSize: 22, lineHeight: 26, paddingHorizontal: spacing.xs },
-  newsSearchButton: { width: 38, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderRadius: radius.sm },
+  newsSearchClear: { color: colors.muted, fontSize: typography.title, lineHeight: 26, paddingHorizontal: spacing.xs },
+  newsSearchButton: { minWidth: 40, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: spacing.sm },
+  newsSearchButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   newsToolbar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  newsFilters: { position: 'relative', zIndex: 30, elevation: 20, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   newsLayoutButton: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface },
+  newsControlWrap: { position: 'relative', zIndex: 1, elevation: 1, flex: 1, minWidth: 88 },
+  newsControlWrapOpen: { zIndex: 50, elevation: 30 },
   newsControl: { minWidth: 0, minHeight: 38, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface },
-  newsControlText: { flexShrink: 1, color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
-  newsTopics: { alignSelf: 'stretch', flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.line },
-  newsTopicsContent: { flexDirection: 'row', gap: spacing.lg, paddingHorizontal: spacing.xs },
-  newsTopic: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.xs, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  newsTopicActive: { borderBottomColor: colors.brand },
-  newsTopicText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
-  newsTopicTextActive: { color: colors.brand, fontWeight: '800' },
+  newsControlOpen: { borderColor: colors.brand },
+  newsControlText: { flexShrink: 1, color: colors.ink, fontSize: 10, fontWeight: '600' },
+  newsDropdown: { position: 'absolute', top: 42, left: 0, minWidth: 170, zIndex: 60, padding: 3, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 32 },
+  newsDropdownAlignRight: { left: undefined, right: 0 },
+  newsDropdownOption: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: 4 },
+  newsDropdownOptionSelected: { backgroundColor: colors.brand },
+  newsDropdownOptionText: { flex: 1, color: colors.ink, fontSize: typography.caption, fontWeight: '500' },
+  newsDropdownOptionTextSelected: { color: '#FFFFFF', fontWeight: '700' },
   newsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   newsGridItem: { width: '48%' },
   newsCard: { padding: spacing.md, gap: spacing.md },
-  newsGridCard: { height: '100%', paddingHorizontal: spacing.sm },
-  newsThumbnail: { height: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderRadius: radius.md, backgroundColor: colors.brandSoft },
-  newsThumbnailLabel: { color: colors.brandDark, fontSize: typography.caption, fontWeight: '700' },
-  newsCardContent: { gap: spacing.sm },
+  newsGridCard: { height: '100%', padding: 0, gap: 0, overflow: 'hidden' },
+  newsListCard: { flexDirection: 'row', alignItems: 'stretch', padding: 0, overflow: 'hidden' },
+  newsThumbnail: { position: 'relative', aspectRatio: 1.65, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
+  newsThumbnailList: { width: 112, aspectRatio: 1, alignSelf: 'stretch' },
+  newsThumbnailImage: { position: 'absolute', width: '100%', height: '100%' },
+  newsAudienceBadge: { position: 'absolute', top: spacing.xs, right: spacing.xs, paddingHorizontal: 6, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: 'rgba(15, 23, 42, 0.78)' },
+  newsAudienceBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  newsNewBadge: { position: 'absolute', top: spacing.xs, left: spacing.xs, paddingHorizontal: 6, paddingVertical: 3, borderRadius: radius.sm, backgroundColor: colors.brand },
+  newsNewBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  newsCardContent: { flex: 1, gap: spacing.xs, padding: spacing.sm },
   newsMeta: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
   newsTitle: { color: colors.ink, fontSize: typography.body, lineHeight: 22, fontWeight: '800' },
   newsExcerpt: { color: colors.muted, fontSize: typography.small, lineHeight: 20 },
-  newsByline: { color: colors.muted, fontSize: typography.caption, lineHeight: 17 },
-  centerDropdown: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  newsByline: { flex: 1, minWidth: 0, color: colors.muted, fontSize: typography.caption, lineHeight: 17 },
+  newsBylineRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 'auto', paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  newsViews: { color: colors.muted, fontSize: 11 },
+  centerPickerWrap: { position: 'relative', zIndex: 1, elevation: 1, marginBottom: spacing.sm },
+  centerPickerWrapOpen: { zIndex: 50, elevation: 30 },
+  centerDropdown: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  centerDropdownOpen: { borderColor: colors.brand },
   centerDropdownText: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
-  centerBanner: { alignItems: 'center', gap: spacing.sm, backgroundColor: colors.brandSoft },
-  centerLogo: { width: 60, height: 60, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  centerInfoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
-  centerInfoValue: { flex: 1, color: colors.ink, fontSize: typography.small, textAlign: 'right' },
-  centerSections: { gap: spacing.xs },
-  centerSection: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  centerSectionText: { color: colors.ink, fontSize: typography.small, fontWeight: '600' },
+  centerDropdownMenu: { position: 'absolute', top: 48, left: 0, right: 0, zIndex: 60, padding: 3, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 32 },
+  centerDropdownOption: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm, borderRadius: 4 },
+  centerDropdownOptionSelected: { backgroundColor: '#1D65D1' },
+  centerDropdownOptionText: { color: colors.ink, fontSize: typography.caption, fontWeight: '500' },
+  centerDropdownOptionTextSelected: { color: '#FFFFFF', fontWeight: '700' },
+  centerBannerImage: { width: '100%', aspectRatio: 2.3, borderRadius: radius.md, backgroundColor: colors.canvas },
+  centerOverview: { gap: spacing.md },
+  centerOverviewHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  centerFounded: { color: colors.muted, fontSize: 10, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing.sm },
+  centerLogoImage: { width: 80, height: 80, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FFFFFF' },
+  centerPillarTitle: { color: colors.brand, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: spacing.xs },
+  centerContactCard: { gap: spacing.xs },
+  centerContactHeading: { color: colors.muted, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
+  centerContactText: { color: colors.ink, fontSize: typography.small, lineHeight: 20 },
+  centerGallery: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  centerGalleryImage: { width: '48%', aspectRatio: 16 / 9, borderRadius: radius.md, backgroundColor: colors.canvas },
+  centerVideoButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  centerVideoFrame: { width: '100%', aspectRatio: 16 / 9, overflow: 'hidden', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#000000' },
+  centerWebVideo: { flex: 1, backgroundColor: '#000000' },
+  centerItemCard: { gap: spacing.md, marginBottom: spacing.sm },
+  centerItemHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  centerItemImage: { width: 64, height: 64, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas },
+  centerItemIconBox: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.canvas },
+  centerItemIcon: { fontSize: 22 },
+  centerItemCode: { color: '#0369A1', fontSize: 11, fontWeight: '800', marginTop: 2 },
+  centerItemDescription: { color: colors.muted, fontSize: typography.small, lineHeight: 20 },
+  centerItemMetadata: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
+  centerItemMetadataText: { color: colors.muted, fontSize: 11, lineHeight: 17 },
+  centerItemActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingTop: spacing.xs },
+  centerItemPrimaryAction: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brand },
+  centerItemPrimaryActionText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  centerItemSecondaryAction: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  centerItemSecondaryText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
+  centerBranchCount: { color: colors.ink, fontSize: typography.small, fontWeight: '700', marginBottom: spacing.sm },
+  centerSectionContent: { gap: spacing.xs },
   quizTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   quizTab: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
   quizTabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
@@ -1412,8 +1887,9 @@ const styles = StyleSheet.create({
   actionText: { color: colors.brand, fontSize: typography.small, fontWeight: '700' },
   comment: { color: colors.ink, fontSize: typography.small, lineHeight: 19, marginTop: spacing.sm },
   strong: { color: colors.ink, fontWeight: '700' },
-  commentComposer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line, marginTop: spacing.md, paddingTop: spacing.sm },
-  commentInput: { flex: 1, minHeight: 42, paddingHorizontal: spacing.md, backgroundColor: colors.canvas, borderRadius: radius.md, color: colors.ink },
+  commentComposer: { gap: spacing.xs, marginTop: spacing.xs, paddingTop: spacing.xs },
+  commentComposerInputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  commentInput: { flex: 1, minHeight: 42, paddingHorizontal: spacing.md, backgroundColor: '#F0F2F5', borderRadius: radius.pill, color: colors.ink, fontSize: typography.caption },
   form: { gap: spacing.md, marginTop: spacing.md },
   fieldLabel: { color: colors.ink, fontSize: typography.small, fontWeight: '700', marginBottom: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },

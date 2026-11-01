@@ -83,9 +83,8 @@ function FeedYouTubePreviews({ text, onOpen, compact = false }) {
             e.stopPropagation();
             onOpen?.({ id, url });
           }}
-          className={`group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left shadow-sm hover:border-red-300 hover:shadow-md transition-all ${
-            compact ? 'aspect-video max-h-36' : 'aspect-video max-h-64'
-          }`}
+          className={`group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 text-left shadow-sm hover:border-red-300 hover:shadow-md transition-all ${compact ? 'aspect-video max-h-36' : 'aspect-video max-h-64'
+            }`}
           title="Xem video YouTube"
         >
           <img
@@ -686,25 +685,7 @@ export default function FeedBoard({ session, role }) {
   return (
     <div className="cms-feed-column pb-8 space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 shrink-0">
-        <div className="min-w-0">
-          <h2 className="cms-feed-page-title flex items-center gap-2">
-            <Newspaper size={20} className="text-red-600 shrink-0" />
-            Bảng tin trao đổi & Hỏi bài
-          </h2>
-          <p className="cms-feed-page-desc mt-1">
-            Đăng câu hỏi, chia sẻ bài tập, phân quyền đối tượng và phản hồi nhanh chóng.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => load(1, false)}
-          className="w-9 h-9 shrink-0 rounded-lg bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-colors"
-          title="Tải lại bảng tin"
-        >
-          <RefreshCw size={16} />
-        </button>
-      </div>
+
 
       <div className="space-y-3 md:space-y-4 min-w-0">
         {/* Post Composer */}
@@ -774,7 +755,7 @@ export default function FeedBoard({ session, role }) {
             onPaste={handlePastePost}
             rows={3}
             maxLength={5000}
-            placeholder="Bạn muốn hỏi gì hoặc chia sẻ điều gì? Viết tại đây... (Có thể dán ảnh trực tiếp từ Ctrl+V)"
+            placeholder="Bạn muốn hỏi gì hoặc chia sẻ điều gì?"
             className="w-full text-sm text-slate-800 placeholder:text-slate-400 border-0 focus:ring-0 focus:outline-none resize-none p-1"
           />
 

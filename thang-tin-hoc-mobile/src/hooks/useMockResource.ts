@@ -4,6 +4,7 @@ type ResourceState<T> = {
   data: T | null;
   loading: boolean;
   error: boolean;
+  errorMessage: string;
   reload: () => void;
 };
 
@@ -11,6 +12,7 @@ export function useMockResource<T>(loader: () => Promise<T>): ResourceState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const reload = useCallback(() => setReloadKey((value) => value + 1), []);
 
@@ -18,12 +20,17 @@ export function useMockResource<T>(loader: () => Promise<T>): ResourceState<T> {
     let active = true;
     setLoading(true);
     setError(false);
+    setErrorMessage('');
     loader()
       .then((result) => { if (active) setData(result); })
-      .catch(() => { if (active) setError(true); })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setError(true);
+        setErrorMessage(reason instanceof Error ? reason.message : 'Không thể tải nội dung. Vui lòng thử lại.');
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [loader, reloadKey]);
 
-  return { data, loading, error, reload };
+  return { data, loading, error, errorMessage, reload };
 }

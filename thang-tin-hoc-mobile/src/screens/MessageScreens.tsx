@@ -631,6 +631,41 @@ export function ConversationScreen() {
     return () => clearInterval(interval);
   }, [scheduleResource.reload]);
   useEffect(() => {
+    const scheduleEvents = [
+      SOCKET_EVENTS.SCHEDULE_NEW,
+      SOCKET_EVENTS.SCHEDULE_UPDATED,
+      SOCKET_EVENTS.SCHEDULE_CANCELLED,
+    ];
+    const idOf = (value: unknown) => {
+      if (value && typeof value === 'object') {
+        const record = value as Record<string, unknown>;
+        return String(record._id || record.id || '');
+      }
+      return String(value || '');
+    };
+    const subscriptions = scheduleEvents.map((eventName) => DeviceEventEmitter.addListener(eventName, (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const event = payload as Record<string, unknown>;
+      const schedule = event.schedule && typeof event.schedule === 'object'
+        ? event.schedule as Record<string, unknown>
+        : event;
+      const peerId = user?.role === 'teacher'
+        ? idOf(schedule.studentId || event.studentId)
+        : idOf(schedule.teacherId || event.teacherId);
+      if (peerId && peerId !== String(route.params.participantId || '')) return;
+      scheduleResource.reload();
+    }));
+    const refreshSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.DATA_REFRESH, (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const type = String((payload as Record<string, unknown>).type || '').toLowerCase();
+      if (type === 'schedule' || type === 'schedules') scheduleResource.reload();
+    });
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+      refreshSubscription.remove();
+    };
+  }, [route.params.participantId, scheduleResource.reload, user?.role]);
+  useEffect(() => {
     const interval = setInterval(pendingAttendanceResource.reload, 20000);
     return () => clearInterval(interval);
   }, [pendingAttendanceResource.reload]);
@@ -2034,6 +2069,17 @@ export function ConversationScreen() {
             </View>
           ) : null}
           {!resource.loading && !resource.error && visibleMessages.map((message, index) => {
+            if (message.messageType === 'system') {
+              return (
+                <View key={message.id} style={styles.systemMessageRow}>
+                  <View style={styles.systemMessageCard}>
+                    <CalendarDays size={14} color={colors.brand} />
+                    <Text style={styles.systemMessageText}>{message.text}</Text>
+                    {message.time ? <Text style={styles.systemMessageTime}>{message.time}</Text> : null}
+                  </View>
+                </View>
+              );
+            }
             if (message.callEvent) {
               const call = message.callEvent;
               const callColor = ['missed', 'rejected', 'busy', 'failed'].includes(call.status) ? '#DC2626' : '#16A34A';
@@ -3107,8 +3153,8 @@ const styles = StyleSheet.create({
   chatHeader: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   chatHeaderBack: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
   chatHeaderCopy: { flex: 1, minWidth: 0, gap: 2 },
-  chatHeaderName: { color: '#1E293B', fontSize: 15, fontWeight: '700' },
-  chatHeaderStatus: { color: '#94A3B8', fontSize: 12, fontWeight: '500' },
+  chatHeaderName: { color: '#1E293B', fontSize: typography.body, fontWeight: '700' },
+  chatHeaderStatus: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '500' },
   chatHeaderAction: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
   meetHeaderAction: { width: 34, height: 34, borderRadius: 10 },
   meetHeaderActionLive: { backgroundColor: '#DC2626' },
@@ -3119,11 +3165,11 @@ const styles = StyleSheet.create({
   teacherAttendanceHeaderActionWaiting: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   teacherAttendanceHeaderActionDone: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   teacherAttendanceHeaderActionCancel: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
-  teacherAttendanceHeaderText: { fontSize: 11, fontWeight: '800' },
+  teacherAttendanceHeaderText: { fontSize: typography.micro, fontWeight: '800' },
   teacherAttendanceHeaderTextPending: { color: '#A16207' },
   teacherAttendanceHeaderTextWaiting: { color: '#1D4ED8' },
   teacherAttendanceHeaderTextDone: { color: '#047857' },
-  teacherAttendanceHeaderTextCancel: { color: '#FFFFFF', fontSize: 10 },
+  teacherAttendanceHeaderTextCancel: { color: '#FFFFFF', fontSize: typography.micro },
   teacherAttendanceModal: { width: '100%', maxWidth: 440, maxHeight: '90%', overflow: 'hidden', borderRadius: 28, backgroundColor: '#FFFFFF' },
   teacherAttendanceModalHeader: { minHeight: 92, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, backgroundColor: '#0DA76B' },
   teacherAttendanceModalIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)' },
@@ -3140,7 +3186,7 @@ const styles = StyleSheet.create({
   teacherAttendanceGradeRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#E5EDF5', borderRadius: 18, backgroundColor: '#F8FAFC' },
   teacherAttendanceGradeStepper: { gap: 2 },
   teacherAttendanceGradeStep: { width: 35, height: 27, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DBE4EF', borderRadius: 8, backgroundColor: '#FFFFFF' },
-  teacherAttendanceStepText: { color: '#64748B', fontSize: 17, lineHeight: 19, fontWeight: '800' },
+  teacherAttendanceStepText: { color: '#64748B', fontSize: typography.heading, lineHeight: 19, fontWeight: '800' },
   teacherAttendanceGradeValue: { flex: 1, color: '#334155', fontSize: typography.body, fontWeight: '800', paddingVertical: spacing.xs },
   teacherAttendanceGradeMaximum: { color: '#CBD5E1', fontSize: typography.body, fontWeight: '900' },
   teacherAttendanceNoteInput: { minHeight: 82, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: '#E5EDF5', borderRadius: 18, backgroundColor: '#F8FAFC', color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
@@ -3151,13 +3197,13 @@ const styles = StyleSheet.create({
   teacherAttendanceConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900', textAlign: 'center' },
   attendancePromptCard: { width: '100%', maxWidth: 400, overflow: 'hidden', borderRadius: 24, backgroundColor: colors.surface },
   attendancePromptHeader: { minHeight: 184, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: spacing.lg, backgroundColor: '#D7192D' },
-  attendancePromptEyebrow: { color: '#FEE2E2', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  attendancePromptEyebrow: { color: '#FEE2E2', fontSize: typography.micro, fontWeight: '900', letterSpacing: 2 },
   attendancePromptSessionLabel: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   attendancePromptSessionNumber: { color: '#FFFFFF', fontSize: 48, lineHeight: 54, fontWeight: '900' },
-  attendancePromptSessionTotal: { color: '#FECACA', fontSize: 24, fontWeight: '800' },
+  attendancePromptSessionTotal: { color: '#FECACA', fontSize: typography.title, fontWeight: '800' },
   attendancePromptCourse: { color: '#FFFFFF', fontSize: typography.caption, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
   attendancePromptDetails: { marginHorizontal: spacing.md, marginTop: spacing.md, padding: spacing.md, gap: 5, borderWidth: 1, borderColor: '#E8EEF5', borderRadius: 16, backgroundColor: '#F8FAFC' },
-  attendancePromptDetailLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '900' },
+  attendancePromptDetailLabel: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '900' },
   attendancePromptTeacher: { color: '#172033', fontSize: typography.body, fontWeight: '900' },
   attendancePromptDate: { color: '#64748B', fontSize: typography.caption },
   attendancePromptTime: { color: '#334155', fontSize: typography.caption, fontWeight: '600' },
@@ -3174,10 +3220,14 @@ const styles = StyleSheet.create({
   inlineSearchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.small },
   searchStatus: { color: colors.muted, fontSize: typography.caption, paddingHorizontal: spacing.md, paddingTop: spacing.xs },
   callEventRow: { width: '100%', alignItems: 'center', paddingVertical: spacing.xs },
+  systemMessageRow: { width: '100%', alignItems: 'center', paddingVertical: spacing.xs },
+  systemMessageCard: { maxWidth: '94%', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
+  systemMessageText: { flexShrink: 1, color: colors.ink, fontSize: typography.caption, lineHeight: 18, textAlign: 'center' },
+  systemMessageTime: { color: colors.muted, fontSize: typography.micro },
   callEventCard: { maxWidth: '90%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
   callEventCopy: { flexShrink: 1, gap: 2 },
-  callEventTitle: { fontSize: 12, fontWeight: '700' },
-  callEventSubtitle: { color: '#64748B', fontSize: 11 },
+  callEventTitle: { fontSize: typography.micro, fontWeight: '700' },
+  callEventSubtitle: { color: '#64748B', fontSize: typography.micro },
   createGroupButton: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandSoft },
   createGroupText: { color: colors.brand, fontSize: typography.small, fontWeight: '700' },
   groupModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
@@ -3191,7 +3241,7 @@ const styles = StyleSheet.create({
   filtersScroll: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
   filterChip: { minHeight: 34, borderRadius: 9999, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 14, paddingVertical: 6, justifyContent: 'center', alignItems: 'center' },
   filterChipActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
-  filterText: { color: '#475569', fontSize: 13, fontWeight: '600' },
+  filterText: { color: '#475569', fontSize: typography.caption, fontWeight: '600' },
   filterTextActive: { color: '#FFFFFF', fontWeight: '700' },
   contactListCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', marginTop: spacing.xs },
   contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 12, backgroundColor: '#FFFFFF' },
@@ -3201,22 +3251,22 @@ const styles = StyleSheet.create({
   avatarRing: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: 44, height: 44, borderRadius: 22 },
   roleBadgePill: { position: 'absolute', bottom: -2, right: -2, minWidth: 18, height: 16, paddingHorizontal: 3, borderRadius: 4, borderWidth: 1, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  roleBadgePillText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', lineHeight: 12 },
+  roleBadgePillText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900', lineHeight: 14 },
   onlineDot: { position: 'absolute', top: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#FFFFFF', zIndex: 10 },
   contactInfoCol: { flex: 1, minWidth: 0, justifyContent: 'center', gap: 4 },
   contactHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   contactNameStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
-  contactNameText: { fontSize: 15, fontWeight: '700', color: '#1E293B', flexShrink: 1 },
+  contactNameText: { fontSize: typography.body, fontWeight: '700', color: '#1E293B', flexShrink: 1 },
   statusPillOnline: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
-  statusPillOnlineText: { fontSize: 9, fontWeight: '600', color: '#059669' },
+  statusPillOnlineText: { fontSize: typography.micro, fontWeight: '600', color: '#059669' },
   statusPillOffline: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
-  statusPillOfflineText: { fontSize: 9, fontWeight: '600', color: '#94A3B8' },
-  contactTimeText: { fontSize: 12, fontWeight: '500', color: '#94A3B8' },
+  statusPillOfflineText: { fontSize: typography.micro, fontWeight: '600', color: '#94A3B8' },
+  contactTimeText: { fontSize: typography.micro, fontWeight: '500', color: '#94A3B8' },
   contactMessageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  contactMessageText: { fontSize: 13, color: '#64748B', flex: 1 },
+  contactMessageText: { fontSize: typography.caption, color: '#64748B', flex: 1 },
   contactMessageTextUnread: { color: '#1E293B', fontWeight: '600' },
   unreadCountBadge: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' },
-  unreadCountText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  unreadCountText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   chatHeaderAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   chatHeaderAvatarImg: { width: 38, height: 38, borderRadius: 19 },
   conversationCopy: { flex: 1, gap: 3 },
@@ -3234,7 +3284,7 @@ const styles = StyleSheet.create({
   socketStatus: { color: colors.red, fontSize: typography.caption, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   dateDividerWrap: { alignItems: 'center', marginVertical: 10, paddingHorizontal: spacing.sm },
   dateDividerPill: { backgroundColor: '#BFC1C5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  dateDividerText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
+  dateDividerText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '700' },
   thread: { paddingTop: spacing.sm, paddingHorizontal: spacing.xs, paddingBottom: 120, flexGrow: 1, backgroundColor: '#EAEBEE' },
   messageRowMine: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14, position: 'relative', zIndex: 1 },
   messageRowGrouped: { marginBottom: 8 },
@@ -3252,26 +3302,26 @@ const styles = StyleSheet.create({
   bubbleWrapOther: { flexShrink: 1 },
   bubbleBottomRight: { position: 'absolute', bottom: -11, right: 4, flexDirection: 'row', alignItems: 'center', gap: 4, zIndex: 200 },
   reactionBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 9999, paddingHorizontal: 6, paddingVertical: 1.5, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
-  reactionBadgeEmoji: { fontSize: 12 },
-  reactionBadgeCount: { fontSize: 11, fontWeight: '700', color: '#475569' },
-  reactionBadgeText: { fontSize: 11, color: '#475569', fontWeight: '600' },
+  reactionBadgeEmoji: { fontSize: typography.micro },
+  reactionBadgeCount: { fontSize: typography.micro, fontWeight: '700', color: '#475569' },
+  reactionBadgeText: { fontSize: typography.micro, color: '#475569', fontWeight: '600' },
   likeCornerContainer: { position: 'relative', zIndex: 300 },
   likeCornerBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 3 },
   likeCornerBtnActive: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
-  likeCornerEmojiText: { fontSize: 12, lineHeight: 14 },
+  likeCornerEmojiText: { fontSize: typography.micro, lineHeight: 14 },
   reactionPopupBridge: { position: 'absolute', bottom: 24, right: -10, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 999999, elevation: 999999 },
   reactionPopupBridgeOther: { right: undefined, left: -10, width: 230 },
   reactionPopupBar: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFFFFF', borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 999999 },
   reactionPopupEmojiBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   reactionPopupEmojiBtnHover: { backgroundColor: '#F1F5F9', transform: [{ scale: 1.25 }] },
   reactionPopupEmojiBtnSelected: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
-  reactionPopupEmojiText: { fontSize: 18 },
+  reactionPopupEmojiText: { fontSize: typography.heading },
   optionsMenuCardMine: { position: 'absolute', top: 32, right: 0, minWidth: 185, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 999999, zIndex: 999999 },
   optionsMenuCardOther: { position: 'absolute', top: 32, right: 0, minWidth: 185, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 999999, zIndex: 999999 },
   optionsMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FFFFFF' },
   optionsMenuItemPressed: { backgroundColor: '#F8FAFC' },
   optionsMenuItemBorderTop: { borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  optionsMenuItemText: { fontSize: 14, fontWeight: '500', color: '#334155' },
+  optionsMenuItemText: { fontSize: typography.small, fontWeight: '500', color: '#334155' },
   optionsMenuItemAmber: { color: '#D97706' },
   optionsMenuItemRed: { color: '#DC2626' },
   bubble: { borderRadius: 9, paddingHorizontal: 14, paddingVertical: 12, position: 'relative', maxWidth: '100%', minWidth: 0, flexShrink: 1 },
@@ -3280,7 +3330,7 @@ const styles = StyleSheet.create({
   imageMessageBubble: { paddingHorizontal: 0, paddingVertical: 0, backgroundColor: 'transparent', borderWidth: 0 },
   recalledMessageBubble: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#E4F0FF', borderWidth: 1, borderColor: '#D1E1F2', borderRadius: 9 },
   recalledMessageContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  recalledMessageText: { color: '#9CA3AF', fontSize: 12, fontStyle: 'italic' },
+  recalledMessageText: { color: '#9CA3AF', fontSize: typography.micro, fontStyle: 'italic' },
   imageCaption: { maxWidth: 220, marginTop: spacing.xs, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
   imageCaptionMine: { backgroundColor: '#E4F0FF', borderWidth: 1, borderColor: '#D1E1F2' },
   imageCaptionOther: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
@@ -3288,11 +3338,11 @@ const styles = StyleSheet.create({
   fileAttachmentCardMine: { backgroundColor: '#F2F7FF' },
   fileAttachmentCardOther: { backgroundColor: '#F1F5F9' },
   fileTypeBadge: { width: 36, height: 36, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
-  fileTypeBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  fileTypeBadgeText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900' },
   fileAttachmentInfo: { flex: 1, minWidth: 0, gap: 2 },
-  fileAttachmentName: { color: '#1E293B', fontSize: 11, fontWeight: '600' },
-  fileAttachmentType: { color: '#64748B', fontSize: 9 },
-  fileAttachmentCaption: { marginTop: 4, paddingHorizontal: 2, fontSize: 13, lineHeight: 18 },
+  fileAttachmentName: { color: '#1E293B', fontSize: typography.micro, fontWeight: '600' },
+  fileAttachmentType: { color: '#64748B', fontSize: typography.micro },
+  fileAttachmentCaption: { marginTop: 4, paddingHorizontal: 2, fontSize: typography.caption, lineHeight: 18 },
   stickerBubble: { padding: 0, backgroundColor: 'transparent', borderWidth: 0 },
   chatSticker: { width: 120, height: 120 },
   pinnedBubble: { borderWidth: 1.5, borderColor: '#93C5FD' },
@@ -3301,22 +3351,22 @@ const styles = StyleSheet.create({
   pinnedBannerBody: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, paddingLeft: 4 },
   pinnedBannerIconWrap: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center' },
   pinnedBannerContent: { flex: 1, minWidth: 0 },
-  pinnedBannerTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: 1 },
-  pinnedBannerText: { fontSize: 13, fontWeight: '500', color: '#334155' },
+  pinnedBannerTitle: { fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.6, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: 1 },
+  pinnedBannerText: { fontSize: typography.caption, fontWeight: '500', color: '#334155' },
   pinnedBannerUnpinBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 6, marginLeft: 8 },
-  messageTextMine: { color: '#1E293B', fontSize: 14, lineHeight: 20 },
-  messageTextOther: { color: '#1E293B', fontSize: 14, lineHeight: 20 },
-  attachmentNameMine: { color: '#1E293B', fontSize: 13, fontWeight: '600' },
-  attachmentNameOther: { color: '#1E293B', fontSize: 13, fontWeight: '600' },
+  messageTextMine: { color: '#1E293B', fontSize: typography.small, lineHeight: 20 },
+  messageTextOther: { color: '#1E293B', fontSize: typography.small, lineHeight: 20 },
+  attachmentNameMine: { color: '#1E293B', fontSize: typography.caption, fontWeight: '600' },
+  attachmentNameOther: { color: '#1E293B', fontSize: typography.caption, fontWeight: '600' },
   replyPreviewMine: { borderLeftWidth: 2, borderLeftColor: '#3B82F6', paddingLeft: 6, marginBottom: 4 },
-  replyPreviewTextMine: { color: '#64748B', fontSize: 12, fontStyle: 'italic' },
+  replyPreviewTextMine: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
   replyPreviewOther: { borderLeftWidth: 2, borderLeftColor: '#94A3B8', paddingLeft: 6, marginBottom: 4 },
-  replyPreviewTextOther: { color: '#64748B', fontSize: 12, fontStyle: 'italic' },
+  replyPreviewTextOther: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
   msgFooterMine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 4, paddingRight: 4, zIndex: 1 },
-  msgFooterTime: { color: '#64748B', fontSize: 11, fontWeight: '500' },
-  messageRejectedNotice: { marginTop: 2, paddingRight: 4, color: '#DC2626', fontSize: 11, fontWeight: '700', textAlign: 'right' },
+  msgFooterTime: { color: '#64748B', fontSize: typography.micro, fontWeight: '500' },
+  messageRejectedNotice: { marginTop: 2, paddingRight: 4, color: '#DC2626', fontSize: typography.micro, fontWeight: '700', textAlign: 'right' },
   readStatusWrap: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#BFC1C5', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  readStatusText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
+  readStatusText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '600' },
   messageRowOther: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14 },
   otherAvatarWrap: { width: 34, height: 34, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   otherAvatarImg: { width: 32, height: 32, borderRadius: 16 },
@@ -3325,20 +3375,20 @@ const styles = StyleSheet.create({
   msgActionsOther: { position: 'relative', marginLeft: 6, zIndex: 200, flexShrink: 0 },
   msgFooterOther: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 6, marginTop: 4, paddingLeft: 4 },
   typingIndicator: { alignSelf: 'flex-start', marginTop: spacing.xs, marginLeft: 42, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  typingIndicatorText: { color: '#64748B', fontSize: 12, fontStyle: 'italic' },
+  typingIndicatorText: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
   sticker: { fontSize: 38, lineHeight: 46 },
   composerBar: { alignSelf: 'stretch', marginHorizontal: -spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
   composerTools: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   composerIcon: { width: 32, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   composerInputPill: { flex: 1, height: 42, minHeight: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 21, paddingHorizontal: 12 },
-  composerTextInput: { flex: 1, height: 40, color: '#1E293B', fontSize: 14, lineHeight: 20, paddingTop: Platform.OS === 'web' ? 10 : 0, paddingBottom: 0, paddingHorizontal: 0, textAlignVertical: 'center' },
+  composerTextInput: { flex: 1, height: 40, color: '#1E293B', fontSize: typography.small, lineHeight: 20, paddingTop: Platform.OS === 'web' ? 10 : 0, paddingBottom: 0, paddingHorizontal: 0, textAlignVertical: 'center' },
   composerEmoji: { width: 28, height: 38, alignItems: 'center', justifyContent: 'center' },
   composerSendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F87171', alignItems: 'center', justifyContent: 'center', shadowColor: '#F87171', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 2 },
   messageInput: { minHeight: 42, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, color: colors.ink, fontSize: typography.small },
   composerSendBtnDisabled: { opacity: 0.45, shadowOpacity: 0 },
   replyBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.brandSoft, borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
   replyBarText: { flex: 1, color: colors.brandDark, fontSize: typography.caption, fontWeight: '600' },
-  cancelReply: { color: colors.brandDark, fontSize: 24, paddingHorizontal: spacing.sm },
+  cancelReply: { color: colors.brandDark, fontSize: typography.title, paddingHorizontal: spacing.sm },
   pickerBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
   pickerCard: { height: '48%', maxHeight: 400, minHeight: 280, gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xl, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
   attachmentPickerCard: { height: 'auto', maxHeight: '45%', minHeight: 0, paddingBottom: spacing.lg },
@@ -3359,18 +3409,18 @@ const styles = StyleSheet.create({
   stickerCategoryScroller: { flexGrow: 0, flexShrink: 0, minHeight: 34 },
   pickerContent: { flex: 1, minHeight: 0 },
   stickerSections: { paddingBottom: spacing.sm },
-  stickerSection: { marginBottom: spacing.sm },
-  stickerSectionTitle: { marginBottom: spacing.xs, color: colors.muted, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1 },
+  stickerSection: { marginBottom: spacing.xs },
+  stickerSectionTitle: { marginBottom: 2, color: colors.muted, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1 },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
-  stickerTile: { width: '32%', aspectRatio: 1, margin: '0.66%', alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
-  stickerImage: { width: 76, height: 76, maxWidth: '100%' },
+  stickerTile: { width: '24%', aspectRatio: 1, margin: '0.5%', alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
+  stickerImage: { width: 58, height: 58, maxWidth: '100%' },
   pickerEmpty: { paddingVertical: spacing.xl, color: colors.muted, textAlign: 'center', fontSize: typography.small },
   emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', paddingBottom: spacing.sm },
   emojiTile: { width: '16.66%', height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
   emojiPickerContent: { paddingTop: spacing.sm },
   gifEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.xl },
   gifPickerContent: { minHeight: 0 },
-  gifBadge: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.canvas, color: colors.ink, fontSize: 22, fontWeight: '800' },
+  gifBadge: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.canvas, color: colors.ink, fontSize: typography.title, fontWeight: '800' },
   gifTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
   gifDescription: { maxWidth: 280, color: colors.muted, textAlign: 'center', fontSize: typography.caption, lineHeight: 18 },
   pickerOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.canvas },
@@ -3415,7 +3465,7 @@ const styles = StyleSheet.create({
   weekScheduleClose: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.canvas },
   weekScheduleNavigator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#E2E8F0' },
   weekScheduleArrow: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center' },
-  weekScheduleArrowText: { color: colors.brand, fontSize: 28, lineHeight: 30, fontWeight: '700' },
+  weekScheduleArrowText: { color: colors.brand, fontSize: typography.display, lineHeight: 30, fontWeight: '700' },
   weekScheduleRange: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
   weekScheduleHint: { marginTop: 4, color: colors.muted, fontSize: typography.caption },
   weekScheduleError: { marginVertical: spacing.xs, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: '#FEF2F2' },
@@ -3425,27 +3475,27 @@ const styles = StyleSheet.create({
   weekScheduleDayRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: colors.surface },
   weekScheduleDayCopy: { flex: 1, minWidth: 0, gap: 2 },
   weekScheduleDayName: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
-  weekScheduleDayDate: { color: colors.muted, fontSize: 11 },
-  weekScheduleBooked: { color: '#6D28D9', fontSize: 11, fontWeight: '700' },
-  weekScheduleEmpty: { color: colors.muted, fontSize: 11 },
+  weekScheduleDayDate: { color: colors.muted, fontSize: typography.micro },
+  weekScheduleBooked: { color: '#6D28D9', fontSize: typography.micro, fontWeight: '700' },
+  weekScheduleEmpty: { color: colors.muted, fontSize: typography.micro },
   weekScheduleDayAction: { minHeight: 34, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#EDE9FE' },
   weekScheduleDayActionDisabled: { opacity: 0.45 },
-  weekScheduleDayActionText: { color: '#6D28D9', fontSize: 11, fontWeight: '800' },
+  weekScheduleDayActionText: { color: '#6D28D9', fontSize: typography.micro, fontWeight: '800' },
   weekScheduleCancel: { minHeight: 34, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#FEF2F2' },
-  weekScheduleCancelText: { color: '#B91C1C', fontSize: 11, fontWeight: '800' },
+  weekScheduleCancelText: { color: '#B91C1C', fontSize: typography.micro, fontWeight: '800' },
   weekScheduleEditor: { gap: spacing.xs, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#F8FAFC' },
   weekScheduleEditorTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
   weekScheduleFieldLabel: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
   weekScheduleCourseChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   weekScheduleCourse: { maxWidth: '100%', paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: radius.sm, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: colors.surface },
   weekScheduleCourseSelected: { borderColor: '#7C3AED', backgroundColor: '#EDE9FE' },
-  weekScheduleCourseText: { color: colors.ink, fontSize: 11, fontWeight: '600' },
+  weekScheduleCourseText: { color: colors.ink, fontSize: typography.micro, fontWeight: '600' },
   weekScheduleCourseTextSelected: { color: '#6D28D9', fontWeight: '800' },
   weekScheduleTimeChoices: { gap: spacing.xs, paddingVertical: 2 },
   weekScheduleTime: { minWidth: 58, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: colors.surface },
   weekScheduleTimeSelected: { borderColor: '#7C3AED', backgroundColor: '#EDE9FE' },
   weekScheduleTimeDisabled: { borderColor: '#E2E8F0', backgroundColor: '#F1F5F9' },
-  weekScheduleTimeText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
+  weekScheduleTimeText: { color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
   weekScheduleTimeTextSelected: { color: '#6D28D9', fontWeight: '900' },
   weekScheduleTimeTextDisabled: { color: '#94A3B8' },
   weekScheduleEditorClose: { minHeight: 36, alignItems: 'center', justifyContent: 'center' },

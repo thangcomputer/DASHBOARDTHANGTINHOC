@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type ImageSourcePropType,
   type TextStyle,
   View,
   type TextInputProps,
@@ -118,6 +119,8 @@ export function AppHeader({
   containerStyle,
   icon: Icon,
   compact = true,
+  showBackButton = true,
+  centered = false,
 }: {
   title: string;
   subtitle?: string;
@@ -126,30 +129,32 @@ export function AppHeader({
   containerStyle?: ViewStyle;
   icon?: LucideIcon;
   compact?: boolean;
+  showBackButton?: boolean;
+  centered?: boolean;
 }) {
   const navigation = useNavigation();
   const route = useRoute();
   const parentNavigation = navigation.getParent();
   const isMainTab = ['Home', 'Schedule', 'Students', 'Messages', 'CourseVideos', 'Feed', 'Notifications', 'Profile'].includes(route.name);
   const canGoBack = !isMainTab && (navigation.canGoBack() || Boolean(parentNavigation?.canGoBack()));
-  const handleBack = onBack || (canGoBack ? () => {
+  const handleBack = showBackButton ? onBack || (canGoBack ? () => {
     if (navigation.canGoBack()) navigation.goBack();
     else parentNavigation?.goBack();
-  } : undefined);
+  } : undefined) : undefined;
 
   if (isMainTab) return null;
 
   return (
-    <View style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, containerStyle]}>
+    <View style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, centered ? styles.headerCentered : null, containerStyle]}>
       {Icon ? <View style={styles.headerIcon}><Icon size={19} color={colors.brand} /></View> : null}
       {handleBack ? (
         <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null]} accessibilityRole="button" accessibilityLabel="Quay lại">
           <ChevronLeft size={compact ? 20 : 22} color={compact ? colors.surface : colors.ink} />
         </Pressable>
       ) : null}
-      <View style={[styles.headerText, Icon ? styles.headerTextWithIcon : null]}>
-        <Text style={[styles.headerTitle, Icon ? styles.headerTitleWithIcon : null, compact ? styles.headerTitleCompact : null]}>{title}</Text>
-        {subtitle ? <Text style={[styles.headerSubtitle, compact ? styles.headerSubtitleCompact : null]}>{subtitle}</Text> : null}
+      <View style={[styles.headerText, Icon ? styles.headerTextWithIcon : null, centered ? styles.headerTextCentered : null]}>
+        <Text style={[styles.headerTitle, Icon ? styles.headerTitleWithIcon : null, compact ? styles.headerTitleCompact : null, centered ? styles.headerTitleCentered : null]}>{title}</Text>
+        {subtitle ? <Text style={[styles.headerSubtitle, compact ? styles.headerSubtitleCompact : null, centered ? styles.headerSubtitleCentered : null]}>{subtitle}</Text> : null}
       </View>
       {right}
     </View>
@@ -184,6 +189,8 @@ export function SectionHeading({
 const badgePalette: Record<string, { backgroundColor: string; color: string }> = {
   'Đang học': { backgroundColor: colors.greenSoft, color: colors.green },
   'Hoàn thành': { backgroundColor: colors.blueSoft, color: colors.blue },
+  'Đạt': { backgroundColor: colors.greenSoft, color: colors.green },
+  'Chưa đạt': { backgroundColor: colors.redSoft, color: colors.red },
   'Đã nộp': { backgroundColor: colors.greenSoft, color: colors.green },
   'Chưa làm': { backgroundColor: colors.goldSoft, color: '#9A6C0A' },
   'Quá hạn': { backgroundColor: colors.redSoft, color: colors.red },
@@ -217,12 +224,12 @@ export function StatusBadge({ label }: { label: string }) {
   );
 }
 
-export function Avatar({ name, color = colors.brandSoft, size = 48, imageUri }: { name: string; color?: string; size?: number; imageUri?: string }) {
+export function Avatar({ name, color = colors.brandSoft, size = 48, imageUri, imageSource }: { name: string; color?: string; size?: number; imageUri?: string; imageSource?: ImageSourcePropType }) {
   const initials = name.split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase();
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]}>
-      {imageUri
-        ? <Image source={{ uri: imageUri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+      {imageSource || imageUri
+        ? <Image source={imageSource || { uri: imageUri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
         : <Text style={[styles.avatarText, { fontSize: Math.max(13, size * 0.3) }]}>{initials}</Text>}
     </View>
   );
@@ -316,12 +323,12 @@ export function EmptyState({ title, message }: { title: string; message: string 
   );
 }
 
-export function ErrorState({ onRetry }: { onRetry: () => void }) {
+export function ErrorState({ onRetry, message }: { onRetry: () => void; message?: string }) {
   return (
     <Card style={styles.stateCard}>
       <View style={[styles.stateIcon, { backgroundColor: colors.redSoft }]}><CircleAlert size={22} color={colors.red} /></View>
       <Text style={styles.stateTitle}>Chưa thể tải nội dung</Text>
-      <Text style={styles.stateMessage}>Đây là trạng thái lỗi minh họa trong bản demo.</Text>
+      <Text style={styles.stateMessage}>{message || 'Đây là trạng thái lỗi minh họa trong bản demo.'}</Text>
       <PrimaryButton title="Thử lại" variant="secondary" onPress={onRetry} />
     </Card>
   );
@@ -432,15 +439,19 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xxxl + 76, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.line },
+  headerCentered: { justifyContent: 'center' },
   headerCompact: { minHeight: 48, gap: spacing.sm, paddingVertical: spacing.xs },
   headerWithIcon: { minHeight: 64, paddingLeft: spacing.md, paddingRight: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 0, borderLeftWidth: 4, borderLeftColor: colors.brand, backgroundColor: '#FFFEFE' },
   headerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
   headerText: { flex: 1 },
+  headerTextCentered: { position: 'absolute', left: spacing.xl, right: spacing.xl, alignItems: 'center' },
   headerTextWithIcon: { gap: 2 },
   headerTitle: { color: colors.ink, fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
+  headerTitleCentered: { width: '100%', textAlign: 'center' },
   headerTitleWithIcon: { fontSize: typography.body, letterSpacing: 0 },
   headerTitleCompact: { fontSize: typography.heading, lineHeight: 22, letterSpacing: -0.2 },
   headerSubtitle: { color: colors.muted, fontSize: typography.small, marginTop: 3 },
+  headerSubtitleCentered: { textAlign: 'center' },
   headerSubtitleCompact: { fontSize: typography.caption, lineHeight: 16, marginTop: 1 },
   headerAction: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   headerActionCompact: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand },

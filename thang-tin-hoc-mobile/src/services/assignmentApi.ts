@@ -184,3 +184,21 @@ export async function gradeAssignmentSubmission(submissionId: string, grade: num
   if (!response.data) throw new Error('Máy chủ không xác nhận đã lưu điểm.');
   return response.data;
 }
+
+export async function uploadStudentAssignmentFile(file: { uri: string; name: string; mimeType?: string }) {
+  const formData = new FormData();
+  const filePart = {
+    uri: file.uri,
+    name: file.name,
+    type: file.mimeType || 'application/octet-stream',
+  } as unknown as Blob;
+  formData.append('file', filePart);
+  const response = await mobileApiRequest<{ success?: boolean; fileUrl?: string; message?: string }>('/assignments/upload', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.success || !response.fileUrl) {
+    throw new Error(response.message || 'Máy chủ không trả về liên kết tệp bài nộp.');
+  }
+  return resolveMobilePublicUrl(response.fileUrl);
+}

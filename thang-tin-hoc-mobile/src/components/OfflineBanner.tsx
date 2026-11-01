@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WifiOff } from 'lucide-react-native';
+import { typography } from '../theme/tokens';
 
 export function OfflineBanner() {
   const insets = useSafeAreaInsets();
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: '#FFFBEB',
-    fontSize: 13,
+    fontSize: typography.caption,
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: 0.2,

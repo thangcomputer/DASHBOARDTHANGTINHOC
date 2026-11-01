@@ -6,10 +6,12 @@ export type DemoUser = {
   name: string;
   role: UserRole;
   phone: string;
+  adminRole?: string | null;
   code: string;
   course: string;
   branch: string;
   avatarColor: string;
+  avatar?: string;
   teacherName?: string;
   teacherRating?: number;
   completedSessions?: number;
@@ -26,7 +28,9 @@ export type DemoUser = {
 
 export type DemoEnrollment = {
   id: string;
+  courseId?: string;
   courseName: string;
+  subjectIds?: string[];
   teacherName?: string;
   registeredAt?: string;
   progress?: number;
@@ -85,6 +89,7 @@ export type Assignment = {
   id: string;
   title: string;
   subject: string;
+  courseName?: string;
   teacher: string;
   deadline: string;
   status: 'Chưa làm' | 'Đã nộp' | 'Quá hạn' | 'Cần chấm' | 'Đã chấm';
@@ -93,6 +98,18 @@ export type Assignment = {
   attachedFileName?: string;
   assignedStudentNames?: string[];
   submissions?: AssignmentSubmission[];
+  mySubmission?: {
+    submittedAt: string;
+    status: 'submitted' | 'graded';
+    grade?: number;
+    forfeit?: boolean;
+    gradeHistory: Array<{
+      at: string;
+      oldGrade?: number;
+      newGrade?: number;
+      note?: string;
+    }>;
+  };
   grade?: number;
   teacherFeedback?: string;
 };
@@ -111,6 +128,9 @@ export type LearningMaterial = {
   id: string;
   title: string;
   subject: string;
+  courseId?: string;
+  courseName?: string;
+  subjectIds?: string[];
   type: 'PDF' | 'WORD' | 'EXCEL' | 'VIDEO' | 'LINK';
   date: string;
   size: string;
@@ -155,6 +175,7 @@ export type ChatMessage = {
   text: string;
   time: string;
   mine: boolean;
+  messageType?: string;
   timestampMs?: number;
   callEvent?: {
     direction: 'incoming' | 'outgoing';
@@ -257,11 +278,35 @@ export type DemoFeedPost = {
   time: string;
   content: string;
   mediaType?: 'image' | 'video';
+  images?: string[];
   audience: string;
-  comments: Array<{ id: string; author: string; text: string }>;
+  comments: Array<{
+    id: string;
+    author: string;
+    text: string;
+    authorId?: string;
+    authorAdminRole?: string | null;
+    avatar?: string;
+    role?: string;
+    time?: string;
+  }>;
+  commentsCount?: number;
   reactionCount: number;
+  reactions?: Record<'heart' | 'like' | 'haha' | 'wow' | 'sad', number>;
+  myReaction?: 'heart' | 'like' | 'haha' | 'wow' | 'sad' | null;
   authorId?: string;
-  replies?: Array<{ id: string; parentId: string; author: string; text: string }>;
+  authorAdminRole?: string | null;
+  authorAvatar?: string;
+  replies?: Array<{
+    id: string;
+    parentId: string;
+    author: string;
+    text: string;
+    authorId?: string;
+    avatar?: string;
+    role?: string;
+    time?: string;
+  }>;
 };
 
 export type DemoNewsAttachment = {
@@ -283,6 +328,10 @@ export type DemoNewsItem = {
   attachments: DemoNewsAttachment[];
   author?: string;
   thumbnailUrl?: string;
+  contentHtml?: string;
+  topicId?: string;
+  targetAudience?: 'all' | 'teacher' | 'student';
+  isNew?: boolean;
 };
 
 export type DemoGradeRecord = {
@@ -290,7 +339,7 @@ export type DemoGradeRecord = {
   courseName: string;
   assessment: string;
   score: string;
-  status: 'Đạt' | 'Hoàn thành' | 'Đang học';
+  status: 'Đạt' | 'Chưa đạt' | 'Hoàn thành' | 'Đang học';
   date?: string;
   feedback?: string;
   qaFixture?: boolean;

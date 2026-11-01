@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { DeviceEventEmitter, Platform } from 'react-native';
 import { authService } from '../services/mockService';
-import { getMobileApiTokens } from '../services/apiClient';
+import { getMobileApiTokens, saveMobileSession } from '../services/apiClient';
 import { connect as connectSocket, disconnect as disconnectSocket } from '../services/socketService';
 import type { DemoUser, UserRole } from '../types';
 
@@ -11,6 +11,7 @@ type AuthContextValue = {
   isSigningIn: boolean;
   authError: string;
   signIn: (role: UserRole, phone: string, password: string) => Promise<void>;
+  updateAvatar: (avatar: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -75,6 +76,14 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       } finally {
         setIsSigningIn(false);
       }
+    },
+    async updateAvatar(avatar) {
+      if (!user || !avatar) throw new Error('Không thể cập nhật ảnh đại diện khi chưa đăng nhập.');
+      const tokens = getMobileApiTokens();
+      if (!tokens) throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+      const updatedUser = { ...user, avatar };
+      await saveMobileSession({ user: updatedUser, tokens });
+      setUser(updatedUser);
     },
     async signOut() {
       try {

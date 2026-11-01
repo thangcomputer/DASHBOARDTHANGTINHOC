@@ -1021,80 +1021,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     document.getElementById(`msg-${msgId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const notifyInboxScheduleEvent = async (formData, action = 'created') => {
-    if (!activeConv?.id) return;
-    let displayDate = formData.date;
-    try {
-      if (displayDate && displayDate.includes('-')) {
-        const parts = displayDate.split('-');
-        if (parts.length === 3) displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-      }
-    } catch (e) { /* ignore */ }
-
-    let weekday = '';
-    try {
-      const rawDate = formData.date
-        ? (String(formData.date).includes('-')
-          ? new Date(`${String(formData.date).slice(0, 10)}T12:00:00`)
-          : new Date(formData.date))
-        : null;
-      if (rawDate && !Number.isNaN(rawDate.getTime())) {
-        weekday = rawDate.toLocaleDateString('vi-VN', {
-          weekday: 'long',
-          timeZone: 'Asia/Ho_Chi_Minh',
-        });
-      }
-    } catch { /* ignore */ }
-
-    const scheduleId = formData.scheduleId || null;
-    const courseLabel = formData.course || activeConv.user?.course || '';
-    const startTime = formData.startTime || '';
-    const endTime = formData.endTime || '';
-    const prevStart = formData.prevStartTime || '';
-    const prevEnd = formData.prevEndTime || '';
-
-    let content = `Đã xếp lịch học thành công cho học viên vào ngày ${displayDate} từ ${startTime} đến ${endTime}.`;
-    let kind = 'schedule_created';
-    if (action === 'changed') {
-      kind = 'schedule_changed';
-      const prevLabel = (prevStart && prevEnd)
-        ? ` (trước đó: ${prevStart}–${prevEnd})`
-        : (prevStart ? ` (trước đó: ${prevStart})` : '');
-      content = `Đã đổi ca học của học viên sang ngày ${displayDate} từ ${startTime} đến ${endTime}${prevLabel}.`;
-    } else if (action === 'cancelled') {
-      kind = 'schedule_cancelled';
-      content = `Đã hủy ca học của học viên ngày ${displayDate} từ ${startTime} đến ${endTime}.`;
-    }
-
-    await ctxSendMessage({
-      conversationId: activeConv.id,
-      senderId: currentUserId,
-      senderName: currentUserName,
-      senderRole: currentUserRole,
-      receiverId: activeConv.user.id,
-      receiverName: activeConv.user.name,
-      receiverRole: activeConv.user.role,
-      content,
-      messageType: 'system',
-      isGroup: false,
-      groupId: null,
-      payload: {
-        kind,
-        scheduleId: scheduleId ? String(scheduleId) : null,
-        date: formData.date || null,
-        dateLabel: displayDate,
-        weekday,
-        startTime,
-        endTime,
-        prevStartTime: prevStart || null,
-        prevEndTime: prevEnd || null,
-        course: courseLabel,
-        studentName: formData.studentName || activeConv.user?.name || '',
-        teacherName: currentUserName || '',
-      },
-    });
-  };
-
   const conversations = useMemo(() => {
     const entries = [];
 
@@ -4314,15 +4240,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               updateSchedule={updateSchedule}
               cancelSchedule={cancelSchedule}
               onClose={() => setShowScheduleModal(false)}
-              onCreated={(payload) => {
-                notifyInboxScheduleEvent(payload, 'created').catch(() => { });
-              }}
-              onUpdated={(payload) => {
-                notifyInboxScheduleEvent(payload, 'changed').catch(() => { });
-              }}
-              onCancelled={(payload) => {
-                notifyInboxScheduleEvent(payload, 'cancelled').catch(() => { });
-              }}
             />
           );
         })()

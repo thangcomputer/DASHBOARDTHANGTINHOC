@@ -34,6 +34,25 @@ async function teacherCanAccessStudent(teacherId, studentId) {
   return assigned.includes(String(studentId));
 }
 
+async function notifyScheduleConversation(req, schedule, action, previous = {}) {
+  try {
+    const { sendScheduleConversationMessage } = require('../services/scheduleConversationService');
+    await sendScheduleConversationMessage({
+      schedule,
+      actor: req.user,
+      action,
+      previous,
+      io: req.app.get('io'),
+      notifyUser: req.app.notifyUser,
+    });
+  } catch (error) {
+    logger.warn(
+      { err: error?.message, scheduleId: String(schedule?._id || schedule?.id || ''), action },
+      '[SCHEDULE] conversation message not sent',
+    );
+  }
+}
+
 function parseTimeToMinutes(raw) {
   if (raw == null || raw === '') return null;
   const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})/);
@@ -973,6 +992,10 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       { path: 'studentId', select: 'name course' },
     ]);
 
+    if (schedule.status === 'scheduled') {
+      await notifyScheduleConversation(req, schedule, 'created');
+    }
+
     // Thông báo real-time
     const io = req.app.get('io');
     if (io) {
@@ -1364,6 +1387,24 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       { path: 'teacherId', select: 'name phone' },
       { path: 'studentId', select: 'name course totalSessions studentExamUnlocked' },
     ]);
+
+    if (updated && schedule.studentId) {
+      if (status === 'cancelled' && schedule.status !== 'cancelled' && !isRejectMakeup) {
+        await notifyScheduleConversation(req, updated, 'cancelled', {
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        });
+      } else if (
+        (startTime && startTime !== schedule.startTime)
+        || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
+        || (endTime !== undefined && String(endTime) !== String(schedule.endTime || ''))
+      ) {
+        await notifyScheduleConversation(req, updated, 'changed', {
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        });
+      }
+    }
 
     // Thông báo + realtime SAU khi DB commit — tránh HV refetch còn thấy lịch cũ
     if (schedule.studentId && io && updated) {
@@ -1964,6 +2005,11 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       teacherName: schedule.teacherName,
       scheduledDate: schedule.date,
       course: schedule.course,
+    });
+
+    await notifyScheduleConversation(req, schedule, 'cancelled', {
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
     });
 
     const io = req.app.get('io');

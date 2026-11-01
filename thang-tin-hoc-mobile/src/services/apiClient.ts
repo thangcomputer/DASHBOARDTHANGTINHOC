@@ -173,10 +173,19 @@ async function rotateTokens() {
   return refreshPromise;
 }
 
-async function request(path: string, init: RequestInit, withAuth: boolean, canRefresh: boolean): Promise<Record<string, unknown>> {
+async function request(
+  path: string,
+  init: RequestInit,
+  withAuth: boolean,
+  canRefresh: boolean,
+  csrfRetried = false,
+): Promise<Record<string, unknown>> {
   const method = init.method || 'GET';
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
+  if (typeof init.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (withAuth && tokens?.accessToken) headers.set('Authorization', `Bearer ${tokens.accessToken}`);
 
   if (isMutating(method)) {
@@ -192,9 +201,21 @@ async function request(path: string, init: RequestInit, withAuth: boolean, canRe
     headers,
     credentials: 'include',
   });
+  if (response.status === 403 && isMutating(method) && !csrfRetried) {
+    let payload: Record<string, unknown> | null = null;
+    try {
+      payload = await response.clone().json() as Record<string, unknown>;
+    } catch {
+      payload = null;
+    }
+    if (payload?.code === 'CSRF_INVALID') {
+      csrfToken = null;
+      return request(path, init, withAuth, canRefresh, true);
+    }
+  }
   if (response.status === 401 && withAuth && canRefresh && tokens?.refreshToken) {
     await rotateTokens();
-    return request(path, init, withAuth, false);
+    return request(path, init, withAuth, false, csrfRetried);
   }
   return parseResponse(response);
 }

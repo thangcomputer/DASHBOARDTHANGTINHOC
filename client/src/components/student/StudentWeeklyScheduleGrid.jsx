@@ -85,9 +85,7 @@ export default function StudentWeeklyScheduleGrid({
             <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
               Lịch học theo tuần
             </h3>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Chỉ xem ca đã xếp. Bấm ca sắp tới để ghi chú hoặc vào lớp.
-            </p>
+
           </div>
         </div>
         <div className="flex items-center justify-start sm:justify-end gap-1.5">
@@ -129,9 +127,8 @@ export default function StudentWeeklyScheduleGrid({
                 return (
                   <th
                     key={key}
-                    className={`px-2 py-2.5 text-center border-b border-slate-100 min-w-[7rem] ${
-                      isToday ? 'bg-red-50/80' : ''
-                    }`}
+                    className={`px-2 py-2.5 text-center border-b border-slate-100 min-w-[7rem] ${isToday ? 'bg-red-50/80' : ''
+                      }`}
                   >
                     <div className={`text-[11px] font-black ${isToday ? 'text-red-700' : 'text-slate-600'}`}>
                       {WEEKDAY_LABELS[i]}
@@ -175,9 +172,8 @@ export default function StudentWeeklyScheduleGrid({
                         disabled={!clickable}
                         onClick={() => onOpenSession?.(sch)}
                         title={clickable ? [hoverHint, teacherHint].filter(Boolean).join(' · ') : teacherHint || undefined}
-                        className={`group relative w-full min-h-9 px-1.5 py-1.5 rounded-lg border text-[10px] font-bold text-center ${tone} ${
-                          clickable ? 'hover:brightness-95 cursor-pointer' : 'cursor-default'
-                        }`}
+                        className={`group relative w-full min-h-9 px-1.5 py-1.5 rounded-lg border text-[10px] font-bold text-center ${tone} ${clickable ? 'hover:brightness-95 cursor-pointer' : 'cursor-default'
+                          }`}
                       >
                         {hasNote ? (
                           <span
