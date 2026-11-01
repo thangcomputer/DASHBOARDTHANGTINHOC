@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  DeviceEventEmitter,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,11 +14,13 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Search } from 'lucide-react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Search, type LucideIcon } from 'lucide-react-native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '../theme/tokens';
-import { useAuth } from '../app/AuthContext';
 import type { Assignment, ScheduleItem } from '../types';
+import { getWebLogoUrl } from '../services/webSettingsApi';
+import type { AppStackParamList } from '../navigation/types';
 
 export function AppScreen({
   children,
@@ -25,6 +29,7 @@ export function AppScreen({
 }: React.PropsWithChildren<{ scroll?: boolean; contentStyle?: ViewStyle }>) {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <BrandingTopBar />
       {scroll ? (
         <ScrollView
           contentContainerStyle={[styles.screenContent, contentStyle]}
@@ -40,53 +45,113 @@ export function AppScreen({
   );
 }
 
+function BrandingTopBar() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const [logoUrl, setLogoUrl] = useState('');
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false);
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    getWebLogoUrl()
+      .then((url) => {
+        if (active) {
+          setLogoUrl(url);
+          setLogoLoadFailed(false);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setLogoLoadFailed(true);
+          console.error('Không thể tải logo thương hiệu từ cài đặt web.', error);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []));
+
+  return (
+    <View style={styles.brandingTopBar}>
+      <Pressable
+        onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
+        style={styles.topBarAction}
+        accessibilityRole="button"
+        accessibilityLabel="Mở tìm kiếm"
+      >
+        <Search size={20} color={colors.muted} />
+      </Pressable>
+      <Pressable
+        onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
+        style={styles.brandingHomeCentered}
+        accessibilityRole="button"
+        accessibilityLabel="Về trang tổng quan"
+      >
+        {logoUrl && !logoLoadFailed ? (
+          <Image
+            source={{ uri: logoUrl }}
+            style={styles.brandingLogo}
+            resizeMode="contain"
+            accessibilityLabel="Logo Thắng Tin Học"
+            onError={() => setLogoLoadFailed(true)}
+          />
+        ) : (
+          <Text style={styles.brandingFallback}>Thắng Tin Học</Text>
+        )}
+      </Pressable>
+      <Pressable
+        onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
+        style={styles.topBarAction}
+        accessibilityRole="button"
+        accessibilityLabel="Mở thông báo"
+      >
+        <Bell size={20} color={colors.muted} />
+      </Pressable>
+    </View>
+  );
+}
+
 export function AppHeader({
   title,
   subtitle,
   onBack,
   right,
+  containerStyle,
+  icon: Icon,
+  compact = true,
 }: {
   title: string;
   subtitle?: string;
   onBack?: () => void;
   right?: React.ReactNode;
+  containerStyle?: ViewStyle;
+  icon?: LucideIcon;
+  compact?: boolean;
 }) {
   const navigation = useNavigation();
   const route = useRoute();
-  const { user } = useAuth();
   const parentNavigation = navigation.getParent();
-  const isMainTab = ['Home', 'Schedule', 'Students', 'Messages', 'Notifications', 'Profile'].includes(route.name);
+  const isMainTab = ['Home', 'Schedule', 'Students', 'Messages', 'CourseVideos', 'Feed', 'Notifications', 'Profile'].includes(route.name);
   const canGoBack = !isMainTab && (navigation.canGoBack() || Boolean(parentNavigation?.canGoBack()));
   const handleBack = onBack || (canGoBack ? () => {
     if (navigation.canGoBack()) navigation.goBack();
     else parentNavigation?.goBack();
   } : undefined);
 
+  if (isMainTab) return null;
+
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, containerStyle]}>
+      {Icon ? <View style={styles.headerIcon}><Icon size={19} color={colors.brand} /></View> : null}
       {handleBack ? (
-        <Pressable onPress={handleBack} style={styles.headerAction} accessibilityRole="button" accessibilityLabel="Quay lại">
-          <ChevronLeft size={22} color={colors.ink} />
+        <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null]} accessibilityRole="button" accessibilityLabel="Quay lại">
+          <ChevronLeft size={compact ? 20 : 22} color={compact ? colors.surface : colors.ink} />
         </Pressable>
       ) : null}
-      <View style={styles.headerText}>
-        <Text style={styles.headerTitle}>{title}</Text>
-        {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
+      <View style={[styles.headerText, Icon ? styles.headerTextWithIcon : null]}>
+        <Text style={[styles.headerTitle, Icon ? styles.headerTitleWithIcon : null, compact ? styles.headerTitleCompact : null]}>{title}</Text>
+        {subtitle ? <Text style={[styles.headerSubtitle, compact ? styles.headerSubtitleCompact : null]}>{subtitle}</Text> : null}
       </View>
-      {user?.role === 'student' ? (
-        <Pressable
-          onPress={() => {
-            if (isMainTab) navigation.navigate('Notifications' as never);
-            else navigation.navigate('NotificationCenter' as never);
-          }}
-          style={styles.notificationButton}
-          accessibilityRole="button"
-          accessibilityLabel="Mở thông báo"
-        >
-          <Bell size={19} color={colors.ink} />
-          <View style={styles.notificationDot} />
-        </Pressable>
-      ) : right}
+      {right}
     </View>
   );
 }
@@ -152,11 +217,13 @@ export function StatusBadge({ label }: { label: string }) {
   );
 }
 
-export function Avatar({ name, color = colors.brandSoft, size = 48 }: { name: string; color?: string; size?: number }) {
+export function Avatar({ name, color = colors.brandSoft, size = 48, imageUri }: { name: string; color?: string; size?: number; imageUri?: string }) {
   const initials = name.split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase();
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]}>
-      <Text style={[styles.avatarText, { fontSize: Math.max(13, size * 0.3) }]}>{initials}</Text>
+      {imageUri
+        ? <Image source={{ uri: imageUri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        : <Text style={[styles.avatarText, { fontSize: Math.max(13, size * 0.3) }]}>{initials}</Text>}
     </View>
   );
 }
@@ -357,15 +424,26 @@ export const uiStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
+  brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line },
+  brandingHomeCentered: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  brandingLogo: { width: 92, height: 34 },
+  brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
+  topBarAction: { zIndex: 1, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   fill: { flex: 1 },
-  screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.lg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line },
+  screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xxxl + 76, gap: spacing.lg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.line },
+  headerCompact: { minHeight: 48, gap: spacing.sm, paddingVertical: spacing.xs },
+  headerWithIcon: { minHeight: 64, paddingLeft: spacing.md, paddingRight: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 0, borderLeftWidth: 4, borderLeftColor: colors.brand, backgroundColor: '#FFFEFE' },
+  headerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
   headerText: { flex: 1 },
+  headerTextWithIcon: { gap: 2 },
   headerTitle: { color: colors.ink, fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
+  headerTitleWithIcon: { fontSize: typography.body, letterSpacing: 0 },
+  headerTitleCompact: { fontSize: typography.heading, lineHeight: 22, letterSpacing: -0.2 },
   headerSubtitle: { color: colors.muted, fontSize: typography.small, marginTop: 3 },
+  headerSubtitleCompact: { fontSize: typography.caption, lineHeight: 16, marginTop: 1 },
   headerAction: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  notificationButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  notificationDot: { position: 'absolute', top: 5, right: 5, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.surface },
+  headerActionCompact: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.line, gap: spacing.md },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },

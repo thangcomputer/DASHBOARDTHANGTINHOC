@@ -1259,6 +1259,28 @@ export const aiSupportAPI = {
 };
 
 // ─── MESSAGE API ────────────────────────────────────────────────────────────
+export const communicationPreferencesAPI = {
+  get: async () => {
+    const res = await apiFetch('/communication-preferences');
+    const body = await res.json();
+    if (!res.ok || body?.success === false) {
+      throw new Error(body?.message || `Không tải được tùy chọn liên lạc (HTTP ${res.status})`);
+    }
+    return body.data;
+  },
+  update: async (updates) => {
+    const res = await apiFetch('/communication-preferences', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    const body = await res.json();
+    if (!res.ok || body?.success === false) {
+      throw new Error(body?.message || `Không lưu được tùy chọn liên lạc (HTTP ${res.status})`);
+    }
+    return body.data;
+  },
+};
+
 export const messagesAPI = {
     getMessage: async (id) => {
       const res = await apiFetch(`/messages/message/${id}`);

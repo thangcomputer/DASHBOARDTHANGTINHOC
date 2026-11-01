@@ -16,6 +16,7 @@ const { validateOwnedCertificationFile } = require('../utils/certificationFilePo
 const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
 const { effectiveCoursePrice } = require('../utils/coursePricing');
 const { isExcludedExamSubjectId } = require('../services/examSubjectCatalog');
+const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -1448,6 +1449,21 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
 
     if (locking) {
       const ioLock = req.app.get('io');
+      try {
+        await revokeMobileSessionsForUser({
+          userId: student._id,
+          role: 'student',
+          reason: 'account_disabled',
+          io: ioLock,
+        });
+      } catch (revokeError) {
+        logger.error('[STUDENTS] Account disabled but mobile session revocation failed:', revokeError);
+        return res.status(503).json({
+          success: false,
+          code: 'MOBILE_SESSION_REVOCATION_FAILED',
+          message: 'Tài khoản đã bị vô hiệu hóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+        });
+      }
       if (ioLock) {
         ioLock.emit('auth:forceLogout', {
           userId: String(student._id),
@@ -3803,6 +3819,21 @@ router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation
     const cascade = await purgeStudentSideEffects(student._id, { studentName: student.name });
     await Student.findByIdAndDelete(student._id);
     try {
+      await revokeMobileSessionsForUser({
+        userId: student._id,
+        role: 'student',
+        reason: 'account_deleted',
+        io: req.app.get('io'),
+      });
+    } catch (revokeError) {
+      logger.error('[STUDENTS] Account deleted but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị xóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
+    try {
       emitDataRefresh(req.app.get('io'), { type: 'students', scope: 'system' });
     } catch { /* ignore */ }
     res.json({
@@ -3832,6 +3863,21 @@ router.post('/:id/reset-devices', [
     );
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     const io = req.app.get('io');
+    try {
+      await revokeMobileSessionsForUser({
+        userId: student._id,
+        role: 'student',
+        reason: 'account_locked',
+        io,
+      });
+    } catch (revokeError) {
+      logger.error('[STUDENTS] Account locked but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị khóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
     if (io) {
       studentRealtime(io, student, 'student:updated', student._id);
       studentDataRefresh(io, student, { type: 'student', id: student._id });

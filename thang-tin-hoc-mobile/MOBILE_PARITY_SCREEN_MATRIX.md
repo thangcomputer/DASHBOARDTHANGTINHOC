@@ -2,6 +2,8 @@
 
 ## Scope and classification
 
+> Integration status in this older UI audit is a historical snapshot. For current API/mock status, use [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md); do not treat the `Backend` cells below as current.
+
 - Prompt 11 closure: all 22 previously named UI gaps were implemented and rechecked; 53 entries are ALIGNED, 0 PARTIAL, 0 MISSING, and 2 WEB-ONLY.
 - Scope: current Student and active Teacher screens in the existing Expo app. The five-tab navigation and role split are retained.
 - This matrix classifies visible UI/UX only. Mock data, missing persistence/network integrations, and Android/iOS not being run are recorded separately and do not create a UI gap.
@@ -9,12 +11,12 @@
 - `ALIGNED` means the mobile screen exposes the current web-visible sections, labels, controls, states and local UI flow in a mobile-adapted layout. It does not assert pixel identity or production readiness.
 - `PARTIAL` requires an exact visible field, control, state, layout or route omission in the final column.
 - `WEB-ONLY` is reserved for web-only exam/certification attempts and Teacher onboarding.
-- Backend for all in-scope mobile screens: `NOT CONNECTED (mock only)`. Native QA: `NOT RUN`.
+- Backend status: see the current API parity report. Native QA: `NOT RUN`.
 - Gap Type is limited to `NONE`, `VISUAL`, `CONTROL`, `STATE`, `FLOW`, `ROUTE`, `WEB-ONLY`. Backend and native readiness are not gap types.
 
 ## Student (S01–S24)
 
-| ID | Screen / web source → mobile | UI/UX | Backend | Gap Type | Exact Remaining Gap |
+| ID | Screen / web source → mobile | UI/UX | Backend (historical snapshot) | Gap Type | Exact Remaining Gap |
 |---|---|---|---|---|---|
 | S01 | Tổng quan học viên — `StudentOverviewTab.jsx` → Home | ALIGNED | NOT CONNECTED | NONE | — |
 | S02 | Lịch học theo tuần — `StudentScheduleTab.jsx`, `StudentWeeklyScheduleGrid.jsx` → Schedule | ALIGNED | NOT CONNECTED | NONE | — |
@@ -114,4 +116,4 @@
 | Expo compatibility | PASS — `npx expo install --check` |
 | Whitespace check | PASS — `git diff --check` and edited mobile-document trailing-whitespace scan |
 
-**Readiness: `MOBILE UI/UX PARITY READY`** — 53 ALIGNED, 0 PARTIAL, 0 MISSING, 2 WEB-ONLY. Backend remains `NOT CONNECTED`; Android/iOS native QA remains `NOT RUN`. Neither is counted as a UI parity gap.
+This matrix is limited to the UI audit and does not certify end-to-end feature parity. Backend status is tracked in [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md); Android/iOS native QA remains `NOT RUN`.

@@ -51,7 +51,7 @@ const corsOriginFn = (origin, cb) => {
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins.length ? allowedOrigins : true,
+    origin: corsOriginFn,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -280,6 +280,15 @@ if (!isTest) outboxWorker.start();
 // ==========================================
 const { socketAuthMiddleware } = require('./middleware/socketAuth');
 const Group = require('./models/Group');
+const CallHistory = require('./models/CallHistory');
+const {
+  callParticipantKey,
+  reserveCallParticipants,
+  releaseCallParticipants,
+  resolveCallEndStatus,
+  getCallDurationSeconds,
+  findCallRecipientSockets,
+} = require('./utils/callSessionRegistry');
 
 function socketUserId(user) {
   return String(user?.id || user?._id || '');
@@ -353,6 +362,35 @@ presenceStore.onPresenceChange(() => {
   try { broadcastOnlinePresence(); } catch { /* ignore */ }
 });
 
+const activeCallSessions = new Map();
+const activeCallByParticipant = new Map();
+
+function persistCallHistory(entry) {
+  return CallHistory.findOneAndUpdate(
+    { callId: entry.callId },
+    { $setOnInsert: entry },
+    { upsert: true, new: true },
+  ).exec().catch((error) => {
+    logger.error({ err: error.message, callId: entry.callId }, 'Call history write failed');
+    return null;
+  });
+}
+
+function updateCallHistory(call, updates) {
+  const pendingUpdate = Promise.resolve(call.historyPromise)
+    .then(() => CallHistory.findOneAndUpdate(
+      { callId: call.callId },
+      { $set: updates },
+      { new: true },
+    ).exec())
+    .catch((error) => {
+      logger.error({ err: error.message, callId: call.callId }, 'Call history update failed');
+      return null;
+    });
+  call.historyPromise = pendingUpdate;
+  return pendingUpdate;
+}
+
 io.use(socketAuthMiddleware);
 
 io.on('connection', (socket) => {
@@ -362,6 +400,7 @@ io.on('connection', (socket) => {
     const uid = socketUserId(socket.user);
     const mRole = getMessagingRole(socket.user);
     if (uid) socket.join(uid);
+    if (socket.sessionId) socket.join(`session:${socket.sessionId}`);
     socket.join('feed_room');
     if (mRole) {
       const uRole = mRole.toUpperCase();
@@ -384,17 +423,21 @@ io.on('connection', (socket) => {
     const resolvedBranchId = socket.user.branchId || null;
     const resolvedBranchCode = socket.user.branchCode || '';
 
-    await presenceStore.upsertPresence(key, {
-      socketId: socket.id,
-      userId,
-      role: messagingRole,
-      adminRole: socket.user.adminRole || null,
-      name,
-      avatar: socket.user.avatar || '',
-      branchId: resolvedBranchId,
-      branchCode: resolvedBranchCode,
-      connectedAt: new Date().toISOString(),
-    });
+    // The legacy presence store keeps one socket per user. Do not let a mobile
+    // session overwrite a live web socket until presence supports many sockets.
+    if (!socket.sessionId) {
+      await presenceStore.upsertPresence(key, {
+        socketId: socket.id,
+        userId,
+        role: messagingRole,
+        adminRole: socket.user.adminRole || null,
+        name,
+        avatar: socket.user.avatar || '',
+        branchId: resolvedBranchId,
+        branchCode: resolvedBranchCode,
+        connectedAt: new Date().toISOString(),
+      });
+    }
 
     console.log(`👤 Online (Verified): ${name} (${messagingRole}) - ${key}`);
 
@@ -502,6 +545,283 @@ io.on('connection', (socket) => {
   }, 30_000);
   socket.on('disconnect', () => { /* cleanup handled below */ });
 
+  const callInviteAttempts = [];
+  function getCallPeer(conversationId) {
+    if (!socket.user) return null;
+    const { canViewConversation } = require('./services/messagingPolicy');
+    if (!canViewConversation(socket.user, conversationId).allowed) return null;
+    return require('./utils/callSignalingPolicy').resolveCallPeer(socket.user, conversationId);
+  }
+  function removeCall(callId) {
+    const call = activeCallSessions.get(callId);
+    if (!call) return null;
+    clearTimeout(call.timeout);
+    activeCallSessions.delete(callId);
+    releaseCallParticipants(activeCallByParticipant, call);
+    return call;
+  }
+  function sendCallError(code, callId) {
+    socket.emit('call:error', { code, callId: String(callId || '') });
+  }
+  function callSignalPeer(callId, conversationId) {
+    const call = activeCallSessions.get(String(callId || ''));
+    if (!call || call.conversationId !== String(conversationId || '')) return null;
+    const currentId = socketUserId(socket.user);
+    const currentRole = getMessagingRole(socket.user);
+    if (!getCallPeer(call.conversationId)) return null;
+    if (call.caller.id === currentId && call.caller.role === currentRole) return { call, sender: call.caller, peer: call.peer };
+    if (call.peer.id === currentId && call.peer.role === currentRole) return { call, sender: call.peer, peer: call.caller };
+    return null;
+  }
+  function finishCall(call, eventName, reason, recipientRoom, status, endedById = '') {
+    const removed = removeCall(call.callId);
+    if (!removed) return Promise.resolve();
+    const endedAt = new Date();
+    return updateCallHistory(removed, {
+      status,
+      endedAt,
+      endedById: String(endedById || ''),
+      reason: String(reason || '').slice(0, 100),
+      durationSeconds: getCallDurationSeconds(removed.answeredAt, endedAt),
+    }).then(() => {
+      io.to(recipientRoom || removed.peerSocketRoom).emit(eventName, {
+        callId: removed.callId,
+        conversationId: removed.conversationId,
+        reason,
+      });
+    });
+  }
+
+  function abandonCall(call, status, reason) {
+    const removed = removeCall(call.callId);
+    if (!removed) return Promise.resolve();
+    const endedAt = new Date();
+    return updateCallHistory(removed, {
+      status,
+      endedAt,
+      reason: String(reason || '').slice(0, 100),
+      durationSeconds: getCallDurationSeconds(removed.answeredAt, endedAt),
+    });
+  }
+
+  function recordRejectedAttempt({ callId, conversationId, caller, peer, status, reason }) {
+    const now = new Date();
+    return persistCallHistory({
+      callId,
+      conversationId,
+      callerId: caller.id,
+      callerRole: caller.role,
+      callerName: caller.name,
+      peerId: peer.id,
+      peerRole: peer.role,
+      peerName: peer.name,
+      status,
+      startedAt: now,
+      endedAt: now,
+      endedById: '',
+      reason: String(reason || '').slice(0, 100),
+      durationSeconds: 0,
+    });
+  }
+
+  socket.on('call:invite', (data = {}) => {
+    if (!socket.user || !data || typeof data !== 'object') return;
+    const callId = String(data.callId || '');
+    const conversationId = String(data.conversationId || '');
+    if (!/^[\w-]{8,100}$/.test(callId) || conversationId.length > 200 || data.callType !== 'audio') {
+      sendCallError('INVALID_CALL', callId);
+      return;
+    }
+
+    const now = Date.now();
+    while (callInviteAttempts.length && now - callInviteAttempts[0] > 60_000) callInviteAttempts.shift();
+    if (callInviteAttempts.length >= 5) {
+      sendCallError('CALL_RATE_LIMITED', callId);
+      return;
+    }
+    callInviteAttempts.push(now);
+
+    const peerToken = getCallPeer(conversationId);
+    if (!peerToken || activeCallSessions.has(callId)) {
+      sendCallError('CALL_NOT_ALLOWED', callId);
+      return;
+    }
+
+    const caller = {
+      id: socketUserId(socket.user),
+      role: getMessagingRole(socket.user),
+      name: String(socket.user.name || 'Người gọi').slice(0, 100),
+    };
+    const peer = {
+      id: peerToken.id,
+      role: peerToken.role,
+      name: String(data.participantName || '').trim().slice(0, 100)
+        || (peerToken.role === 'teacher' ? 'Giảng viên' : 'Học viên'),
+    };
+    const callerKey = callParticipantKey(caller);
+    const peerKey = callParticipantKey(peer);
+    if (!caller.id) {
+      sendCallError('CALL_NOT_ALLOWED', callId);
+      return;
+    }
+    if (activeCallByParticipant.has(callerKey) || activeCallByParticipant.has(peerKey)) {
+      void recordRejectedAttempt({ callId, conversationId, caller, peer, status: 'busy', reason: 'busy' })
+        .then(() => sendCallError('USER_BUSY', callId));
+      return;
+    }
+
+    if (activeCallSessions.has(callId) || !reserveCallParticipants(activeCallByParticipant, callId, caller, peer)) {
+      void recordRejectedAttempt({ callId, conversationId, caller, peer, status: 'busy', reason: 'busy' })
+        .then(() => sendCallError('USER_BUSY', callId));
+      return;
+    }
+
+    const startedAt = new Date();
+    const call = {
+      callId,
+      conversationId,
+      caller,
+      peer,
+      peerSocketRoom: peer.id,
+      callerSocketRoom: caller.id,
+      status: 'ringing',
+      startedAt,
+      answeredAt: null,
+      historyPromise: null,
+      timeout: setTimeout(() => {
+        const expired = activeCallSessions.get(callId);
+        if (!expired) return;
+        void finishCall(expired, 'call:timeout', 'timeout', expired.callerSocketRoom, 'missed')
+          .then(() => io.to(expired.peerSocketRoom).emit('call:ended', { callId, conversationId, reason: 'timeout' }));
+      }, 45_000),
+    };
+    activeCallSessions.set(callId, call);
+    call.historyPromise = persistCallHistory({
+      callId,
+      conversationId,
+      callerId: caller.id,
+      callerRole: caller.role,
+      callerName: caller.name,
+      peerId: peer.id,
+      peerRole: peer.role,
+      peerName: peer.name,
+      status: 'ringing',
+      startedAt,
+      answeredAt: null,
+      endedAt: null,
+      endedById: '',
+      reason: '',
+      durationSeconds: 0,
+    });
+
+    socket.emit('call:checking', { callId, conversationId });
+    (async () => {
+      const { getCommunicationPreferences } = require('./services/communicationPreferences');
+      const peerPreferences = await getCommunicationPreferences(peer.id, peer.role);
+      if (peerPreferences.rejectCalls) {
+        await abandonCall(call, 'rejected', 'recipient_rejected_calls');
+        sendCallError('CALL_REJECTED_BY_RECIPIENT', callId);
+        return;
+      }
+
+      const peerSockets = await findCallRecipientSockets(() => io.in(peer.id).fetchSockets());
+
+      if (activeCallSessions.get(callId) !== call) return;
+      if (!peerSockets.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1_200));
+        if (activeCallSessions.get(callId) !== call) return;
+        await abandonCall(call, 'missed', 'offline');
+        sendCallError('USER_OFFLINE', callId);
+        return;
+      }
+
+      const peerSocket = peerSockets.find((candidate) => (
+        candidate.user && socketUserId(candidate.user) === peer.id && getMessagingRole(candidate.user) === peer.role
+      ));
+      if (peerSocket?.user?.name) peer.name = String(peerSocket.user.name).slice(0, 100);
+      try {
+        const PeerModel = peer.role === 'teacher' ? require('./models/Teacher') : require('./models/Student');
+        const peerProfile = await PeerModel.findById(peer.id).select('name').lean();
+        if (peerProfile?.name) peer.name = String(peerProfile.name).slice(0, 100);
+      } catch (error) {
+        logger.warn({ err: error.message, callId, peerId: peer.id }, 'Call recipient name lookup failed');
+      }
+      await updateCallHistory(call, { peerName: peer.name });
+      if (activeCallSessions.get(callId) !== call) return;
+
+      io.to(peer.id).emit('call:incoming', {
+        callId,
+        conversationId,
+        callType: 'audio',
+        caller: { id: caller.id, role: caller.role, name: caller.name },
+      });
+      logger.info({
+        callId,
+        conversationId,
+        callerId: caller.id,
+        peerId: peer.id,
+        recipientSocketCount: peerSockets.length,
+      }, 'Call invitation delivered');
+      socket.emit('call:ringing', { callId, conversationId });
+    })().catch(async (error) => {
+      logger.error({ err: error.message, callId, conversationId }, 'Call recipient lookup failed');
+      await abandonCall(call, 'failed', 'delivery_failed');
+      sendCallError('CALL_DELIVERY_FAILED', callId);
+    });
+  });
+
+  socket.on('call:accept', (data = {}) => {
+    const signal = callSignalPeer(data.callId, data.conversationId);
+    if (!signal || signal.sender.id !== signal.call.peer.id || signal.call.status !== 'ringing') {
+      sendCallError('CALL_NOT_AVAILABLE', data.callId);
+      return;
+    }
+    clearTimeout(signal.call.timeout);
+    signal.call.status = 'active';
+    signal.call.answeredAt = new Date();
+    void updateCallHistory(signal.call, { status: 'active', answeredAt: signal.call.answeredAt });
+    io.to(signal.peer.id).emit('call:accepted', {
+      callId: signal.call.callId,
+      conversationId: signal.call.conversationId,
+    });
+  });
+
+  socket.on('call:reject', (data = {}) => {
+    const signal = callSignalPeer(data.callId, data.conversationId);
+    if (!signal || signal.sender.id !== signal.call.peer.id || signal.call.status !== 'ringing') return;
+    void finishCall(signal.call, 'call:rejected', 'declined', signal.call.callerSocketRoom, 'rejected', signal.sender.id);
+  });
+
+  for (const eventName of ['call:offer', 'call:answer', 'call:ice']) {
+    socket.on(eventName, (data = {}) => {
+      if (!data || typeof data !== 'object') return;
+      const signal = callSignalPeer(data.callId, data.conversationId);
+      if (!signal || signal.call.status !== 'active') {
+        sendCallError('CALL_NOT_AVAILABLE', data.callId);
+        return;
+      }
+      if (eventName === 'call:offer' && signal.sender.id !== signal.call.caller.id) return;
+      if (eventName === 'call:answer' && signal.sender.id !== signal.call.peer.id) return;
+      const signalData = data.description ?? data.candidate;
+      if (!signalData || typeof signalData !== 'object') return;
+      if (eventName !== 'call:ice' && (typeof signalData.sdp !== 'string' || signalData.sdp.length > 65_536)) return;
+      if (eventName === 'call:ice' && typeof signalData.candidate === 'string' && signalData.candidate.length > 4_096) return;
+      io.to(signal.peer.id).emit(eventName, {
+        callId: signal.call.callId,
+        conversationId: signal.call.conversationId,
+        description: eventName === 'call:ice' ? undefined : signalData,
+        candidate: eventName === 'call:ice' ? signalData : undefined,
+      });
+    });
+  }
+
+  socket.on('call:end', (data = {}) => {
+    const signal = callSignalPeer(data.callId, data.conversationId);
+    if (!signal) return;
+    const status = resolveCallEndStatus(signal.call.status, signal.sender.id === signal.call.caller.id);
+    void finishCall(signal.call, 'call:ended', 'ended', signal.peer.id, status, signal.sender.id);
+  });
+
   socket.on('message:send', async (data) => {
     if (!socket.user) return;
     const u = socket.user;
@@ -589,6 +909,11 @@ io.on('connection', (socket) => {
             policy: result.policy || null,
             reason: result.message || null,
             socketId: socket.id,
+          });
+          socket.emit('message:error', {
+            conversationId: result.conversationId || String(data?.conversationId || ''),
+            code: result.code || 'MESSAGE_SEND_DENIED',
+            message: result.message || 'Không gửi được tin nhắn.',
           });
           return;
         }
@@ -811,6 +1136,17 @@ io.on('connection', (socket) => {
 
   // ── Disconnect ──
   socket.on('disconnect', async () => {
+    if (socket.user) {
+      const callId = activeCallByParticipant.get(`${getMessagingRole(socket.user)}:${socketUserId(socket.user)}`);
+      const call = callId ? activeCallSessions.get(callId) : null;
+      if (call) {
+        const isCaller = call.caller.id === socketUserId(socket.user)
+          && call.caller.role === getMessagingRole(socket.user);
+        const peerRoom = isCaller ? call.peerSocketRoom : call.callerSocketRoom;
+        const status = call.status === 'ringing' ? 'missed' : 'completed';
+        void finishCall(call, 'call:ended', 'disconnected', peerRoom, status, socketUserId(socket.user));
+      }
+    }
     const hit = presenceStore.findPresenceBySocketId(socket.id);
     if (hit) {
       lastSeenMap.set(String(hit.user.userId), new Date().toISOString());
@@ -837,18 +1173,10 @@ app.notifyUser = (role, userId, eventName, data) => {
     return true;
   }
 
-  const tryRoles = [role, getMessagingRole({ id: strUserId, role }), ...(role === 'admin' || role === 'staff' || role === 'support' ? ['admin', 'staff'] : [])];
-  for (const r of new Set(tryRoles.filter(Boolean))) {
-    const user = onlineUsers.get(`${r}_${strUserId}`);
-    if (user?.socketId) {
-      io.to(user.socketId).emit(eventName, data);
-      logDelivery({ eventName, targetRole: r, targetUserId: strUserId, selectedSocketId: user.socketId, mode: 'presence_socketId', ok: true });
-      return true;
-    }
-  }
-
+  // Every authenticated session joins this room, including mobile sessions that
+  // intentionally do not replace the legacy single-socket presence record.
   io.to(strUserId).emit(eventName, data);
-  logDelivery({ eventName, targetRole: role, targetUserId: strUserId, mode: 'userId_room', ok: true });
+  logDelivery({ eventName, targetRole: role, targetUserId: strUserId, mode: 'userId_room_all_sessions', ok: true });
   return true;
 };
 
@@ -897,6 +1225,8 @@ const lessonPracticeRoutes = require('./routes/lessonPracticeRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 
 app.use('/api/auth', authRoutes);
+app.use('/api/calls', require('./routes/callRoutes'));
+app.use('/api/communication-preferences', require('./routes/communicationPreferencesRoutes'));
 app.use('/api/students', studentRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/messages', messageRoutes);

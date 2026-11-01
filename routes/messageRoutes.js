@@ -121,19 +121,22 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
         { senderId: userId },
         { receiverId: userId },
         ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
-      ]
+      ],
+      $and: [
+        { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(userId) }] },
+      ],
     };
 
     // If STAFF or TEACHER, filter by their branch
     if (!isSuperAdmin && userBranch) {
-      matchQuery.$and = [
+      matchQuery.$and.push(
         { $or: [
           { senderBranchCode: userBranch },
           { receiverBranchCode: userBranch },
           // Không leak hộp chung admin cho STAFF/TEACHER
           ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
-        ]}
-      ];
+        ]},
+      );
     }
 
     const messages = await Message.aggregate([
@@ -211,26 +214,67 @@ router.get('/search/:userId', messagesGuard('search'), async (req, res) => {
 
     const { sanitizeRegex } = require('../middleware/sanitizeRegex');
     const safeQ = sanitizeRegex(q);
+    const conversationId = String(req.query.conversationId || '');
 
     const isSuperAdmin = isAdminLevelAccount(req.user);
     const userBranch = req.user.branchCode || '';
 
     const searchQuery = {
-      $or: [
-        { senderId: userId }, 
-        { receiverId: userId },
-        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
+      $and: [
+        { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }] },
+        {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+            ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
+          ],
+        },
+        {
+          $or: [
+            { content: { $regex: safeQ, $options: 'i' } },
+            { fileName: { $regex: safeQ, $options: 'i' } },
+          ],
+        },
       ],
-      content: { $regex: safeQ, $options: 'i' }
     };
 
-    if (!isSuperAdmin && userBranch) {
-      searchQuery.$and = [
-        { $or: [
-          { senderBranchCode: userBranch },
-          { receiverBranchCode: userBranch }
-        ]}
-      ];
+    if (conversationId) {
+      let conversationIds = [conversationId];
+      let isParticipant = false;
+      if (conversationId.startsWith('group_')) {
+        const mongoose = require('mongoose');
+        const groupId = conversationId.slice('group_'.length);
+        if (mongoose.Types.ObjectId.isValid(groupId)) {
+          const group = await Group.findOne({
+            _id: groupId,
+            'participants.userId': String(req.user.id),
+          }).select('_id').lean();
+          isParticipant = Boolean(group) || isAdminLevelAccount(req.user);
+        }
+      } else {
+        const expanded = expandConversationIdAliases(conversationId);
+        conversationIds = expanded.ids;
+        isParticipant = conversationIds.some((id) => canAccessDirectConversation(id, req.user));
+      }
+
+      if (!isParticipant) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+      }
+
+      searchQuery.conversationId = { $in: conversationIds };
+      searchQuery.hiddenFor = { $ne: String(req.user.id) };
+      if (conversationId.startsWith('group_')) searchQuery.$and.shift();
+    }
+
+    if (!conversationId && !isSuperAdmin && userBranch) {
+      searchQuery.$and.push(
+        {
+          $or: [
+            { senderBranchCode: userBranch },
+            { receiverBranchCode: userBranch },
+          ],
+        },
+      );
     }
 
     const messages = await Message.find(searchQuery).sort({ createdAt: -1 }).limit(50);
@@ -287,7 +331,8 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
     }
     const messages = await Message.find({
       conversationId: { $in: queryIds },
-      hiddenFor: { $ne: req.user.id }
+      hiddenFor: { $ne: req.user.id },
+      $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }],
     })
       .sort({ createdAt: 1 })
       .limit(200);
@@ -339,16 +384,21 @@ router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
         ? ['ALL_USERS', 'ALL_TEACHERS']
         : ['ALL_USERS'];
     const messages = await Message.find({
-      $or: [
-        { senderId: { $in: targetIds } },
-        { receiverId: { $in: targetIds } },
-        { receiverId: { $in: broadcastIds } },
-        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
-        ...(groupIds.length > 0 ? [
-          { conversationId: { $in: groupIds.map(id => `group_${id}`) } },
-          { groupId: { $in: groupIds } },
-          { isGroup: true, groupId: { $in: groupIds } },
-        ] : []),
+      $and: [
+        { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }] },
+        {
+          $or: [
+            { senderId: { $in: targetIds } },
+            { receiverId: { $in: targetIds } },
+            { receiverId: { $in: broadcastIds } },
+            ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
+            ...(groupIds.length > 0 ? [
+              { conversationId: { $in: groupIds.map(id => `group_${id}`) } },
+              { groupId: { $in: groupIds } },
+              { isGroup: true, groupId: { $in: groupIds } },
+            ] : []),
+          ],
+        },
       ],
       hiddenFor: { $nin: targetIds }
     }).sort({ createdAt: -1 }).limit(1000);
@@ -572,7 +622,12 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
 
     const filter = isGroupConv
       ? { conversationId, isRead: false, senderId: { $nin: receiverTargets } }
-      : { conversationId: { $in: readIds }, receiverId: { $in: receiverTargets }, isRead: false };
+      : {
+          conversationId: { $in: readIds },
+          receiverId: { $in: receiverTargets },
+          isRead: false,
+          recipientRejected: { $ne: true },
+        };
 
     await Message.updateMany(
       filter,
@@ -841,6 +896,14 @@ router.patch('/:messageId/soft-delete', messagesGuard('soft_delete'), async (req
       await message.save();
     }
 
+    const io = req.app.get('io');
+    if (io && typeof req.app.notifyUser === 'function') {
+      req.app.notifyUser(getMessagingRole(req.user), userId, 'message:delete', {
+        messageId: String(message._id),
+        conversationId: message.conversationId,
+      });
+    }
+
     res.json({ success: true, message: 'Đã xóa tin nhắn', data: message.hiddenFor });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -942,7 +1005,30 @@ router.get('/groups/user/:userId', messagesGuard('group_list'), async (req, res)
         { 'createdBy.userId': { $in: targetIds } },
       ],
     }).sort({ updatedAt: -1 });
-    res.json({ success: true, data: groups });
+    const groupConversationIds = groups.map((group) => `group_${group._id}`);
+    const unreadRows = groupConversationIds.length
+      ? await Message.aggregate([
+          {
+            $match: {
+              conversationId: { $in: groupConversationIds },
+              isRead: false,
+              isRecalled: { $ne: true },
+              messageType: { $ne: 'system' },
+              senderId: { $nin: [...targetIds, 'ai_support'] },
+              hiddenFor: { $nin: targetIds },
+            },
+          },
+          { $group: { _id: '$conversationId', unreadCount: { $sum: 1 } } },
+        ])
+      : [];
+    const unreadByConversation = new Map(
+      unreadRows.map((row) => [String(row._id), Number(row.unreadCount) || 0]),
+    );
+    const data = groups.map((group) => ({
+      ...group.toObject(),
+      unreadCount: unreadByConversation.get(`group_${group._id}`) || 0,
+    }));
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

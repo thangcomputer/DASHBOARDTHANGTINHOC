@@ -10,7 +10,24 @@ export type AppStackParamList = {
   Attendance: { scheduleId?: string } | undefined;
   Grades: undefined;
   NotificationCenter: undefined;
-  Conversation: { conversationId: string; conversationName?: string };
+  Conversation: {
+    conversationId: string;
+    conversationName?: string;
+    participantId?: string;
+    participantRole?: string;
+    participantOnline?: boolean;
+    participantAvatarUri?: string;
+  };
+  CallHistory: undefined;
+  Call: {
+    callId: string;
+    conversationId: string;
+    conversationName: string;
+    participantId: string;
+    participantRole: string;
+    participantName: string;
+    direction: 'incoming' | 'outgoing';
+  };
   MobileMenu: undefined;
   StudentLearning: undefined;
   StudentExam: undefined;
@@ -25,12 +42,21 @@ export type AppStackParamList = {
   TeacherTraining: undefined;
   TeacherFinance: undefined;
   Tuition: undefined;
+  CertPrepCatalog: undefined;
+  CertPrepLevel: { levelId: string; courseName: string };
+  CertPrepPlayer: { sessionId: string; testTitle: string };
+  CertPrepResult: { sessionId: string; testTitle: string };
+  LessonPracticeCatalog: undefined;
+  LessonPracticeUnits: { subjectId: string; subjectName: string; courseName?: string };
+  LessonPracticePlayer: { unitId: string; unitTitle: string; subjectName?: string; courseName?: string };
 };
 
 export type MainTabsParamList = {
   Home: undefined;
   Schedule: undefined;
   Messages: undefined;
+  CourseVideos: undefined;
+  Feed: undefined;
   Notifications: undefined;
   Profile: undefined;
   Students: undefined;
@@ -38,6 +64,6 @@ export type MainTabsParamList = {
 
 export function getTabItems(role: UserRole) {
   return role === 'student'
-    ? ['Home', 'Schedule', 'Messages', 'Notifications', 'Profile'] as const
+    ? ['Schedule', 'Messages', 'CourseVideos', 'Home', 'Feed', 'Profile'] as const
     : ['Home', 'Schedule', 'Students', 'Messages', 'Profile'] as const;
 }

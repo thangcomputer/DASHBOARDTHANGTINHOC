@@ -10,27 +10,72 @@ import {
   mockStudentQuizzes,
   mockSoftwareLinks,
   mockTrainingCourses,
-  mockConversations,
   mockMessages,
   mockMaterials,
   mockNotifications,
-  mockSchedule,
   mockTeacherSchedule,
-  mockStudent,
+  mockSchedule,
   mockStudentProfileQaEnrollments,
   mockStudentProfileQaVideoOrders,
+  mockStudent,
   mockTeacher,
   mockTeacherAssignments,
-  mockTeacherConversations,
   mockTeacherNotifications,
   mockTeacherStudents,
   mockTeacherThreads,
+  mockStudentThreads,
 } from '../mocks/data';
-import type { DemoUser, ScheduleItem, UserRole } from '../types';
+import type {
+  ChatMessage, Conversation, DemoNewsItem, DemoSoftwareLink, DemoTrainingCourse, DemoUser, LearningMaterial, ScheduleItem, UserRole,
+} from '../types';
+import { Platform } from 'react-native';
+import {
+  clearMobileSession,
+  loadMobileSession,
+  mobileApiRequest,
+  resolveMobilePublicUrl,
+  saveMobileSession,
+  setMobileApiTokens,
+  type MobileStoredSession,
+} from './apiClient';
+import {
+  getStudentAccountData,
+  getStudentAssignments,
+  getTeacherAssignedStudents,
+  submitStudentAssignment,
+  type RawStudent,
+} from './studentApi';
+import {
+  createTeacherAssignment,
+  getTeacherAssignments,
+  gradeAssignmentSubmission,
+} from './assignmentApi';
+import {
+  createMessageGroup, getMessageContacts, getMessageThread, markConversationRead, sendChatMessage,
+  uploadChatAttachment, searchChatMessages, reactToChatMessage, recallChatMessage,
+  deleteChatMessageForMe, togglePinnedChatMessage, type ChatAttachmentUpload,
+} from './messageApi';
+import { emitMessageRead, joinChatGroup } from './socketService';
+import {
+  getTeacherProfile,
+  getTeacherFinanceOverview,
+  getTeacherTrainingCourses,
+  updateTeacherProfile,
+  type TeacherProfile,
+  type TeacherProfileUpdate,
+  type TeacherFinanceOverview,
+} from './teacherApi';
+import {
+  getStudentEvaluations,
+  submitPrivateEvaluation,
+  submitTeacherRating,
+} from './evaluationApi';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
-const mobileScheduleApiEnabled = String(process.env.EXPO_PUBLIC_MOBILE_SCHEDULE_API || '').toLowerCase() === 'true';
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
+const qaReadNotificationIds = new Set<string>();
+const qaDismissedNotificationIds = new Set<string>();
+let qaAllNotificationsRead = false;
 
 function formatScheduleDateLabel(rawDate?: string | null) {
   if (!rawDate) return 'Chưa xác định';
@@ -47,13 +92,25 @@ function formatScheduleTime(startTime?: string | null, endTime?: string | null) 
   return start || end;
 }
 
+function scheduleDateKey(value: unknown) {
+  const raw = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const date = raw ? new Date(raw) : null;
+  if (!date || Number.isNaN(date.getTime())) return undefined;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleItem {
   const id = String(raw?._id || raw?.id || `${raw?.date || Date.now()}-${raw?.course || raw?.teacherName || role}`);
   const course = String(raw?.course || raw?.subject || raw?.title || 'Buổi học').trim() || 'Buổi học';
-  const dateValue = raw?.date ? new Date(raw.date) : null;
-  const dateKey = dateValue && !Number.isNaN(dateValue.getTime())
-    ? `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, '0')}-${String(dateValue.getDate()).padStart(2, '0')}`
-    : raw?.date || undefined;
+  const dateKey = scheduleDateKey(raw?.date);
   const startTime = String(raw?.startTime || raw?.start || '').trim();
   const endTime = String(raw?.endTime || raw?.end || '').trim();
   const teacherName = String(raw?.teacherName || raw?.teacherId?.name || 'Giảng viên').trim();
@@ -79,14 +136,24 @@ function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleI
     status,
     date: dateKey,
     courseName: course,
+    teacherId: raw?.teacherId && typeof raw.teacherId === 'object'
+      ? String(raw.teacherId._id || raw.teacherId.id || '')
+      : String(raw?.teacherId || ''),
     teacherName,
     studentName,
     studentId: raw?.studentId && typeof raw.studentId === 'object' ? String(raw.studentId._id || raw.studentId.id || '') : String(raw?.studentId || ''),
-    note: String(raw?.note || raw?.studentNote || '').trim(),
+    enrollmentId: String(raw?.enrollmentId?._id || raw?.enrollmentId || ''),
+    startTime,
+    endTime,
+    note: String(raw?.studentNote || raw?.note || '').trim(),
     attendanceStatus,
     learningMode: raw?.linkHoc ? 'Trực tuyến' : 'Trực tiếp',
     meetingUrl: String(raw?.linkHoc || raw?.meetingUrl || '').trim(),
-    confirmedByStudent: ['accepted', 'pending', 'admin_approved'].includes(String(raw?.studentConfirmStatus || '')),
+    confirmedByStudent: ['accepted', 'admin_approved'].includes(String(raw?.studentConfirmStatus || '')),
+    attendanceConfirmPending: String(raw?.studentConfirmStatus || '') === 'pending',
+    attendanceConfirmStatus: String(raw?.studentConfirmStatus || 'none'),
+    attendanceDisputed: String(raw?.studentConfirmStatus || '') === 'disputed',
+    attendanceRejected: String(raw?.studentConfirmStatus || '') === 'admin_rejected',
     confirmedByTeacher: String(raw?.status || '') === 'completed' || String(raw?.studentConfirmStatus || '') === 'admin_approved',
     grade: raw?.attendancePendingGrade ?? null,
     color: '#3B82F6',
@@ -94,40 +161,261 @@ function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleI
 }
 
 async function readRealScheduleList(role: UserRole): Promise<ScheduleItem[]> {
-  const baseUrl = String(process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
-  const envStudentId = String(process.env.EXPO_PUBLIC_MOBILE_STUDENT_ID || '').trim();
-  const envTeacherId = String(process.env.EXPO_PUBLIC_MOBILE_TEACHER_ID || '').trim();
-  const userId = role === 'teacher' ? envTeacherId : envStudentId;
-
-  if (!userId) {
-    return [];
+  const payload = await mobileApiRequest<{ data?: Record<string, any>[] }>('/schedules?limit=500');
+  if (!Array.isArray(payload.data)) {
+    throw new Error('Phản hồi danh sách lịch học không hợp lệ.');
   }
+  return payload.data.map((row) => mapRealScheduleRow(row, role));
+}
 
-  const query = new URLSearchParams({
-    ...(role === 'teacher' ? { teacherId: userId } : { studentId: userId }),
-  });
-
-  const response = await fetch(`${baseUrl}/api/schedules?${query.toString()}`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-            Authorization: 'Bearer ' + String(process.env.EXPO_PUBLIC_MOBILE_API_TOKEN || '').trim(),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Schedule API error (${response.status})`);
-  }
-
-  const payload = await response.json();
-  const rows = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
-  return rows.map((row: Record<string, any>) => mapRealScheduleRow(row, role));
+function mapRealNotification(raw: Record<string, any>) {
+  const createdAt = raw?.time || raw?.createdAt;
+  const createdDate = createdAt ? new Date(createdAt) : null;
+  const elapsedMinutes = createdDate && !Number.isNaN(createdDate.getTime())
+    ? Math.max(0, Math.floor((Date.now() - createdDate.getTime()) / 60000))
+    : null;
+  const time = elapsedMinutes == null
+    ? String(createdAt || 'Chưa xác định')
+    : elapsedMinutes < 1
+      ? 'Vừa xong'
+      : elapsedMinutes < 60
+        ? `${elapsedMinutes} phút trước`
+        : elapsedMinutes < 1440
+          ? `${Math.floor(elapsedMinutes / 60)} giờ trước`
+          : createdDate!.toLocaleDateString('vi-VN');
+  const type = String(raw?.type || raw?.category || 'SYSTEM').toUpperCase();
+  const categoryByType: Record<string, string> = {
+    SCHEDULE: 'Lịch học',
+    ASSIGNMENT: 'Bài tập',
+    FINANCE: 'Tài chính',
+    MESSAGE: 'Tin nhắn',
+    COURSE: 'Khóa học',
+    EXAM: 'Thi',
+    EVALUATION: 'Đánh giá',
+    TRAINING: 'Đào tạo',
+    NEWS: 'Tin tức',
+    SYSTEM: 'Hệ thống',
+  };
+  const id = String(raw?.id || raw?._id || '').trim();
+  if (!id) throw new Error('Thông báo từ máy chủ thiếu mã định danh.');
+  return {
+    id,
+    title: String(raw?.title || 'Thông báo'),
+    message: String(raw?.message || raw?.content || ''),
+    time,
+    category: categoryByType[type] || String(raw?.category || 'Thông báo'),
+    type,
+    targetPath: String(raw?.link || raw?.targetPath || ''),
+    payload: raw?.payload && typeof raw.payload === 'object' ? raw.payload : undefined,
+    unread: raw?.read !== true,
+  };
 }
 
 async function readMockList<T>(items: T[]): Promise<T[]> {
   await delay();
   if (qaState === 'error') throw new Error('Mock UI QA error state');
   return qaState === 'empty' ? [] : items;
+}
+
+type CenterInfoSectionItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  email: string;
+  phone: string;
+  address: string;
+  url: string;
+  mapsUrl: string;
+  hours: string;
+  detailHtml: string;
+};
+
+type CenterInfoSection = { title: string; items: CenterInfoSectionItem[] };
+
+type CenterInfo = {
+  name: string;
+  intro: string;
+  mission: string;
+  vision: string;
+  coreValues: string;
+  foundedYear: string;
+  headquartersAddress: string;
+  contactPhone: string;
+  contactEmail: string;
+  website: string;
+  sections: CenterInfoSection[];
+};
+
+function rawRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function rawText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function centerLink(value: unknown) {
+  const url = rawText(value);
+  if (!url || /^(https?:|mailto:|tel:)/i.test(url)) return url;
+  return resolveMobilePublicUrl(url);
+}
+
+function newsDate(value: unknown) {
+  if (!value) return 'Chưa xác định';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  const now = new Date();
+  return date.toDateString() === now.toDateString()
+    ? 'Hôm nay'
+    : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function plainNewsContent(value: unknown) {
+  return rawText(value)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|h[1-6]|li)>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+function mapRealNews(raw: Record<string, unknown>): DemoNewsItem {
+  const id = rawText(raw.id || raw._id);
+  if (!id) throw new Error('Bài viết từ máy chủ thiếu mã định danh.');
+  const attachments = Array.isArray(raw.attachments) ? raw.attachments.map((entry, index) => {
+    const file = rawRecord(entry);
+    const url = rawText(file.url || file.fileUrl || file.path);
+    const mimeType = rawText(file.mimeType || file.type).toLowerCase();
+    const name = rawText(file.name || file.originalName || file.title) || `Tệp đính kèm ${index + 1}`;
+    const extension = name.split('.').pop()?.toLowerCase() || '';
+    const type: DemoNewsItem['attachments'][number]['type'] = mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp'].includes(extension)
+      ? 'image'
+      : mimeType.startsWith('video/') || ['mp4', 'mov', 'webm'].includes(extension)
+        ? 'video'
+        : url
+          ? 'link'
+          : 'file';
+    return {
+      id: rawText(file.id || file._id) || `${id}-attachment-${index + 1}`,
+      name,
+      type,
+      url: url ? resolveMobilePublicUrl(url) : undefined,
+    };
+  }) : [];
+  const thumbnail = rawText(raw.thumbnailUrl);
+  return {
+    id,
+    slug: rawText(raw.slug) || id,
+    title: rawText(raw.title) || 'Tin tức',
+    topic: rawText(raw.topicName) || 'Tin tức',
+    publishedAt: newsDate(raw.publishedAt || raw.createdAt),
+    excerpt: plainNewsContent(raw.excerpt),
+    content: plainNewsContent(raw.contentHtml || raw.content || raw.excerpt),
+    views: Number(raw.viewCount) || 0,
+    attachments,
+    author: rawText(raw.authorName) || 'Trung tâm Thắng Tin Học',
+    thumbnailUrl: thumbnail ? resolveMobilePublicUrl(thumbnail) : undefined,
+  };
+}
+
+function mapCenterInfoItem(value: unknown, index: number): CenterInfoSectionItem {
+  const item = rawRecord(value);
+  return {
+    id: rawText(item.id || item._id) || `center-info-${index + 1}`,
+    title: rawText(item.title) || 'Thông tin',
+    subtitle: rawText(item.subtitle),
+    description: rawText(item.description),
+    email: rawText(item.email),
+    phone: rawText(item.phone),
+    address: rawText(item.address),
+    url: centerLink(item.url),
+    mapsUrl: centerLink(item.mapsUrl),
+    hours: rawText(item.hours),
+    detailHtml: plainNewsContent(item.detailHtml),
+  };
+}
+
+function mapCenterInfo(payload: Record<string, unknown>): CenterInfo {
+  const data = rawRecord(payload.data);
+  const overview = rawRecord(data.overview);
+  if (data.published !== true || !Object.keys(overview).length) {
+    throw new Error('Thông tin Trung tâm chưa được công bố trên hệ thống.');
+  }
+  const rawSections = rawRecord(data.sections);
+  const labels: Record<string, string> = {
+    staff: 'Nhân sự',
+    branch: 'Chi nhánh',
+    social: 'Mạng xã hội',
+    service: 'Dịch vụ đào tạo',
+    exam_venue: 'Địa điểm thi',
+    certificate: 'Chứng chỉ',
+  };
+  const sections = Object.entries(labels).map(([key, title]) => ({
+    title,
+    items: (Array.isArray(rawSections[key]) ? rawSections[key] as unknown[] : []).map(mapCenterInfoItem),
+  }));
+  return {
+    name: rawText(overview.name) || 'Trung tâm',
+    intro: rawText(overview.intro),
+    mission: rawText(overview.mission),
+    vision: rawText(overview.vision),
+    coreValues: rawText(overview.coreValues),
+    foundedYear: rawText(overview.foundedYear),
+    headquartersAddress: rawText(overview.headquartersAddress),
+    contactPhone: rawText(overview.contactPhone),
+    contactEmail: rawText(overview.contactEmail),
+    website: rawText(overview.website),
+    sections,
+  };
+}
+
+async function getRoleTrainingData(user?: DemoUser | null) {
+  if (!user || !['student', 'teacher'].includes(user.role)) {
+    throw new Error('Không thể tải tài nguyên: tài khoản mobile không hợp lệ.');
+  }
+  const endpoint = user.role === 'teacher' ? '/settings/training-data' : '/settings/student-training-data';
+  const response = await mobileApiRequest<{ data?: Record<string, unknown> }>(endpoint);
+  if (!response.data) throw new Error('Máy chủ không trả về danh sách tài nguyên.');
+  return response.data;
+}
+
+function mapMaterial(value: unknown, index: number, fallbackType = ''): LearningMaterial {
+  const raw = rawRecord(value);
+  const title = rawText(raw.title || raw.name || raw.fileOriginalName || raw.fileName) || `Tài liệu ${index + 1}`;
+  const url = centerLink(raw.url || raw.fileUrl || raw.link);
+  const extension = (url || title).split(/[?#]/)[0].split('.').pop()?.toLowerCase() || '';
+  const sourceType = rawText(raw.type || raw.fileType || fallbackType).toLowerCase();
+  const type: LearningMaterial['type'] = sourceType.includes('video') || ['mp4', 'mov', 'webm'].includes(extension)
+    ? 'VIDEO'
+    : sourceType.includes('pdf') || extension === 'pdf'
+      ? 'PDF'
+      : sourceType.includes('word') || sourceType.includes('doc') || ['doc', 'docx'].includes(extension)
+        ? 'WORD'
+        : sourceType.includes('excel') || ['xls', 'xlsx', 'csv'].includes(extension)
+          ? 'EXCEL'
+          : url
+            ? 'LINK'
+          : 'LINK';
+  const dateValue = raw.publishedAt || raw.createdAt || raw.updatedAt;
+  const date = dateValue ? new Date(String(dateValue)) : null;
+  return {
+    id: rawText(raw.id || raw._id) || `material-${fallbackType || 'file'}-${index + 1}`,
+    title,
+    subject: rawText(raw.courseName || raw.course || raw.subject || raw.category) || 'Tài nguyên khóa học',
+    type,
+    date: date && !Number.isNaN(date.getTime())
+      ? date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : rawText(dateValue) || 'Chưa xác định',
+    size: rawText(raw.sizeLabel || raw.size || raw.fileSize) || '—',
+    url: url || undefined,
+  };
 }
 
 function dateTimeHoursAgo(hours: number) {
@@ -140,25 +428,110 @@ function dateTimeHoursAgo(hours: number) {
 }
 
 export const authService = {
-  async signIn(role: UserRole, phone: string, password: string) {
-    await delay(280);
+  async signIn(role: UserRole, phone: string, password: string): Promise<MobileStoredSession<DemoUser>> {
     if (!phone.trim() || !password.trim()) throw new Error('Vui lòng nhập số điện thoại và mật khẩu.');
-    return role === 'student' ? mockStudent : mockTeacher;
+    const platform = Platform.OS === 'web' ? 'web' : Platform.OS;
+    if (!['android', 'ios', 'web'].includes(platform)) throw new Error('Nền tảng đăng nhập chưa được hỗ trợ.');
+    const payload = await mobileApiRequest<{
+      data?: {
+        user?: Record<string, unknown>;
+        accessToken?: string;
+        refreshToken?: string;
+        sessionId?: string;
+      };
+    }>('/auth/login/mobile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: phone.trim(),
+        password,
+        role,
+        platform,
+        deviceLabel: platform === 'web' ? 'Expo Web trên máy tính' : `${platform} app`,
+      }),
+    }, false);
+    const data = payload.data;
+    const rawUser = data?.user;
+    if (
+      !rawUser
+      || typeof data?.accessToken !== 'string'
+      || typeof data.refreshToken !== 'string'
+      || typeof data.sessionId !== 'string'
+    ) {
+      throw new Error('Phản hồi đăng nhập từ máy chủ không hợp lệ.');
+    }
+    const returnedRole = rawUser.role === 'teacher' ? 'teacher' : rawUser.role === 'student' ? 'student' : null;
+    const id = String(rawUser._id || rawUser.id || '').trim();
+    const name = String(rawUser.name || '').trim();
+    if (!returnedRole || returnedRole !== role || !id || !name) {
+      throw new Error('Thông tin tài khoản trả về không hợp lệ.');
+    }
+    const user: DemoUser = {
+      id,
+      name,
+      role: returnedRole,
+      phone: String(rawUser.phone || phone).trim(),
+      code: String(rawUser.code || rawUser.studentCode || rawUser.teacherCode || ''),
+      course: String(rawUser.course || rawUser.specialty || ''),
+      branch: String(rawUser.branchName || rawUser.branchCode || ''),
+      avatarColor: returnedRole === 'teacher' ? '#E9E5FA' : '#DDF1EB',
+      completedSessions: typeof rawUser.completedSessions === 'number' ? rawUser.completedSessions : undefined,
+      totalSessions: typeof rawUser.totalSessions === 'number' ? rawUser.totalSessions : undefined,
+      avgGrade: typeof rawUser.avgGrade === 'number' ? rawUser.avgGrade : undefined,
+    };
+    const session: MobileStoredSession<DemoUser> = {
+      user,
+      tokens: {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        sessionId: data.sessionId,
+      },
+    };
+    try {
+      await saveMobileSession(session);
+    } catch (error) {
+      setMobileApiTokens(null);
+      throw error;
+    }
+    return session;
+  },
+  async restore() {
+    return loadMobileSession<DemoUser>();
+  },
+  async signOut() {
+    try {
+      const sessionTokens = (await loadMobileSession<DemoUser>())?.tokens;
+      if (sessionTokens) {
+        await mobileApiRequest('/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: sessionTokens.refreshToken }),
+        });
+      }
+    } finally {
+      await clearMobileSession();
+    }
+  },
+  async changePassword(oldPassword: string, newPassword: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể thay đổi mật khẩu thật trong chế độ UI QA.');
+    await mobileApiRequest('/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
+    await clearMobileSession();
   },
 };
 
 export const scheduleService = {
   async list(role: UserRole = 'student') {
-    if (mobileScheduleApiEnabled) {
-      try {
-        const realItems = await readRealScheduleList(role);
-        if (realItems.length) return realItems;
-      } catch (error) {
-        console.warn('[mobile:schedule] backend fallback to mock:', error);
-      }
+    if (__DEV__ && qaState === 'web-preview') {
+      return readMockList(role === 'teacher' ? mockTeacherSchedule : mockSchedule);
     }
-
-    if (role === 'teacher' && ['attendance-overdue', 'attendance-pending'].includes(qaState || '')) {
+    if (__DEV__ && qaState === 'error') throw new Error('Mock UI QA error state');
+    if (__DEV__ && qaState === 'empty') return [];
+    if (__DEV__ && qaState === 'loading') await delay();
+    if (__DEV__ && qaState && ['attendance-overdue', 'attendance-pending'].includes(qaState)) {
       const timing = dateTimeHoursAgo(qaState === 'attendance-overdue' ? 3 : 2);
       const item = {
         ...mockTeacherSchedule[0],
@@ -174,55 +547,322 @@ export const scheduleService = {
       };
       return readMockList([item]);
     }
-    return readMockList(role === 'teacher' ? mockTeacherSchedule : mockSchedule);
+    return readRealScheduleList(role);
+  },
+  async pendingAttendanceConfirm(user?: DemoUser | null) {
+    if (!user || user.role !== 'student') {
+      throw new Error('Chỉ học viên đã đăng nhập mới được tải xác nhận điểm danh.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) return [];
+    const response = await mobileApiRequest<{ data?: Record<string, any>[] }>('/schedules/pending-confirm');
+    if (!Array.isArray(response.data)) {
+      throw new Error('Phản hồi xác nhận điểm danh đang chờ không hợp lệ.');
+    }
+    return response.data.map((raw) => ({
+      ...mapRealScheduleRow({
+        ...raw,
+        _id: raw.scheduleId,
+        course: raw.course,
+        status: 'scheduled',
+      }, 'student'),
+      teacherName: String(raw.teacherName || 'Giảng viên'),
+      studentName: String(raw.studentName || user.name),
+      attendanceSessionNumber: raw.sessionNumber ?? raw.sessionOrdinalPreview ?? raw.completedSessions ?? null,
+      attendanceTotalSessions: raw.totalSessions ?? raw.sessionTotalPreview ?? null,
+      weekday: String(raw.weekday || ''),
+    }));
+  },
+  async create(
+    input: {
+      teacherId: string;
+      studentId: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      course: string;
+      enrollmentId?: string;
+    },
+    user?: DemoUser | null,
+  ) {
+    if (!user || user.role !== 'teacher' || !user.id) {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được xếp lịch.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      throw new Error('Không thể xếp lịch thật trong chế độ xem trước.');
+    }
+    const response = await mobileApiRequest<{ success?: boolean; data?: Record<string, unknown> }>('/schedules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...input, teacherId: user.id }),
+    });
+    if (response.success !== true || !response.data) {
+      throw new Error('Máy chủ không xác nhận lịch học đã được tạo.');
+    }
+  },
+  async update(
+    scheduleId: string,
+    updates: { date: string; startTime: string; endTime: string },
+    user?: DemoUser | null,
+  ) {
+    if (!scheduleId.trim()) throw new Error('Không thể đổi lịch: thiếu mã buổi học.');
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được đổi lịch.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      throw new Error('Không thể đổi lịch thật trong chế độ xem trước.');
+    }
+    const response = await mobileApiRequest<{ success?: boolean; data?: Record<string, unknown> }>(
+      `/schedules/${encodeURIComponent(scheduleId)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      },
+    );
+    if (response.success !== true || !response.data) {
+      throw new Error('Máy chủ không xác nhận lịch học đã được cập nhật.');
+    }
+  },
+  async markAttendance(
+    scheduleId: string,
+    input: { note: string; grade: number },
+    user?: DemoUser | null,
+  ) {
+    if (!scheduleId.trim()) throw new Error('Không thể điểm danh: thiếu mã buổi học.');
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được điểm danh.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      throw new Error('Không thể điểm danh thật trong chế độ xem trước.');
+    }
+    const response = await mobileApiRequest<{
+      success?: boolean;
+      data?: Record<string, unknown>;
+    }>(`/schedules/${encodeURIComponent(scheduleId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'completed',
+        note: input.note,
+        grade: input.grade,
+      }),
+    });
+    if (response.success !== true || !response.data) {
+      throw new Error('Máy chủ không xác nhận đã ghi nhận điểm danh.');
+    }
+    return response.data;
+  },
+  async cancel(scheduleId: string, reason: string, user?: DemoUser | null) {
+    if (!scheduleId.trim()) throw new Error('Không thể hủy lịch: thiếu mã buổi học.');
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được hủy lịch.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      throw new Error('Không thể hủy lịch thật trong chế độ xem trước.');
+    }
+    const response = await mobileApiRequest<{ success?: boolean }>(
+      `/schedules/${encodeURIComponent(scheduleId)}/cancel`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      },
+    );
+    if (response.success !== true) {
+      throw new Error('Máy chủ không xác nhận lịch học đã được hủy.');
+    }
+  },
+  async confirmAttendance(
+    scheduleId: string,
+    decision: 'accept' | 'dispute',
+    user?: DemoUser | null,
+  ) {
+    if (!scheduleId.trim()) throw new Error('Không thể xác nhận điểm danh: thiếu mã buổi học.');
+    if (!user || user.role !== 'student') {
+      throw new Error('Chỉ học viên đã đăng nhập mới được xác nhận điểm danh.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      return { disputed: decision === 'dispute' };
+    }
+    const response = await mobileApiRequest<{
+      data?: Record<string, unknown>;
+      disputed?: boolean;
+    }>(`/schedules/${encodeURIComponent(scheduleId)}/student-confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision }),
+    });
+    if (!response.data) throw new Error('Máy chủ không xác nhận đã cập nhật điểm danh.');
+    return { disputed: response.disputed === true };
+  },
+  async saveStudentNote(scheduleId: string, note: string, user?: DemoUser | null) {
+    if (!scheduleId.trim()) throw new Error('Không thể gửi ghi chú: thiếu mã buổi học.');
+    if (!user || user.role !== 'student') {
+      throw new Error('Chỉ học viên đã đăng nhập mới được gửi ghi chú.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) return;
+    await mobileApiRequest(`/schedules/${encodeURIComponent(scheduleId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentNote: note }),
+    });
   },
 };
 
 export const assignmentService = {
-  async list(role: UserRole = 'student') {
+  async list(role: UserRole = 'student', user?: DemoUser | null) {
     if (role === 'student' && qaState === 'assignment-submitted') {
       return readMockList(mockAssignments.map((item) => item.id === 'task-1' ? { ...item, status: 'Đã nộp' as const } : item));
     }
     if (role === 'student' && qaState === 'assignment-graded') {
       return readMockList(mockAssignments.map((item) => item.id === 'task-1' ? { ...item, status: 'Đã chấm' as const, grade: 8.5, teacherFeedback: 'Bài làm demo đã được nhận xét.' } : item));
     }
+    if (role === 'student' && !qaState) {
+      if (!user) throw new Error('Không thể tải bài tập: tài khoản học viên không hợp lệ.');
+      return getStudentAssignments(user);
+    }
+    if (role === 'teacher' && !qaState && !user?.previewMode) {
+      if (!user) throw new Error('Không thể tải bài tập: tài khoản giảng viên không hợp lệ.');
+      return getTeacherAssignments(user);
+    }
     return readMockList(role === 'teacher' ? mockTeacherAssignments : mockAssignments);
+  },
+  async create(user: DemoUser, input: Parameters<typeof createTeacherAssignment>[1]) {
+    if (__DEV__ && qaState) throw new Error('Không thể giao bài thật trong chế độ UI QA.');
+    return createTeacherAssignment(user, input);
+  },
+  async grade(submissionId: string, grade: number, feedback: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể chấm bài thật trong chế độ UI QA.');
+    return gradeAssignmentSubmission(submissionId, grade, feedback);
+  },
+  async submit(assignmentId: string, studentId: string, submittedFileUrl: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể gửi bài thật trong chế độ UI QA.');
+    return submitStudentAssignment(assignmentId, studentId, submittedFileUrl);
   },
 };
 
 export const materialService = {
-  async list() { return readMockList(mockMaterials); },
+  async list(user?: DemoUser | null): Promise<LearningMaterial[]> {
+    if (__DEV__ && qaState) return readMockList(mockMaterials);
+    if (user?.previewMode) return readMockList(mockMaterials);
+    const data = await getRoleTrainingData(user);
+    const rows = [
+      ...(['files', 'guides', 'videos'] as const).flatMap((key) => {
+        const values = data[key];
+        if (values === undefined) return [];
+        if (!Array.isArray(values)) throw new Error(`Danh sách ${key} từ máy chủ không hợp lệ.`);
+        const type = key === 'videos' ? 'video' : key === 'guides' ? 'link' : '';
+        return values.map((value, index) => mapMaterial(value, index, type));
+      }),
+    ];
+    return rows;
+  },
 };
 
 export const notificationService = {
-  async list(role: UserRole = 'student') {
-    if (qaState === 'notification-25-items') {
-      const source = role === 'teacher' ? mockTeacherNotifications : mockNotifications;
+  async list(_role: UserRole = 'student') {
+    if (__DEV__ && qaState === 'notification-25-items') {
+      const source = _role === 'teacher' ? mockTeacherNotifications : mockNotifications;
       const fixture = Array.from({ length: 25 }, (_, index) => {
         const item = source[index % source.length];
-        return { ...item, id: `qa-notice-${index + 1}`, title: `${item.title} · ${index + 1}`, unread: index % 2 === 0 };
+        const id = `qa-notice-${index + 1}`;
+        return { ...item, id, title: `${item.title} · ${index + 1}`, unread: !qaAllNotificationsRead && !qaReadNotificationIds.has(id) && index % 2 === 0 };
       });
-      return readMockList(fixture);
+      return readMockList(fixture.filter((item) => !qaDismissedNotificationIds.has(item.id)));
     }
-    return readMockList(role === 'teacher' ? mockTeacherNotifications : mockNotifications);
+    if (__DEV__ && qaState) {
+      const source = _role === 'teacher' ? mockTeacherNotifications : mockNotifications;
+      return readMockList(source.filter((item) => !qaDismissedNotificationIds.has(item.id)).map((item) => ({
+        ...item,
+        unread: !qaAllNotificationsRead && !qaReadNotificationIds.has(item.id) && item.unread,
+      })));
+    }
+    const payload = await mobileApiRequest<{ data?: Record<string, any>[] }>('/notifications?page=1&limit=100');
+    if (!Array.isArray(payload.data)) {
+      throw new Error('Phản hồi danh sách thông báo không hợp lệ.');
+    }
+    return payload.data.map(mapRealNotification);
+  },
+  async markRead(notificationId?: string) {
+    if (__DEV__ && qaState) {
+      if (notificationId) qaReadNotificationIds.add(notificationId);
+      else qaAllNotificationsRead = true;
+      return;
+    }
+    await mobileApiRequest('/notifications/mark-read', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notificationId ? { notificationId } : { markAll: true }),
+    });
+  },
+  async dismiss(notificationId: string) {
+    if (__DEV__ && qaState) {
+      qaDismissedNotificationIds.add(notificationId);
+      return;
+    }
+    await mobileApiRequest(`/notifications/${encodeURIComponent(notificationId)}`, { method: 'DELETE' });
   },
 };
 
 export const messageService = {
-  async conversations(role: UserRole = 'student') {
-    if (qaState === 'chat-empty') return readMockList([]);
-    if (role === 'teacher' && qaState === 'chat-group') return readMockList(mockTeacherConversations.filter((item) => item.category === 'group'));
-    if (role === 'teacher' && qaState === 'chat-unread') return readMockList(mockTeacherConversations.filter((item) => item.unread > 0));
-    return readMockList(role === 'teacher' ? mockTeacherConversations : mockConversations);
+  async conversations(_role: UserRole = 'student', user?: DemoUser | null) {
+    if (!user) throw new Error('Không thể tải danh bạ khi chưa đăng nhập.');
+    return getMessageContacts(user);
   },
-  async thread(conversationId = 'chat-1', role: UserRole = 'student') {
+  async thread(conversationId = 'chat-1', role: UserRole = 'student', user?: DemoUser | null) {
     if (qaState === 'chat-empty') return readMockList([]);
-    return readMockList(role === 'teacher' ? mockTeacherThreads[conversationId] || [] : mockMessages);
+    if (user && !user.previewMode) return getMessageThread(conversationId, user);
+    return readMockList(role === 'teacher' ? mockTeacherThreads[conversationId] || [] : (mockStudentThreads[conversationId] || mockMessages));
+  },
+  async markRead(conversationId: string, user?: DemoUser | null) {
+    if (user && !user.previewMode) {
+      await markConversationRead(conversationId);
+      emitMessageRead(conversationId);
+    }
+  },
+  async send(conversation: Conversation, content: string, user?: DemoUser | null, attachment?: ChatAttachmentUpload, replyTo?: ChatMessage) {
+    if (user && !user.previewMode) {
+      const uploaded = attachment ? await uploadChatAttachment(attachment) : undefined;
+      return sendChatMessage(conversation, user, content, uploaded, replyTo);
+    }
+    throw new Error('Gửi tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
+  },
+  async search(conversationId: string, query: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) return [];
+    return searchChatMessages(conversationId, user, query);
+  },
+  async react(messageId: string, emoji: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Thả cảm xúc chỉ khả dụng với tài khoản đã đăng nhập.');
+    return reactToChatMessage(messageId, emoji, user);
+  },
+  async recall(messageId: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Thu hồi tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
+    return recallChatMessage(messageId);
+  },
+  async deleteForMe(messageId: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Xóa tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
+    return deleteChatMessageForMe(messageId);
+  },
+  async togglePin(conversationId: string, messageId: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Ghim tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
+    return togglePinnedChatMessage(conversationId, messageId);
+  },
+  async createGroup(name: string, members: Conversation[], user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Tạo nhóm thật chỉ khả dụng với tài khoản đã đăng nhập.');
+    const group = await createMessageGroup(name, members);
+    joinChatGroup(group.participantId || '');
+    return group;
   },
 };
 
 export const studentService = {
-  async assigned() { return readMockList(mockTeacherStudents); },
+  async assigned(user?: DemoUser | null) {
+    if (__DEV__ && qaState) return readMockList(mockTeacherStudents);
+    if (!user) throw new Error('Không thể tải danh sách học viên khi chưa đăng nhập.');
+    if (user.previewMode) return readMockList(mockTeacherStudents);
+    if (user.role !== 'teacher') return [];
+    return getTeacherAssignedStudents(user);
+  },
 };
 
 export const learningService = {
@@ -238,30 +878,118 @@ export const learningService = {
 };
 
 export const gradeService = {
-  async list() {
+  async list(user?: DemoUser | null) {
     if (qaState === 'grades-no-grade') return readMockList([]);
     if (qaState === 'grades-completed') {
       return readMockList(mockGradeQaFixtureRecords.map((record) => ({ ...record, status: 'Hoàn thành' as const, qaFixture: true })));
     }
-    return readMockList([]);
+    if (__DEV__ && qaState) return readMockList([]);
+    if (user?.previewMode) return readMockList([]);
+    if (!user || user.role !== 'student') throw new Error('Không thể tải điểm: tài khoản học viên không hợp lệ.');
+    const assignments = await getStudentAssignments(user);
+    return assignments.flatMap((assignment) => assignment.grade == null ? [] : [{
+      id: assignment.id,
+      courseName: assignment.subject,
+      assessment: assignment.title,
+      score: `${assignment.grade}/10`,
+      status: 'Hoàn thành' as const,
+      date: assignment.submissions?.[0]?.submittedAt,
+      feedback: assignment.teacherFeedback,
+    }]);
   },
 };
 
 export const studentProfileService = {
-  async get(user: DemoUser | null | undefined) {
-    await delay();
-    if (qaState === 'error') throw new Error('Mock UI QA error state');
-    const qaFixture = qaState === 'student-profile-populated';
+  async get(user: DemoUser | null | undefined): Promise<{
+    enrollments: NonNullable<DemoUser['enrollments']>;
+    videoOrders: NonNullable<DemoUser['videoOrders']>;
+    qaFixture: boolean;
+    student: RawStudent | null;
+  }> {
+    if (!user) throw new Error('Không thể tải hồ sơ khi chưa đăng nhập.');
+    if (__DEV__ && qaState === 'web-preview') {
+      return {
+        enrollments: mockStudentProfileQaEnrollments,
+        videoOrders: mockStudentProfileQaVideoOrders,
+        qaFixture: true,
+        student: {
+          ...mockStudent,
+          _id: user.id,
+          enrollments: mockStudentProfileQaEnrollments,
+          email: 'minhanh@example.test',
+          address: 'Địa chỉ mẫu — chỉ dùng xem giao diện',
+          zalo: mockStudent.phone,
+          branch: mockStudent.branch,
+        } as RawStudent,
+      };
+    }
+    if (__DEV__ && qaState === 'student-profile-populated') {
+      return {
+        enrollments: mockStudentProfileQaEnrollments,
+        videoOrders: mockStudentProfileQaVideoOrders,
+        qaFixture: true,
+        student: null,
+      };
+    }
+    if (__DEV__ && qaState === 'error') throw new Error('Mock UI QA error state');
+    const account = await getStudentAccountData(user);
     return {
-      enrollments: qaFixture ? mockStudentProfileQaEnrollments : user?.enrollments || [],
-      videoOrders: qaFixture ? mockStudentProfileQaVideoOrders : user?.videoOrders || [],
-      qaFixture,
+      enrollments: account.enrollments,
+      videoOrders: account.videoOrders,
+      qaFixture: false,
+      student: account.student,
     };
   },
 };
 
+export const teacherProfileService = {
+  async get(user: DemoUser | null | undefined): Promise<TeacherProfile> {
+    if (!user) throw new Error('Không thể tải hồ sơ khi chưa đăng nhập.');
+    if (__DEV__ && qaState === 'web-preview') {
+      return {
+        _id: user.id,
+        ...mockTeacher,
+        email: 'giangvien@example.test',
+        zalo: mockTeacher.phone,
+        age: 30,
+        address: 'Địa chỉ mẫu — chỉ dùng xem giao diện',
+        bio: 'Thông tin giới thiệu mẫu để xem trước màn hình.',
+        voiceRegion: 'nam',
+        status: 'active',
+        testScore: 90,
+        baseSalaryPerSession: 250000,
+        startDate: new Date().toISOString(),
+        bankAccount: {
+          bankName: 'Ngân hàng mẫu',
+          accountNumber: '0000000000',
+          accountHolder: mockTeacher.name,
+          bankBranch: 'Chi nhánh mẫu',
+        },
+      };
+    }
+    if (__DEV__ && qaState) {
+      if (qaState === 'error') throw new Error('Mock UI QA error state');
+      return {
+        _id: user.id,
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        zalo: user.zalo,
+        address: user.address,
+        specialty: user.course,
+      };
+    }
+    return getTeacherProfile(user);
+  },
+  async update(user: DemoUser | null | undefined, updates: TeacherProfileUpdate) {
+    if (__DEV__ && qaState) throw new Error('Không thể cập nhật hồ sơ thật trong chế độ UI QA.');
+    if (!user) throw new Error('Không thể cập nhật hồ sơ khi chưa đăng nhập.');
+    return updateTeacherProfile(user, updates);
+  },
+};
+
 export const evaluationService = {
-  async list() {
+  async list(user?: DemoUser | null) {
     if (qaState === 'evaluation-not-eligible') {
       return readMockList(mockEvaluations.map((item) => item.public ? { ...item, completedSessions: 4, totalSessions: 12 } : item));
     }
@@ -287,7 +1015,18 @@ export const evaluationService = {
         completedSessions: item.totalSessions,
       } : item));
     }
-    return readMockList(mockEvaluations);
+    if (__DEV__ && qaState) return readMockList(mockEvaluations);
+    if (user?.previewMode) return readMockList(mockEvaluations);
+    if (!user) throw new Error('Không thể tải đánh giá khi chưa đăng nhập.');
+    return getStudentEvaluations(user);
+  },
+  async submitPrivate(user: DemoUser, evaluation: Parameters<typeof submitPrivateEvaluation>[1], criteria: Record<string, string>, comment: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể gửi đánh giá thật trong chế độ UI QA.');
+    return submitPrivateEvaluation(user, evaluation, criteria, comment);
+  },
+  async submitTeacher(user: DemoUser, evaluation: Parameters<typeof submitTeacherRating>[1], criteria: Record<string, string>, stars: number, comment: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể gửi đánh giá thật trong chế độ UI QA.');
+    return submitTeacherRating(user, evaluation, criteria, stars, comment);
   },
 };
 
@@ -309,7 +1048,7 @@ export const feedService = {
     }
     return readMockList(mockFeedPosts);
   },
-  async news() {
+  async news(): Promise<DemoNewsItem[]> {
     if (qaState === 'news-empty') return readMockList([]);
     if (qaState === 'news-multiple') {
       return readMockList(Array.from({ length: 12 }, (_, index) => ({
@@ -329,36 +1068,73 @@ export const feedService = {
               : [],
       })));
     }
-    return readMockList(mockNews);
+    if (__DEV__ && qaState) return readMockList(mockNews);
+    const response = await mobileApiRequest<{ data?: Record<string, unknown>[] }>('/blog/posts?page=1&limit=40');
+    if (!Array.isArray(response.data)) throw new Error('Phản hồi danh sách tin tức không hợp lệ.');
+    return response.data.map(mapRealNews);
+  },
+  async newsDetail(newsId: string): Promise<DemoNewsItem> {
+    if (!newsId.trim()) throw new Error('Không thể tải tin tức: thiếu mã bài viết.');
+    if (__DEV__ && qaState) {
+      const fixture = mockNews.find((item) => item.id === newsId || item.slug === newsId);
+      if (!fixture) throw new Error('Không tìm thấy tin tức trong dữ liệu xem trước.');
+      return fixture;
+    }
+    const response = await mobileApiRequest<{ data?: Record<string, unknown> }>(
+      `/blog/posts/${encodeURIComponent(newsId)}`,
+    );
+    if (!response.data) throw new Error('Máy chủ không trả về chi tiết tin tức.');
+    return mapRealNews(response.data);
   },
   async centerInfo() {
-    await delay();
-    if (qaState === 'error') throw new Error('Mock UI QA error state');
-    return {
-      name: 'Trung tâm Thắng Tin Học',
-      intro: '',
-      mission: '',
-      vision: '',
-      coreValues: '',
-      headquartersAddress: '',
-      contactPhone: '',
-      contactEmail: '',
-      website: '',
-      sections: [
-        { title: 'Tổng quan' },
-        { title: 'Nhân sự' },
-        { title: 'Chi nhánh' },
-        { title: 'Mạng xã hội' },
-        { title: 'Dịch vụ đào tạo' },
-        { title: 'Địa điểm thi' },
-        { title: 'Chứng chỉ' },
-      ],
-    };
+    if (__DEV__ && qaState) {
+      await delay();
+      if (qaState === 'error') throw new Error('Mock UI QA error state');
+      return {
+        name: 'Trung tâm Thắng Tin Học',
+        intro: '',
+        mission: '',
+        vision: '',
+        coreValues: '',
+        foundedYear: '',
+        headquartersAddress: '',
+        contactPhone: '',
+        contactEmail: '',
+        website: '',
+        sections: [
+          { title: 'Nhân sự', items: [] },
+          { title: 'Chi nhánh', items: [] },
+          { title: 'Mạng xã hội', items: [] },
+          { title: 'Dịch vụ đào tạo', items: [] },
+          { title: 'Địa điểm thi', items: [] },
+          { title: 'Chứng chỉ', items: [] },
+        ],
+      };
+    }
+    const response = await mobileApiRequest<Record<string, unknown>>('/center-info');
+    return mapCenterInfo(response);
   },
 };
 
 export const softwareService = {
-  async list() { return readMockList(mockSoftwareLinks); },
+  async list(user?: DemoUser | null): Promise<DemoSoftwareLink[]> {
+    if (__DEV__ && qaState) return readMockList(mockSoftwareLinks);
+    if (user?.previewMode) return readMockList(mockSoftwareLinks);
+    const data = await getRoleTrainingData(user);
+    if (!Array.isArray(data.softwareLinks)) {
+      throw new Error('Phản hồi danh sách phần mềm không hợp lệ.');
+    }
+    return data.softwareLinks.map((value, index) => {
+      const raw = rawRecord(value);
+      return {
+        id: rawText(raw.id || raw._id) || `software-${index + 1}`,
+        name: rawText(raw.name || raw.title) || `Phần mềm ${index + 1}`,
+        description: rawText(raw.description || raw.desc),
+        category: rawText(raw.category || raw.type) || 'Phần mềm khóa học',
+        url: centerLink(raw.url || raw.link),
+      };
+    });
+  },
 };
 
 export const quizService = {
@@ -372,7 +1148,11 @@ export const quizService = {
 };
 
 export const trainingService = {
-  async list() { return readMockList(mockTrainingCourses); },
+  async list(user?: DemoUser | null): Promise<DemoTrainingCourse[]> {
+    if (__DEV__ && qaState) return readMockList(mockTrainingCourses);
+    if (!user) throw new Error('Không thể tải đào tạo: tài khoản giảng viên không hợp lệ.');
+    return getTeacherTrainingCourses(user);
+  },
 };
 
 export const financeService = {
@@ -388,5 +1168,23 @@ export const financeService = {
       })));
     }
     return readMockList(mockFinanceTransactions);
+  },
+};
+
+export const teacherFinanceService = {
+  async overview(user: DemoUser | null | undefined): Promise<TeacherFinanceOverview> {
+    if (!user) throw new Error('Không thể tải tài chính: tài khoản giảng viên không hợp lệ.');
+    if (__DEV__ && qaState) {
+      const transactions = await financeService.list();
+      return {
+        totalSessions: transactions.reduce((sum, transaction) => sum + transaction.sessions, 0),
+        paidAmount: transactions.filter((transaction) => transaction.status === 'Đã nhận').reduce((sum, transaction) => sum + transaction.amount, 0),
+        unpaidAmount: transactions.filter((transaction) => transaction.status === 'Chưa nhận').reduce((sum, transaction) => sum + transaction.amount, 0),
+        salaryPerSession: 0,
+        pendingSessionsCount: 0,
+        pendingSessions: [],
+      };
+    }
+    return getTeacherFinanceOverview(user);
   },
 };

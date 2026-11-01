@@ -22,8 +22,8 @@ The current Mobile app has a valid base structure and navigation for many Studen
 | Role | Feature | Web source | Mobile source | UI | Function | Data source | Gap | Result |
 |---|---|---|---|---|---|---|---|---|
 | Student | Overview / Home | Current Web dashboard and Student home sections | Mobile Home overview screen | PARTIAL | PARTIAL | MOCK | Order, detail blocks, KPI grouping, and course/account linkage do not fully match the live Web structure | PARTIAL |
-| Student | Schedule | Web schedule calendar + day/session cards + filters | Mobile schedule screen | PARTIAL | PARTIAL | MOCK | Missing some exact filters, session metadata, navigation detail, and day/week ordering parity | PARTIAL |
-| Student | Learning / Lessons | Student learning catalog and lesson detail flow | Mobile learning screen(s) | PARTIAL | PARTIAL | MIXED | Real API layer exists but still not fully mapped to current Web labels, modules, status semantics, and empty/error states | PARTIAL |
+| Student | Schedule | Web schedule calendar + day/session cards + filters | Mobile schedule screen | PARTIAL | PARTIAL | REAL REST API | API-backed data is now used; some exact filters, session metadata, navigation detail, and day/week ordering parity remain incomplete | PARTIAL |
+| Student | Learning / Lessons | Student learning catalog and lesson detail flow | Mobile learning screen(s) | PARTIAL | PARTIAL | MOCK | Course catalog, lesson modules, progress, and Web empty/error states are not yet backed by matching API data | PARTIAL |
 | Student | Notifications | Web notifications list and action flows | Mobile notifications screen | MATCHED | MATCHED | REAL REST API | Functional parity is acceptable for the in-scope list/filter/mutation flow; still separate from native QA | MATCHED |
 | Student | Messages / Inbox | Shared Web inbox and messaging flow | Mobile messages screen | PARTIAL | PARTIAL | MOCK | Message actions, read state, attachments, and route parity are not complete compared to Web | PARTIAL |
 | Student | Assignments / Materials | Web assignments/resources/materials sections | Mobile materials/assignment surfaces | PARTIAL | PARTIAL | MOCK | Missing exact labels, upload/submit flow, status states, and detail depth | PARTIAL |
@@ -32,7 +32,7 @@ The current Mobile app has a valid base structure and navigation for many Studen
 | Student | Feed / News / Center | Web feed/news/center information panels | Mobile feed/news/center areas | PARTIAL | PARTIAL | MOCK | Content depth and action destinations remain incomplete; not fully source-backed | PARTIAL |
 | Student | Exam / Certification attempt | Official exam and certification attempt flow | Mobile menu/informational destination only | WEB-ONLY | WEB-ONLY | WEB-ONLY | Native attempt, camera, proctor, fullscreen and result flow remain website-only by explicit scope | WEB-ONLY |
 | Teacher | Overview / Home | Web teacher overview with KPIs, next session, learner focus | Teacher home screen | PARTIAL | PARTIAL | MOCK | KPI ordering and metric detail do not match current Web output exactly | PARTIAL |
-| Teacher | Schedule / Attendance | Web teacher schedule, attendance and makeup views | Mobile teacher schedule/attendance screens | PARTIAL | PARTIAL | MOCK | Attendance states, overdue/makeup details, and schedule filters are still partial compared to Web | PARTIAL |
+| Teacher | Schedule / Attendance | Web teacher schedule, attendance and makeup views | Mobile teacher schedule/attendance screens | PARTIAL | PARTIAL | REAL REST API | Schedule data is API-backed; attendance mutations, overdue/makeup details, and schedule filters remain partial compared to Web | PARTIAL |
 | Teacher | Students | Web learner management and student profile actions | Mobile students screen | PARTIAL | PARTIAL | MOCK | Search/status/course/progress and detail actions are incomplete compared to Web | PARTIAL |
 | Teacher | Messages | Shared web inbox teacher view | Mobile message screen | PARTIAL | PARTIAL | MOCK | Full inbox actions and message state parity are not fully implemented | PARTIAL |
 | Teacher | Assignments | Web assignment creation, detail, submissions, grading | Mobile assignment screen | PARTIAL | PARTIAL | MOCK | Missing exact action flow, submission state, grading state, and file behavior | PARTIAL |
@@ -293,3 +293,28 @@ Full inbox parity with the live Web message metadata and actions remains to be c
 `MOBILE WEB UI/FUNCTION PARITY = PARTIAL`
 
 The current Mobile app is not yet fully aligned to the live Web app. The current batch fixed the visible student home navigation dead-ends and tightened the home action selection to in-scope Web-aligned flows, but the broader Student core parity remains partially complete and is not yet ready to be marked as fully matched.
+
+## Student exam route closure
+
+Before:
+OPEN
+
+Issue:
+Student exam entries were still exposed in the mobile menu and in student material/notification actions, creating a misleading native route back into a web-only assessment flow.
+
+Fix:
+- removed the Student exam item from the student menu
+- blocked the material filter action that previously navigated to the exam screen
+- redirected exam-related notification routes for student users to a safe website-only notice instead of a native screen
+
+Runtime re-check:
+PASS
+
+390:
+PASS
+
+430:
+PASS
+
+Status:
+CLOSED

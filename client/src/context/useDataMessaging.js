@@ -30,7 +30,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
   const [groups, setGroups] = useState(() => loadState('thvp_groups', []));
 
   const {
-    onGroupNew, onGroupDelete, onRecallReceive, onReactionReceive, onMessageReceive, onMessageSent, onReadAck, onMessagePinned,
+    onGroupNew, onGroupDelete, onRecallReceive, onMessageDeleted, onReactionReceive, onMessageReceive, onMessageSent, onReadAck, onMessagePinned,
     emitMessageRead,
   } = useSocket();
 
@@ -89,7 +89,8 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
         isGroup: isGrp,
         groupId: gId,
         isRecalled: n.isRecalled,
-              isPinned: n.isPinned,
+        recipientRejected: n.recipientRejected,
+        isPinned: n.isPinned,
         messageType: n.messageType,
         fileName: n.fileName,
         fileUrl: n.fileUrl,
@@ -158,6 +159,13 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
       });
     }
 
+    let unsubDelete;
+    if (onMessageDeleted) {
+      unsubDelete = onMessageDeleted((data) => {
+        setMessages((prev) => prev.filter((message) => String(message.id || message._id) !== String(data.messageId)));
+      });
+    }
+
     let unsubReaction;
     if (onReactionReceive) {
       unsubReaction = onReactionReceive((data) => {
@@ -221,13 +229,14 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
       if (unsubGroup) unsubGroup();
       if (unsubGroupDelete) unsubGroupDelete();
       if (unsubRecall) unsubRecall();
+      if (unsubDelete) unsubDelete();
       if (unsubReaction) unsubReaction();
       if (unsubMsg) unsubMsg();
       if (unsubSent) unsubSent();
       if (unsubRead) unsubRead();
       if (unsubPinned) unsubPinned();
     };
-  }, [onGroupNew, onGroupDelete, onRecallReceive, onMessageReceive, onMessageSent, onReactionReceive, onReadAck, onMessagePinned, upsertServerMessage, currentUser]);
+  }, [onGroupNew, onGroupDelete, onRecallReceive, onMessageDeleted, onMessageReceive, onMessageSent, onReactionReceive, onReadAck, onMessagePinned, upsertServerMessage, currentUser]);
 
   useEffect(() => {
     try {
@@ -340,6 +349,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
                   fileUrl: n.fileUrl || m.fileUrl,
                   fileName: n.fileName || m.fileName,
                   payload: n.payload != null ? n.payload : m.payload,
+                  recipientRejected: n.recipientRejected,
                   aiImageRemaining: n.aiImageRemaining ?? m.aiImageRemaining,
                   time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
                   read: n.read ?? m.read,
@@ -360,6 +370,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
           convId: savedConvId,
           isGroup: savedIsGroup,
           groupId: savedIsGroup ? savedGroupId : null,
+          recipientRejected: n.recipientRejected,
           aiImageRemaining: n.aiImageRemaining,
         };
       }
@@ -415,6 +426,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
             fileUrl: n.fileUrl,
             fileName: n.fileName,
             fileExpired: n.fileExpired,
+            recipientRejected: n.recipientRejected,
             aiImageRemaining: n.aiImageRemaining,
             time: n.time instanceof Date ? n.time : new Date(m.createdAt || Date.now()),
             read: n.read,

@@ -1,8 +1,8 @@
-import React, { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { DeviceEventEmitter, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
-  ArrowRight, Award, Bell, BookOpen, CalendarDays, ClipboardCheck, FileText, GraduationCap,
-  MessageCircle, Star, Users, WalletCards, UserPlus,
+  ArrowRight, Award, BookOpen, CalendarDays, ClipboardCheck, FileText, GraduationCap,
+  MessageCircle, Star, Users, WalletCards, UserPlus, Trophy, Zap,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -10,10 +10,11 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../app/AuthContext';
 import { Avatar, AppScreen, Card, ErrorState, LoadingSkeleton, ScheduleCard, SectionHeading, StatusBadge, ProgressBar } from '../components/ui';
 import {
-  assignmentService, financeService, learningService, materialService, messageService,
-  notificationService, quizService, scheduleService, studentService,
+  assignmentService, teacherFinanceService, learningService, materialService, messageService,
+  quizService, scheduleService, studentService,
 } from '../services/mockService';
 import { useMockResource } from '../hooks/useMockResource';
+import { SOCKET_EVENTS } from '../services/socketService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 
@@ -27,31 +28,34 @@ export function HomeScreen() {
   const { width } = useWindowDimensions();
   const isTeacher = user?.role === 'teacher';
   const schedulesLoader = useCallback(() => scheduleService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
-  const assignmentsLoader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
+  const assignmentsLoader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const learningLoader = useCallback(() => learningService.courses(), []);
-  const notificationsLoader = useCallback(() => notificationService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
-  const studentsLoader = useCallback(() => studentService.assigned(), []);
-  const financeLoader = useCallback(() => financeService.list(), []);
-  const materialsLoader = useCallback(() => materialService.list(), []);
+  const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
+  const financeLoader = useCallback(() => isTeacher ? teacherFinanceService.overview(user) : Promise.resolve(null), [isTeacher, user]);
+  const materialsLoader = useCallback(() => materialService.list(user), [user]);
   const quizzesLoader = useCallback(() => quizService.studentList(), []);
-  const messagesLoader = useCallback(() => messageService.conversations('student'), []);
+  const messagesLoader = useCallback(() => messageService.conversations(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const schedules = useMockResource(schedulesLoader);
   const assignments = useMockResource(assignmentsLoader);
   const learning = useMockResource(learningLoader);
-  const notifications = useMockResource(notificationsLoader);
   const students = useMockResource(studentsLoader);
   const finance = useMockResource(financeLoader);
   const materials = useMockResource(materialsLoader);
   const quizzes = useMockResource(quizzesLoader);
   const messages = useMockResource(messagesLoader);
+  useEffect(() => {
+    const subscriptions = [
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_RECEIVED, messages.reload),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_SENT_ACK, messages.reload),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription.remove());
+  }, [messages.reload]);
 
   const firstSchedule = schedules.data?.find((item) => item.status === 'upcoming');
-  const unreadNotifications = notifications.data?.filter((item) => item.unread) || [];
-  const firstUnreadNotification = unreadNotifications[0];
   const assignmentsToGrade = assignments.data?.filter((item) => item.status === 'Cần chấm') || [];
-  const unreadCount = unreadNotifications.length;
   const pendingAssignments = assignments.data?.filter((item) => item.status === 'Chưa làm' || item.status === 'Quá hạn') || [];
   const unreadMessages = messages.data?.reduce((count, item) => count + item.unread, 0);
+  const pendingQuizCount = quizzes.data?.length ?? 0;
   const gradeEntries = schedules.data?.filter((item) => item.grade != null) || [];
   const completedSessions = user?.completedSessions;
   const totalSessions = user?.totalSessions;
@@ -59,45 +63,30 @@ export function HomeScreen() {
   const studentProgress = completedSessions != null && totalSessions != null && totalSessions > 0
     ? Math.round((completedSessions / totalSessions) * 100)
     : null;
-  const quickActions = isTeacher ? [
-        { title: 'Bảng tin', icon: MessageCircle, route: 'Feed' as const, tint: colors.blueSoft },
-        { title: 'Giao bài tập & kiểm tra', icon: FileText, route: 'Assignments' as const, tint: colors.goldSoft },
-        { title: 'Khóa đào tạo', icon: GraduationCap, route: 'TeacherTraining' as const, tint: colors.purpleSoft },
-        { title: 'Tài chính', icon: WalletCards, route: 'TeacherFinance' as const, tint: colors.greenSoft },
-      ] : [
-        { title: 'Bài học', icon: BookOpen, route: 'StudentLearning' as const, tint: colors.purpleSoft },
-        { title: 'Lịch học', icon: CalendarDays, route: 'Schedule' as const, tint: colors.blueSoft },
-        { title: 'Tài liệu', icon: FileText, route: 'Materials' as const, tint: colors.goldSoft },
-        { title: 'Thông báo', icon: Bell, route: 'NotificationCenter' as const, tint: colors.redSoft },
-      ];
+  const quickActions = [
+    { title: 'Bảng tin', icon: MessageCircle, route: 'Feed' as const, tint: colors.blueSoft },
+    { title: 'Giao bài tập & kiểm tra', icon: FileText, route: 'Assignments' as const, tint: colors.goldSoft },
+    { title: 'Khóa đào tạo', icon: GraduationCap, route: 'TeacherTraining' as const, tint: colors.purpleSoft },
+    { title: 'Tài chính', icon: WalletCards, route: 'TeacherFinance' as const, tint: colors.greenSoft },
+  ];
 
   return (
-    <AppScreen contentStyle={styles.screen}>
+    <AppScreen contentStyle={isTeacher ? styles.screen : styles.studentScreen}>
       <View style={styles.topRow}>
         <View style={styles.greeting}>
-          <Text style={styles.greetingMeta}>{isTeacher ? 'KHÔNG GIAN GIẢNG DẠY' : 'TRUNG TÂM THẮNG TIN HỌC'}</Text>
           <Text style={styles.greetingTitle}>{isTeacher ? `Chào mừng, ${user?.name || 'Giảng viên'}!` : `Chào mừng, ${user?.name}! 👋`}</Text>
           <Text style={styles.greetingSub}>{isTeacher ? 'Ưu tiên điểm danh, lịch dạy và học viên được phân công.' : '“Học hôm nay, thành công mai sau.”'}</Text>
+          <Text style={styles.greetingMeta}>{isTeacher ? 'KHÔNG GIAN GIẢNG DẠY' : 'TRUNG TÂM THẮNG TIN HỌC'}</Text>
         </View>
-        <Pressable
-          onPress={() => tabNavigation.navigate('Notifications')}
-          style={styles.notificationButton}
-          accessibilityRole="button"
-          accessibilityLabel={`Thông báo, ${unreadCount} chưa đọc`}
-        >
-          <Bell size={20} color={colors.ink} />
-          {unreadCount ? <View style={styles.notificationDot} /> : null}
-        </Pressable>
       </View>
 
-      {schedules.loading || assignments.loading || notifications.loading || students.loading || (isTeacher && learning.loading) || (isTeacher && finance.loading) || (!isTeacher && (materials.loading || quizzes.loading || messages.loading))
+      {schedules.loading || assignments.loading || students.loading || (isTeacher && learning.loading) || (isTeacher && finance.loading) || (!isTeacher && (materials.loading || quizzes.loading || messages.loading))
         ? <LoadingSkeleton rows={1} />
         : null}
-      {schedules.error || assignments.error || notifications.error || students.error || (isTeacher && learning.error) || (isTeacher && finance.error) || (!isTeacher && (materials.error || quizzes.error || messages.error)) ? (
+      {schedules.error || assignments.error || students.error || (isTeacher && learning.error) || (isTeacher && finance.error) || (!isTeacher && (materials.error || quizzes.error || messages.error)) ? (
         <ErrorState onRetry={() => {
           schedules.reload();
           assignments.reload();
-          notifications.reload();
           students.reload();
           learning.reload();
           finance.reload();
@@ -157,7 +146,7 @@ export function HomeScreen() {
             <SectionHeading title="Tổng quan tháng này" />
             <View style={styles.teacherStatsGrid}>
               {[
-                { label: `Thu nhập ${finance.data?.[0]?.month || 'tháng này'}`, value: finance.data?.[0] ? formatCurrency(finance.data[0].amount) : '—', detail: finance.loading ? '—' : finance.data?.[0]?.status || '—', icon: WalletCards },
+                { label: 'Đã nhận', value: finance.data ? formatCurrency(finance.data.paidAmount) : '—', detail: 'Tổng thanh toán', icon: WalletCards },
                 { label: 'Đang dạy', value: students.data ? String(students.data.filter((student) => student.enrollmentStatus === 'active').length) : '—', detail: students.data ? 'học viên' : '—', icon: Users },
                 { label: 'HV mới', value: '—', detail: '—', icon: UserPlus },
                 { label: '5 sao', value: '—', detail: '—', icon: Award },
@@ -217,9 +206,17 @@ export function HomeScreen() {
         </>
       ) : (
         <>
-          <Pressable onPress={() => navigation?.navigate('StudentLearning')} accessibilityRole="button">
+          <Pressable
+            onPress={() => navigation?.navigate('StudentLearning')}
+            accessibilityRole="button"
+            accessibilityLabel={`Lớp học sắp diễn ra: ${user?.course || firstSchedule?.courseName || 'mở bài học'}`}
+            style={({ pressed }) => pressed && styles.studentCoursePressed}
+          >
             <View style={styles.studentCourseCard}>
-              <Text style={styles.studentCourseEyebrow}>{firstSchedule ? 'LỚP HỌC SẮP DIỄN RA' : 'CHƯA CÓ LỊCH SẮP TỚI'}</Text>
+              <View style={styles.studentCourseTop}>
+                <Text style={styles.studentCourseEyebrow}>{firstSchedule ? 'LỚP HỌC SẮP DIỄN RA' : 'CHƯA CÓ LỊCH SẮP TỚI'}</Text>
+                <View style={styles.studentCourseArrow}><ArrowRight size={15} color="#FFFFFF" /></View>
+              </View>
               <Text numberOfLines={2} style={styles.studentCourseTitle}>{user?.course || firstSchedule?.courseName || '—'}</Text>
               <Text style={styles.studentCourseCopy}>{firstSchedule ? `${firstSchedule.time} · ${firstSchedule.dateLabel}` : 'Lịch học mới sẽ hiển thị tại đây.'}</Text>
               <View style={styles.studentCourseFooter}>
@@ -246,82 +243,160 @@ export function HomeScreen() {
               </Card>
             ))}
           </View>
+
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Việc cần làm hôm nay" />
-            <Text style={styles.muted}>Các hoạt động đang chờ bạn</Text>
-            {[
-              { title: 'Lộ trình học tập', detail: learning.loading ? '—' : learning.data?.length ? `${learning.data.length} khóa đang theo dõi` : 'Không có khóa đang theo dõi', icon: BookOpen, route: 'StudentLearning' as const },
-              { title: 'Bài tập về nhà', detail: assignments.loading ? '—' : `${pendingAssignments.length} bài cần nộp`, icon: FileText, route: 'Assignments' as const },
-              { title: 'Lịch học sắp tới', detail: schedules.loading ? '—' : `${schedules.data?.filter((item) => item.status === 'upcoming').length ?? '—'} buổi sắp tới`, icon: CalendarDays, route: 'Schedule' as const },
-              { title: 'Tin nhắn & Phản hồi', detail: messages.loading ? '—' : `${unreadMessages ?? '—'} tin nhắn mới`, icon: MessageCircle, route: 'Messages' as const },
-            ].map(({ title, detail, icon: Icon, route }) => (
+            <SectionHeading title="Luyện tập & Ôn thi" />
+            <View style={styles.practiceGrid}>
+              <Pressable
+                onPress={() => navigation?.navigate('LessonPracticeCatalog')}
+                accessibilityRole="button"
+                accessibilityLabel="Luyện bài theo bài học"
+                style={({ pressed }) => [styles.practiceCard, pressed && styles.pressed]}
+              >
+                <View style={[styles.practiceIconWrap, { backgroundColor: colors.blueSoft }]}>
+                  <BookOpen size={20} color={colors.blue} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.practiceTitle}>Luyện theo bài học</Text>
+                  <Text style={styles.practiceSub}>Theo chương & bài tập</Text>
+                </View>
+                <ArrowRight size={16} color={colors.muted} />
+              </Pressable>
+
+              <Pressable
+                onPress={() => navigation?.navigate('CertPrepCatalog')}
+                accessibilityRole="button"
+                accessibilityLabel="Ôn thi MOS / IC3"
+                style={({ pressed }) => [styles.practiceCard, pressed && styles.pressed]}
+              >
+                <View style={[styles.practiceIconWrap, { backgroundColor: colors.goldSoft }]}>
+                  <Award size={20} color="#D97706" />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.practiceTitle}>Ôn thi MOS / IC3</Text>
+                  <Text style={styles.practiceSub}>Luyện đề thi thử theo cấp độ</Text>
+                </View>
+                <ArrowRight size={16} color={colors.muted} />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.sectionWrap}>
+            <Card style={styles.todoPanel}>
+              <View style={styles.todoHeader}>
+                <View style={styles.todoHeaderIcon}><Zap size={20} color="#FFFFFF" fill="#FFFFFF" /></View>
+                <View style={styles.flex}>
+                  <Text style={styles.cardTitle}>Việc cần làm hôm nay</Text>
+                  <Text style={styles.todoSubtitle}>Các hoạt động đang chờ bạn</Text>
+                </View>
+              </View>
+              {[
+              {
+                title: 'Trắc nghiệm buổi học',
+                detail: quizzes.loading ? '—' : pendingQuizCount ? `${pendingQuizCount} bài chưa làm` : 'Không có bài chờ',
+                action: 'Làm ngay',
+                icon: Trophy,
+                route: 'StudentExam' as const,
+                tone: styles.quizTodo,
+                iconTone: styles.quizTodoIcon,
+                color: '#DC2626',
+                badge: pendingQuizCount,
+              },
+              {
+                title: 'Bài tập về nhà',
+                detail: assignments.loading ? '—' : `${pendingAssignments.length} bài cần nộp`,
+                action: pendingAssignments.length ? 'Nộp ngay' : 'Xem ngay',
+                icon: FileText,
+                route: 'Assignments' as const,
+                tone: styles.homeworkTodo,
+                iconTone: styles.homeworkTodoIcon,
+                color: '#EA580C',
+                badge: pendingAssignments.length,
+              },
+              {
+                title: 'Lịch học sắp tới',
+                detail: schedules.loading ? '—' : `${schedules.data?.filter((item) => item.status === 'upcoming').length ?? '—'} buổi sắp tới`,
+                action: 'Xem lịch',
+                icon: CalendarDays,
+                route: 'Schedule' as const,
+                tone: styles.scheduleTodo,
+                iconTone: styles.scheduleTodoIcon,
+                color: '#2563EB',
+                badge: 0,
+              },
+              {
+                title: 'Tin nhắn & Phản hồi',
+                detail: messages.loading ? '—' : `${unreadMessages ?? '—'} tin nhắn mới`,
+                action: 'Xem ngay',
+                icon: MessageCircle,
+                route: 'Messages' as const,
+                tone: styles.messagesTodo,
+                iconTone: styles.messagesTodoIcon,
+                color: '#7C3AED',
+                badge: unreadMessages ?? 0,
+              },
+            ].map(({ title, detail, action, icon: Icon, route, tone, iconTone, color, badge }) => (
               <Pressable key={title} onPress={() => {
                 if (route === 'Messages' || route === 'Schedule') tabNavigation.navigate(route);
                 else navigation?.navigate(route);
-              }} accessibilityRole="button" style={styles.studentTodo}>
-                <View style={styles.studentTodoIcon}><Icon size={21} color={colors.brand} /></View>
-                <View style={styles.flex}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.muted}>{detail}</Text></View>
-                <Text style={styles.studentTodoCta}>Xem ngay ›</Text>
+              }} accessibilityRole="button" style={[styles.todoCard, tone]}>
+                <View style={[styles.todoCardIcon, iconTone]}>
+                  <Icon size={24} color="#FFFFFF" strokeWidth={2.4} />
+                  {badge > 0 ? <Text style={styles.todoBadge}>{badge > 99 ? '99+' : badge}</Text> : null}
+                </View>
+                <View style={styles.todoCardContent}>
+                  <Text style={styles.cardTitle}>{title}</Text>
+                  <Text style={[styles.todoDetail, { color }]}>{detail}</Text>
+                  <View style={styles.todoCta}><Text style={styles.todoCtaText}>{action}</Text><ArrowRight size={14} color={colors.ink} /></View>
+                </View>
               </Pressable>
             ))}
+            </Card>
           </View>
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Tài liệu" action="Xem tất cả" onPress={() => navigation?.navigate('Materials')} />
-            {!materials.loading && !materials.error && materials.data?.length ? materials.data.slice(0, 3).map((item) => (
-              <Pressable key={item.id} onPress={() => navigation?.navigate('Materials')} accessibilityRole="button">
-                <Card style={styles.studentMaterialRow}>
-                  <View style={styles.studentKpiIcon}><BookOpen size={18} color={colors.brand} /></View>
-                  <View style={styles.flex}>
-                    <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
-                    <Text numberOfLines={1} style={styles.muted}>{item.subject}</Text>
-                  </View>
-                  <ArrowRight size={17} color={colors.brand} />
-                </Card>
+            <View style={styles.materialPanel}>
+              <View style={styles.materialHeading}>
+                <BookOpen size={16} color="#CBD5E1" />
+                <Text style={styles.materialHeadingText}>Tài liệu</Text>
+              </View>
+              {materials.loading ? <Text style={styles.materialEmpty}>Đang tải tài liệu...</Text> : null}
+              {!materials.loading && !materials.error && materials.data?.length ? materials.data.slice(0, 3).map((item) => (
+                <Pressable key={item.id} onPress={() => navigation?.navigate('Materials')} accessibilityRole="button" style={styles.materialRow}>
+                  <Text style={styles.materialType}>{item.type || 'TÀI LIỆU'}</Text>
+                  <Text numberOfLines={1} style={styles.materialTitle}>{item.title}</Text>
+                  <ArrowRight size={16} color="#7DD3FC" />
+                </Pressable>
+              )) : null}
+              {!materials.loading && !materials.error && !materials.data?.length ? (
+                <Text style={styles.materialEmpty}>Chưa có tài liệu.</Text>
+              ) : null}
+              <Pressable onPress={() => navigation?.navigate('Materials')} accessibilityRole="button" style={styles.materialAction}>
+                <Text style={styles.materialActionText}>Xem tất cả</Text><ArrowRight size={15} color="#BAE6FD" />
               </Pressable>
-            )) : null}
-            {!materials.loading && !materials.error && !materials.data?.length ? (
-              <Card><Text style={styles.muted}>Chưa có tài liệu.</Text></Card>
-            ) : null}
+            </View>
           </View>
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Nhật ký học tập & Điểm số" action="Xem tất cả" onPress={() => navigation?.navigate('Grades')} />
-            {schedules.loading ? <Text style={styles.muted}>— lượt ghi nhận</Text> : (
-              <>
-                <Text style={styles.muted}>{gradeEntries.length} lượt ghi nhận</Text>
-                {gradeEntries.length ? gradeEntries.slice(0, 3).map((item) => (
-                  <Card key={`student-grade-${item.id}`}>
+            <Card style={styles.gradePanel}>
+              <Pressable onPress={() => navigation?.navigate('Grades')} accessibilityRole="button" style={styles.gradeHeading}>
+                <Text style={styles.cardTitle}>Nhật ký học tập &amp; Điểm số</Text>
+                <Text style={styles.gradeCount}>{schedules.loading ? '—' : `${gradeEntries.length} lượt ghi nhận`}</Text>
+              </Pressable>
+              {schedules.loading ? <Text style={styles.muted}>Đang tải nhật ký...</Text> : (
+                <>
+                  {gradeEntries.length ? gradeEntries.slice(0, 3).map((item) => (
+                    <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
                     <Text style={styles.cardTitle}>{item.title}</Text>
                     <Text style={styles.muted}>{item.dateLabel} · Điểm: {item.grade}</Text>
-                  </Card>
-                )) : <Text style={styles.muted}>Chưa có dữ liệu điểm số.</Text>}
-              </>
-            )}
-          </View>
-          {firstUnreadNotification ? (
-            <Pressable
-              onPress={() => tabNavigation.navigate('Notifications')}
-              accessibilityRole="button"
-              accessibilityLabel={`Thông báo chưa đọc: ${firstUnreadNotification.title}`}
-            >
-              <Card style={styles.notificationPreview}>
-                <View style={styles.notificationPreviewIcon}><Bell size={18} color={colors.brandDark} /></View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{firstUnreadNotification.title}</Text>
-                  <Text numberOfLines={2} style={styles.muted}>{firstUnreadNotification.message}</Text>
-                </View>
-                <ArrowRight size={18} color={colors.brand} />
-              </Card>
-            </Pressable>
-          ) : !notifications.loading && !notifications.error ? (
-            <Card style={styles.notificationPreview}>
-              <View style={styles.notificationPreviewIcon}><Bell size={18} color={colors.brandDark} /></View>
-              <Text style={styles.muted}>Không có thông báo mới.</Text>
+                    </View>
+                  )) : <Text style={styles.muted}>Chưa có dữ liệu điểm số.</Text>}
+                </>
+              )}
             </Card>
-          ) : null}
+          </View>
         </>
       )}
 
-      <View style={styles.sectionWrap}>
+      {isTeacher ? <View style={styles.sectionWrap}>
         <SectionHeading title="Truy cập nhanh" />
         <View style={styles.quickGrid}>
           {quickActions.map(({ title, icon: Icon, route, tint }) => (
@@ -370,16 +445,16 @@ export function HomeScreen() {
             </Pressable>
           ))}
         </View>
-      </View>
+      </View> : null}
 
-      <Pressable onPress={() => tabNavigation.navigate('Messages')} style={styles.helpCard} accessibilityRole="button">
+      {isTeacher ? <Pressable onPress={() => tabNavigation.navigate('Messages')} style={styles.helpCard} accessibilityRole="button">
         <View style={styles.helpIcon}><MessageCircle size={18} color="#FFFFFF" /></View>
         <View style={styles.flex}>
           <Text style={styles.helpTitle}>Cần hỗ trợ?</Text>
           <Text style={styles.helpText}>Nhắn tin với {isTeacher ? 'trung tâm' : 'giảng viên'} của bạn</Text>
         </View>
         <ArrowRight size={18} color="#FFFFFF" />
-      </Pressable>
+      </Pressable> : null}
     </AppScreen>
   );
 }
@@ -408,18 +483,17 @@ function formatCurrency(value: number) {
 
 const styles = StyleSheet.create({
   screen: { paddingTop: spacing.lg, gap: spacing.xl },
+  studentScreen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   greeting: { flex: 1, gap: 4 },
-  greetingMeta: { color: colors.brand, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
+  greetingMeta: { color: colors.brand, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1.3 },
   greetingTitle: { color: colors.ink, fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
   greetingSub: { color: colors.muted, fontSize: typography.small, lineHeight: 19 },
-  notificationButton: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-  notificationDot: { position: 'absolute', width: 9, height: 9, borderRadius: 5, top: 9, right: 10, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.surface },
   heroCard: { backgroundColor: colors.brandDark, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.md, overflow: 'hidden' },
   heroCompact: { padding: spacing.lg },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   courseTag: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  courseTagText: { color: '#D8F3EF', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  courseTagText: { color: '#D8F3EF', fontSize: typography.micro, fontWeight: '800', letterSpacing: 1 },
   heroTitle: { color: '#FFFFFF', fontSize: typography.heading, fontWeight: '800', lineHeight: 25, marginTop: spacing.xs },
   heroMeta: { color: '#C3DDDC', fontSize: typography.small },
   heroProgress: { gap: spacing.sm, marginTop: spacing.sm },
@@ -436,30 +510,58 @@ const styles = StyleSheet.create({
   teacherStatLabel: { flex: 1, color: colors.muted, fontSize: typography.caption, fontWeight: '700', lineHeight: 16 },
   teacherStatValue: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' },
   teacherStudentCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  studentCourseCard: { backgroundColor: '#1E293B', borderRadius: radius.lg, padding: spacing.xl, gap: spacing.md, borderWidth: 1, borderColor: '#334155' },
+  studentCourseCard: { backgroundColor: '#1E293B', borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
+  studentCoursePressed: { opacity: 0.92, transform: [{ scale: 0.995 }] },
+  studentCourseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  studentCourseArrow: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
   studentCourseEyebrow: { color: '#FCA5A5', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.8 },
   studentCourseTitle: { color: '#FFFFFF', fontSize: typography.heading, lineHeight: 25, fontWeight: '800' },
   studentCourseCopy: { color: '#CBD5E1', fontSize: typography.small, lineHeight: 20 },
-  studentCourseFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderTopWidth: 1, borderTopColor: '#475569', paddingTop: spacing.md },
+  studentCourseFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, borderTopWidth: 1, borderTopColor: '#475569', paddingTop: spacing.sm },
   studentCourseTeacher: { flex: 1, color: '#F8FAFC', fontSize: typography.small, fontWeight: '700' },
   studentRating: { color: '#FDE68A', fontSize: typography.small, fontWeight: '800' },
   studentKpiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.sm },
-  studentKpi: { width: '48%', minHeight: 144, justifyContent: 'space-between' },
+  studentKpi: { width: '48%', minHeight: 132, justifyContent: 'space-between', padding: spacing.md, borderRadius: 14 },
   studentKpiIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   studentKpiLabel: { color: colors.muted, fontSize: typography.small, fontWeight: '700' },
   studentKpiValue: { fontSize: typography.heading, fontWeight: '800' },
-  studentTodo: { backgroundColor: colors.surface, minHeight: 82, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  studentMaterialRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  studentTodoIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  studentTodoCta: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
+  todoPanel: { gap: spacing.sm, overflow: 'hidden' },
+  todoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xs },
+  todoHeaderIcon: { width: 40, height: 40, borderRadius: 16, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
+  todoSubtitle: { color: colors.muted, fontSize: typography.caption, fontWeight: '600', marginTop: 2 },
+  todoCard: { minHeight: 116, borderWidth: 1, borderRadius: 16, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, overflow: 'hidden' },
+  quizTodo: { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' },
+  homeworkTodo: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
+  scheduleTodo: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  messagesTodo: { backgroundColor: '#FAF5FF', borderColor: '#E9D5FF' },
+  todoCardIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+  todoBadge: { position: 'absolute', top: -7, right: -8, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, textAlign: 'center', overflow: 'hidden', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: typography.micro, lineHeight: 20, fontWeight: '900', borderWidth: 2, borderColor: '#FFFFFF' },
+  quizTodoIcon: { backgroundColor: '#E11D48' },
+  homeworkTodoIcon: { backgroundColor: '#F97316' },
+  scheduleTodoIcon: { backgroundColor: '#3B82F6' },
+  messagesTodoIcon: { backgroundColor: '#8B5CF6' },
+  todoCardContent: { flex: 1, alignItems: 'flex-start', gap: spacing.xs },
+  todoDetail: { fontSize: typography.caption, fontWeight: '700' },
+  todoCta: { minHeight: 32, marginTop: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 2 },
+  todoCtaText: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  materialPanel: { backgroundColor: '#334155', borderRadius: 16, padding: spacing.lg, gap: spacing.sm },
+  materialHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  materialHeadingText: { color: '#CBD5E1', fontSize: typography.small, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  materialRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(71, 85, 105, 0.75)', borderRadius: 12, paddingHorizontal: spacing.md },
+  materialType: { color: '#FFFFFF', backgroundColor: '#EA580C', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 3, fontSize: typography.micro, fontWeight: '900' },
+  materialTitle: { flex: 1, color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700' },
+  materialEmpty: { color: '#CBD5E1', fontSize: typography.caption, paddingVertical: spacing.md },
+  materialAction: { minHeight: 40, marginTop: spacing.xs, backgroundColor: 'rgba(71, 85, 105, 0.55)', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  materialActionText: { color: '#BAE6FD', fontSize: typography.caption, fontWeight: '700' },
+  gradePanel: { padding: 0, overflow: 'hidden' },
+  gradeHeading: { minHeight: 54, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  gradeCount: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
+  gradeRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: spacing.xs },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   quickAction: { width: '47.8%', minHeight: 91, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, justifyContent: 'space-between' },
   quickActionSmall: { width: '47%' },
   quickIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   quickTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
-  notificationPreview: { flexDirection: 'row', alignItems: 'center' },
-  notificationPreviewIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  attentionCard: { flexDirection: 'row', alignItems: 'center' },
   flex: { flex: 1 },
   muted: { color: colors.muted, fontSize: typography.small, lineHeight: 19 },
   cardTitle: { color: colors.ink, fontWeight: '700', fontSize: typography.body, lineHeight: 21 },
@@ -472,4 +574,10 @@ const styles = StyleSheet.create({
   helpIcon: { width: 38, height: 38, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   helpTitle: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.body },
   helpText: { color: '#D8F3EF', fontSize: typography.caption, marginTop: 2 },
+  practiceGrid: { gap: spacing.sm },
+  practiceCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, gap: spacing.md },
+  practiceIconWrap: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  practiceTitle: { fontSize: typography.body, fontWeight: '700', color: colors.ink },
+  practiceSub: { fontSize: typography.caption, color: colors.muted, marginTop: 2 },
+  pressed: { opacity: 0.8 },
 });

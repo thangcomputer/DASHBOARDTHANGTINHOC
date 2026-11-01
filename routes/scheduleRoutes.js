@@ -1317,6 +1317,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     // Cập nhật các field được phép
     const updates = {};
     if (status)    updates.status    = status;
+    if (isRejectMakeup) updates.studentConfirmStatus = 'admin_rejected';
     if (linkHoc)   updates.linkHoc   = linkHoc;
     if (startTime) {
       updates.startTime = startTime;
@@ -1399,20 +1400,35 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
            course: schedule.course,
          }).catch(e => logger.warn('[ScheduleHistory] PUT CANCELLED log err:', e.message));
 
+         const makeupRejectionPayload = isRejectMakeup
+           ? {
+             ...buildAttendanceConfirmPayload(updated),
+             kind: 'attendance_rejected',
+             rejected: true,
+           }
+           : null;
          NotificationService.send(io, {
            type: 'SCHEDULE',
-           title: '❌ Lịch học bị hủy',
-           content: cancelReason
-             ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
-             : `Lịch học ngày ${notifDate} đã bị hủy.`,
+           title: isRejectMakeup ? '❌ Buổi điểm danh bù không được tính' : '❌ Lịch học bị hủy',
+           content: isRejectMakeup
+             ? `Admin không tính buổi điểm danh bù ngày ${notifDate}. Buổi học không được cộng vào tiến độ hoặc lương.`
+             : cancelReason
+               ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
+               : `Lịch học ngày ${notifDate} đã bị hủy.`,
            receivers: String(scheduleScope.studentId),
-           payload: { scheduleId: String(updated._id), reason: cancelReason },
+           payload: makeupRejectionPayload || { scheduleId: String(updated._id), reason: cancelReason },
            link: '/student#schedule'
          }).catch((e) => logger.warn('[SCHEDULE] cancel notif:', e.message));
 
          if (isRejectMakeup && scheduleScope.teacherId) {
            const { notifyTeacherMakeupRejected } = require('../services/teacherAdminNotifier');
            notifyTeacherMakeupRejected(io, schedule, req.user).catch(() => {});
+         }
+         if (isRejectMakeup) {
+           await emitAttendanceConfirmEvents(io, updated, 'attendance:rejected', {
+             rejected: true,
+             kind: 'admin_makeup_rejected',
+           });
          }
 
          emitScheduleEvent(io, scheduleScope, 'schedule:cancelled', {

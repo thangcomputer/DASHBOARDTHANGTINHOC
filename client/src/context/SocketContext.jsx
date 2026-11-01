@@ -31,6 +31,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const messageSentCallbacksRef = useRef(new Set());
   const reactionCallbacksRef = useRef(new Set());
   const recallCallbacksRef = useRef(new Set());
+  const deleteCallbacksRef = useRef(new Set());
   const pinnedCallbacksRef = useRef(new Set());
   const groupNewCallbackRef = useRef(null);
   const groupDeleteCallbacksRef = useRef(new Set());
@@ -80,6 +81,11 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
   const onRecallReceive = useCallback((callback) => {
     recallCallbacksRef.current.add(callback);
     return () => recallCallbacksRef.current.delete(callback);
+  }, []);
+
+  const onMessageDeleted = useCallback((callback) => {
+    deleteCallbacksRef.current.add(callback);
+    return () => deleteCallbacksRef.current.delete(callback);
   }, []);
 
   const onMessagePinned = useCallback((callback) => {
@@ -249,6 +255,10 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       recallCallbacksRef.current.forEach((cb) => cb(data));
     };
 
+    const onMessageDelete = (data) => {
+      deleteCallbacksRef.current.forEach((cb) => cb(data));
+    };
+
     const onMessagePinnedEvt = (data) => {
       pinnedCallbacksRef.current.forEach((cb) => cb(data));
     };
@@ -401,6 +411,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('message:sent', onMessageSentEvt);
     newSocket.on('message:reaction', onMessageReaction);
     newSocket.on('message:recall', onMessageRecall);
+    newSocket.on('message:delete', onMessageDelete);
     newSocket.on('message:pinned', onMessagePinnedEvt);
     newSocket.on('message:read_ack', onMessageReadAck);
     newSocket.on('typing:show', onTypingShow);
@@ -456,6 +467,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.off('message:sent', onMessageSentEvt);
       newSocket.off('message:reaction', onMessageReaction);
       newSocket.off('message:recall', onMessageRecall);
+      newSocket.off('message:delete', onMessageDelete);
       newSocket.off('message:pinned', onMessagePinnedEvt);
       newSocket.off('message:read_ack', onMessageReadAck);
       newSocket.off('typing:show', onTypingShow);
@@ -517,6 +529,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     onMessageSent,
     onReactionReceive,
     onRecallReceive,
+    onMessageDeleted,
     onMessagePinned,
     onGroupNew,
     onGroupDelete,
@@ -553,6 +566,7 @@ export const useSocket = () => {
       onMessageSent: () => () => {},
       onReactionReceive: () => () => {},
       onRecallReceive: () => () => {},
+      onMessageDeleted: () => () => {},
       onMessagePinned: () => () => {},
       onGroupNew: () => () => {},
       onGroupDelete: () => () => {},

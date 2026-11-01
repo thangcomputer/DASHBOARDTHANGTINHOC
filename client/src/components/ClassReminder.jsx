@@ -65,7 +65,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
             <div className="min-w-0">
               <p className="font-black text-sm sm:text-base uppercase tracking-tight truncate">
                 {isLive
-                  ? '🔴 ĐANG DIỄN RA — Vào lớp ngay!'
+                  ? '🔴 Vào lớp ngay!'
                   : isUrgent
                     ? `⚡ CÒN ${minutesLeft} PHÚT — Vào lớp ngay!`
                     : `📚 Sắp đến giờ vào lớp! (Còn ${minutesLeft} phút)`

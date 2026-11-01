@@ -487,22 +487,23 @@ describe('Phase 8 live messaging runtime', { concurrency: false, timeout: 180000
     record('reconnect', 'PASS', { supportA: seeded.actors.supportA.id });
   });
 
-  it('Multi-tab: notifyUser targets latest presence socketId (current semantics)', async (t) => {
+  it('Multi-session: private messages reach every authenticated device session', async (t) => {
     if (!ready) { t.skip(evidence.envFailure || 'not ready'); return; }
     const tab2 = await harness.connectClient(seeded.actors.supportA, ORIGIN);
     await harness.sleep(400);
     const content = `[P8:multitab] ${Date.now()}`;
-    // CURRENT DESIGN: app.notifyUser prefers onlineUsers[role_id].socketId (last register),
-    // then returns — so only the latest Support A tab is guaranteed to receive.
+    // Both authenticated sockets join the user's ID room; the legacy presence
+    // record still holds only one socket ID and must not suppress mobile delivery.
+    const r1 = harness.waitReceive(sockets.supportA, (p) => p.content === content, 10000);
     const r2 = harness.waitReceive(tab2, (p) => p.content === content, 10000);
     await harness.sendViaSocket(sockets.studentA, seeded.actors.supportA, content);
-    await r2;
+    await Promise.all([r1, r2]);
     tab2.close();
     // Restore primary Support A socket for any later observations
     await harness.sleep(300);
     sockets.supportA = await harness.connectClient(seeded.actors.supportA, ORIGIN);
     record('multitab', 'PASS', {
-      note: 'CURRENT DESIGNED BEHAVIOR — latest presence socketId receives; not both tabs. Not classified as duplicate-user leak.',
+      note: 'All authenticated sessions receive private messages through the user ID room.',
     });
   });
 

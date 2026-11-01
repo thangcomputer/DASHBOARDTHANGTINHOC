@@ -72,6 +72,7 @@ const messageSchema = new mongoose.Schema({
   readAt:     { type: Date },
   isRecalled: { type: Boolean, default: false },
   isPinned: { type: Boolean, default: false },
+  recipientRejected: { type: Boolean, default: false },
 
   // Nhóm trò chuyện (nếu có)
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },

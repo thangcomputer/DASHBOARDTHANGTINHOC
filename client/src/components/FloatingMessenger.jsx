@@ -73,6 +73,24 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const CHAT_FILE_ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav';
 const FM_SIZE_KEY = 'cms_fm_win_size';
 const FM_SIZE_DEFAULT = { w: 400, h: 480 };
+const FM_DRAFT_KEY_PREFIX = 'cms_fm_draft_v1';
+
+function readChatDraft(storageKey) {
+  try {
+    return localStorage.getItem(storageKey) || '';
+  } catch {
+    return '';
+  }
+}
+
+function persistChatDraft(storageKey, text) {
+  try {
+    if (text) localStorage.setItem(storageKey, text);
+    else localStorage.removeItem(storageKey);
+  } catch {
+    // Draft persistence is best-effort when browser storage is unavailable.
+  }
+}
 
 function readFmSize() {
   try {
@@ -518,7 +536,7 @@ function ChatHead({ tab, unread = 0, online = false, onOpen, onClose }) {
 }
 
 function ChatWindow({
-  tab, meId, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onRecall, onReact, onlineUsers = [], isSuper = false,
+  tab, meId, draftStorageKey, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onRecall, onReact, onlineUsers = [], isSuper = false,
   peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
   canShowEscalate = false, feedbackPhase = '', supportOnline = false,
   onEscalate, onResetAi, onAgree, onDisagree, onMoreYes, onMoreNo,
@@ -531,7 +549,7 @@ function ChatWindow({
   viewerRole = 'student',
 }) {
   const toast = useToast();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => readChatDraft(draftStorageKey));
   const [uploading, setUploading] = useState(false);
   const [pendingImage, setPendingImage] = useState(null);
   const pendingUrlRef = useRef('');
@@ -547,6 +565,10 @@ function ChatWindow({
   const typingActiveRef = useRef(false);
   const [winSize, setWinSize] = useState(readFmSize);
   const resizeRef = useRef({ active: false, x: 0, y: 0, w: 0, h: 0 });
+
+  useEffect(() => {
+    persistChatDraft(draftStorageKey, text);
+  }, [draftStorageKey, text]);
 
   const isOnline = useMemo(() => {
     if (isAiSupportPeer(tab.user)) return true;
@@ -864,8 +886,12 @@ function ChatWindow({
       }
       return;
     }
-    onSend(tab, body);
-    setText('');
+    try {
+      const sent = await onSend(tab, body);
+      if (sent !== false) setText('');
+    } catch (err) {
+      toast?.error(err?.message || 'Gửi tin nhắn thất bại');
+    }
   };
 
   const handleInputChange = (e) => {
@@ -908,6 +934,7 @@ function ChatWindow({
   };
 
   const handleInputBlur = () => {
+    persistChatDraft(draftStorageKey, text);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     if (typingActiveRef.current && onTypingStop) {
       typingActiveRef.current = false;
@@ -2363,6 +2390,7 @@ export default function FloatingMessenger({ session, role }) {
             key={openWindow.id}
             tab={getFreshTab(openWindow)}
             meId={meId}
+            draftStorageKey={`${FM_DRAFT_KEY_PREFIX}_${encodeURIComponent(meId)}_${encodeURIComponent(openWindow.id)}`}
             onlineUsers={onlineUsers}
             isSuper={isSuper}
             messages={openWindowMessages}

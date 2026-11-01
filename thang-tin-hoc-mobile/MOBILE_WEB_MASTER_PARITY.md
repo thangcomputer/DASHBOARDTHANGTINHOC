@@ -1,5 +1,7 @@
 # Mobile ↔ Web Master Parity Inventory
 
+> Historical inventory: the integration statements and `MOCK ONLY / NOT CONNECTED` cells below predate current API work. Use [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md) for verified current API status.
+
 ## Mục tiêu và nguyên tắc
 
 Website hiện tại là nguồn chuẩn cho chức năng, nội dung, quyền, trạng thái và luồng thao tác. Mobile có thể tối ưu bố cục cho điện thoại nhưng không tự mở rộng nghiệp vụ.
@@ -7,14 +9,14 @@ Website hiện tại là nguồn chuẩn cho chức năng, nội dung, quyền, 
 - Project mobile hiện tại (`thang-tin-hoc-mobile/`) được giữ nguyên.
 - Mobile phase hiện tại tập trung Student và Teacher.
 - Admin/Admin Staff được kiểm kê nhưng đánh dấu `WEB-ONLY CURRENT SCOPE`.
-- Mobile chỉ dùng UI, navigation và mock local. Không kết nối API/auth thật, database, Redis, Socket.IO, push, thanh toán, upload/download thật, camera/proctor hoặc thi thật.
+- Các bảng dưới đây là ảnh chụp UI/mock ở thời điểm kiểm kê, không phản ánh các tích hợp API được triển khai sau đó.
 - Những số liệu không có nguồn mock xác minh phải hiển thị `—` hoặc trạng thái trống phù hợp.
 - Các trạng thái bên dưới mô tả mức UI/luồng local, không phải đồng bộ backend.
 - Bảng đánh giá mới nhất tách riêng `UI/UX Parity` và `Backend Status` xem tại [`MOBILE_WEB_UI_UX_FINAL_AUDIT.md`](./MOBILE_WEB_UI_UX_FINAL_AUDIT.md).
 
 ## Trạng thái
 
-Trong các bảng inventory, `Status` chỉ là **UI/UX Parity**; backend được theo dõi riêng. Mất API, đăng nhập thật, đồng bộ dữ liệu hoặc persistence **không tự làm giảm UI/UX status**. Chỉ đánh `PARTIAL` khi thiếu nội dung, control, trạng thái, đường đi hoặc luồng UI thuộc source web. Với toàn bộ mobile phase hiện tại, `Backend Status` là `MOCK ONLY / NOT CONNECTED`.
+Trong các bảng inventory, `Status` chỉ là **UI/UX Parity**; backend được theo dõi riêng. Các ô backend trong tài liệu này là trạng thái lịch sử và đã được thay thế bởi báo cáo API hiện tại. Mất API, đăng nhập thật, đồng bộ dữ liệu hoặc persistence **không tự làm giảm UI/UX status**. Chỉ đánh `PARTIAL` khi thiếu nội dung, control, trạng thái, đường đi hoặc luồng UI thuộc source web.
 
 | Status | Ý nghĩa |
 |---|---|

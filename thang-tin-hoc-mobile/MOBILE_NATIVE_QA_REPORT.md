@@ -1,5 +1,22 @@
 # Android Native QA Report
 
+## Out-of-scope precheck
+
+`npm run test:phase15:unit`: 27/28 PASS; one backend exam-bank-dependent test returned `EXAM_BANK_UNAVAILABLE` (503). No backend fix attempted. This result is out of scope for Mobile UI QA and is not counted as a Mobile UI failure.
+
+## Android Native QA - Current Run
+
+| Check | Status | Result |
+| --- | --- | --- |
+| Target branch | PASS | `feature/mobile-native-qa` |
+| `adb --version` | BLOCKED | `adb` is not installed or available on PATH |
+| Android SDK | BLOCKED | `ANDROID_HOME` and `ANDROID_SDK_ROOT` are unset; standard `%LOCALAPPDATA%\Android\Sdk` path does not exist |
+| Physical Android device | BLOCKED | No device detected; device enumeration is unavailable without `adb` |
+| Android emulator | BLOCKED | `emulator` and `sdkmanager` are not available; no AVDs could be listed |
+| Expo native capability | AVAILABLE (static config) | Expo 58 / React Native project with Android config in `app.json`; no generated `android/` directory |
+| Android native app actually launched | NO | No Android device/emulator or SDK available; Expo Web was not used as a substitute |
+| Backend/API connected | PARTIAL (source only) | Mobile login/session, schedule, and notification REST calls are implemented; backend runtime, database, Redis, Socket.IO, push, payment, file transfer, and native exam were not exercised |
+
 ## Readiness
 
 **ANDROID NATIVE QA BLOCKED**
@@ -85,13 +102,13 @@ Native execution was not possible in this environment. No Android SDK, `adb`, em
 
 | Check | Status | Result |
 | --- | --- | --- |
-| TypeScript | PASS | `npm run typecheck` from `thang-tin-hoc-mobile/` completed successfully |
-| Expo compatibility | PASS | `npx expo install --check` from `thang-tin-hoc-mobile/` reported dependencies up to date |
-| New dependencies | PASS | None added; Expo version and dependency files unchanged |
-| Backend/API | PASS (scope review) | No backend/API integration was performed; app services inspected here use local mock data |
-| Web/backend edits | PASS (scope review) | No web/backend files were edited or staged for this QA task |
-| Native-specific fixes | NOT APPLICABLE | No native-only defect could be reproduced or verified without an Android target; no product UI/code change was made |
+| TypeScript | PASS | `npm run typecheck` from `thang-tin-hoc-mobile/` completed successfully in this run |
+| Expo compatibility | PASS | `npx expo install --check` from `thang-tin-hoc-mobile/` reported dependencies up to date in this run |
+| New dependencies | PASS | `expo-secure-store` added using the Expo SDK-compatible version for native token storage |
+| Backend/API | NOT RUN | Login/session, schedule, and notification REST integration exists in source; no backend runtime or staging credentials were available for end-to-end verification |
+| Web/backend edits | PASS (scope review) | No web/backend files were edited for this QA task |
+| Native-specific fixes | NOT RUN | API/auth changes were made, but native-only behavior could not be exercised without an Android target |
 
 ## Conclusion
 
-**ANDROID NATIVE EXECUTION BLOCKED**. Static review and project checks completed, but Android device/emulator QA is still required before claiming Android native QA readiness. No Auth/API work was started.
+**ANDROID NATIVE EXECUTION BLOCKED**. TypeScript and Expo Web build checks pass, but Android device/emulator QA and backend end-to-end verification are still required before claiming native/API readiness. Mobile Auth/API integration is present in source but has not been verified against a running backend.

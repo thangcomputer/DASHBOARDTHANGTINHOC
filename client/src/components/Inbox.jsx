@@ -21,6 +21,21 @@ import {
   conversationPeerKey,
 } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
+import { getAttendanceAction } from '../utils/attendanceAction';
+import {
+  ATTENDANCE_CONFIRM_MS,
+  attendanceConfirmKey,
+  getAttendanceConfirm,
+  removeAttendanceConfirm,
+  subscribeAttendanceConfirm,
+  upsertAttendanceConfirm,
+} from '../utils/attendanceConfirmStore';
+import {
+  getScheduleDisplayKind,
+  isScheduleOngoingNow,
+  formatLocalDateKey,
+  normalizeScheduleDate,
+} from '../utils/scheduleTime';
 import {
   resolveMessagingDeepLink,
   existingPeerIdsFromConversations,
@@ -42,9 +57,9 @@ import {
   isAiIdleStill,
   handoffReasonLabel,
 } from '../utils/aiSupport';
-import { getScheduleDisplayKind, isScheduleOngoingNow, normalizeScheduleDate } from '../utils/scheduleTime';
 import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
 import { getChatFileType } from '../utils/chatFileType';
+import CommunicationPreferences from './CommunicationPreferences';
 import StickerPicker from './StickerPicker';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const showFileName = (name) => displayFileName(name);
@@ -65,6 +80,24 @@ const formatDisplayName = (name) => {
 
 /** Bỏ epoch / ngày rác (tránh hiện "01/01" khi chưa có tin nhắn). */
 const MIN_ACTIVITY_MS = Date.UTC(2000, 0, 1);
+const ATTENDANCE_CONFIRM_UNLOCK_MS = 15 * 60 * 1000;
+
+function getAttendanceConfirmUnlockAt(schedule) {
+  const date = normalizeScheduleDate(schedule?.date);
+  const time = String(schedule?.startTime || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!date || !time) return null;
+  const [year, month, day] = date.split('-').map(Number);
+  const hour = Number(time[1]);
+  const minute = Number(time[2]);
+  if (![year, month, day, hour, minute].every(Number.isFinite) || hour > 23 || minute > 59) return null;
+  return Date.UTC(year, month - 1, day, hour - 7, minute) + ATTENDANCE_CONFIRM_UNLOCK_MS;
+}
+
+function normalizeClassroomUrl(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
 
 function toValidActivityDate(date) {
   if (date == null || date === '') return null;
@@ -111,6 +144,21 @@ function getMessageDateInfo(date) {
         year: 'numeric',
       });
   return { key: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, label };
+}
+
+function getConversationDraftStorageKey(userId, conversationId) {
+  if (!userId || !conversationId) return '';
+  return `cms-chat-draft:v1:${encodeURIComponent(String(userId))}:${encodeURIComponent(String(conversationId))}`;
+}
+
+function readConversationDraft(key) {
+  if (!key || typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem(key) || '';
+  } catch (error) {
+    console.warn('Không thể tải bản nháp tin nhắn:', error);
+    return '';
+  }
 }
 
 function maskPhoneLastFour(phone) {
@@ -277,20 +325,33 @@ const MESSAGE_REACTIONS = [
   { type: 'angry', emoji: '😡', label: 'Phẫn nộ' },
 ];
 
+function areConsecutiveMessagesInGroup(first, second) {
+  if (!first || !second || first.messageType === 'system' || second.messageType === 'system') return false;
+  if (!first.senderId || String(first.senderId) !== String(second.senderId)) return false;
+
+  const firstTime = new Date(first.time).getTime();
+  const secondTime = new Date(second.time).getTime();
+  const elapsed = secondTime - firstTime;
+  return Number.isFinite(firstTime)
+    && Number.isFinite(secondTime)
+    && elapsed >= 0
+    && elapsed < 5 * 60 * 1000
+    && getMessageDateInfo(first.time)?.key === getMessageDateInfo(second.time)?.key;
+}
+
 function ReactionPicker({ msgId, onReact, myReactions, align = 'right' }) {
   return (
-    <div className="group/reaction relative shrink-0">
+    <div className="cms-chat-reaction-action group/reaction relative z-0 shrink-0 hover:z-40 focus-within:z-40">
       <button
         type="button"
         onClick={(event) => {
           event.stopPropagation();
           onReact(msgId, 'like');
         }}
-        className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition hover:scale-105 ${
-          myReactions?.includes('like')
-            ? 'border-amber-300 bg-amber-100 text-amber-500 hover:bg-amber-200 hover:text-amber-600'
-            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-        }`}
+        className={`flex h-[22px] w-[22px] items-center justify-center rounded-full border shadow-sm transition hover:scale-105 ${myReactions?.includes('like')
+          ? 'border-amber-300 bg-amber-100 text-amber-500 hover:bg-amber-200 hover:text-amber-600'
+          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+          }`}
         title="Thích"
         aria-label="Thích"
         aria-pressed={myReactions?.includes('like') || false}
@@ -314,9 +375,8 @@ function ReactionPicker({ msgId, onReact, myReactions, align = 'right' }) {
               event.stopPropagation();
               onReact(msgId, type);
             }}
-            className={`flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-slate-100 ${
-              myReactions?.includes(type) ? 'bg-blue-50 ring-1 ring-blue-200' : ''
-            }`}
+            className={`flex h-8 w-8 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-slate-100 ${myReactions?.includes(type) ? 'bg-blue-50 ring-1 ring-blue-200' : ''
+              }`}
             title={label}
             aria-label={label}
             aria-pressed={myReactions?.includes(type) || false}
@@ -337,11 +397,9 @@ function ChatFlipWrap({ open, onClose, estimatedHeight = 160, className = 'relat
     const closeOnOutsidePointer = (event) => {
       if (!wrapRef.current?.contains(event.target)) onClose();
     };
-    document.addEventListener('mousedown', closeOnOutsidePointer);
-    document.addEventListener('touchstart', closeOnOutsidePointer);
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
     return () => {
-      document.removeEventListener('mousedown', closeOnOutsidePointer);
-      document.removeEventListener('touchstart', closeOnOutsidePointer);
+      document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
     };
   }, [open, onClose, wrapRef]);
 
@@ -527,13 +585,46 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [newMsg, setNewMsg] = useState('');
+  const [conversationDrafts, setConversationDrafts] = useState({});
+  const activeDraftStorageKey = getConversationDraftStorageKey(currentUserId, activeConv?.id);
+  const newMsg = activeDraftStorageKey
+    ? (Object.prototype.hasOwnProperty.call(conversationDrafts, activeDraftStorageKey)
+      ? conversationDrafts[activeDraftStorageKey]
+      : readConversationDraft(activeDraftStorageKey))
+    : '';
+  const setNewMsg = (value) => {
+    if (!activeDraftStorageKey) return;
+    const nextDraft = typeof value === 'function' ? value(newMsg) : value;
+    setConversationDrafts((current) => ({ ...current, [activeDraftStorageKey]: nextDraft }));
+    try {
+      if (nextDraft) window.sessionStorage.setItem(activeDraftStorageKey, nextDraft);
+      else window.sessionStorage.removeItem(activeDraftStorageKey);
+    } catch (error) {
+      console.warn('Không thể lưu bản nháp tin nhắn:', error);
+      toast.error('Không thể lưu bản nháp trên thiết bị này.');
+    }
+  };
+  const clearConversationDraft = (key) => {
+    if (!key) return;
+    setConversationDrafts((current) => ({ ...current, [key]: '' }));
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch (error) {
+      console.warn('Không thể xóa bản nháp tin nhắn đã gửi:', error);
+      toast.error('Không thể xóa bản nháp đã gửi khỏi thiết bị này.');
+    }
+  };
   const [replyMessage, setReplyMessage] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showPeerInfo, setShowPeerInfo] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
+  const [teacherAttendanceModalSchedule, setTeacherAttendanceModalSchedule] = useState(null);
+  const [teacherAttendanceGrade, setTeacherAttendanceGrade] = useState('0');
+  const [teacherAttendanceNote, setTeacherAttendanceNote] = useState('');
+  const [headerAttendancePending, setHeaderAttendancePending] = useState(null);
+  const [headerAttendanceRemaining, setHeaderAttendanceRemaining] = useState(0);
 
   useEffect(() => {
     setShowPeerInfo(false);
@@ -597,19 +688,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       });
 
     if (!matchingSchedules.length) return '';
-      const schedule = matchingSchedules.find((item) => isScheduleOngoingNow(item, scheduleNow))
-        || matchingSchedules.find((item) => String(item.linkHoc || '').trim())
-        || matchingSchedules[0];
+    const schedule = matchingSchedules.find((item) => isScheduleOngoingNow(item, scheduleNow))
+      || matchingSchedules.find((item) => String(item.linkHoc || '').trim())
+      || matchingSchedules[0];
     const studentProfile = isTeacher
       ? peerProfile
       : (students || []).find((student) => entityId(student) === studentId) || currentUser;
-    return String(
+    return normalizeClassroomUrl(
       schedule.linkHoc
       || studentProfile?.joinClassUrl
       || studentProfile?.linkHoc
       || studentProfile?.online_meeting_url
       || '',
-    ).trim();
+    );
   }, [
     canShowClassroomButton,
     activeConv,
@@ -627,6 +718,143 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     && entityId(schedule.teacherId) === (viewerRole === 'teacher' ? String(currentUserId || '') : entityId(activeConv?.user))
     && isScheduleOngoingNow(schedule, scheduleNow)
   ));
+  const pendingAttendanceSchedule = viewerRole === 'student' && peerRole === 'teacher'
+    ? (Array.isArray(schedules) ? schedules : [])
+      .filter((schedule) => (
+        String(schedule?.status || '') === 'scheduled'
+        && String(schedule?.studentConfirmStatus || '').toLowerCase() === 'pending'
+        && entityId(schedule.studentId) === String(currentUserId || '')
+        && entityId(schedule.teacherId) === entityId(activeConv?.user)
+        && (getAttendanceConfirmUnlockAt(schedule) || Infinity) <= scheduleNow.getTime()
+      ))
+      .sort((a, b) => normalizeScheduleDate(a.date).localeCompare(normalizeScheduleDate(b.date))
+        || String(a.startTime || '').localeCompare(String(b.startTime || '')))[0] || null
+    : null;
+  const teacherAttendanceSchedule = viewerRole === 'teacher' && peerRole === 'student' && !activeConv?.isGroup
+    ? (Array.isArray(schedules) ? schedules : [])
+      .filter((schedule) => {
+        const status = String(schedule?.status || '').toLowerCase();
+        const confirmStatus = String(schedule?.studentConfirmStatus || '').toLowerCase();
+        const isMarked = status === 'completed' || ['accepted', 'admin_approved'].includes(confirmStatus);
+        const isAwaiting = confirmStatus === 'pending' || confirmStatus === 'disputed';
+        const isEligible = getAttendanceAction(schedule, null, scheduleNow).canAttend;
+        return entityId(schedule.studentId) === entityId(activeConv?.user)
+          && entityId(schedule.teacherId) === String(currentUserId || '')
+          && normalizeScheduleDate(schedule.date) === formatLocalDateKey(scheduleNow)
+          && !['cancelled', 'canceled', 'no_show'].includes(status)
+          && (isMarked || isAwaiting || isEligible);
+      })
+      .sort((left, right) => {
+        const attendanceRank = (schedule) => {
+          const confirmStatus = String(schedule?.studentConfirmStatus || '').toLowerCase();
+          const isMarked = String(schedule?.status || '').toLowerCase() === 'completed'
+            || ['accepted', 'admin_approved'].includes(confirmStatus);
+          if (confirmStatus === 'pending' || confirmStatus === 'disputed') return 0;
+          if (!isMarked && getAttendanceAction(schedule, null, scheduleNow).canAttend) return 1;
+          return 2;
+        };
+        const rankDifference = attendanceRank(left) - attendanceRank(right);
+        if (rankDifference) return rankDifference;
+        return normalizeScheduleDate(left.date).localeCompare(normalizeScheduleDate(right.date))
+          || String(left.startTime || '').localeCompare(String(right.startTime || ''));
+      })[0] || null
+    : null;
+  const teacherAttendanceStudent = useMemo(() => {
+    if (!teacherAttendanceSchedule) return null;
+    const studentId = entityId(teacherAttendanceSchedule.studentId);
+    const course = String(teacherAttendanceSchedule.course || teacherAttendanceSchedule.courseName || teacherAttendanceSchedule.title || '')
+      .trim()
+      .toLocaleLowerCase('vi');
+    const teacherRows = typeof getStudentsByTeacher === 'function'
+      ? getStudentsByTeacher(currentUserId) || []
+      : [];
+    const matchingEnrollment = [...teacherRows, ...(students || [])].find((student) => (
+      entityId(student) === studentId
+      && String(student.course || '').trim().toLocaleLowerCase('vi') === course
+    ));
+    return matchingEnrollment
+      || teacherRows.find((student) => entityId(student) === studentId)
+      || (students || []).find((student) => entityId(student) === studentId)
+      || peerProfile
+      || null;
+  }, [currentUserId, getStudentsByTeacher, peerProfile, students, teacherAttendanceSchedule]);
+  const teacherAttendanceKey = attendanceConfirmKey(teacherAttendanceStudent);
+  const teacherAttendanceConfirmStatus = String(teacherAttendanceSchedule?.studentConfirmStatus || '').toLowerCase();
+  const teacherAttendanceMarked = String(teacherAttendanceSchedule?.status || '').toLowerCase() === 'completed'
+    || ['accepted', 'admin_approved'].includes(teacherAttendanceConfirmStatus);
+  const teacherAttendanceAwaiting = teacherAttendanceConfirmStatus === 'pending';
+  const teacherAttendanceUnderReview = teacherAttendanceConfirmStatus === 'disputed';
+  const teacherAttendanceCompleted = Number(teacherAttendanceStudent?.completedSessions) || 0;
+  const teacherAttendanceTotal = Number(teacherAttendanceStudent?.totalSessions) || 0;
+  useEffect(() => {
+    const syncPendingAttendance = () => setHeaderAttendancePending(getAttendanceConfirm(teacherAttendanceKey));
+    const timerId = window.setTimeout(syncPendingAttendance, 0);
+    const unsubscribe = subscribeAttendanceConfirm(syncPendingAttendance);
+    return () => {
+      window.clearTimeout(timerId);
+      unsubscribe();
+    };
+  }, [teacherAttendanceKey]);
+  useEffect(() => {
+    if (!headerAttendancePending) return undefined;
+    const intervalId = window.setInterval(() => {
+      setHeaderAttendanceRemaining(Math.max(
+        0,
+        Math.ceil((Number(headerAttendancePending.endsAt) - Date.now()) / 1000),
+      ));
+    }, 250);
+    return () => window.clearInterval(intervalId);
+  }, [headerAttendancePending]);
+  const openTeacherAttendanceModal = () => {
+    if (!teacherAttendanceSchedule || !teacherAttendanceStudent || headerAttendancePending) return;
+    const grade = Number(teacherAttendanceStudent.avgGrade ?? teacherAttendanceStudent.lastGrade);
+    setTeacherAttendanceGrade(Number.isFinite(grade) ? String(grade) : '0');
+    setTeacherAttendanceNote(
+      `Buổi ${teacherAttendanceCompleted + 1}: Đã điểm danh hoàn thành buổi học`,
+    );
+    setTeacherAttendanceModalSchedule(teacherAttendanceSchedule);
+  };
+  const confirmHeaderAttendance = () => {
+    if (!teacherAttendanceModalSchedule || !teacherAttendanceStudent || !teacherAttendanceKey) return;
+    const grade = Number(String(teacherAttendanceGrade).replace(',', '.'));
+    if (!Number.isFinite(grade) || grade < 0 || grade > 10) {
+      toast.error('Vui lòng nhập điểm từ 0 đến 10.');
+      return;
+    }
+    if (
+      normalizeScheduleDate(teacherAttendanceModalSchedule.date) !== formatLocalDateKey(new Date())
+      || !getAttendanceAction(teacherAttendanceModalSchedule, null, new Date()).canAttend
+    ) {
+      setTeacherAttendanceModalSchedule(null);
+      toast.info('Buổi học không còn trong khung giờ điểm danh.');
+      return;
+    }
+    if (getAttendanceConfirm(teacherAttendanceKey)) {
+      setTeacherAttendanceModalSchedule(null);
+      toast.info('Học viên đang có yêu cầu điểm danh chờ xử lý.');
+      return;
+    }
+    upsertAttendanceConfirm(teacherAttendanceKey, {
+      studentId: entityId(teacherAttendanceStudent),
+      courseName: String(teacherAttendanceModalSchedule.course || teacherAttendanceModalSchedule.courseName || teacherAttendanceModalSchedule.title || ''),
+      scheduleId: entityId(teacherAttendanceModalSchedule),
+      note: teacherAttendanceNote.trim(),
+      grade,
+      endsAt: Date.now() + ATTENDANCE_CONFIRM_MS,
+      teacherId: String(currentUserId || ''),
+    });
+    setTeacherAttendanceModalSchedule(null);
+    toast.info(`Đã ghi nhận — còn ${Math.round(ATTENDANCE_CONFIRM_MS / 1000)} giây để hủy điểm danh.`);
+  };
+  const cancelHeaderAttendance = () => {
+    const pending = getAttendanceConfirm(teacherAttendanceKey);
+    if (pending?.committing) {
+      toast.info('Đang ghi nhận điểm danh — không thể hủy lúc này.');
+      return;
+    }
+    removeAttendanceConfirm(teacherAttendanceKey);
+    toast.success('Đã hủy điểm danh — buổi chưa được tính.');
+  };
   const shouldMaskPeerPhone = (['student', 'teacher'].includes(viewerRole) && ['admin', 'staff'].includes(peerRole))
     || (viewerRole === 'teacher' && peerRole === 'student')
     || (viewerRole === 'student' && peerRole === 'teacher');
@@ -1218,6 +1446,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       time: m.time,
       isRead: m.read,
       isRecalled: m.isRecalled || false,
+      recipientRejected: m.recipientRejected || false,
       messageType: m.messageType || 'text',
       fileName: m.fileName,
       fileUrl: m.fileUrl,
@@ -1391,6 +1620,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
               time: new Date(data.createdAt || Date.now()),
               isRead: data.isRead || false,
               isRecalled: data.isRecalled || false,
+              recipientRejected: data.recipientRejected || false,
               messageType: data.messageType || 'text',
               fileName: data.fileName,
               fileUrl: data.fileUrl,
@@ -1784,6 +2014,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const handleSend = async (messageOverride, payloadOverride = null) => {
     const hasMessageOverride = typeof messageOverride === 'string' && Boolean(messageOverride);
+    const sendingDraftKey = activeDraftStorageKey;
     const contentText = hasMessageOverride ? messageOverride.trim() : newMsg.trim();
     if ((!contentText && !pendingImage) || !activeConv || (hasMessageOverride && pendingImage)) return false;
     stopInboxTyping();
@@ -1801,7 +2032,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           fileName: pendingImage?.fileName || '',
           messageType: pendingImage ? 'image' : 'text',
         });
-        if (!hasMessageOverride) setNewMsg('');
+        if (!hasMessageOverride) clearConversationDraft(sendingDraftKey);
         setPendingImage(null);
         setReplyMessage(null);
         return true;
@@ -1834,10 +2065,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (sentImg?.failed) {
         toast.error(sentImg.failReason || 'Không gửi được tin nhắn');
         sendSucceeded = false;
+      } else {
+        clearConversationDraft(sendingDraftKey);
+        setPendingImage(null);
+        setReplyMessage(null);
       }
-      setPendingImage(null);
-      setNewMsg('');
-      setReplyMessage(null);
     } else if (contentText) {
       const { isGroup: sendIsGroup, groupId: sendGroupId } = resolveGroupSendFlags(activeConv);
       const msgData = {
@@ -1858,9 +2090,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       if (sent?.failed) {
         toast.error(sent.failReason || 'Không gửi được tin nhắn');
         sendSucceeded = false;
+      } else {
+        if (!hasMessageOverride) clearConversationDraft(sendingDraftKey);
+        setReplyMessage(null);
       }
-      if (!hasMessageOverride) setNewMsg('');
-      setReplyMessage(null);
     }
 
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -1989,6 +2222,24 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     const safeName = showFileName(fileName);
     const fullUrl = resolveMediaUrl(url);
     if (!fullUrl) return;
+    if (typeof window.showSaveFilePicker === 'function') {
+      try {
+        const handle = await window.showSaveFilePicker({ suggestedName: safeName || 'download' });
+        const response = await fetch(fullUrl);
+        if (!response.ok) throw new Error(`Không tải được tệp (HTTP ${response.status}).`);
+        const writable = await handle.createWritable();
+        await writable.write(await response.blob());
+        await writable.close();
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          toast.error(error instanceof Error ? error.message : 'Không thể lưu tệp.');
+        }
+      } finally {
+        setShowMessageOptions(null);
+      }
+      return;
+    }
+
     try {
       const response = await fetch(fullUrl);
       const blob = await response.blob();
@@ -2587,8 +2838,71 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
-                {canShowClassroomButton && isClassTime && (
-                  joinClassUrl ? (
+                {teacherAttendanceSchedule ? (
+                  <button
+                    type="button"
+                    onClick={headerAttendancePending
+                      ? cancelHeaderAttendance
+                      : teacherAttendanceMarked || teacherAttendanceAwaiting || teacherAttendanceUnderReview
+                        ? undefined
+                        : openTeacherAttendanceModal}
+                    disabled={
+                      Boolean(headerAttendancePending?.committing)
+                      || (!headerAttendancePending && (
+                        teacherAttendanceMarked || teacherAttendanceAwaiting || teacherAttendanceUnderReview
+                      ))
+                    }
+                    data-chat-popup
+                    className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold transition-colors sm:px-3 ${
+                      headerAttendancePending?.committing || (!headerAttendancePending && teacherAttendanceMarked)
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : headerAttendancePending
+                          ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                          : teacherAttendanceAwaiting || teacherAttendanceUnderReview
+                            ? 'border-blue-200 bg-blue-50 text-blue-700'
+                            : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                    }`}
+                    aria-label={headerAttendancePending?.committing
+                      ? 'Đang ghi nhận điểm danh'
+                      : headerAttendancePending
+                        ? `Hủy điểm danh, còn ${headerAttendanceRemaining} giây`
+                        : teacherAttendanceAwaiting
+                          ? 'Chờ học viên xác nhận điểm danh'
+                          : teacherAttendanceUnderReview
+                            ? 'Điểm danh đang được Admin xử lý'
+                            : teacherAttendanceMarked
+                              ? 'Đã điểm danh buổi học hôm nay'
+                              : 'Điểm danh học viên'}
+                    title={headerAttendancePending?.committing
+                      ? 'Đang ghi nhận điểm danh'
+                      : headerAttendancePending
+                        ? `Hủy điểm danh (${headerAttendanceRemaining}s)`
+                        : teacherAttendanceAwaiting
+                          ? 'Chờ học viên xác nhận'
+                          : teacherAttendanceUnderReview
+                            ? 'Đang chờ Admin xử lý'
+                            : teacherAttendanceMarked
+                              ? 'Đã điểm danh buổi học hôm nay'
+                              : 'Điểm danh học viên'}
+                  >
+                    <CheckCircle2 size={16} aria-hidden="true" />
+                    <span className="hidden sm:inline">
+                      {headerAttendancePending?.committing
+                        ? 'Đang ghi nhận'
+                        : headerAttendancePending
+                          ? `Hủy (${headerAttendanceRemaining}s)`
+                          : teacherAttendanceAwaiting
+                            ? 'Chờ xác nhận'
+                            : teacherAttendanceUnderReview
+                              ? 'Đang xử lý'
+                              : teacherAttendanceMarked
+                                ? 'Đã điểm danh'
+                                : 'Điểm danh'}
+                    </span>
+                  </button>
+                ) : null}
+                {canShowClassroomButton && (
+                  isClassTime && joinClassUrl ? (
                     <a
                       href={joinClassUrl}
                       target="_blank"
@@ -2599,21 +2913,41 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     >
                       {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
                       <Video size={16} aria-hidden="true" />
-                      <span className="hidden sm:inline">{isClassTime ? 'ĐANG DIỄN RA · VÀO LỚP' : 'Vào lớp học ngay'}</span>
+                      <span className="hidden sm:inline">{isClassTime ? 'VÀO LỚP HỌC' : 'Vào lớp học ngay'}</span>
                     </a>
                   ) : (
                     <button
                       type="button"
                       disabled
-                      className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-400 sm:px-3"
-                      aria-label="Lớp học đang diễn ra nhưng chưa có link"
-                      title="Buổi học đang diễn ra nhưng chưa có link lớp"
+                      className={`inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-semibold transition-opacity sm:px-3 ${isClassTime
+                        ? 'border-slate-200 bg-slate-50 text-slate-400'
+                        : 'border-red-200 bg-red-50 text-red-300 opacity-50'
+                        }`}
+                      aria-label={isClassTime ? 'Lớp học đang diễn ra nhưng chưa có link' : 'Lớp học chưa đến giờ'}
+                      title={isClassTime ? 'Buổi học đang diễn ra nhưng chưa có link lớp' : 'Lớp học chưa đến giờ'}
                     >
                       <Video size={16} aria-hidden="true" />
-                      <span className="hidden sm:inline">Vào lớp học ngay</span>
+                      <span className="hidden sm:inline">{isClassTime ? 'Vào lớp học ngay' : 'Sắp đến giờ học'}</span>
                     </button>
                   )
                 )}
+                {pendingAttendanceSchedule ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('cms:open-student-attendance-confirm', {
+                        detail: { scheduleId: entityId(pendingAttendanceSchedule) },
+                      }));
+                    }}
+                    data-chat-popup
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 sm:px-3"
+                    aria-label="Mở xác nhận điểm danh"
+                    title="Xác nhận điểm danh buổi học"
+                  >
+                    <CheckCircle2 size={16} aria-hidden="true" />
+                    <span className="hidden sm:inline">Điểm danh</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setShowMessageSearch((open) => !open)}
@@ -2639,7 +2973,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <Info size={19} />
                     </button>
                     {showPeerInfo && (
-                      <div data-chat-popup className="absolute right-0 top-11 z-40 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                      <div
+                        data-chat-popup
+                        onMouseDown={(event) => event.stopPropagation()}
+                        className="absolute right-0 top-11 z-40 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl"
+                      >
                         <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-3">
                           <Info size={16} className="text-blue-600" />
                           <h3 className="text-sm font-black text-slate-800">Thông tin {peerRole === 'student' ? 'học viên' : peerRole === 'teacher' ? 'giảng viên' : 'nhân viên'}</h3>
@@ -2748,6 +3086,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             )}
                           </>
                         )}
+                        {!activeConv.isGroup
+                          && ['student', 'teacher'].includes(currentUserRole)
+                          && ['student', 'teacher'].includes(peerRole)
+                          && currentUserRole !== peerRole ? (
+                          <div className="mt-3 border-t border-slate-100 pt-3">
+                            <CommunicationPreferences role={currentUserRole} />
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -2996,29 +3342,23 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 ) : null}
                 {displayedMessages.map((msg, index) => {
                   const messageDate = getMessageDateInfo(msg.time);
+                  const previousMessage = index > 0 ? displayedMessages[index - 1] : null;
                   const previousMessageDate = index > 0
-                    ? getMessageDateInfo(displayedMessages[index - 1]?.time)
+                    ? getMessageDateInfo(previousMessage?.time)
                     : null;
                   const showDateDivider = messageDate && messageDate.key !== previousMessageDate?.key;
                   const dateDivider = showDateDivider ? (
-                    <div className="flex justify-center py-3" aria-label={messageDate.label}>
-                      <span className="rounded-full bg-slate-300 px-3 py-1 text-[11px] font-semibold text-white shadow-sm">
+                    <div className="flex justify-center py-1" aria-label={messageDate.label}>
+                      <span className="rounded-lg bg-[#BFC1C5] px-2.5 py-1 text-[11px] font-bold text-white">
                         {messageDate.label}
                       </span>
                     </div>
                   ) : null;
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const nextMessage = displayedMessages[index + 1];
-                  const currentTimestamp = new Date(msg.time).getTime();
-                  const nextTimestamp = nextMessage ? new Date(nextMessage.time).getTime() : NaN;
-                  const nextMessageStartsGroup = !nextMessage
-                    || nextMessage.messageType === 'system'
-                    || messageIsFromMe(nextMessage, currentUserId, currentUserRole) !== isMine
-                    || !Number.isFinite(currentTimestamp)
-                    || !Number.isFinite(nextTimestamp)
-                    || nextTimestamp - currentTimestamp >= 5 * 60 * 1000
-                    || getMessageDateInfo(nextMessage.time)?.key !== messageDate?.key;
-                  const showMessageTimestamp = index === 0 || nextMessageStartsGroup;
+                  const previousMessageContinuesGroup = areConsecutiveMessagesInGroup(previousMessage, msg);
+                  const nextMessageStartsGroup = !areConsecutiveMessagesInGroup(msg, nextMessage);
+                  const showMessageTimestamp = nextMessageStartsGroup;
                   const role = normalizeRole(msg.senderRole);
                   const messageAvatar = resolveMessageAvatar(msg);
                   const stickerMessage = !msg.isRecalled ? getChatStickerFromMessage(msg) : null;
@@ -3102,309 +3442,314 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   return (
                     <React.Fragment key={msg.id}>
                       {dateDivider}
-                      <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative`}>
-                        <div className={`max-w-[85%] md:max-w-[70%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative group-hover/msg:z-20 group-focus-within/msg:z-20 ${previousMessageContinuesGroup ? '-mt-1.5' : ''}`}>
+                        <div className={`relative ${isMine ? 'max-w-[85%] items-end' : 'w-full items-start gap-2'} flex ${isMine ? 'flex-col' : 'flex-row'}`}>
                           {!isMine && (
-                            <div className="mb-1 ml-1 flex min-w-0 items-center gap-1.5">
-                              <img
-                                src={resolveAvatarUrl({
-                                  ...messageAvatar,
+                            <img
+                              src={resolveAvatarUrl({
+                                ...messageAvatar,
+                                id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
+                                name: messageAvatar?.name || msg.senderName,
+                                role: messageAvatar?.role || role,
+                                avatar: messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar,
+                              })}
+                              alt=""
+                              aria-hidden="true"
+                              className={`mt-0.5 h-[34px] w-[34px] shrink-0 rounded-full border border-slate-200 bg-white object-cover ${isRealAvatar(messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar) ? 'cms-fm-avatar--photo' : ''}`}
+                              onError={(event) => {
+                                event.currentTarget.onerror = null;
+                                event.currentTarget.src = resolveAvatarUrl({
                                   id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
                                   name: messageAvatar?.name || msg.senderName,
                                   role: messageAvatar?.role || role,
-                                  avatar: messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar,
-                                })}
-                                alt=""
-                                aria-hidden="true"
-                                className={`h-9 w-9 shrink-0 rounded-full border-2 border-slate-300 object-cover shadow-sm ${isRealAvatar(messageAvatar?.avatar || messageAvatar?.avatarUrl || msg.senderAvatar) ? 'cms-fm-avatar--photo' : ''}`}
-                                onError={(event) => {
-                                  event.currentTarget.onerror = null;
-                                  event.currentTarget.src = resolveAvatarUrl({
-                                    id: messageAvatar?.id || messageAvatar?._id || msg.senderId,
-                                    name: messageAvatar?.name || msg.senderName,
-                                    role: messageAvatar?.role || role,
-                                    adminRole: messageAvatar?.adminRole || msg.senderAdminRole,
-                                    gender: messageAvatar?.gender || messageAvatar?.genderCode,
-                                    avatar: '',
-                                  });
-                                }}
-                              />
-                              {activeConv?.isGroup && (
-                                <>
-                                  <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
-                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
-                                    role === 'staff' ? 'bg-amber-600 text-white' :
-                                      role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-                                    }`}>
-                                    {badgeLabel}
-                                  </span>
-                                </>
-                              )}
-                            </div>
+                                  adminRole: messageAvatar?.adminRole || msg.senderAdminRole,
+                                  gender: messageAvatar?.gender || messageAvatar?.genderCode,
+                                  avatar: '',
+                                });
+                              }}
+                            />
                           )}
+                          <div className={`relative flex min-w-0 flex-col ${isMine ? 'items-end' : 'flex-1 items-start'}`}>
+                            {!isMine && activeConv?.isGroup && (
+                              <div className="mb-1 ml-1 flex min-w-0 items-center gap-1.5">
+                                <p className="min-w-0 truncate text-xs font-semibold text-gray-500">{msg.senderName}</p>
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${role === 'admin' ? 'bg-red-500 text-white' :
+                                  role === 'staff' ? 'bg-amber-600 text-white' :
+                                    role === 'teacher' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+                                  }`}>
+                                  {badgeLabel}
+                                </span>
+                              </div>
+                            )}
 
-                          {/* Bubble + action buttons */}
-                          <div className={`flex min-w-0 items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                            {/* Bubble + action buttons */}
+                            <div className={`cms-chat-message-content flex min-w-0 items-end gap-1.5 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
 
-                            {/* Message bubble */}
-                            <div className={`relative min-w-0 text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
-                              {!msg.isRecalled && msg.payload?.replyTo && (
-                                <button
-                                  type="button"
-                                  onClick={() => scrollToMessage(msg.payload.replyTo.id)}
-                                  className="mb-2 block w-full rounded-lg border-l-2 border-blue-400 bg-black/5 px-2.5 py-1.5 text-left text-xs transition hover:bg-black/10"
-                                  title="Đi đến tin nhắn được trả lời"
-                                >
-                                  <span className="block truncate font-bold">{msg.payload.replyTo.senderName || 'Người dùng'}</span>
-                                  <span className="block line-clamp-2 opacity-80">
-                                    {msg.payload.replyTo.content || (msg.payload.replyTo.messageType === 'image' ? '[Hình ảnh]' : '[Tệp đính kèm]')}
-                                  </span>
-                                </button>
-                              )}
-                              {msg.isRecalled ? (
-                                <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
-                                  <RotateCcw size={12} /> Tin nhắn đã được thu hồi
-                                </p>
-                              ) : isAttachmentExpired(msg) ? (
-                                <p className="italic text-amber-600/90 flex items-start gap-1.5 text-xs leading-relaxed">
-                                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                                  <span>{msg.content || 'Tệp đính kèm đã hết hạn lưu trữ (10 ngày) và không còn được lưu trên hệ thống.'}</span>
-                                </p>
-                              ) : isImageMessage(msg) ? (
-                                <div className="space-y-0">
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openImagePreview(msg);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        openImagePreview(msg);
-                                      }
-                                    }}
-                                    className="group/img relative block w-full max-w-[min(420px,100%)] cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl overflow-hidden"
-                                    title="Bấm để xem ảnh lớn"
+                              {/* Message bubble */}
+                              <div className={`cms-chat-message-bubble relative min-w-0 text-[14px] leading-relaxed transition-all ${isImageMessage(msg) && !msg.isRecalled && !isAttachmentExpired(msg) ? '!p-0 !overflow-visible !bg-transparent !shadow-none !border-transparent' : isStickerMessage ? 'cms-chat-sticker-bubble' : 'px-4 py-2.5'} ${isMine ? 'cms-bubble-mine' : 'cms-bubble-other'} ${bubbleRoleClass}`}>
+                                {!msg.isRecalled && msg.payload?.replyTo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => scrollToMessage(msg.payload.replyTo.id)}
+                                    className="mb-1 block w-full truncate border-l-2 border-slate-400 pl-1.5 text-left text-xs italic text-slate-500 transition hover:text-slate-700"
+                                    title="Đi đến tin nhắn được trả lời"
                                   >
-                                    <img
-                                      src={resolveMediaUrl(msg.fileUrl)}
-                                      alt={showFileName(msg.fileName) || 'Hình ảnh'}
-                                      className="w-full h-auto max-h-96 object-cover select-none"
-                                      draggable={false}
-                                    />
-                                    <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
-                                      <ZoomIn size={12} /> Phóng to
-                                    </span>
-                                  </div>
-                                  {attachmentCaption(msg) ? (
-                                    <div className={`whitespace-pre-wrap break-words px-4 py-2.5 mt-1 rounded-xl ${isMine ? 'bg-[#dc2626] text-white' : 'bg-white border border-slate-100 text-slate-800'}`}>
-                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ) : msg.messageType === 'file' ? (
-                                <div className="space-y-1.5">
-                                  {(() => {
-                                    const fileType = getChatFileType(msg.fileName, msg.fileUrl);
-                                    return (
-                                  <a href={resolveMediaUrl(msg.fileUrl)} download={showFileName(msg.fileName)} className={`cms-inbox-file-link flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10' : 'bg-gray-100'}`}>
-                                    <div className={`flex h-10 min-w-10 items-center justify-center rounded-lg px-1.5 text-[10px] font-black tracking-wide shadow-sm ${fileType.badgeClass}`}>
-                                      {fileType.extension}
-                                    </div>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
-                                      <span className="text-[10px] font-medium opacity-60">{fileType.label}</span>
-                                    </div>
-                                  </a>
-                                    );
-                                  })()}
-                                  {attachmentCaption(msg) ? (
-                                    <div className="whitespace-pre-wrap break-words px-0.5">
-                                      <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ) : (
-                                <div className="whitespace-pre-wrap break-words">
-                                  <MessageRichText text={msg.content} payload={msg.payload} mine={isMine} highlight={normalizedMessageSearch} />
-                                </div>
-                              )}
-
-                            </div>
-
-                            <ChatFlipWrap
-                              open={showMessageOptions === msg.id}
-                              onClose={() => setShowMessageOptions(null)}
-                              estimatedHeight={240}
-                              className="relative"
-                            >
-                              {(placeBelow) => (
-                                <>
-                                  <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover/msg:opacity-100 sm:group-focus-within/msg:opacity-100">
-                                    {!msg.isRecalled && (
-                                      <ReactionPicker
-                                        msgId={msg.id}
-                                        onReact={handleReaction}
-                                        myReactions={myReactions}
-                                        align={isMine ? 'right' : 'left'}
-                                      />
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => startReply(msg)}
-                                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800"
-                                      title="Trả lời tin nhắn"
-                                      aria-label="Trả lời tin nhắn"
-                                    >
-                                      <Reply size={14} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
-                                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 active:scale-90"
-                                      title="Tùy chọn"
-                                      aria-label="Tùy chọn tin nhắn"
-                                    >
-                                      <MoreHorizontal size={14} />
-                                    </button>
-                                  </div>
-                                  {showMessageOptions === msg.id && (
+                                    ↪ {msg.payload.replyTo.content || (msg.payload.replyTo.messageType === 'image' ? '[Hình ảnh]' : '[Tệp đính kèm]')}
+                                  </button>
+                                )}
+                                {msg.isRecalled ? (
+                                  <p className="italic text-gray-400 flex items-center gap-1.5 text-xs">
+                                    <RotateCcw size={12} /> Tin nhắn đã được thu hồi
+                                  </p>
+                                ) : isAttachmentExpired(msg) ? (
+                                  <p className="italic text-amber-600/90 flex items-start gap-1.5 text-xs leading-relaxed">
+                                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                    <span>{msg.content || 'Tệp đính kèm đã hết hạn lưu trữ (10 ngày) và không còn được lưu trên hệ thống.'}</span>
+                                  </p>
+                                ) : isImageMessage(msg) ? (
+                                  <div className="space-y-0">
                                     <div
-                                      onClick={(event) => event.stopPropagation()}
-                                      className={`absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'left-0' : 'right-0'}`}
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openImagePreview(msg);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                          e.preventDefault();
+                                          openImagePreview(msg);
+                                        }
+                                      }}
+                                      className="group/img relative block w-full max-w-[min(420px,100%)] cursor-zoom-in touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl overflow-hidden"
+                                      title="Bấm để xem ảnh lớn"
                                     >
-                                      {!msg.isRecalled && (
-                                        <button
-                                          onClick={() => {
-                                            handlePinMessage(msg.id);
-                                            setShowMessageOptions(null);
-                                          }}
-                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                                        >
-                                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned
-                                            ? <PinOff size={12} />
-                                            : <Pin size={12} />}
-                                          {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
-                                        </button>
-                                      )}
-                                      {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
-                                        <button
-                                          onClick={() => {
-                                            handleDownload(msg.fileUrl, msg.fileName);
-                                            setShowMessageOptions(null);
-                                          }}
-                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                                        >
-                                          <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
-                                        </button>
-                                      )}
-                                      {isImageMessage(msg) && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            handleCopyImage(msg.fileUrl);
-                                            setShowMessageOptions(null);
-                                          }}
-                                          className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                                        >
-                                          <Copy size={12} /> Sao chép ảnh
-                                        </button>
-                                      )}
-                                      {!msg.isRecalled &&
-                                        !isImageMessage(msg) &&
-                                        !msg.fileUrl &&
-                                        !['file', 'video'].includes(String(msg.messageType || '').toLowerCase()) && (
+                                      <img
+                                        src={resolveMediaUrl(msg.fileUrl)}
+                                        alt={showFileName(msg.fileName) || 'Hình ảnh'}
+                                        className="w-full h-auto max-h-96 object-cover select-none"
+                                        draggable={false}
+                                      />
+                                      <span className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-[10px] font-bold shadow-sm pointer-events-none">
+                                        <ZoomIn size={12} /> Phóng to
+                                      </span>
+                                    </div>
+                                    {attachmentCaption(msg) ? (
+                                      <div className={`whitespace-pre-wrap break-words px-4 py-2.5 mt-1 rounded-[9px] ${isMine ? 'border border-[#D1E1F2] bg-[#E4F0FF] text-slate-800' : 'border border-slate-200 bg-white text-slate-800'}`}>
+                                        <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : msg.messageType === 'file' ? (
+                                  <div className="space-y-1.5">
+                                    {(() => {
+                                      const fileType = getChatFileType(msg.fileName, msg.fileUrl);
+                                      return (
+                                        <a href={resolveMediaUrl(msg.fileUrl)} target="_blank" rel="noreferrer" className={`cms-inbox-file-link flex items-center gap-3 py-2 px-3 rounded-xl transition hover:opacity-80 ${isMine ? 'bg-white/10' : 'bg-gray-100'}`}>
+                                          <div className={`flex h-10 min-w-10 items-center justify-center rounded-lg px-1.5 text-[10px] font-black tracking-wide shadow-sm ${fileType.badgeClass}`}>
+                                            {fileType.extension}
+                                          </div>
+                                          <div className="flex flex-col min-w-0">
+                                            <span className="font-semibold text-xs truncate max-w-[150px]">{showFileName(msg.fileName)}</span>
+                                            <span className="text-[10px] font-medium opacity-60">{fileType.label}</span>
+                                          </div>
+                                        </a>
+                                      );
+                                    })()}
+                                    {attachmentCaption(msg) ? (
+                                      <div className="whitespace-pre-wrap break-words px-0.5">
+                                        <MessageRichText text={attachmentCaption(msg)} mine={isMine} highlight={normalizedMessageSearch} />
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <div className="whitespace-pre-wrap break-words">
+                                    <MessageRichText text={msg.content} payload={msg.payload} mine={isMine} highlight={normalizedMessageSearch} />
+                                  </div>
+                                )}
+                                {!msg.isRecalled && (
+                                  <div className="cms-chat-reaction-corner right-1">
+                                    {reactionCounts.length > 0 && (
+                                      <div className="cms-bubble-reactions z-10">
+                                        {reactionCounts.map(({ type, emoji, count }) => (
+                                          <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => handleReaction(msg.id, type)}
+                                            className="inline-flex items-center gap-0.5 rounded-full px-0.5 transition hover:bg-slate-100"
+                                            aria-label={`Cảm xúc ${type}, ${count}`}
+                                          >
+                                            <span>{emoji}</span>
+                                            {count > 1 && <span className="font-bold text-gray-500">{count}</span>}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <ReactionPicker
+                                      msgId={msg.id}
+                                      onReact={handleReaction}
+                                      myReactions={myReactions}
+                                      align={isMine ? 'right' : 'left'}
+                                    />
+                                  </div>
+                                )}
+
+                              </div>
+
+                              <ChatFlipWrap
+                                open={showMessageOptions === msg.id}
+                                onClose={() => setShowMessageOptions(null)}
+                                estimatedHeight={240}
+                                className="relative self-center"
+                              >
+                                {(placeBelow) => (
+                                  <>
+                                    <div className="cms-chat-message-actions flex shrink-0 items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => startReply(msg)}
+                                        className="cms-chat-hover-action flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800"
+                                        title="Trả lời tin nhắn"
+                                        aria-label="Trả lời tin nhắn"
+                                      >
+                                        <Reply size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
+                                        className="cms-chat-hover-action flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 active:scale-90"
+                                        title="Tùy chọn"
+                                        aria-label="Tùy chọn tin nhắn"
+                                      >
+                                        <MoreHorizontal size={14} />
+                                      </button>
+                                    </div>
+                                    {showMessageOptions === msg.id && (
+                                      <div
+                                        onClick={(event) => event.stopPropagation()}
+                                        className={`cms-chat-message-options-menu absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'left-0' : 'right-0'}`}
+                                      >
+                                        {!msg.isRecalled && (
                                           <button
                                             onClick={() => {
-                                              handleCopyText(msg.content || msg.fileName);
+                                              handlePinMessage(msg.id);
                                               setShowMessageOptions(null);
                                             }}
                                             className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                           >
-                                            <Copy size={12} /> Copy tin nhắn
+                                            {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned
+                                              ? <PinOff size={12} />
+                                              : <Pin size={12} />}
+                                            {activeConv?.metadata?.pinnedMessageId === String(msg.id) || msg.isPinned ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
                                           </button>
                                         )}
-                                      {isMine && !msg.isRecalled && (() => {
-                                        const now = new Date();
-                                        const sentAt = new Date(msg.time);
-                                        const diffHours = (now - sentAt) / (1000 * 60 * 60);
-                                        return diffHours <= 24;
-                                      })() && (
+                                        {msg.fileUrl && !msg.isRecalled && !isAttachmentExpired(msg) && (
                                           <button
                                             onClick={() => {
-                                              handleRecall(msg.id);
+                                              handleDownload(msg.fileUrl, msg.fileName);
                                               setShowMessageOptions(null);
                                             }}
-                                            disabled={recallingId === msg.id}
-                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                           >
-                                            {recallingId === msg.id
-                                              ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
-                                              : <RotateCcw size={12} />
-                                            } Thu hồi
+                                            <Download size={12} /> Tải {msg.messageType === 'image' ? 'ảnh' : 'tệp'}
                                           </button>
                                         )}
-                                      <button
-                                        onClick={() => {
-                                          handleDeleteHistory(msg.id);
-                                          setShowMessageOptions(null);
-                                        }}
-                                        className="flex w-full items-center gap-3 whitespace-nowrap border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                                      >
-                                        <Trash2 size={12} /> Xóa chỉ ở phía tôi
-                                      </button>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </ChatFlipWrap>
-                          </div>
-
-                          {!msg.isRecalled && reactionCounts.length > 0 && (
-                            <div className={`mt-1 flex w-full ${isMine ? 'justify-end' : 'justify-start'}`}>
-                              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] shadow-sm">
-                                {reactionCounts.map(({ type, emoji, count }) => (
-                                  <span key={type} className="inline-flex items-center gap-0.5">
-                                    <span>{emoji}</span>
-                                    {count > 1 && <span className="font-bold text-gray-500">{count}</span>}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Message time and delivery status stay in normal flow below the message/actions row. */}
-                          <div className={`mt-1 flex w-full items-center gap-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                            {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
-                              <span className={`text-[10px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
-                                {formatMessageTime(msg.time)}
-                              </span>
-                            )}
-                            {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
-                              <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
-                                <Pin size={10} className="rotate-45" />
-                              </span>
-                            )}
-                            {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
-                              <span title="Chưa gửi được (Kết nối yếu)">
-                                <AlertCircle size={10} className="text-red-500 animate-pulse" />
-                              </span>
-                            ) : isMine && !msg.isRecalled && !isAiSupportConversationId(activeConv?.id) && (
-                              <span
-                                className={`inline-flex items-center gap-0.5 font-semibold ${msg.isRead ? 'text-emerald-600' : 'text-slate-400'
-                                  }`}
-                                title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
-                              >
-                                {msg.isRead ? (
-                                  <CheckCircle2 size={11} aria-hidden="true" />
-                                ) : (
-                                  <CheckCircle2 size={11} aria-hidden="true" />
+                                        {isImageMessage(msg) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              handleCopyImage(msg.fileUrl);
+                                              setShowMessageOptions(null);
+                                            }}
+                                            className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                          >
+                                            <Copy size={12} /> Sao chép ảnh
+                                          </button>
+                                        )}
+                                        {!msg.isRecalled &&
+                                          !isImageMessage(msg) &&
+                                          !msg.fileUrl &&
+                                          !['file', 'video'].includes(String(msg.messageType || '').toLowerCase()) && (
+                                            <button
+                                              onClick={() => {
+                                                handleCopyText(msg.content || msg.fileName);
+                                                setShowMessageOptions(null);
+                                              }}
+                                              className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                                            >
+                                              <Copy size={12} /> Copy tin nhắn
+                                            </button>
+                                          )}
+                                        {isMine && !msg.isRecalled && (() => {
+                                          const now = new Date();
+                                          const sentAt = new Date(msg.time);
+                                          const diffHours = (now - sentAt) / (1000 * 60 * 60);
+                                          return diffHours <= 24;
+                                        })() && (
+                                            <button
+                                              onClick={() => {
+                                                handleRecall(msg.id);
+                                                setShowMessageOptions(null);
+                                              }}
+                                              disabled={recallingId === msg.id}
+                                              className="flex w-full items-center gap-3 whitespace-nowrap px-3 py-2 text-left text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                                            >
+                                              {recallingId === msg.id
+                                                ? <span className="w-3 h-3 border-2 border-amber-300 border-t-amber-600 rounded-full inline-block animate-spin" />
+                                                : <RotateCcw size={12} />
+                                              } Thu hồi
+                                            </button>
+                                          )}
+                                        <button
+                                          onClick={() => {
+                                            handleDeleteHistory(msg.id);
+                                            setShowMessageOptions(null);
+                                          }}
+                                          className="flex w-full items-center gap-3 whitespace-nowrap border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                                        >
+                                          <Trash2 size={12} /> Xóa chỉ ở phía tôi
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
-                                <span>{msg.isRead ? 'Đã đọc' : 'Chưa đọc'}</span>
-                              </span>
-                            )}
+                              </ChatFlipWrap>
+                            </div>
+
+                            {/* Message time and delivery status stay in normal flow below the message/actions row. */}
+                            <div className={`mt-1 flex w-full flex-col gap-1 ${isMine ? 'items-end' : 'items-start'}`}>
+                              <div className="flex items-center gap-1.5">
+                                {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
+                                  <span className={`text-[11px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    {formatMessageTime(msg.time)}
+                                  </span>
+                                )}
+                                {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
+                                  <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
+                                    <Pin size={10} className="rotate-45" />
+                                  </span>
+                                )}
+                                {isMine && !msg.isRecalled && String(msg.id).startsWith('temp_') ? (
+                                  <span title="Chưa gửi được (Kết nối yếu)">
+                                    <AlertCircle size={10} className="text-red-500 animate-pulse" />
+                                  </span>
+                                ) : nextMessageStartsGroup && isMine && !msg.isRecalled && !msg.recipientRejected && !isAiSupportConversationId(activeConv?.id) && (
+                                  <span
+                                    className={`inline-flex items-center gap-0.5 font-semibold ${msg.isRead ? 'text-emerald-600' : 'text-slate-400'
+                                      }`}
+                                    title={msg.isRead ? 'Đã đọc' : 'Chưa đọc'}
+                                  >
+                                    <CheckCircle2 size={11} aria-hidden="true" />
+                                    <span>{msg.isRead ? 'Đã đọc' : 'Chưa đọc'}</span>
+                                  </span>
+                                )}
+                              </div>
+                              {isMine && msg.recipientRejected && !msg.isRecalled ? (
+                                <span className="text-[11px] font-semibold text-red-600">
+                                  Người nhận từ chối tin nhắn.
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3450,7 +3795,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
                   <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
 
-                  <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                  <div className="cms-chat-attachment-tools flex items-center gap-0.5">
                     <button
                       onClick={() => imageInputRef.current?.click()}
                       disabled={isUploading}
@@ -3513,7 +3858,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         onBlur={stopInboxTyping}
                         onKeyDown={handleKeyPress}
                         onPaste={handlePaste}
-                        className="cms-input pl-4 pr-10 w-full"
+                        className="cms-input cms-chat-composer-input pl-4 pr-10 w-full"
                         placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
                       />
                       <StickerPicker
@@ -3527,7 +3872,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <button
                     onClick={() => handleSend()}
                     disabled={!newMsg.trim() && !pendingImage}
-                    className="cms-btn cms-btn-primary cms-btn-icon"
+                    className="cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send"
                     title="Gửi tin nhắn"
                   >
                     <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
@@ -3982,6 +4327,101 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           );
         })()
       )}
+
+      {teacherAttendanceModalSchedule && typeof document !== 'undefined' ? createPortal(
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setTeacherAttendanceModalSchedule(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="inbox-attendance-title"
+          >
+            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-emerald-700 to-green-600 px-6 py-5 text-white">
+              <div>
+                <h2 id="inbox-attendance-title" className="text-base font-black uppercase tracking-wide">
+                  Điểm danh &amp; chấm điểm
+                </h2>
+                <p className="mt-1 text-xs font-semibold text-emerald-100">
+                  {teacherAttendanceModalSchedule.course
+                    || teacherAttendanceModalSchedule.courseName
+                    || teacherAttendanceModalSchedule.title
+                    || 'Buổi học'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTeacherAttendanceModalSchedule(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 hover:text-white"
+                aria-label="Đóng popup điểm danh"
+              >
+                <X size={19} />
+              </button>
+            </div>
+            <div className="space-y-5 p-6">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-emerald-800">Học viên</p>
+                <p className="mt-1 text-base font-black text-emerald-700">
+                  {teacherAttendanceStudent?.name || activeConv?.user?.name || 'Học viên'}
+                </p>
+                <p className="mt-2 text-xs font-bold text-emerald-700">
+                  Tiến độ hiện tại: {teacherAttendanceCompleted}/{teacherAttendanceTotal || '—'} buổi
+                </p>
+                <p className="mt-1 text-xs text-emerald-700">
+                  Ca {teacherAttendanceModalSchedule.startTime || '—'}
+                  {teacherAttendanceModalSchedule.endTime ? ` - ${teacherAttendanceModalSchedule.endTime}` : ''}
+                </p>
+              </div>
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+                  Đánh giá buổi học (0-10)
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value={teacherAttendanceGrade}
+                  onChange={(event) => setTeacherAttendanceGrade(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Ghi chú nhanh</span>
+                <textarea
+                  rows={3}
+                  value={teacherAttendanceNote}
+                  onChange={(event) => setTeacherAttendanceNote(event.target.value)}
+                  placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:bg-white"
+                />
+              </label>
+              <div className="flex flex-col-reverse gap-2 min-[380px]:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setTeacherAttendanceModalSchedule(null)}
+                  className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmHeaderAttendance}
+                  className="min-h-11 flex-[2] rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black uppercase tracking-wide text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                >
+                  Xác nhận điểm danh
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
 
       <ScheduleMessagePreviewModal
         open={!!schedulePreview}

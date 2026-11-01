@@ -20,6 +20,9 @@ describe('Group messages sync on reload and High Admin messaging verification', 
     const src = read('routes/messageRoutes.js');
     assert.ok(src.includes("router.get('/groups/user/:userId'"), 'Group list endpoint must exist');
     assert.ok(src.includes("createdBy.userId': { $in: targetIds }"), 'Must query groups where user is creator or participant');
+    assert.ok(src.includes('const unreadRows = groupConversationIds.length'), 'Must return server-calculated group unread counts');
+    assert.ok(src.includes("messageType: { $ne: 'system' }"), 'System messages must not count as unread');
+    assert.ok(src.includes('hiddenFor: { $nin: targetIds }'), 'Messages hidden by the requesting user must not count as unread');
   });
 
   it('server.js joins user groups on connect and handles group:join', () => {

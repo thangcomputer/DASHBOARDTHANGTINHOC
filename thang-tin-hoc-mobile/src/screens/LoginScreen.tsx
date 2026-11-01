@@ -17,7 +17,7 @@ import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { UserRole } from '../types';
 
 export function LoginScreen() {
-  const { signIn, isSigningIn } = useAuth();
+  const { signIn, isSigningIn, authError } = useAuth();
   const [role, setRole] = useState<UserRole>('student');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -26,8 +26,6 @@ export function LoginScreen() {
 
   const chooseRole = (nextRole: UserRole) => {
     setRole(nextRole);
-    setPhone(nextRole === 'student' ? '0901 234 567' : '0912 345 678');
-    setPassword('demo123');
     setError('');
   };
 
@@ -36,7 +34,7 @@ export function LoginScreen() {
     try {
       await signIn(role, phone, password);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập demo.');
+      setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập.');
     }
   };
 
@@ -52,7 +50,7 @@ export function LoginScreen() {
           <Text style={styles.brandName}>THẮNG TIN HỌC</Text>
           <Text style={styles.eyebrow}>HỌC TẬP, THEO CÁCH CỦA BẠN</Text>
           <Text style={styles.welcome}>Chào mừng{'\n'}bạn quay trở lại</Text>
-          <Text style={styles.intro}>Đăng nhập vào không gian học tập của bạn.</Text>
+          <Text style={styles.intro}>Dùng số điện thoại và mật khẩu thật đang sử dụng trên website.</Text>
 
           <View style={styles.form}>
             <Text style={styles.label}>Bạn đang đăng nhập với vai trò</Text>
@@ -65,11 +63,11 @@ export function LoginScreen() {
               label="Số điện thoại"
               value={phone}
               onChangeText={setPhone}
-              placeholder="Nhập số điện thoại"
+              placeholder="Số điện thoại tài khoản Web"
               keyboardType="phone-pad"
               autoComplete="tel"
               textContentType="telephoneNumber"
-              accessibilityLabel="Số điện thoại demo"
+              accessibilityLabel="Số điện thoại"
             />
             <View style={styles.passwordField}>
               <FormField
@@ -80,7 +78,7 @@ export function LoginScreen() {
                 secureTextEntry={!showPassword}
                 autoComplete="password"
                 textContentType="password"
-                accessibilityLabel="Mật khẩu demo"
+                accessibilityLabel="Mật khẩu"
               />
               <Pressable
                 style={styles.eyeButton}
@@ -91,15 +89,12 @@ export function LoginScreen() {
                 {showPassword ? <EyeOff size={19} color={colors.muted} /> : <Eye size={19} color={colors.muted} />}
               </Pressable>
             </View>
+            {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <PrimaryButton title="Đăng nhập demo" onPress={submit} loading={isSigningIn} />
+            <PrimaryButton title="Đăng nhập" onPress={submit} loading={isSigningIn} />
 
-            <View style={styles.demoNote}>
-              <Text style={styles.demoTitle}>Chế độ xem trước</Text>
-              <Text style={styles.demoCopy}>Dữ liệu chỉ là minh họa. Bạn có thể chọn vai trò để mở giao diện mẫu.</Text>
-            </View>
             <Pressable
-              onPress={() => Alert.alert('Quên mật khẩu', 'Đây là giao diện demo. Hãy liên hệ trung tâm trên website.')}
+              onPress={() => Alert.alert('Quên mật khẩu', 'Vui lòng liên hệ trung tâm để được hỗ trợ đặt lại mật khẩu.')}
               accessibilityRole="button"
               style={styles.forgot}
             >
@@ -107,7 +102,9 @@ export function LoginScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.footer}>Phiên bản giao diện demo · Không kết nối hệ thống thật</Text>
+          <Text style={styles.footer}>{Platform.OS === 'web'
+            ? 'Phiên đăng nhập được giữ trong tab trình duyệt hiện tại'
+            : 'Đăng nhập an toàn bằng phiên mobile của hệ thống'}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -144,8 +141,8 @@ const styles = StyleSheet.create({
   scroll: { width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xxl, paddingBottom: spacing.xxl },
   brandMark: { width: 54, height: 54, borderRadius: 18, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   brandName: { color: colors.brandDark, fontWeight: '900', fontSize: typography.small, letterSpacing: 1.8 },
-  eyebrow: { color: colors.brand, fontWeight: '800', fontSize: 10, letterSpacing: 1.4, marginTop: spacing.xxxl },
-  welcome: { color: colors.ink, fontSize: 34, lineHeight: 40, letterSpacing: -1, fontWeight: '800', marginTop: spacing.md },
+  eyebrow: { color: colors.brand, fontWeight: '800', fontSize: typography.micro, letterSpacing: 1.4, marginTop: spacing.xxxl },
+  welcome: { color: colors.ink, fontSize: typography.hero, lineHeight: 40, letterSpacing: -1, fontWeight: '800', marginTop: spacing.md },
   intro: { color: colors.muted, fontSize: typography.body, marginTop: spacing.sm, lineHeight: 22 },
   form: { marginTop: spacing.xxl, gap: spacing.lg },
   label: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
@@ -159,9 +156,6 @@ const styles = StyleSheet.create({
   passwordField: { position: 'relative' },
   eyeButton: { position: 'absolute', right: spacing.md, bottom: 7, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   errorText: { color: colors.red, fontSize: typography.small },
-  demoNote: { backgroundColor: colors.goldSoft, borderRadius: radius.sm, padding: spacing.lg, gap: spacing.xs },
-  demoTitle: { color: '#805900', fontWeight: '800', fontSize: typography.small },
-  demoCopy: { color: '#785F2D', fontSize: typography.caption, lineHeight: 18 },
   forgot: { alignSelf: 'center', padding: spacing.sm },
   forgotText: { color: colors.brandDark, fontWeight: '700', fontSize: typography.small },
   footer: { color: colors.muted, fontSize: typography.caption, textAlign: 'center', marginTop: spacing.xxxl },

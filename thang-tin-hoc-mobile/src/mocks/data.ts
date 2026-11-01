@@ -61,6 +61,7 @@ export const mockSchedule: ScheduleItem[] = [
     subject: 'Microsoft Word',
     person: 'Cô Ngọc Hà',
     dateLabel: 'Hôm nay',
+    date: '2026-10-25',
     time: '18:00 – 19:30',
     location: 'Phòng học 02 · Trực tiếp',
     status: 'upcoming',
@@ -72,6 +73,7 @@ export const mockSchedule: ScheduleItem[] = [
     subject: 'Microsoft Excel',
     person: 'Thầy Hoàng Nam',
     dateLabel: 'Thứ Tư, 28/10',
+    date: '2026-10-28',
     time: '17:30 – 19:00',
     location: 'Học trực tuyến',
     status: 'upcoming',
@@ -83,6 +85,7 @@ export const mockSchedule: ScheduleItem[] = [
     subject: 'Microsoft PowerPoint',
     person: 'Cô Ngọc Hà',
     dateLabel: 'Thứ Sáu, 30/10',
+    date: '2026-10-30',
     time: '18:00 – 19:30',
     location: 'Phòng học 01 · Trực tiếp',
     status: 'upcoming',
@@ -93,7 +96,8 @@ export const mockSchedule: ScheduleItem[] = [
     title: 'Excel cơ bản · Buổi 4',
     subject: 'Microsoft Excel',
     person: 'Thầy Hoàng Nam',
-    dateLabel: 'Thứ Hai, 26/10',
+    dateLabel: 'Thứ Ba, 20/10',
+    date: '2026-10-20',
     time: '17:30 – 19:00',
     location: 'Phòng học 03',
     status: 'completed',
@@ -357,9 +361,11 @@ export const mockTeacherNotifications: AppNotification[] = [
 ];
 
 export const mockConversations: Conversation[] = [
-  { id: 'chat-1', name: 'Cô Ngọc Hà', role: 'Giảng viên', category: 'teacher', online: true, lastMessage: 'Em nhớ xem lại phần định dạng trang nhé.', time: '10:42', unread: 2, color: '#F6E9D9' },
-  { id: 'chat-2', name: 'Thầy Hoàng Nam', role: 'Giảng viên', category: 'teacher', online: false, lastMessage: 'Thầy đã gửi tài liệu Excel tuần này.', time: 'Hôm qua', unread: 0, color: '#E4EBFA' },
-  { id: 'chat-3', name: 'Trung tâm Thắng Tin Học', role: 'Hỗ trợ học viên', category: 'support', lastMessage: 'Chào bạn, trung tâm có thể hỗ trợ gì?', time: 'Thứ Sáu', unread: 0, color: '#DDF1EB' },
+  { id: 'chat-support', name: 'Nhân Viên Support', role: 'Hỗ trợ', adminRole: 'SUPPORT', category: 'support', roleBadge: 'HT', online: false, lastMessage: 'Bắt đầu cuộc trò chuyện', time: '', unread: 0, color: '#2563EB' },
+  { id: 'chat-teacher-online', name: 'Giảng Viên Nâng Cao Online', role: 'Giảng viên', category: 'teacher', roleBadge: 'GV', online: false, lastMessage: 'Bắt đầu cuộc trò chuyện', time: '', unread: 0, color: '#F59E0B' },
+  { id: 'chat-1', name: 'Cô Ngọc Hà', role: 'Giảng viên', category: 'teacher', roleBadge: 'GV', online: true, lastMessage: 'Em nhớ xem lại phần định dạng trang nhé.', time: '10:42', unread: 2, color: '#F59E0B' },
+  { id: 'chat-2', name: 'Thầy Hoàng Nam', role: 'Giảng viên', category: 'teacher', roleBadge: 'GV', online: false, lastMessage: 'Thầy đã gửi tài liệu Excel tuần này.', time: 'Hôm qua', unread: 0, color: '#F59E0B' },
+  { id: 'chat-staff', name: 'Bộ phận Tuyển sinh', role: 'Tuyển sinh', adminRole: 'STAFF', category: 'recruitment', roleBadge: 'NV', online: false, lastMessage: 'Bắt đầu cuộc trò chuyện', time: '', unread: 0, color: '#64748B' },
 ];
 
 export const mockTeacherConversations: Conversation[] = [
@@ -376,6 +382,22 @@ export const mockMessages: ChatMessage[] = [
   { id: 'msg-2', text: 'Dạ cô ơi, phần đánh số trang em làm như vậy đã đúng chưa ạ?', time: '10:36', mine: true },
   { id: 'msg-3', text: 'Em nhớ xem lại phần định dạng trang nhé. Cô gửi em một mẫu để tham khảo.', time: '10:42', mine: false },
 ];
+
+export const mockStudentThreads: Record<string, ChatMessage[]> = {
+  'chat-teacher-online': [
+    { id: 'msg-online-1', text: 'xin chào', time: '16:34', mine: true, state: 'sent' },
+  ],
+  'chat-support': [
+    { id: 'msg-supp-1', text: 'xin chào', time: '16:34', mine: true, state: 'sent' },
+  ],
+  'chat-1': mockMessages,
+  'chat-2': [
+    { id: 'msg-hn-1', text: 'Thầy đã gửi tài liệu Excel tuần này.', time: 'Hôm qua', mine: false },
+  ],
+  'chat-staff': [
+    { id: 'msg-staff-1', text: 'Chào bạn, phòng tuyển sinh có thể hỗ trợ gì cho bạn?', time: 'Hôm qua', mine: false },
+  ],
+};
 
 export const mockTeacherThreads: Record<string, ChatMessage[]> = {
   'teacher-chat-1': [

@@ -964,6 +964,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     setAttendanceConfirm(null);
   }, []);
 
+  React.useEffect(() => {
+    const onOpenAttendanceConfirm = (event) => {
+      const scheduleId = event?.detail?.scheduleId;
+      if (role !== 'student' || !scheduleId) return;
+      void openStudentAttendanceFromNotif({ scheduleId });
+    };
+    window.addEventListener('cms:open-student-attendance-confirm', onOpenAttendanceConfirm);
+    return () => window.removeEventListener('cms:open-student-attendance-confirm', onOpenAttendanceConfirm);
+  }, [openStudentAttendanceFromNotif, role]);
+
   const handleAdminDisputeDecision = React.useCallback(async (decision) => {
     const sid = attendanceDispute?.scheduleId;
     if (!sid) return;

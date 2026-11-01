@@ -38,10 +38,11 @@ export const radius = {
 } as const;
 
 export const typography = {
+  micro: 11,
   hero: 30,
   title: 23,
   heading: 18,
-  body: 15,
-  small: 13,
+  body: 16,
+  small: 14,
   caption: 12,
 } as const;

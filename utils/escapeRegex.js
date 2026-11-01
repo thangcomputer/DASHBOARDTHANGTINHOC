@@ -10,10 +10,13 @@ const MOJIBAKE_RE = /\u00c3.|\u00e1\u00ba|\u00e1\u00bb|\u00c4|\u00c6\u00b0/;
 
 function fixMulterFilename(name) {
   if (!name) return '';
+  const original = String(name);
+  if (!MOJIBAKE_RE.test(original) || original.includes('\uFFFD')) return original;
   try {
-    return Buffer.from(String(name), 'latin1').toString('utf8');
+    const fixed = Buffer.from(original, 'latin1').toString('utf8');
+    return fixed && !fixed.includes('\uFFFD') ? fixed : original;
   } catch {
-    return String(name);
+    return original;
   }
 }
 

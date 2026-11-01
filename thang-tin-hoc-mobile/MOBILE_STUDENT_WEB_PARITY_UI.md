@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-Đối chiếu Student mobile với source web hiện có. Mobile tiếp tục là Expo/React Native app riêng, dùng mock data local; website/backend không bị thay đổi. Không có API, auth thật, database, Socket.IO, push, payment, upload, media playback hay native exam integration.
+Đây là bản kiểm kê UI/UX lịch sử, không phản ánh các tích hợp API đã được thêm sau đó. Trạng thái API hiện tại được theo dõi trong [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md). Các nội dung bên dưới chỉ mô tả trạng thái khi kiểm kê.
 
 ## Nguồn web đã đối chiếu
 
@@ -29,10 +29,10 @@
 | Tài liệu, video, bài tập, quiz, đánh giá | Materials / Assignments / StudentExam / Evaluations | CHƯA ĐỦ | Tài liệu và video có mock list; các category còn lại điều hướng tới màn tương ứng. File, nộp bài và feedback không gửi đi. |
 | Điểm/kết quả học tập | Grades / StudentExam | CHƯA ĐỦ | Có tiến độ bài học; điểm thi chính thức, lịch sử thi và báo cáo vẫn trên web. |
 | Thi/chứng chỉ/MOS/IC3 | StudentExam (menu) | WEB-ONLY TẠM THỜI | Có inventory/menu và thông báo tiếp tục trên website. Không có attempt, camera, proctoring, screen capture, fullscreen hoặc kết quả chính thức trên mobile. |
-| Bảng tin | Feed | CHƯA ĐỦ | Bài đăng, phản hồi và reaction chỉ mock; media/quyền và đồng bộ chưa có. |
-| Tin tức/chi tiết | News / NewsDetail | CHƯA ĐỦ | Tìm kiếm, danh sách và chi tiết dùng fixture; chưa tải nội dung/đính kèm web. |
-| Đánh giá giảng viên | Evaluations | CHƯA ĐỦ | Có tab riêng tư/công khai, tiêu chí nguồn web, ngưỡng nửa khóa, nạp đánh giá đã có để sửa và khóa sau khi kết thúc khóa. QA đã kiểm tra 4/12 bị chặn, đánh giá 4.5★ đã có và khóa cuối khóa; lưu vẫn local, không gửi dữ liệu thật. |
-| Thông tin Trung tâm | CenterInfo | CHƯA ĐỦ | Có giới thiệu và danh sách thông tin mock; chưa điều hướng sâu hoặc hiển thị nội dung live. |
+| Bảng tin | Feed | CHƯA ĐỦ | Bài viết, reaction và bình luận đồng bộ API; upload ảnh chưa hỗ trợ. |
+| Tin tức/chi tiết | News / NewsDetail | CHƯA ĐỦ | Danh sách, chi tiết và liên kết tệp đọc từ Blog API; nội dung HTML phong phú và thumbnail chưa được hiển thị đầy đủ. |
+| Đánh giá giảng viên | Evaluations | CHƯA ĐỦ | Đọc điều kiện, phản hồi riêng đã gửi, đánh giá công khai đã có và khóa cuối khóa từ API; gửi/sửa phản hồi và đánh giá qua API. |
+| Thông tin Trung tâm | CenterInfo | CHƯA ĐỦ | Tổng quan và các mục đã xuất bản đọc từ API; bố cục chi tiết/đa phương tiện chưa đầy đủ. |
 | Hồ sơ/cập nhật/học phí | Profile / Tuition | CHƯA ĐỦ | Profile đã bổ sung KPI, thông tin cá nhân, tóm tắt học tập/tiến độ khóa, tình trạng học phí và trạng thái rỗng đơn hàng video; QA responsive không thấy tràn ngang ở 320–768 px. Dữ liệu thanh toán/đơn hàng và cập nhật chính thức không kết nối; screenshot parity chưa xác nhận. |
 | Thông báo | Notifications | CHƯA ĐỦ | Có loại, lọc, chi tiết, đọc/ẩn local, điều hướng mock và phân trang 20 mục. QA fixture 25 mục đã kiểm tra Trang 1/2 và responsive 320–768 px; trạng thái/đích thực tế không đồng bộ. |
 

@@ -1,5 +1,7 @@
 # Teacher Mobile UI — Web Parity and Responsive QA
 
+> Historical inventory: its backend integration statements predate current API work. Use [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md) for verified API status.
+
 **Updated:** 2026-10-24
 **Scope:** Teacher UI in the existing Expo project only. The five Teacher tabs and current project structure remain in place.
 

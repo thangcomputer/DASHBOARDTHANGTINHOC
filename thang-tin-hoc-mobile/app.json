@@ -8,7 +8,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "vn.thangcomputer.thangtinhoc.mobile"
+      "bundleIdentifier": "vn.thangcomputer.thangtinhoc.mobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Cho phép sử dụng micro để gọi thoại với giảng viên hoặc học viên."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,10 +21,33 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "vn.thangcomputer.thangtinhoc.mobile"
+      "package": "vn.thangcomputer.thangtinhoc.mobile",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép truy cập ảnh để gửi hình trong tin nhắn.",
+          "cameraPermission": "Cho phép sử dụng camera để chụp ảnh gửi trong tin nhắn.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Cho phép sử dụng micro để gọi thoại với giảng viên hoặc học viên."
+        }
+      ],
+      "expo-audio"
+    ]
   }
 }

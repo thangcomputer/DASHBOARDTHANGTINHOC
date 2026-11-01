@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
 import {
-  BookOpen, Building2, CheckCircle2, ChevronRight, CircleDollarSign,
-  ClipboardList, GraduationCap, ImagePlus, MessageSquareText, Newspaper, Paperclip, Radio, Star, WalletCards,
+  ArrowDownWideNarrow, BookOpen, Building2, CalendarDays, CheckCircle2, ChevronRight, ClipboardList,
+  GraduationCap, Grid2X2, ImagePlus, List, MessageSquareText, Newspaper, Paperclip, Radio, Search, Star, WalletCards,
 } from 'lucide-react-native';
 import {
   AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton,
@@ -13,8 +13,11 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  evaluationService, feedService, financeService, learningService, quizService,
-  softwareService, studentProfileService, studentService, trainingService,
+  commentFeedPost, createFeedPost, deleteFeedPost, fetchFeedPosts, reactFeedPost, updateFeedPost,
+} from '../services/feedApi';
+import {
+  evaluationService, feedService, learningService, quizService,
+  softwareService, studentProfileService, studentService, teacherFinanceService, trainingService,
 } from '../services/mockService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
@@ -25,11 +28,25 @@ import type {
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
-type MenuScreen = 'Assignments' | 'Materials' | 'StudentLearning' | 'StudentExam' | 'Evaluations' | 'Feed' | 'News' | 'CenterInfo' | 'Tuition' | 'SoftwareLinks' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance';
+async function openExternalUrl(url: string | undefined, label: string) {
+  if (!url) {
+    Alert.alert('Không có liên kết', `${label} chưa có liên kết để mở.`);
+    return;
+  }
+  try {
+    await Linking.openURL(url);
+  } catch (error) {
+    Alert.alert('Không thể mở liên kết', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+  }
+}
+
+type MenuScreen = 'Assignments' | 'Materials' | 'StudentLearning' | 'Evaluations' | 'Feed' | 'News' | 'CenterInfo' | 'Tuition' | 'SoftwareLinks' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'CertPrepCatalog' | 'LessonPracticeCatalog';
 type MenuItem = { label: string; screen?: MenuScreen; description: string };
 
 const studentMenu: MenuItem[] = [
   { label: 'Bài học', screen: 'StudentLearning', description: 'Khóa học đã đăng ký và tự học qua video' },
+  { label: 'Luyện bài theo bài học', screen: 'LessonPracticeCatalog', description: 'Học và làm bài tập theo từng chương bài' },
+  { label: 'Ôn thi chứng chỉ MOS / IC3', screen: 'CertPrepCatalog', description: 'Luyện đề và thi thử chứng chỉ theo cấp độ' },
   { label: 'Bài tập về nhà', screen: 'Assignments', description: 'Bài tập, hạn nộp và trạng thái bài làm' },
   { label: 'Tài liệu học tập', screen: 'Materials', description: 'Tài liệu và video theo khóa học' },
   { label: 'Phần mềm', screen: 'SoftwareLinks', description: 'Phần mềm được cung cấp theo khóa học' },
@@ -38,19 +55,17 @@ const studentMenu: MenuItem[] = [
   { label: 'Tin tức', screen: 'News', description: 'Tin tức và thông báo của trung tâm' },
   { label: 'Liên hệ Trung tâm', screen: 'CenterInfo', description: 'Thông tin trung tâm và các mục liên quan' },
   { label: 'Thông tin học phí', screen: 'Tuition', description: 'Trạng thái học phí theo khóa học' },
-  { label: 'Phòng thi', screen: 'StudentExam', description: 'Bài thi chứng nhận tiếp tục thực hiện trên website' },
 ];
 
 const teacherMenu: MenuItem[] = [
   { label: 'Bảng tin', screen: 'Feed', description: 'Bài đăng dành cho lớp học' },
-  { label: 'Phần mềm', screen: 'SoftwareLinks', description: 'Phần mềm được cung cấp theo khóa học' },
   { label: 'Giao bài tập & kiểm tra', screen: 'Assignments', description: 'Bài tập, bài nộp và trắc nghiệm' },
   { label: 'Trắc nghiệm mỗi buổi học', screen: 'TeacherQuizzes', description: 'Danh sách bài trắc nghiệm đã tạo' },
   { label: 'Khóa đào tạo', screen: 'TeacherTraining', description: 'Nội dung đào tạo và tài liệu' },
   { label: 'Tài chính', screen: 'TeacherFinance', description: 'Tổng hợp buổi dạy và thanh toán' },
+  { label: 'Phần mềm', screen: 'SoftwareLinks', description: 'Phần mềm được cung cấp theo khóa học' },
   { label: 'Tin tức', screen: 'News', description: 'Tin tức và thông báo của trung tâm' },
   { label: 'Thông tin Trung tâm', screen: 'CenterInfo', description: 'Thông tin và các mục của trung tâm' },
-  { label: 'Bài kiểm tra đầu vào', description: 'WEB-ONLY TẠM THỜI — thực hiện trên website' },
 ];
 
 export function MobileMenuScreen() {
@@ -58,36 +73,43 @@ export function MobileMenuScreen() {
   const { user } = useAuth();
   const items = user?.role === 'teacher' ? teacherMenu : studentMenu;
   return (
-    <AppScreen>
-      <AppHeader title="Danh mục" subtitle="Các mục theo tài khoản hiện tại" />
-      {items.map((item) => (
-        <Pressable
-          key={item.label}
-          onPress={() => {
-            if (!item.screen) {
-              Alert.alert(item.label, 'Chức năng này hiện được thực hiện trên website.');
-              return;
-            }
-            navigation.navigate(item.screen);
-          }}
-          accessibilityRole="button"
-        >
-          <Card style={styles.menuRow}>
-            <View style={styles.menuIcon}><MenuIcon label={item.label} /></View>
-            <View style={styles.flex}>
-              <Text style={styles.title}>{item.label}</Text>
-              <Text style={styles.muted}>{item.description}</Text>
-            </View>
-            <ChevronRight size={19} color={colors.muted} />
-          </Card>
-        </Pressable>
-      ))}
+    <AppScreen contentStyle={styles.menuScreen}>
+      <AppHeader
+        title="Danh mục"
+        subtitle="Các mục theo tài khoản hiện tại"
+        containerStyle={styles.menuHeader}
+      />
+      <View style={styles.menuList}>
+        {items.map((item) => (
+          <Pressable
+            key={item.label}
+            onPress={() => {
+              if (!item.screen) {
+                Alert.alert(item.label, 'Chức năng này hiện được thực hiện trên website.');
+                return;
+              }
+              navigation.navigate(item.screen);
+            }}
+            style={({ pressed }) => pressed && styles.menuPressed}
+            accessibilityRole="button"
+          >
+            <Card style={styles.menuRow}>
+              <View style={styles.menuIcon}><MenuIcon label={item.label} /></View>
+              <View style={styles.menuCopy}>
+                <Text numberOfLines={1} style={styles.menuItemTitle}>{item.label}</Text>
+                <Text numberOfLines={1} style={styles.menuItemDescription}>{item.description}</Text>
+              </View>
+              <View style={styles.menuArrow}><ChevronRight size={16} color="#64748B" /></View>
+            </Card>
+          </Pressable>
+        ))}
+      </View>
     </AppScreen>
   );
 }
 
 function MenuIcon({ label }: { label: string }) {
-  const common = { size: 20, color: colors.brand };
+  const common = { size: 16, color: colors.brand };
   if (label.includes('Video') || label.includes('Khóa đào tạo')) return <GraduationCap {...common} />;
   if (label.includes('Bài tập') || label.includes('Trắc nghiệm') || label.includes('thi')) return <ClipboardList {...common} />;
   if (label.includes('Đánh giá')) return <Star {...common} />;
@@ -180,7 +202,7 @@ export function StudentLearningScreen() {
 export function StudentExamScreen() {
   return (
     <AppScreen>
-      <AppHeader title="Phòng thi" subtitle="Các bài thi và kết quả học tập" />
+      <AppHeader title="Phòng thi" subtitle="Các bài thi và kết quả học tập" compact />
       <View style={styles.examEntryGrid}>
         {[
           { title: 'MOS / IC3', description: 'Thi chứng nhận tiếp tục trên website.' },
@@ -253,7 +275,9 @@ export function LearningLessonScreen() {
 }
 
 export function EvaluationsScreen() {
-  const loader = useCallback(() => evaluationService.list(), []);
+  const { user } = useAuth();
+  const isPreview = !!user?.previewMode || (__DEV__ && Boolean(process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE));
+  const loader = useCallback(() => evaluationService.list(user), [user]);
   const resource = useMockResource(loader);
   const [active, setActive] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'center' | 'teacher'>('center');
@@ -263,13 +287,14 @@ export function EvaluationsScreen() {
   const [submittedStars, setSubmittedStars] = useState<Record<string, number>>({});
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [validationMessage, setValidationMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
-    const existing = resource.data?.filter((evaluation) => evaluation.public && evaluation.existingRating) || [];
+    const existing = resource.data?.filter((evaluation) => evaluation.completed && evaluation.existingRating) || [];
     if (!existing.length) return;
     setSubmittedIds((current) => [...new Set([...current, ...existing.map((evaluation) => evaluation.id)])]);
     setSubmittedStars((current) => ({
       ...current,
-      ...Object.fromEntries(existing.map((evaluation) => [evaluation.id, evaluation.existingRating!.stars])),
+      ...Object.fromEntries(existing.filter((evaluation) => evaluation.public).map((evaluation) => [evaluation.id, evaluation.existingRating!.stars])),
     }));
     setComments((current) => ({
       ...current,
@@ -281,7 +306,11 @@ export function EvaluationsScreen() {
     }));
   }, [resource.data]);
   const updateAnswer = (id: string, value: string) => setAnswers((current) => ({ ...current, [id]: value }));
-  const submit = (evaluation: DemoEvaluation) => {
+  const submit = async (evaluation: DemoEvaluation) => {
+    if (!isPreview && !user) {
+      setValidationMessage('Vui lòng đăng nhập để gửi đánh giá.');
+      return;
+    }
     if (evaluation.public) {
       const criteria = ['teaching', 'voice', 'guidance', 'support'];
       if (criteria.some((key) => !answers[`${evaluation.id}-${key}`])) {
@@ -294,11 +323,41 @@ export function EvaluationsScreen() {
       };
       const score = criteria.reduce((sum, key) => sum + (scoreByKey[answers[`${evaluation.id}-${key}`]] || 0), 0) / criteria.length;
       setSubmittedStars((current) => ({ ...current, [evaluation.id]: Math.round(score * 10) / 10 }));
+      setIsSubmitting(true);
+      try {
+        if (!isPreview && user) {
+          await evaluationService.submitTeacher(user, evaluation, Object.fromEntries(criteria.map((key) => [key, answers[`${evaluation.id}-${key}`]])), Math.round(score * 10) / 10, comments[evaluation.id] || '');
+          resource.reload();
+        }
+        setSubmittedIds((current) => current.includes(evaluation.id) ? current : [...current, evaluation.id]);
+        setValidationMessage('');
+        setFeedbackMessage(isPreview ? 'Phản hồi chỉ được lưu trong bản xem trước.' : 'Đã gửi đánh giá tới hệ thống.');
+        setActive(null);
+      } catch (error) {
+        setValidationMessage(error instanceof Error ? error.message : 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
     }
-    setSubmittedIds((current) => current.includes(evaluation.id) ? current : [...current, evaluation.id]);
-    setValidationMessage('');
-    setFeedbackMessage('Đã lưu phản hồi trong phiên demo này; chưa gửi tới hệ thống.');
-    setActive(null);
+    setIsSubmitting(true);
+    try {
+      if (!isPreview && user) {
+        await evaluationService.submitPrivate(user, evaluation, {
+          satisfied: answers[`${evaluation.id}-satisfied`] || 'yes',
+          lessonClear: answers[`${evaluation.id}-lessonClear`] || 'yes',
+        }, comments[evaluation.id] || '');
+        resource.reload();
+      }
+      setSubmittedIds((current) => current.includes(evaluation.id) ? current : [...current, evaluation.id]);
+      setValidationMessage('');
+      setFeedbackMessage(isPreview ? 'Phản hồi chỉ được lưu trong bản xem trước.' : 'Đã gửi phản hồi riêng cho Trung tâm.');
+      setActive(null);
+    } catch (error) {
+      setValidationMessage(error instanceof Error ? error.message : 'Không thể gửi phản hồi. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   const evaluations = resource.data || [];
   const visibleEvaluations = evaluations.filter((evaluation) => activeTab === 'teacher' ? evaluation.public : !evaluation.public);
@@ -391,9 +450,9 @@ export function EvaluationsScreen() {
               {validationMessage ? <Text style={styles.validationText}>{validationMessage}</Text> : null}
               <TextInput value={comments[evaluation.id] || ''} onChangeText={(value) => setComments((current) => ({ ...current, [evaluation.id]: value }))} placeholder={evaluation.public ? 'Chia sẻ thêm nếu bạn muốn...' : 'Nhập điều bạn chưa hài lòng hoặc muốn trung tâm cải thiện...'} multiline style={styles.textArea} />
               <PrimaryButton
-                title={evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`]) ? 'CHỌN ĐỦ TIÊU CHÍ ĐỂ GỬI' : evaluation.public ? submittedIds.includes(evaluation.id) ? 'CẬP NHẬT ĐÁNH GIÁ DEMO' : 'GỬI ĐÁNH GIÁ CÔNG KHAI' : 'GỬI PHẢN HỒI CHO TRUNG TÂM'}
-                disabled={evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`])}
-                onPress={() => submit(evaluation)}
+                title={isSubmitting ? 'Đang gửi…' : evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`]) ? 'CHỌN ĐỦ TIÊU CHÍ ĐỂ GỬI' : evaluation.public ? submittedIds.includes(evaluation.id) ? 'CẬP NHẬT ĐÁNH GIÁ' : 'GỬI ĐÁNH GIÁ CÔNG KHAI' : 'GỬI PHẢN HỒI CHO TRUNG TÂM'}
+                disabled={isSubmitting || (evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`]))}
+                onPress={() => { void submit(evaluation); }}
               />
               {!evaluation.public ? <Text style={styles.note}>Mọi thông tin bạn gửi ở đây Giảng viên sẽ KHÔNG biết.</Text> : null}
             </View>
@@ -408,16 +467,46 @@ export function EvaluationsScreen() {
 export function FeedScreen() {
   const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
-  const loader = useCallback(() => feedService.posts(), []);
-  const resource = useMockResource(loader);
   const [posts, setPosts] = useState<DemoFeedPost[] | null>(null);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const live = !!user && !user.previewMode;
+  const loader = useCallback(() => (live ? fetchFeedPosts() : feedService.posts()), [live]);
+  const resource = useMockResource(loader);
+  useEffect(() => {
+    if (!live) return undefined;
+    const timer = setInterval(() => {
+      if (editingPostId || busy) return;
+      fetchFeedPosts()
+        .then((latest) => {
+          setPosts(latest);
+          setRefreshError('');
+        })
+        .catch((error: unknown) => {
+          setRefreshError(error instanceof Error ? error.message : 'Không thể cập nhật bảng tin.');
+        });
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [live, busy, editingPostId]);
+  const apiRun = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      setPosts(await fetchFeedPosts());
+      setRefreshError('');
+    } catch (error) {
+      Alert.alert('Bảng tin', error instanceof Error ? error.message : 'Thao tác thất bại, vui lòng thử lại.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const [comment, setComment] = useState('');
   const [draft, setDraft] = useState('');
   const [audience, setAudience] = useState('Công khai');
   const [attachImage, setAttachImage] = useState(false);
   const [visiblePostCount, setVisiblePostCount] = useState(3);
   const [replyTarget, setReplyTarget] = useState<{ postId: string; parentId: string; author: string } | null>(null);
-  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const items = posts || resource.data || [];
   const visiblePosts = items.slice(0, visiblePostCount);
@@ -428,7 +517,7 @@ export function FeedScreen() {
   };
   return (
     <AppScreen>
-      <AppHeader title={isTeacher ? 'Bảng tin trao đổi & Hỏi bài' : 'Bảng tin'} subtitle="Bài đăng dành cho lớp học" />
+      <AppHeader title={isTeacher ? 'Bảng tin trao đổi & Hỏi bài' : 'Bảng tin'} subtitle="Bài đăng dành cho lớp học" icon={Newspaper} />
       <Card style={styles.feedComposer}>
         <View style={styles.feedAuthorRow}>
           <Avatar name={user?.name || roleLabel} color={user?.avatarColor} size={42} />
@@ -453,9 +542,15 @@ export function FeedScreen() {
           <Pressable onPress={() => setAttachImage((value) => !value)} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh demo">
             <ImagePlus size={19} color={colors.green} /><Text style={styles.actionText}>{attachImage ? 'Bỏ ảnh' : 'Thêm ảnh'}</Text>
           </Pressable>
-          <PrimaryButton title="Đăng bài" disabled={!draft.trim()} onPress={() => {
+          <PrimaryButton title="Đăng bài" disabled={!draft.trim() || busy} onPress={() => {
             const content = draft.trim();
             if (!content) return;
+            if (live) {
+              setDraft('');
+              setAttachImage(false);
+              void apiRun(() => createFeedPost(content, audience));
+              return;
+            }
             setPosts([{
               id: `feed-${Date.now()}`, authorId: user?.id, author: user?.name || roleLabel, role: roleLabel,
               time: 'Vừa xong', content, audience, mediaType: attachImage ? 'image' : undefined,
@@ -465,10 +560,11 @@ export function FeedScreen() {
             setAttachImage(false);
           }} />
         </View>
-        <Text style={styles.note}>Bài đăng và ảnh chỉ được giữ cục bộ trong bản demo.</Text>
+        <Text style={styles.note}>{live ? 'Bài đăng và tương tác được đồng bộ với hệ thống; tải ảnh lên chưa được hỗ trợ.' : 'Bài đăng và ảnh chỉ được giữ cục bộ trong bản xem trước.'}</Text>
       </Card>
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+      {refreshError ? <Text style={styles.note}>Không thể cập nhật bảng tin: {refreshError}</Text> : null}
       {visiblePosts.map((post) => (
         <Card key={post.id}>
           <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
@@ -476,7 +572,7 @@ export function FeedScreen() {
               <Pressable onPress={() => { setEditingPostId(post.id); setEditDraft(post.content); }} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel="Sửa bài đăng của bạn"><Text style={styles.feedInlineActionText}>Sửa</Text></Pressable>
               <Pressable onPress={() => Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị xóa khỏi bản demo.', [
                 { text: 'Hủy', style: 'cancel' },
-                { text: 'Xóa', style: 'destructive', onPress: () => setPosts(items.filter((item) => item.id !== post.id)) },
+                { text: 'Xóa', style: 'destructive', onPress: () => (live ? void apiRun(() => deleteFeedPost(post.id)) : setPosts(items.filter((item) => item.id !== post.id))) },
               ])} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel="Xóa bài đăng của bạn"><Text style={styles.feedDeleteText}>Xóa</Text></Pressable>
             </View> : null}
           </View>
@@ -489,6 +585,7 @@ export function FeedScreen() {
                 <Pressable onPress={() => {
                   const content = editDraft.trim();
                   if (!content) { Alert.alert('Nội dung trống', 'Nhập nội dung trước khi lưu.'); return; }
+                  if (live) { setEditingPostId(null); void apiRun(() => updateFeedPost(post.id, content)); return; }
                   updatePost(post.id, (item) => ({ ...item, content }));
                   setEditingPostId(null);
                 }} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Lưu thay đổi</Text></Pressable>
@@ -497,7 +594,7 @@ export function FeedScreen() {
           ) : <Text style={styles.body}>{post.content}</Text>}
           {post.mediaType === 'image' ? <View style={styles.feedImagePlaceholder}><ImagePlus size={22} color={colors.muted} /><Text style={styles.metaText}>Ảnh đính kèm demo</Text></View> : null}
           <View style={styles.row}>
-            <Pressable onPress={() => updatePost(post.id, (item) => ({ ...item, reactionCount: item.reactionCount + 1 }))} style={styles.action}><Star size={16} color={colors.brand} /><Text style={styles.actionText}>Quan tâm {post.reactionCount}</Text></Pressable>
+            <Pressable onPress={() => (live ? void apiRun(() => reactFeedPost(post.id)) : updatePost(post.id, (item) => ({ ...item, reactionCount: item.reactionCount + 1 })))} style={styles.action}><Star size={16} color={colors.brand} /><Text style={styles.actionText}>Quan tâm {post.reactionCount}</Text></Pressable>
             <Text style={styles.actionText}>{post.comments.length} bình luận</Text>
           </View>
           {post.comments.map((item) => (
@@ -512,12 +609,19 @@ export function FeedScreen() {
             <Pressable onPress={() => {
               const text = comment.trim();
               if (!text) return;
+              if (live) {
+                const parentId = replyTarget?.postId === post.id ? replyTarget.parentId : undefined;
+                setComment('');
+                setReplyTarget(null);
+                void apiRun(() => commentFeedPost(post.id, text, parentId));
+                return;
+              }
               updatePost(post.id, (item) => replyTarget?.postId === post.id
                 ? { ...item, replies: [...(item.replies || []), { id: `reply-${Date.now()}`, parentId: replyTarget.parentId, author: user?.name || 'Bạn', text }] }
                 : { ...item, comments: [...item.comments, { id: `comment-${Date.now()}`, author: user?.name || 'Bạn', text }] });
               setComment('');
               setReplyTarget(null);
-            }} accessibilityRole="button" accessibilityLabel="Gửi bình luận demo">
+            }} accessibilityRole="button" accessibilityLabel="Gửi bình luận">
               <MessageSquareText size={20} color={colors.brand} />
             </Pressable>
           </View>
@@ -550,43 +654,63 @@ export function NewsScreen() {
     return sort === 'Cũ nhất' ? filtered.reverse() : filtered;
   }, [resource.data, query, sort, time, topic]);
   return (
-    <AppScreen>
+    <AppScreen contentStyle={styles.newsScreen}>
       <AppHeader title="Tin tức" subtitle="Tin tức và thông báo của trung tâm" />
-      <>
-          <View style={styles.newsSearch}>
-            <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={() => setQuery(draft.trim())} returnKeyType="search" placeholder="Tìm kiếm tin tức" style={styles.newsSearchInput} />
-            <Pressable onPress={() => setQuery(draft.trim())} style={styles.newsSearchButton} accessibilityRole="button"><Text style={styles.newsSearchButtonText}>Tìm</Text></Pressable>
-          </View>
-          <View style={styles.newsToolbar}>
-        <Pressable onPress={() => setLayout((current) => current === 'list' ? 'grid' : 'list')} style={styles.newsControl} accessibilityRole="button" accessibilityLabel={`Chuyển sang chế độ ${layout === 'list' ? 'lưới' : 'danh sách'}`}>
-          <Text style={styles.newsControlText}>{layout === 'list' ? '▦ Lưới' : '☰ Danh sách'}</Text>
+      <View style={styles.newsSearch}>
+        <Search size={17} color={colors.muted} />
+        <TextInput value={draft} onChangeText={setDraft} onSubmitEditing={() => setQuery(draft.trim())} returnKeyType="search" placeholder="Tìm kiếm tin tức" placeholderTextColor={colors.muted} style={styles.newsSearchInput} />
+        {draft ? <Pressable onPress={() => { setDraft(''); setQuery(''); }} accessibilityRole="button" accessibilityLabel="Xóa từ khóa tìm kiếm"><Text style={styles.newsSearchClear}>×</Text></Pressable> : null}
+        <Pressable onPress={() => setQuery(draft.trim())} style={styles.newsSearchButton} accessibilityRole="button" accessibilityLabel="Tìm tin tức"><Search size={17} color="#FFFFFF" /></Pressable>
+      </View>
+      <View style={styles.newsToolbar}>
+        <Pressable onPress={() => setLayout((current) => current === 'list' ? 'grid' : 'list')} style={styles.newsLayoutButton} accessibilityRole="button" accessibilityLabel={`Chuyển sang chế độ ${layout === 'list' ? 'lưới' : 'danh sách'}`}>
+          {layout === 'list' ? <Grid2X2 size={17} color={colors.brand} /> : <List size={17} color={colors.brand} />}
         </Pressable>
         <Pressable onPress={() => Alert.alert('Sắp xếp', 'Chọn thứ tự hiển thị.', [
           { text: 'Mới nhất', onPress: () => setSort('Mới nhất') },
           { text: 'Cũ nhất', onPress: () => setSort('Cũ nhất') },
           { text: 'Xem nhiều', onPress: () => setSort('Xem nhiều') },
           { text: 'Hủy', style: 'cancel' },
-        ])} style={styles.newsControl} accessibilityRole="button"><Text style={styles.newsControlText}>Sắp xếp: {sort}</Text></Pressable>
-        <Pressable onPress={() => Alert.alert('Thời gian', 'Lọc theo thời gian hiển thị trong dữ liệu demo.', [
+        ])} style={styles.newsControl} accessibilityRole="button">
+          <ArrowDownWideNarrow size={15} color={colors.muted} />
+          <Text numberOfLines={1} style={styles.newsControlText}>{sort}</Text>
+        </Pressable>
+        <Pressable onPress={() => Alert.alert('Thời gian', 'Lọc tin được đăng hôm nay.', [
           { text: 'Tất cả', onPress: () => setTime('Tất cả') },
           { text: 'Hôm nay', onPress: () => setTime('Hôm nay') },
           { text: 'Hủy', style: 'cancel' },
-        ])} style={styles.newsControl} accessibilityRole="button"><Text style={styles.newsControlText}>Thời gian: {time}</Text></Pressable>
-          </View>
-          <View style={styles.chips}>{topics.map((item) => <Pressable key={item} onPress={() => setTopic(item)} style={[styles.choice, topic === item && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: topic === item }}><Text style={[styles.choiceText, topic === item && styles.choiceTextActive]}>{item}</Text></Pressable>)}</View>
-      </>
+        ])} style={styles.newsControl} accessibilityRole="button">
+          <CalendarDays size={15} color={colors.muted} />
+          <Text numberOfLines={1} style={styles.newsControlText}>{time}</Text>
+        </Pressable>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.newsTopics} contentContainerStyle={styles.newsTopicsContent}>
+        {topics.map((item) => {
+          const active = topic === item;
+          return (
+            <Pressable key={item} onPress={() => setTopic(item)} style={[styles.newsTopic, active && styles.newsTopicActive]} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+              <Text style={[styles.newsTopicText, active && styles.newsTopicTextActive]}>{item}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       <View style={layout === 'grid' ? styles.newsGrid : undefined}>
         {articles.map((news) => (
           <Pressable key={news.id} onPress={() => navigation.navigate('NewsDetail', { newsId: news.id })} style={layout === 'grid' ? styles.newsGridItem : undefined} accessibilityRole="button">
-            <Card style={layout === 'grid' ? styles.newsGridCard : undefined}>
-              <View style={styles.newsThumbnail}><Newspaper size={24} color={colors.muted} /><Text style={styles.metaText}>{news.thumbnailUrl ? 'Ảnh minh họa' : '—'}</Text></View>
-              <Text style={styles.caption}>{news.topic} · {news.publishedAt}</Text>
-              <Text style={styles.cardTitle}>{news.title}</Text>
-              {layout === 'list' ? <Text style={styles.body}>{news.excerpt}</Text> : null}
-              <Text style={styles.metaText}>Tác giả: {news.author || '—'} · {news.views} lượt xem · {news.publishedAt}</Text>
-              <Text style={styles.link}>Xem chi tiết</Text>
+            <Card style={{ ...styles.newsCard, ...(layout === 'grid' ? styles.newsGridCard : {}) }}>
+              <View style={styles.newsThumbnail}>
+                <Newspaper size={22} color={colors.brand} />
+                <Text style={styles.newsThumbnailLabel}>{news.thumbnailUrl ? 'Ảnh minh họa' : 'Tin tức'}</Text>
+              </View>
+              <View style={styles.newsCardContent}>
+                <Text style={styles.newsMeta}>{news.topic} · {news.publishedAt}</Text>
+                <Text style={styles.newsTitle}>{news.title}</Text>
+                {layout === 'list' ? <Text style={styles.newsExcerpt}>{news.excerpt}</Text> : null}
+                <Text style={styles.newsByline}>{news.author || 'Trung tâm Thắng Tin Học'} · {news.views} lượt xem</Text>
+                <Text style={styles.link}>Xem chi tiết  ›</Text>
+              </View>
             </Card>
           </Pressable>
         ))}
@@ -598,9 +722,9 @@ export function NewsScreen() {
 
 export function NewsDetailScreen() {
   const route = useRoute<NativeStackScreenProps<AppStackParamList, 'NewsDetail'>['route']>();
-  const loader = useCallback(() => feedService.news(), []);
+  const loader = useCallback(() => feedService.newsDetail(route.params.newsId), [route.params.newsId]);
   const resource = useMockResource(loader);
-  const news = resource.data?.find((item) => item.id === route.params.newsId);
+  const news = resource.data;
   return (
     <AppScreen>
       <AppHeader title="Chi tiết tin tức" subtitle={news?.topic} />
@@ -612,9 +736,9 @@ export function NewsDetailScreen() {
         {news.excerpt ? <Text style={styles.muted}>{news.excerpt}</Text> : null}
         <Text style={styles.body}>{news.content}</Text>
         {news.attachments.map((file) => (
-          <Pressable key={file.id} onPress={() => Alert.alert(file.name, 'url' in file && file.url ? 'Liên kết đính kèm chỉ hiển thị trong bản demo.' : 'Tệp này chưa có liên kết để mở trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={`Mở tệp đính kèm ${file.name}`}>
+          <Pressable key={file.id} onPress={() => { void openExternalUrl(file.url, file.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={`Mở tệp đính kèm ${file.name}`}>
             <Paperclip size={17} color={colors.brand} />
-            <Text style={styles.newsAttachmentText}>{file.name} · {file.type}</Text><Text style={styles.newsAttachmentAction}>{'url' in file && file.url ? 'Mở' : '—'}</Text>
+            <Text style={styles.newsAttachmentText}>{file.name} · {file.type}</Text><Text style={styles.newsAttachmentAction}>{file.url ? 'Mở' : '—'}</Text>
           </Pressable>
         ))}
       </Card> : null}
@@ -629,10 +753,26 @@ export function CenterInfoScreen() {
   const resource = useMockResource(loader);
   const center = resource.data;
   const centerSections = (center?.sections || [
-    { title: 'Tổng quan' }, { title: 'Nhân sự' }, { title: 'Chi nhánh' }, { title: 'Mạng xã hội' },
-    { title: 'Dịch vụ đào tạo' }, { title: 'Địa điểm thi' }, { title: 'Chứng chỉ' },
+    { title: 'Nhân sự', items: [] }, { title: 'Chi nhánh', items: [] }, { title: 'Mạng xã hội', items: [] },
+    { title: 'Dịch vụ đào tạo', items: [] }, { title: 'Địa điểm thi', items: [] }, { title: 'Chứng chỉ', items: [] },
   ]).filter((item: { title: string }) => item.title !== 'Tổng quan');
   const [section, setSection] = useState('Tổng quan');
+  const selectedSection = centerSections.find((item) => item.title === section);
+  const renderCenterItems = () => selectedSection?.items.length ? selectedSection.items.map((item) => (
+    <View key={item.id} style={styles.centerInfoRow}>
+      <View style={styles.flex}>
+        <Text style={styles.cardTitle}>{item.title}</Text>
+        {[item.subtitle, item.description, item.address, item.phone, item.email, item.hours, item.detailHtml].filter(Boolean).map((text) => (
+          <Text key={text} style={styles.muted}>{text}</Text>
+        ))}
+      </View>
+      {item.url || item.mapsUrl ? (
+        <Pressable onPress={() => { void openExternalUrl(item.url || item.mapsUrl, item.title); }} accessibilityRole="button">
+          <Text style={styles.link}>Mở</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  )) : <Text style={styles.muted}>Chưa có nội dung cho mục này.</Text>;
   return (
     <AppScreen>
       <AppHeader title="Thông tin Trung tâm" subtitle="Thông tin và các mục của trung tâm" />
@@ -656,7 +796,7 @@ export function CenterInfoScreen() {
             <Card>
               <SectionHeading title="Thông tin Trung tâm" />
               {[
-                ['Thành lập', '—'],
+                ['Thành lập', center.foundedYear || '—'],
                 ['Địa chỉ', center.headquartersAddress || '—'],
                 ['Điện thoại', center.contactPhone || '—'],
                 ['Email', center.contactEmail || '—'],
@@ -669,7 +809,7 @@ export function CenterInfoScreen() {
           ) : (
             <Card>
               <View style={styles.rowBetween}><Building2 size={18} color={colors.brand} /><Text style={[styles.cardTitle, styles.flex]}>{section}</Text></View>
-              <Text style={styles.muted}>—</Text>
+              {renderCenterItems()}
             </Card>
           )}
           <SectionHeading title="Các mục Trung tâm" />
@@ -699,7 +839,7 @@ export function CenterInfoScreen() {
                   ['Email', center.contactEmail],
                   ['Website', center.website],
                 ].map(([label, value]) => <Text key={label} style={styles.muted}>{label}: {value || 'Chưa có dữ liệu'}</Text>)}
-                <Text style={styles.muted}>Thành lập: —</Text>
+                <Text style={styles.muted}>Thành lập: {center.foundedYear || '—'}</Text>
                 <Text style={styles.muted}>Sứ mệnh: {center.mission || '—'}</Text>
                 <Text style={styles.muted}>Tầm nhìn: {center.vision || '—'}</Text>
                 <Text style={styles.muted}>Giá trị cốt lõi: {center.coreValues || '—'}</Text>
@@ -707,7 +847,7 @@ export function CenterInfoScreen() {
               ) : (
                 <Card>
                   <Text style={styles.cardTitle}>{section}</Text>
-                  <Text style={styles.muted}>Chưa có nội dung cho mục này trong dữ liệu demo.</Text>
+                  {renderCenterItems()}
                 </Card>
               )}
               <SectionHeading title="Các mục Trung tâm" />
@@ -727,7 +867,8 @@ export function CenterInfoScreen() {
 }
 
 export function SoftwareLinksScreen() {
-  const loader = useCallback(() => softwareService.list(), []);
+  const { user } = useAuth();
+  const loader = useCallback(() => softwareService.list(user), [user]);
   const resource = useMockResource(loader);
   return (
     <AppScreen>
@@ -739,7 +880,7 @@ export function SoftwareLinksScreen() {
           <Text style={styles.cardTitle}>{item.name}</Text>
           <Text style={styles.caption}>{item.category}</Text>
           <Text style={styles.body}>{item.description}</Text>
-          <Pressable onPress={() => Alert.alert(item.name, item.url ? 'Liên kết chỉ được hiển thị trong bản demo; không mở website bên ngoài.' : 'Chưa có liên kết phần mềm trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}>
+          <Pressable onPress={() => { void openExternalUrl(item.url, item.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}>
             <Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text>
           </Pressable>
         </Card>
@@ -750,10 +891,11 @@ export function SoftwareLinksScreen() {
 }
 
 export function TeacherQuizzesScreen() {
+  const { user } = useAuth();
   const navigation = useNavigation<Navigation>();
   const loader = useCallback(() => quizService.list(), []);
   const resource = useMockResource(loader);
-  const studentsLoader = useCallback(() => studentService.assigned(), []);
+  const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
   const studentsResource = useMockResource(studentsLoader);
   const [quizzes, setQuizzes] = useState<DemoQuiz[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -973,9 +1115,10 @@ function QuizCard({ quiz, onDelete, onRecreate }: { quiz: DemoQuiz; onDelete: ()
 }
 
 export function TeacherTrainingScreen() {
-  const loader = useCallback(() => trainingService.list(), []);
+  const { user } = useAuth();
+  const loader = useCallback(() => trainingService.list(user), [user]);
   const resource = useMockResource(loader);
-  const softwareLoader = useCallback(() => softwareService.list(), []);
+  const softwareLoader = useCallback(() => softwareService.list(user), [user]);
   const software = useMockResource(softwareLoader);
   const courses = resource.data || [];
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -998,7 +1141,7 @@ export function TeacherTrainingScreen() {
           {software.error ? <ErrorState onRetry={software.reload} /> : null}
           {(software.data || []).map((item) => <Card key={item.id}>
             <Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.metaText}>{item.category}</Text><Text style={styles.muted}>{item.description}</Text>
-            <Pressable onPress={() => Alert.alert(item.name, item.url ? 'Liên kết chỉ được hiển thị trong bản demo; không mở website bên ngoài.' : 'Chưa có liên kết phần mềm trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}><Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text></Pressable>
+            <Pressable onPress={() => { void openExternalUrl(item.url, item.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}><Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text></Pressable>
           </Card>)}
           {!software.loading && !software.error && !software.data?.length ? <EmptyState title="Chưa có phần mềm" message="Chưa có dữ liệu phần mềm trong bản demo." /> : null}
         </>
@@ -1047,97 +1190,54 @@ function TrainingCard({ course, expanded, tab, onToggle }: { course: DemoTrainin
 
 export function TeacherFinanceScreen() {
   const { user } = useAuth();
-  const loader = useCallback(() => financeService.list(), []);
+  const loader = useCallback(() => teacherFinanceService.overview(user), [user]);
   const resource = useMockResource(loader);
-  const transactions = resource.data || [];
-  const [filter, setFilter] = useState('Tất cả');
-  const paid = transactions.filter((transaction) => transaction.status === 'Đã nhận');
-  const pending = transactions.filter((transaction) => transaction.status === 'Chưa nhận');
-  const filtered = filter === 'Đã nhận' ? paid : filter === 'Chưa nhận' ? pending : transactions;
-  const totalEarned = paid.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const totalPending = pending.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const totalSessions = transactions.reduce((sum, transaction) => sum + transaction.sessions, 0);
-  const maxAmount = Math.max(0, ...transactions.map((transaction) => transaction.amount));
-  const showSummary = !resource.loading && !resource.error && transactions.length > 0;
+  const overview = resource.data;
   return (
     <AppScreen>
       <AppHeader title="Tài chính" subtitle="Tổng hợp buổi dạy và thanh toán" />
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       <View style={styles.rowBetween}>
-        <Text style={styles.title}>Tài chính & Hoa hồng</Text>
+        <Text style={styles.title}>Tài chính giảng viên</Text>
         <Text style={styles.financeTeacherName}>GV: {user?.name || '—'}</Text>
       </View>
       <View style={styles.financeStats}>
         {[
-          ['Tổng đã nhận', showSummary ? formatCurrency(totalEarned) : '—'],
-          ['Chưa nhận', showSummary ? formatCurrency(totalPending) : '—'],
-          ['Tổng buổi đã dạy', showSummary ? String(totalSessions) : '—'],
+          ['Tổng đã nhận', overview ? formatCurrency(overview.paidAmount) : '—'],
+          ['Chưa nhận', overview ? formatCurrency(overview.unpaidAmount) : '—'],
+          ['Buổi đã dạy', overview ? String(overview.totalSessions) : '—'],
         ].map(([label, value]) => <Card key={label} style={styles.financeStat}><Text style={styles.metaText}>{label}</Text><Text numberOfLines={1} adjustsFontSizeToFit style={styles.financeStatValue}>{value}</Text></Card>)}
       </View>
       <Card style={styles.financeChart}>
-        <View style={styles.rowBetween}><Text style={styles.cardTitle}>Biểu đồ thu nhập</Text><CircleDollarSign size={20} color={colors.brand} /></View>
-        {!showSummary ? <Text style={styles.muted}>Chưa có dữ liệu thống kê</Text> : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.financeChartBars}>
-            {transactions.map((transaction) => (
-              <View key={`chart-${transaction.id}`} style={styles.financeChartColumn}>
-                <Text numberOfLines={1} style={styles.financeChartAmount}>{formatCurrency(transaction.amount)}</Text>
-                <View style={styles.financeChartTrack}>
-                  <View style={[styles.financeChartBar, { height: Math.max(16, Math.round((transaction.amount / maxAmount) * 96)) }]} />
-                </View>
-                <Text style={styles.financeChartMonth}>T{transaction.month}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        )}
+        <View style={styles.rowBetween}><Text style={styles.cardTitle}>Mức lương theo buổi</Text><WalletCards size={20} color={colors.brand} /></View>
+        <Text style={styles.financeAmount}>{overview ? formatCurrency(overview.salaryPerSession) : '—'}</Text>
+        <Text style={styles.metaText}>Tổng buổi chờ thanh toán: {overview ? overview.pendingSessionsCount : '—'}</Text>
       </Card>
-      <Card>
-        <Text style={styles.cardTitle}>Xuất báo cáo</Text>
-        <Text style={styles.metaText}>Tải xuống sao kê thu nhập của bạn</Text>
-        <Text style={styles.financeGroupTitle}>TỔNG HỢP</Text>
-        <View style={styles.financeActions}>
-          {['PDF', 'CSV'].map((action) => (
-            <Pressable key={action} onPress={() => Alert.alert(action, 'Xuất tệp chưa được kết nối trong bản demo.')} style={styles.financeExport} accessibilityRole="button" accessibilityLabel={`Xuất báo cáo ${action}`}>
-              <Text style={styles.financeExportText}>{action}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.financeGroupTitle}>CHI TIẾT THEO HỌC VIÊN</Text>
-        <View style={styles.financeActions}>
-          {['PDF chi tiết', 'CSV chi tiết'].map((action) => (
-            <Pressable key={action} onPress={() => Alert.alert(action, 'Xuất tệp chưa được kết nối trong bản demo.')} style={[styles.financeExport, styles.financeDetailExport]} accessibilityRole="button">
-              <Text style={styles.financeExportText}>{action}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Card>
-      <SectionHeading title="Lịch sử chuyển tiền hoa hồng" />
-      <View style={styles.chips}>
-        {['Tất cả', 'Đã nhận', 'Chưa nhận'].map((item) => <Pressable key={item} onPress={() => setFilter(item)} style={[styles.choice, filter === item && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: filter === item }}><Text style={[styles.choiceText, filter === item && styles.choiceTextActive]}>{item}</Text></Pressable>)}
-      </View>
-      {filtered.map((transaction) => (
-        <Card key={transaction.id}>
-          <View style={styles.rowBetween}><Text style={styles.cardTitle}>Kỳ {transaction.month}</Text><StatusBadge label={transaction.status} /></View>
-          <Text style={styles.financeAmount}>{formatCurrency(transaction.amount)}</Text>
-          <Text style={styles.muted}>{transaction.sessions} buổi · Ngày chuyển: {transaction.date}</Text>
-          <Text style={styles.caption}>{transaction.note}</Text>
-          <Text style={styles.metaText}>Học viên: {transaction.studentName || '—'} · Phân bổ: {transaction.studentAmount != null ? formatCurrency(transaction.studentAmount) : '—'}</Text>
+      <SectionHeading title="Buổi dạy chờ thanh toán" />
+      {overview?.pendingSessions.map((session) => (
+        <Card key={session.id}>
+          <View style={styles.rowBetween}><Text style={styles.cardTitle}>{session.course}</Text><StatusBadge label="Chưa nhận" /></View>
+          <Text style={styles.financeAmount}>{formatCurrency(session.amount)}</Text>
+          <Text style={styles.muted}>{session.studentName} · Buổi {session.sessionNo ?? '—'}</Text>
+          <Text style={styles.metaText}>
+            {session.date ? new Date(session.date).toLocaleDateString('vi-VN') : 'Chưa có ngày'}
+            {session.startTime ? ` · ${session.startTime}` : ''}
+            {session.endTime ? `–${session.endTime}` : ''}
+          </Text>
         </Card>
       ))}
-      {!resource.loading && !resource.error && !resource.data?.length ? <EmptyState title="Chưa có dữ liệu tài chính" message="Các kỳ thanh toán sẽ hiển thị tại đây." /> : null}
-      <Text style={styles.note}>Dữ liệu là bản demo. Không gọi API, không tạo giao dịch và không xuất/tải tệp thật.</Text>
+      {!resource.loading && !resource.error && overview && !overview.pendingSessions.length ? <EmptyState title="Không có buổi chờ thanh toán" message="Các buổi đã hoàn thành và chưa thanh toán sẽ xuất hiện tại đây." /> : null}
+      <Text style={styles.note}>Thông tin thanh toán chỉ xem được trong ứng dụng. Các giao dịch và xuất báo cáo do trung tâm xử lý.</Text>
     </AppScreen>
   );
 }
 
 export function TuitionScreen() {
   const { user } = useAuth();
-  const [paidEnrollmentIds, setPaidEnrollmentIds] = useState<string[]>([]);
-  const [confirmPaymentEnrollmentId, setConfirmPaymentEnrollmentId] = useState<string | null>(null);
   const profileLoader = useCallback(() => studentProfileService.get(user), [user]);
   const profileResource = useMockResource(profileLoader);
   const enrollments = profileResource.data?.enrollments || [];
-  const confirmPaymentEnrollment = enrollments.find((enrollment) => enrollment.id === confirmPaymentEnrollmentId);
   return (
     <AppScreen>
       <AppHeader title="Học phí theo khóa" subtitle="Thông tin học phí trên hồ sơ học viên" />
@@ -1145,9 +1245,8 @@ export function TuitionScreen() {
       {profileResource.loading ? <LoadingSkeleton /> : null}
       {profileResource.error ? <ErrorState onRetry={profileResource.reload} /> : null}
       {!profileResource.loading && !profileResource.error ? enrollments.map((enrollment) => {
-        const paid = paidEnrollmentIds.includes(enrollment.id) || (enrollment.tuitionAmount != null && (enrollment.paidAmount || 0) >= enrollment.tuitionAmount);
         const amount = enrollment.tuitionAmount;
-        const paidAmount = paid ? amount : enrollment.paidAmount;
+        const paidAmount = enrollment.paidAmount;
         const remaining = amount != null && paidAmount != null ? Math.max(amount - paidAmount, 0) : null;
         return <Card key={enrollment.id}>
           <Text style={styles.cardTitle}>{enrollment.courseName}</Text>
@@ -1155,29 +1254,10 @@ export function TuitionScreen() {
           <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Học phí</Text><Text style={styles.infoValue}>{amount != null ? formatCurrency(amount) : '—'}</Text></View>
           <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Đã thanh toán</Text><Text style={styles.infoValue}>{paidAmount != null ? formatCurrency(paidAmount) : '—'}</Text></View>
           <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Còn lại</Text><Text style={styles.infoValue}>{remaining != null ? formatCurrency(remaining) : '—'}</Text></View>
-          <PrimaryButton title={paid ? 'Đã thanh toán' : 'Tiếp tục thanh toán'} disabled={paid || amount == null || amount <= (enrollment.paidAmount || 0)} onPress={() => setConfirmPaymentEnrollmentId(enrollment.id)} variant="secondary" />
-          <Text style={styles.note}>Thao tác chỉ cập nhật trạng thái tạm thời trên màn hình này; không xử lý thanh toán thật.</Text>
         </Card>
       }) : null}
       {!profileResource.loading && !profileResource.error && !enrollments.length ? <EmptyState title="Chưa có khóa học" message="Thông tin học phí sẽ xuất hiện theo khóa học." /> : null}
-      <Modal visible={!!confirmPaymentEnrollment} transparent animationType="slide" onRequestClose={() => setConfirmPaymentEnrollmentId(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.cardTitle}>Xác nhận thanh toán demo</Text>
-            <Text style={styles.muted}>{confirmPaymentEnrollment?.courseName || '—'}</Text>
-            <Text style={styles.metaText}>Số tiền: {confirmPaymentEnrollment?.tuitionAmount != null ? formatCurrency(confirmPaymentEnrollment.tuitionAmount) : '—'}</Text>
-            <Text style={styles.note}>Không xử lý giao dịch thật; chỉ cập nhật trạng thái tạm thời trên màn hình.</Text>
-            <View style={styles.modalActions}>
-              <PrimaryButton title="Hủy" variant="quiet" onPress={() => setConfirmPaymentEnrollmentId(null)} />
-              <PrimaryButton title="Xác nhận demo" onPress={() => {
-                if (!confirmPaymentEnrollment) return;
-                setPaidEnrollmentIds((ids) => ids.includes(confirmPaymentEnrollment.id) ? ids : [...ids, confirmPaymentEnrollment.id]);
-                setConfirmPaymentEnrollmentId(null);
-              }} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <Text style={styles.note}>Thông tin học phí chỉ xem trong ứng dụng. Để thanh toán hoặc xác nhận giao dịch, vui lòng thực hiện trên website.</Text>
     </AppScreen>
   );
 }
@@ -1226,17 +1306,32 @@ const styles = StyleSheet.create({
   modalCard: { gap: spacing.md, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
   feedAudience: { alignSelf: 'flex-start', color: colors.muted, fontSize: typography.caption, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.canvas },
-  newsSearch: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  newsSearchInput: { flex: 1, minWidth: 0, minHeight: 46, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: spacing.md, color: colors.ink },
-  newsSearchButton: { minHeight: 46, minWidth: 56, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderRadius: radius.md, paddingHorizontal: spacing.md },
-  newsSearchButtonText: { color: '#FFFFFF', fontSize: typography.small, fontWeight: '700' },
-  newsToolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  newsControl: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
-  newsControlText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  newsScreen: { gap: spacing.md },
+  newsSearch: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.md, paddingRight: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  newsSearchInput: { flex: 1, minWidth: 0, minHeight: 42, paddingVertical: 0, color: colors.ink, fontSize: typography.small },
+  newsSearchClear: { color: colors.muted, fontSize: 22, lineHeight: 26, paddingHorizontal: spacing.xs },
+  newsSearchButton: { width: 38, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderRadius: radius.sm },
+  newsToolbar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  newsLayoutButton: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface },
+  newsControl: { minWidth: 0, minHeight: 38, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface },
+  newsControlText: { flexShrink: 1, color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  newsTopics: { alignSelf: 'stretch', flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.line },
+  newsTopicsContent: { flexDirection: 'row', gap: spacing.lg, paddingHorizontal: spacing.xs },
+  newsTopic: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.xs, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  newsTopicActive: { borderBottomColor: colors.brand },
+  newsTopicText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
+  newsTopicTextActive: { color: colors.brand, fontWeight: '800' },
   newsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   newsGridItem: { width: '48%' },
+  newsCard: { padding: spacing.md, gap: spacing.md },
   newsGridCard: { height: '100%', paddingHorizontal: spacing.sm },
-  newsThumbnail: { height: 88, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginBottom: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas },
+  newsThumbnail: { height: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderRadius: radius.md, backgroundColor: colors.brandSoft },
+  newsThumbnailLabel: { color: colors.brandDark, fontSize: typography.caption, fontWeight: '700' },
+  newsCardContent: { gap: spacing.sm },
+  newsMeta: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
+  newsTitle: { color: colors.ink, fontSize: typography.body, lineHeight: 22, fontWeight: '800' },
+  newsExcerpt: { color: colors.muted, fontSize: typography.small, lineHeight: 20 },
+  newsByline: { color: colors.muted, fontSize: typography.caption, lineHeight: 17 },
   centerDropdown: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
   centerDropdownText: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
   centerBanner: { alignItems: 'center', gap: spacing.sm, backgroundColor: colors.brandSoft },
@@ -1273,19 +1368,27 @@ const styles = StyleSheet.create({
   financeChart: { gap: spacing.md, minHeight: 196 },
   financeChartBars: { minHeight: 142, alignItems: 'flex-end', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.sm },
   financeChartColumn: { width: 68, alignItems: 'center', justifyContent: 'flex-end', gap: spacing.xs },
-  financeChartAmount: { maxWidth: 68, color: colors.muted, fontSize: 10 },
+  financeChartAmount: { maxWidth: 68, color: colors.muted, fontSize: typography.micro },
   financeChartTrack: { width: 44, height: 100, justifyContent: 'flex-end', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.line },
   financeChartBar: { width: 40, borderTopLeftRadius: 10, borderTopRightRadius: 10, backgroundColor: colors.blue },
-  financeChartMonth: { color: colors.brandDark, fontSize: 10, fontWeight: '600' },
+  financeChartMonth: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '600' },
   financeActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
   financeExport: { flex: 1, minWidth: '45%', minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas },
   financeDetailExport: { flexBasis: '100%', backgroundColor: colors.greenSoft, borderColor: '#86EFAC' },
   financeExportText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
-  financeTeacherName: { maxWidth: '48%', color: colors.muted, fontSize: 10, textAlign: 'right' },
-  financeGroupTitle: { color: colors.green, fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginTop: spacing.md },
+  financeTeacherName: { maxWidth: '48%', color: colors.muted, fontSize: typography.micro, textAlign: 'right' },
+  financeGroupTitle: { color: colors.green, fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.8, marginTop: spacing.md },
   financeAmount: { color: colors.ink, fontSize: typography.title, fontWeight: '800', marginTop: spacing.sm },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  menuIcon: { width: 42, height: 42, borderRadius: radius.md, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  menuScreen: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
+  menuHeader: { minHeight: 66, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, marginBottom: spacing.xs },
+  menuList: { gap: spacing.sm },
+  menuPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
+  menuRow: { minHeight: 57, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: 14, borderColor: '#E5EBF0', backgroundColor: colors.surface },
+  menuIcon: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  menuCopy: { flex: 1, minWidth: 0, gap: 2 },
+  menuItemTitle: { color: colors.ink, fontSize: typography.small, lineHeight: 18, fontWeight: '800' },
+  menuItemDescription: { color: colors.muted, fontSize: typography.micro, lineHeight: 15, fontWeight: '500' },
+  menuArrow: { width: 22, height: 30, alignItems: 'center', justifyContent: 'center' },
   courseCard: { gap: spacing.sm },
   availableCourse: { overflow: 'hidden', borderColor: '#FECACA' },
   courseRibbon: { marginTop: -spacing.lg, marginHorizontal: -spacing.lg, marginBottom: spacing.sm, minHeight: 42, backgroundColor: colors.brand, justifyContent: 'center', paddingHorizontal: spacing.lg },

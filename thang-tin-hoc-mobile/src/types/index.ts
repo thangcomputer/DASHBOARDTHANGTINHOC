@@ -2,6 +2,7 @@ export type UserRole = 'student' | 'teacher';
 
 export type DemoUser = {
   id: string;
+  previewMode?: boolean;
   name: string;
   role: UserRole;
   phone: string;
@@ -56,16 +57,27 @@ export type ScheduleItem = {
   status: 'upcoming' | 'completed' | 'cancelled';
   date?: string;
   courseName?: string;
+  teacherId?: string;
   teacherName?: string;
   studentName?: string;
   studentId?: string;
+  enrollmentId?: string;
+  startTime?: string;
+  endTime?: string;
   note?: string;
   attendanceStatus?: 'pending' | 'present' | 'absent' | 'late' | 'excused';
   learningMode?: 'Trực tiếp' | 'Trực tuyến';
   meetingUrl?: string;
   confirmedByStudent?: boolean;
+  attendanceConfirmPending?: boolean;
+  attendanceConfirmStatus?: string;
+  attendanceDisputed?: boolean;
+  attendanceRejected?: boolean;
   confirmedByTeacher?: boolean;
   grade?: number | null;
+  attendanceSessionNumber?: number | string | null;
+  attendanceTotalSessions?: number | string | null;
+  weekday?: string;
   color: string;
 };
 
@@ -102,6 +114,7 @@ export type LearningMaterial = {
   type: 'PDF' | 'WORD' | 'EXCEL' | 'VIDEO' | 'LINK';
   date: string;
   size: string;
+  url?: string;
 };
 
 export type AppNotification = {
@@ -120,7 +133,16 @@ export type Conversation = {
   id: string;
   name: string;
   role: string;
+  participantId?: string;
+  participantRole?: string;
+  avatar?: string;
+  avatarUri?: string;
+  phone?: string;
+  zalo?: string;
+  lastActivityAt?: number;
   category?: 'student' | 'teacher' | 'recruitment' | 'admin' | 'support' | 'group';
+  adminRole?: string | null;
+  roleBadge?: string;
   online?: boolean;
   lastMessage: string;
   time: string;
@@ -133,26 +155,41 @@ export type ChatMessage = {
   text: string;
   time: string;
   mine: boolean;
+  timestampMs?: number;
+  callEvent?: {
+    direction: 'incoming' | 'outgoing';
+    status: 'ringing' | 'active' | 'missed' | 'rejected' | 'completed' | 'busy' | 'cancelled' | 'failed';
+    durationSeconds: number;
+    participantName: string;
+  };
   senderName?: string;
   state?: 'sent' | 'delivered' | 'read';
   sticker?: string;
+  stickerId?: string;
   reaction?: string;
+  reactions?: Array<{ type: string; userId: string; userName?: string }>;
   recalled?: boolean;
+  recipientRejected?: boolean;
+  pinned?: boolean;
   attachmentName?: string;
   attachmentType?: 'image' | 'file' | 'gif';
+  attachmentUrl?: string;
   gifLabel?: string;
   replyToText?: string;
+  replyTo?: { id: string; content: string; messageType?: string };
 };
 
 export type DemoStudent = {
   id: string;
   name: string;
   course: string;
+  courses?: string[];
   progress: number;
   lastClass: string;
   status: 'Đang học' | 'Cần hỗ trợ' | 'Hoàn thành' | 'Thôi học';
   color: string;
   phone?: string;
+  enrollments?: DemoEnrollment[];
   enrollmentStatus?: 'active' | 'completed' | 'cancelled';
   notes?: string;
   avgGrade?: number;
@@ -196,10 +233,12 @@ export type DemoEvaluation = {
   id: string;
   courseName: string;
   teacherName: string;
-  milestone: 'manual_feedback' | 'course_end_teacher' | 'course_end_admin';
+  milestone: 'manual_feedback' | 'course_end_teacher' | 'course_end_admin' | 'teacher_rating';
   completed: boolean;
   public: boolean;
   criteria: string[];
+  teacherId?: string;
+  courseId?: string;
   comment?: string;
   completedSessions: number;
   totalSessions: number;
@@ -253,6 +292,7 @@ export type DemoGradeRecord = {
   score: string;
   status: 'Đạt' | 'Hoàn thành' | 'Đang học';
   date?: string;
+  feedback?: string;
   qaFixture?: boolean;
 };
 

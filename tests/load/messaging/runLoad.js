@@ -152,7 +152,7 @@ async function runMultiTabProbe(origin, actor) {
   const result = {
     status: 'ok',
     sockets: [a.id, b.id],
-    note: 'latest presence socketId wins (Phase 8/9 designed behavior); not redesigned',
+    note: 'All authenticated sessions receive messages through the user ID room.',
   };
   a.close();
   b.close();
