@@ -18,6 +18,7 @@ export type AppStackParamList = {
     participantAdminRole?: string | null;
     participantOnline?: boolean;
     participantAvatarUri?: string;
+    supportStatus?: string;
   };
   CallHistory: undefined;
   Call: {
@@ -58,6 +59,7 @@ export type MainTabsParamList = {
   Messages: undefined;
   CourseVideos: undefined;
   Feed: undefined;
+  Support: undefined;
   Notifications: undefined;
   Profile: undefined;
   Students: undefined;
@@ -66,6 +68,6 @@ export type MainTabsParamList = {
 
 export function getTabItems(role: UserRole) {
   return role === 'student'
-    ? ['Schedule', 'Messages', 'CourseVideos', 'Home', 'Feed', 'Profile'] as const
-    : ['Home', 'Schedule', 'Finance', 'Messages', 'Profile'] as const;
+    ? ['Schedule', 'Messages', 'Feed', 'Home', 'CourseVideos', 'Support', 'Profile'] as const
+    : ['Schedule', 'Messages', 'Feed', 'Home', 'Finance', 'Support', 'Profile'] as const;
 }

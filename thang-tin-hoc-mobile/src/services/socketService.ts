@@ -49,6 +49,7 @@ export const SOCKET_EVENTS = {
   ASSIGNMENT_CHANGED: 'socket:assignment:changed',
   SUBMISSION_CHANGED: 'socket:submission:changed',
   STUDENT_CHANGED: 'socket:student:changed',
+  AI_SUPPORT_STATUS: 'socket:ai-support:status',
 } as const;
 
 let socket: Socket | null = null;
@@ -107,6 +108,7 @@ function bindSocketEvents(instance: Socket, token: string) {
   instance.on('message:recall', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_RECALLED, data));
   instance.on('message:delete', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_DELETED, data));
   instance.on('message:pinned', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_PINNED, data));
+  instance.on('ai-support:status', (data) => emitDeviceEvent(SOCKET_EVENTS.AI_SUPPORT_STATUS, data));
   instance.on('message:read_ack', (data) => emitDeviceEvent(SOCKET_EVENTS.READ_ACK, data));
   instance.on('typing:show', (data) => emitDeviceEvent(SOCKET_EVENTS.TYPING_CHANGE, { ...(data as object), isTyping: true }));
   instance.on('typing:hide', (data) => emitDeviceEvent(SOCKET_EVENTS.TYPING_CHANGE, { ...(data as object), isTyping: false }));
@@ -261,6 +263,10 @@ export function waitForConnection(timeoutMs = 10_000) {
 
 export function joinChatGroup(groupId: string) {
   if (groupId) emit('group:join', { groupId });
+}
+
+export function leaveChatGroup(groupId: string) {
+  if (groupId) emit('group:leave', { groupId });
 }
 
 export function emitTypingStart(conversationId: string, userName: string) {

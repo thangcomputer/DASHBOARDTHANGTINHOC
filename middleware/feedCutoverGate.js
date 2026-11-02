@@ -2,7 +2,7 @@
  * Phase 7.17 — Controlled cutover gate for LIVE /api/feed ONLY.
  *
  * LEGACY (default):
- *   - All actions → auth already applied on routes; pass-through.
+ *   - All actions → authentication already applied on routes; pass-through.
  *     Ownership for delete_post / delete_comment remains in the handler.
  *
  * POLICY (env opt-in): Policy decision is HTTP authority.

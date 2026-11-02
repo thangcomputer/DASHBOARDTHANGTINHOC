@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   DeviceEventEmitter,
   Image,
@@ -20,13 +21,22 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  CalendarDays, Camera, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, ImagePlus, Info, MessageCircle,
-  MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, Video, X,
+  CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, LogOut, MessageCircle,
+  MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, UserPlus, Video, X,
 } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField, useBrandingHeaderScrollHandler } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { messageService, scheduleService } from '../services/mockService';
 import { getMobileImageSource } from '../services/apiClient';
+import {
+  AI_SUPPORT_WELCOME_CHIPS,
+  AI_SUPPORT_STATUS,
+  escalateAiSupportConversation,
+  getAiSupportReplyPresentation,
+  isAiSupportWelcome,
+  resetAiSupportConversation,
+  type AiSupportStatus,
+} from '../services/aiSupportApi';
 import { downloadChatAttachment, openChatAttachment } from '../services/chatFileAccess';
 import {
   getChatReactionEmoji,
@@ -63,6 +73,11 @@ import {
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 type PickerTab = 'emoji' | 'sticker' | 'gif' | 'attachment';
 const conversationDrafts = new Map<string, string>();
+const aiSupportStatuses = Object.values(AI_SUPPORT_STATUS) as AiSupportStatus[];
+
+function resolveAiSupportStatus(value?: string): AiSupportStatus {
+  return aiSupportStatuses.find((status) => status === value) || AI_SUPPORT_STATUS.AI_ACTIVE;
+}
 
 function getScheduleMeetState(
   schedule: { date?: string; startTime?: string; endTime?: string; status: string; meetingUrl?: string },
@@ -306,6 +321,19 @@ function matchesContactSearch(query: string, conversation: Conversation) {
   });
 }
 
+function groupMemberRoleLabel(role: string, adminRole?: string | null) {
+  const normalized = role.toLowerCase();
+  if (normalized === 'teacher') return 'Giảng viên';
+  if (normalized === 'student') return 'Học viên';
+  if (normalized === 'admin') {
+    if (adminRole === 'SUPER_ADMIN') return 'Super Admin';
+    if (adminRole === 'HIGH_ADMIN') return 'Admin cấp cao';
+    return 'Quản trị viên';
+  }
+  if (normalized === 'staff' || normalized === 'support') return 'Nhân viên';
+  return 'Thành viên';
+}
+
 export function MessagesScreen() {
   const navigation = useNavigation<Navigation>();
   const { user } = useAuth();
@@ -319,6 +347,7 @@ export function MessagesScreen() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>(() => getPresenceUserIds(getOnlineUsersSnapshot()));
   const [socketStatus, setSocketStatus] = useState('');
+  const [pinningConversationId, setPinningConversationId] = useState<string | null>(null);
   const categoryFilters = user?.role === 'teacher'
     ? [
         { id: 'all' as const, label: 'Tất cả' },
@@ -339,6 +368,7 @@ export function MessagesScreen() {
     const subscriptions = [
       DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_RECEIVED, () => { void resource.reload(); }),
       DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_SENT_ACK, () => { void resource.reload(); }),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_PINNED, () => { void resource.reload(); }),
       DeviceEventEmitter.addListener(SOCKET_EVENTS.GROUP_NEW, (group: { _id?: string; id?: string }) => {
         const groupId = String(group?._id || group?.id || '');
         if (groupId) joinChatGroup(groupId);
@@ -375,9 +405,11 @@ export function MessagesScreen() {
     .map((conversation, index) => ({
       conversation,
       index,
+      pinned: conversation.isPinned ? 1 : 0,
       online: conversation.category !== 'group' && onlineUserIds.includes(String(conversation.participantId || '')) ? 1 : 0,
     }))
     .sort((a, b) => {
+      if (a.pinned !== b.pinned) return b.pinned - a.pinned;
       if (a.online !== b.online) return b.online - a.online;
       const aActivity = a.conversation.lastActivityAt || 0;
       const bActivity = b.conversation.lastActivityAt || 0;
@@ -385,6 +417,21 @@ export function MessagesScreen() {
       return a.index - b.index;
     })
     .map(({ conversation }) => conversation);
+  const toggleConversationPin = async (conversation: Conversation) => {
+    if (!user || pinningConversationId) return;
+    setPinningConversationId(conversation.id);
+    try {
+      await messageService.setConversationPinned(conversation.id, !conversation.isPinned, user);
+      await resource.reload();
+    } catch (error) {
+      Alert.alert(
+        'Không thể cập nhật ghim liên hệ',
+        error instanceof Error ? error.message : 'Vui lòng thử lại.',
+      );
+    } finally {
+      setPinningConversationId(null);
+    }
+  };
   const createGroup = async () => {
     const groupTitle = groupName.trim();
     const participants = availableMembers.filter((member) => selectedMembers.includes(member.id));
@@ -458,84 +505,94 @@ export function MessagesScreen() {
               conversation.adminRole,
               conversation.avatarUri,
             );
-            const isLast = index === conversations.length - 1;
+            const isLast = index === sortedConversations.length - 1;
             const isOnline = conversation.category !== 'group'
               && Boolean(conversation.participantId && onlineUserIds.includes(conversation.participantId));
             return (
-              <Pressable
+              <View
                 key={conversation.id}
-                onPress={() => navigation.navigate('Conversation', {
-                  conversationId: conversation.id,
-                  conversationName: conversation.name,
-                  participantId: conversation.participantId,
-                  participantRole: conversation.participantRole || conversation.category,
-                  participantAdminRole: conversation.adminRole,
-                  participantOnline: isOnline,
-                  participantAvatarUri: conversation.avatarUri,
-                })}
-                style={({ pressed }) => [
-                  styles.contactRow,
-                  pressed && styles.contactRowPressed,
-                  !isLast && styles.contactRowDivider,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
+                style={[styles.contactRow, !isLast && styles.contactRowDivider]}
               >
-                {/* Avatar with Ring, Role Badge, and Online Dot */}
-                <View style={styles.avatarContainer}>
-                  <View style={[styles.avatarRing, { borderColor: badge.ring }]}>
-                    <Image source={avatarSource} style={styles.avatarImg} />
-                  </View>
-                  <View style={[styles.roleBadgePill, { backgroundColor: badge.bg }]}>
-                    <Text style={styles.roleBadgePillText}>
-                      {conversation.roleBadge || badge.label}
-                    </Text>
-                  </View>
-                  {isOnline ? <View style={styles.onlineDot} /> : null}
-                </View>
-
-                {/* Contact Information */}
-                <View style={styles.contactInfoCol}>
-                  <View style={styles.contactHeaderRow}>
-                    <View style={styles.contactNameStatusRow}>
-                      <Text numberOfLines={1} style={styles.contactNameText}>
-                        {conversation.name}
-                      </Text>
-                      {isOnline ? (
-                        <View style={styles.statusPillOnline}>
-                          <Text style={styles.statusPillOnlineText}>online</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.statusPillOffline}>
-                          <Text style={styles.statusPillOfflineText}>offline</Text>
-                        </View>
-                      )}
+                <Pressable
+                  onPress={() => navigation.navigate('Conversation', {
+                    conversationId: conversation.id,
+                    conversationName: conversation.name,
+                    participantId: conversation.participantId,
+                    participantRole: conversation.participantRole || conversation.category,
+                    participantAdminRole: conversation.adminRole,
+                    participantOnline: isOnline,
+                    participantAvatarUri: conversation.avatarUri,
+                  })}
+                  style={({ pressed }) => [styles.contactRowMain, pressed && styles.contactRowPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
+                >
+                  <View style={styles.avatarContainer}>
+                    <View style={[styles.avatarRing, { borderColor: badge.ring }]}>
+                      <Image source={avatarSource} style={styles.avatarImg} />
                     </View>
-                    {conversation.time ? (
-                      <Text style={styles.contactTimeText}>{conversation.time}</Text>
-                    ) : null}
+                    <View style={[styles.roleBadgePill, { backgroundColor: badge.bg }]}>
+                      <Text style={styles.roleBadgePillText}>
+                        {conversation.roleBadge || badge.label}
+                      </Text>
+                    </View>
+                    {isOnline ? <View style={styles.onlineDot} /> : null}
                   </View>
 
-                  <View style={styles.contactMessageRow}>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.contactMessageText,
-                        conversation.unread > 0 && styles.contactMessageTextUnread,
-                      ]}
-                    >
-                      {conversation.lastMessage || 'Bắt đầu cuộc trò chuyện'}
-                    </Text>
-                    {conversation.unread > 0 ? (
-                      <View style={styles.unreadCountBadge}>
-                        <Text style={styles.unreadCountText}>
-                          {conversation.unread > 99 ? '99+' : conversation.unread}
+                  <View style={styles.contactInfoCol}>
+                    <View style={styles.contactHeaderRow}>
+                      <View style={styles.contactNameStatusRow}>
+                        <Text numberOfLines={1} style={styles.contactNameText}>
+                          {conversation.name}
                         </Text>
+                        {isOnline ? (
+                          <View style={styles.statusPillOnline}>
+                            <Text style={styles.statusPillOnlineText}>online</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.statusPillOffline}>
+                            <Text style={styles.statusPillOfflineText}>offline</Text>
+                          </View>
+                        )}
                       </View>
-                    ) : null}
+                      {conversation.time ? (
+                        <Text style={styles.contactTimeText}>{conversation.time}</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.contactMessageRow}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.contactMessageText,
+                          conversation.unread > 0 && styles.contactMessageTextUnread,
+                        ]}
+                      >
+                        {conversation.lastMessage || 'Bắt đầu cuộc trò chuyện'}
+                      </Text>
+                      {conversation.unread > 0 ? (
+                        <View style={styles.unreadCountBadge}>
+                          <Text style={styles.unreadCountText}>
+                            {conversation.unread > 99 ? '99+' : conversation.unread}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              </Pressable>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void toggleConversationPin(conversation); }}
+                  style={[styles.contactPinButton, conversation.isPinned && styles.contactPinButtonActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={conversation.isPinned ? `Bỏ ghim ${conversation.name}` : `Ghim ${conversation.name}`}
+                  accessibilityState={{ disabled: pinningConversationId === conversation.id, selected: Boolean(conversation.isPinned) }}
+                  disabled={pinningConversationId === conversation.id}
+                >
+                  {conversation.isPinned
+                    ? <PinOff size={16} color="#2563EB" />
+                    : <Pin size={16} color="#64748B" />}
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -587,6 +644,24 @@ export function ConversationScreen() {
   const isTeacher = user?.role === 'teacher';
   const isPreview = Boolean(user?.previewMode);
   const [showInfo, setShowInfo] = useState(false);
+  const isGroupConversation = route.params.conversationId.startsWith('group_');
+  const isAiSupportConversation = route.params.conversationId.includes('system_ai_support');
+  const [aiSupportStatus, setAiSupportStatus] = useState<AiSupportStatus>(
+    () => resolveAiSupportStatus(route.params.supportStatus),
+  );
+  const [aiSupportBusy, setAiSupportBusy] = useState(false);
+  const [aiSupportError, setAiSupportError] = useState('');
+  const groupId = isGroupConversation ? route.params.conversationId.slice('group_'.length) : '';
+  const [groupDetails, setGroupDetails] = useState<Conversation | null>(null);
+  const [groupContacts, setGroupContacts] = useState<Conversation[]>([]);
+  const [groupDetailsError, setGroupDetailsError] = useState('');
+  const [groupDetailsVersion, setGroupDetailsVersion] = useState(0);
+  const [showAddGroupMembers, setShowAddGroupMembers] = useState(false);
+  const [groupMemberSearch, setGroupMemberSearch] = useState('');
+  const [selectedGroupMemberIds, setSelectedGroupMemberIds] = useState<string[]>([]);
+  const [groupManagementBusy, setGroupManagementBusy] = useState(false);
+  const [groupActionDialog, setGroupActionDialog] = useState<'leave' | 'delete' | null>(null);
+  const [groupActionError, setGroupActionError] = useState('');
   const [showWeekSchedule, setShowWeekSchedule] = useState(false);
   const [scheduleWeekOffset, setScheduleWeekOffset] = useState(0);
   const [scheduleDate, setScheduleDate] = useState<string | null>(null);
@@ -602,11 +677,74 @@ export function ConversationScreen() {
   const [teacherAttendanceBusy, setTeacherAttendanceBusy] = useState(false);
   const [teacherAttendanceSavedScheduleId, setTeacherAttendanceSavedScheduleId] = useState('');
   const teacherAttendanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const groupDeleteRequested = useRef(false);
+  useEffect(() => {
+    setAiSupportStatus(resolveAiSupportStatus(route.params.supportStatus));
+  }, [route.params.supportStatus]);
+  useEffect(() => {
+    if (!isAiSupportConversation || isPreview) return undefined;
+    const subscription = DeviceEventEmitter.addListener(
+      SOCKET_EVENTS.AI_SUPPORT_STATUS,
+      (payload: unknown) => {
+        if (!payload || typeof payload !== 'object') return;
+        const event = payload as { conversationId?: string; status?: string };
+        if (event.conversationId !== route.params.conversationId || !event.status) return;
+        setAiSupportStatus(resolveAiSupportStatus(event.status));
+      },
+    );
+    return () => subscription.remove();
+  }, [isAiSupportConversation, isPreview, route.params.conversationId]);
+  const changeAiSupportStatus = async () => {
+    if (!isAiSupportConversation || aiSupportBusy) return;
+    setAiSupportBusy(true);
+    setAiSupportError('');
+    try {
+      const status = aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
+        || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED
+        ? await resetAiSupportConversation(route.params.conversationId)
+        : await escalateAiSupportConversation(route.params.conversationId);
+      setAiSupportStatus(resolveAiSupportStatus(status));
+      resource.reload();
+    } catch (error) {
+      setAiSupportError(error instanceof Error ? error.message : 'Không thể cập nhật yêu cầu hỗ trợ.');
+    } finally {
+      setAiSupportBusy(false);
+    }
+  };
   const threadLoader = useCallback(
     () => messageService.thread(route.params.conversationId, user?.role === 'teacher' ? 'teacher' : 'student', user),
     [route.params.conversationId, user?.role, user],
   );
   const resource = useMockResource(threadLoader);
+  useEffect(() => {
+    if (!isGroupConversation || !user || isPreview) {
+      setGroupDetails(null);
+      setGroupContacts([]);
+      setGroupDetailsError('');
+      return undefined;
+    }
+    let active = true;
+    setGroupDetailsError('');
+    messageService.conversations(user.role, user)
+      .then((conversations) => {
+        if (!active) return;
+        const group = conversations.find((conversation) => conversation.id === route.params.conversationId);
+        if (!group) {
+          setGroupDetails(null);
+          setGroupDetailsError('Không thể tải thông tin nhóm. Bạn có thể đã rời nhóm hoặc nhóm đã bị xóa.');
+          return;
+        }
+        setGroupDetails(group);
+        setGroupContacts(conversations.filter((conversation) => conversation.category !== 'group'));
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setGroupDetailsError(error instanceof Error ? error.message : 'Không thể tải thông tin nhóm.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [groupDetailsVersion, isGroupConversation, isPreview, route.params.conversationId, user]);
   const scheduleLoader = useCallback(
     () => user?.role === 'teacher' || user?.role === 'student'
       ? scheduleService.list(user.role)
@@ -909,7 +1047,35 @@ export function ConversationScreen() {
     return [...(messages || resource.data || []), ...callMessages]
       .sort((left, right) => (left.timestampMs || 0) - (right.timestampMs || 0));
   }, [callHistory, messages, resource.data]);
-  const conversationName = route.params.conversationName || 'Cuộc trò chuyện';
+  const lastAiWelcomeIndex = useMemo(
+    () => thread.reduce((lastIndex, message, index) => (
+      isAiSupportConversation
+        && !message.mine
+        && message.senderId === 'ai_support'
+        && isAiSupportWelcome(message.text)
+        ? index
+        : lastIndex
+    ), -1),
+    [isAiSupportConversation, thread],
+  );
+  const showAiWelcomeChips = Boolean(
+    isAiSupportConversation
+    && !isPreview
+    && !isSearching
+    && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+    && lastAiWelcomeIndex >= 0
+    && !thread.slice(lastAiWelcomeIndex + 1).some((message) => (
+      message.mine && message.messageType !== 'system' && !message.recalled
+    )),
+  );
+  const aiWelcomeChips = user?.role === 'teacher'
+    ? AI_SUPPORT_WELCOME_CHIPS.teacher
+    : AI_SUPPORT_WELCOME_CHIPS.student;
+  const conversationName = isAiSupportConversation
+    && (aiSupportStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+      || aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE)
+    ? 'Hỗ trợ trực tiếp'
+    : route.params.conversationName || 'Cuộc trò chuyện';
   const canShowMeetButton = Boolean(
     user
     && user.role !== route.params.participantRole
@@ -1316,11 +1482,20 @@ export function ConversationScreen() {
     if (!pinnedId) return null;
     return thread.find((item) => item.id === pinnedId) || null;
   }, [pinnedId, thread]);
+  const isGroupCreator = Boolean(groupDetails?.groupCreatorId && groupDetails.groupCreatorId === user?.id);
+  const groupParticipantIds = new Set((groupDetails?.groupParticipants || []).map((participant) => participant.userId));
+  const availableGroupMembers = groupContacts
+    .filter((contact) => contact.participantId && !groupParticipantIds.has(contact.participantId))
+    .filter((contact) => ['student', 'teacher', 'admin', 'staff', 'support'].includes(String(contact.participantRole).toLowerCase()))
+    .filter((contact) => matchesContactSearch(groupMemberSearch, contact));
+  const groupMemberCount = groupDetails?.groupParticipants?.length;
   const peerId = String(route.params.participantId || '');
   const isPeerOnline = peerId && getPresenceUserIds(presenceOnlineUsers).includes(peerId);
-  const contactStatus = isPeerOnline
-    ? 'Trực tuyến'
-    : formatLastSeenStatus(presenceLastSeen[peerId]);
+  const contactStatus = isGroupConversation
+    ? groupMemberCount == null ? '' : `${groupMemberCount} thành viên`
+    : isPeerOnline
+      ? 'Trực tuyến'
+      : formatLastSeenStatus(presenceLastSeen[peerId]);
   const contactRole = ({
     admin: 'Admin',
     group: 'Nhóm',
@@ -1429,6 +1604,83 @@ export function ConversationScreen() {
   }, [route.params.conversationId]);
 
   useEffect(() => {
+    if (!isGroupConversation) return undefined;
+    const refreshGroup = (event: { _id?: string; id?: string }) => {
+      if (String(event?._id || event?.id || '') === groupId) {
+        setGroupDetailsVersion((version) => version + 1);
+      }
+    };
+    const subscription = DeviceEventEmitter.addListener(
+      SOCKET_EVENTS.GROUP_DELETE,
+      (event: { groupId?: string }) => {
+        if (groupDeleteRequested.current || String(event?.groupId || '') !== groupId) return;
+        Alert.alert('Nhóm đã bị xóa', 'Nhóm chat này không còn khả dụng.');
+        if (navigation.canGoBack()) navigation.goBack();
+        else navigation.navigate('MainTabs', { screen: 'Messages' });
+      },
+    );
+    const newGroupSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.GROUP_NEW, refreshGroup);
+    return () => {
+      subscription.remove();
+      newGroupSubscription.remove();
+    };
+  }, [groupId, isGroupConversation, navigation]);
+
+  const returnToInbox = () => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('MainTabs', { screen: 'Messages' });
+  };
+  const addSelectedGroupMembers = async () => {
+    if (!groupId || !user || groupManagementBusy) return;
+    const selected = groupContacts.filter((contact) => (
+      contact.participantId && selectedGroupMemberIds.includes(contact.participantId)
+    ));
+    if (!selected.length) return;
+    setGroupManagementBusy(true);
+    try {
+      await messageService.addGroupMembers(groupId, selected, user);
+      setShowAddGroupMembers(false);
+      setSelectedGroupMemberIds([]);
+      setGroupMemberSearch('');
+      setGroupDetailsVersion((version) => version + 1);
+      resource.reload();
+      Alert.alert('Đã thêm thành viên', `Đã thêm ${selected.length} thành viên vào nhóm.`);
+    } catch (error) {
+      Alert.alert('Không thể thêm thành viên', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setGroupManagementBusy(false);
+    }
+  };
+  const confirmLeaveGroup = () => {
+    setGroupActionError('');
+    setGroupActionDialog('leave');
+  };
+  const confirmDeleteGroup = () => {
+    setGroupActionError('');
+    setGroupActionDialog('delete');
+  };
+  const runGroupAction = async () => {
+    if (!user || !groupActionDialog || groupManagementBusy) return;
+    setGroupManagementBusy(true);
+    setGroupActionError('');
+    try {
+      if (groupActionDialog === 'leave') {
+        await messageService.leaveGroup(groupId, user);
+      } else {
+        groupDeleteRequested.current = true;
+        await messageService.deleteGroup(groupId, user);
+      }
+      setGroupActionDialog(null);
+      returnToInbox();
+    } catch (error) {
+      if (groupActionDialog === 'delete') groupDeleteRequested.current = false;
+      setGroupActionError(error instanceof Error ? error.message : 'Không thể hoàn tất thao tác. Vui lòng thử lại.');
+    } finally {
+      setGroupManagementBusy(false);
+    }
+  };
+
+  useEffect(() => {
     const pinned = thread.find((message) => message.pinned);
     setPinnedId(pinned?.id || null);
   }, [thread]);
@@ -1530,11 +1782,12 @@ export function ConversationScreen() {
     };
   }, [isPreview, resource.data, route.params.conversationId, user]);
 
-  const send = async () => {
+  const send = async (quickPrompt?: string) => {
     stopTyping();
     const sendingDraftKey = draftKey;
-    const text = draft.trim();
-    const attachment = selectedAttachment;
+    const isQuickPrompt = typeof quickPrompt === 'string';
+    const text = (isQuickPrompt ? quickPrompt : draft).trim();
+    const attachment = isQuickPrompt ? null : selectedAttachment;
     const messageText = attachment
       ? text || (attachment.type === 'image' ? '[Hình ảnh]' : `Đã gửi tệp: ${attachment.name}`)
       : text;
@@ -1558,12 +1811,14 @@ export function ConversationScreen() {
           messageText,
           user,
           attachmentUpload,
-          replyingTo || undefined,
+          isQuickPrompt ? undefined : replyingTo || undefined,
         );
         appendMessage(sentMessage);
-        clearDraft(sendingDraftKey);
-        setReplyingTo(null);
-        setSelectedAttachment(null);
+        if (!isQuickPrompt) {
+          clearDraft(sendingDraftKey);
+          setReplyingTo(null);
+          setSelectedAttachment(null);
+        }
       } catch (error) {
         Alert.alert('Không gửi được tin nhắn', error instanceof Error ? error.message : 'Vui lòng thử lại.');
       } finally {
@@ -1935,6 +2190,42 @@ export function ConversationScreen() {
           >
             <Search size={19} color={colors.muted} />
           </Pressable>
+          {isGroupConversation && isGroupCreator ? (
+            <Pressable
+              onPress={() => {
+                setSelectedGroupMemberIds([]);
+                setGroupMemberSearch('');
+                setShowAddGroupMembers(true);
+              }}
+              style={[styles.chatHeaderAction, styles.groupAddHeaderAction]}
+              disabled={groupManagementBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Thêm thành viên vào nhóm"
+            >
+              <UserPlus size={19} color="#2563EB" />
+            </Pressable>
+          ) : null}
+          {isGroupConversation && isGroupCreator && user?.role !== 'student' ? (
+            <Pressable
+              onPress={confirmDeleteGroup}
+              style={[styles.chatHeaderAction, styles.groupDeleteHeaderAction, groupManagementBusy && styles.groupActionDisabled]}
+              disabled={groupManagementBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Xóa nhóm vĩnh viễn"
+            >
+              <Trash2 size={19} color="#DC2626" />
+            </Pressable>
+          ) : isGroupConversation && groupDetails && !isGroupCreator ? (
+            <Pressable
+              onPress={confirmLeaveGroup}
+              style={[styles.chatHeaderAction, styles.groupLeaveHeaderAction, groupManagementBusy && styles.groupActionDisabled]}
+              disabled={groupManagementBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Rời nhóm"
+            >
+              <LogOut size={18} color="#C2410C" />
+            </Pressable>
+          ) : null}
           {user && user.role !== route.params.participantRole
             && (route.params.participantRole === 'student' || route.params.participantRole === 'teacher')
             && route.params.participantId ? (
@@ -1962,6 +2253,53 @@ export function ConversationScreen() {
             <Info size={19} color={colors.muted} />
           </Pressable>
         </View>
+        {isAiSupportConversation && !isPreview ? (
+          <View style={styles.aiSupportStatusCard}>
+            <View style={styles.aiSupportStatusCopy}>
+              <Text style={styles.aiSupportStatusTitle}>
+                {aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
+                  ? 'Đang trò chuyện với nhân viên hỗ trợ'
+                  : aiSupportStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+                    ? 'Đã gửi yêu cầu hỗ trợ'
+                    : aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED
+                      ? 'Yêu cầu hỗ trợ đã hoàn tất'
+                      : 'Trợ lý AI sẵn sàng hỗ trợ'}
+              </Text>
+              <Text style={styles.aiSupportStatusMessage}>
+                {aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
+                  ? 'Bạn có thể tiếp tục nhắn tin tại đây với nhân viên.'
+                  : aiSupportStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
+                    ? 'Nhân viên sẽ tiếp nhận và trả lời ngay trong cuộc trò chuyện này.'
+                    : aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED
+                      ? 'Bạn có thể tiếp tục trao đổi với Trợ lý AI.'
+                      : 'Nếu cần người hỗ trợ trực tiếp, hãy gửi yêu cầu tại đây.'}
+              </Text>
+              {aiSupportError ? <Text style={styles.aiSupportError}>{aiSupportError}</Text> : null}
+            </View>
+            {aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+              || aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
+              || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED ? (
+                <Pressable
+                  onPress={() => { void changeAiSupportStatus(); }}
+                  disabled={aiSupportBusy}
+                  style={[styles.aiSupportAction, aiSupportBusy && styles.aiSupportActionDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+                    ? 'Chuyển sang nhân viên hỗ trợ'
+                    : 'Tiếp tục trò chuyện với Trợ lý AI'}
+                >
+                  {aiSupportBusy
+                    ? <ActivityIndicator size="small" color="#FFFFFF" />
+                    : aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+                      ? <Headphones size={15} color="#FFFFFF" />
+                      : <MessageCircle size={15} color="#FFFFFF" />}
+                  <Text style={styles.aiSupportActionText}>
+                    {aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? 'Nhân viên' : 'Hỏi AI tiếp'}
+                  </Text>
+                </Pressable>
+              ) : null}
+          </View>
+        ) : null}
         {isSearching ? (
           <View>
             <View style={styles.inlineSearch}>
@@ -1995,7 +2333,7 @@ export function ConversationScreen() {
               </View>
             </View>
             <Pressable
-              onPress={() => setPinnedId(null)}
+              onPress={() => { void handleTogglePin(pinnedMessage.id); }}
               style={styles.pinnedBannerUnpinBtn}
               accessibilityRole="button"
               accessibilityLabel="Bỏ ghim tin nhắn"
@@ -2090,6 +2428,24 @@ export function ConversationScreen() {
               }))
               .filter((reaction) => reaction.emoji);
             const isActive = optionsMenuMsgId === message.id || reactionPopupMsgId === message.id;
+            const isAiSupportAssistantMessage = isAiSupportConversation
+              && !message.mine
+              && message.senderId === 'ai_support'
+              && !message.recalled;
+            const aiReplyPresentation = isAiSupportAssistantMessage && !message.attachmentType
+              ? getAiSupportReplyPresentation(message.text)
+              : { content: message.text, suggestions: [] as string[] };
+            const promptChips = isAiSupportAssistantMessage
+              && !isPreview
+              && !isSearching
+              && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+              ? lastAiWelcomeIndex === index && showAiWelcomeChips
+                ? aiWelcomeChips
+                : aiReplyPresentation.suggestions.map((label, suggestionIndex) => ({
+                  id: `suggestion-${suggestionIndex}`,
+                  label,
+                }))
+              : [];
             const showReactionControls = hoverMsgId === message.id
               || reactionPopupMsgId === message.id;
             const showActions = optionsMenuMsgId === message.id
@@ -2106,7 +2462,7 @@ export function ConversationScreen() {
               >
                 <Pressable
                   onPress={() => setHoverMsgId((cur) => (cur === message.id ? null : message.id))}
-                  onLongPress={isPreview ? () => handleMessageMenu(message) : undefined}
+                  onLongPress={() => handleMessageMenu(message)}
                   delayLongPress={350}
                   style={[
                     styles.bubble,
@@ -2139,6 +2495,12 @@ export function ConversationScreen() {
                   ) : message.sticker ? (
                     <Text style={styles.sticker}>{message.sticker}</Text>
                   ) : null}
+                  {pinnedId === message.id ? (
+                    <View style={styles.messagePinnedLabel}>
+                      <Pin size={10} color="#1D4ED8" />
+                      <Text style={styles.messagePinnedLabelText}>Đã ghim</Text>
+                    </View>
+                  ) : null}
                   {message.gifLabel ? (
                     <View style={styles.chatGif}>
                       <Text style={styles.chatGifText}>GIF</Text>
@@ -2148,10 +2510,10 @@ export function ConversationScreen() {
                   {message.text && !message.recalled && message.attachmentType !== 'file' ? (
                     message.attachmentType === 'image' ? (
                       <View style={[styles.imageCaption, isMine ? styles.imageCaptionMine : styles.imageCaptionOther]}>
-                        <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.text}</Text>
+                        <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{aiReplyPresentation.content}</Text>
                       </View>
                     ) : (
-                      <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.text}</Text>
+                      <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{aiReplyPresentation.content}</Text>
                     )
                   ) : null}
                   {message.attachmentName && !message.recalled ? (
@@ -2423,11 +2785,13 @@ export function ConversationScreen() {
               >
                 <View style={styles.otherAvatarWrap}>
                   <Image
-                    source={getContactAvatarSource(
-                      route.params.participantRole,
-                      route.params.participantAdminRole,
-                      route.params.participantAvatarUri,
-                    )}
+                    source={(isGroupConversation || isAiSupportConversation) && message.senderAvatarUri
+                      ? getMobileImageSource(message.senderAvatarUri)
+                      : getContactAvatarSource(
+                          isGroupConversation || isAiSupportConversation ? message.senderRole : route.params.participantRole,
+                          isGroupConversation || isAiSupportConversation ? message.senderAdminRole : route.params.participantAdminRole,
+                          isGroupConversation || isAiSupportConversation ? undefined : route.params.participantAvatarUri,
+                        )}
                     style={styles.otherAvatarImg}
                   />
                 </View>
@@ -2436,6 +2800,22 @@ export function ConversationScreen() {
                     {bubble}
                     {actions}
                   </View>
+                  {promptChips.length ? (
+                    <View style={styles.aiSupportPromptList}>
+                      {promptChips.map((prompt) => (
+                        <Pressable
+                          key={prompt.id}
+                          onPress={() => { void send(prompt.label); }}
+                          disabled={sending}
+                          style={[styles.aiSupportPromptButton, sending && styles.aiSupportPromptButtonDisabled]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Hỏi trợ lý: ${prompt.label}`}
+                        >
+                          <Text style={styles.aiSupportPromptText}>{prompt.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
               </View>
             );
@@ -2509,7 +2889,7 @@ export function ConversationScreen() {
             </Pressable>
           </View>
           <Pressable
-            onPress={send}
+            onPress={() => { void send(); }}
             disabled={sending || (!draft.trim() && !selectedAttachment)}
             style={[styles.composerSendBtn, (sending || (!draft.trim() && !selectedAttachment)) && styles.composerSendBtnDisabled]}
             accessibilityRole="button"
@@ -2808,6 +3188,206 @@ export function ConversationScreen() {
             </View>
           </View>
         </Modal>
+        <Modal
+          visible={groupActionDialog !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!groupManagementBusy) {
+              setGroupActionDialog(null);
+              setGroupActionError('');
+            }
+          }}
+        >
+          <View style={styles.groupActionBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                if (!groupManagementBusy) {
+                  setGroupActionDialog(null);
+                  setGroupActionError('');
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Đóng xác nhận"
+            />
+            <View style={styles.groupActionCard}>
+              <View style={[
+                styles.groupActionIcon,
+                groupActionDialog === 'delete' ? styles.groupActionIconDelete : styles.groupActionIconLeave,
+              ]}>
+                {groupActionDialog === 'delete'
+                  ? <Trash2 size={22} color="#DC2626" />
+                  : <LogOut size={22} color="#C2410C" />}
+              </View>
+              <Text style={styles.groupActionTitle}>
+                {groupActionDialog === 'delete' ? 'Xóa nhóm vĩnh viễn?' : 'Rời khỏi nhóm?'}
+              </Text>
+              <Text style={styles.groupActionDescription}>
+                {groupActionDialog === 'delete'
+                  ? 'Toàn bộ tin nhắn và dữ liệu nhóm sẽ bị xóa, không thể khôi phục.'
+                  : 'Bạn sẽ không còn nhận được tin nhắn trong nhóm này.'}
+              </Text>
+              {groupActionError ? (
+                <Text accessibilityRole="alert" style={styles.groupActionError}>{groupActionError}</Text>
+              ) : null}
+              <View style={styles.groupActionButtons}>
+                <Pressable
+                  onPress={() => {
+                    setGroupActionDialog(null);
+                    setGroupActionError('');
+                  }}
+                  disabled={groupManagementBusy}
+                  style={[styles.groupActionButton, styles.groupActionCancel]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.groupActionCancelText}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void runGroupAction(); }}
+                  disabled={groupManagementBusy}
+                  style={[
+                    styles.groupActionButton,
+                    groupActionDialog === 'delete' ? styles.groupActionDelete : styles.groupActionLeave,
+                    groupManagementBusy && styles.groupActionButtonDisabled,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={groupActionDialog === 'delete' ? 'Xác nhận xóa nhóm' : 'Xác nhận rời nhóm'}
+                >
+                  <Text style={styles.groupActionConfirmText}>
+                    {groupManagementBusy
+                      ? 'Đang xử lý…'
+                      : groupActionDialog === 'delete' ? 'Xóa nhóm' : 'Rời nhóm'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={showAddGroupMembers}
+          transparent
+          animationType="slide"
+          onRequestClose={() => {
+            if (!groupManagementBusy) setShowAddGroupMembers(false);
+          }}
+        >
+          <View style={styles.groupManagementBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                if (!groupManagementBusy) setShowAddGroupMembers(false);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Đóng thêm thành viên"
+            />
+            <View style={styles.groupManagementSheet}>
+              <View style={styles.groupManagementHeader}>
+                <View style={styles.groupManagementHeadingCopy}>
+                  <Text style={styles.groupManagementTitle}>Thêm thành viên</Text>
+                  <Text style={styles.groupManagementSubtitle}>
+                    {groupMemberCount || 0} thành viên hiện tại
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setShowAddGroupMembers(false)}
+                  disabled={groupManagementBusy}
+                  style={styles.groupManagementClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Đóng"
+                >
+                  <X size={20} color={colors.muted} />
+                </Pressable>
+              </View>
+              <View style={styles.groupMemberSearch}>
+                <Search size={18} color={colors.muted} />
+                <TextInput
+                  value={groupMemberSearch}
+                  onChangeText={setGroupMemberSearch}
+                  placeholder="Tìm tên, số điện thoại..."
+                  placeholderTextColor="#94A3B8"
+                  style={styles.groupMemberSearchInput}
+                  accessibilityLabel="Tìm thành viên"
+                />
+                {groupMemberSearch ? (
+                  <Pressable onPress={() => setGroupMemberSearch('')} accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm">
+                    <X size={17} color={colors.muted} />
+                  </Pressable>
+                ) : null}
+              </View>
+              <ScrollView
+                style={styles.groupMemberCandidates}
+                contentContainerStyle={styles.groupMemberCandidatesContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {groupDetailsError ? (
+                  <Text style={styles.groupMemberEmpty}>{groupDetailsError}</Text>
+                ) : availableGroupMembers.length ? availableGroupMembers.map((contact) => {
+                  const id = String(contact.participantId);
+                  const selected = selectedGroupMemberIds.includes(id);
+                  return (
+                    <Pressable
+                      key={id}
+                      onPress={() => setSelectedGroupMemberIds((current) => (
+                        selected
+                          ? current.filter((memberId) => memberId !== id)
+                          : [...current, id]
+                      ))}
+                      style={[styles.groupMemberCandidate, selected && styles.groupMemberCandidateSelected]}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Thêm ${contact.name}`}
+                      accessibilityState={{ checked: selected }}
+                    >
+                      <Avatar
+                        name={contact.name}
+                        color="#E8EEF8"
+                        size={42}
+                        imageSource={contact.avatarUri ? getMobileImageSource(contact.avatarUri) : undefined}
+                      />
+                      <View style={styles.groupMemberCandidateCopy}>
+                        <Text numberOfLines={1} style={styles.groupMemberCandidateName}>{contact.name}</Text>
+                        <Text style={styles.groupMemberCandidateRole}>
+                          {groupMemberRoleLabel(contact.participantRole || '', contact.adminRole)}
+                        </Text>
+                      </View>
+                      <View style={[styles.groupMemberCheckbox, selected && styles.groupMemberCheckboxSelected]}>
+                        {selected ? <Check size={15} color="#FFFFFF" strokeWidth={3} /> : null}
+                      </View>
+                    </Pressable>
+                  );
+                }) : (
+                  <Text style={styles.groupMemberEmpty}>Không còn thành viên phù hợp để thêm.</Text>
+                )}
+              </ScrollView>
+              <View style={styles.groupManagementActions}>
+                <Pressable
+                  onPress={() => setShowAddGroupMembers(false)}
+                  disabled={groupManagementBusy}
+                  style={[styles.groupManagementButton, styles.groupManagementCancel]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.groupManagementCancelText}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void addSelectedGroupMembers(); }}
+                  disabled={!selectedGroupMemberIds.length || groupManagementBusy}
+                  style={[
+                    styles.groupManagementButton,
+                    styles.groupManagementConfirm,
+                    (!selectedGroupMemberIds.length || groupManagementBusy) && styles.groupManagementButtonDisabled,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Thêm ${selectedGroupMemberIds.length} thành viên`}
+                >
+                  <Text style={styles.groupManagementConfirmText}>
+                    {groupManagementBusy ? 'Đang thêm...' : `Thêm${selectedGroupMemberIds.length ? ` (${selectedGroupMemberIds.length})` : ''}`}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <Modal visible={showInfo} transparent animationType="fade" onRequestClose={() => setShowInfo(false)}>
           <View style={styles.infoBackdrop}>
             <Pressable
@@ -2830,6 +3410,32 @@ export function ConversationScreen() {
               <Text style={styles.infoName}>{infoDisplayName}</Text>
               <Text style={styles.infoRole}>{contactRole}</Text>
               <Text style={styles.infoStatus}>{contactStatus}</Text>
+              {isGroupConversation ? (
+                <View style={styles.groupInfoMembers}>
+                  <Text style={styles.groupInfoHeading}>Thành viên nhóm</Text>
+                  {groupDetailsError ? (
+                    <Text style={styles.groupInfoEmpty}>{groupDetailsError}</Text>
+                  ) : groupDetails?.groupParticipants?.length ? (
+                    <ScrollView style={styles.groupInfoList} nestedScrollEnabled>
+                      {groupDetails.groupParticipants.map((participant) => (
+                        <View key={participant.userId} style={styles.groupInfoMember}>
+                          <Avatar name={participant.name} color="#E8EEF8" size={34} />
+                          <View style={styles.groupInfoMemberCopy}>
+                            <Text numberOfLines={1} style={styles.groupInfoMemberName}>{participant.name}</Text>
+                            <Text style={styles.groupInfoMemberRole}>
+                              {participant.userId === groupDetails.groupCreatorId
+                                ? 'Người tạo nhóm'
+                                : groupMemberRoleLabel(participant.role)}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <Text style={styles.groupInfoEmpty}>Đang tải danh sách thành viên…</Text>
+                  )}
+                </View>
+              ) : null}
               {route.params.participantRole === 'teacher' ? (
                 <View style={styles.teacherDetails}>
                   {teacherCard.loading ? (
@@ -3143,7 +3749,23 @@ const styles = StyleSheet.create({
   chatHeaderCopy: { flex: 1, minWidth: 0, gap: 2 },
   chatHeaderName: { color: '#1E293B', fontSize: typography.body, fontWeight: '700' },
   chatHeaderStatus: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '500' },
+  aiSupportStatusCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA' },
+  aiSupportStatusCopy: { flex: 1, minWidth: 0, gap: 2 },
+  aiSupportStatusTitle: { color: '#9A3412', fontSize: typography.caption, fontWeight: '800' },
+  aiSupportStatusMessage: { color: '#7C2D12', fontSize: typography.micro, lineHeight: 16 },
+  aiSupportError: { color: '#B91C1C', fontSize: typography.micro, fontWeight: '600' },
+  aiSupportAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#C2410C' },
+  aiSupportActionDisabled: { opacity: 0.6 },
+  aiSupportActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
+  aiSupportPromptList: { alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingHorizontal: 4, paddingTop: spacing.xs },
+  aiSupportPromptButton: { maxWidth: '100%', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  aiSupportPromptButtonDisabled: { opacity: 0.55 },
+  aiSupportPromptText: { color: '#065F46', fontSize: typography.micro, fontWeight: '700' },
   chatHeaderAction: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
+  groupAddHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#EFF6FF' },
+  groupDeleteHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FEF2F2' },
+  groupLeaveHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFF7ED' },
+  groupActionDisabled: { opacity: 0.5 },
   meetHeaderAction: { width: 34, height: 34, borderRadius: 10 },
   meetHeaderActionLive: { backgroundColor: '#DC2626' },
   meetHeaderActionUpcoming: { backgroundColor: '#F1F5F9', opacity: 0.55 },
@@ -3224,9 +3846,12 @@ const styles = StyleSheet.create({
   filterText: { color: '#475569', fontSize: typography.caption, fontWeight: '600' },
   filterTextActive: { color: '#FFFFFF', fontWeight: '700' },
   contactListCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', marginTop: spacing.xs },
-  contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 12, backgroundColor: '#FFFFFF' },
+  contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 6, backgroundColor: '#FFFFFF' },
+  contactRowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4, gap: 10, borderRadius: radius.md },
   contactRowPressed: { backgroundColor: '#F8FAFC' },
   contactRowDivider: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  contactPinButton: { width: 36, height: 36, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: '#F8FAFC' },
+  contactPinButtonActive: { backgroundColor: '#EFF6FF' },
   avatarContainer: { width: 48, height: 48, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   avatarRing: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: 44, height: 44, borderRadius: 22 },
@@ -3327,6 +3952,8 @@ const styles = StyleSheet.create({
   stickerBubble: { padding: 0, backgroundColor: 'transparent', borderWidth: 0 },
   chatSticker: { width: 120, height: 120 },
   pinnedBubble: { borderWidth: 1.5, borderColor: '#93C5FD' },
+  messagePinnedLabel: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: '#DBEAFE' },
+  messagePinnedLabelText: { color: '#1D4ED8', fontSize: 10, fontWeight: '700' },
   pinnedBannerCard: { marginHorizontal: 12, marginTop: 8, marginBottom: 4, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#BAE6FD', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
   pinnedBannerAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: '#3B82F6' },
   pinnedBannerBody: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, paddingLeft: 4 },
@@ -3409,10 +4036,60 @@ const styles = StyleSheet.create({
   messageImageAttachment: { width: 180, height: 150, borderRadius: radius.md },
   chatAttachment: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   infoBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, backgroundColor: colors.overlay },
-  infoCard: { width: '100%', maxWidth: 360, alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface },
+  infoCard: { width: '100%', maxWidth: 360, maxHeight: '86%', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface },
   infoName: { color: colors.ink, fontSize: typography.heading, fontWeight: '800', textAlign: 'center' },
   infoRole: { color: colors.brand, fontSize: typography.small, fontWeight: '700', textTransform: 'capitalize' },
   infoStatus: { color: colors.muted, fontSize: typography.caption },
+  groupInfoMembers: { width: '100%', gap: spacing.xs, marginTop: spacing.sm },
+  groupInfoHeading: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  groupInfoList: { maxHeight: 210, width: '100%' },
+  groupInfoMember: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  groupInfoMemberCopy: { flex: 1, minWidth: 0, gap: 2 },
+  groupInfoMemberName: { color: colors.ink, fontSize: typography.caption, fontWeight: '700' },
+  groupInfoMemberRole: { color: colors.muted, fontSize: typography.micro },
+  groupInfoEmpty: { color: colors.muted, fontSize: typography.micro, lineHeight: 18 },
+  groupActionBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: 'rgba(15, 23, 42, 0.56)' },
+  groupActionCard: { width: '100%', maxWidth: 360, alignItems: 'center', gap: spacing.md, padding: spacing.xl, borderRadius: 24, backgroundColor: colors.surface },
+  groupActionIcon: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 27 },
+  groupActionIconLeave: { backgroundColor: '#FFF7ED' },
+  groupActionIconDelete: { backgroundColor: '#FEF2F2' },
+  groupActionTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '800', textAlign: 'center' },
+  groupActionDescription: { color: colors.muted, fontSize: typography.caption, lineHeight: 20, textAlign: 'center' },
+  groupActionError: { width: '100%', padding: spacing.sm, borderRadius: 10, backgroundColor: '#FEF2F2', color: '#B91C1C', fontSize: typography.micro, lineHeight: 18, textAlign: 'center' },
+  groupActionButtons: { width: '100%', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  groupActionButton: { minHeight: 46, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
+  groupActionCancel: { backgroundColor: '#F1F5F9' },
+  groupActionLeave: { backgroundColor: '#EA580C' },
+  groupActionDelete: { backgroundColor: '#DC2626' },
+  groupActionButtonDisabled: { opacity: 0.55 },
+  groupActionCancelText: { color: colors.ink, fontSize: typography.caption, fontWeight: '700' },
+  groupActionConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
+  groupManagementBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.48)' },
+  groupManagementSheet: { maxHeight: '88%', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xl, borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: colors.surface },
+  groupManagementHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  groupManagementHeadingCopy: { flex: 1, gap: 3 },
+  groupManagementTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' },
+  groupManagementSubtitle: { color: colors.muted, fontSize: typography.micro },
+  groupManagementClose: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: '#F1F5F9' },
+  groupMemberSearch: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: '#F8FAFC' },
+  groupMemberSearchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: typography.caption, paddingVertical: spacing.sm },
+  groupMemberCandidates: { flexGrow: 0, minHeight: 90, maxHeight: 360 },
+  groupMemberCandidatesContent: { gap: spacing.xs, paddingVertical: spacing.xs },
+  groupMemberCandidate: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: 15, backgroundColor: colors.surface },
+  groupMemberCandidateSelected: { borderColor: '#93C5FD', backgroundColor: '#EFF6FF' },
+  groupMemberCandidateCopy: { flex: 1, minWidth: 0, gap: 3 },
+  groupMemberCandidateName: { color: colors.ink, fontSize: typography.caption, fontWeight: '700' },
+  groupMemberCandidateRole: { color: colors.muted, fontSize: typography.micro },
+  groupMemberCheckbox: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 7, backgroundColor: colors.surface },
+  groupMemberCheckboxSelected: { borderColor: colors.blue, backgroundColor: colors.blue },
+  groupMemberEmpty: { paddingVertical: spacing.xl, color: colors.muted, fontSize: typography.caption, textAlign: 'center' },
+  groupManagementActions: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
+  groupManagementButton: { minHeight: 48, flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  groupManagementCancel: { backgroundColor: '#F1F5F9' },
+  groupManagementConfirm: { backgroundColor: colors.brand },
+  groupManagementButtonDisabled: { opacity: 0.45 },
+  groupManagementCancelText: { color: colors.ink, fontSize: typography.caption, fontWeight: '700' },
+  groupManagementConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   teacherDetails: { width: '100%', gap: spacing.xs, marginTop: spacing.xs },
   teacherDetailRow: { flexDirection: 'row', gap: spacing.xs },
   teacherDetail: { flex: 1, minHeight: 58, justifyContent: 'center', gap: 3, padding: spacing.sm },

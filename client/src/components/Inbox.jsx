@@ -2434,7 +2434,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { id: 'all', label: 'Tất cả' },
-                { id: 'teacher', label: 'Giảng viên' },
+                currentUserRole === 'teacher'
+                  ? { id: 'student', label: 'Học viên' }
+                  : { id: 'teacher', label: 'Giảng viên' },
                 { id: 'group', label: 'Nhóm' }
               ].map(tab => (
                 <button

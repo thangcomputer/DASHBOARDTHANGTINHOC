@@ -1154,6 +1154,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('group:leave', (payload) => {
+    const rawId = typeof payload === 'object' && payload?.groupId ? payload.groupId : payload;
+    const groupId = String(rawId || '').trim();
+    if (!socket.user || !groupId || !mongoose.Types.ObjectId.isValid(groupId)) return;
+    socket.leave(`group_${groupId}`);
+  });
+
   // ── Client xác nhận nhận được exam:unlocked ──
   socket.on('exam:unlock_ack', ({ studentId }) => {
     console.log(`✅ [ACK] Học viên ${studentId} đã nhận thông báo unlock thi`);

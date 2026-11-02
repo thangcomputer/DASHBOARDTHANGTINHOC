@@ -63,6 +63,7 @@ export function mapFeedPost(raw: Raw): DemoFeedPost {
     time: relTime(raw.createdAt),
     content: String(raw.content || ''),
     audience: AUDIENCE_LABEL[String(raw.visibility)] || 'Công khai',
+    isPinned: raw.isPinned === true,
     mediaType: images.length ? 'image' : undefined,
     images,
     reactionCount: Number(raw.reactionsCount ?? raw.likesCount ?? 0),
@@ -142,3 +143,39 @@ export const commentFeedPost = (id: string, content: string, parentId?: string) 
 export const deleteFeedComment = (postId: string, commentId: string) => unwrap(
   mobileApiRequest(`/feed/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' }),
 );
+
+export type FeedReportReason = 'spam' | 'harassment' | 'inappropriate' | 'misinformation' | 'other';
+export type FeedPostReport = {
+  id: string;
+  postId: string;
+  reporterName: string;
+  reporterRole: string;
+  reason: FeedReportReason;
+  details: string;
+  createdAt: string;
+  post: { authorName: string; content: string; visibility: string } | null;
+};
+
+export async function reportFeedPost(id: string, reason: FeedReportReason, details = '') {
+  return mobileApiRequest<{ success: boolean; message?: string }>(`/feed/${encodeURIComponent(id)}/reports`, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ reason, details }),
+  });
+}
+
+export async function toggleFeedPostPin(id: string) {
+  const response = await mobileApiRequest<{ data?: Raw }>(`/feed/${encodeURIComponent(id)}/pin`, { method: 'POST' });
+  if (!response.data) throw new Error('Máy chủ không trả về trạng thái ghim bài viết.');
+  return mapFeedPost(response.data);
+}
+
+export async function fetchFeedReports(): Promise<FeedPostReport[]> {
+  const response = await mobileApiRequest<{ data?: FeedPostReport[] }>('/feed/reports');
+  if (!Array.isArray(response.data)) throw new Error('Phản hồi danh sách báo cáo không hợp lệ.');
+  return response.data;
+}
+
+export async function resolveFeedReport(id: string) {
+  return mobileApiRequest<{ success: boolean }>(`/feed/reports/${encodeURIComponent(id)}/resolve`, { method: 'POST' });
+}

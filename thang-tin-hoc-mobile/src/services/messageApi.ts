@@ -26,6 +26,16 @@ type RawMessage = {
   content?: string;
   senderId?: string;
   senderName?: string;
+  senderRole?: string;
+  senderAdminRole?: string | null;
+  senderAvatar?: string;
+  sender?: {
+    id?: string;
+    role?: string;
+    adminRole?: string | null;
+    displayName?: string;
+    avatar?: string;
+  };
   createdAt?: string;
   isRead?: boolean;
   isRecalled?: boolean;
@@ -48,9 +58,14 @@ type RawGroup = {
   _id?: string;
   name?: string;
   participants?: Array<{ userId?: string; name?: string; role?: string }>;
+  createdBy?: { userId?: string };
   updatedAt?: string;
   lastMessage?: { content?: string; senderName?: string; sentAt?: string };
   unreadCount?: number;
+};
+
+type RawPinnedConversations = {
+  data?: string[];
 };
 
 const MOJIBAKE_RE = /\u00c3.|\u00e1\u00ba|\u00e1\u00bb|\u00c4|\u00c6\u00b0/;
@@ -234,8 +249,14 @@ function mapMessage(raw: RawMessage, user: DemoUser, index: number): ChatMessage
       : content,
     time: formatMessageTime(raw.createdAt),
     ...(timestampMs !== undefined ? { timestampMs } : {}),
-    mine: String(raw.senderId || '') === user.id,
-    senderName: text(raw.senderName),
+    mine: String(raw.senderId || raw.sender?.id || '') === user.id,
+    senderId: text(raw.senderId || raw.sender?.id),
+    senderName: text(raw.senderName || raw.sender?.displayName),
+    senderRole: text(raw.senderRole || raw.sender?.role),
+    senderAdminRole: raw.senderAdminRole || raw.sender?.adminRole || null,
+    ...(text(raw.senderAvatar || raw.sender?.avatar)
+      ? { senderAvatarUri: resolveMobilePublicUrl(text(raw.senderAvatar || raw.sender?.avatar)) }
+      : {}),
     reactions,
     reaction: getCurrentUserReaction(reactions, user.id),
     pinned: Boolean(raw.isPinned),
@@ -265,14 +286,19 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
   if (!user.id || user.previewMode) {
     throw new Error('Danh bạ cần phiên đăng nhập thật. Vui lòng đăng nhập bằng tài khoản của bạn.');
   }
-  const [contactsPayload, conversationsPayload, groupsPayload] = await Promise.all([
+  const [contactsPayload, conversationsPayload, groupsPayload, pinnedPayload] = await Promise.all([
     mobileApiRequest<{ data?: RawContact[] }>('/messages/contacts'),
     mobileApiRequest<{ data?: RawConversation[] }>(`/messages/conversations/${encodeURIComponent(user.id)}`),
     mobileApiRequest<{ data?: RawGroup[] }>(`/messages/groups/user/${encodeURIComponent(user.id)}`),
+    mobileApiRequest<RawPinnedConversations>('/messages/pinned-conversations'),
   ]);
-  if (!Array.isArray(contactsPayload.data) || !Array.isArray(conversationsPayload.data) || !Array.isArray(groupsPayload.data)) {
+  if (!Array.isArray(contactsPayload.data)
+    || !Array.isArray(conversationsPayload.data)
+    || !Array.isArray(groupsPayload.data)
+    || !Array.isArray(pinnedPayload.data)) {
     throw new Error('Máy chủ trả về danh bạ, cuộc trò chuyện hoặc nhóm không hợp lệ.');
   }
+  const pinnedConversations = new Set(pinnedPayload.data.map(String));
 
   const conversationByContact = new Map(
     conversationsPayload.data
@@ -287,13 +313,15 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
       const adminRole = contact.adminRole || null;
       const history = conversationByContact.get(String(contact.id));
       const cat = contactCategory(rawRole, adminRole);
+      const conversationId = history?.conversationId || buildDirectConversationId(user, String(contact.id), rawRole);
       return {
-        id: history?.conversationId || buildDirectConversationId(user, String(contact.id), rawRole),
+        id: conversationId,
         name: text(contact.name, 'Người dùng'),
         role: roleLabel(rawRole, adminRole),
         adminRole,
         category: cat,
         roleBadge: roleBadge(rawRole, adminRole),
+        isPinned: pinnedConversations.has(conversationId),
         lastMessage: text(history?.lastMessage?.content, 'Bắt đầu cuộc trò chuyện'),
         time: history ? formatMessageTime(history.lastMessage?.createdAt) : '',
         lastActivityAt: timestamp(history?.lastMessage?.createdAt),
@@ -317,14 +345,24 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
       if (typeof group.unreadCount !== 'number' || !Number.isInteger(group.unreadCount) || group.unreadCount < 0) {
         throw new Error('Máy chủ trả về số tin nhắn chưa đọc của nhóm không hợp lệ.');
       }
+      const conversationId = `group_${group._id}`;
       return {
-        id: `group_${group._id}`,
+        id: conversationId,
         name: text(group.name, 'Nhóm chat'),
         role: `Nhóm chat · ${(group.participants || []).length} thành viên`,
         category: 'group' as const,
         roleBadge: 'GR',
+        isPinned: pinnedConversations.has(conversationId),
         participantId: String(group._id),
         participantRole: 'group',
+        groupCreatorId: text(group.createdBy?.userId),
+        groupParticipants: (group.participants || [])
+          .filter((participant) => participant.userId && participant.name && participant.role)
+          .map((participant) => ({
+            userId: String(participant.userId),
+            name: String(participant.name),
+            role: String(participant.role),
+          })),
         lastMessage: text(group.lastMessage?.content, 'Bắt đầu cuộc trò chuyện nhóm'),
         time: formatMessageTime(lastActivity),
         lastActivityAt: timestamp(lastActivity),
@@ -400,6 +438,32 @@ export async function createMessageGroup(
     unread: 0,
     color: '#EF4444',
   };
+}
+
+export async function addMessageGroupMembers(
+  groupId: string,
+  members: Conversation[],
+) {
+  const participants = members.map((member) => {
+    if (!member.participantId || !member.participantRole) {
+      throw new Error(`Không thể thêm ${member.name} vào nhóm vì thiếu thông tin tài khoản.`);
+    }
+    return { userId: member.participantId, name: member.name, role: member.participantRole };
+  });
+  if (!participants.length) throw new Error('Vui lòng chọn ít nhất một thành viên.');
+  await mobileApiRequest(`/messages/groups/${encodeURIComponent(groupId)}/members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participants }),
+  });
+}
+
+export async function leaveMessageGroup(groupId: string) {
+  await mobileApiRequest(`/messages/groups/${encodeURIComponent(groupId)}/leave`, { method: 'POST' });
+}
+
+export async function deleteMessageGroup(groupId: string) {
+  await mobileApiRequest(`/messages/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
 }
 
 export function mapLiveChatMessage(raw: Record<string, unknown>, user: DemoUser): ChatMessage {
@@ -484,5 +548,13 @@ export async function togglePinnedChatMessage(conversationId: string, messageId:
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messageId }),
+  });
+}
+
+export async function setPinnedConversation(conversationId: string, pinned: boolean) {
+  await mobileApiRequest(`/messages/pin-conversation/${encodeURIComponent(conversationId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pinned }),
   });
 }

@@ -11,7 +11,7 @@ import * as Notifications from 'expo-notifications';
 import Svg, { Path } from 'react-native-svg';
 import {
   BookOpen, Building2, CalendarDays, CheckSquare, Clapperboard, FileBox, FileText, GraduationCap,
-  House, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
+  Headphones, House, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,7 @@ import {
   TeacherQuizzesScreen, TeacherTrainingScreen, TuitionScreen,
 } from '../screens/ParityScreens';
 import { TeacherFinanceScreen } from '../screens/TeacherFinanceScreen';
+import { SupportEntryScreen } from '../screens/SupportEntryScreen';
 import {
   CertPrepCatalogScreen, CertPrepLevelScreen, CertPrepPlayerScreen, CertPrepResultScreen,
 } from '../screens/CertPrepScreens';
@@ -514,21 +515,24 @@ function PersistentTabBar({
   }, [visibility]);
   const items = isTeacher
     ? [
-      { name: 'Home' as const, label: 'Tổng quan', icon: House },
-      { name: 'Schedule' as const, label: 'Lịch dạy', icon: CalendarDays },
-      { name: 'Messages' as const, label: 'Hộp thư', icon: MessageCircle },
-      { name: 'Finance' as const, label: 'Tài chính', icon: WalletCards },
-      { name: 'Profile' as const, label: 'Hồ sơ', icon: UserRound },
+      { name: 'Schedule' as const, label: 'Lịch dạy', shortLabel: 'Lịch', icon: CalendarDays },
+      { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
+      { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
+      { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
+      { name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: WalletCards },
+      { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
+      { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
     ]
     : [
-      { name: 'Schedule' as const, label: 'Lịch học', icon: CalendarDays },
-      { name: 'Messages' as const, label: 'Hộp thư', icon: MessageCircle },
-      { name: 'Home' as const, label: 'Trang chủ', icon: House },
-      { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', icon: Clapperboard },
-      { name: 'Profile' as const, label: 'Cá nhân', icon: UserRound },
+      { name: 'Schedule' as const, label: 'Lịch học', shortLabel: 'Lịch', icon: CalendarDays },
+      { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
+      { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
+      { name: 'Home' as const, label: 'Trang chủ', shortLabel: 'Trang chủ', icon: House },
+      { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', shortLabel: 'Luyện tập', icon: Clapperboard },
+      { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
+      { name: 'Profile' as const, label: 'Cá nhân', shortLabel: 'Cá nhân', icon: UserRound },
     ];
-  const tabOrder = ['Schedule', 'Messages', 'Home', 'Finance', 'Students', 'CourseVideos', 'Profile'];
-  const orderedItems = [...items].sort((left, right) => tabOrder.indexOf(left.name) - tabOrder.indexOf(right.name));
+  const orderedItems = items;
   const barHeight = 76 + insets.bottom;
   return (
     <Animated.View
@@ -547,7 +551,7 @@ function PersistentTabBar({
       <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
         <Path d="M0 26 C18 8 45 8 62 25 C78 40 77 82 106 86 C132 90 148 79 160 42 C170 9 183 0 200 0 C217 0 230 9 240 42 C252 79 268 90 294 86 C323 82 322 40 338 25 C355 8 382 8 400 26 V100 H0 Z" fill={colors.canvas} />
       </Svg>
-      {orderedItems.map(({ name, label, icon: Icon }) => {
+      {orderedItems.map(({ name, label, shortLabel, icon: Icon }) => {
         const selected = name === activeTab;
         const badgeCount = name === 'Messages'
           ? unreadConversationCount
@@ -558,12 +562,12 @@ function PersistentTabBar({
             onPress={() => {
                 navigationRef.navigate('MainTabs', { screen: name });
             }}
-            style={[styles.persistentTabItem, selected && name === 'Home' && styles.persistentHomeItem]}
+            style={styles.persistentTabItem}
             accessibilityRole="button"
             accessibilityLabel={label}
           >
             {selected && name === 'Home' ? (
-              <View style={styles.homeArcButton}><House size={23} color="#FFFFFF" strokeWidth={2.5} /></View>
+              <View style={[styles.homeArcButton, styles.persistentHomeIcon]}><House size={23} color="#FFFFFF" strokeWidth={2.5} /></View>
             ) : (
               <View style={styles.persistentTabIconWrap}>
                 <Icon size={22} color={selected ? colors.brand : colors.muted} strokeWidth={2.2} />
@@ -572,6 +576,12 @@ function PersistentTabBar({
                 ) : null}
               </View>
             )}
+            <Text
+              numberOfLines={1}
+              style={[styles.persistentTabLabel, selected && styles.persistentTabLabelActive, selected && name === 'Home' && styles.persistentHomeLabel]}
+            >
+              {shortLabel}
+            </Text>
           </Pressable>
         );
       })}
@@ -585,6 +595,7 @@ type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVi
   | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance';
 
 type MenuEntry = { label: string; destination: MenuDestination; icon: LucideIcon };
+type MenuSection = { label: string; items: MenuEntry[] };
 
 function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   const { user } = useAuth();
@@ -604,32 +615,58 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   useEffect(() => {
     setMenuTop((currentTop) => Math.max(minMenuTop, Math.min(maxMenuTop, currentTop)));
   }, [maxMenuTop, minMenuTop]);
-  const menuItems: MenuEntry[] = isTeacher
+  const menuSections: MenuSection[] = isTeacher
     ? [
-      { label: 'Tổng quan', destination: 'Home', icon: House },
-      { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-      { label: 'Học viên', destination: 'Students', icon: Users },
-      { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
-      { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
-      { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
-      { label: 'Tài chính', destination: 'TeacherFinance', icon: WalletCards },
-      { label: 'Bảng tin', destination: 'Feed', icon: Radio },
-      { label: 'Tin tức', destination: 'News', icon: Newspaper },
-      { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
+      {
+        label: 'KHÔNG GIAN LÀM VIỆC',
+        items: [
+          { label: 'Tổng quan', destination: 'Home', icon: House },
+          { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+          { label: 'Học viên', destination: 'Students', icon: Users },
+          { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
+        ],
+      },
+      {
+        label: 'QUẢN LÝ ĐÀO TẠO',
+        items: [
+          { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
+          { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
+          { label: 'Tài chính', destination: 'TeacherFinance', icon: WalletCards },
+        ],
+      },
+      {
+        label: 'THÔNG TIN',
+        items: [
+          { label: 'Bảng tin', destination: 'Feed', icon: Radio },
+          { label: 'Tin tức', destination: 'News', icon: Newspaper },
+          { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
+        ],
+      },
     ]
     : [
-      { label: 'Tổng quan', destination: 'Home', icon: House },
-      { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-      { label: 'Luyện tập kỹ năng', destination: 'CourseVideos', icon: Clapperboard },
-      { label: 'Lịch học', destination: 'Schedule', icon: CalendarDays },
-      { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
-      { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
-      { label: 'Bảng tin', destination: 'Feed', icon: Radio },
-      { label: 'Tin tức', destination: 'News', icon: Newspaper },
-      { label: 'Đánh giá giảng viên', destination: 'Evaluations', icon: Star },
-      { label: 'Thông tin học phí', destination: 'Tuition', icon: WalletCards },
-      { label: 'Liên hệ Trung tâm', destination: 'CenterInfo', icon: Building2 },
+      {
+        label: 'HỌC TẬP',
+        items: [
+          { label: 'Tổng quan', destination: 'Home', icon: House },
+          { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+          { label: 'Luyện tập kỹ năng', destination: 'CourseVideos', icon: Clapperboard },
+          { label: 'Lịch học', destination: 'Schedule', icon: CalendarDays },
+          { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
+          { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
+        ],
+      },
+      {
+        label: 'KẾT NỐI & HỖ TRỢ',
+        items: [
+          { label: 'Bảng tin', destination: 'Feed', icon: Radio },
+          { label: 'Tin tức', destination: 'News', icon: Newspaper },
+          { label: 'Đánh giá giảng viên', destination: 'Evaluations', icon: Star },
+          { label: 'Thông tin học phí', destination: 'Tuition', icon: WalletCards },
+          { label: 'Liên hệ Trung tâm', destination: 'CenterInfo', icon: Building2 },
+        ],
+      },
     ];
+  const menuItems = menuSections.flatMap((section) => section.items);
   useEffect(() => {
     let active = true;
     getMobileSoundEnabled()
@@ -647,6 +684,8 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       const activeItem = menuItems.find((item) => item.destination === currentRoute);
       const activeAlias = isTeacher && currentRoute === 'Assignments'
         ? 'TeacherQuizzes'
+        : currentRoute === 'Conversation' || currentRoute === 'CallHistory'
+          ? 'Messages'
         : currentRoute === 'Profile'
           ? 'Profile'
           : null;
@@ -668,12 +707,11 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       navigationRef.navigate('Students');
       return;
     }
-    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Profile'].includes(destination)) {
+    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile'].includes(destination)) {
       navigationRef.navigate('MainTabs', { screen: destination as keyof MainTabsParamList });
       return;
     }
-    if (destination === 'Feed') navigationRef.navigate('Feed');
-    else if (destination === 'Assignments') navigationRef.navigate('Assignments');
+    if (destination === 'Assignments') navigationRef.navigate('Assignments');
     else if (destination === 'Materials') navigationRef.navigate('Materials');
     else if (destination === 'StudentExam') navigationRef.navigate('StudentExam');
     else if (destination === 'StudentLearning') navigationRef.navigate('StudentLearning');
@@ -715,37 +753,57 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <View style={styles.drawerOverlay}>
           <Pressable style={styles.drawerDismiss} onPress={() => setMenuVisible(false)} accessibilityLabel="Đóng danh mục" />
-          <View style={styles.drawer}>
+          <View style={[styles.drawer, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.sm }]}>
             <View style={styles.drawerHeader}>
-              <View style={styles.drawerAvatar}>
-                {user?.avatar
-                  ? <Image source={getMobileImageSource(resolveMobilePublicUrl(user.avatar))} style={styles.drawerAvatarImage} />
-                  : <UserRound size={22} color="#FFFFFF" />}
-              </View>
-              <View style={styles.drawerIdentity}>
-                <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
-                <Text style={styles.drawerRole}>{isTeacher ? 'Giảng viên' : 'Học viên'}</Text>
-              </View>
-              <Pressable onPress={() => setMenuVisible(false)} style={styles.drawerClose} accessibilityRole="button" accessibilityLabel="Đóng menu">
-                <X size={19} color="#CBD5E1" />
-              </Pressable>
-            </View>
-            <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems}>
-              {menuItems.map(({ label, destination, icon: Icon }) => (
-                <Pressable
-                  key={destination}
-                  onPress={() => openDestination(destination)}
-                  style={({ pressed }) => [
-                    styles.drawerItem,
-                    activeDestination === destination && styles.drawerItemActive,
-                    pressed && styles.drawerItemPressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: activeDestination === destination }}
-                >
-                  <Icon size={17} color={activeDestination === destination ? '#FFFFFF' : '#C7D2FE'} />
-                  <Text style={[styles.drawerItemText, activeDestination === destination && styles.drawerItemTextActive]}>{label}</Text>
+              <View style={styles.drawerProfileCard}>
+                <View style={styles.drawerAvatar}>
+                  {user?.avatar
+                    ? <Image source={getMobileImageSource(resolveMobilePublicUrl(user.avatar))} style={styles.drawerAvatarImage} />
+                    : <UserRound size={23} color="#FFFFFF" />}
+                </View>
+                <View style={styles.drawerIdentity}>
+                  <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
+                  <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
+                    <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
+                      {isTeacher ? 'Giảng viên' : 'Học viên'}
+                    </Text>
+                  </View>
+                </View>
+                <Pressable onPress={() => setMenuVisible(false)} style={styles.drawerClose} accessibilityRole="button" accessibilityLabel="Đóng menu">
+                  <X size={19} color="#CBD5E1" />
                 </Pressable>
+              </View>
+            </View>
+            <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
+              {menuSections.map((section) => (
+                <View key={section.label} style={styles.drawerSection}>
+                  <Text style={styles.drawerSectionLabel}>{section.label}</Text>
+                  <View style={styles.drawerSectionItems}>
+                    {section.items.map(({ label, destination, icon: Icon }) => {
+                      const selected = activeDestination === destination;
+                      return (
+                        <Pressable
+                          key={destination}
+                          onPress={() => openDestination(destination)}
+                          style={({ pressed }) => [
+                            styles.drawerItem,
+                            selected && styles.drawerItemActive,
+                            pressed && styles.drawerItemPressed,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel={label}
+                          accessibilityState={{ selected }}
+                        >
+                          <View style={[styles.drawerItemIcon, selected && styles.drawerItemIconActive]}>
+                            <Icon size={18} color={selected ? '#FFFFFF' : '#A8B6CC'} strokeWidth={2} />
+                          </View>
+                          <Text style={[styles.drawerItemText, selected && styles.drawerItemTextActive]}>{label}</Text>
+                          {selected ? <View style={styles.drawerItemSelectedMark} /> : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
               ))}
             </ScrollView>
             <View style={styles.drawerFooter}>
@@ -755,15 +813,19 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                 accessibilityRole="button"
                 accessibilityState={{ selected: activeDestination === 'Profile' }}
               >
-                <UserRound size={17} color={activeDestination === 'Profile' ? '#FFFFFF' : '#C7D2FE'} />
+                <View style={[styles.drawerItemIcon, activeDestination === 'Profile' && styles.drawerItemIconActive]}>
+                  <UserRound size={18} color={activeDestination === 'Profile' ? '#FFFFFF' : '#A8B6CC'} />
+                </View>
                 <Text style={[styles.drawerItemText, activeDestination === 'Profile' && styles.drawerItemTextActive]}>Hồ sơ</Text>
               </Pressable>
-              <Pressable onPress={() => { setMenuVisible(false); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button">
-                <LogOut size={17} color="#C7D2FE" />
+              <Pressable onPress={() => { setMenuVisible(false); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
+                <View style={styles.drawerItemIcon}><LogOut size={18} color="#FCA5A5" /></View>
                 <Text style={styles.drawerItemText}>Đăng xuất</Text>
               </Pressable>
-              <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityState={{ checked: !soundEnabled }}>
-                {soundEnabled ? <Volume2 size={17} color="#C7D2FE" /> : <VolumeX size={17} color="#C7D2FE" />}
+              <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'} accessibilityState={{ checked: soundEnabled }}>
+                <View style={styles.drawerItemIcon}>
+                  {soundEnabled ? <Volume2 size={18} color="#A8B6CC" /> : <VolumeX size={18} color="#A8B6CC" />}
+                </View>
                 <Text style={styles.drawerItemText}>{soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}</Text>
               </Pressable>
             </View>
@@ -799,9 +861,11 @@ function MainTabs() {
   const teacherTabPositions: Record<string, number> = {
     Schedule: 0,
     Messages: 1,
-    Home: 2,
-    Finance: 3,
-    Profile: 4,
+    Feed: 2,
+    Home: 3,
+    Finance: 4,
+    Support: 5,
+    Profile: 6,
   };
   const refreshTabBadges = useCallback(async () => {
     if (!user) {
@@ -919,6 +983,7 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
+      initialRouteName={isTeacher ? 'Home' : 'Schedule'}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
@@ -953,6 +1018,7 @@ function MainTabs() {
             }),
           }],
         },
+        tabBarIconStyle: { height: 54 },
         tabBarBackground: () => (
           <Svg
             width="100%"
@@ -967,38 +1033,61 @@ function MainTabs() {
         tabBarItemStyle: isTeacher
           ? {
             position: 'absolute',
-            left: `${(teacherTabPositions[route.name] ?? 0) * 20}%`,
-            width: '20%',
+            left: `${(teacherTabPositions[route.name] ?? 0) * (100 / 7)}%`,
+            width: `${100 / 7}%`,
             height: '100%',
-            ...(route.name === 'Home' ? { transform: [{ translateY: -12 }] } : {}),
           }
-          : route.name === 'Home'
-            ? { transform: [{ translateY: -12 }] }
-            : undefined,
+          : undefined,
         tabBarIcon: ({ color, size }) => {
+          const label = route.name === 'Schedule'
+            ? isTeacher ? 'Lịch dạy' : 'Lịch'
+            : route.name === 'Messages'
+              ? 'Tin nhắn'
+              : route.name === 'Feed'
+                ? 'Bảng tin'
+                : route.name === 'Home'
+                  ? isTeacher ? 'Tổng quan' : 'Trang chủ'
+                  : route.name === 'Finance'
+                    ? 'Tài chính'
+                    : route.name === 'CourseVideos'
+                      ? 'Luyện tập'
+                      : route.name === 'Support'
+                        ? 'Hỗ trợ'
+                        : isTeacher ? 'Hồ sơ' : 'Cá nhân';
           if (route.name === 'Home') {
             return (
-              <View style={styles.homeArcButton}>
-                <House size={23} color="#FFFFFF" strokeWidth={2.5} />
+              <View style={styles.tabBarIconContent}>
+                <View style={[styles.homeArcButton, styles.tabBarHomeIcon]}>
+                  <House size={23} color="#FFFFFF" strokeWidth={2.5} />
+                </View>
+                <Text numberOfLines={1} style={[styles.tabBarLabel, styles.tabBarHomeLabel, { color }]}>{label}</Text>
               </View>
             );
           }
           const common = { size: size - 2, color, strokeWidth: 2.2 };
+          let icon;
           switch (route.name) {
-            case 'Schedule': return <CalendarDays {...common} />;
-            case 'Messages': return <MessageCircle {...common} />;
-            case 'CourseVideos': return <Clapperboard {...common} />;
-            case 'Finance': return <WalletCards {...common} />;
-            case 'Profile': return <UserRound {...common} />;
-            case 'Students': return <Users {...common} />;
-            default: return <FileText {...common} />;
+            case 'Schedule': icon = <CalendarDays {...common} />; break;
+            case 'Messages': icon = <MessageCircle {...common} />; break;
+            case 'Feed': icon = <Newspaper {...common} />; break;
+            case 'Support': icon = <Headphones {...common} />; break;
+            case 'CourseVideos': icon = <Clapperboard {...common} />; break;
+            case 'Finance': icon = <WalletCards {...common} />; break;
+            case 'Profile': icon = <UserRound {...common} />; break;
+            case 'Students': icon = <Users {...common} />; break;
+            default: icon = <FileText {...common} />;
           }
+          return (
+            <View style={styles.tabBarIconContent}>
+              {icon}
+              <Text numberOfLines={1} style={[styles.tabBarLabel, { color }]}>{label}</Text>
+            </View>
+          );
         },
       })}
     >
       {isTeacher ? (
         <>
-          <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Tổng quan' }} />
           <Tab.Screen
             name="Schedule"
             component={ScheduleScreen}
@@ -1007,6 +1096,12 @@ function MainTabs() {
               tabBarBadge: todayScheduleCount ? (todayScheduleCount > 99 ? '99+' : todayScheduleCount) : undefined,
             }}
           />
+          <Tab.Screen
+            name="Feed"
+            component={FeedScreen}
+            options={{ title: 'Bảng tin' }}
+          />
+          <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Tổng quan' }} />
           <Tab.Screen
             name="Finance"
             component={TeacherFinanceScreen}
@@ -1025,6 +1120,8 @@ function MainTabs() {
               tabBarBadge: unreadConversationCount ? (unreadConversationCount > 99 ? '99+' : unreadConversationCount) : undefined,
             }}
           />
+          <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
+          <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
         </>
       ) : (
         <>
@@ -1044,11 +1141,13 @@ function MainTabs() {
               tabBarBadge: unreadConversationCount ? (unreadConversationCount > 99 ? '99+' : unreadConversationCount) : undefined,
             }}
           />
+          <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
           <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập kỹ năng' }} />
+          <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
+          <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Cá nhân' }} />
         </>
       )}
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: isTeacher ? 'Hồ sơ' : 'Cá nhân' }} />
     </Tab.Navigator>
   );
 }
@@ -1104,30 +1203,47 @@ const styles = StyleSheet.create({
   acceptCallButton: { backgroundColor: '#16A34A' },
   incomingCallButtonText: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '700' },
   persistentTabBar: { position: 'absolute', zIndex: 15, left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingTop: spacing.md, backgroundColor: colors.canvas },
-  persistentTabItem: { flex: 1, height: 42, alignItems: 'center', justifyContent: 'center' },
+  persistentTabItem: { flex: 1, minWidth: 0, height: 56, alignItems: 'center', justifyContent: 'flex-start' },
   persistentTabIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  persistentTabLabel: { maxWidth: '100%', marginTop: 3, color: colors.muted, fontSize: 8, lineHeight: 10, fontWeight: '600', textAlign: 'center' },
+  persistentTabLabelActive: { color: colors.brand, fontWeight: '800' },
+  persistentHomeLabel: { position: 'absolute', right: 0, bottom: 0, left: 0, marginTop: 0 },
+  tabBarIconContent: { position: 'relative', width: 64, height: 54, alignItems: 'center', justifyContent: 'flex-start', gap: 2 },
+  tabBarLabel: { maxWidth: '100%', fontSize: 8, lineHeight: 10, fontWeight: '700', textAlign: 'center' },
+  tabBarHomeLabel: { position: 'absolute', right: 0, bottom: 0, left: 0 },
+  tabBarHomeIcon: { position: 'absolute', top: -18 },
   persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
-  persistentHomeItem: { transform: [{ translateY: -12 }] },
+  persistentHomeIcon: { position: 'absolute', top: -12 },
   floatingMenuHandle: { position: 'absolute', right: 0, zIndex: 20 },
   floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopLeftRadius: 12, borderBottomLeftRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: -2, height: 2 }, elevation: 6 },
-  drawerOverlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(2, 6, 23, 0.58)' },
+  drawerOverlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
-  drawer: { width: '82%', maxWidth: 320, height: '100%', backgroundColor: '#111827', paddingTop: spacing.xl, paddingBottom: spacing.md },
-  drawerHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(148, 163, 184, 0.2)' },
-  drawerAvatar: { width: 38, height: 38, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: '#334155' },
-  drawerAvatarImage: { width: 38, height: 38, borderRadius: 19 },
-  drawerIdentity: { flex: 1, minWidth: 0, gap: 4 },
-  drawerName: { color: '#FFFFFF', fontSize: typography.small, fontWeight: '800' },
-  drawerRole: { color: '#A5B4FC', fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.8 },
-  drawerClose: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  drawer: { width: '86%', maxWidth: 360, height: '100%', backgroundColor: '#0D1524', paddingHorizontal: spacing.md, borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden' },
+  drawerHeader: { paddingBottom: spacing.md },
+  drawerProfileCard: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.14)', borderRadius: 20, backgroundColor: '#151F30' },
+  drawerAvatar: { width: 46, height: 46, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 23, backgroundColor: '#334155' },
+  drawerAvatarImage: { width: 46, height: 46, borderRadius: 23 },
+  drawerIdentity: { flex: 1, minWidth: 0, gap: 6 },
+  drawerName: { color: '#F8FAFC', fontSize: typography.small, fontWeight: '800' },
+  drawerRoleBadge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: 'rgba(96, 165, 250, 0.12)' },
+  drawerRoleBadgeTeacher: { backgroundColor: 'rgba(251, 191, 36, 0.12)' },
+  drawerRole: { color: '#93C5FD', fontSize: typography.micro, fontWeight: '700' },
+  drawerRoleTeacher: { color: '#FCD34D' },
+  drawerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: 'rgba(148, 163, 184, 0.1)' },
   drawerScroll: { flex: 1 },
-  drawerItems: { paddingVertical: spacing.sm, gap: 2 },
-  drawerItem: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(148, 163, 184, 0.14)' },
-  drawerItemActive: { borderBottomWidth: 0, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.15)' },
-  drawerItemPressed: { borderRadius: radius.md, backgroundColor: 'rgba(148, 163, 184, 0.2)' },
-  drawerItemText: { color: '#E2E8F0', fontSize: typography.caption, fontWeight: '600' },
+  drawerItems: { paddingTop: spacing.xs, paddingBottom: spacing.md, gap: spacing.lg },
+  drawerSection: { gap: spacing.xs },
+  drawerSectionLabel: { paddingHorizontal: spacing.sm, paddingTop: spacing.xs, paddingBottom: spacing.xs, color: '#74839A', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
+  drawerSectionItems: { gap: 3 },
+  drawerItem: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.sm, borderRadius: 14 },
+  drawerItemActive: { backgroundColor: '#1C2A3D' },
+  drawerItemPressed: { backgroundColor: '#223149' },
+  drawerItemIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+  drawerItemIconActive: { backgroundColor: colors.brand },
+  drawerItemText: { flex: 1, color: '#D5DCE7', fontSize: typography.caption, fontWeight: '600' },
   drawerItemTextActive: { color: '#FFFFFF', fontWeight: '800' },
-  drawerFooter: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.2)' },
+  drawerItemSelectedMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FCA5A5' },
+  drawerFooter: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.16)', gap: 2 },
   homeArcButton: {
     width: 58,
     height: 58,

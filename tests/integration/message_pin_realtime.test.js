@@ -74,4 +74,16 @@ describe('Message Pin & Unpin Realtime Verification', () => {
 
     assert.equal(messages[0].isPinned, false);
   });
+
+  it('7. Mobile chat keeps the pinned message banner outside the scrolling thread and persists unpinning', () => {
+    const mobileChat = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
+    const bannerIndex = mobileChat.indexOf('<View style={styles.pinnedBannerCard}>');
+    const threadIndex = mobileChat.indexOf('<View style={styles.threadSurface}>', bannerIndex);
+
+    assert.ok(bannerIndex >= 0);
+    assert.ok(threadIndex > bannerIndex);
+    assert.ok(mobileChat.includes('onPress={() => { void handleTogglePin(pinnedMessage.id); }}'));
+    assert.ok(mobileChat.includes('onLongPress={() => handleMessageMenu(message)}'));
+    assert.ok(mobileChat.includes('Đã ghim'));
+  });
 });

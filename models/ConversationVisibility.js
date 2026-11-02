@@ -7,11 +7,13 @@ const conversationVisibilitySchema = new mongoose.Schema({
     unique: true,
     index: true
   },
-  hiddenByUsers: [{ type: String }] // Array of user IDs who have hidden this conversation
+  hiddenByUsers: [{ type: String }],
+  pinnedByUsers: [{ type: String }],
 }, {
   timestamps: true,
 });
 
 conversationVisibilitySchema.index({ hiddenByUsers: 1 });
+conversationVisibilitySchema.index({ pinnedByUsers: 1 });
 
 module.exports = mongoose.model('ConversationVisibility', conversationVisibilitySchema);

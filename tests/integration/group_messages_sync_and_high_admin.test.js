@@ -29,6 +29,8 @@ describe('Group messages sync on reload and High Admin messaging verification', 
     const src = read('server.js');
     assert.ok(src.includes("socket.join(`group_${g._id}`)"), 'Must auto-join socket into user group rooms on connect');
     assert.ok(src.includes("socket.on('group:join'"), 'Must handle socket group:join event');
+    assert.ok(src.includes("socket.on('group:leave'"), 'Must allow a user who left to leave the realtime group room');
+    assert.ok(src.includes("socket.leave(`group_${groupId}`)"), 'Must stop realtime group messages after leaving');
   });
 
   it('directMessageService.js notifies group members in realtime', () => {

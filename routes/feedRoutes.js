@@ -4,6 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const FeedPost = require('../models/FeedPost');
+const FeedPostReport = require('../models/FeedPostReport');
 const { REACTION_TYPES } = require('../models/FeedPost');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowFeed } = require('../middleware/policyShadowFeed');
@@ -213,6 +214,8 @@ function serializePost(doc, currentUserId) {
     content: o.content || '',
     images: o.images || [],
     visibility: o.visibility || 'public',
+    isPinned: !!o.isPinned,
+    pinnedAt: o.pinnedAt || null,
     isEdited: !!o.isEdited,
     editedAt: o.editedAt || null,
     reactions: counts,
@@ -291,7 +294,7 @@ router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
     const skip = (page - 1) * limit;
     const query = buildFeedFilter(req.user);
     const [rows, total] = await Promise.all([
-      FeedPost.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      FeedPost.find(query).sort({ isPinned: -1, pinnedAt: -1, createdAt: -1 }).skip(skip).limit(limit),
       FeedPost.countDocuments(query),
     ]);
     return res.json({
@@ -302,6 +305,104 @@ router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
   } catch (err) {
     logger.error({ err }, '[FEED] list error');
     return res.status(500).json({ success: false, message: 'Loi server' });
+  }
+});
+
+router.get('/reports', authMiddleware, ...feedGuard('report_list'), async (req, res) => {
+  try {
+    if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Bạn không có quyền xem báo cáo.' });
+    const reports = await FeedPostReport.find({ status: 'pending' }).sort({ createdAt: 1 }).limit(100).lean();
+    const postIds = [...new Set(reports.map((report) => report.postId))];
+    const posts = await FeedPost.find({ _id: { $in: postIds } }).select('_id authorName content visibility').lean();
+    const postsById = new Map(posts.map((post) => [String(post._id), post]));
+    return res.json({
+      success: true,
+      data: reports.map((report) => {
+        const post = postsById.get(report.postId);
+        return {
+          id: String(report._id),
+          postId: report.postId,
+          reporterName: report.reporterName,
+          reporterRole: report.reporterRole,
+          reason: report.reason,
+          details: report.details,
+          createdAt: report.createdAt,
+          post: post ? { authorName: post.authorName, content: post.content, visibility: post.visibility || 'public' } : null,
+        };
+      }),
+    });
+  } catch (err) {
+    logger.error({ err }, '[FEED] reports list error');
+    return res.status(500).json({ success: false, message: 'Không thể tải báo cáo bài viết.' });
+  }
+});
+
+router.post('/:id/reports', authMiddleware, ...feedGuard('report'), async (req, res) => {
+  try {
+    const post = await FeedPost.findOne({ _id: req.params.id, ...buildFeedFilter(req.user) });
+    if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết.' });
+    if (String(post.authorId) === String(req.user.id || req.user._id)) {
+      return res.status(400).json({ success: false, message: 'Bạn không thể báo cáo bài viết của chính mình.' });
+    }
+    if (!feedRateOk(req.user.id, 'report', 5, 10 * 60 * 1000)) {
+      return res.status(429).json({ success: false, message: 'Bạn đã gửi nhiều báo cáo. Vui lòng thử lại sau.' });
+    }
+    const reasons = ['spam', 'harassment', 'inappropriate', 'misinformation', 'other'];
+    const reason = String(req.body?.reason || '');
+    const details = String(req.body?.details || '').trim();
+    if (!reasons.includes(reason)) return res.status(400).json({ success: false, message: 'Vui lòng chọn lý do báo cáo hợp lệ.' });
+    if (details.length > 500) return res.status(400).json({ success: false, message: 'Nội dung bổ sung tối đa 500 ký tự.' });
+    const report = await FeedPostReport.create({
+      postId: String(post._id),
+      reporterId: String(req.user.id || req.user._id),
+      reporterName: req.user.name || 'Người dùng',
+      reporterRole: normalizeRole(req.user.role),
+      reason,
+      details,
+    });
+    return res.status(201).json({ success: true, message: 'Đã gửi báo cáo để trung tâm xem xét.', id: String(report._id) });
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Bạn đã báo cáo bài viết này rồi.' });
+    }
+    logger.error({ err }, '[FEED] report create error');
+    return res.status(500).json({ success: false, message: 'Không thể gửi báo cáo bài viết.' });
+  }
+});
+
+router.post('/:id/pin', authMiddleware, ...feedGuard('pin'), async (req, res) => {
+  try {
+    if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Chỉ quản trị viên mới được ghim thông báo.' });
+    const post = await FeedPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết.' });
+    if ((post.visibility || 'public') !== 'public') {
+      return res.status(400).json({ success: false, message: 'Chỉ có thể ghim thông báo công khai.' });
+    }
+    post.isPinned = !post.isPinned;
+    post.pinnedAt = post.isPinned ? new Date() : null;
+    await post.save();
+    const data = serializePost(post, req.user.id);
+    emitFeed(req.app.get('io'), 'feed:updated', data);
+    return res.json({ success: true, data });
+  } catch (err) {
+    logger.error({ err }, '[FEED] pin toggle error');
+    return res.status(500).json({ success: false, message: 'Không thể cập nhật trạng thái ghim.' });
+  }
+});
+
+router.post('/reports/:reportId/resolve', authMiddleware, ...feedGuard('resolve_report'), async (req, res) => {
+  try {
+    if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Bạn không có quyền xử lý báo cáo.' });
+    const report = await FeedPostReport.findOneAndUpdate(
+      { _id: req.params.reportId, status: 'pending' },
+      { $set: { status: 'reviewed', resolvedBy: String(req.user.id || req.user._id), resolvedAt: new Date() } },
+      { new: true },
+    );
+    if (!report) return res.status(404).json({ success: false, message: 'Báo cáo không tồn tại hoặc đã được xử lý.' });
+    return res.json({ success: true, message: 'Đã đánh dấu báo cáo là đã xử lý.' });
+  } catch (err) {
+    logger.error({ err }, '[FEED] report resolve error');
+    return res.status(500).json({ success: false, message: 'Không thể xử lý báo cáo.' });
   }
 });
 

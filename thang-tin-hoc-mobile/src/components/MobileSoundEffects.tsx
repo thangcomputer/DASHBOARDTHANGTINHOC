@@ -4,12 +4,9 @@ import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { SOCKET_EVENTS } from '../services/socketService';
 import { getMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 
-const CALL_RING_PATTERN_MS = [0, 360, 720, 3000, 3360, 3720];
-const CALL_RING_PATTERN_INTERVAL_MS = 4500;
-
 export function MobileSoundEffects({ incomingCall }: { incomingCall: boolean }) {
   const notificationPlayer = useAudioPlayer(require('../assets/audio/practice-correct.wav'));
-  const ringtonePlayer = useAudioPlayer(require('../assets/audio/call-ringback.wav'));
+  const ringtonePlayer = useAudioPlayer(require('../assets/audio/incoming-call-ringtone.wav'));
   const [soundEnabled, setSoundEnabled] = useState<boolean | null>(null);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
   const lastNotificationSoundAt = useRef(0);
@@ -56,28 +53,17 @@ export function MobileSoundEffects({ incomingCall }: { incomingCall: boolean }) 
       return undefined;
     }
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
     let stopped = false;
-    const schedulePattern = () => {
-      for (const delay of CALL_RING_PATTERN_MS) {
-        timers.push(setTimeout(() => {
-          if (stopped) return;
-          void ringtonePlayer.seekTo(0)
-            .then(() => {
-              if (!stopped) ringtonePlayer.play();
-            })
-            .catch((error: unknown) => {
-              console.warn('Không thể phát nhạc chuông cuộc gọi đến.', error);
-            });
-        }, delay));
-      }
-    };
-    schedulePattern();
-    const interval = setInterval(schedulePattern, CALL_RING_PATTERN_INTERVAL_MS);
+    ringtonePlayer.loop = true;
+    void ringtonePlayer.seekTo(0)
+      .then(() => {
+        if (!stopped) ringtonePlayer.play();
+      })
+      .catch((error: unknown) => {
+        console.warn('Không thể phát nhạc chuông cuộc gọi đến.', error);
+      });
     return () => {
       stopped = true;
-      clearInterval(interval);
-      timers.forEach(clearTimeout);
       ringtonePlayer.pause();
       void ringtonePlayer.seekTo(0).catch((error: unknown) => {
         console.warn('Không thể dừng nhạc chuông cuộc gọi đến.', error);

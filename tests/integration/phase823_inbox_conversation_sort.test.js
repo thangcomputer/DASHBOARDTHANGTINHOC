@@ -170,14 +170,15 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
     assert.ok(mobileInbox.includes("(category === 'all' || item.category === category)"));
   });
 
-  it('13 web inbox only shows All, Teachers, and Groups while keeping contact filtering and title-case names', () => {
+  it('13 web inbox filters teachers and students by the current role while keeping contact filtering and title-case names', () => {
     const inbox = read('client/src/components/Inbox.jsx');
     const tabBlock = inbox.match(/\/\* Hàng Tabs \(Pills\) Phân loại danh bạ \*\/[\s\S]*?\]\.map\(tab => \(/)?.[0] || '';
 
     assert.ok(tabBlock.includes("{ id: 'all', label: 'Tất cả' }"));
     assert.ok(tabBlock.includes("{ id: 'teacher', label: 'Giảng viên' }"));
+    assert.ok(tabBlock.includes("{ id: 'student', label: 'Học viên' }"));
+    assert.ok(tabBlock.includes("currentUserRole === 'teacher'"));
     assert.ok(tabBlock.includes("{ id: 'group', label: 'Nhóm' }"));
-    assert.equal(tabBlock.includes("label: 'Học viên'"), false);
     assert.equal(tabBlock.includes("label: 'Admin'"), false);
     assert.equal(tabBlock.includes("label: 'Tuyển sinh'"), false);
     assert.equal(tabBlock.includes("label: 'Hỗ trợ'"), false);

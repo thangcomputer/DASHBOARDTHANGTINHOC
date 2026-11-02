@@ -57,11 +57,11 @@ import {
   gradeAssignmentSubmission,
 } from './assignmentApi';
 import {
-  createMessageGroup, getMessageContacts, getMessageThread, markConversationRead, sendChatMessage,
+  addMessageGroupMembers, createMessageGroup, deleteMessageGroup, getMessageContacts, getMessageThread, leaveMessageGroup, markConversationRead, sendChatMessage,
   uploadChatAttachment, searchChatMessages, reactToChatMessage, recallChatMessage,
-  deleteChatMessageForMe, togglePinnedChatMessage, type ChatAttachmentUpload,
+  deleteChatMessageForMe, setPinnedConversation, togglePinnedChatMessage, type ChatAttachmentUpload,
 } from './messageApi';
-import { emitMessageRead, joinChatGroup } from './socketService';
+import { emitMessageRead, joinChatGroup, leaveChatGroup as leaveSocketChatGroup } from './socketService';
 import {
   getTeacherProfile,
   getTeacherFinanceOverview,
@@ -994,11 +994,28 @@ export const messageService = {
     if (!user || user.previewMode) throw new Error('Ghim tin nhắn chỉ khả dụng với tài khoản đã đăng nhập.');
     return togglePinnedChatMessage(conversationId, messageId);
   },
+  async setConversationPinned(conversationId: string, pinned: boolean, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Ghim cuộc trò chuyện chỉ khả dụng với tài khoản đã đăng nhập.');
+    await setPinnedConversation(conversationId, pinned);
+  },
   async createGroup(name: string, members: Conversation[], user?: DemoUser | null) {
     if (!user || user.previewMode) throw new Error('Tạo nhóm thật chỉ khả dụng với tài khoản đã đăng nhập.');
     const group = await createMessageGroup(name, members);
     joinChatGroup(group.participantId || '');
     return group;
+  },
+  async addGroupMembers(groupId: string, members: Conversation[], user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Quản lý nhóm chỉ khả dụng với tài khoản đã đăng nhập.');
+    await addMessageGroupMembers(groupId, members);
+  },
+  async leaveGroup(groupId: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Rời nhóm chỉ khả dụng với tài khoản đã đăng nhập.');
+    await leaveMessageGroup(groupId);
+    leaveSocketChatGroup(groupId);
+  },
+  async deleteGroup(groupId: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) throw new Error('Xóa nhóm chỉ khả dụng với tài khoản đã đăng nhập.');
+    await deleteMessageGroup(groupId);
   },
 };
 

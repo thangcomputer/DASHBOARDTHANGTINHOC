@@ -155,6 +155,8 @@ export type Conversation = {
   id: string;
   name: string;
   role: string;
+  groupCreatorId?: string;
+  groupParticipants?: Array<{ userId: string; name: string; role: string }>;
   participantId?: string;
   participantRole?: string;
   avatar?: string;
@@ -166,6 +168,7 @@ export type Conversation = {
   adminRole?: string | null;
   roleBadge?: string;
   online?: boolean;
+  isPinned?: boolean;
   lastMessage: string;
   time: string;
   unread: number;
@@ -185,7 +188,11 @@ export type ChatMessage = {
     durationSeconds: number;
     participantName: string;
   };
+  senderId?: string;
   senderName?: string;
+  senderRole?: string;
+  senderAdminRole?: string | null;
+  senderAvatarUri?: string;
   state?: 'sent' | 'delivered' | 'read';
   sticker?: string;
   stickerId?: string;
@@ -304,6 +311,7 @@ export type DemoFeedPost = {
   authorId?: string;
   authorAdminRole?: string | null;
   authorAvatar?: string;
+  isPinned?: boolean;
   replies?: Array<{
     id: string;
     parentId: string;

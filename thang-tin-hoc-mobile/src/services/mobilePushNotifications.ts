@@ -92,6 +92,16 @@ export async function enableMobilePushNotifications() {
   return registerMobilePushNotifications(true);
 }
 
+export async function requestWebNotificationPermission(): Promise<NotificationPermission> {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    throw new Error('Trình duyệt này không hỗ trợ thông báo. Hãy thử bằng trình duyệt mới hơn.');
+  }
+  if (!window.isSecureContext) {
+    throw new Error('Thông báo trên web chỉ hoạt động qua HTTPS hoặc localhost.');
+  }
+  return window.Notification.requestPermission();
+}
+
 export async function unregisterMobilePushNotifications() {
   if (Platform.OS === 'web' || !registeredExpoPushToken) return;
   const token = registeredExpoPushToken;

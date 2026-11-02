@@ -33,10 +33,14 @@ const BRANDING_HEADER_HEIGHT = 58;
 export function useBrandingHeaderScrollHandler() {
   const previousScrollOffset = useRef(0);
   return useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = Math.max(0, event.nativeEvent.contentOffset.y);
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const offsetY = Math.max(0, contentOffset.y);
     const offsetDelta = offsetY - previousScrollOffset.current;
     previousScrollOffset.current = offsetY;
-    if (offsetY <= 8) {
+    const hasScrollableContent = contentSize.height > layoutMeasurement.height + 8;
+    const reachedBottom = hasScrollableContent
+      && offsetY + layoutMeasurement.height >= contentSize.height - 8;
+    if (offsetY <= 8 || reachedBottom) {
       DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
       DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
     } else if (offsetY > 48 && offsetDelta > 3) {
@@ -76,6 +80,8 @@ export function AppScreen({
           ref={scrollViewRef}
           contentContainerStyle={[styles.screenContent, contentStyle]}
           showsVerticalScrollIndicator={false}
+          bounces={false}
+          overScrollMode="never"
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
           onScrollEndDrag={handleScroll}
@@ -545,7 +551,7 @@ const styles = StyleSheet.create({
   notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },
   notificationUnreadBadgeText: { color: '#FFFFFF', fontSize: 8, lineHeight: 11, fontWeight: '800' },
   fill: { flex: 1 },
-  screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xxxl + 76, gap: spacing.lg },
+  screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.line },
   headerCentered: { justifyContent: 'center' },
   headerCompact: { minHeight: 48, gap: spacing.sm, paddingVertical: spacing.xs },

@@ -44,6 +44,7 @@ export function CallScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [muted, setMuted] = useState(false);
   const [checkingRecipient, setCheckingRecipient] = useState(false);
+  const [ringbackActive, setRingbackActive] = useState(direction === 'outgoing');
   const [remoteStream, setRemoteStream] = useState<CallMediaStream | null>(null);
   const peerRef = useRef<CallPeerConnection | null>(null);
   const localStreamRef = useRef<CallMediaStream | null>(null);
@@ -76,6 +77,7 @@ export function CallScreen() {
   const endCall = useCallback((notifyPeer = true) => {
     if (finished.current) return;
     finished.current = true;
+    setRingbackActive(false);
     if (notifyPeer) emit('call:end', { callId, conversationId });
     closeMedia();
     setStatus('Cuộc gọi đã kết thúc');
@@ -88,6 +90,7 @@ export function CallScreen() {
       if (!active) return;
       if (finished.current) return;
       finished.current = true;
+      setRingbackActive(false);
       emit('call:end', { callId, conversationId });
       closeMedia();
       setErrorMessage(message);
@@ -125,7 +128,10 @@ export function CallScreen() {
 
     const subscriptions = [
       DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_ACCEPTED, (event: CallPayload) => {
-        if (matchesCall(event) && direction === 'outgoing') void startOffer();
+        if (matchesCall(event) && direction === 'outgoing') {
+          setRingbackActive(false);
+          void startOffer();
+        }
       }),
       DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_RINGING, (event: CallPayload) => {
         if (matchesCall(event) && direction === 'outgoing') {
@@ -142,6 +148,7 @@ export function CallScreen() {
       DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_REJECTED, (event: CallPayload) => {
         if (!matchesCall(event) || finished.current) return;
         finished.current = true;
+        setRingbackActive(false);
         closeMedia();
         setStatus('Cuộc gọi bị từ chối');
         scheduleClose(900);
@@ -149,6 +156,7 @@ export function CallScreen() {
       DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_TIMEOUT, (event: CallPayload) => {
         if (!matchesCall(event) || finished.current) return;
         finished.current = true;
+        setRingbackActive(false);
         closeMedia();
         setStatus('Không có người trả lời');
         scheduleClose(900);
@@ -156,6 +164,7 @@ export function CallScreen() {
       DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_ENDED, (event: CallPayload) => {
         if (!matchesCall(event) || finished.current) return;
         finished.current = true;
+        setRingbackActive(false);
         closeMedia();
         setStatus(event.reason === 'disconnected' ? 'Cuộc gọi bị ngắt kết nối' : 'Cuộc gọi đã kết thúc');
         scheduleClose(900);
@@ -225,7 +234,10 @@ export function CallScreen() {
           if (active) setRemoteStream(remote);
         });
         peer.onConnectionStateChange((connectionState) => {
-          if (connectionState === 'connected') setStatus('Đang trong cuộc gọi');
+          if (connectionState === 'connected') {
+            setRingbackActive(false);
+            setStatus('Đang trong cuộc gọi');
+          }
           if (connectionState === 'failed') handleFailure('Không thể kết nối hai thiết bị qua mạng hiện tại.');
           if (connectionState === 'disconnected') setStatus('Đang khôi phục kết nối…');
         });
@@ -265,7 +277,7 @@ export function CallScreen() {
 
   return (
     <View style={styles.screen}>
-      <CallRingback active={checkingRecipient && direction === 'outgoing' && !finished.current} />
+      <CallRingback active={ringbackActive && direction === 'outgoing' && !finished.current} />
       <CallAudio stream={remoteStream} />
       <View style={styles.callCard}>
         <View style={styles.avatar}>

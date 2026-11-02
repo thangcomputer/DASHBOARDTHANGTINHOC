@@ -13,9 +13,9 @@ import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScree
 import { CourseVideosScreen } from './CourseVideosScreen';
 import {
   AlertCircle, BarChart3, BookOpen, Building2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight,
-  ClipboardList, Clock3, CreditCard, Download, FileSpreadsheet, FileText, Frown, Globe,
-  EyeOff, GraduationCap, Grid2X2, Heart, ImagePlus, Laugh, List, MessageCircle, MoreVertical,
-  Newspaper, Paperclip, Pencil, Play, Radio, Reply, Search, Send, Sparkles, Star, ThumbsUp, Trash2, TrendingUp, WalletCards, X,
+  ClipboardList, Clock3, CreditCard, Download, FileSpreadsheet, FileText, Flag, Frown, Globe,
+  EyeOff, GraduationCap, Grid2X2, Heart, ImagePlus, Laugh, List, MessageCircle, MoreVertical, Pin, PinOff,
+  MessageSquare, Newspaper, Paperclip, Pencil, Play, Radio, Reply, Search, Send, Sparkles, Star, ThumbsUp, Trash2, TrendingUp, WalletCards, X,
   Users, Video, Link2, Plus,
 } from 'lucide-react-native';
 import {
@@ -24,8 +24,10 @@ import {
 } from '../components/ui';
 import { useMockResource } from '../hooks/useMockResource';
 import {
-  commentFeedPost, createFeedPost, deleteFeedComment, deleteFeedPost, fetchFeedPosts, reactFeedPost, updateFeedPost, uploadFeedImages,
+  commentFeedPost, createFeedPost, deleteFeedComment, deleteFeedPost, fetchFeedPosts, fetchFeedReports, reactFeedPost,
+  reportFeedPost, resolveFeedReport, toggleFeedPostPin, updateFeedPost, uploadFeedImages,
 } from '../services/feedApi';
+import type { FeedPostReport, FeedReportReason } from '../services/feedApi';
 import {
   evaluationService, feedService, quizService,
   softwareService, studentPaymentService, studentProfileService, studentService, trainingService,
@@ -365,6 +367,8 @@ export function EvaluationsScreen() {
 export function FeedScreen() {
   const { user } = useAuth();
   const isTeacher = user?.role === 'teacher';
+  const canModerateFeed = ['admin', 'staff'].includes(String(user?.role || '').toLowerCase())
+    || ['SUPER_ADMIN', 'HIGH_ADMIN'].includes(String(user?.adminRole || '').toUpperCase());
   const [posts, setPosts] = useState<DemoFeedPost[] | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([]);
@@ -372,9 +376,27 @@ export function FeedScreen() {
   const [busy, setBusy] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const [feedActionError, setFeedActionError] = useState('');
+  const [feedActionNotice, setFeedActionNotice] = useState('');
+  const [reportingPost, setReportingPost] = useState<DemoFeedPost | null>(null);
+  const [reportReason, setReportReason] = useState<FeedReportReason | ''>('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [pendingReports, setPendingReports] = useState<FeedPostReport[]>([]);
+  const [reportQueueError, setReportQueueError] = useState('');
+  const [resolvingReportId, setResolvingReportId] = useState('');
   const live = !!user && !user.previewMode;
   const loader = useCallback(() => (live ? fetchFeedPosts() : feedService.posts()), [live]);
   const resource = useMockResource(loader);
+  const loadPendingReports = useCallback(async () => {
+    if (!live || !canModerateFeed) return;
+    try {
+      setPendingReports(await fetchFeedReports());
+      setReportQueueError('');
+    } catch (error) {
+      setReportQueueError(error instanceof Error ? error.message : 'Không thể tải báo cáo bài viết.');
+    }
+  }, [canModerateFeed, live]);
+  useEffect(() => { void loadPendingReports(); }, [loadPendingReports]);
   const hiddenPostsStorageKey = `mobile-feed-hidden:${user?.id || 'preview'}`;
   useEffect(() => {
     if (!postMenuId || Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
@@ -440,6 +462,46 @@ export function FeedScreen() {
       setBusy(false);
     }
   };
+  const submitPostReport = async () => {
+    if (!reportingPost || !reportReason || reportSubmitting) return;
+    setReportSubmitting(true);
+    try {
+      const result = await reportFeedPost(reportingPost.id, reportReason, reportDetails.trim());
+      setReportingPost(null);
+      setReportReason('');
+      setReportDetails('');
+      setFeedActionNotice(result.message || 'Đã gửi báo cáo để trung tâm xem xét.');
+      setFeedActionError('');
+      if (canModerateFeed) void loadPendingReports();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể gửi báo cáo bài viết.';
+      setFeedActionError(message);
+      setFeedActionNotice('');
+      if (Platform.OS !== 'web') Alert.alert('Báo cáo bài viết', message);
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+  const handleResolveFeedReport = async (report: FeedPostReport) => {
+    if (resolvingReportId) return;
+    setResolvingReportId(report.id);
+    try {
+      await resolveFeedReport(report.id);
+      setPendingReports((current) => current.filter((entry) => entry.id !== report.id));
+      setReportQueueError('');
+    } catch (error) {
+      setReportQueueError(error instanceof Error ? error.message : 'Không thể cập nhật báo cáo.');
+    } finally {
+      setResolvingReportId('');
+    }
+  };
+  const reportReasonOptions: { value: FeedReportReason; label: string }[] = [
+    { value: 'spam', label: 'Spam hoặc quảng cáo' },
+    { value: 'harassment', label: 'Quấy rối hoặc xúc phạm' },
+    { value: 'inappropriate', label: 'Nội dung không phù hợp' },
+    { value: 'misinformation', label: 'Thông tin sai lệch' },
+    { value: 'other', label: 'Lý do khác' },
+  ];
   const selectFeedImages = async () => {
     if (busy) return;
     try {
@@ -644,13 +706,47 @@ export function FeedScreen() {
   );
   return (
     <AppScreen>
-      <AppHeader title={isTeacher ? 'Bảng tin trao đổi & Hỏi bài' : 'Bảng tin'} subtitle="Bài đăng dành cho lớp học" icon={Newspaper} />
+      <AppHeader title="Bảng tin chung" subtitle="Học viên và giảng viên đều có thể đăng bài" icon={Newspaper} />
+      {canModerateFeed && reportQueueError ? (
+        <View style={styles.feedReportError}><Text style={styles.feedReportErrorText}>{reportQueueError}</Text></View>
+      ) : null}
+      {canModerateFeed && pendingReports.length ? (
+        <Card style={styles.feedModerationCard}>
+          <View style={styles.feedModerationHeading}>
+            <View style={styles.feedModerationHeadingIcon}><Flag size={16} color="#B45309" /></View>
+            <View style={styles.flex}>
+              <Text style={styles.feedModerationTitle}>Báo cáo cần xem xét</Text>
+              <Text style={styles.feedModerationSubtitle}>{pendingReports.length} báo cáo đang chờ xử lý</Text>
+            </View>
+          </View>
+          {pendingReports.map((report) => (
+            <View key={report.id} style={styles.feedReportItem}>
+              <View style={styles.feedReportCopy}>
+                <Text style={styles.feedReportReason}>{reportReasonOptions.find((option) => option.value === report.reason)?.label || 'Lý do khác'}</Text>
+                <Text numberOfLines={2} style={styles.feedReportExcerpt}>{report.post?.content || 'Bài viết không còn tồn tại.'}</Text>
+                <Text style={styles.feedReportReporter}>Báo cáo bởi {report.reporterName} · {report.reporterRole}</Text>
+                {report.details ? <Text style={styles.feedReportDetails}>{report.details}</Text> : null}
+              </View>
+              <Pressable
+                onPress={() => { void handleResolveFeedReport(report); }}
+                disabled={resolvingReportId === report.id}
+                style={styles.feedReportResolve}
+                accessibilityRole="button"
+                accessibilityLabel="Đánh dấu báo cáo đã xử lý"
+              >
+                <Check size={15} color="#047857" />
+                <Text style={styles.feedReportResolveText}>{resolvingReportId === report.id ? 'Đang lưu' : 'Đã xử lý'}</Text>
+              </Pressable>
+            </View>
+          ))}
+        </Card>
+      ) : null}
       <Card style={styles.feedComposer}>
         <View style={styles.feedAuthorRow}>
           <Avatar name={user?.name || roleLabel} color={user?.avatarColor} size={42} />
           <View style={styles.flex}>
             <Text style={styles.cardTitle}>{user?.name || roleLabel}</Text>
-            <Text style={styles.caption}>{roleLabel}</Text>
+            <View style={styles.feedRoleTag}><Text style={styles.feedRoleCaption}>{roleLabel}</Text></View>
           </View>
           <View style={styles.privacyMenuAnchor}>
             <Pressable
@@ -666,7 +762,7 @@ export function FeedScreen() {
             </Pressable>
             {showAudienceMenu ? (
               <View style={styles.privacyMenu}>
-                <Text style={styles.privacyMenuTitle}>Ai có thể xem bài viết?</Text>
+                <Text style={styles.privacyMenuTitle}>AI CÓ THỂ XEM BÀI VIẾT?</Text>
                 {audienceOptions.map((option) => {
                   const OptionIcon = option.icon;
                   const selected = audience === option.value;
@@ -697,7 +793,7 @@ export function FeedScreen() {
             ) : null}
           </View>
         </View>
-        <TextInput value={draft} onChangeText={setDraft} placeholder="Bạn muốn chia sẻ điều gì?" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng" />
+        <TextInput value={draft} onChangeText={setDraft} placeholder="Chia sẻ với mọi người trong bảng tin…" multiline style={styles.feedDraft} accessibilityLabel="Nội dung bài đăng" />
         {selectedImages.length ? (
           <View style={styles.feedImagePreviewList}>
             {selectedImages.map((asset, index) => (
@@ -712,7 +808,7 @@ export function FeedScreen() {
         ) : null}
         <View style={styles.feedComposerActions}>
           <Pressable onPress={() => { void selectFeedImages(); }} style={styles.feedImageAction} accessibilityRole="button" accessibilityLabel="Thêm ảnh">
-            <ImagePlus size={19} color={colors.green} /><Text style={styles.actionText}>Thêm ảnh ({selectedImages.length}/6)</Text>
+            <ImagePlus size={18} color={colors.green} /><Text style={styles.feedImageActionText}>{selectedImages.length ? `Ảnh (${selectedImages.length}/6)` : 'Thêm ảnh'}</Text>
           </Pressable>
           <PrimaryButton title="Đăng bài" disabled={(!draft.trim() && !selectedImages.length) || busy} onPress={() => {
             const content = draft.trim();
@@ -746,12 +842,17 @@ export function FeedScreen() {
         </View>
         {!live ? <Text style={styles.note}>Bài đăng và ảnh chỉ được giữ cục bộ trong bản xem trước.</Text> : null}
       </Card>
+      <View style={styles.feedListHeading}>
+        <Text style={styles.feedListTitle}>Bài viết mới nhất</Text>
+        <View style={styles.feedListCount}><Newspaper size={13} color={colors.brand} /><Text style={styles.feedListCountText}>{visibleItems.length} bài</Text></View>
+      </View>
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {refreshError ? <Text style={styles.note}>Không thể cập nhật bảng tin: {refreshError}</Text> : null}
       {feedActionError ? <Text style={styles.note}>Không thể hoàn tất thao tác: {feedActionError}</Text> : null}
+      {feedActionNotice ? <Text style={styles.feedActionNotice}>{feedActionNotice}</Text> : null}
       {visiblePosts.map((post) => (
-        <Card key={post.id}>
+        <Card key={post.id} style={styles.feedPostCard}>
           <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} imageSource={post.authorAvatar ? getMobileImageSource(post.authorAvatar) : undefined} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
             <View nativeID="feed-post-menu" style={styles.feedPostMenuAnchor}>
               <Pressable
@@ -785,6 +886,35 @@ export function FeedScreen() {
                       </Pressable>
                     </>
                   ) : null}
+                  {live && canModerateFeed && post.audience === 'Công khai' ? (
+                    <Pressable
+                      onPress={() => {
+                        setPostMenuId(null);
+                        void apiRun(() => toggleFeedPostPin(post.id));
+                      }}
+                      style={styles.feedPostMenuItem}
+                      accessibilityRole="button"
+                    >
+                      {post.isPinned ? <PinOff size={15} color={colors.brand} /> : <Pin size={15} color={colors.brand} />}
+                      <Text style={styles.feedPostMenuText}>{post.isPinned ? 'Bỏ ghim thông báo' : 'Ghim thông báo'}</Text>
+                    </Pressable>
+                  ) : null}
+                  {live && !ownPost(post) ? (
+                    <Pressable
+                      onPress={() => {
+                        setPostMenuId(null);
+                        setReportingPost(post);
+                        setReportReason('');
+                        setReportDetails('');
+                        setFeedActionError('');
+                        setFeedActionNotice('');
+                      }}
+                      style={styles.feedPostMenuItem}
+                      accessibilityRole="button"
+                    >
+                      <Flag size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Báo cáo bài viết</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable onPress={() => hidePost(post.id)} style={styles.feedPostMenuItem} accessibilityRole="button">
                     <EyeOff size={15} color={colors.muted} /><Text style={styles.feedPostMenuText}>Ẩn bài viết</Text>
                   </Pressable>
@@ -792,7 +922,15 @@ export function FeedScreen() {
               ) : null}
             </View>
           </View>
-          {isTeacher ? <Text style={styles.feedAudience}>{post.audience}</Text> : null}
+          <View style={styles.feedPostMeta}>
+            {post.isPinned ? (
+              <View style={styles.feedPinnedBadge}><Pin size={12} color="#B45309" /><Text style={styles.feedPinnedText}>Thông báo ghim</Text></View>
+            ) : null}
+            <View style={styles.feedAudience}>
+              {post.audience === 'Công khai' ? <Globe size={12} color={colors.green} /> : <Users size={12} color={colors.brand} />}
+              <Text numberOfLines={1} style={styles.feedAudienceText}>{post.audience || 'Công khai'}</Text>
+            </View>
+          </View>
           {editingPostId === post.id ? (
             <View style={styles.feedEditBox}>
               <TextInput value={editDraft} onChangeText={setEditDraft} multiline style={styles.feedDraft} accessibilityLabel="Chỉnh sửa bài đăng demo" />
@@ -807,7 +945,7 @@ export function FeedScreen() {
                 }} style={styles.feedInlineAction}><Text style={styles.feedInlineActionText}>Lưu thay đổi</Text></Pressable>
               </View>
             </View>
-          ) : <Text style={styles.body}>{post.content}</Text>}
+          ) : <Text style={styles.feedPostBody}>{post.content}</Text>}
           {post.images?.length ? (
             <View style={styles.feedPostImages}>
               {post.images.map((image, index) => (
@@ -817,53 +955,73 @@ export function FeedScreen() {
               ))}
             </View>
           ) : null}
-          <View style={styles.feedActionBar}>
-            <View style={styles.feedReactionActionWrap}>
-              {reactionPickerPostId === post.id ? (
-                <View style={styles.feedReactionPicker}>
-                  {([
-                    ['heart', '❤️'], ['like', '👍'], ['haha', '😄'], ['wow', '😮'], ['sad', '😢'],
-                  ] as const).map(([type, emoji]) => (
-                    <Pressable key={type} onHoverIn={() => openReactionPicker(post.id)} onPress={() => selectReaction(post.id, type)} style={styles.feedReactionOption} accessibilityRole="button" accessibilityLabel={`Cảm xúc ${type}`}>
-                      <Text style={styles.feedReactionEmoji}>{emoji}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
+          <View style={styles.feedEngagement}>
+            <View style={styles.feedEngagementSummary}>
+              <View style={styles.feedReactionSummary}>
+                {([
+                  ['heart', '❤️'],
+                  ['like', '👍'],
+                  ['haha', '😄'],
+                  ['wow', '😮'],
+                  ['sad', '😢'],
+                ] as const).map(([type, emoji]) => ({
+                  type,
+                  emoji,
+                  count: post.reactions?.[type] || (!post.reactions && type === 'like' ? post.reactionCount : 0),
+                })).filter(({ count }) => count > 0).map(({ type, emoji, count }) => (
+                  <View key={type} style={styles.feedReactionSummaryChip} accessibilityLabel={`${emoji} ${count}`}>
+                    <Text style={styles.feedReactionSummaryEmoji}>{emoji}</Text>
+                    <Text style={styles.feedReactionSummaryCount}>{count}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.feedCommentSummary}>
+                {post.commentsCount ?? post.comments.length + (post.replies || []).length} bình luận
+              </Text>
+            </View>
+            <View style={styles.feedActionBar}>
+              <View style={styles.feedReactionActionWrap}>
+                {reactionPickerPostId === post.id ? (
+                  <View style={styles.feedReactionPicker}>
+                    {([
+                      ['heart', '❤️'], ['like', '👍'], ['haha', '😄'], ['wow', '😮'], ['sad', '😢'],
+                    ] as const).map(([type, emoji]) => (
+                      <Pressable key={type} onHoverIn={() => openReactionPicker(post.id)} onPress={() => selectReaction(post.id, type)} style={styles.feedReactionOption} accessibilityRole="button" accessibilityLabel={`Cảm xúc ${type}`}>
+                        <Text style={styles.feedReactionEmoji}>{emoji}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                <Pressable
+                  onHoverIn={() => openReactionPicker(post.id)}
+                  onHoverOut={scheduleReactionPickerClose}
+                  onPress={() => setReactionPickerPostId((current) => {
+                    if (current === post.id) return Platform.OS === 'web' ? current : null;
+                    return post.id;
+                  })}
+                  style={[styles.feedActionButton, post.myReaction ? styles.feedActionButtonActive : null]}
+                  accessibilityRole="button"
+                  accessibilityLabel={post.myReaction ? 'Đổi cảm xúc' : 'Thả cảm xúc'}
+                >
+                  {post.myReaction === 'heart' ? <Heart size={15} color={colors.red} fill={colors.red} />
+                    : post.myReaction === 'like' ? <ThumbsUp size={15} color={colors.brand} fill={colors.brand} />
+                      : post.myReaction === 'haha' ? <Laugh size={15} color={colors.gold} />
+                        : post.myReaction === 'wow' ? <Sparkles size={15} color={colors.brand} />
+                          : post.myReaction === 'sad' ? <Frown size={15} color={colors.muted} />
+                            : <Heart size={15} color={colors.muted} />}
+                  <Text numberOfLines={1} style={styles.feedActionButtonText}>{post.myReaction ? ({ heart: 'Tim', like: 'Like', haha: 'Haha', wow: 'Wow', sad: 'Buồn' })[post.myReaction] : 'Thích'}</Text>
+                </Pressable>
+              </View>
               <Pressable
-                onHoverIn={() => openReactionPicker(post.id)}
-                onHoverOut={scheduleReactionPickerClose}
-                onPress={() => setReactionPickerPostId((current) => {
-                  if (current === post.id) return Platform.OS === 'web' ? current : null;
-                  return post.id;
-                })}
-                style={[styles.feedActionButton, post.myReaction ? styles.feedActionButtonActive : null]}
+                onPress={() => toggleComments(post.id)}
+                style={[styles.feedActionButton, commentsOpen[post.id] ? styles.feedActionButtonActive : null]}
                 accessibilityRole="button"
-                accessibilityLabel={post.myReaction ? 'Đổi cảm xúc' : 'Thả cảm xúc'}
+                accessibilityLabel={commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}
               >
-                {post.myReaction === 'heart' ? <Heart size={15} color={colors.red} fill={colors.red} />
-                  : post.myReaction === 'like' ? <ThumbsUp size={15} color={colors.brand} fill={colors.brand} />
-                    : post.myReaction === 'haha' ? <Laugh size={15} color={colors.gold} />
-                      : post.myReaction === 'wow' ? <Sparkles size={15} color={colors.brand} />
-                        : post.myReaction === 'sad' ? <Frown size={15} color={colors.muted} />
-                          : <Heart size={15} color={colors.muted} />}
-                <Text numberOfLines={1} style={styles.feedActionButtonText}>{post.myReaction ? ({ heart: 'Tim', like: 'Like', haha: 'Haha', wow: 'Wow', sad: 'Buồn' })[post.myReaction] : 'Thích'}</Text>
-                {post.reactionCount > 0 ? <Text style={styles.feedActionCount}>{post.reactionCount}</Text> : null}
+                <MessageCircle size={15} color={commentsOpen[post.id] ? colors.brand : colors.muted} />
+                <Text numberOfLines={1} style={styles.feedActionButtonText}>{commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}</Text>
               </Pressable>
             </View>
-            <Pressable
-              onPress={() => toggleComments(post.id)}
-              style={[styles.feedActionButton, commentsOpen[post.id] ? styles.feedActionButtonActive : null]}
-              accessibilityRole="button"
-              accessibilityLabel={commentsOpen[post.id] ? 'Ẩn bình luận' : 'Viết bình luận'}
-            >
-              <MessageCircle size={15} color={commentsOpen[post.id] ? colors.brand : colors.muted} />
-              <Text numberOfLines={1} style={styles.feedActionButtonText}>{commentsOpen[post.id]
-                ? `Ẩn bình luận${(post.commentsCount ?? post.comments.length + (post.replies || []).length) ? ` (${post.commentsCount ?? post.comments.length + (post.replies || []).length})` : ''}`
-                : (post.commentsCount ?? post.comments.length + (post.replies || []).length) > 0
-                  ? `Bình luận (${post.commentsCount ?? post.comments.length + (post.replies || []).length})`
-                  : 'Viết bình luận'}</Text>
-            </Pressable>
           </View>
           {commentsOpen[post.id] ? (
             <View style={styles.feedCommentsSection}>
@@ -949,6 +1107,65 @@ export function FeedScreen() {
       ))}
       {visibleItems.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
       {!resource.loading && !resource.error && !visibleItems.length ? <EmptyState title={items.length ? 'Bạn đã ẩn tất cả bài viết' : 'Chưa có bài đăng'} message={items.length ? 'Bài viết mới sẽ hiển thị tại đây.' : 'Bài đăng mới sẽ hiển thị tại đây.'} /> : null}
+      <Modal visible={!!reportingPost} transparent animationType="fade" onRequestClose={() => setReportingPost(null)}>
+        <View style={styles.feedReportModalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setReportingPost(null)} accessibilityRole="button" accessibilityLabel="Đóng báo cáo" />
+          <View style={styles.feedReportModal}>
+            <View style={styles.feedReportModalHeading}>
+              <View style={styles.feedReportModalIcon}><Flag size={18} color="#B45309" /></View>
+              <View style={styles.flex}>
+                <Text style={styles.feedReportModalTitle}>Báo cáo bài viết</Text>
+                <Text style={styles.feedReportModalSubtitle}>Chọn lý do để trung tâm xem xét</Text>
+              </View>
+              <Pressable onPress={() => setReportingPost(null)} style={styles.feedReportClose} accessibilityRole="button" accessibilityLabel="Đóng">
+                <X size={18} color={colors.muted} />
+              </Pressable>
+            </View>
+            <Text numberOfLines={3} style={styles.feedReportTarget}>{reportingPost?.content || 'Bài viết có hình ảnh đính kèm'}</Text>
+            <View style={styles.feedReportReasonList}>
+              {reportReasonOptions.map((option) => {
+                const selected = reportReason === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setReportReason(option.value)}
+                    style={[styles.feedReportReasonOption, selected && styles.feedReportReasonOptionSelected]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <View style={[styles.feedReportRadio, selected && styles.feedReportRadioSelected]}>{selected ? <View style={styles.feedReportRadioDot} /> : null}</View>
+                    <Text style={[styles.feedReportReasonOptionText, selected && styles.feedReportReasonOptionTextSelected]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <TextInput
+              value={reportDetails}
+              onChangeText={setReportDetails}
+              placeholder="Thông tin bổ sung (không bắt buộc)"
+              maxLength={500}
+              multiline
+              style={styles.feedReportDetailsInput}
+              accessibilityLabel="Thông tin bổ sung cho báo cáo"
+            />
+            {feedActionError ? <Text style={styles.feedReportErrorText}>{feedActionError}</Text> : null}
+            <View style={styles.feedReportModalActions}>
+              <Pressable onPress={() => setReportingPost(null)} style={styles.feedReportCancel} accessibilityRole="button">
+                <Text style={styles.feedReportCancelText}>Hủy</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { void submitPostReport(); }}
+                disabled={!reportReason || reportSubmitting}
+                style={[styles.feedReportSubmit, (!reportReason || reportSubmitting) && styles.feedReportSubmitDisabled]}
+                accessibilityRole="button"
+              >
+                <Flag size={15} color="#FFFFFF" />
+                <Text style={styles.feedReportSubmitText}>{reportSubmitting ? 'Đang gửi…' : 'Gửi báo cáo'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -2212,7 +2429,13 @@ const styles = StyleSheet.create({
   validationText: { color: colors.red, fontSize: typography.caption, fontWeight: '600' },
   evaluationLocked: { marginVertical: spacing.sm, backgroundColor: colors.canvas },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  feedComposer: { gap: spacing.md },
+  feedComposer: { gap: spacing.md, padding: spacing.md, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  feedRoleTag: { alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: '#F1F5F9' },
+  feedRoleCaption: { color: colors.muted, fontSize: 10, lineHeight: 13, fontWeight: '700' },
+  feedListHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.xs, paddingTop: spacing.xs },
+  feedListTitle: { color: colors.ink, fontSize: typography.body, fontWeight: '800' },
+  feedListCount: { minHeight: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: '#EEF2FF' },
+  feedListCountText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
   privacyMenuAnchor: { position: 'relative', zIndex: 30, alignItems: 'flex-end' },
   privacyButton: { maxWidth: 190, minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#86EFAC', borderRadius: radius.md, backgroundColor: '#ECFDF5' },
   privacyText: { flexShrink: 1, color: '#047857', fontSize: typography.micro, fontWeight: '700' },
@@ -2224,18 +2447,60 @@ const styles = StyleSheet.create({
   privacyOptionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
   privacyOptionTitle: { flexShrink: 1, color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
   privacyOptionDescription: { color: colors.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
-  feedDraft: { minHeight: 92, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
+  feedDraft: { minHeight: 92, textAlignVertical: 'top', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: spacing.md, backgroundColor: '#F8FAFC', color: colors.ink, fontSize: typography.caption, lineHeight: 20 },
   feedImagePreviewList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   feedImagePreview: { position: 'relative', width: 76, height: 76, overflow: 'hidden', borderRadius: radius.sm, backgroundColor: colors.canvas },
   feedImagePreviewImage: { width: '100%', height: '100%' },
   feedImageRemove: { position: 'absolute', top: 3, right: 3, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(15, 23, 42, 0.75)' },
   feedImageRemoveText: { color: '#FFFFFF', fontSize: typography.body, lineHeight: 22, fontWeight: '800' },
-  feedComposerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  feedImageAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm },
+  feedComposerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E8EEF2' },
+  feedImageAction: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: '#ECFDF5' },
+  feedImageActionText: { color: '#047857', fontSize: typography.caption, fontWeight: '700' },
   feedAuthorRow: { position: 'relative', zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  feedPostCard: { gap: spacing.md, padding: spacing.md, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOpacity: 0.035, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  feedPostBody: { color: colors.ink, fontSize: typography.caption, lineHeight: 21 },
+  feedActionNotice: { padding: spacing.sm, borderRadius: radius.md, backgroundColor: '#ECFDF5', color: '#047857', fontSize: typography.caption, fontWeight: '700' },
+  feedModerationCard: { gap: spacing.sm, borderColor: '#FDE68A', backgroundColor: '#FFFEF7' },
+  feedModerationHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  feedModerationHeadingIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
+  feedModerationTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  feedModerationSubtitle: { color: colors.muted, fontSize: typography.micro, marginTop: 2 },
+  feedReportItem: { gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F3E8C2' },
+  feedReportCopy: { gap: 3 },
+  feedReportReason: { color: '#92400E', fontSize: typography.caption, fontWeight: '800' },
+  feedReportExcerpt: { color: colors.ink, fontSize: typography.caption, lineHeight: 18 },
+  feedReportReporter: { color: colors.muted, fontSize: typography.micro },
+  feedReportDetails: { color: colors.muted, fontSize: typography.micro, fontStyle: 'italic' },
+  feedReportResolve: { alignSelf: 'flex-start', minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: '#ECFDF5' },
+  feedReportResolveText: { color: '#047857', fontSize: typography.micro, fontWeight: '800' },
+  feedReportError: { padding: spacing.sm, borderRadius: radius.md, backgroundColor: '#FEF2F2' },
+  feedReportErrorText: { color: colors.red, fontSize: typography.caption, lineHeight: 18 },
+  feedReportModalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg, backgroundColor: 'rgba(15,23,42,0.56)' },
+  feedReportModal: { width: '100%', maxWidth: 420, maxHeight: '90%', gap: spacing.md, padding: spacing.lg, borderRadius: 22, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
+  feedReportModalHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  feedReportModalIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
+  feedReportModalTitle: { color: colors.ink, fontSize: typography.body, fontWeight: '800' },
+  feedReportModalSubtitle: { color: colors.muted, fontSize: typography.micro, marginTop: 2 },
+  feedReportClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.canvas },
+  feedReportTarget: { maxHeight: 58, overflow: 'hidden', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas, color: colors.muted, fontSize: typography.caption, lineHeight: 18 },
+  feedReportReasonList: { gap: spacing.xs },
+  feedReportReasonOption: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  feedReportReasonOptionSelected: { borderColor: '#93C5FD', backgroundColor: '#EFF6FF' },
+  feedReportRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: '#94A3B8', alignItems: 'center', justifyContent: 'center' },
+  feedReportRadioSelected: { borderColor: colors.brand },
+  feedReportRadioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand },
+  feedReportReasonOptionText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  feedReportReasonOptionTextSelected: { color: colors.brand, fontWeight: '800' },
+  feedReportDetailsInput: { minHeight: 64, maxHeight: 100, textAlignVertical: 'top', padding: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, color: colors.ink, fontSize: typography.caption },
+  feedReportModalActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.sm },
+  feedReportCancel: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.canvas },
+  feedReportCancelText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
+  feedReportSubmit: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brand },
+  feedReportSubmitDisabled: { opacity: 0.45 },
+  feedReportSubmitText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   feedPostImages: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  feedPostImageFrame: { width: '48%', aspectRatio: 1.35, overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.canvas },
-  feedPostImageSingle: { width: '100%', aspectRatio: 1.6 },
+  feedPostImageFrame: { width: '48%', aspectRatio: 1.35, overflow: 'hidden', borderRadius: 14, backgroundColor: colors.canvas },
+  feedPostImageSingle: { width: '100%', aspectRatio: 1.55 },
   feedPostImage: { width: '100%', height: '100%' },
   feedPostMenuAnchor: { position: 'relative', zIndex: 20, alignItems: 'flex-end' },
   feedPostMenuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
@@ -2247,15 +2512,21 @@ const styles = StyleSheet.create({
   feedInlineActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
   feedDeleteText: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
   feedEditBox: { gap: spacing.xs },
-  feedActionBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  feedEngagement: { gap: spacing.xs, paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E8EEF2' },
+  feedEngagementSummary: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  feedReactionSummary: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  feedReactionSummaryChip: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, borderWidth: 1, borderColor: '#DBEAFE', borderRadius: radius.pill, backgroundColor: '#F8FAFC' },
+  feedReactionSummaryEmoji: { fontSize: 11 },
+  feedReactionSummaryCount: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  feedCommentSummary: { color: '#94A3B8', fontSize: 10 },
+  feedActionBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   feedReactionActionWrap: { position: 'relative', flex: 1, minWidth: 0 },
   feedReactionPicker: { position: 'absolute', zIndex: 5, bottom: 42, left: 0, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs, paddingVertical: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 5 },
   feedReactionOption: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   feedReactionEmoji: { fontSize: 20 },
-  feedActionButton: { minWidth: 0, minHeight: 36, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: 'transparent' },
+  feedActionButton: { minWidth: 0, minHeight: 38, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: colors.surface },
   feedActionButtonActive: { backgroundColor: '#EEF2FF' },
   feedActionButtonText: { flexShrink: 1, color: colors.muted, fontSize: 10, fontWeight: '700', textAlign: 'center' },
-  feedActionCount: { color: colors.muted, fontSize: 10, fontWeight: '600' },
   feedCommentsSection: { gap: spacing.md, marginTop: spacing.sm, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   feedCommentThread: { gap: 0 },
   feedCommentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
@@ -2287,7 +2558,11 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
   modalCard: { gap: spacing.md, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
-  feedAudience: { alignSelf: 'flex-start', color: colors.muted, fontSize: typography.caption, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.canvas },
+  feedPostMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.xs },
+  feedPinnedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: '#FEF3C7' },
+  feedPinnedText: { color: '#92400E', fontSize: typography.micro, fontWeight: '800' },
+  feedAudience: { maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: '#F1F5F9' },
+  feedAudienceText: { flexShrink: 1, color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   newsScreen: { gap: spacing.md },
   newsSearch: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.md, paddingRight: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
   newsSearchInput: { flex: 1, minWidth: 0, minHeight: 42, paddingVertical: 0, color: colors.ink, fontSize: typography.small },

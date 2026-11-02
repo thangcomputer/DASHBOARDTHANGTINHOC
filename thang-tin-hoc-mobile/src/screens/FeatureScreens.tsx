@@ -30,7 +30,7 @@ import type { AppNotification, Assignment, Conversation, DemoGradeRecord, DemoSt
 import type { TeacherProfile, TeacherProfileUpdate } from '../services/teacherApi';
 import { updateStudentProfile } from '../services/studentApi';
 import { buildDirectConversationId } from '../services/messageApi';
-import { enableMobilePushNotifications } from '../services/mobilePushNotifications';
+import { enableMobilePushNotifications, requestWebNotificationPermission } from '../services/mobilePushNotifications';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -3866,9 +3866,10 @@ export function ProfileScreen() {
   const [showTeacherProfileForm, setShowTeacherProfileForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
+  const [pushFeedback, setPushFeedback] = useState<{ title: string; message: string } | null>(null);
   const [previewStudentUpdates, setPreviewStudentUpdates] = useState<Record<string, string>>({});
   const [openStudentSections, setOpenStudentSections] = useState({
-    courses: true,
+    courses: false,
   });
   const studentProfileLoader = useCallback(
     async () => {
@@ -3901,12 +3902,6 @@ export function ProfileScreen() {
     if (['inactive', 'ngừng hoạt động'].includes(status)) return 'Ngừng hoạt động';
     return status || '—';
   })();
-  const teacherVoice = ({
-    bac: 'Miền Bắc',
-    trung: 'Miền Trung',
-    nam: 'Miền Nam',
-    tay: 'Tây Nguyên',
-  } as Record<string, string>)[teacherText('voiceRegion')] || teacherText('voiceRegion');
   const enrollments = studentProfile?.enrollments || [];
   const toggleStudentSection = (section: keyof typeof openStudentSections) => {
     setOpenStudentSections((current) => ({ ...current, [section]: !current[section] }));
@@ -3926,6 +3921,23 @@ export function ProfileScreen() {
     if (enablingPush) return;
     setEnablingPush(true);
     try {
+      if (Platform.OS === 'web') {
+        const permission = await requestWebNotificationPermission();
+        if (permission === 'granted') {
+          setPushFeedback({
+            title: 'Đã cho phép thông báo',
+            message: 'Trình duyệt đã cấp quyền thông báo. Lưu ý: bản web hiện chưa kết nối dịch vụ push nền, nên bạn chỉ nhận thông báo khi chức năng push web được cấu hình.',
+          });
+        } else {
+          setPushFeedback({
+            title: permission === 'denied' ? 'Thông báo đang bị chặn' : 'Chưa cấp quyền thông báo',
+            message: permission === 'denied'
+              ? 'Hãy mở cài đặt quyền của trang web trong trình duyệt, cho phép Thông báo rồi tải lại trang.'
+              : 'Bạn chưa cho phép thông báo. Hãy bấm lại và chọn Cho phép trong hộp thoại của trình duyệt.',
+          });
+        }
+        return;
+      }
       const enabled = await enableMobilePushNotifications();
       if (enabled) {
         Alert.alert('Đã bật thông báo', 'Thiết bị này sẽ nhận thông báo khi có cập nhật.');
@@ -3940,7 +3952,9 @@ export function ProfileScreen() {
         );
       }
     } catch (error) {
-      Alert.alert('Thông báo', error instanceof Error ? error.message : 'Không thể bật thông báo trên thiết bị.');
+      const message = error instanceof Error ? error.message : 'Không thể bật thông báo trên thiết bị.';
+      if (Platform.OS === 'web') setPushFeedback({ title: 'Không thể bật thông báo', message });
+      else Alert.alert('Thông báo', message);
     } finally {
       setEnablingPush(false);
     }
@@ -3984,46 +3998,6 @@ export function ProfileScreen() {
           </Card>
           <Card style={styles.teacherDetails}>
             <SectionHeading title="Thông tin cá nhân" action="Chỉnh sửa" onPress={() => setShowTeacherProfileForm(true)} />
-            {[
-              ['Mã giảng viên', teacherText('teacherCode')],
-              ['Zalo', teacherText('zalo', user?.zalo || '—')],
-              ['Tuổi', typeof profileTeacher?.age === 'number' ? `${profileTeacher.age} tuổi` : '—'],
-              ['Email', teacherText('email', user?.email || '—')],
-              ['Địa chỉ (Thường trú/Tạm trú)', teacherText('address', user?.address || '—')],
-              ['Chuyên môn', teacherText('specialty', user?.course || '—')],
-              ['Giọng (vùng miền)', teacherVoice],
-              ['Giới thiệu bản thân', teacherText('bio')],
-            ].filter(([, value]) => value !== '—').map(([label, value]) => (
-              <View
-                key={label}
-                style={[
-                  styles.teacherProfileField,
-                  ['Địa chỉ (Thường trú/Tạm trú)', 'Chuyên môn', 'Giới thiệu bản thân'].includes(label) && styles.teacherProfileFieldStacked,
-                ]}
-              >
-                <Text style={styles.teacherProfileLabel}>{label}</Text>
-                <Text
-                  style={[
-                    styles.teacherProfileValue,
-                    ['Địa chỉ (Thường trú/Tạm trú)', 'Chuyên môn', 'Giới thiệu bản thân'].includes(label) && styles.teacherProfileValueFull,
-                  ]}
-                >
-                  {value}
-                </Text>
-              </View>
-            ))}
-            {![
-              teacherText('teacherCode'),
-              teacherText('zalo'),
-              typeof profileTeacher?.age === 'number' ? `${profileTeacher.age} tuổi` : '—',
-              teacherText('email', user?.email || '—'),
-              teacherText('address', user?.address || '—'),
-              teacherText('specialty', user?.course || '—'),
-              teacherVoice,
-              teacherText('bio'),
-            ].some((value) => value !== '—') ? (
-              <Text style={styles.teacherProfileEmpty}>Chưa có thông tin bổ sung.</Text>
-            ) : null}
           </Card>
           {typeof profileTeacher?.testScore === 'number' || typeof profileTeacher?.baseSalaryPerSession === 'number' ? (
             <Card style={styles.teacherDetails}>
@@ -4066,23 +4040,6 @@ export function ProfileScreen() {
                 <Text style={styles.profileEditButtonText}>Chỉnh sửa</Text>
               </Pressable>
             </View>
-            <View style={styles.studentProfileRows}>
-              {[
-                { label: 'Họ và tên', value: studentText('name', user?.name || 'Chưa cập nhật'), Icon: UserRound },
-                { label: 'Số điện thoại', value: studentText('phone', user?.phone || 'Chưa cập nhật'), Icon: Phone },
-                { label: 'Email', value: studentText('email', user?.email || 'Chưa cập nhật'), Icon: Mail },
-                { label: 'Số điện thoại khác', value: studentText('zalo', user?.zalo || 'Chưa cập nhật'), Icon: Phone },
-                { label: 'Địa chỉ', value: studentText('address', user?.address || 'Chưa cập nhật'), Icon: MapPin },
-              ].map(({ label, value, Icon }) => (
-                <View key={label} style={styles.studentProfileInfoRow}>
-                  <Icon size={16} color="#94A3B8" />
-                  <View style={styles.studentProfileInfoCopy}>
-                    <Text style={styles.studentProfileLabel}>{label}</Text>
-                    <Text style={styles.studentProfileValue}>{value}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
           </Card>
           <Card style={styles.profileDetails}>
             <Pressable onPress={() => toggleStudentSection('courses')} style={styles.studentProfileSectionHeader} accessibilityRole="button" accessibilityState={{ expanded: openStudentSections.courses }}>
@@ -4111,23 +4068,11 @@ export function ProfileScreen() {
         <Card style={styles.menuCard}>
           <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
           <MenuRow icon={<Users size={18} color={colors.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
-          <MenuRow icon={<Clock3 size={18} color={colors.red} />} title="Đăng xuất" destructive onPress={handleSignOut} />
         </Card>
       ) : (
-        <>
-          <Card style={styles.menuCard}>
-            <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} borderless />
-          </Card>
-          <Pressable
-            onPress={handleSignOut}
-            style={({ pressed }) => [styles.profileSignOutButton, pressed && styles.profileSignOutButtonPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Đăng xuất"
-          >
-            <LogOut size={18} color={colors.red} />
-            <Text style={styles.profileSignOutText}>Đăng xuất</Text>
-          </Pressable>
-        </>
+        <Card style={styles.menuCard}>
+          <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} borderless />
+        </Card>
       )}
       {!user?.previewMode ? (
         <Card style={styles.menuCard}>
@@ -4135,7 +4080,7 @@ export function ProfileScreen() {
           <MenuRow
             icon={<Bell size={18} color={colors.brand} />}
             title={enablingPush ? 'Đang bật thông báo…' : 'Bật thông báo trên thiết bị'}
-            subtitle="Chỉ hỏi quyền khi bạn chọn bật"
+            subtitle={Platform.OS === 'web' ? 'Bật quyền thông báo cho trình duyệt này' : 'Chỉ hỏi quyền khi bạn chọn bật'}
             onPress={() => { void enablePush(); }}
           />
           {configuredLinks.map((item, index) => (
@@ -4152,6 +4097,15 @@ export function ProfileScreen() {
           ) : null}
         </Card>
       ) : null}
+      <Pressable
+        onPress={handleSignOut}
+        style={({ pressed }) => [styles.profileSignOutButton, pressed && styles.profileSignOutButtonPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Đăng xuất"
+      >
+        <LogOut size={18} color={colors.red} />
+        <Text style={styles.profileSignOutText}>Đăng xuất</Text>
+      </Pressable>
       {!isTeacher && showStudentProfileForm ? (
         <StudentProfileEditModal
           user={user}
@@ -4184,6 +4138,29 @@ export function ProfileScreen() {
           }}
         />
       ) : null}
+      <Modal
+        visible={Boolean(pushFeedback)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPushFeedback(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.cardTitle}>{pushFeedback?.title}</Text>
+            <Text style={styles.metaText}>{pushFeedback?.message}</Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setPushFeedback(null)}
+                style={styles.profilePushFeedbackButton}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng thông báo trạng thái quyền"
+              >
+                <Text style={styles.profilePushFeedbackButtonText}>Đã hiểu</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -5421,6 +5398,8 @@ const styles = StyleSheet.create({
   profileSignOutButton: { minHeight: 48, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.xl, borderWidth: 1, borderColor: colors.redSoft, borderRadius: radius.md, backgroundColor: colors.surface },
   profileSignOutButtonPressed: { backgroundColor: colors.redSoft },
   profileSignOutText: { color: colors.red, fontSize: typography.small, fontWeight: '800' },
+  profilePushFeedbackButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colors.brand },
+  profilePushFeedbackButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
   studentProfileSectionText: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
   studentProfileChevronOpen: { transform: [{ rotate: '180deg' }] },
   studentProfileRows: { paddingVertical: 2 },

@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, DeviceEventEmitter, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, Easing, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
-  ArrowRight, Award, BookOpen, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardCheck, ClipboardList,
-  Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, Star, TrendingUp, Users,
+  ArrowRight, Award, BookOpen, Bot, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardCheck, ClipboardList,
+  Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, Sparkles, Star, TrendingUp, Users,
   WalletCards, UserPlus, Trophy, Video, Zap,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -20,6 +20,7 @@ import { getDashboardBanners } from '../services/webSettingsApi';
 import { getMobileImageSource } from '../services/apiClient';
 import { getTeacherDashboardMetrics } from '../services/teacherApi';
 import { buildStudentDashboardActivity } from '../services/studentDashboardActivity';
+import { openAiSupportConversation } from '../services/aiSupportApi';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 
@@ -74,6 +75,17 @@ export function HomeScreen() {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [bannerIndex, setBannerIndex] = useState(0);
   const [failedBannerImages, setFailedBannerImages] = useState<string[]>([]);
+  const [openingSupport, setOpeningSupport] = useState(false);
+  const [supportOpenError, setSupportOpenError] = useState('');
+  const supportBotMotion = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const motion = Animated.loop(Animated.sequence([
+      Animated.timing(supportBotMotion, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(supportBotMotion, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    motion.start();
+    return () => motion.stop();
+  }, [supportBotMotion]);
   const schedulesLoader = useCallback(() => scheduleService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const assignmentsLoader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
@@ -102,6 +114,26 @@ export function HomeScreen() {
   const quizzes = useMockResource(quizzesLoader);
   const evaluationActivity = useMockResource(evaluationActivityLoader);
   const messages = useMockResource(messagesLoader);
+  const openSupportChat = async () => {
+    if (!user || openingSupport) return;
+    setOpeningSupport(true);
+    setSupportOpenError('');
+    try {
+      const support = await openAiSupportConversation();
+      navigation?.navigate('Conversation', {
+        conversationId: support.conversationId,
+        conversationName: 'Trợ lý Thắng Tin Học',
+        participantId: 'ai_support',
+        participantRole: 'system',
+        participantOnline: true,
+        supportStatus: support.status,
+      });
+    } catch (error) {
+      setSupportOpenError(error instanceof Error ? error.message : 'Không thể mở kênh hỗ trợ. Vui lòng thử lại.');
+    } finally {
+      setOpeningSupport(false);
+    }
+  };
   useFocusEffect(useCallback(() => {
     schedules.reload();
     assignments.reload();
@@ -613,7 +645,7 @@ export function HomeScreen() {
                 </View>
                 {width >= 640 ? <Text style={styles.todoOverviewPill}>Tổng quan</Text> : null}
               </View>
-              <View style={[styles.todoCards, width >= 640 && styles.todoCardsWide]}>
+              <View style={styles.todoCards}>
               {[
               {
                 title: 'Trắc nghiệm buổi học',
@@ -663,14 +695,14 @@ export function HomeScreen() {
               <Pressable key={title} onPress={() => {
                 if (route === 'Messages' || route === 'Schedule') tabNavigation.navigate(route);
                 else navigation?.navigate(route);
-              }} accessibilityRole="button" style={[styles.todoCard, width >= 640 && styles.todoCardWide, tone]}>
+              }} accessibilityRole="button" style={[styles.todoCard, tone]}>
                 <View style={[styles.todoCardIcon, iconTone]}>
                   <Icon size={24} color="#FFFFFF" strokeWidth={2.4} />
                   {badge > 0 ? <Text style={styles.todoBadge}>{badge > 99 ? '99+' : badge}</Text> : null}
                 </View>
                 <View style={styles.todoCardContent}>
-                  <Text style={styles.cardTitle}>{title}</Text>
-                  <Text style={[styles.todoDetail, { color }]}>{detail}</Text>
+                  <Text numberOfLines={2} style={styles.todoCardTitle}>{title}</Text>
+                  <Text numberOfLines={1} style={[styles.todoDetail, { color }]}>{detail}</Text>
                   <View style={styles.todoCta}><Text style={styles.todoCtaText}>{action}</Text><ChevronRight size={14} color={colors.ink} /></View>
                 </View>
               </Pressable>
@@ -713,10 +745,10 @@ export function HomeScreen() {
             <Card style={styles.gradePanel}>
               <Pressable onPress={() => navigation?.navigate('Grades')} accessibilityRole="button" style={styles.gradeHeading}>
                 <View style={styles.gradeHeadingTitle}>
-                  <ClipboardList size={18} color="#10B981" />
-                  <Text style={styles.cardTitle}>Nhật ký học tập &amp; Điểm số</Text>
+                  <View style={styles.gradeHeadingIcon}><ClipboardList size={17} color="#059669" /></View>
+                  <Text numberOfLines={2} style={styles.gradeHeadingText}>Nhật ký học tập &amp; Điểm số</Text>
                 </View>
-                <Text style={styles.gradeCount}>{assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
+                <Text numberOfLines={1} style={styles.gradeCount}>{assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
                   ? '—'
                   : `${gradeEntries.length} lượt ghi nhận`}</Text>
               </Pressable>
@@ -726,8 +758,8 @@ export function HomeScreen() {
                 <>
                   {gradeEntries.length ? gradeEntries.slice(0, 3).map((item) => (
                     <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
-                    <Text style={styles.cardTitle}>{item.note}</Text>
-                    <Text style={styles.muted}>{item.date}{item.grade == null ? '' : ` · Điểm: ${item.grade}`}</Text>
+                    <Text style={styles.gradeRowTitle}>{item.note}</Text>
+                    <Text style={styles.gradeRowMeta}>{item.date}{item.grade == null ? '' : `  ·  Điểm: ${item.grade}`}</Text>
                     </View>
                       )) : (
                         <View style={styles.gradeEmpty}>
@@ -794,14 +826,39 @@ export function HomeScreen() {
         </View>
       </View> : null}
 
-      {isTeacher ? <Pressable onPress={() => tabNavigation.navigate('Messages')} style={styles.helpCard} accessibilityRole="button">
-        <View style={styles.helpIcon}><MessageCircle size={18} color="#FFFFFF" /></View>
-        <View style={styles.flex}>
-          <Text style={styles.helpTitle}>Cần hỗ trợ?</Text>
-          <Text style={styles.helpText}>Nhắn tin với {isTeacher ? 'trung tâm' : 'giảng viên'} của bạn</Text>
+      {user && !user.previewMode ? <Pressable
+        onPress={() => { void openSupportChat(); }}
+        disabled={openingSupport}
+        style={[styles.helpCard, openingSupport && styles.helpCardDisabled]}
+        accessibilityRole="button"
+        accessibilityLabel="Mở Trợ lý AI hoặc nhân viên hỗ trợ"
+        accessibilityState={{ disabled: openingSupport }}
+      >
+        <View style={styles.helpRobotStage} pointerEvents="none">
+          <View style={styles.helpRobotHalo} />
+          <Animated.View style={[styles.helpRobot, { transform: [{ translateY: supportBotMotion.interpolate({ inputRange: [0, 1], outputRange: [2, -4] }) }] }]}>
+            <Bot size={28} color="#E6FFFB" strokeWidth={1.9} />
+          </Animated.View>
+          <Sparkles size={14} color="#FDE68A" style={styles.helpRobotSparkle} />
+          <View style={styles.helpRobotStatus}><View style={styles.helpRobotStatusDot} /><Text style={styles.helpRobotStatusText}>AI</Text></View>
         </View>
-        <ArrowRight size={18} color="#FFFFFF" />
+        <View style={styles.flex}>
+          <View style={styles.helpTitleRow}>
+            <Text style={styles.helpTitle}>{openingSupport ? 'Đang kết nối…' : 'Trợ lý AI'}</Text>
+            <View style={styles.helpOnline}><View style={styles.helpOnlineDot} /><Text style={styles.helpOnlineText}>SẴN SÀNG</Text></View>
+          </View>
+          <Text style={styles.helpText}>Hỏi đáp cùng AI hoặc kết nối nhân viên hỗ trợ</Text>
+        </View>
+        {openingSupport ? <ActivityIndicator size="small" color="#FFFFFF" /> : <View style={styles.helpArrow}><ArrowRight size={17} color="#FFFFFF" /></View>}
       </Pressable> : null}
+      {supportOpenError ? (
+        <View style={styles.helpError}>
+          <Text style={styles.helpErrorText}>{supportOpenError}</Text>
+          <Pressable onPress={() => setSupportOpenError('')} accessibilityRole="button" accessibilityLabel="Đóng lỗi hỗ trợ">
+            <Text style={styles.helpErrorClose}>Đóng</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </AppScreen>
   );
 }
@@ -922,24 +979,23 @@ const styles = StyleSheet.create({
   todoHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xs },
   todoHeaderIcon: { width: 40, height: 40, borderRadius: 16, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
   todoOverviewPill: { overflow: 'hidden', borderRadius: radius.pill, backgroundColor: '#F1F5F9', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, color: colors.muted, fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.6 },
-  todoCards: { gap: spacing.sm },
-  todoCardsWide: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  todoCards: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
   todoSubtitle: { color: colors.muted, fontSize: typography.caption, fontWeight: '600', marginTop: 2 },
-  todoCard: { minHeight: 104, borderWidth: 1, borderRadius: 16, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md, overflow: 'hidden' },
-  todoCardWide: { width: '48%' },
+  todoCard: { width: '48%', height: 148, borderWidth: 1, borderRadius: 16, padding: spacing.sm, alignItems: 'flex-start', gap: spacing.xs, overflow: 'hidden' },
   quizTodo: { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' },
   homeworkTodo: { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' },
   scheduleTodo: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   messagesTodo: { backgroundColor: '#FAF5FF', borderColor: '#E9D5FF' },
-  todoCardIcon: { width: 48, height: 48, flexShrink: 0, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+  todoCardIcon: { width: 36, height: 36, flexShrink: 0, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   todoBadge: { position: 'absolute', top: -7, right: -8, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, textAlign: 'center', overflow: 'hidden', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: typography.micro, lineHeight: 20, fontWeight: '900', borderWidth: 2, borderColor: '#FFFFFF' },
   quizTodoIcon: { backgroundColor: '#E11D48' },
   homeworkTodoIcon: { backgroundColor: '#F97316' },
   scheduleTodoIcon: { backgroundColor: '#3B82F6' },
   messagesTodoIcon: { backgroundColor: '#8B5CF6' },
-  todoCardContent: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 2 },
-  todoDetail: { fontSize: typography.caption, fontWeight: '700' },
-  todoCta: { minHeight: 28, marginTop: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 2 },
+  todoCardContent: { flex: 1, width: '100%', minWidth: 0, alignItems: 'flex-start', gap: 2 },
+  todoCardTitle: { minHeight: 36, color: colors.ink, fontWeight: '700', fontSize: typography.caption, lineHeight: 18 },
+  todoDetail: { minHeight: 16, fontSize: typography.caption, lineHeight: 16, fontWeight: '700' },
+  todoCta: { minHeight: 28, marginTop: 'auto', paddingHorizontal: spacing.sm, borderRadius: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', gap: 2 },
   todoCtaText: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
   materialPanel: { backgroundColor: '#334155', borderRadius: 16, padding: spacing.lg, gap: spacing.sm },
   materialHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
@@ -954,10 +1010,14 @@ const styles = StyleSheet.create({
   materialAction: { minHeight: 40, marginTop: spacing.xs, backgroundColor: 'rgba(71, 85, 105, 0.55)', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   materialActionText: { color: '#BAE6FD', fontSize: typography.caption, fontWeight: '700' },
   gradePanel: { padding: 0, overflow: 'hidden' },
-  gradeHeading: { minHeight: 54, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  gradeHeadingTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  gradeCount: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
+  gradeHeading: { minHeight: 62, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: '#FCFDFE', borderBottomWidth: 1, borderBottomColor: '#E8EEF2', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  gradeHeadingTitle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  gradeHeadingIcon: { width: 34, height: 34, flexShrink: 0, borderRadius: 11, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
+  gradeHeadingText: { flex: 1, minWidth: 0, color: colors.ink, fontWeight: '800', fontSize: typography.caption, lineHeight: 18 },
+  gradeCount: { maxWidth: 112, overflow: 'hidden', borderRadius: radius.pill, backgroundColor: '#F1F5F9', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, color: '#475569', fontSize: typography.micro, fontWeight: '800', textAlign: 'center' },
   gradeRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: spacing.xs },
+  gradeRowTitle: { color: colors.ink, fontSize: typography.caption, lineHeight: 19, fontWeight: '700' },
+  gradeRowMeta: { color: colors.muted, fontSize: typography.caption, lineHeight: 17 },
   gradeEmpty: { minHeight: 160, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.lg },
   gradeEmptyIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', marginBottom: spacing.xs },
   gradeEmptyTitle: { color: '#475569', fontSize: typography.caption, fontWeight: '800' },
@@ -975,9 +1035,24 @@ const styles = StyleSheet.create({
   taskCard: { gap: spacing.sm },
   taskTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   taskIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  helpCard: { backgroundColor: colors.brandDark, borderRadius: radius.md, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, shadowColor: colors.brandDark, shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  helpIcon: { width: 38, height: 38, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  helpCard: { minHeight: 104, position: 'relative', overflow: 'hidden', backgroundColor: '#123B4A', borderRadius: 22, borderWidth: 1, borderColor: 'rgba(167,243,208,0.26)', paddingHorizontal: spacing.md, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, shadowColor: '#0F766E', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 6 },
+  helpCardDisabled: { opacity: 0.78 },
+  helpRobotStage: { width: 60, height: 64, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  helpRobotHalo: { position: 'absolute', width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(45,212,191,0.18)', borderWidth: 1, borderColor: 'rgba(153,246,228,0.22)' },
+  helpRobot: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0F766E', borderWidth: 1, borderColor: 'rgba(204,251,241,0.45)', alignItems: 'center', justifyContent: 'center', shadowColor: '#5EEAD4', shadowOpacity: 0.35, shadowRadius: 9, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  helpRobotSparkle: { position: 'absolute', top: 0, right: 0 },
+  helpRobotStatus: { position: 'absolute', bottom: 0, right: -2, height: 20, minWidth: 30, paddingHorizontal: 5, borderRadius: 10, backgroundColor: '#ECFDF5', borderWidth: 2, borderColor: '#123B4A', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  helpRobotStatusDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#10B981' },
+  helpRobotStatusText: { color: '#047857', fontSize: 8, lineHeight: 12, fontWeight: '900' },
+  helpTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
   helpTitle: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.body },
-  helpText: { color: '#D8F3EF', fontSize: typography.caption, marginTop: 2 },
+  helpOnline: { borderRadius: radius.pill, backgroundColor: 'rgba(16,185,129,0.16)', paddingHorizontal: 7, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  helpOnlineDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#6EE7B7' },
+  helpOnlineText: { color: '#A7F3D0', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.5 },
+  helpText: { color: '#D1FAE5', fontSize: typography.caption, lineHeight: 17, marginTop: 4 },
+  helpArrow: { width: 32, height: 32, flexShrink: 0, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+  helpError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
+  helpErrorText: { flex: 1, color: '#991B1B', fontSize: typography.caption, lineHeight: 18 },
+  helpErrorClose: { color: '#991B1B', fontSize: typography.caption, fontWeight: '800' },
   pressed: { opacity: 0.8 },
 });

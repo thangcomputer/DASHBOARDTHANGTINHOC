@@ -25,8 +25,10 @@ test('mobile feed uses the shared API for images, visibility, reactions and comm
   assert.ok(screen.includes('getMobileImageSource(image)'));
   assert.ok(screen.includes('feedReactionPicker'));
   assert.ok(screen.includes('onHoverOut={scheduleReactionPickerClose}'));
-  assert.ok(screen.includes('feedActionCount'));
-  assert.ok(!screen.includes('feedReactionSummary'));
+  assert.ok(screen.includes('feedReactionSummary'));
+  assert.ok(screen.includes('feedCommentSummary'));
+  assert.ok(screen.includes('feedEngagement'));
+  assert.ok(!screen.includes('feedActionCount'));
   assert.ok(screen.includes('Ẩn bình luận'));
   assert.ok(screen.includes('Viết bình luận thảo luận...'));
   assert.ok(screen.includes('feedCommentRow'));
@@ -45,6 +47,14 @@ test('mobile feed uses the shared API for images, visibility, reactions and comm
   assert.ok(screen.includes('closeOnOutsidePointer'));
   assert.ok(screen.includes("document.addEventListener('pointerdown', closeOnOutsidePointer, true)"));
   assert.ok(screen.includes('event.target.closest(\'#feed-post-menu\')'));
+  assert.ok(api.includes("'/feed/reports'"));
+  assert.ok(api.includes('/reports`'));
+  assert.ok(api.includes('/pin`'));
+  assert.ok(screen.includes('Báo cáo bài viết'));
+  assert.ok(screen.includes('Ghim thông báo'));
+  assert.ok(screen.includes('Báo cáo cần xem xét'));
+  assert.ok(screen.includes('Đã xử lý'));
+  assert.ok(screen.includes('Thông báo ghim'));
 });
 
 test('mobile news list, categories and detail use the shared blog API', () => {
@@ -62,4 +72,18 @@ test('mobile news list, categories and detail use the shared blog API', () => {
   assert.ok(screen.includes('openNewsFilter'));
   assert.ok(screen.includes('<RenderHtml'));
   assert.ok(screen.includes('getMobileImageSource(news.thumbnailUrl)'));
+});
+
+test('web feed exposes report handling and center notice pinning', () => {
+  const api = read('client/src/services/api.js');
+  const board = read('client/src/components/FeedBoard.jsx');
+
+  assert.ok(api.includes("apiFetch(`/feed/${postId}/reports`"));
+  assert.ok(api.includes("apiFetch(`/feed/${postId}/pin`"));
+  assert.ok(api.includes("apiFetch('/feed/reports')"));
+  assert.ok(api.includes("apiFetch(`/feed/reports/${reportId}/resolve`"));
+  assert.ok(board.includes('Báo cáo bài viết'));
+  assert.ok(board.includes('Báo cáo cần xem xét'));
+  assert.ok(board.includes('Đánh dấu đã xử lý'));
+  assert.ok(board.includes('Ghim thông báo'));
 });

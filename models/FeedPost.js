@@ -59,6 +59,8 @@ const feedPostSchema = new mongoose.Schema({
     default: 'public',
     index: true,
   },
+  isPinned: { type: Boolean, default: false, index: true },
+  pinnedAt: { type: Date, default: null },
   isEdited:   { type: Boolean, default: false },
   editedAt:   { type: Date, default: null },
 }, { timestamps: true });
@@ -67,6 +69,7 @@ feedPostSchema.index({ createdAt: -1 });
 feedPostSchema.index({ authorId: 1, createdAt: -1 });
 feedPostSchema.index({ authorRole: 1, createdAt: -1 });
 feedPostSchema.index({ visibility: 1, createdAt: -1 });
+feedPostSchema.index({ isPinned: -1, pinnedAt: -1, createdAt: -1 });
 
 module.exports = mongoose.model('FeedPost', feedPostSchema);
 module.exports.REACTION_TYPES = REACTION_TYPES;

@@ -297,6 +297,62 @@ router.get('/hidden', messagesGuard('hidden'), async (req, res) => {
   }
 });
 
+router.get('/pinned-conversations', messagesGuard('pinned_conversations'), async (req, res) => {
+  try {
+    const userIds = [...new Set([req.user.id, req.user._id].filter(Boolean).map(String))];
+    const rows = await ConversationVisibility.find({ pinnedByUsers: { $in: userIds } })
+      .select('conversationId')
+      .lean();
+    res.json({ success: true, data: rows.map((row) => row.conversationId) });
+  } catch (err) {
+    logger.error('[MESSAGES] pinned-conversations:', err.message);
+    res.status(500).json({ success: false, message: 'Không thể tải danh sách hội thoại đã ghim.' });
+  }
+});
+
+router.put('/pin-conversation/:conversationId', messagesGuard('pin_conversation'), async (req, res) => {
+  try {
+    const conversationId = String(req.params.conversationId || '');
+    const { pinned } = req.body || {};
+    if (!conversationId || typeof pinned !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Trạng thái ghim cuộc trò chuyện không hợp lệ.' });
+    }
+
+    const userIds = [...new Set([req.user.id, req.user._id].filter(Boolean).map(String))];
+    let isParticipant = false;
+    if (conversationId.startsWith('group_')) {
+      const mongoose = require('mongoose');
+      const groupId = conversationId.slice('group_'.length);
+      if (mongoose.Types.ObjectId.isValid(groupId)) {
+        isParticipant = Boolean(await Group.findOne({
+          _id: groupId,
+          'participants.userId': { $in: userIds },
+        }).select('_id').lean());
+      }
+    } else {
+      isParticipant = canAccessDirectConversation(conversationId, req.user);
+    }
+
+    if (!isParticipant) {
+      return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này.' });
+    }
+
+    const userId = String(req.user.id || req.user._id);
+    const update = pinned
+      ? { $addToSet: { pinnedByUsers: userId } }
+      : { $pull: { pinnedByUsers: { $in: userIds } } };
+    await ConversationVisibility.findOneAndUpdate(
+      { conversationId },
+      update,
+      { upsert: pinned, returnDocument: 'after' },
+    );
+    res.json({ success: true, data: { conversationId, pinned } });
+  } catch (err) {
+    logger.error('[MESSAGES] pin-conversation:', err.message);
+    res.status(500).json({ success: false, message: 'Không thể cập nhật ghim cuộc trò chuyện.' });
+  }
+});
+
 // ── Lấy tin nhắn của cuộc trò chuyện ──
 router.get('/:conversationId', messagesGuard('get_conversation'), async (req, res) => {
   try {

@@ -2403,6 +2403,25 @@ export const feedAPI = {
     const res = await apiFetch(`/feed/${postId}/comments/${commentId}`, { method: 'DELETE' });
     return res.json();
   },
+  report: async (postId, payload) => {
+    const res = await apiFetch(`/feed/${postId}/reports`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+  togglePin: async (postId) => {
+    const res = await apiFetch(`/feed/${postId}/pin`, { method: 'POST' });
+    return res.json();
+  },
+  reports: async () => {
+    const res = await apiFetch('/feed/reports');
+    return res.json();
+  },
+  resolveReport: async (reportId) => {
+    const res = await apiFetch(`/feed/reports/${reportId}/resolve`, { method: 'POST' });
+    return res.json();
+  },
   uploadImages: async (files) => {
     const fd = new FormData();
     (files || []).forEach((f) => fd.append('images', f));

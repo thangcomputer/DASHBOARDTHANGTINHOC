@@ -13,19 +13,28 @@ export function CallRingback({ active }: { active: boolean }) {
     }
 
     let cancelled = false;
-    const timers = BEEP_TIMES_MS.map((delay) => setTimeout(() => {
-      if (cancelled) return;
-      void player.seekTo(0)
-        .then(() => {
-          if (!cancelled) player.play();
-        })
-        .catch((error: unknown) => {
-          console.warn('Không thể phát âm báo kết nối cuộc gọi.', error);
-        });
-    }, delay));
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const playPattern = () => {
+      for (const delay of BEEP_TIMES_MS) {
+        timers.push(setTimeout(() => {
+          if (cancelled) return;
+          void player.seekTo(0)
+            .then(() => {
+              if (!cancelled) player.play();
+            })
+            .catch((error: unknown) => {
+              console.warn('Không thể phát âm báo kết nối cuộc gọi.', error);
+            });
+        }, delay));
+      }
+    };
+    playPattern();
+    const interval = setInterval(playPattern, 4500);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
+      timers.forEach(clearTimeout);
       timers.forEach(clearTimeout);
       player.pause();
       void player.seekTo(0).catch((error: unknown) => {

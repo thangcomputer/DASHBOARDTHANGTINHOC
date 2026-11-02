@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Headphones, ImagePlus, Send, Trash2, MessageCircle,
+  Headphones, ImagePlus, Send, Trash2, MessageCircle, Flag, Pin, PinOff,
   Loader2, X, Newspaper, RefreshCw, Reply, Sparkles, Heart, ThumbsUp, Laugh, Frown,
   Globe, GraduationCap, Users, Lock, Edit3, Check, ChevronDown, Eye, AlertCircle,
   Play, ExternalLink,
@@ -164,6 +164,7 @@ export default function FeedBoard({ session, role }) {
   const meAdminRole = String(session?.adminRole || '').toUpperCase();
   const isSuperAdminViewerUser = meId === 'admin' || meAdminRole === 'SUPER_ADMIN';
   const isHighAdminViewerUser = meAdminRole === 'HIGH_ADMIN';
+  const canModerateFeed = meRole === 'admin' || meRole === 'staff' || isSuperAdminViewerUser || isHighAdminViewerUser;
 
   const isAuthorSuperAdmin = (authorId, authorAdminRole, authorRole) => {
     const uid = String(authorId || '');
@@ -288,6 +289,21 @@ export default function FeedBoard({ session, role }) {
   // Reaction Details Modal State
   const [reactionModalPost, setReactionModalPost] = useState(null);
   const [reactionModalTab, setReactionModalTab] = useState('all');
+  const [pendingReports, setPendingReports] = useState([]);
+  const [reportQueueError, setReportQueueError] = useState('');
+  const [reportingPost, setReportingPost] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [resolvingReportId, setResolvingReportId] = useState(null);
+
+  const reportReasons = [
+    { value: 'spam', label: 'Spam hoặc quảng cáo' },
+    { value: 'harassment', label: 'Quấy rối hoặc xúc phạm' },
+    { value: 'inappropriate', label: 'Nội dung không phù hợp' },
+    { value: 'misinformation', label: 'Thông tin sai lệch' },
+    { value: 'other', label: 'Lý do khác' },
+  ];
 
   const convertImageFileToWebp = async (file, quality = 0.85) => {
     try {
@@ -351,6 +367,25 @@ export default function FeedBoard({ session, role }) {
   useEffect(() => {
     load(1, false);
   }, [load]);
+
+  useEffect(() => {
+    if (!canModerateFeed) return undefined;
+    let active = true;
+    api.feed.reports()
+      .then((res) => {
+        if (!active) return;
+        if (res.success) {
+          setPendingReports(Array.isArray(res.data) ? res.data : []);
+          setReportQueueError('');
+        } else {
+          setReportQueueError(res.message || 'Không thể tải báo cáo bài viết.');
+        }
+      })
+      .catch((error) => {
+        if (active) setReportQueueError(error?.message || 'Không thể tải báo cáo bài viết.');
+      });
+    return () => { active = false; };
+  }, [canModerateFeed]);
 
   useEffect(() => {
     if (!youtubeModal) return undefined;
@@ -631,6 +666,68 @@ export default function FeedBoard({ session, role }) {
     }
   };
 
+  const handleTogglePin = async (post) => {
+    setBusyId(post.id);
+    try {
+      const res = await api.feed.togglePin(post.id);
+      if (!res.success || !res.data) {
+        toast.error(res.message || 'Không thể cập nhật ghim thông báo');
+        return;
+      }
+      setPosts((prev) => prev
+        .map((item) => item.id === post.id ? { ...item, ...res.data } : item)
+        .sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned)
+          || new Date(b.pinnedAt || b.createdAt || 0).getTime() - new Date(a.pinnedAt || a.createdAt || 0).getTime()));
+      toast.success(res.data.isPinned ? 'Đã ghim thông báo lên đầu bảng tin' : 'Đã bỏ ghim thông báo');
+    } catch (error) {
+      toast.error(error?.message || 'Không thể cập nhật ghim thông báo');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const submitPostReport = async () => {
+    if (!reportingPost || !reportReason || reportBusy) return;
+    setReportBusy(true);
+    try {
+      const res = await api.feed.report(reportingPost.id, { reason: reportReason, details: reportDetails.trim() });
+      if (!res.success) {
+        toast.error(res.message || 'Không thể gửi báo cáo bài viết');
+        return;
+      }
+      setReportingPost(null);
+      setReportReason('');
+      setReportDetails('');
+      toast.success(res.message || 'Đã gửi báo cáo để trung tâm xem xét');
+      if (canModerateFeed) {
+        const reports = await api.feed.reports();
+        if (reports.success) setPendingReports(Array.isArray(reports.data) ? reports.data : []);
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Không thể gửi báo cáo bài viết');
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
+  const resolvePostReport = async (report) => {
+    if (resolvingReportId) return;
+    setResolvingReportId(report.id);
+    try {
+      const res = await api.feed.resolveReport(report.id);
+      if (!res.success) {
+        toast.error(res.message || 'Không thể xử lý báo cáo');
+        return;
+      }
+      setPendingReports((prev) => prev.filter((item) => item.id !== report.id));
+      toast.success('Đã đánh dấu báo cáo là đã xử lý');
+    } catch (error) {
+      toast.error(error?.message || 'Không thể xử lý báo cáo');
+    } finally {
+      setResolvingReportId(null);
+    }
+  };
+
   const pickCommentFiles = (postId, e) => {
     const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith('image/')).slice(0, 3);
     e.target.value = '';
@@ -686,6 +783,40 @@ export default function FeedBoard({ session, role }) {
     <div className="cms-feed-column pb-8 space-y-4">
       {/* Header */}
 
+      {canModerateFeed && reportQueueError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+          {reportQueueError}
+        </div>
+      )}
+      {canModerateFeed && pendingReports.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Flag size={17} /></span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-bold text-slate-900">Báo cáo cần xem xét</h2>
+              <p className="text-xs text-slate-500">{pendingReports.length} bài viết đang chờ xử lý</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {pendingReports.map((report) => (
+              <div key={report.id} className="rounded-xl border border-amber-100 bg-white p-3">
+                <p className="text-xs font-bold text-amber-800">{reportReasons.find((reason) => reason.value === report.reason)?.label || 'Lý do khác'}</p>
+                <p className="mt-1 line-clamp-2 text-sm text-slate-800">{report.post?.content || 'Bài viết không còn tồn tại.'}</p>
+                <p className="mt-1 text-[11px] text-slate-500">Báo cáo bởi {report.reporterName} · {report.reporterRole}</p>
+                {report.details && <p className="mt-1 text-xs italic text-slate-500">{report.details}</p>}
+                <button
+                  type="button"
+                  disabled={resolvingReportId === report.id}
+                  onClick={() => resolvePostReport(report)}
+                  className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  <Check size={14} />{resolvingReportId === report.id ? 'Đang lưu…' : 'Đánh dấu đã xử lý'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="space-y-3 md:space-y-4 min-w-0">
         {/* Post Composer */}
@@ -865,6 +996,11 @@ export default function FeedBoard({ session, role }) {
 
                       {/* Privacy Badge on Post */}
                       <div className="flex items-center gap-1.5 mt-1">
+                        {post.isPinned && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-amber-200 bg-amber-50 text-amber-800">
+                            <Pin size={11} />Thông báo ghim
+                          </span>
+                        )}
                         <span className={'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border ' + postPrivacy.badgeClass}>
                           <PostPrivacyIcon size={11} />
                           {postPrivacy.label}
@@ -874,6 +1010,29 @@ export default function FeedBoard({ session, role }) {
 
                     {/* Post Action Buttons (Edit / Delete) */}
                     <div className="flex items-center gap-1 shrink-0">
+                      {canModerateFeed && (post.visibility || 'public') === 'public' && (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePin(post)}
+                          disabled={busyId === post.id}
+                          className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                          title={post.isPinned ? 'Bỏ ghim thông báo' : 'Ghim thông báo'}
+                          aria-label={post.isPinned ? 'Bỏ ghim thông báo' : 'Ghim thông báo'}
+                        >
+                          {post.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+                        </button>
+                      )}
+                      {String(post.authorId || '') !== meId && (
+                        <button
+                          type="button"
+                          onClick={() => { setReportingPost(post); setReportReason(''); setReportDetails(''); }}
+                          className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Báo cáo bài viết"
+                          aria-label="Báo cáo bài viết"
+                        >
+                          <Flag size={15} />
+                        </button>
+                      )}
                       {canEditPost(post) && (
                         <button
                           type="button"
@@ -1487,6 +1646,59 @@ export default function FeedBoard({ session, role }) {
                   );
                 });
               })()}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {reportingPost && createPortal(
+        <div
+          className="fixed inset-0 z-[120000] flex items-center justify-center p-4 bg-black/55 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feed-report-title"
+          onClick={() => setReportingPost(null)}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl space-y-4" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Flag size={18} /></span>
+              <div className="min-w-0 flex-1">
+                <h2 id="feed-report-title" className="text-sm font-bold text-slate-900">Báo cáo bài viết</h2>
+                <p className="text-xs text-slate-500">Chọn lý do để trung tâm xem xét</p>
+              </div>
+              <button type="button" onClick={() => setReportingPost(null)} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="Đóng">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="max-h-16 overflow-hidden rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">{reportingPost.content || 'Bài viết có hình ảnh đính kèm'}</p>
+            <div className="space-y-2">
+              {reportReasons.map((reason) => (
+                <label key={reason.value} className={'flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border px-3 text-xs font-medium transition-colors ' + (reportReason === reason.value ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50')}>
+                  <input type="radio" name="feed-report-reason" value={reason.value} checked={reportReason === reason.value} onChange={() => setReportReason(reason.value)} />
+                  {reason.label}
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={reportDetails}
+              onChange={(event) => setReportDetails(event.target.value)}
+              maxLength={500}
+              rows={3}
+              placeholder="Thông tin bổ sung (không bắt buộc)"
+              className="w-full resize-none rounded-xl border border-slate-200 p-3 text-xs text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setReportingPost(null)} className="min-h-10 rounded-xl bg-slate-100 px-4 text-xs font-bold text-slate-600 hover:bg-slate-200">Hủy</button>
+              <button
+                type="button"
+                disabled={!reportReason || reportBusy}
+                onClick={submitPostReport}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-red-700 disabled:opacity-45"
+              >
+                {reportBusy ? <Loader2 size={14} className="animate-spin" /> : <Flag size={14} />}
+                {reportBusy ? 'Đang gửi…' : 'Gửi báo cáo'}
+              </button>
             </div>
           </div>
         </div>,

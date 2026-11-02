@@ -56,7 +56,12 @@ test('mobile app registers native push tokens and configures notification handli
   assert.ok(pushService.includes("mobileApiRequest('/mobile-push-tokens'"));
   assert.ok(authContext.includes('registerMobilePushNotifications'));
   assert.ok(pushConfig.includes('requestPermission = false'));
+  assert.ok(pushConfig.includes('requestWebNotificationPermission'));
+  assert.ok(pushConfig.includes('window.Notification.requestPermission()'));
   assert.ok(profileScreen.includes('enableMobilePushNotifications()'));
+  assert.ok(profileScreen.includes('requestWebNotificationPermission()'));
+  assert.ok(profileScreen.includes('bản web hiện chưa kết nối dịch vụ push nền'));
+  assert.ok(profileScreen.includes('Đóng thông báo trạng thái quyền'));
   assert.ok(!profileScreen.includes("id: 'primary-course'"));
 });
 

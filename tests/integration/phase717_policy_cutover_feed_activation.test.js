@@ -2,8 +2,9 @@
  * Phase 7.17 — Controlled cutover + production activation for /api/feed
  *
  * LIVE: authMiddleware → policyShadowFeed → feedCutoverGate → handler.
- * Auth-only for list/create/upload/like/react/comment.
+ * Auth-only for list/create/upload/like/react/comment/report/pin/report moderation.
  * delete_post / delete_comment: adminLike OR ownership (handler still owns Legacy path).
+ * Pin/report moderation additionally enforces role checks inside the route handlers.
  * Socket feed_room emits remain in handlers only.
  */
 const test = require('node:test');
@@ -235,6 +236,23 @@ test('Phase7.17 delete_comment: commenter / post author / admin; missing → ALL
   assert.equal(parity('delete_comment', staff, { post, comment }).policy.decision, 'DENY');
   assert.equal(parity('delete_comment', commenter, { post: null, comment: null }).policy.decision, 'ALLOW');
   assert.equal(parity('delete_comment', commenter, { post, comment: null }).policy.decision, 'ALLOW');
+});
+
+test('Phase7.17 feed report and pin routes are authenticated policy actions', () => {
+  const student = sub({ id: AUTHOR, role: 'student' });
+  for (const action of ['report', 'pin', 'report_list', 'resolve_report']) {
+    assert.ok(ACTIONS.has(action), action);
+    assert.equal(parity(action, student).policy.decision, 'ALLOW', action);
+  }
+  assert.equal(parity('unknown_feed_action', student).policy.decision, 'DENY');
+
+  const routes = fs.readFileSync(path.join(ROOT, 'routes/feedRoutes.js'), 'utf8');
+  const model = fs.readFileSync(path.join(ROOT, 'models/FeedPostReport.js'), 'utf8');
+  assert.ok(routes.includes("feedGuard('report')"));
+  assert.ok(routes.includes("feedGuard('pin')"));
+  assert.ok(routes.includes("feedGuard('report_list')"));
+  assert.ok(routes.includes("feedGuard('resolve_report')"));
+  assert.ok(model.includes('feedPostReportSchema.index({ postId: 1, reporterId: 1 }, { unique: true })'));
 });
 
 test('Phase7.17 spoof resistance: body role/authorId/branch/tenant do not elevate', () => {

@@ -27,7 +27,7 @@ function policyShadowFeed(action) {
       });
 
       const ctx = { post: null, comment: null };
-      if (['delete_post', 'update_post', 'delete_comment', 'like', 'react', 'comment'].includes(action) && req.params?.id) {
+      if (['delete_post', 'update_post', 'delete_comment', 'like', 'react', 'comment', 'pin', 'report'].includes(action) && req.params?.id) {
         // delete/update need post; only load fields needed for ownership
         if (action === 'delete_post' || action === 'update_post' || action === 'delete_comment') {
           const post = await FeedPost.findById(req.params.id).select('authorId authorAdminRole authorRole comments').lean();
