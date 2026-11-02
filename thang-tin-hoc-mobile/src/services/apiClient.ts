@@ -30,7 +30,14 @@ let csrfToken: string | null = null;
 let refreshPromise: Promise<void> | null = null;
 
 function readWebSession<TUser>() {
-  const stored = globalThis.sessionStorage.getItem(sessionStorageKey);
+  let stored = globalThis.localStorage.getItem(sessionStorageKey);
+  if (!stored) {
+    stored = globalThis.sessionStorage.getItem(sessionStorageKey);
+    if (stored) {
+      globalThis.localStorage.setItem(sessionStorageKey, stored);
+      globalThis.sessionStorage.removeItem(sessionStorageKey);
+    }
+  }
   if (!stored) return null;
   const session = JSON.parse(stored) as MobileStoredSession<TUser>;
   if (!session.user || !session.tokens?.accessToken || !session.tokens?.refreshToken || !session.tokens?.sessionId) {
@@ -42,7 +49,7 @@ function readWebSession<TUser>() {
 async function persistSessionTokens(nextTokens: MobileApiTokens) {
   if (Platform.OS === 'web') {
     const session = readWebSession<unknown>();
-    if (session) globalThis.sessionStorage.setItem(sessionStorageKey, JSON.stringify({ ...session, tokens: nextTokens }));
+    if (session) globalThis.localStorage.setItem(sessionStorageKey, JSON.stringify({ ...session, tokens: nextTokens }));
     return;
   }
   const stored = await SecureStore.getItemAsync(sessionStorageKey);
@@ -230,7 +237,7 @@ export function getMobileApiTokens() {
 
 export async function saveMobileSession<TUser>(session: MobileStoredSession<TUser>) {
   if (Platform.OS === 'web') {
-    globalThis.sessionStorage.setItem(sessionStorageKey, JSON.stringify(session));
+    globalThis.localStorage.setItem(sessionStorageKey, JSON.stringify(session));
     tokens = session.tokens;
     return;
   }
@@ -259,6 +266,7 @@ export async function clearMobileSession() {
   csrfToken = null;
   if (Platform.OS === 'web') {
     globalThis.sessionStorage.removeItem(sessionStorageKey);
+    globalThis.localStorage.removeItem(sessionStorageKey);
     return;
   }
   await SecureStore.deleteItemAsync(sessionStorageKey);

@@ -153,12 +153,11 @@ function avatarUri(value?: string) {
   return apiBaseUrl ? new URL(avatar, `${apiBaseUrl.replace(/\/+$/, '')}/`).toString() : undefined;
 }
 
-function buildConversationId(user: DemoUser, contact: RawContact) {
-  const contactId = text(contact.id);
-  const contactRole = text(contact.role).toLowerCase();
-  const parts = user.role === 'student' && contactRole === 'admin'
+export function buildDirectConversationId(user: Pick<DemoUser, 'id' | 'role'>, contactId: string, contactRole: string) {
+  const normalizedRole = contactRole.toLowerCase();
+  const parts = user.role === 'student' && normalizedRole === 'admin'
     ? ['admin_admin', `student_${user.id}`]
-    : [`${user.role}_${user.id}`, `${contactRole}_${contactId}`];
+    : [`${user.role}_${user.id}`, `${normalizedRole}_${contactId}`];
   return parts.sort().join('__');
 }
 
@@ -289,7 +288,7 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
       const history = conversationByContact.get(String(contact.id));
       const cat = contactCategory(rawRole, adminRole);
       return {
-        id: history?.conversationId || buildConversationId(user, contact),
+        id: history?.conversationId || buildDirectConversationId(user, String(contact.id), rawRole),
         name: text(contact.name, 'Người dùng'),
         role: roleLabel(rawRole, adminRole),
         adminRole,

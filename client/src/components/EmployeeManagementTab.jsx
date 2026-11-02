@@ -442,21 +442,21 @@ export default function EmployeeManagementTab() {
                       </div>
                       <div className="grid grid-cols-1 gap-1.5 text-[14px]">
                         <p className="text-slate-600">
-                          <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Chức vụ</span>
+                          <span className="text-slate-400 text-[12px] font-semibold  tracking-wide mr-1">Chức vụ</span>
                           {POSITION_MAP[emp.position]?.emoji || '📋'} {POSITION_MAP[emp.position]?.label || emp.position}
                         </p>
                         {(isSuperAdmin || emp.branchCode) && (
                           <p className="text-slate-600">
-                            <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Chi nhánh</span>
+                            <span className="text-slate-400 text-[12px] font-semibold  tracking-wide mr-1">Chi nhánh</span>
                             {emp.branchCode || '—'}
                           </p>
                         )}
                         <p className="text-slate-800 font-semibold">
-                          <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Mức lương</span>
+                          <span className="text-slate-400 text-[12px] font-semibold  tracking-wide mr-1">Mức lương</span>
                           {fmtSalary(emp.baseSalary)}
                         </p>
                         <p className="text-slate-600">
-                          <span className="text-slate-400 text-[12px] font-semibold uppercase tracking-wide mr-1">Ngân hàng</span>
+                          <span className="text-slate-400 text-[12px] font-semibold  tracking-wide mr-1">Ngân hàng</span>
                           {emp.bankAccount?.bankCode
                             ? (BANK_MAP[emp.bankAccount.bankCode]?.shortName || emp.bankAccount.bankCode)
                             : 'Chưa có'}
@@ -482,12 +482,12 @@ export default function EmployeeManagementTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-6 py-3 text-left text-xs font-black text-gray-500 uppercase">Họ tên</th>
-                  <th className="px-4 py-3 text-left text-xs font-black text-gray-500 uppercase">Chức vụ</th>
-                  {isSuperAdmin && <th className="px-4 py-3 text-left text-xs font-black text-gray-500 uppercase">Chi nhánh</th>}
-                  <th className="px-4 py-3 text-right text-xs font-black text-gray-500 uppercase">Mức lương</th>
-                  <th className="px-4 py-3 text-center text-xs font-black text-gray-500 uppercase">Ngân hàng</th>
-                  <th className="px-4 py-3 text-center text-xs font-black text-gray-500 uppercase">Thao tác</th>
+                  <th className="px-6 py-3 text-left text-xs font-black text-gray-500 ">Họ tên</th>
+                  <th className="px-4 py-3 text-left text-xs font-black text-gray-500 ">Chức vụ</th>
+                  {isSuperAdmin && <th className="px-4 py-3 text-left text-xs font-black text-gray-500 ">Chi nhánh</th>}
+                  <th className="px-4 py-3 text-right text-xs font-black text-gray-500 ">Mức lương</th>
+                  <th className="px-4 py-3 text-center text-xs font-black text-gray-500 ">Ngân hàng</th>
+                  <th className="px-4 py-3 text-center text-xs font-black text-gray-500 ">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -551,7 +551,7 @@ export default function EmployeeManagementTab() {
 
           {stats?.byPosition?.length > 0 && (
             <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100">
-              <p className="text-xs font-bold text-gray-500 mb-2">PHÂN BỔ CHỨC VỤ</p>
+              <p className="text-xs font-bold text-gray-500 mb-2">Phân bổ chức vụ</p>
               <div className="flex flex-wrap gap-2">
                 {stats.byPosition.map((bp) => (
                   <span key={bp._id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white border border-gray-200 text-gray-600">
@@ -642,12 +642,12 @@ export default function EmployeeManagementTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="px-6 py-3 text-left text-xs font-black text-gray-500 uppercase">Nhân viên</th>
-                    <th className="px-4 py-3 text-left text-xs font-black text-gray-500 uppercase">Chức vụ</th>
-                    <th className="px-4 py-3 text-right text-xs font-black text-gray-500 uppercase">Số tiền</th>
-                    <th className="px-4 py-3 text-center text-xs font-black text-gray-500 uppercase">Loại</th>
-                    <th className="px-4 py-3 text-center text-xs font-black text-gray-500 uppercase">Ngày trả</th>
-                    <th className="px-4 py-3 text-left text-xs font-black text-gray-500 uppercase">Ghi chú</th>
+                    <th className="px-6 py-3 text-left text-xs font-black text-gray-500 ">Nhân viên</th>
+                    <th className="px-4 py-3 text-left text-xs font-black text-gray-500 ">Chức vụ</th>
+                    <th className="px-4 py-3 text-right text-xs font-black text-gray-500 ">Số tiền</th>
+                    <th className="px-4 py-3 text-center text-xs font-black text-gray-500 ">Loại</th>
+                    <th className="px-4 py-3 text-center text-xs font-black text-gray-500 ">Ngày trả</th>
+                    <th className="px-4 py-3 text-left text-xs font-black text-gray-500 ">Ghi chú</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -701,7 +701,7 @@ export default function EmployeeManagementTab() {
             </div>
             <div className="cms-sheet-body space-y-5">
               <div>
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <p className="text-xs font-black text-gray-500  tracking-wider mb-3 flex items-center gap-1.5">
                   <Users size={13} /> Thông tin cơ bản
                 </p>
                 <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 sm:gap-4">
@@ -749,7 +749,7 @@ export default function EmployeeManagementTab() {
               </div>
 
               <div>
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <p className="text-xs font-black text-gray-500  tracking-wider mb-3 flex items-center gap-1.5">
                   <CreditCard size={13} /> Thông tin thanh toán (VietQR)
                 </p>
                 <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 sm:gap-4">
@@ -769,7 +769,7 @@ export default function EmployeeManagementTab() {
                   <div>
                     <label className="cms-hr-label">Tên chủ tài khoản</label>
                     <input type="text" value={form.bankAccountName} onChange={(e) => setForm((f) => ({ ...f, bankAccountName: e.target.value.toUpperCase() }))}
-                      className="cms-hr-input w-full uppercase" placeholder="NGUYEN VAN A" />
+                      className="cms-hr-input w-full " placeholder="Nguyen van a" />
                   </div>
                 </div>
               </div>
@@ -840,17 +840,17 @@ export default function EmployeeManagementTab() {
                       </div>
                       <div className="text-center space-y-1.5 w-full max-w-[240px]">
                         <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Ngân hàng</p>
+                          <p className="text-[10px] text-gray-400  font-bold mb-0.5">Ngân hàng</p>
                           <p className="text-sm font-black text-gray-800">
                             {BANK_MAP[showPayModal.bankAccount.bankCode]?.shortName || showPayModal.bankAccount.bankCode}
                           </p>
                         </div>
                         <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Số tài khoản</p>
+                          <p className="text-[10px] text-gray-400  font-bold mb-0.5">Số tài khoản</p>
                           <p className="text-sm font-black text-gray-800 tracking-wider">{showPayModal.bankAccount.accountNumber}</p>
                         </div>
                         <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-                          <p className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Người nhận</p>
+                          <p className="text-[10px] text-gray-400  font-bold mb-0.5">Người nhận</p>
                           <p className="text-sm font-black text-gray-800 uppercase">{showPayModal.bankAccount.accountName || showPayModal.name}</p>
                         </div>
                       </div>
@@ -955,4 +955,3 @@ export default function EmployeeManagementTab() {
     </div>
   );
 }
-

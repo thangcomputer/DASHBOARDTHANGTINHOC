@@ -38,21 +38,21 @@ function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
   if (adminRole === 'SUPER_ADMIN') {
     return (
       <span className="cms-rbac-badge cms-rbac-badge-admin">
-        <Crown size={10} aria-hidden="true" /> SUPER ADMIN
+        <Crown size={10} aria-hidden="true" />  Qu?N tr? Vi?N c?P cao
       </span>
     );
   }
   if (adminRole === 'SUPPORT') {
     return (
       <span className="cms-rbac-badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
-        <Headset size={10} aria-hidden="true" /> HỖ TRỢ VIÊN
+        <Headset size={10} aria-hidden="true" />  Hỗ trợ viên
       </span>
     );
   }
   if (adminRole === 'HIGH_ADMIN') {
     return (
       <span className="cms-rbac-badge" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fbbf24' }}>
-        <Shield size={10} aria-hidden="true" /> ADMIN CẤP CAO
+        <Shield size={10} aria-hidden="true" />  Qu?N tr? Vi?N cấp cao
       </span>
     );
   }
@@ -60,7 +60,7 @@ function RoleBadge({ adminRole, permissions = [], branchName = '' }) {
   if (isOnlyMessages) {
     return (
       <span className="cms-rbac-badge bg-blue-50 text-blue-700 border border-blue-200">
-        <MessageSquare size={10} aria-hidden="true" /> HỖ TRỢ VIÊN
+        <MessageSquare size={10} aria-hidden="true" />  Hỗ trợ viên
       </span>
     );
   }

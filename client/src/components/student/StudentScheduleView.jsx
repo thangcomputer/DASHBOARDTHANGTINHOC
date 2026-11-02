@@ -60,7 +60,7 @@ export const ScheduleView = ({
             <CheckCircle size={20} />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">Đã học tháng này</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide">Đã học tháng này</p>
             <p className="text-base sm:text-xl font-black text-emerald-600 leading-tight">
               {completedCount} <span className="text-xs font-semibold text-slate-400">buổi</span>
             </p>
@@ -71,7 +71,7 @@ export const ScheduleView = ({
             <Clock size={20} />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">Buổi sắp tới</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide">Buổi sắp tới</p>
             <p className="text-base sm:text-xl font-black text-slate-800 leading-tight">
               {upcomingCount} <span className="text-xs font-semibold text-slate-400">buổi</span>
             </p>
@@ -82,7 +82,7 @@ export const ScheduleView = ({
             <Ban size={20} />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">Đã hủy</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide">Đã hủy</p>
             <p className="text-base sm:text-xl font-black text-rose-600 leading-tight">
               {cancelledCount} <span className="text-xs font-semibold text-slate-400">buổi</span>
             </p>

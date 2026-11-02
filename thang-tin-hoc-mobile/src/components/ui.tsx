@@ -1,8 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   ActivityIndicator,
   DeviceEventEmitter,
   Image,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,26 +19,69 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Search, type LucideIcon } from 'lucide-react-native';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { Assignment, ScheduleItem } from '../types';
 import { getWebLogoUrl } from '../services/webSettingsApi';
 import type { AppStackParamList } from '../navigation/types';
 
+const BRANDING_HEADER_VISIBILITY_EVENT = 'mobile:branding-header-visibility';
+export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility';
+const BRANDING_HEADER_HEIGHT = 58;
+
+export function useBrandingHeaderScrollHandler() {
+  const previousScrollOffset = useRef(0);
+  return useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = Math.max(0, event.nativeEvent.contentOffset.y);
+    const offsetDelta = offsetY - previousScrollOffset.current;
+    previousScrollOffset.current = offsetY;
+    if (offsetY <= 8) {
+      DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
+      DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
+    } else if (offsetY > 48 && offsetDelta > 3) {
+      DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, false);
+      DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, false);
+    } else if (offsetDelta < -3) {
+      DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
+      DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
+    }
+  }, []);
+}
+
 export function AppScreen({
   children,
   scroll = true,
   contentStyle,
-}: React.PropsWithChildren<{ scroll?: boolean; contentStyle?: ViewStyle }>) {
+  refreshControl,
+  scrollViewRef,
+}: React.PropsWithChildren<{
+  scroll?: boolean;
+  contentStyle?: ViewStyle;
+  refreshControl?: React.ReactElement;
+  scrollViewRef?: React.Ref<React.ComponentRef<typeof ScrollView>>;
+}>) {
+  const handleScroll = useBrandingHeaderScrollHandler();
+
+  useFocusEffect(useCallback(() => {
+    DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
+    DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
+  }, []));
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <BrandingTopBar />
       {scroll ? (
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={[styles.screenContent, contentStyle]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onScroll={handleScroll}
+          onScrollEndDrag={handleScroll}
+          onMomentumScrollEnd={handleScroll}
+          scrollEventThrottle={16}
+          refreshControl={refreshControl}
         >
           {children}
         </ScrollView>
@@ -48,11 +94,43 @@ export function AppScreen({
 
 function BrandingTopBar() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const isFocused = useIsFocused();
   const [logoUrl, setLogoUrl] = useState('');
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const headerHeight = useRef(new Animated.Value(BRANDING_HEADER_HEIGHT)).current;
+  const headerVisible = useRef(true);
+
+  const setHeaderVisible = useCallback((visible: boolean) => {
+    if (headerVisible.current === visible) return;
+    headerVisible.current = visible;
+    Animated.timing(headerHeight, {
+      toValue: visible ? BRANDING_HEADER_HEIGHT : 0,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  }, [headerHeight]);
+
+  useEffect(() => {
+    if (!isFocused) return undefined;
+    const subscription = DeviceEventEmitter.addListener(
+      BRANDING_HEADER_VISIBILITY_EVENT,
+      setHeaderVisible,
+    );
+    setHeaderVisible(true);
+    return () => subscription.remove();
+  }, [isFocused, setHeaderVisible]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('mobile:notification-count-changed', (count: number) => {
+      setUnreadCount(Number.isInteger(count) ? Math.max(0, count) : 0);
+    });
+    return () => subscription.remove();
+  }, []);
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    DeviceEventEmitter.emit('mobile:notification-count-refresh');
     getWebLogoUrl()
       .then((url) => {
         if (active) {
@@ -72,42 +150,51 @@ function BrandingTopBar() {
   }, []));
 
   return (
-    <View style={styles.brandingTopBar}>
-      <Pressable
-        onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
-        style={styles.topBarAction}
-        accessibilityRole="button"
-        accessibilityLabel="Mở tìm kiếm"
-      >
-        <Search size={20} color={colors.muted} />
-      </Pressable>
-      <Pressable
-        onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
-        style={styles.brandingHomeCentered}
-        accessibilityRole="button"
-        accessibilityLabel="Về trang tổng quan"
-      >
-        {logoUrl && !logoLoadFailed ? (
-          <Image
-            source={{ uri: logoUrl }}
-            style={styles.brandingLogo}
-            resizeMode="contain"
-            accessibilityLabel="Logo Thắng Tin Học"
-            onError={() => setLogoLoadFailed(true)}
-          />
-        ) : (
-          <Text style={styles.brandingFallback}>Thắng Tin Học</Text>
-        )}
-      </Pressable>
-      <Pressable
-        onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
-        style={styles.topBarAction}
-        accessibilityRole="button"
-        accessibilityLabel="Mở thông báo"
-      >
-        <Bell size={20} color={colors.muted} />
-      </Pressable>
-    </View>
+    <Animated.View style={[styles.brandingTopBarContainer, { height: headerHeight }]}>
+      <View style={styles.brandingTopBar}>
+        <Pressable
+          onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
+          style={styles.topBarAction}
+          accessibilityRole="button"
+          accessibilityLabel="Mở tìm kiếm"
+        >
+          <Search size={20} color={colors.muted} />
+        </Pressable>
+        <Pressable
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
+          style={styles.brandingHomeCentered}
+          accessibilityRole="button"
+          accessibilityLabel="Về trang tổng quan"
+        >
+          {logoUrl && !logoLoadFailed ? (
+            <Image
+              source={{ uri: logoUrl }}
+              style={styles.brandingLogo}
+              resizeMode="contain"
+              accessibilityLabel="Logo Thắng Tin Học"
+              onError={() => setLogoLoadFailed(true)}
+            />
+          ) : (
+            <Text style={styles.brandingFallback}>Thắng Tin Học</Text>
+          )}
+        </Pressable>
+        <Pressable
+          onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}
+          style={styles.topBarAction}
+          accessibilityRole="button"
+          accessibilityLabel={unreadCount > 0 ? `Mở thông báo, ${unreadCount} chưa đọc` : 'Mở thông báo'}
+        >
+          <View style={styles.notificationBell}>
+            <Bell size={20} color={colors.muted} />
+            {unreadCount > 0 ? (
+              <View style={styles.notificationUnreadBadge}>
+                <Text style={styles.notificationUnreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -135,7 +222,7 @@ export function AppHeader({
   const navigation = useNavigation();
   const route = useRoute();
   const parentNavigation = navigation.getParent();
-  const isMainTab = ['Home', 'Schedule', 'Students', 'Messages', 'CourseVideos', 'Feed', 'Notifications', 'Profile'].includes(route.name);
+  const isMainTab = ['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Notifications', 'Profile'].includes(route.name);
   const canGoBack = !isMainTab && (navigation.canGoBack() || Boolean(parentNavigation?.canGoBack()));
   const handleBack = showBackButton ? onBack || (canGoBack ? () => {
     if (navigation.canGoBack()) navigation.goBack();
@@ -152,7 +239,12 @@ export function AppHeader({
           <ChevronLeft size={compact ? 20 : 22} color={compact ? colors.surface : colors.ink} />
         </Pressable>
       ) : null}
-      <View style={[styles.headerText, Icon ? styles.headerTextWithIcon : null, centered ? styles.headerTextCentered : null]}>
+      <View style={[
+        styles.headerText,
+        Icon ? styles.headerTextWithIcon : null,
+        centered ? styles.headerTextCentered : null,
+        centered && right ? styles.headerTextCenteredWithRight : null,
+      ]}>
         <Text style={[styles.headerTitle, Icon ? styles.headerTitleWithIcon : null, compact ? styles.headerTitleCompact : null, centered ? styles.headerTitleCentered : null]}>{title}</Text>
         {subtitle ? <Text style={[styles.headerSubtitle, compact ? styles.headerSubtitleCompact : null, centered ? styles.headerSubtitleCentered : null]}>{subtitle}</Text> : null}
       </View>
@@ -202,6 +294,10 @@ const badgePalette: Record<string, { backgroundColor: string; color: string }> =
   'Chưa nhận': { backgroundColor: colors.goldSoft, color: '#9A6C0A' },
   'Tốt': { backgroundColor: colors.greenSoft, color: colors.green },
   'Có mặt': { backgroundColor: colors.greenSoft, color: colors.green },
+  'Điểm danh': { backgroundColor: '#FEE2E2', color: '#B91C1C' },
+  'Đã điểm danh': { backgroundColor: colors.greenSoft, color: colors.green },
+  'Đã điểm danh bù': { backgroundColor: colors.greenSoft, color: colors.green },
+  'Đã xác nhận': { backgroundColor: colors.greenSoft, color: colors.green },
   'Vắng': { backgroundColor: colors.redSoft, color: colors.red },
   'Đi trễ': { backgroundColor: colors.goldSoft, color: '#9A6C0A' },
   'Có phép': { backgroundColor: colors.blueSoft, color: colors.blue },
@@ -210,7 +306,7 @@ const badgePalette: Record<string, { backgroundColor: string; color: string }> =
   cancelled: { backgroundColor: colors.redSoft, color: colors.red },
 };
 
-export function StatusBadge({ label }: { label: string }) {
+export function StatusBadge({ label, compact = false }: { label: string; compact?: boolean }) {
   const palette = badgePalette[label] || { backgroundColor: colors.canvas, color: colors.muted };
   const displayLabel = ({
     upcoming: 'Sắp tới',
@@ -218,8 +314,8 @@ export function StatusBadge({ label }: { label: string }) {
     cancelled: 'Đã hủy',
   } as Record<string, string>)[label] || label;
   return (
-    <View style={[styles.badge, { backgroundColor: palette.backgroundColor }]} accessibilityLabel={`Trạng thái: ${displayLabel}`}>
-      <Text style={[styles.badgeText, { color: palette.color }]}>{displayLabel}</Text>
+    <View style={[styles.badge, compact && styles.badgeCompact, { backgroundColor: palette.backgroundColor }]} accessibilityLabel={`Trạng thái: ${displayLabel}`}>
+      <Text numberOfLines={1} style={[styles.badgeText, compact && styles.badgeTextCompact, { color: palette.color }]}>{displayLabel}</Text>
     </View>
   );
 }
@@ -403,15 +499,17 @@ export function MenuRow({
   subtitle,
   onPress,
   destructive = false,
+  borderless = false,
 }: {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   onPress: () => void;
   destructive?: boolean;
+  borderless?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.menuRow} accessibilityRole="button">
+    <Pressable onPress={onPress} style={[styles.menuRow, borderless && styles.menuRowBorderless]} accessibilityRole="button">
       <View style={styles.menuIcon}>{icon}</View>
       <View style={styles.menuCopy}>
         <Text style={[styles.menuTitle, destructive && { color: colors.red }]}>{title}</Text>
@@ -431,20 +529,25 @@ export const uiStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
+  brandingTopBarContainer: { overflow: 'hidden' },
   brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line },
   brandingHomeCentered: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  brandingLogo: { width: 92, height: 34 },
+  brandingLogo: { width: 108, height: 40 },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
   topBarAction: { zIndex: 1, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  notificationBell: { position: 'relative' },
+  notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },
+  notificationUnreadBadgeText: { color: '#FFFFFF', fontSize: 8, lineHeight: 11, fontWeight: '800' },
   fill: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xxxl + 76, gap: spacing.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.line },
   headerCentered: { justifyContent: 'center' },
   headerCompact: { minHeight: 48, gap: spacing.sm, paddingVertical: spacing.xs },
-  headerWithIcon: { minHeight: 64, paddingLeft: spacing.md, paddingRight: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 0, borderLeftWidth: 4, borderLeftColor: colors.brand, backgroundColor: '#FFFEFE' },
+  headerWithIcon: { minHeight: 64, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 0, backgroundColor: '#FFFEFE' },
   headerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
   headerText: { flex: 1 },
   headerTextCentered: { position: 'absolute', left: spacing.xl, right: spacing.xl, alignItems: 'center' },
+  headerTextCenteredWithRight: { left: 44, right: 44 },
   headerTextWithIcon: { gap: 2 },
   headerTitle: { color: colors.ink, fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
   headerTitleCentered: { width: '100%', textAlign: 'center' },
@@ -453,7 +556,7 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.muted, fontSize: typography.small, marginTop: 3 },
   headerSubtitleCentered: { textAlign: 'center' },
   headerSubtitleCompact: { fontSize: typography.caption, lineHeight: 16, marginTop: 1 },
-  headerAction: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  headerAction: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   headerActionCompact: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.line, gap: spacing.md },
@@ -462,6 +565,8 @@ const styles = StyleSheet.create({
   sectionAction: { color: colors.brand, fontSize: typography.small, fontWeight: '700' },
   badge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', minHeight: 28, justifyContent: 'center' },
   badgeText: { fontSize: typography.caption, fontWeight: '700' },
+  badgeCompact: { minHeight: 22, maxWidth: '100%', paddingHorizontal: 7, paddingVertical: 3 },
+  badgeTextCompact: { fontSize: 9, lineHeight: 12, fontWeight: '700' },
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.brandDark, fontWeight: '800' },
   button: { minHeight: 50, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, backgroundColor: colors.brand },
@@ -498,6 +603,7 @@ const styles = StyleSheet.create({
   assignmentIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
   assignmentIconText: { fontSize: typography.small, fontWeight: '800', color: colors.brandDark },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 64, borderBottomWidth: 1, borderBottomColor: colors.line },
+  menuRowBorderless: { borderBottomWidth: 0 },
   menuIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   menuCopy: { flex: 1, gap: 2 },
   menuTitle: { color: colors.ink, fontSize: typography.body, fontWeight: '600' },

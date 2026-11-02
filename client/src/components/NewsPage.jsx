@@ -76,7 +76,7 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
         )}
         {post.isNew && (
           <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black tracking-wide shadow-sm">
-            NEW
+            New
           </span>
         )}
         {!isList && (
@@ -341,7 +341,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
 
           {/* ── BỘ CHỌN ĐỐI TƯỢNG NHẬN TIN ── */}
           <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+            <label className="text-[11px] font-black  tracking-wider text-slate-500 block">
               Đối tượng nhận tin (Bài viết này đăng cho ai?)
             </label>
             <div className="flex items-center gap-2 flex-wrap">
@@ -366,7 +366,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           </div>
 
           <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+            <label className="text-[11px] font-black  tracking-wider text-slate-500 block">
               Chủ đề bài viết
             </label>
             <div className="flex items-center gap-2 flex-wrap">
@@ -433,7 +433,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           />
 
           <div className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Ảnh bìa (card / đầu bài)</p>
+            <p className="text-[11px] font-black  tracking-wide text-slate-400">Ảnh bìa (card / đầu bài)</p>
             {thumbnailUrl ? (
               <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden bg-slate-100">
                 <img src={resolveMediaUrl(thumbnailUrl)} alt="" className="w-full h-full object-cover" />
@@ -469,7 +469,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           </div>
 
           <div className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Nội dung</p>
+            <p className="text-[11px] font-black  tracking-wide text-slate-400">Nội dung</p>
             <NewsRichEditor
               ref={editorRef}
               value={contentHtml}
@@ -481,7 +481,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Tệp đính kèm (PDF, Word…)</p>
+              <p className="text-[11px] font-black  tracking-wide text-slate-400">Tệp đính kèm (PDF, Word…)</p>
               <button
                 type="button"
                 disabled={busy}
@@ -798,7 +798,7 @@ export default function NewsPage({ session, role = 'admin' }) {
           </button>
           <div>
             {detail.isNew && (
-              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">NEW</span>
+              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">New</span>
             )}
             {detail.topicName ? (
               <span className="inline-block mb-2 ml-2 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black">
@@ -834,7 +834,7 @@ export default function NewsPage({ session, role = 'admin' }) {
             if (!attachList.length) return null;
             return (
               <div className="space-y-2">
-                <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tệp đính kèm</p>
+                <p className="text-xs font-black  tracking-wide text-slate-400">Tệp đính kèm</p>
                 <ul className="space-y-1.5">
                   {attachList.map((a, i) => (
                     <li key={`${a.url}-${i}`}>
@@ -924,7 +924,7 @@ export default function NewsPage({ session, role = 'admin' }) {
           )}
           {related.length > 0 && (
             <div className="pt-6 border-t border-slate-100">
-              <h2 className="text-sm font-black uppercase tracking-wide text-slate-400 mb-3">Bài liên quan</h2>
+              <h2 className="text-sm font-black  tracking-wide text-slate-400 mb-3">Bài liên quan</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {related.map((p) => (
                   <NewsCard key={p.id} post={p} basePath={base} onOpen={openPost} />

@@ -70,7 +70,7 @@ export default function CertPrepQuestionNavigator({
       className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
     >
       <div className="flex items-baseline justify-between gap-2 mb-2 px-0.5">
-        <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">
+        <p className="text-[11px] font-black  tracking-wide text-slate-400">
           Danh sách câu
         </p>
         <p className="text-[11px] font-bold text-slate-500">

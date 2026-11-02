@@ -1,17 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Alert, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
 import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScreen';
 import { CourseVideosScreen } from './CourseVideosScreen';
 import {
-  BookOpen, Building2, Check, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Frown, Globe,
+  AlertCircle, BarChart3, BookOpen, Building2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight,
+  ClipboardList, Clock3, CreditCard, Download, FileSpreadsheet, FileText, Frown, Globe,
   EyeOff, GraduationCap, Grid2X2, Heart, ImagePlus, Laugh, List, MessageCircle, MoreVertical,
-  Newspaper, Paperclip, Pencil, Radio, Reply, Search, Send, Sparkles, Star, ThumbsUp, Trash2, WalletCards,
-  Users,
+  Newspaper, Paperclip, Pencil, Play, Radio, Reply, Search, Send, Sparkles, Star, ThumbsUp, Trash2, TrendingUp, WalletCards, X,
+  Users, Video, Link2, Plus,
 } from 'lucide-react-native';
 import {
   AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton,
@@ -23,18 +28,46 @@ import {
 } from '../services/feedApi';
 import {
   evaluationService, feedService, quizService,
-  softwareService, studentProfileService, studentService, teacherFinanceService, trainingService,
+  softwareService, studentPaymentService, studentProfileService, studentService, trainingService,
 } from '../services/mockService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { getMobileApiBaseUrl, getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
+import { SOCKET_EVENTS } from '../services/socketService';
+import { createTeacherQuizQuestionWorkbook, parseTeacherQuizQuestionsExcel } from '../services/teacherQuizExcel';
+import { completeTeacherTrainingLesson, saveTeacherTrainingWatchProgress } from '../services/teacherApi';
+import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from './VideoPlayerFrame';
 import RenderHtml from '@native-html/render';
 import { WebView } from 'react-native-webview';
 import type { AppStackParamList } from '../navigation/types';
 import type {
-  DemoEvaluation, DemoFeedPost, DemoNewsItem, DemoQuiz, DemoStudent, DemoTrainingCourse,
+  DemoEvaluation, DemoFeedPost, DemoNewsItem, DemoQuiz, DemoStudent, DemoTrainingCourse, DemoUser,
 } from '../types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
+
+async function shareQuizWorkbook(base64: string, fileName: string) {
+  const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (Platform.OS === 'web') {
+    const binary = atob(base64);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.rel = 'noopener noreferrer';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return;
+  }
+  if (!FileSystem.cacheDirectory) throw new Error('Không thể truy cập vùng lưu tệp trên thiết bị.');
+  const uri = `${FileSystem.cacheDirectory}${fileName}`;
+  await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+  if (!(await Sharing.isAvailableAsync())) throw new Error('Thiết bị không hỗ trợ chia sẻ hoặc lưu tệp Excel.');
+  await Sharing.shareAsync(uri, { mimeType, dialogTitle: 'Lưu tệp câu hỏi Excel' });
+}
 
 async function openExternalUrl(url: string | undefined, label: string) {
   if (!url) {
@@ -67,8 +100,7 @@ const studentMenu: MenuItem[] = [
 
 const teacherMenu: MenuItem[] = [
   { label: 'Bảng tin', screen: 'Feed', description: 'Bài đăng dành cho lớp học' },
-  { label: 'Giao bài tập & kiểm tra', screen: 'Assignments', description: 'Bài tập, bài nộp và trắc nghiệm' },
-  { label: 'Trắc nghiệm mỗi buổi học', screen: 'TeacherQuizzes', description: 'Danh sách bài trắc nghiệm đã tạo' },
+  { label: 'Bài tập & kiểm tra', screen: 'TeacherQuizzes', description: 'Bài tập, bài nộp và trắc nghiệm' },
   { label: 'Khóa đào tạo', screen: 'TeacherTraining', description: 'Nội dung đào tạo và tài liệu' },
   { label: 'Tài chính', screen: 'TeacherFinance', description: 'Tổng hợp buổi dạy và thanh toán' },
   { label: 'Phần mềm', screen: 'SoftwareLinks', description: 'Phần mềm được cung cấp theo khóa học' },
@@ -316,7 +348,7 @@ export function EvaluationsScreen() {
               {validationMessage ? <Text style={styles.validationText}>{validationMessage}</Text> : null}
               <TextInput value={comments[evaluation.id] || ''} onChangeText={(value) => setComments((current) => ({ ...current, [evaluation.id]: value }))} placeholder={evaluation.public ? 'Chia sẻ thêm nếu bạn muốn...' : 'Nhập điều bạn chưa hài lòng hoặc muốn trung tâm cải thiện...'} multiline style={styles.textArea} />
               <PrimaryButton
-                title={isSubmitting ? 'Đang gửi…' : evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`]) ? 'CHỌN ĐỦ TIÊU CHÍ ĐỂ GỬI' : evaluation.public ? submittedIds.includes(evaluation.id) ? 'CẬP NHẬT ĐÁNH GIÁ' : 'GỬI ĐÁNH GIÁ CÔNG KHAI' : 'GỬI PHẢN HỒI CHO TRUNG TÂM'}
+                title={isSubmitting ? 'Đang gửi…' : evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`]) ? 'Chọn đủ tiêu chí để gửi' : evaluation.public ? submittedIds.includes(evaluation.id) ? 'Cập nhật đánh giá' : 'Gửi đánh giá công khai' : 'Gửi phản hồi cho trung tâm'}
                 disabled={isSubmitting || (evaluation.public && ['teaching', 'voice', 'guidance', 'support'].some((key) => !answers[`${evaluation.id}-${key}`]))}
                 onPress={() => { void submit(evaluation); }}
               />
@@ -634,7 +666,7 @@ export function FeedScreen() {
             </Pressable>
             {showAudienceMenu ? (
               <View style={styles.privacyMenu}>
-                <Text style={styles.privacyMenuTitle}>AI CÓ THỂ XEM BÀI VIẾT?</Text>
+                <Text style={styles.privacyMenuTitle}>Ai có thể xem bài viết?</Text>
                 {audienceOptions.map((option) => {
                   const OptionIcon = option.icon;
                   const selected = audience === option.value;
@@ -1038,7 +1070,7 @@ export function NewsScreen() {
                 <View style={styles.newsAudienceBadge}>
                   <Text style={styles.newsAudienceBadgeText}>{news.targetAudience === 'teacher' ? 'Giảng viên' : news.targetAudience === 'student' ? 'Học viên' : 'Tất cả'}</Text>
                 </View>
-                {news.isNew ? <View style={styles.newsNewBadge}><Text style={styles.newsNewBadgeText}>MỚI</Text></View> : null}
+                {news.isNew ? <View style={styles.newsNewBadge}><Text style={styles.newsNewBadgeText}>Mới</Text></View> : null}
               </View>
               <View style={styles.newsCardContent}>
                 <Text style={styles.newsTitle} numberOfLines={2}>{news.title}</Text>
@@ -1272,13 +1304,17 @@ export function SoftwareLinksScreen() {
 export function TeacherQuizzesScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<Navigation>();
-  const loader = useCallback(() => quizService.list(), []);
+  const loader = useCallback(() => quizService.list(user), [user]);
   const resource = useMockResource(loader);
   const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
   const studentsResource = useMockResource(studentsLoader);
   const [quizzes, setQuizzes] = useState<DemoQuiz[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [savingQuiz, setSavingQuiz] = useState(false);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [questionExcelBusy, setQuestionExcelBusy] = useState(false);
   const [title, setTitle] = useState('');
+  const [titlePromptError, setTitlePromptError] = useState(false);
   const [courseName, setCourseName] = useState('');
   const [targetAll, setTargetAll] = useState(true);
   const [targetStudentIds, setTargetStudentIds] = useState<string[]>([]);
@@ -1286,49 +1322,390 @@ export function TeacherQuizzesScreen() {
   const [timeLimit, setTimeLimit] = useState('20');
   const [startTime, setStartTime] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [aiQuestionCount, setAiQuestionCount] = useState(5);
+  const [aiQuestionCount, setAiQuestionCount] = useState(10);
   const [aiDifficulty, setAiDifficulty] = useState('trung bình');
+  const [aiTopic, setAiTopic] = useState('');
   const [quizToolsMessage, setQuizToolsMessage] = useState('');
   const [questions, setQuestions] = useState<Array<{ text: string; options: string[]; correctOption: number; explanation: string }>>([
     { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' },
   ]);
-  const items = quizzes || resource.data || [];
+  const isPreview = Boolean(user?.previewMode)
+    || (__DEV__ && Boolean(process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE));
+  const loadedItems = quizzes || resource.data || [];
   const students = studentsResource.data || [];
-  const courses = [...new Set(students.map((student) => student.course).filter(Boolean))];
-  const courseStudents = students.filter((student) => !courseName || student.course === courseName);
+  const courses = [...new Set(students.flatMap((student) => student.courses?.length ? student.courses : [student.course]).filter(Boolean))];
+  const items = loadedItems.map((quiz) => {
+    const assignedStudents = quiz.targetStudentIds?.length
+      ? students.filter((student) => quiz.targetStudentIds?.includes(student.id))
+      : students.filter((student) => student.course === quiz.courseName || student.courses?.includes(quiz.courseName));
+    return {
+      ...quiz,
+      studentCount: quiz.studentCount ?? assignedStudents.length,
+      assignedStudentNames: quiz.assignedStudentNames?.length
+        ? quiz.assignedStudentNames
+        : quiz.targetStudentIds?.length ? assignedStudents.map((student) => student.name) : undefined,
+    };
+  });
+  const courseStudents = students.filter((student) => !courseName || student.course === courseName || student.courses?.includes(courseName));
   const visibleTargetStudents = courseStudents.filter((student) => `${student.name} ${student.course}`.toLowerCase().includes(targetSearch.trim().toLowerCase()));
+  useFocusEffect(useCallback(() => {
+    resource.reload();
+  }, [resource.reload]));
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.QUIZ_SUBMITTED, () => {
+      resource.reload();
+    });
+    const changeSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.QUIZ_CHANGED, () => {
+      setQuizzes(null);
+      resource.reload();
+    });
+    return () => {
+      subscription.remove();
+      changeSubscription.remove();
+    };
+  }, [resource.reload]);
+  useEffect(() => {
+    if (!courseName && courses.length) setCourseName(courses[0]);
+  }, [courseName, courses]);
   const updateQuestion = (questionIndex: number, update: (question: typeof questions[number]) => typeof questions[number]) => {
     setQuestions((current) => current.map((question, index) => index === questionIndex ? update(question) : question));
   };
   const resetCreateForm = () => {
     setTitle('');
+    setTitlePromptError(false);
     setTargetAll(true);
     setTargetStudentIds([]);
     setTargetSearch('');
     setTimeLimit('20');
     setStartTime('');
     setDeadline('');
+    setAiQuestionCount(10);
+    setAiTopic('');
+    setQuizToolsMessage('');
     setQuestions([{ text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }]);
+  };
+  const handleGenerateQuestions = async () => {
+    if (!user || user.role !== 'teacher') {
+      Alert.alert('Không thể tạo câu hỏi', 'Tài khoản giảng viên không hợp lệ.');
+      return;
+    }
+    if (isPreview) {
+      Alert.alert('Chế độ xem trước', 'Tạo câu hỏi AI chỉ dùng được với tài khoản giảng viên thật.');
+      return;
+    }
+    const prompt = title.trim();
+    if (!prompt) {
+      setTitlePromptError(true);
+      Alert.alert('Thiếu prompt', 'Nhập tên bài kiểm tra trước khi tạo bằng AI.');
+      return;
+    }
+    const topic = [prompt, aiTopic.trim()].filter(Boolean).join('\n');
+    setGeneratingQuestions(true);
+    setQuizToolsMessage('');
+    try {
+      const generated = await quizService.generateAI(user, {
+        topic,
+        courseName,
+        count: aiQuestionCount,
+        difficulty: aiDifficulty,
+      });
+      if (generated.source === 'fallback') {
+        setQuizToolsMessage(generated.message || 'AI chưa sẵn sàng; vui lòng kiểm tra và thử lại trên website.');
+        return;
+      }
+      setQuestions(generated.questions.map((question) => ({
+        text: question.questionText,
+        options: question.options,
+        correctOption: question.correctAnswer,
+        explanation: question.explanation,
+      })));
+      setQuizToolsMessage(generated.message || `Đã tạo ${generated.questions.length} câu. Hãy kiểm tra trước khi giao bài.`);
+    } catch (error) {
+      Alert.alert('Không tạo được câu hỏi', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+  const handleImportQuestionExcel = async () => {
+    setQuestionExcelBusy(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+      const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const parsed = await parseTeacherQuizQuestionsExcel(content);
+      if (!parsed.questions.length) {
+        throw new Error(parsed.errors[0] || 'Không có câu trắc nghiệm hợp lệ trong tệp.');
+      }
+      setQuestions(parsed.questions.map((question) => ({
+        text: question.questionText,
+        options: question.options,
+        correctOption: question.correctAnswer,
+        explanation: question.explanation,
+      })));
+      Alert.alert(
+        'Đã nhập câu hỏi',
+        `Đã thêm ${parsed.questions.length} câu${parsed.errors.length ? `. Bỏ qua ${parsed.errors.length} dòng không hợp lệ.` : '.'}`,
+      );
+    } catch (error) {
+      Alert.alert('Không thể nhập Excel', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setQuestionExcelBusy(false);
+    }
+  };
+  const handleDownloadQuestionTemplate = async () => {
+    setQuestionExcelBusy(true);
+    try {
+      const base64 = await createTeacherQuizQuestionWorkbook([], courseName || 'Khóa học', true);
+      await shareQuizWorkbook(base64, 'Mau_ngan_hang_cau_hoi_trac_nghiem.xlsx');
+    } catch (error) {
+      Alert.alert('Không thể tải mẫu Excel', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setQuestionExcelBusy(false);
+    }
+  };
+  const handleExportQuestionExcel = async () => {
+    if (!questions.length) {
+      Alert.alert('Chưa có câu hỏi', 'Thêm hoặc nhập câu hỏi trước khi xuất Excel.');
+      return;
+    }
+    setQuestionExcelBusy(true);
+    try {
+      const rows = questions.map((question) => ({
+        questionText: question.text.trim(),
+        options: question.options.map((option) => option.trim()),
+        correctAnswer: question.correctOption,
+        explanation: question.explanation.trim(),
+      }));
+      const base64 = await createTeacherQuizQuestionWorkbook(rows, courseName || 'Khóa học');
+      const safeCourse = (courseName || 'Quiz').replace(/[^\w-]+/g, '_').slice(0, 30);
+      await shareQuizWorkbook(base64, `Cau_hoi_trac_nghiem_${safeCourse}.xlsx`);
+    } catch (error) {
+      Alert.alert('Không thể xuất Excel', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setQuestionExcelBusy(false);
+    }
+  };
+  const handleCreateQuiz = async () => {
+    const value = title.trim();
+    if (!value) {
+      setTitlePromptError(true);
+      Alert.alert('Thiếu tên bài', 'Nhập tên bài trắc nghiệm trước khi tạo.');
+      return;
+    }
+    const validQuestions = questions.filter((question) => (
+      question.text.trim() && question.options.every((option) => option.trim())
+    ));
+    if (!validQuestions.length || validQuestions.length !== questions.length) {
+      Alert.alert('Thiếu nội dung', 'Nhập nội dung và đủ bốn phương án cho từng câu hỏi.');
+      return;
+    }
+    if (courses.length && !courseName) {
+      Alert.alert('Chưa chọn khóa học', 'Chọn khóa học trước khi tạo bài trắc nghiệm.');
+      return;
+    }
+    const limit = Number(timeLimit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 180) {
+      Alert.alert('Thời gian chưa hợp lệ', 'Nhập thời gian làm bài từ 1 đến 180 phút.');
+      return;
+    }
+    const parseSchedule = (value: string) => {
+      if (!value.trim()) return null;
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value.trim())) return Number.NaN;
+      return new Date(value.trim().replace(' ', 'T')).getTime();
+    };
+    const startAt = parseSchedule(startTime);
+    const deadlineAt = parseSchedule(deadline);
+    if ((startTime.trim() && (startAt === null || !Number.isFinite(startAt) || startAt <= Date.now()))
+      || (deadline.trim() && (deadlineAt === null || !Number.isFinite(deadlineAt) || deadlineAt <= Date.now()))
+      || (startAt !== null && deadlineAt !== null && deadlineAt <= startAt)) {
+      Alert.alert('Lịch bài không hợp lệ', 'Thời gian phải đúng định dạng YYYY-MM-DD HH:mm, nằm trong tương lai và hạn kết thúc sau giờ bắt đầu.');
+      return;
+    }
+    if (!targetAll && !targetStudentIds.length) {
+      Alert.alert('Chưa chọn học viên', 'Chọn ít nhất một học viên hoặc giao cho cả lớp.');
+      return;
+    }
+    if (!isPreview && (!user || user.role !== 'teacher')) {
+      Alert.alert('Không thể tạo bài', 'Tài khoản giảng viên không hợp lệ.');
+      return;
+    }
+    const assignedStudents = targetAll
+      ? courseStudents
+      : courseStudents.filter((student) => targetStudentIds.includes(student.id));
+    if (isPreview) {
+      const localQuiz: DemoQuiz = {
+        id: `quiz-${Date.now()}`,
+        title: value,
+        courseName: courseName || '—',
+        timeLimitMinutes: limit,
+        startTime: startTime.trim() || undefined,
+        deadline: deadline.trim() || 'Không giới hạn',
+        questions: validQuestions.length,
+        studentCount: assignedStudents.length || undefined,
+        targetStudentIds: targetAll ? [] : targetStudentIds,
+        assignedStudentNames: assignedStudents.map((student) => student.name),
+        submissions: [],
+        sampleQuestions: validQuestions.map((question) => ({
+          text: question.text.trim(),
+          options: question.options.map((option) => option.trim()),
+          correctOption: question.correctOption,
+        })),
+      };
+      setQuizzes([localQuiz, ...items]);
+      resetCreateForm();
+      setShowCreate(false);
+      return;
+    }
+
+    setSavingQuiz(true);
+    try {
+      const teacher = user;
+      if (!teacher || teacher.role !== 'teacher') {
+        Alert.alert('Không thể tạo bài', 'Tài khoản giảng viên không hợp lệ.');
+        return;
+      }
+      const isoDate = (value: string) => value.trim()
+        ? new Date(value.trim().replace(' ', 'T')).toISOString()
+        : null;
+      await quizService.create(teacher, {
+        title: value,
+        courseName,
+        targetStudentIds: targetAll ? [] : targetStudentIds,
+        timeLimitMinutes: limit,
+        startTime: isoDate(startTime),
+        deadline: isoDate(deadline),
+        questions: validQuestions.map((question) => ({
+          questionText: question.text.trim(),
+          options: question.options.map((option) => option.trim()),
+          correctAnswer: question.correctOption,
+          explanation: question.explanation.trim(),
+        })),
+      });
+      setQuizzes(null);
+      resource.reload();
+      resetCreateForm();
+      setShowCreate(false);
+      Alert.alert('Đã tạo bài trắc nghiệm', 'Bài đã được lưu và học viên được giao sẽ nhận thông báo.');
+    } catch (error) {
+      Alert.alert('Không thể tạo bài trắc nghiệm', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setSavingQuiz(false);
+    }
+  };
+  const handleDeleteQuiz = (quiz: DemoQuiz) => {
+    Alert.alert('Xóa bài trắc nghiệm?', `Bài "${quiz.title}" sẽ bị xóa khỏi danh sách.`, [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: () => {
+          if (isPreview) {
+            setQuizzes(items.filter((item) => item.id !== quiz.id));
+            return;
+          }
+          if (!user || user.role !== 'teacher') {
+            Alert.alert('Không thể xóa bài', 'Tài khoản giảng viên không hợp lệ.');
+            return;
+          }
+          void quizService.remove(user, quiz.id)
+            .then(() => {
+              setQuizzes(null);
+              resource.reload();
+            })
+            .catch((error: unknown) => {
+              Alert.alert('Không thể xóa bài trắc nghiệm', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+            });
+        },
+      },
+    ]);
+  };
+  const handleRecreateQuiz = (quiz: DemoQuiz) => {
+    setTitle(`${quiz.title} (Bản sao)`);
+    setCourseName(quiz.courseName === 'Chưa chọn khóa học' ? '' : quiz.courseName);
+    setTargetStudentIds(quiz.targetStudentIds || []);
+    setTargetAll(!quiz.targetStudentIds?.length);
+    setTimeLimit(String(quiz.timeLimitMinutes));
+    const toInputDate = (value?: string) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const pad = (part: number) => String(part).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+    setStartTime(toInputDate(quiz.startTime));
+    setDeadline(toInputDate(quiz.deadline));
+    setQuestions((quiz.sampleQuestions || []).map((question) => ({
+      text: question.text,
+      options: [...question.options],
+      correctOption: question.correctOption,
+      explanation: '',
+    })).concat(quiz.sampleQuestions?.length ? [] : [{ text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }]));
+    setShowCreate(true);
   };
   return (
     <AppScreen>
-      <AppHeader title="Giao bài tập & kiểm tra" subtitle="Quản lý Trắc nghiệm mỗi buổi học" />
-      <View style={styles.quizTabs}>
-        <View style={[styles.quizTab, styles.quizTabActive]}><Text style={styles.quizTabActiveText}>Bài thi Trắc nghiệm</Text></View>
-        <Pressable onPress={() => navigation.navigate('Assignments')} style={styles.quizTab} accessibilityRole="button"><Text style={styles.quizTabText}>Bài tập về nhà (Nộp file)</Text></Pressable>
+      <AppHeader
+        title="Giao bài tập & kiểm tra"
+        subtitle="Quản lý trắc nghiệm mỗi buổi học"
+        centered
+        showBackButton={false}
+      />
+      <View style={styles.assessmentTabs} accessibilityRole="tablist">
+        <View style={[styles.assessmentTab, styles.assessmentTabActive]} accessible accessibilityRole="tab" accessibilityState={{ selected: true }}>
+          <Text style={[styles.assessmentTabText, styles.assessmentTabTextActive]}>Trắc nghiệm</Text>
+        </View>
+        <Pressable onPress={() => navigation.navigate('Assignments')} style={styles.assessmentTab} accessibilityRole="tab" accessibilityState={{ selected: false }}>
+          <Text style={styles.assessmentTabText}>Bài tập về nhà</Text>
+        </Pressable>
       </View>
-      <SectionHeading title="Quản lý Trắc nghiệm mỗi buổi học" />
-      <PrimaryButton title={showCreate ? 'Đóng biểu mẫu' : '+ Tạo bài trắc nghiệm mới'} onPress={() => setShowCreate(!showCreate)} variant="secondary" />
+      <View style={styles.quizCreateRow}>
+        <Pressable
+          onPress={() => setShowCreate(!showCreate)}
+          style={styles.quizCreateAction}
+          accessibilityRole="button"
+          accessibilityLabel={showCreate ? 'Đóng biểu mẫu tạo bài' : 'Tạo bài trắc nghiệm'}
+          accessibilityState={{ expanded: showCreate }}
+        >
+          {showCreate ? <X size={18} color={colors.brand} /> : <Plus size={19} color={colors.brand} />}
+          <Text style={styles.quizCreateActionText}>{showCreate ? 'Đóng' : 'Tạo bài'}</Text>
+        </Pressable>
+      </View>
       {showCreate ? (
-        <Card>
-          <TextInput value={title} onChangeText={setTitle} placeholder="Tên bài trắc nghiệm" style={styles.input} />
+        <Card style={styles.quizCreateCard}>
+          <View>
+            <TextInput
+              value={title}
+              onChangeText={(value) => {
+                setTitle(value);
+                if (value.trim()) setTitlePromptError(false);
+              }}
+              placeholder="Tên bài trắc nghiệm"
+              style={[styles.input, styles.quizTitleInput, titlePromptError && { borderColor: colors.red }]}
+              accessibilityLabel="Tên bài kiểm tra, cũng là prompt AI"
+              accessibilityHint={titlePromptError ? 'Bắt buộc nhập trước khi tạo câu hỏi bằng AI.' : undefined}
+            />
+            {titlePromptError ? (
+              <Text style={{ color: colors.red, fontSize: typography.caption, fontWeight: '700', marginTop: spacing.xs }}>
+                Bắt buộc nhập prompt trước khi tạo bằng AI.
+              </Text>
+            ) : null}
+          </View>
           <Text style={styles.fieldLabel}>Khóa học</Text>
           {studentsResource.loading ? <LoadingSkeleton rows={1} /> : null}
           {studentsResource.error ? <ErrorState onRetry={studentsResource.reload} /> : null}
           <View style={styles.chips}>
             {courses.map((course) => <Pressable key={course} onPress={() => { setCourseName(course); setTargetStudentIds([]); }} style={[styles.choice, courseName === course && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: courseName === course }}><Text style={[styles.choiceText, courseName === course && styles.choiceTextActive]}>{course}</Text></Pressable>)}
           </View>
-          {!courses.length && !studentsResource.loading ? <Text style={styles.note}>Khóa học chưa có trong dữ liệu demo — không thể gán học viên cụ thể.</Text> : null}
+          {!courses.length && !studentsResource.loading ? <Text style={styles.note}>Chưa có khóa học được phân công để giao trắc nghiệm.</Text> : null}
           <Text style={styles.fieldLabel}>Đối tượng</Text>
           <View style={styles.chips}>
             <Pressable onPress={() => setTargetAll(true)} style={[styles.choice, targetAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: targetAll }}><Text style={[styles.choiceText, targetAll && styles.choiceTextActive]}>Cả lớp ({courseStudents.length || '—'})</Text></Pressable>
@@ -1336,7 +1713,7 @@ export function TeacherQuizzesScreen() {
           </View>
           {!targetAll ? (
             <View style={styles.studentTargetList}>
-              <TextInput value={targetSearch} onChangeText={setTargetSearch} placeholder="Tìm học viên" style={styles.input} accessibilityLabel="Tìm học viên để giao trắc nghiệm" />
+              <TextInput value={targetSearch} onChangeText={setTargetSearch} placeholder="Tìm học viên" style={[styles.input, styles.quizCompactInput]} accessibilityLabel="Tìm học viên để giao trắc nghiệm" />
               <View style={styles.quizActions}>
                 <Pressable onPress={() => setTargetStudentIds((current) => [...new Set([...current, ...visibleTargetStudents.map((student) => student.id)])])} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Chọn tất cả đang hiển thị</Text></Pressable>
                 <Pressable onPress={() => setTargetStudentIds([])} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Bỏ chọn</Text></Pressable>
@@ -1345,32 +1722,60 @@ export function TeacherQuizzesScreen() {
                 const selected = targetStudentIds.includes(student.id);
                 return <Pressable key={student.id} onPress={() => setTargetStudentIds((current) => selected ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.studentTarget, selected && styles.studentTargetSelected]} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><Text style={styles.studentTargetText}>{selected ? '✓  ' : ''}{student.name} · {student.course}</Text></Pressable>;
               })}
-              {!visibleTargetStudents.length ? <Text style={styles.note}>{courseStudents.length ? 'Không tìm thấy học viên phù hợp.' : 'Không có học viên demo cho khóa này.'}</Text> : null}
+              {!visibleTargetStudents.length ? <Text style={styles.note}>{courseStudents.length ? 'Không tìm thấy học viên phù hợp.' : 'Khóa học này chưa có học viên được phân công.'}</Text> : null}
             </View>
           ) : null}
-          <TextInput value={timeLimit} onChangeText={setTimeLimit} keyboardType="number-pad" placeholder="Thời gian (phút)" style={styles.input} />
-          <TextInput value={startTime} onChangeText={setStartTime} placeholder="Thời gian bắt đầu · YYYY-MM-DD HH:mm" style={styles.input} />
-          <TextInput value={deadline} onChangeText={setDeadline} placeholder="Hạn kết thúc · YYYY-MM-DD HH:mm" style={styles.input} />
+          <View style={styles.quizScheduleFields}>
+            <Text style={styles.fieldLabel}>Lịch làm bài</Text>
+            <TextInput value={timeLimit} onChangeText={setTimeLimit} keyboardType="number-pad" placeholder="Thời lượng (phút)" style={[styles.input, styles.quizCompactInput]} />
+            <TextInput value={startTime} onChangeText={setStartTime} placeholder="Bắt đầu · YYYY-MM-DD HH:mm" style={[styles.input, styles.quizCompactInput]} />
+            <TextInput value={deadline} onChangeText={setDeadline} placeholder="Kết thúc · YYYY-MM-DD HH:mm" style={[styles.input, styles.quizCompactInput]} />
+          </View>
           <View style={styles.quizTools}>
             <Text style={styles.fieldLabel}>Ngân hàng câu hỏi</Text>
             <View style={styles.quizActions}>
-              {['Nhập câu hỏi', 'Mẫu', 'Xuất'].map((action) => (
-                <Pressable key={action} onPress={() => setQuizToolsMessage(`${action}: thao tác tệp không được kết nối trong bản demo.`)} style={styles.quizAction} accessibilityRole="button">
-                  <Text style={styles.quizActionText}>{action}</Text>
-                </Pressable>
-              ))}
+              <Pressable onPress={() => { void handleImportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
+                <Text style={styles.quizActionText}>{questionExcelBusy ? 'Đang xử lý…' : 'Nhập Excel'}</Text>
+              </Pressable>
+              <Pressable onPress={() => { void handleDownloadQuestionTemplate(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
+                <Text style={styles.quizActionText}>Tải mẫu</Text>
+              </Pressable>
+              <Pressable onPress={() => { void handleExportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
+                <Text style={styles.quizActionText}>Xuất Excel</Text>
+              </Pressable>
+              <Text style={styles.note}>Câu hỏi Excel sẽ được thêm vào bài và lưu lên hệ thống khi bạn tạo bài trắc nghiệm.</Text>
             </View>
+            <TextInput value={aiTopic} onChangeText={setAiTopic} placeholder="Chủ đề câu hỏi AI (tùy chọn)" style={[styles.input, styles.quizCompactInput]} />
             <Text style={styles.fieldLabel}>Số câu AI</Text>
-            <View style={styles.chips}>
-              {[5, 10, 15].map((count) => <Pressable key={count} onPress={() => setAiQuestionCount(count)} style={[styles.choice, aiQuestionCount === count && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: aiQuestionCount === count }}><Text style={[styles.choiceText, aiQuestionCount === count && styles.choiceTextActive]}>{count} câu</Text></Pressable>)}
+            <View style={styles.radioChoices} accessibilityRole="radiogroup">
+              {[5, 10, 15].map((count) => {
+                const selected = aiQuestionCount === count;
+                return (
+                  <Pressable key={count} onPress={() => setAiQuestionCount(count)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected ? <View style={styles.radioInner} /> : null}
+                    </View>
+                    <Text style={styles.radioChoiceText}>{count} câu</Text>
+                  </Pressable>
+                );
+              })}
             </View>
             <Text style={styles.fieldLabel}>Độ khó</Text>
-            <View style={styles.chips}>
-              {['dễ', 'trung bình', 'khó'].map((difficulty) => <Pressable key={difficulty} onPress={() => setAiDifficulty(difficulty)} style={[styles.choice, aiDifficulty === difficulty && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: aiDifficulty === difficulty }}><Text style={[styles.choiceText, aiDifficulty === difficulty && styles.choiceTextActive]}>{difficulty}</Text></Pressable>)}
+            <View style={styles.radioChoices} accessibilityRole="radiogroup">
+              {['dễ', 'trung bình', 'khó'].map((difficulty) => {
+                const selected = aiDifficulty === difficulty;
+                return (
+                  <Pressable key={difficulty} onPress={() => setAiDifficulty(difficulty)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected ? <View style={styles.radioInner} /> : null}
+                    </View>
+                    <Text style={styles.radioChoiceText}>{difficulty}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <PrimaryButton title="Tạo bằng AI (Gemini)" variant="secondary" onPress={() => setQuizToolsMessage(`AI demo: đã chọn ${aiQuestionCount} câu, độ khó ${aiDifficulty}; không gọi AI thật.`)} />
+            <PrimaryButton title={generatingQuestions ? 'Đang tạo câu hỏi…' : 'Tạo câu hỏi bằng AI (Gemini)'} variant="secondary" loading={generatingQuestions} disabled={generatingQuestions} onPress={() => { void handleGenerateQuestions(); }} />
             {quizToolsMessage ? <Text style={styles.note}>{quizToolsMessage}</Text> : null}
-            <Text style={styles.note}>AI và Excel trên web không được kết nối từ mobile demo.</Text>
           </View>
           <SectionHeading title={`Câu hỏi (${questions.length})`} action="Thêm câu" onPress={() => setQuestions((current) => [...current, { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }])} />
           {questions.map((question, questionIndex) => (
@@ -1379,64 +1784,25 @@ export function TeacherQuizzesScreen() {
                 <Text style={styles.cardTitle}>Câu {questionIndex + 1}</Text>
                 {questions.length > 1 ? <Pressable onPress={() => setQuestions((current) => current.filter((_, index) => index !== questionIndex))} style={styles.questionRemove} accessibilityRole="button" accessibilityLabel={`Xóa câu hỏi ${questionIndex + 1}`}><Text style={styles.quizDeleteText}>Xóa câu</Text></Pressable> : null}
               </View>
-              <TextInput value={question.text} onChangeText={(text) => updateQuestion(questionIndex, (current) => ({ ...current, text }))} placeholder="Nội dung câu hỏi" style={[styles.input, styles.textArea]} />
+              <TextInput value={question.text} onChangeText={(text) => updateQuestion(questionIndex, (current) => ({ ...current, text }))} placeholder="Nội dung câu hỏi" style={[styles.input, styles.textArea, styles.quizQuestionText]} />
               {question.options.map((option, optionIndex) => (
                 <View key={`option-${questionIndex}-${optionIndex}`} style={styles.optionRow}>
                   <Pressable onPress={() => updateQuestion(questionIndex, (current) => ({ ...current, correctOption: optionIndex }))} accessibilityRole="radio" accessibilityLabel={`Đánh dấu phương án ${String.fromCharCode(65 + optionIndex)} câu ${questionIndex + 1} là đáp án đúng`} accessibilityState={{ selected: question.correctOption === optionIndex }}>
                     <Text style={[styles.optionToggle, question.correctOption === optionIndex && styles.optionToggleActive]}>{question.correctOption === optionIndex ? '✓' : String.fromCharCode(65 + optionIndex)}</Text>
                   </Pressable>
-                  <TextInput value={option} onChangeText={(value) => updateQuestion(questionIndex, (current) => ({ ...current, options: current.options.map((item, index) => index === optionIndex ? value : item) }))} placeholder={`Phương án ${String.fromCharCode(65 + optionIndex)}`} style={[styles.input, styles.flex]} />
+                  <TextInput value={option} onChangeText={(value) => updateQuestion(questionIndex, (current) => ({ ...current, options: current.options.map((item, index) => index === optionIndex ? value : item) }))} placeholder={`Phương án ${String.fromCharCode(65 + optionIndex)}`} style={[styles.input, styles.quizCompactInput, styles.flex]} />
                 </View>
               ))}
-              <TextInput value={question.explanation} onChangeText={(explanation) => updateQuestion(questionIndex, (current) => ({ ...current, explanation }))} placeholder="Giải thích đáp án (nếu có)" multiline style={[styles.input, styles.textArea]} />
+              <TextInput value={question.explanation} onChangeText={(explanation) => updateQuestion(questionIndex, (current) => ({ ...current, explanation }))} placeholder="Giải thích đáp án (nếu có)" multiline style={[styles.input, styles.textArea, styles.quizQuestionText]} />
             </View>
           ))}
-          <Text style={styles.note}>Lịch mở bài, hạn kết thúc và câu hỏi chỉ lưu trong phiên demo. Không tạo bài thi hoặc gửi thông báo thật.</Text>
-          <PrimaryButton title="Thêm vào danh sách demo" onPress={() => {
-            const value = title.trim();
-            const validQuestions = questions.filter((question) => question.text.trim() && question.options.every((option) => option.trim()));
-            if (!value || !validQuestions.length || validQuestions.length !== questions.length) {
-              Alert.alert('Thiếu nội dung', 'Nhập tên bài, nội dung và đủ bốn phương án cho từng câu hỏi.');
-              return;
-            }
-            if (courses.length && !courseName) {
-              Alert.alert('Chưa chọn khóa học', 'Chọn khóa học trước khi tạo bài trắc nghiệm demo.');
-              return;
-            }
-            const limit = Number(timeLimit);
-            if (!Number.isFinite(limit) || limit < 1) {
-              Alert.alert('Thời gian chưa hợp lệ', 'Nhập thời gian làm bài lớn hơn 0 phút.');
-              return;
-            }
-            const parseSchedule = (value: string) => {
-              if (!value.trim()) return null;
-              if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value.trim())) return Number.NaN;
-              return new Date(value.trim().replace(' ', 'T')).getTime();
-            };
-            const startAt = parseSchedule(startTime);
-            const deadlineAt = parseSchedule(deadline);
-            if ((startTime.trim() && (startAt === null || !Number.isFinite(startAt) || startAt <= Date.now()))
-              || (deadline.trim() && (deadlineAt === null || !Number.isFinite(deadlineAt) || deadlineAt <= Date.now()))
-              || (startAt !== null && deadlineAt !== null && deadlineAt <= startAt)) {
-              Alert.alert('Lịch bài không hợp lệ', 'Thời gian bắt đầu và hạn kết thúc phải đúng định dạng, ở tương lai và hạn kết thúc sau thời gian bắt đầu.');
-              return;
-            }
-            if (!targetAll && !targetStudentIds.length) {
-              Alert.alert('Chưa chọn học viên', 'Chọn ít nhất một học viên hoặc giao cho cả lớp.');
-              return;
-            }
-            const assignedStudents = targetAll ? courseStudents : courseStudents.filter((student) => targetStudentIds.includes(student.id));
-            setQuizzes([{
-              id: `quiz-${Date.now()}`, title: value, courseName: courseName || '—',
-              timeLimitMinutes: limit, startTime: startTime.trim() || undefined, deadline: deadline.trim() || '—', questions: validQuestions.length,
-              studentCount: assignedStudents.length || undefined,
-              assignedStudentNames: assignedStudents.map((student) => student.name),
-              submissions: [],
-              sampleQuestions: validQuestions.map((question) => ({ text: question.text.trim(), options: question.options.map((option) => option.trim()), correctOption: question.correctOption })),
-            }, ...items]);
-            resetCreateForm();
-            setShowCreate(false);
-          }} />
+          {isPreview ? <Text style={styles.note}>Bản xem trước: bài tạo chỉ lưu cục bộ, không gửi cho học viên.</Text> : null}
+          <PrimaryButton
+            title={savingQuiz ? 'Đang tạo bài…' : isPreview ? 'Thêm vào danh sách xem trước' : 'Tạo bài trắc nghiệm'}
+            loading={savingQuiz}
+            disabled={savingQuiz}
+            onPress={() => { void handleCreateQuiz(); }}
+          />
         </Card>
       ) : null}
       {resource.loading ? <LoadingSkeleton /> : null}
@@ -1445,8 +1811,8 @@ export function TeacherQuizzesScreen() {
         <QuizCard
           key={quiz.id}
           quiz={quiz}
-          onDelete={() => setQuizzes(items.filter((item) => item.id !== quiz.id))}
-          onRecreate={() => setQuizzes([{ ...quiz, id: `quiz-${Date.now()}`, title: `${quiz.title} (Tạo lại)`, submissions: [] }, ...items])}
+          onDelete={() => handleDeleteQuiz(quiz)}
+          onRecreate={() => handleRecreateQuiz(quiz)}
         />
       ))}
       {!resource.loading && !resource.error && !items.length ? <EmptyState title="Chưa có bài trắc nghiệm" message="Bài trắc nghiệm đã tạo sẽ hiển thị tại đây." /> : null}
@@ -1483,7 +1849,21 @@ function QuizCard({ quiz, onDelete, onRecreate }: { quiz: DemoQuiz; onDelete: ()
         </View>
       ))}
       <SectionHeading title={`Bài nộp (${quiz.submissions.length})`} />
-      {showResults ? quiz.submissions.map((submission) => <Text key={submission.studentName} style={styles.muted}>{submission.studentName} · {submission.score}% · {submission.status === 'passed' ? 'Đạt' : 'Đã nộp'}</Text>) : null}
+      {showResults ? quiz.submissions.map((submission, index) => (
+        <View key={`${quiz.id}-${submission.studentName}-${index}`} style={styles.gradeHistoryRow}>
+          <View style={styles.rowCopy}>
+            <Text style={styles.cardTitle}>{submission.studentName}</Text>
+            <Text style={styles.metaText}>
+              {submission.submittedAt ? `${submission.submittedAt} · ` : ''}
+              {submission.forfeit ? `Thoát giữa giờ${submission.exitReason ? ` · ${submission.exitReason}` : ''}` : `${submission.correctCount ?? '—'}/${submission.totalQuestions ?? quiz.questions} câu đúng`}
+            </Text>
+          </View>
+          <View style={styles.gradeResult}>
+            <Text style={styles.gradeScore}>{submission.score}%</Text>
+            <StatusBadge label={submission.forfeit ? 'Chưa đạt' : submission.status === 'passed' ? 'Đạt' : 'Chưa đạt'} />
+          </View>
+        </View>
+      )) : null}
       <View style={styles.quizActions}>
         <Pressable onPress={onRecreate} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Tạo lại</Text></Pressable>
         <Pressable onPress={() => setShowResults((value) => !value)} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>{showResults ? 'Ẩn kết quả' : 'Xem kết quả'}</Text></Pressable>
@@ -1502,13 +1882,25 @@ export function TeacherTrainingScreen() {
   const courses = resource.data || [];
   const [expanded, setExpanded] = useState<string[]>([]);
   const [tab, setTab] = useState('Khóa học');
+  const trainingTabs = [
+    { label: 'Khóa học', count: courses.length, icon: Video, color: '#EF4056' },
+    { label: 'Quy trình', count: courses.reduce((total, course) => total + course.lessons.length, 0), icon: FileText, color: '#3B82F6' },
+    { label: 'Tài liệu', count: courses.reduce((total, course) => total + course.files.length, 0), icon: Download, color: '#F97316' },
+    { label: 'Phần mềm', count: software.data?.length || 0, icon: Link2, color: '#14B8A6' },
+  ];
   return (
     <AppScreen>
-      <AppHeader title="Khóa đào tạo" subtitle="Nội dung học tập và tài liệu được giao" />
+      <AppHeader title="Khóa đào tạo" subtitle="Nội dung học tập và tài liệu được giao" centered showBackButton={false} />
       <View style={styles.trainingTabs}>
-        {['Khóa học', 'Quy trình', 'Tài liệu', 'Phần mềm'].map((item) => (
-          <Pressable key={item} onPress={() => setTab(item)} style={[styles.trainingTab, tab === item && styles.trainingTabActive]} accessibilityRole="button" accessibilityState={{ selected: tab === item }}>
-            <Text style={[styles.trainingTabText, tab === item && styles.trainingTabTextActive]}>{item}</Text>
+        {trainingTabs.map(({ label, count, icon: Icon, color }) => (
+          <Pressable key={label} onPress={() => setTab(label)} style={[styles.trainingTab, tab === label && styles.trainingTabActive]} accessibilityRole="button" accessibilityState={{ selected: tab === label }}>
+            <View style={[styles.trainingTabIcon, { backgroundColor: color }]}>
+              <Icon size={15} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text numberOfLines={1} style={[styles.trainingTabText, tab === label && styles.trainingTabTextActive]}>{label}</Text>
+            <View style={[styles.trainingTabCount, tab === label && styles.trainingTabCountActive]}>
+              <Text style={[styles.trainingTabCountText, tab === label && styles.trainingTabCountTextActive]}>{count}</Text>
+            </View>
           </Pressable>
         ))}
       </View>
@@ -1525,104 +1917,249 @@ export function TeacherTrainingScreen() {
           {!software.loading && !software.error && !software.data?.length ? <EmptyState title="Chưa có phần mềm" message="Chưa có dữ liệu phần mềm trong bản demo." /> : null}
         </>
       ) : tab === 'Tài liệu' ? (
-        courses.flatMap((course) => course.files.map((file) => <Card key={`${course.id}-${file}`} style={styles.unitRow}>
-          <BookOpen size={18} color={colors.brand} /><View style={styles.flex}><Text style={styles.cardTitle}>{file}</Text><Text style={styles.metaText}>{course.title}</Text></View>
-          <Pressable onPress={() => Alert.alert(file, 'Tệp học liệu chưa có liên kết mở/tải trong dữ liệu demo.')} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel={`Mở tài liệu ${file}`}><Text style={styles.feedInlineActionText}>Mở</Text></Pressable>
-        </Card>))
+        courses.flatMap((course) => course.files.map((file, index) => {
+          const resourceFile = course.fileLinks?.[index];
+          return <Card key={`${course.id}-${file}`} style={styles.unitRow}>
+            <BookOpen size={18} color={colors.brand} /><View style={styles.flex}><Text style={styles.cardTitle}>{file}</Text><Text style={styles.metaText}>{course.title}</Text></View>
+            <Pressable onPress={() => { void openExternalUrl(resourceFile?.url, file); }} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel={`Mở tài liệu ${file}`}><Text style={styles.feedInlineActionText}>Mở</Text></Pressable>
+          </Card>;
+        }))
       ) : (
-        courses.map((course) => <TrainingCard key={course.id} course={course} expanded={expanded.includes(course.id)} tab={tab} onToggle={() => setExpanded(expanded.includes(course.id) ? expanded.filter((id) => id !== course.id) : [...expanded, course.id])} />)
+        courses.map((course) => <TrainingCard
+          key={course.id}
+          course={course}
+          user={user}
+          expanded={expanded.includes(course.id)}
+          tab={tab}
+          onLessonCompleted={resource.reload}
+          onToggle={() => setExpanded(expanded.includes(course.id) ? expanded.filter((id) => id !== course.id) : [...expanded, course.id])}
+        />)
       )}
       {!resource.loading && !resource.error && !courses.length && tab !== 'Phần mềm' ? <EmptyState title="Chưa có khóa đào tạo" message="Nội dung sẽ xuất hiện khi được giao." /> : null}
     </AppScreen>
   );
 }
 
-function TrainingCard({ course, expanded, tab, onToggle }: { course: DemoTrainingCourse; expanded: boolean; tab: string; onToggle: () => void }) {
+function embeddedTrainingVideoUrl(url: string) {
+  const youtubeId = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/)?.[1];
+  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0`;
+  const vimeoId = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
+  return vimeoId ? `https://player.vimeo.com/video/${vimeoId}?autoplay=1` : '';
+}
+
+function isSupportedTrainingVideo(url: string) {
+  return Boolean(embeddedTrainingVideoUrl(url) || /\.(mp4|webm|ogg)(?:$|[?#])/i.test(url));
+}
+
+function trainingDurationSeconds(duration: string) {
+  const parts = duration.split(':').map(Number);
+  if (!parts.length || parts.some((part) => !Number.isFinite(part))) return 0;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  const numeric = Number(duration);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function TrainingCard({
+  course,
+  user,
+  expanded,
+  tab,
+  onToggle,
+  onLessonCompleted,
+}: {
+  course: DemoTrainingCourse;
+  user: DemoUser | null | undefined;
+  expanded: boolean;
+  tab: string;
+  onToggle: () => void;
+  onLessonCompleted: () => void;
+}) {
+  const [activeLesson, setActiveLesson] = useState<DemoTrainingCourse['lessons'][number] | null>(null);
   return (
     <Card style={styles.trainingCard}>
-      <View style={styles.trainingBanner}><GraduationCap size={22} color="#FFFFFF" /><Text style={styles.trainingBannerText}>ĐÀO TẠO GIẢNG VIÊN</Text></View>
+      <View style={styles.trainingBanner}><GraduationCap size={22} color="#FFFFFF" /><Text style={styles.trainingBannerText}>Đào tạo giảng viên</Text></View>
       <Text style={styles.cardTitle}>{course.title}</Text>
       <View style={styles.rowBetween}><Text style={styles.metaText}>Tiến độ khóa học</Text><Text style={styles.cardTitle}>{course.progress}%</Text></View>
       <ProgressBar value={course.progress} />
       <Text style={styles.caption}>{course.lessons.length} bài học</Text>
-      <PrimaryButton title={expanded ? 'THU GỌN' : 'VÀO HỌC'} onPress={onToggle} variant="secondary" />
+      <Text style={styles.note}>Tiến độ được đồng bộ với máy chủ. Video hỗ trợ sẽ ghi nhận thời gian xem để cập nhật khi hoàn thành.</Text>
+      <PrimaryButton title={expanded ? 'Thu gọn' : 'Vào học'} onPress={onToggle} variant="secondary" />
       {expanded ? (
         <>
           {tab !== 'Tài liệu' ? (
             <>
               <SectionHeading title="Quy trình" />
-              {course.lessons.map((lesson) => <Text key={lesson.id} style={styles.muted}>{lesson.completed ? '✓' : '○'} {lesson.title} · {lesson.duration}</Text>)}
+              {course.lessons.map((lesson) => (
+                <Pressable key={lesson.id} onPress={() => {
+                  if (lesson.url && isSupportedTrainingVideo(lesson.url)) setActiveLesson(lesson);
+                  else void openExternalUrl(lesson.url, lesson.title);
+                }} style={styles.trainingLesson} accessibilityRole="button" accessibilityLabel={`${lesson.completed ? 'Đã hoàn thành' : 'Phát'} bài học ${lesson.title}`}>
+                  <Text style={styles.muted}>{lesson.completed ? '✓' : '○'} {lesson.title} · {lesson.duration}</Text>
+                  <Text style={styles.newsAttachmentAction}>{lesson.completed ? 'Phát lại' : lesson.url ? 'Xem & ghi nhận' : 'Chưa có liên kết'}</Text>
+                </Pressable>
+              ))}
             </>
           ) : null}
           {tab !== 'Quy trình' ? (
             <>
               <SectionHeading title="Tài liệu" />
-              {course.files.map((file) => <Pressable key={file} onPress={() => Alert.alert(file, 'Tệp học liệu chưa có liên kết mở/tải trong dữ liệu demo.')} style={styles.newsAttachment} accessibilityRole="button"><Text style={styles.newsAttachmentText}>{file}</Text><Text style={styles.newsAttachmentAction}>Mở</Text></Pressable>)}
+              {course.files.map((file, index) => <Pressable key={file} onPress={() => { void openExternalUrl(course.fileLinks?.[index]?.url, file); }} style={styles.newsAttachment} accessibilityRole="button"><Text style={styles.newsAttachmentText}>{file}</Text><Text style={styles.newsAttachmentAction}>Mở</Text></Pressable>)}
             </>
           ) : null}
           {course.notices.map((notice) => <Text key={notice} style={styles.note}>{notice}</Text>)}
         </>
       ) : null}
+      {activeLesson && user ? (
+        <TeacherTrainingPlayer
+          user={user}
+          courseId={course.id}
+          lesson={activeLesson}
+          onClose={() => setActiveLesson(null)}
+          onCompleted={() => {
+            setActiveLesson(null);
+            onLessonCompleted();
+          }}
+        />
+      ) : null}
     </Card>
   );
 }
 
-export function TeacherFinanceScreen() {
-  const { user } = useAuth();
-  const loader = useCallback(() => teacherFinanceService.overview(user), [user]);
-  const resource = useMockResource(loader);
-  const overview = resource.data;
+function TeacherTrainingPlayer({
+  user,
+  courseId,
+  lesson,
+  onClose,
+  onCompleted,
+}: {
+  user: DemoUser;
+  courseId: string;
+  lesson: DemoTrainingCourse['lessons'][number];
+  onClose: () => void;
+  onCompleted: () => void;
+}) {
+  const [progress, setProgress] = useState<VideoPlayerProgress>({
+    currentTime: 0,
+    duration: 0,
+    watchedSeconds: lesson.watchedSeconds || 0,
+    completed: lesson.completed,
+    playing: false,
+  });
+  const [saveError, setSaveError] = useState('');
+  const latestProgress = useRef(progress);
+  const lastSavedWatchedSeconds = useRef(lesson.watchedSeconds || 0);
+  const playerApiRef = useRef<VideoPlayerApi | null>(null);
+  const url = resolveMobilePublicUrl(lesson.url || '');
+  const embeddedUrl = embeddedTrainingVideoUrl(url);
+  const saveProgress = useCallback(async (next: VideoPlayerProgress) => {
+    if (!user || next.watchedSeconds <= lastSavedWatchedSeconds.current) return;
+    await saveTeacherTrainingWatchProgress(user, {
+      courseId,
+      lessonId: lesson.id,
+      watchedSeconds: next.watchedSeconds,
+      videoDuration: next.duration || trainingDurationSeconds(lesson.duration),
+    });
+    lastSavedWatchedSeconds.current = next.watchedSeconds;
+  }, [courseId, lesson.duration, lesson.id, user]);
+  const onProgress = useCallback((next: VideoPlayerProgress) => {
+    latestProgress.current = next;
+    setProgress(next);
+    if (next.playing && next.watchedSeconds - lastSavedWatchedSeconds.current >= 10) {
+      void saveProgress(next).then(() => setSaveError('')).catch((error: unknown) => {
+        setSaveError(error instanceof Error ? error.message : 'Không thể lưu tiến độ xem.');
+      });
+    }
+  }, [saveProgress]);
+  const onWatched = useCallback(async () => {
+    const current = latestProgress.current;
+    try {
+      await saveProgress(current);
+      await completeTeacherTrainingLesson(user, {
+        courseId,
+        lessonId: lesson.id,
+        watchedSeconds: current.watchedSeconds,
+        videoDuration: current.duration || trainingDurationSeconds(lesson.duration),
+      });
+      onCompleted();
+      return true;
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Không thể cập nhật tiến độ bài học.');
+      return false;
+    }
+  }, [courseId, lesson.duration, lesson.id, onCompleted, saveProgress, user]);
+  const isDirectVideo = /\.(mp4|webm|ogg)(?:$|[?#])/i.test(url);
+
   return (
-    <AppScreen>
-      <AppHeader title="Tài chính" subtitle="Tổng hợp buổi dạy và thanh toán" />
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      <View style={styles.rowBetween}>
-        <Text style={styles.title}>Tài chính giảng viên</Text>
-        <Text style={styles.financeTeacherName}>GV: {user?.name || '—'}</Text>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.trainingPlayerBackdrop}>
+        <View style={styles.trainingPlayer}>
+          <View style={styles.trainingPlayerHeader}>
+            <View style={styles.flex}>
+              <Text numberOfLines={1} style={styles.cardTitle}>{lesson.title}</Text>
+              <Text style={styles.metaText}>{progress.completed ? 'Đã hoàn thành' : `${Math.floor(progress.watchedSeconds)} giây đã xem`}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.trainingPlayerClose} accessibilityRole="button" accessibilityLabel="Đóng video">
+              <X size={21} color={colors.ink} />
+            </Pressable>
+          </View>
+          <View style={styles.trainingPlayerFrame}>
+            <VideoPlayerFrame
+              videoUrl={url}
+              embeddedUrl={embeddedUrl}
+              title={lesson.title}
+              lessonId={`teacher-${user.id}-${lesson.id}`}
+              antiSeekEnabled={lesson.antiSeek === true}
+              done={progress.completed}
+              playerApiRef={playerApiRef}
+              onProgress={onProgress}
+              onWatched={onWatched}
+            />
+          </View>
+          {saveError ? <Text style={styles.trainingPlayerError}>{saveError}</Text> : null}
+          {!embeddedUrl && !isDirectVideo ? <Text style={styles.note}>Định dạng này không hỗ trợ phát và ghi nhận tiến độ trong ứng dụng.</Text> : null}
+        </View>
       </View>
-      <View style={styles.financeStats}>
-        {[
-          ['Tổng đã nhận', overview ? formatCurrency(overview.paidAmount) : '—'],
-          ['Chưa nhận', overview ? formatCurrency(overview.unpaidAmount) : '—'],
-          ['Buổi đã dạy', overview ? String(overview.totalSessions) : '—'],
-        ].map(([label, value]) => <Card key={label} style={styles.financeStat}><Text style={styles.metaText}>{label}</Text><Text numberOfLines={1} adjustsFontSizeToFit style={styles.financeStatValue}>{value}</Text></Card>)}
-      </View>
-      <Card style={styles.financeChart}>
-        <View style={styles.rowBetween}><Text style={styles.cardTitle}>Mức lương theo buổi</Text><WalletCards size={20} color={colors.brand} /></View>
-        <Text style={styles.financeAmount}>{overview ? formatCurrency(overview.salaryPerSession) : '—'}</Text>
-        <Text style={styles.metaText}>Tổng buổi chờ thanh toán: {overview ? overview.pendingSessionsCount : '—'}</Text>
-      </Card>
-      <SectionHeading title="Buổi dạy chờ thanh toán" />
-      {overview?.pendingSessions.map((session) => (
-        <Card key={session.id}>
-          <View style={styles.rowBetween}><Text style={styles.cardTitle}>{session.course}</Text><StatusBadge label="Chưa nhận" /></View>
-          <Text style={styles.financeAmount}>{formatCurrency(session.amount)}</Text>
-          <Text style={styles.muted}>{session.studentName} · Buổi {session.sessionNo ?? '—'}</Text>
-          <Text style={styles.metaText}>
-            {session.date ? new Date(session.date).toLocaleDateString('vi-VN') : 'Chưa có ngày'}
-            {session.startTime ? ` · ${session.startTime}` : ''}
-            {session.endTime ? `–${session.endTime}` : ''}
-          </Text>
-        </Card>
-      ))}
-      {!resource.loading && !resource.error && overview && !overview.pendingSessions.length ? <EmptyState title="Không có buổi chờ thanh toán" message="Các buổi đã hoàn thành và chưa thanh toán sẽ xuất hiện tại đây." /> : null}
-      <Text style={styles.note}>Thông tin thanh toán chỉ xem được trong ứng dụng. Các giao dịch và xuất báo cáo do trung tâm xử lý.</Text>
-    </AppScreen>
+    </Modal>
   );
 }
 
 export function TuitionScreen() {
   const { user } = useAuth();
   const profileLoader = useCallback(() => studentProfileService.get(user), [user]);
+  const paymentLoader = useCallback(() => studentPaymentService.get(user), [user]);
   const profileResource = useMockResource(profileLoader);
+  const paymentResource = useMockResource(paymentLoader);
   const enrollments = profileResource.data?.enrollments || [];
+  const paymentStatus = paymentResource.data;
   return (
     <AppScreen>
       <AppHeader title="Học phí theo khóa" subtitle="Thông tin học phí trên hồ sơ học viên" showBackButton={false} centered />
       {profileResource.data?.qaFixture ? <Text style={styles.note}>QA fixture — dữ liệu minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
       {profileResource.loading ? <LoadingSkeleton /> : null}
       {profileResource.error ? <ErrorState onRetry={profileResource.reload} /> : null}
+      {paymentResource.loading ? <LoadingSkeleton /> : null}
+      {paymentResource.error ? <ErrorState onRetry={paymentResource.reload} /> : null}
+      {paymentStatus ? (
+        <Card>
+          <Text style={styles.cardTitle}>Trạng thái thanh toán tổng thể</Text>
+          <View style={styles.tuitionAmountRow}>
+            <Text style={styles.metaText}>Học phí toàn tài khoản</Text>
+            <StatusBadge label={paymentStatus.paid ? 'Đã thanh toán' : 'Chưa thanh toán'} />
+          </View>
+          <View style={styles.tuitionAmountRow}>
+            <Text style={styles.metaText}>Số tiền đã thanh toán</Text>
+            <Text style={styles.infoValue}>{formatCurrency(paymentStatus.paidAmount)}</Text>
+          </View>
+          {paymentStatus.paidAt ? (
+            <View style={styles.tuitionAmountRow}>
+              <Text style={styles.metaText}>Ngày ghi nhận</Text>
+              <Text style={styles.infoValue}>{formatPaymentDate(paymentStatus.paidAt)}</Text>
+            </View>
+          ) : null}
+          <Text style={styles.note}>Đây là trạng thái tổng thể của học viên, không phải số tiền phân bổ theo từng khóa.</Text>
+        </Card>
+      ) : null}
       {!profileResource.loading && !profileResource.error ? enrollments.map((enrollment) => {
         const amount = enrollment.tuitionAmount;
         const paidAmount = enrollment.paidAmount;
@@ -1636,13 +2173,20 @@ export function TuitionScreen() {
         </Card>
       }) : null}
       {!profileResource.loading && !profileResource.error && !enrollments.length ? <EmptyState title="Chưa có khóa học" message="Thông tin học phí sẽ xuất hiện theo khóa học." /> : null}
-      <Text style={styles.note}>Thông tin học phí chỉ xem trong ứng dụng. Để thanh toán hoặc xác nhận giao dịch, vui lòng thực hiện trên website.</Text>
+      <Text style={styles.note}>Để thanh toán hoặc xác nhận giao dịch, vui lòng thực hiện trên website.</Text>
     </AppScreen>
   );
 }
 
 function formatCurrency(value: number) {
   return `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
+}
+
+function formatPaymentDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 const styles = StyleSheet.create({
@@ -1687,7 +2231,7 @@ const styles = StyleSheet.create({
   feedPostImageSingle: { width: '100%', aspectRatio: 1.6 },
   feedPostImage: { width: '100%', height: '100%' },
   feedPostMenuAnchor: { position: 'relative', zIndex: 20, alignItems: 'flex-end' },
-  feedPostMenuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+  feedPostMenuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
   feedPostMenu: { position: 'absolute', top: 38, right: 0, zIndex: 30, width: 174, padding: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 8 },
   feedPostMenuItem: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.sm },
   feedPostMenuText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
@@ -1778,7 +2322,7 @@ const styles = StyleSheet.create({
   newsViews: { color: colors.muted, fontSize: 11 },
   centerPickerWrap: { position: 'relative', zIndex: 1, elevation: 1, marginBottom: spacing.sm },
   centerPickerWrapOpen: { zIndex: 50, elevation: 30 },
-  centerDropdown: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  centerDropdown: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: '#FFFFFF' },
   centerDropdownOpen: { borderColor: colors.brand },
   centerDropdownText: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
   centerDropdownMenu: { position: 'absolute', top: 48, left: 0, right: 0, zIndex: 60, padding: 3, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 32 },
@@ -1789,11 +2333,11 @@ const styles = StyleSheet.create({
   centerBannerImage: { width: '100%', aspectRatio: 2.3, borderRadius: radius.md, backgroundColor: colors.canvas },
   centerOverview: { gap: spacing.md },
   centerOverviewHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  centerFounded: { color: colors.muted, fontSize: 10, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing.sm },
+  centerFounded: { color: colors.muted, fontSize: 10, fontWeight: '900', letterSpacing: 0.6, marginTop: spacing.sm },
   centerLogoImage: { width: 80, height: 80, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FFFFFF' },
-  centerPillarTitle: { color: colors.brand, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: spacing.xs },
+  centerPillarTitle: { color: colors.brand, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, marginBottom: spacing.xs },
   centerContactCard: { gap: spacing.xs },
-  centerContactHeading: { color: colors.muted, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
+  centerContactHeading: { color: colors.muted, fontSize: 11, fontWeight: '900', letterSpacing: 0.6 },
   centerContactText: { color: colors.ink, fontSize: typography.small, lineHeight: 20 },
   centerGallery: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   centerGalleryImage: { width: '48%', aspectRatio: 16 / 9, borderRadius: radius.md, backgroundColor: colors.canvas },
@@ -1816,44 +2360,49 @@ const styles = StyleSheet.create({
   centerItemSecondaryText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
   centerBranchCount: { color: colors.ink, fontSize: typography.small, fontWeight: '700', marginBottom: spacing.sm },
   centerSectionContent: { gap: spacing.xs },
-  quizTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  quizTab: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
-  quizTabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  quizTabText: { color: colors.ink, fontSize: typography.caption, fontWeight: '700' },
-  quizTabActiveText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700' },
+  assessmentTabs: { flexDirection: 'row', marginBottom: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  assessmentTab: { flex: 1, minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  assessmentTabActive: { borderBottomColor: colors.brand },
+  assessmentTabText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
+  assessmentTabTextActive: { color: colors.brand, fontWeight: '800' },
+  quizCreateRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: -spacing.sm },
+  quizCreateAction: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: colors.redSoft },
+  quizCreateActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
+  quizCreateCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  quizTitleInput: { minHeight: 44, borderColor: '#DCE3EB', backgroundColor: '#FBFCFE', fontWeight: '700' },
+  quizCompactInput: { minHeight: 42, paddingVertical: spacing.xs, borderColor: '#DCE3EB', backgroundColor: '#FFFFFF' },
+  quizScheduleFields: { gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas },
   quizMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   quizMetric: { width: '47%', minHeight: 58, justifyContent: 'center', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas },
-  quizActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
-  quizTools: { gap: spacing.xs, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas },
+  gradeHistoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  gradeResult: { alignItems: 'flex-end', gap: spacing.xs },
+  gradeScore: { color: colors.brandDark, fontSize: typography.body, fontWeight: '800' },
+  quizActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  quizTools: { gap: spacing.xs, marginTop: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas },
   quizAction: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
   quizActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
   quizDelete: { borderColor: colors.redSoft, backgroundColor: colors.redSoft },
   quizDeleteText: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
-  trainingTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  trainingTab: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill },
-  trainingTabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  trainingTabText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
-  trainingTabTextActive: { color: '#FFFFFF' },
+  trainingTabs: { flexDirection: 'row', flexWrap: 'nowrap', gap: spacing.xs, paddingBottom: spacing.md, marginBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  trainingTab: { flex: 1, minWidth: 0, minHeight: 63, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 2, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: 13, backgroundColor: colors.surface },
+  trainingTabActive: { borderColor: '#FF4D5A', backgroundColor: '#FFF3F3', shadowColor: '#EF4056', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 2 },
+  trainingTabIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
+  trainingTabText: { maxWidth: '100%', color: colors.ink, fontSize: typography.micro, fontWeight: '700' },
+  trainingTabTextActive: { color: colors.ink },
+  trainingTabCount: { position: 'absolute', top: 3, right: 3, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: radius.pill, backgroundColor: '#EEF2F7' },
+  trainingTabCountActive: { backgroundColor: '#E11D2E' },
+  trainingTabCountText: { color: '#64748B', fontSize: typography.micro, lineHeight: 16, fontWeight: '800' },
+  trainingTabCountTextActive: { color: '#FFFFFF' },
   trainingCard: { overflow: 'hidden' },
   trainingBanner: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: -spacing.lg, marginHorizontal: -spacing.lg, marginBottom: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.brandDark },
+  trainingLesson: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   trainingBannerText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.5 },
-  financeStats: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  financeStat: { flex: 1, minWidth: '30%', paddingHorizontal: spacing.sm },
-  financeStatValue: { color: colors.ink, fontSize: typography.body, fontWeight: '800', marginTop: spacing.sm },
-  financeChart: { gap: spacing.md, minHeight: 196 },
-  financeChartBars: { minHeight: 142, alignItems: 'flex-end', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.sm },
-  financeChartColumn: { width: 68, alignItems: 'center', justifyContent: 'flex-end', gap: spacing.xs },
-  financeChartAmount: { maxWidth: 68, color: colors.muted, fontSize: typography.micro },
-  financeChartTrack: { width: 44, height: 100, justifyContent: 'flex-end', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.line },
-  financeChartBar: { width: 40, borderTopLeftRadius: 10, borderTopRightRadius: 10, backgroundColor: colors.blue },
-  financeChartMonth: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '600' },
-  financeActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
-  financeExport: { flex: 1, minWidth: '45%', minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas },
-  financeDetailExport: { flexBasis: '100%', backgroundColor: colors.greenSoft, borderColor: '#86EFAC' },
-  financeExportText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
-  financeTeacherName: { maxWidth: '48%', color: colors.muted, fontSize: typography.micro, textAlign: 'right' },
-  financeGroupTitle: { color: colors.green, fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.8, marginTop: spacing.md },
-  financeAmount: { color: colors.ink, fontSize: typography.title, fontWeight: '800', marginTop: spacing.sm },
+  trainingPlayerBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.82)' },
+  trainingPlayer: { gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  trainingPlayerHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  trainingPlayerClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.canvas },
+  trainingPlayerFrame: { width: '100%', aspectRatio: 16 / 9, overflow: 'hidden', borderRadius: radius.md, backgroundColor: '#080D19' },
+  trainingPlayerError: { color: colors.red, fontSize: typography.caption, fontWeight: '700' },
   menuScreen: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
   menuHeader: { minHeight: 66, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, marginBottom: spacing.xs },
   menuList: { gap: spacing.sm },
@@ -1893,7 +2442,13 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md, marginTop: spacing.md },
   fieldLabel: { color: colors.ink, fontSize: typography.small, fontWeight: '700', marginBottom: spacing.xs },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  choice: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 10 },
+  radioChoices: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
+  radioChoice: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: 2 },
+  radioOuter: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.muted, borderRadius: radius.pill, backgroundColor: colors.surface },
+  radioOuterSelected: { borderColor: colors.brand },
+  radioInner: { width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.brand },
+  radioChoiceText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  choice: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, paddingVertical: 7, paddingHorizontal: 10 },
   choiceActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   choiceText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
   choiceTextActive: { color: '#FFFFFF' },
@@ -1901,9 +2456,10 @@ const styles = StyleSheet.create({
   studentTarget: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
   studentTargetSelected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
   studentTargetText: { color: colors.ink, fontSize: typography.small },
-  questionEditor: { gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
+  questionEditor: { gap: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
   questionRemove: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm },
-  textArea: { minHeight: 84, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
+  textArea: { minHeight: 76, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
+  quizQuestionText: { minHeight: 68, paddingVertical: spacing.sm, backgroundColor: '#FBFCFE' },
   input: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   optionToggle: { width: 34, height: 34, textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden', borderRadius: 17, color: colors.ink, backgroundColor: colors.canvas, fontWeight: '800' },

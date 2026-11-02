@@ -283,7 +283,7 @@ export default function StickerPicker({
 function StickerSection({ label, stickers, disabled, onSelect, onMissing }) {
   return (
     <section className="mb-2 last:mb-0">
-      <h3 className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</h3>
+      <h3 className="mb-1 px-1 text-[10px] font-bold  tracking-wider text-slate-400">{label}</h3>
       <div className="grid grid-cols-3 gap-2 min-[420px]:grid-cols-4">
         {stickers.map((sticker) => (
           <button

@@ -26,7 +26,7 @@ export default function TrueFalseGridEditor({
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full min-w-[420px] text-sm">
           <thead>
-            <tr className="bg-slate-50 text-left text-xs font-black uppercase tracking-wide text-slate-500">
+            <tr className="bg-slate-50 text-left text-xs font-black  tracking-wide text-slate-500">
               <th className="px-3 py-2 w-10">#</th>
               <th className="px-3 py-2">Nhận định</th>
               <th className="px-3 py-2 w-28 text-center">Đáp án</th>

@@ -47,7 +47,7 @@ export default function TeacherPaymentCelebration({ payment, onClose, onViewDeta
             </div>
           </div>
 
-          <p className="relative z-10 mt-4 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-600">
+          <p className="relative z-10 mt-4 text-[10px] font-bold  tracking-[0.22em] text-emerald-600">
             Bạn vừa nhận được thanh toán
           </p>
           <h2 id="teacher-payment-title" className="relative z-10 mt-2 text-3xl font-black text-slate-900">

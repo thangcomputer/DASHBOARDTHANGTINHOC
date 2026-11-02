@@ -174,14 +174,14 @@ export function MilestoneEvaluationModal({
               ? <Building2 size={isCompactHeader ? 20 : 32} className="text-white" />
               : <Star size={isCompactHeader ? 20 : 32} className="fill-white text-white" />}
           </div>
-          <h3 className={`font-black uppercase tracking-tight ${isCompactHeader ? 'text-base' : 'text-xl'}`}>
+          <h3 className={`font-black  tracking-tight ${isCompactHeader ? 'text-base' : 'text-xl'}`}>
             {title}
           </h3>
           <p className={`text-red-100 font-medium italic ${isCompactHeader ? 'text-[10px] mt-0.5' : 'text-xs mt-1'}`}>
             {subtitle}
           </p>
           {isCourseEnd ? (
-            <p className={`font-bold text-white/80 uppercase tracking-wider ${
+            <p className={`font-bold text-white/80  tracking-wider ${
               isCompactHeader ? 'text-[10px] mt-1' : 'text-[11px] mt-2'
             }`}>
               Bước {step === 'center' ? '1/2 · Trung tâm' : '2/2 · Giảng viên'}
@@ -227,9 +227,9 @@ export function MilestoneEvaluationModal({
                 disabled={!canSubmitCenter || submitting}
                 className="w-full bg-gradient-to-r from-red-600 to-red-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-red-100 active:scale-95 transition transform disabled:opacity-50 inline-flex items-center justify-center gap-1"
               >
-                TIẾP TỤC
+                Tiếp tục
                 <NavArrow size={16} className="text-white" />
-                {alreadyPubliclyRated ? 'CHỈNH SỬA ĐÁNH GIÁ GV' : 'ĐÁNH GIÁ GIẢNG VIÊN'}
+                {alreadyPubliclyRated ? 'Chỉnh sửa đánh giá GV' : 'Đánh giá giảng viên'}
               </button>
             </>
           ) : !isCourseEnd ? (
@@ -266,7 +266,7 @@ export function MilestoneEvaluationModal({
                 disabled={!canSubmitLesson1 || submitting}
                 className="w-full bg-gradient-to-r from-red-600 to-red-500 py-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-red-100 active:scale-95 transition transform disabled:opacity-50"
               >
-                GỬI ĐÁNH GIÁ
+                Gửi đánh giá
               </button>
             </>
           ) : (
@@ -285,7 +285,7 @@ export function MilestoneEvaluationModal({
                     key={catKey}
                     className="flex flex-col gap-1.5 px-2.5 py-2 bg-gray-50 rounded-xl border border-gray-100"
                   >
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">
+                    <p className="text-[10px] font-black text-gray-500  tracking-wide">
                       {cat.label}
                     </p>
                     <div className={`grid gap-1 ${cat.options.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
@@ -321,7 +321,7 @@ export function MilestoneEvaluationModal({
                 className="w-full bg-gradient-to-r from-red-600 to-red-500 py-3 rounded-xl text-white font-black text-sm shadow-lg shadow-red-100 active:scale-95 transition transform disabled:opacity-50"
               >
                 {submitting
-                  ? 'ĐANG GỬI…'
+                  ? 'Đang gửi…'
                   : (alreadyPubliclyRated ? 'GỬI & KHÓA ĐÁNH GIÁ' : 'GỬI ĐÁNH GIÁ')}
               </button>
             </>

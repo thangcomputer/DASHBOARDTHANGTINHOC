@@ -466,8 +466,8 @@ export default function EditTeacherModal({
                             accountName: e.target.value.toUpperCase(),
                           },
                         }))}
-                        className="cms-input uppercase"
-                        placeholder="NGUYEN VAN A"
+                        className="cms-input "
+                        placeholder="Nguyen Van A"
                       />
                     </div>
                   </div>

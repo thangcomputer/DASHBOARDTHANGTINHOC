@@ -31,7 +31,7 @@ const EMPTY = { name: '', code: '', address: '', phone: '', isActive: true };
 function BranchField({ label, name, placeholder, icon: Icon, type, hint, value, onChange }) {
   return (
     <div>
-      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{label}</label>
+      <label className="text-xs font-bold text-gray-500  block mb-1">{label}</label>
       <div className="flex items-center gap-2 border-2 border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-blue-400 transition">
         {Icon && <Icon size={14} className="text-gray-400 flex-shrink-0" />}
         <input

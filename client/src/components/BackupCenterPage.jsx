@@ -129,7 +129,7 @@ export default function BackupCenterPage() {
           { label: 'Lần gần nhất', value: formatTime(stats?.lastBackupAt) },
         ].map((c) => (
           <div key={c.label} className="bg-white border border-gray-100 rounded-xl p-3">
-            <p className="text-[10px] font-black text-gray-400 uppercase">{c.label}</p>
+            <p className="text-[10px] font-black text-gray-400 ">{c.label}</p>
             <p className="text-sm font-black text-gray-800 mt-1 truncate">{c.value}</p>
           </div>
         ))}
@@ -137,7 +137,7 @@ export default function BackupCenterPage() {
 
       <div className="bg-red-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium shrink-0">
         Backup xuất toàn bộ collection MongoDB ra file <code className="font-mono">.json.gz</code>.
-        Lịch tự động 03:00 hàng ngày (tắt bằng <code className="font-mono">BACKUP_SCHEDULE=0</code>).
+        Lịch tự động 03:00 hàng ngày (tắt bằng <code className="font-mono">Backup_schedule=0</code>).
         Restore thủ công từ file tải về — không ghi đè DB qua UI.
       </div>
 
@@ -155,7 +155,7 @@ export default function BackupCenterPage() {
               <li key={row._id} className="p-4 flex flex-wrap items-center gap-3 hover:bg-gray-50">
                 <div className="flex-1 min-w-[200px]">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${STATUS_STYLE[row.status] || STATUS_STYLE.pending}`}>
+                    <span className={`text-[10px] font-black  px-2 py-0.5 rounded-full ${STATUS_STYLE[row.status] || STATUS_STYLE.pending}`}>
                       {row.status}
                     </span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase">{row.type}</span>

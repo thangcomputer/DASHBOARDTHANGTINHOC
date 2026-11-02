@@ -171,7 +171,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
           {/* Từ hồ sơ HV: đã biết HV → không hiện chọn / banner khóa. Từ lịch: mới hiện dropdown. */}
           {!isStudentLocked && (
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chọn học viên</label>
+              <label className="text-xs font-bold text-gray-400  block mb-1">Chọn học viên</label>
               <CmsSelect
                 name="enrollmentKey"
                 value={form.enrollmentKey}
@@ -220,7 +220,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
           )}
 
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Ngày học (Ngày / Tháng / Năm)</label>
+            <label className="text-xs font-bold text-gray-400  block mb-1">Ngày học (Ngày / Tháng / Năm)</label>
             <div className="grid grid-cols-3 gap-2">
               <CmsSelect
                 disabled={lockedPast}
@@ -281,7 +281,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Bắt đầu</label>
+              <label className="text-xs font-bold text-gray-400  block mb-1">Bắt đầu</label>
               <input
                 type="time"
                 name="startTime"
@@ -293,7 +293,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Kết thúc</label>
+              <label className="text-xs font-bold text-gray-400  block mb-1">Kết thúc</label>
               <input
                 type="time"
                 name="endTime"
@@ -310,7 +310,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
             Mỗi buổi học cố định <span className="font-bold text-slate-700">1 giờ 30 phút</span> — giờ kết thúc tự cập nhật khi đổi giờ bắt đầu.
           </p>
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Chủ đề buổi học</label>
+            <label className="text-xs font-bold text-gray-400  block mb-1">Chủ đề buổi học</label>
             <input
               type="text"
               name="topic"
@@ -330,7 +330,7 @@ export const ScheduleModal = ({ schedule, students = [], allSchedules, onClose, 
             disabled={lockedPast || (!gate.canSchedule && !isEdit)}
             className="w-full bg-red-600 py-4 rounded-2xl text-white font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
           >
-            {(schedule?.id || schedule?._id) ? 'CẬP NHẬT LỊCH' : 'XẾP LỊCH NGAY'}
+            {(schedule?.id || schedule?._id) ? 'Cập nhật lịch' : 'Xếp lịch ngay'}
           </button>
         </div>
       </div>

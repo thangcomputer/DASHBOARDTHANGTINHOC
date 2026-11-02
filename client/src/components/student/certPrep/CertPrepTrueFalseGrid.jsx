@@ -33,7 +33,7 @@ export default function CertPrepTrueFalseGrid({
     >
       <table className="w-full min-w-[360px] text-sm">
         <thead>
-          <tr className={`text-xs font-black uppercase tracking-wide ${
+          <tr className={`text-xs font-black  tracking-wide ${
             exam ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'
           }`}
           >

@@ -2,6 +2,7 @@ import type {
   Assignment,
   AssignmentSubmission,
   DemoEnrollment,
+  DemoGradeRecord,
   DemoStudent,
   DemoVideoOrder,
   DemoUser,
@@ -23,11 +24,31 @@ export type StudentAccountData = {
   videoOrders: DemoVideoOrder[];
 };
 
+export type TeacherAssignedStudentDetail = {
+  attendance: Array<{ id: string; date: string; course: string; status: string; time: string }>;
+  examResults: Array<{
+    id: string;
+    subject: string;
+    date: string;
+    correct: number;
+    total: number;
+    essayScore: number | null;
+    passed: boolean;
+    note: string;
+  }>;
+};
+
 export type StudentProfileUpdate = {
   email: string;
   zalo: string;
   address: string;
   gender: 'male' | 'female';
+};
+
+export type StudentPaymentStatus = {
+  paid: boolean;
+  paidAmount: number;
+  paidAt: string | null;
 };
 
 const studentColors = ['#DDF1EB', '#F6E9D9', '#E9E5FA', '#E4EBFA', '#F1E6E4'];
@@ -39,6 +60,13 @@ function text(value: unknown, fallback = '') {
 function number(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function toDateLabel(value: unknown) {
@@ -61,15 +89,21 @@ function mapAssignedStudent(raw: RawStudent, index: number): DemoStudent {
     return !['completed', 'hoàn thành', 'cancelled', 'canceled', 'refunded', 'thôi học', 'đã hủy'].includes(status);
   });
   const rootStatus = text(raw.enrollmentStatus || raw.status).toLowerCase();
-  const enrollmentStatus: DemoStudent['enrollmentStatus'] = activeEnrollment
-    ? 'active'
-    : enrollments.length > 0
-      ? 'completed'
-      : rootStatus === 'cancelled' || rootStatus === 'canceled' || rootStatus === 'refunded'
-        ? 'cancelled'
-        : rootStatus === 'completed' || rootStatus === 'hoàn thành'
-          ? 'completed'
-          : 'active';
+  let enrollmentStatus: DemoStudent['enrollmentStatus'];
+  if (activeEnrollment) {
+    enrollmentStatus = 'active';
+  } else if (enrollments.length > 0) {
+    const allEnrollmentsCancelled = enrollments.every((enrollment) => (
+    ['cancelled', 'canceled', 'refunded', 'thôi học', 'đã hủy'].includes(text(enrollment.status).toLowerCase())
+    ));
+    enrollmentStatus = allEnrollmentsCancelled ? 'cancelled' : 'completed';
+  } else if (['cancelled', 'canceled', 'refunded', 'thôi học', 'đã hủy'].includes(rootStatus)) {
+    enrollmentStatus = 'cancelled';
+  } else if (['completed', 'hoàn thành'].includes(rootStatus)) {
+    enrollmentStatus = 'completed';
+  } else {
+    enrollmentStatus = 'active';
+  }
   const enrollment = activeEnrollment || enrollments[0] || {};
   const totalSessions = number(raw.totalSessions ?? enrollment.totalSessions);
   const completedSessions = number(
@@ -113,11 +147,18 @@ function mapAssignedStudent(raw: RawStudent, index: number): DemoStudent {
     lastClass: raw.last_attendance_at ? `Học ngày ${toDateLabel(raw.last_attendance_at)}` : 'Chưa có buổi học',
     status,
     color: studentColors[index % studentColors.length],
+    avatar: text(raw.avatarUrl || raw.avatar || raw.photo),
     phone: text(raw.phone),
+    zalo: text(raw.zalo),
+    lastSeenAt: text(raw.lastSeenAt || raw.lastSeen || raw.last_access),
     enrollments: mappedEnrollments,
     enrollmentStatus,
-    notes: text(raw.teacherNote || raw.note),
-    avgGrade: raw.avgGrade == null ? undefined : number(raw.avgGrade),
+    notes: text(raw.teacherNote || activeEnrollment?.notes || enrollment.notes || raw.note),
+    linkHoc: text(activeEnrollment?.linkHoc || raw.linkHoc || raw.online_meeting_url),
+    avgGrade: raw.avgGrade == null && enrollment.avgGrade == null
+      ? undefined
+      : number(raw.avgGrade ?? enrollment.avgGrade),
+    studentExamUnlocked: raw.studentExamUnlocked === true,
     totalSessions: totalSessions || undefined,
     completedSessions: raw.completedSessions == null && enrollment.completedSessions == null
       ? (totalSessions ? completedSessions : undefined)
@@ -164,6 +205,99 @@ export async function getTeacherAssignedStudents(user: DemoUser): Promise<DemoSt
   return [...unique.values()];
 }
 
+export async function getTeacherAssignedStudentDetail(
+  user: DemoUser,
+  studentId: string,
+): Promise<TeacherAssignedStudentDetail> {
+  if (user.role !== 'teacher' || !user.id || !studentId.trim()) {
+    throw new Error('Không thể tải hồ sơ chi tiết: tài khoản hoặc mã học viên không hợp lệ.');
+  }
+  const response = await mobileApiRequest<{ data?: Record<string, unknown> }>(
+    `/students/${encodeURIComponent(studentId)}/full-detail`,
+  );
+  const detail = response.data;
+  if (!detail || !Array.isArray(detail.schedules) || !Array.isArray(detail.examResults)) {
+    throw new Error('Máy chủ trả về hồ sơ học viên không hợp lệ.');
+  }
+  const attendance = detail.schedules.map((entry, index) => {
+    const schedule = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? entry as Record<string, unknown>
+      : {};
+    return {
+      id: text(schedule._id || schedule.id, `attendance-${index}`),
+      date: text(schedule.date, 'Chưa xác định'),
+      course: text(schedule.course || schedule.courseName, 'Chưa phân khóa'),
+      status: text(schedule.attendanceStatus || schedule.status, 'Chưa xác định'),
+      time: text(schedule.time || schedule.startTime),
+    };
+  });
+  const examResults = detail.examResults.map((entry, index) => {
+    const result = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? entry as Record<string, unknown>
+      : {};
+    const essayScore = result.essayScore == null ? null : number(result.essayScore);
+    return {
+      id: text(result._id || result.id, `exam-${index}`),
+      subject: text(result.subject, 'Bài kiểm tra'),
+      date: text(result.date || result.createdAt, 'Chưa xác định'),
+      correct: number(result.multipleChoiceCorrect),
+      total: number(result.multipleChoiceTotal),
+      essayScore,
+      passed: result.passed === true,
+      note: text(result.essayNote),
+    };
+  });
+  return { attendance, examResults };
+}
+
+export async function updateTeacherAssignedStudent(
+  user: DemoUser,
+  studentId: string,
+  courseName: string,
+  updates: { notes?: string; linkHoc?: string; avgGrade?: number },
+) {
+  if (user.role !== 'teacher' || !user.id || !studentId.trim()) {
+    throw new Error('Không thể cập nhật học viên: tài khoản hoặc mã học viên không hợp lệ.');
+  }
+  if (updates.avgGrade != null && (!Number.isFinite(updates.avgGrade) || updates.avgGrade < 0 || updates.avgGrade > 10)) {
+    throw new Error('Điểm trung bình phải nằm trong khoảng 0 đến 10.');
+  }
+  const response = await mobileApiRequest<{ data?: RawStudent }>(
+    `/students/${encodeURIComponent(studentId)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ courseName, ...updates }),
+    },
+  );
+  const rawStudent = response.data;
+  if (!rawStudent || text(rawStudent._id || rawStudent.id) !== studentId) {
+    throw new Error('Máy chủ chưa xác nhận thông tin học viên đã được cập nhật.');
+  }
+  return mapAssignedStudent(rawStudent, 0);
+}
+
+export async function failTeacherAssignedStudentExam(
+  user: DemoUser,
+  studentId: string,
+  reason: string,
+) {
+  if (user.role !== 'teacher' || !user.id || !studentId.trim()) {
+    throw new Error('Không thể đánh trượt học viên: tài khoản hoặc mã học viên không hợp lệ.');
+  }
+  const response = await mobileApiRequest<{ success?: boolean; message?: string }>(
+    `/students/${encodeURIComponent(studentId)}/lock-exam`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    },
+  );
+  if (response.success !== true) {
+    throw new Error(response.message || 'Máy chủ chưa xác nhận thao tác đánh trượt.');
+  }
+}
+
 function mapEnrollment(raw: Record<string, unknown>, index: number): DemoEnrollment {
   const courseName = text(raw.courseName || raw.course, `Khóa học ${index + 1}`);
   const totalSessions = number(raw.totalSessions);
@@ -196,6 +330,7 @@ function mapEnrollment(raw: Record<string, unknown>, index: number): DemoEnrollm
     totalSessions,
     avgGrade: number(raw.avgGrade),
     status: mappedStatus,
+    notes: text(raw.notes),
     tuitionAmount: number(raw.price),
     paidAmount: raw.paid === true ? number(raw.price) : 0,
   };
@@ -224,6 +359,74 @@ export async function getStudentDetail(user: DemoUser) {
     throw new Error('Máy chủ trả về hồ sơ học viên không hợp lệ.');
   }
   return student;
+}
+
+export async function getStudentExamResults(user: DemoUser): Promise<DemoGradeRecord[]> {
+  if (user.role !== 'student' || !user.id) {
+    throw new Error('Không thể tải kết quả kiểm tra: tài khoản học viên không hợp lệ.');
+  }
+  const response = await mobileApiRequest<{ data?: { student?: RawStudent; examResults?: unknown[] } }>(
+    `/students/${encodeURIComponent(user.id)}/full-detail`,
+  );
+  const detail = response.data;
+  const studentId = String(detail?.student?._id || detail?.student?.id || '');
+  if (!detail || studentId !== user.id || !Array.isArray(detail.examResults)) {
+    throw new Error('Máy chủ trả về kết quả kiểm tra học viên không hợp lệ.');
+  }
+  return detail.examResults.flatMap((entry, index): DemoGradeRecord[] => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const result = entry as Record<string, unknown>;
+    const correct = finiteNumber(result.multipleChoiceCorrect);
+    const total = finiteNumber(result.multipleChoiceTotal);
+    const hasMultipleChoice = correct !== null && total !== null && total > 0;
+    const essayScore = finiteNumber(result.essayScore);
+    const hasEssayScore = essayScore !== null;
+    const scoreParts = [
+      ...(hasMultipleChoice ? [`${correct}/${total} câu`] : []),
+      ...(hasEssayScore ? [`Tự luận ${essayScore}`] : []),
+    ];
+    const feedbackParts = [
+      ...(hasMultipleChoice ? [`${correct}/${total} câu trắc nghiệm`] : []),
+      text(result.essayNote),
+    ].filter(Boolean);
+    return [{
+      id: text(result._id || result.id, `exam-${index}`),
+      courseName: text(result.subject, 'Kết quả kiểm tra'),
+      assessment: 'Kết quả kiểm tra',
+      score: scoreParts.join(' · ') || '—',
+      status: result.passed === true ? 'Đạt' : 'Chưa đạt',
+      date: text(result.date || result.createdAt) || undefined,
+      feedback: feedbackParts.join(' · ') || undefined,
+    }];
+  });
+}
+
+export async function getStudentPaymentStatus(user: DemoUser): Promise<StudentPaymentStatus> {
+  if (user.role !== 'student' || !user.id) {
+    throw new Error('Không thể tải trạng thái học phí: tài khoản học viên không hợp lệ.');
+  }
+  const response = await mobileApiRequest<{
+    success?: unknown;
+    paid?: unknown;
+    paidAmount?: unknown;
+    paidAt?: unknown;
+  }>(`/webhooks/payment-status/${encodeURIComponent(user.id)}`);
+  const paidAmount = finiteNumber(response.paidAmount);
+  if (
+    response.success !== true
+    || typeof response.paid !== 'boolean'
+    || (typeof response.paidAmount !== 'number' && typeof response.paidAmount !== 'string')
+    || paidAmount === null
+    || paidAmount < 0
+    || (response.paidAt !== null && typeof response.paidAt !== 'string')
+  ) {
+    throw new Error('Máy chủ trả về trạng thái học phí không hợp lệ.');
+  }
+  return {
+    paid: response.paid,
+    paidAmount,
+    paidAt: response.paidAt,
+  };
 }
 
 export type StudentChatCard = {
@@ -313,7 +516,7 @@ function mapSubmission(raw: Record<string, unknown> | null | undefined): Assignm
     studentName: student,
     submittedAt: toDateLabel(raw.submittedAt),
     status,
-    submittedFileUrl: text(raw.submittedFileUrl),
+    submittedFileUrl: text(raw.submittedFileUrl) ? resolveMobilePublicUrl(text(raw.submittedFileUrl)) : '',
     grade: raw.grade == null ? undefined : number(raw.grade),
     teacherFeedback: text(raw.teacherFeedback),
   };

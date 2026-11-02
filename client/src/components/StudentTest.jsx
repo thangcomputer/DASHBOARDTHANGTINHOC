@@ -630,10 +630,10 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
 
     const confirmExit = (reasonTxt) => {
       showModal({
-        title: 'CẢNH BÁO TỪ HỆ THỐNG',
+        title: 'Cảnh báo từ hệ thống',
         content: `Nếu bạn ${reasonTxt}, đồng nghĩa với việc HỦY BÀI THI và bạn sẽ bị đánh rớt môn này bắt buộc. Bạn có chắc chắn muốn thoát?`,
         type: 'warning',
-        confirmText: 'ĐỒNG Ý HỦY BÀI',
+        confirmText: 'Đồng ý hủy bài',
         cancelText: 'Làm bài tiếp',
         onConfirm: () => {
           if (failAndExitRef.current) failAndExitRef.current();
@@ -997,7 +997,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
 
               {/* Fake Dropdown */}
               <div className="border border-slate-200/80 rounded-[10px] px-3 py-1.5 text-xs cms-min-text-xs font-bold text-slate-600 mb-2 flex justify-between bg-white shadow-sm">
-                <span>HD WEB CAMERA</span>
+                <span>HD web camera</span>
                 <span className="text-slate-400">▼</span>
               </div>
 
@@ -1037,10 +1037,10 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                   : 'bg-red-50 text-red-400 border-2 border-red-200 cursor-not-allowed'
                   }`}>
                 {questionsLoading
-                  ? 'ĐANG TẢI ĐỀ THI...'
+                  ? 'Đang tải đề thi...'
                   : canStartExam
-                    ? 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'
-                    : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
+                    ? 'Tôi đã hiểu và bắt đầu thi'
+                    : 'Tôi đã hiểu và bắt đầu thi'}
               </button>
               {!cameraReady && !cameraError && (
                 <p className="text-[10px] text-slate-400 font-bold mt-2">Bấm &quot;Cho phép mỗi khi truy cập&quot; để bật camera.</p>
@@ -1064,7 +1064,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="bg-gradient-to-r from-red-700 to-red-600 px-8 py-6 text-center">
           <div className="text-5xl mb-3">🚫</div>
-          <h2 className="text-white font-black text-xl">TẠM KHÓA QUYỀN THI</h2>
+          <h2 className="text-white font-black text-xl">Tạm khóa quyền thi</h2>
           <p className="text-red-200 text-sm mt-1">Hệ thống phát hiện vi phạm</p>
         </div>
         <div className="p-8 space-y-4 text-center">
@@ -1077,7 +1077,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
             Quyền thi của bạn bị khóa tạm thời. Vui lòng liên hệ giảng viên để giải trình.
           </p>
           <button onClick={() => onBack?.()} className="w-full mt-4 py-3 bg-gray-900 shadow-xl hover:bg-black text-white font-bold rounded-xl active:scale-95 transition-all">
-            OK, TÔI ĐÃ HIỂU VÀ THOÁT
+            Ok, tôi đã hiểu và thoát
           </button>
         </div>
       </div>
@@ -1098,7 +1098,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
         {/* Score */}
         <div className={`rounded-2xl p-6 text-center ${passed ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'}`}>
           <div className="text-5xl mb-3">{passed ? '🏆' : '😔'}</div>
-          <h2 className={`text-2xl font-black ${passed ? 'text-green-700' : 'text-red-700'}`}>{passed ? 'ĐÃ ĐẠT!' : 'CHƯA ĐẠT'}</h2>
+          <h2 className={`text-2xl font-black ${passed ? 'text-green-700' : 'text-red-700'}`}>{passed ? 'Đã đạt!' : 'Chưa đạt'}</h2>
           <p className="text-4xl font-black mt-1 text-gray-800">{pct}%</p>
           <p className="text-gray-500 text-sm mt-2">
             Đúng <span className="font-bold text-green-700">{score}</span> câu
@@ -1202,10 +1202,10 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                 type="button"
                 onClick={() => {
                   showModal({
-                    title: 'CẢNH BÁO TỪ HỆ THỐNG',
+                    title: 'Cảnh báo từ hệ thống',
                     content: 'Nếu bạn quay lại bây giờ, bài thi sẽ lập tức BỊ HỦY và hệ thống sẽ hiển thị RỚT. Bạn có chắc chắn muốn thoát?',
                     type: 'warning',
-                    confirmText: 'ĐỒNG Ý HỦY BÀI',
+                    confirmText: 'Đồng ý hủy bài',
                     cancelText: 'Làm bài tiếp',
                     onConfirm: () => {
                       void applyFailAndLock().then(() => onBack?.());
@@ -1247,7 +1247,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
               />
               <div className="h-7 w-px bg-white/20 hidden sm:block shrink-0" />
               <div className="text-left hidden sm:block min-w-0">
-                <h1 className="text-[11px] font-black leading-none text-white uppercase tracking-wider">Ca thi</h1>
+                <h1 className="text-[11px] font-black leading-none text-white  tracking-wider">Ca thi</h1>
                 <p className="text-xs font-bold text-indigo-300 mt-1 leading-tight truncate max-w-[14rem]">{meta.label}</p>
               </div>
             </div>
@@ -1314,7 +1314,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                 {tab === 'trac_nghiem' && (
                   <div className="flex h-full min-h-0 flex-col p-2.5 md:p-3 lg:p-4">
                     <div className="shrink-0 border-b border-slate-100 pb-2 md:pb-2.5">
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500 md:text-xs">
+                      <p className="text-xs font-bold  tracking-[0.12em] text-slate-500 md:text-xs">
                         Câu hỏi {currentQ + 1} / {TOTAL}
                       </p>
                       <h2 className="mt-1 text-sm font-bold leading-snug text-slate-900 md:text-base lg:text-lg">
@@ -1407,7 +1407,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                       <div className="space-y-6">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 md:flex md:gap-6">
                           <div className="mb-4 flex w-full shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 md:mb-0 md:w-48">
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đề thi</p>
+                            <p className="text-xs font-bold  tracking-wider text-slate-400">Đề thi</p>
                             {meta.hasPracticeFile ? (
                               <div className="mt-2 w-full space-y-2">
                                 {meta.practiceFiles.map((f, i) => (
@@ -1507,7 +1507,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                             onClick={trySubmitTuLuan}
                             className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-500/25 transition hover:from-red-700 hover:to-red-800 disabled:cursor-not-allowed disabled:opacity-45"
                           >
-                            <Send size={18} /> {tuLuanSubmitting ? 'ĐANG TẢI LÊN…' : uploadFile ? 'NỘP BÀI' : 'CHỌN FILE'}
+                            <Send size={18} /> {tuLuanSubmitting ? 'Đang tải lên…' : uploadFile ? 'Nộp bài' : 'Chọn file'}
                           </button>
                         </div>
                       </div>
@@ -1522,7 +1522,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
             <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain lg:gap-3">
               <div className="shrink-0 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-lg shadow-slate-200/40 backdrop-blur-sm md:p-4">
                 <div className="mb-4 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-600">
+                  <span className="flex items-center gap-2 text-sm font-bold  tracking-wider text-slate-600">
                     <LayoutGrid size={16} className="text-indigo-600" />
                     Mục lục câu hỏi
                   </span>
@@ -1581,7 +1581,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
         {tab === 'trac_nghiem' && !isTracNghiemSubmitted && (
           <div className="mx-auto mt-1 w-full max-w-[min(100%,90rem)] shrink-0 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2 shadow-sm backdrop-blur-md md:mt-2 md:flex md:items-center md:justify-between md:px-5 md:py-2.5">
             <div className="mb-2 md:mb-0">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Tiến độ</p>
+              <p className="text-xs font-bold  tracking-wider text-slate-400">Tiến độ</p>
               <p className="text-sm font-semibold text-slate-700">
                 Đã trả lời{' '}
                 <span className={answeredCount === TOTAL ? 'text-emerald-600' : 'text-amber-600'}>
@@ -1596,7 +1596,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
               onClick={trySubmit}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-md shadow-emerald-500/20 transition hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto md:rounded-2xl md:px-8 md:py-3.5 md:shadow-lg"
             >
-              <CheckCircle size={18} /> {submitting ? 'ĐANG NỘP BÀI…' : 'NỘP BÀI TRẮC NGHIỆM'}
+              <CheckCircle size={18} /> {submitting ? 'Đang nộp bài…' : 'Nộp bài trắc nghiệm'}
             </button>
           </div>
         )}

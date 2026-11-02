@@ -48,19 +48,19 @@ const MOCK_COURSES = [
   {
     _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0,
     videos: [{ title: 'Giới thiệu về Thắng Tin Học', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 635 }, { title: 'Tổng quan công việc', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 920 }],
-    files: [{ title: 'Quy trình giảng dạy.pdf', type: 'PDF', size: '2 MB' }, { title: 'Sổ tay Giảng viên.docx', type: 'DOCX', size: '1 MB' }],
+    files: [{ title: 'Quy trình giảng dạy.PDF', type: 'PDF', size: '2 MB' }, { title: 'Sổ tay Giảng viên.DOCX', type: 'DOCX', size: '1 MB' }],
     notices: ['Chào mừng các bạn đến với TT', 'Hãy xem hết các video trước khi nhận lớp']
   },
   {
     _id: '2', title: 'Kỹ năng Đứng lớp Chuyên sâu', progress: 45,
     videos: [{ title: 'Xử lý tình huống học viên yếu', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 2412 }],
-    files: [{ title: 'Quy trình xử lý.docx', type: 'DOCX', size: '500 KB' }],
+    files: [{ title: 'Quy trình xử lý.DOCX', type: 'DOCX', size: '500 KB' }],
     notices: ['Nhớ nộp bài thu hoạch trước 15/4 ngay sau khi xem video']
   },
   {
     _id: '3', title: 'Khóa học Excel Nâng cao', progress: 100,
     videos: [{ title: 'Hàm logic phức tạp', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 2100 }],
-    files: [{ title: 'Bài tập thực hành.xlsx', type: 'EXCEL', size: '3.5 MB' }],
+    files: [{ title: 'Bài tập thực hành.XLSX', type: 'EXCEL', size: '3.5 MB' }],
     notices: []
   },
   {
@@ -235,7 +235,7 @@ const AdminProgressPanel = ({ courseId }) => {
       <div className="px-8 py-6 bg-gradient-to-r from-green-900 to-slate-900 flex items-center justify-between">
         <div className="flex items-center gap-3 text-white">
           <Users size={20} />
-          <h3 className="font-black text-base uppercase tracking-wide">Tiến độ Giảng viên</h3>
+          <h3 className="font-black text-base  tracking-wide">Tiến độ Giảng viên</h3>
         </div>
         <button onClick={load} className="text-slate-400 hover:text-white transition-colors">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -1139,13 +1139,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           </p>
 
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 mt-auto">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5 min-w-0">
+            <div className="text-[11px] font-bold  tracking-wide text-slate-500 flex items-center gap-1.5 min-w-0">
               <Video size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
               <span className="truncate">{lessonCount} bài học</span>
             </div>
 
             <span
-              className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black uppercase tracking-wide shadow-sm transition-all ${
+              className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black  tracking-wide shadow-sm transition-all ${
                 owned
                   ? 'bg-emerald-600 text-white group-hover:bg-emerald-700 group-hover:shadow-md'
                   : 'bg-red-600 text-white group-hover:bg-red-700 group-hover:shadow-md'
@@ -1286,7 +1286,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           <>
           <div className="mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-end">
             <label className="flex flex-col gap-1 min-w-0 sm:min-w-[9.5rem] flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Trạng thái học</span>
+              <span className="text-[10px] font-bold  tracking-wide text-slate-500">Trạng thái học</span>
               <CmsSelect
                 value={courseFilterStatus}
                 onChange={(e) => setCourseFilterStatus(e.target.value)}
@@ -1299,7 +1299,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               </CmsSelect>
             </label>
             <label className="flex flex-col gap-1 min-w-0 sm:min-w-[8.5rem] flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Học phí</span>
+              <span className="text-[10px] font-bold  tracking-wide text-slate-500">Học phí</span>
               <CmsSelect
                 value={courseFilterPrice}
                 onChange={(e) => setCourseFilterPrice(e.target.value)}
@@ -1311,7 +1311,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               </CmsSelect>
             </label>
             <label className="flex flex-col gap-1 min-w-0 sm:min-w-[10rem] flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Môn học</span>
+              <span className="text-[10px] font-bold  tracking-wide text-slate-500">Môn học</span>
               <CmsSelect
                 value={courseFilterSubject}
                 onChange={(e) => setCourseFilterSubject(e.target.value)}
@@ -1361,7 +1361,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 <section>
                   <div className="flex items-center gap-2 mb-3">
                     <Gift size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
-                    <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">Khóa miễn phí</h2>
+                    <h2 className="text-sm font-black  tracking-wide text-slate-700">Khóa miễn phí</h2>
                     <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full tabular-nums">{freeFilteredCourses.length}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
@@ -1373,7 +1373,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 <section>
                   <div className="flex items-center gap-2 mb-3 pt-1 border-t border-slate-200/80">
                     <Crown size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
-                    <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">Khóa có phí</h2>
+                    <h2 className="text-sm font-black  tracking-wide text-slate-700">Khóa có phí</h2>
                     <span className="text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full tabular-nums">{paidFilteredCourses.length}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
@@ -1410,7 +1410,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${
                         isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-rose-500' : 'bg-green-500')
                       }`}>
-                        {isLink ? 'LINK' : (file.fileType || 'FILE')}
+                        {isLink ? 'Link' : (file.fileType || 'FILE')}
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-bold text-slate-800 text-base leading-tight group-hover:text-green-700 transition-colors">{file.title}</h3>
@@ -1543,7 +1543,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                       <div className="flex flex-col gap-2 mb-2">
                         <h3 className="font-bold text-slate-800 text-base leading-tight flex items-center gap-2 flex-wrap">
                           <span className="line-clamp-2 min-w-0">{a.title}</span>
-                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black  tracking-wide border ${
                             isAdminAssign
                               ? 'bg-violet-100 text-violet-700 border-violet-200'
                               : 'bg-red-100 text-red-700 border-red-200'
@@ -1668,12 +1668,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           const renderResultCell = (sub) => {
             const displayStatus = getExamProgressDisplayStatus(sub);
-            if (displayStatus === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">ĐẠT</span>;
-            if (displayStatus === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">KHÔNG ĐẠT</span>;
-            if (displayStatus === 'cho_nop') return <span className="text-blue-600 font-black text-[10px] sm:text-xs">CHỜ NỘP</span>;
-            if (displayStatus === 'cho_cham') return <span className="text-amber-600 font-black text-[10px] sm:text-xs">CHỜ CHẤM</span>;
-            if (sub.status === 'dang_khoa') return <span className="text-orange-500 font-bold text-[10px] sm:text-xs">ĐANG KHÓA</span>;
-            return <span className="text-gray-400 font-bold text-[10px] sm:text-xs">CHƯA THI</span>;
+            if (displayStatus === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">Đạt</span>;
+            if (displayStatus === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">Không đạt</span>;
+            if (displayStatus === 'cho_nop') return <span className="text-blue-600 font-black text-[10px] sm:text-xs">Chờ nộp</span>;
+            if (displayStatus === 'cho_cham') return <span className="text-amber-600 font-black text-[10px] sm:text-xs">Chờ chấm</span>;
+            if (sub.status === 'dang_khoa') return <span className="text-orange-500 font-bold text-[10px] sm:text-xs">Đang khóa</span>;
+            return <span className="text-gray-400 font-bold text-[10px] sm:text-xs">Chưa thi</span>;
           };
 
           return (
@@ -1702,11 +1702,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[10px]">
                         <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
-                          <p className="font-bold uppercase tracking-wide text-slate-400 mb-0.5">Trắc nghiệm</p>
+                          <p className="font-bold  tracking-wide text-slate-400 mb-0.5">Trắc nghiệm</p>
                           <p className="font-bold text-slate-700 tabular-nums break-words">{trScore}</p>
                         </div>
                         <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
-                          <p className="font-bold uppercase tracking-wide text-slate-400 mb-0.5 leading-tight">Tự luận / Thực hành</p>
+                          <p className="font-bold  tracking-wide text-slate-400 mb-0.5 leading-tight">Tự luận / Thực hành</p>
                           <div className="mt-0.5">{renderEssayCell(sub)}</div>
                         </div>
                       </div>
@@ -1723,11 +1723,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                 <table className="w-full text-left text-[11px] md:text-[13px] table-fixed">
                   <thead className="bg-[#f8fafc] border-b border-gray-200">
                     <tr>
-                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 w-10 md:w-14 text-center uppercase tracking-wide leading-tight">STT</th>
-                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 uppercase tracking-wide leading-tight">Tên môn thi</th>
-                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center uppercase tracking-wide leading-tight w-[18%]">Trắc nghiệm</th>
-                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center uppercase tracking-wide leading-tight w-[22%]">Tự luận / Thực hành</th>
-                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center uppercase tracking-wide leading-tight w-[16%]">Kết quả</th>
+                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 w-10 md:w-14 text-center  tracking-wide leading-tight">STT</th>
+                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500  tracking-wide leading-tight">Tên môn thi</th>
+                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[18%]">Trắc nghiệm</th>
+                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[22%]">Tự luận / Thực hành</th>
+                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[16%]">Kết quả</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -1881,7 +1881,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                             {idx + 1}. {lesson.title}
                           </span>
                           {lesson.isPreview || playable ? (
-                            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border shrink-0 ${
+                            <span className={`text-[10px] font-black  px-2.5 py-1 rounded-full border shrink-0 ${
                               isActive
                                 ? 'bg-red-600 text-white border-red-600'
                                 : 'bg-pink-50 text-pink-700 border-pink-200'
@@ -1946,15 +1946,15 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                       </div>
                       <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Tổng số bài</dt>
+                          <dt className="text-[10px] font-bold  tracking-wide text-slate-400">Tổng số bài</dt>
                           <dd className="text-sm font-bold text-slate-800 mt-1 tabular-nums">{lessons.length} bài</dd>
                         </div>
                         <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Thời lượng xem</dt>
+                          <dt className="text-[10px] font-bold  tracking-wide text-slate-400">Thời lượng xem</dt>
                           <dd className="text-sm font-bold text-slate-800 mt-1">{formatDur(totalSec)}</dd>
                         </div>
                         <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phần mềm</dt>
+                          <dt className="text-[10px] font-bold  tracking-wide text-slate-400">Phần mềm</dt>
                           <dd className="text-sm font-bold text-slate-800 mt-1">{software || 'Chưa cập nhật'}</dd>
                         </div>
                       </dl>
@@ -1966,7 +1966,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           </div>
           <aside className="lg:col-span-4">
             <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm lg:sticky lg:top-4">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Học phí khóa video</p>
+              <p className="text-xs font-bold text-slate-500  mb-1">Học phí khóa video</p>
               <p className="text-3xl font-black text-red-600 tabular-nums mb-4">
                 {selectedCoursePrice.toLocaleString('vi-VN')}đ
               </p>
@@ -2029,7 +2029,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {completing && (
-              <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold animate-pulse uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold animate-pulse  tracking-widest">
                 <RefreshCw size={11} className="animate-spin" /> Đang lưu...
               </div>
             )}
@@ -2125,14 +2125,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
           {/* Sidebar Header */}
           <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
+              <h3 className="text-[11px] font-black  tracking-widest text-slate-300">Nội dung khóa học</h3>
               <span
                 className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${overallProgress === 100
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
                   : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
                   }`}
               >
-                {lessons.filter(l => l.isCompleted).length}/{lessons.length} BÀI
+                {lessons.filter(l => l.isCompleted).length}/{lessons.length}  Bài
               </span>
             </div>
             {/* Mini progress bar */}

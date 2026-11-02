@@ -183,7 +183,7 @@ export default function ScreenCaptureButton({
             </div>
             <div className="flex flex-col gap-1">
               <span className="text-slate-300">2. Dán vào khung chat để gửi</span>
-              <kbd className="w-fit rounded-md border border-emerald-300/50 bg-emerald-400/20 px-1.5 py-1 text-[10px] font-black text-emerald-100 shadow-sm">Ctrl + V</kbd>
+              <kbd className="w-fit rounded-md border border-emerald-300/50 bg-emerald-400/20 px-1.5 py-1 text-[10px] font-black text-emerald-100 shadow-sm">Ctrl + VN?</kbd>
             </div>
           </div>
         </div>

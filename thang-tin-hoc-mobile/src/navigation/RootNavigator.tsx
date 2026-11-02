@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, DeviceEventEmitter, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput,
   useWindowDimensions, View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import Svg, { Path } from 'react-native-svg';
 import {
-  Bell, BookOpen, Building2, CalendarDays, CheckSquare, Clapperboard, FileBox, FileText, GraduationCap,
+  BookOpen, Building2, CalendarDays, CheckSquare, Clapperboard, FileBox, FileText, GraduationCap,
   House, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -17,6 +20,7 @@ import { emit, SOCKET_EVENTS } from '../services/socketService';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
+import { messageService, notificationService, scheduleService, teacherFinanceService } from '../services/mockService';
 import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CallScreen } from '../screens/CallScreen';
@@ -29,9 +33,10 @@ import { ConversationScreen, MessagesScreen } from '../screens/MessageScreens';
 import { CourseVideosScreen } from '../screens/CourseVideosScreen';
 import {
   CenterInfoScreen, EvaluationsScreen, FeedScreen, LearningLessonScreen, MobileMenuScreen,
-  NewsDetailScreen, NewsScreen, SoftwareLinksScreen, StudentExamScreen, StudentLearningScreen, TeacherFinanceScreen,
+  NewsDetailScreen, NewsScreen, SoftwareLinksScreen, StudentExamScreen, StudentLearningScreen,
   TeacherQuizzesScreen, TeacherTrainingScreen, TuitionScreen,
 } from '../screens/ParityScreens';
+import { TeacherFinanceScreen } from '../screens/TeacherFinanceScreen';
 import {
   CertPrepCatalogScreen, CertPrepLevelScreen, CertPrepPlayerScreen, CertPrepResultScreen,
 } from '../screens/CertPrepScreens';
@@ -39,6 +44,8 @@ import {
   LessonPracticeCatalogScreen, LessonPracticeUnitsScreen, LessonPracticePlayerScreen,
 } from '../screens/LessonPracticeScreens';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { MobileSoundEffects } from '../components/MobileSoundEffects';
+import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT } from '../components/ui';
 import type { AppStackParamList, MainTabsParamList } from './types';
 import { navigationRef } from './navigationRef';
 
@@ -56,9 +63,16 @@ type IncomingCallPrompt = {
 export function RootNavigator() {
   const { user, isRestoringSession, signOut } = useAuth();
   const [notificationOverlayVisible, setNotificationOverlayVisible] = useState(false);
+  const unreadNotificationCountRef = useRef(0);
+  const handledReadNotificationIds = useRef(new Set<string>());
   const [searchOverlayVisible, setSearchOverlayVisible] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCallPrompt | null>(null);
+  const [pendingPushResponse, setPendingPushResponse] = useState<Notifications.NotificationResponse | null>(null);
+  const handledPushResponses = useRef(new Set<string>());
   const [examRoomActive, setExamRoomActive] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('Home');
+  const [unreadConversationCount, setUnreadConversationCount] = useState(0);
+  const [todayScheduleCount, setTodayScheduleCount] = useState(0);
   const [stackRouteName, setStackRouteName] = useState<string | undefined>(() => {
     if (!navigationRef.isReady()) return undefined;
     const state = navigationRef.getRootState();
@@ -69,6 +83,130 @@ export function RootNavigator() {
     return () => subscription.remove();
   }, []);
   useEffect(() => {
+    let active = true;
+    const handleResponse = (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const identifier = response.notification.request.identifier;
+      if (handledPushResponses.current.has(identifier)) return;
+      handledPushResponses.current.add(identifier);
+      setPendingPushResponse(response);
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (active) handleResponse(response);
+      })
+      .catch((error: unknown) => {
+        console.error('Không thể đọc thao tác mở thông báo đẩy.', error);
+      });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+  useEffect(() => {
+    if (!pendingPushResponse || !user || isRestoringSession || !navigationRef.isReady()) return;
+    const data = pendingPushResponse.notification.request.content.data;
+    if (!data) {
+      navigationRef.navigate('NotificationCenter');
+      setPendingPushResponse(null);
+      return;
+    }
+    if (data.event === 'call:incoming') {
+      const caller = data.caller as { id?: unknown; role?: unknown; name?: unknown } | undefined;
+      const callId = typeof data.callId === 'string' ? data.callId : '';
+      const conversationId = typeof data.conversationId === 'string' ? data.conversationId : '';
+      const callerId = typeof caller?.id === 'string' ? caller.id : '';
+      const callerRole = typeof caller?.role === 'string' ? caller.role : '';
+      const rolesMatch = (user.role === 'student' && callerRole === 'teacher')
+        || (user.role === 'teacher' && callerRole === 'student');
+      if (callId && conversationId && callerId && rolesMatch) {
+        setIncomingCall({
+          callId,
+          conversationId,
+          callerId,
+          callerRole,
+          callerName: typeof caller?.name === 'string' ? caller.name : 'Người gọi',
+        });
+      } else {
+        navigationRef.navigate('NotificationCenter');
+      }
+    } else {
+      navigationRef.navigate('NotificationCenter');
+    }
+    setPendingPushResponse(null);
+    void Notifications.clearLastNotificationResponseAsync().catch((error: unknown) => {
+      console.warn('Không thể xóa trạng thái mở thông báo đẩy.', error);
+    });
+  }, [isRestoringSession, pendingPushResponse, user]);
+  useEffect(() => {
+    if (isRestoringSession) return undefined;
+    let active = true;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let refreshInFlight = false;
+    let refreshQueued = false;
+    handledReadNotificationIds.current.clear();
+    const publishCount = (count: number) => {
+      unreadNotificationCountRef.current = count;
+      DeviceEventEmitter.emit('mobile:notification-count-changed', count);
+    };
+    const refreshCount = async () => {
+      if (refreshInFlight) {
+        refreshQueued = true;
+        return;
+      }
+      refreshInFlight = true;
+      try {
+        const count = await notificationService.unreadCount(user);
+        if (active) publishCount(count);
+      } catch (error) {
+        if (active) console.error('Không thể cập nhật số thông báo chưa đọc.', error);
+      } finally {
+        refreshInFlight = false;
+        if (active && refreshQueued) {
+          refreshQueued = false;
+          scheduleRefresh();
+        }
+      }
+    };
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void refreshCount();
+      }, 120);
+    };
+    const decrementForNotification = (event: { id?: string }) => {
+      if (!event?.id || handledReadNotificationIds.current.has(event.id)) return;
+      handledReadNotificationIds.current.add(event.id);
+      unreadNotificationCountRef.current = Math.max(0, unreadNotificationCountRef.current - 1);
+      DeviceEventEmitter.emit('mobile:notification-count-changed', unreadNotificationCountRef.current);
+      scheduleRefresh();
+    };
+    const clearUnreadCount = () => {
+      unreadNotificationCountRef.current = 0;
+      DeviceEventEmitter.emit('mobile:notification-count-changed', 0);
+      scheduleRefresh();
+    };
+    const subscriptions = [
+      DeviceEventEmitter.addListener('mobile:notification-count-refresh', scheduleRefresh),
+      DeviceEventEmitter.addListener('mobile:notification-read', decrementForNotification),
+      DeviceEventEmitter.addListener('mobile:notifications-mark-all-read', clearUnreadCount),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.NOTIFICATION, scheduleRefresh),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.CONNECTED, scheduleRefresh),
+      AppState.addEventListener('change', (state) => {
+        if (state === 'active') scheduleRefresh();
+      }),
+    ];
+    publishCount(0);
+    scheduleRefresh();
+    return () => {
+      active = false;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      subscriptions.forEach((subscription) => subscription.remove());
+    };
+  }, [isRestoringSession, user?.id, user?.role, user?.previewMode]);
+  useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('mobile:open-search', () => setSearchOverlayVisible(true));
     return () => subscription.remove();
   }, []);
@@ -78,7 +216,7 @@ export function RootNavigator() {
   }, []);
   useEffect(() => {
     if (!user || !['student', 'teacher'].includes(user.role)) return undefined;
-    const subscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_INCOMING, (event: {
+    const handleIncomingCall = (event: {
       callId?: string;
       conversationId?: string;
       callType?: string;
@@ -105,8 +243,31 @@ export function RootNavigator() {
         callerRole: participantRole,
         callerName: caller.name || 'Người gọi',
       });
+    };
+    const socketSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.CALL_INCOMING, handleIncomingCall);
+    const pushSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (!data || data.event !== 'call:incoming') return;
+      const rawCaller = data.caller;
+      const caller = rawCaller && typeof rawCaller === 'object' && !Array.isArray(rawCaller)
+        ? rawCaller as Record<string, unknown>
+        : undefined;
+      handleIncomingCall({
+        callId: typeof data.callId === 'string' ? data.callId : undefined,
+        conversationId: typeof data.conversationId === 'string' ? data.conversationId : undefined,
+        caller: caller
+          ? {
+            id: typeof caller.id === 'string' ? caller.id : undefined,
+            role: typeof caller.role === 'string' ? caller.role : undefined,
+            name: typeof caller.name === 'string' ? caller.name : undefined,
+          }
+          : undefined,
+      });
     });
-    return () => subscription.remove();
+    return () => {
+      socketSubscription.remove();
+      pushSubscription.remove();
+    };
   }, [user]);
   useEffect(() => {
     if (!incomingCall) return undefined;
@@ -144,9 +305,31 @@ export function RootNavigator() {
     const unsubscribe = navigationRef.addListener('state', () => {
       if (!navigationRef.isReady()) return;
       const state = navigationRef.getRootState();
-      setStackRouteName(state?.routes[state.index ?? 0]?.name);
+      const currentRouteName = state?.routes[state.index ?? 0]?.name;
+      setStackRouteName(currentRouteName);
+      if (currentRouteName === 'Students') {
+        setActiveTab('Students');
+        return;
+      }
+      if (currentRouteName !== 'MainTabs') return;
+      const mainTabsRoute = state?.routes.find((route) => route.name === 'MainTabs');
+      const tabState = mainTabsRoute?.state;
+      if (tabState) {
+        setActiveTab(tabState.routes[tabState.index ?? 0]?.name ?? 'Home');
+      }
     });
     return unsubscribe;
+  }, []);
+  useEffect(() => {
+    const subscriptions = [
+      DeviceEventEmitter.addListener('mobile:tab-badge-messages', (count: number) => {
+        setUnreadConversationCount(Number.isInteger(count) ? Math.max(0, count) : 0);
+      }),
+      DeviceEventEmitter.addListener('mobile:tab-badge-schedule', (count: number) => {
+        setTodayScheduleCount(Number.isInteger(count) ? Math.max(0, count) : 0);
+      }),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription.remove());
   }, []);
   if (isRestoringSession) {
     return (
@@ -158,6 +341,7 @@ export function RootNavigator() {
   return user ? (
     <View style={styles.root}>
       <OfflineBanner />
+      <MobileSoundEffects incomingCall={Boolean(incomingCall)} />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
@@ -210,7 +394,14 @@ export function RootNavigator() {
           }}
         />
       ) : null}
-      {!examRoomActive && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? <PersistentTabBar role={user.role} /> : null}
+      {!examRoomActive && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? (
+        <PersistentTabBar
+          role={user.role}
+          activeTab={activeTab}
+          unreadConversationCount={unreadConversationCount}
+          todayScheduleCount={todayScheduleCount}
+        />
+      ) : null}
       {notificationOverlayVisible ? (
         <NotificationsScreen
           overlay
@@ -301,29 +492,32 @@ function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   );
 }
 
-function PersistentTabBar({ role }: { role: 'student' | 'teacher' }) {
+function PersistentTabBar({
+  role,
+  activeTab,
+  unreadConversationCount,
+  todayScheduleCount,
+}: {
+  role: 'student' | 'teacher';
+  activeTab: string;
+  unreadConversationCount: number;
+  todayScheduleCount: number;
+}) {
   const insets = useSafeAreaInsets();
   const isTeacher = role === 'teacher';
-  const [activeTab, setActiveTab] = useState<string>('Home');
+  const visibility = useNavigationBarVisibility();
   useEffect(() => {
     const unsubscribe = navigationRef.addListener('state', () => {
-      if (!navigationRef.isReady()) return;
-      const state = navigationRef.getRootState();
-      const mainTabsRoute = state?.routes.find((r) => r.name === 'MainTabs');
-      const tabState = mainTabsRoute?.state;
-      if (tabState) {
-        const currentTab = tabState.routes[tabState.index ?? 0]?.name ?? 'Home';
-        setActiveTab(currentTab);
-      }
+      Animated.timing(visibility, { toValue: 1, duration: 220, useNativeDriver: false }).start();
     });
     return unsubscribe;
-  }, []);
+  }, [visibility]);
   const items = isTeacher
     ? [
       { name: 'Home' as const, label: 'Tổng quan', icon: House },
       { name: 'Schedule' as const, label: 'Lịch dạy', icon: CalendarDays },
-      { name: 'Students' as const, label: 'Học viên', icon: Users },
       { name: 'Messages' as const, label: 'Hộp thư', icon: MessageCircle },
+      { name: 'Finance' as const, label: 'Tài chính', icon: WalletCards },
       { name: 'Profile' as const, label: 'Hồ sơ', icon: UserRound },
     ]
     : [
@@ -333,21 +527,37 @@ function PersistentTabBar({ role }: { role: 'student' | 'teacher' }) {
       { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', icon: Clapperboard },
       { name: 'Profile' as const, label: 'Cá nhân', icon: UserRound },
     ];
-  const tabOrder = ['Schedule', 'Messages', 'Home', 'Students', 'CourseVideos', 'Profile'];
+  const tabOrder = ['Schedule', 'Messages', 'Home', 'Finance', 'Students', 'CourseVideos', 'Profile'];
   const orderedItems = [...items].sort((left, right) => tabOrder.indexOf(left.name) - tabOrder.indexOf(right.name));
   const barHeight = 76 + insets.bottom;
   return (
-    <View style={[styles.persistentTabBar, { height: barHeight, paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+    <Animated.View
+      pointerEvents="box-none"
+      style={[
+        styles.persistentTabBar,
+        {
+          height: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, barHeight] }),
+          paddingTop: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
+          paddingBottom: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(insets.bottom, spacing.xs)] }),
+          opacity: visibility,
+          transform: [{ translateY: visibility.interpolate({ inputRange: [0, 1], outputRange: [barHeight, 0] }) }],
+        },
+      ]}
+    >
       <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
-        <Path d="M0 30 H145 C145 13 169 0 200 0 C231 0 255 13 255 30 H400 V100 H0 Z" fill={colors.brandSoft} />
-        <Path d="M151 30 C151 11 173 2 200 2 C227 2 249 11 249 30 Z" fill={colors.redSoft} />
+        <Path d="M0 26 C18 8 45 8 62 25 C78 40 77 82 106 86 C132 90 148 79 160 42 C170 9 183 0 200 0 C217 0 230 9 240 42 C252 79 268 90 294 86 C323 82 322 40 338 25 C355 8 382 8 400 26 V100 H0 Z" fill={colors.canvas} />
       </Svg>
       {orderedItems.map(({ name, label, icon: Icon }) => {
         const selected = name === activeTab;
+        const badgeCount = name === 'Messages'
+          ? unreadConversationCount
+          : name === 'Schedule' ? todayScheduleCount : 0;
         return (
           <Pressable
             key={name}
-            onPress={() => navigationRef.navigate('MainTabs', { screen: name })}
+            onPress={() => {
+                navigationRef.navigate('MainTabs', { screen: name });
+            }}
             style={[styles.persistentTabItem, selected && name === 'Home' && styles.persistentHomeItem]}
             accessibilityRole="button"
             accessibilityLabel={label}
@@ -355,17 +565,22 @@ function PersistentTabBar({ role }: { role: 'student' | 'teacher' }) {
             {selected && name === 'Home' ? (
               <View style={styles.homeArcButton}><House size={23} color="#FFFFFF" strokeWidth={2.5} /></View>
             ) : (
-              <Icon size={22} color={selected ? colors.brand : colors.muted} strokeWidth={2.2} />
+              <View style={styles.persistentTabIconWrap}>
+                <Icon size={22} color={selected ? colors.brand : colors.muted} strokeWidth={2.2} />
+                {badgeCount > 0 ? (
+                  <Text style={styles.persistentTabBadge}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+                ) : null}
+              </View>
             )}
           </Pressable>
         );
       })}
-    </View>
+    </Animated.View>
   );
 }
 
 type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVideos' | 'Feed'
-  | 'Profile' | 'NotificationCenter' | 'Assignments' | 'Materials' | 'StudentExam'
+  | 'Profile' | 'Assignments' | 'Materials' | 'StudentExam'
   | 'StudentLearning' | 'Evaluations' | 'News' | 'CenterInfo' | 'SoftwareLinks'
   | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance';
 
@@ -395,13 +610,11 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
       { label: 'Học viên', destination: 'Students', icon: Users },
       { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
-      { label: 'Bài tập & kiểm tra', destination: 'Assignments', icon: CheckSquare },
-      { label: 'Trắc nghiệm', destination: 'TeacherQuizzes', icon: GraduationCap },
+      { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
       { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
       { label: 'Tài chính', destination: 'TeacherFinance', icon: WalletCards },
       { label: 'Bảng tin', destination: 'Feed', icon: Radio },
       { label: 'Tin tức', destination: 'News', icon: Newspaper },
-      { label: 'Thông báo', destination: 'NotificationCenter', icon: Bell },
       { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
     ]
     : [
@@ -432,8 +645,8 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     const updateActiveDestination = () => {
       const currentRoute = navigationRef.getCurrentRoute()?.name;
       const activeItem = menuItems.find((item) => item.destination === currentRoute);
-      const activeAlias = currentRoute === 'Notifications'
-        ? 'NotificationCenter'
+      const activeAlias = isTeacher && currentRoute === 'Assignments'
+        ? 'TeacherQuizzes'
         : currentRoute === 'Profile'
           ? 'Profile'
           : null;
@@ -451,12 +664,15 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
 
   const openDestination = (destination: MenuDestination) => {
     setMenuVisible(false);
-    if (['Home', 'Schedule', 'Students', 'Messages', 'CourseVideos', 'Profile'].includes(destination)) {
+    if (destination === 'Students') {
+      navigationRef.navigate('Students');
+      return;
+    }
+    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Profile'].includes(destination)) {
       navigationRef.navigate('MainTabs', { screen: destination as keyof MainTabsParamList });
       return;
     }
     if (destination === 'Feed') navigationRef.navigate('Feed');
-    else if (destination === 'NotificationCenter') navigationRef.navigate('NotificationCenter');
     else if (destination === 'Assignments') navigationRef.navigate('Assignments');
     else if (destination === 'Materials') navigationRef.navigate('Materials');
     else if (destination === 'StudentExam') navigationRef.navigate('StudentExam');
@@ -488,7 +704,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
           onHoverOut={() => setHandleHovered(false)}
           style={({ pressed }) => [
             styles.floatingMenuButton,
-            { opacity: pressed || handleHovered ? 0.96 : 0.34 },
+            { opacity: pressed || handleHovered ? 0.96 : 0.22 },
           ]}
           accessibilityRole="button"
           accessibilityLabel="Mở danh mục điều hướng"
@@ -508,7 +724,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
               </View>
               <View style={styles.drawerIdentity}>
                 <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
-                <Text style={styles.drawerRole}>{isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}</Text>
+                <Text style={styles.drawerRole}>{isTeacher ? 'Giảng viên' : 'Học viên'}</Text>
               </View>
               <Pressable onPress={() => setMenuVisible(false)} style={styles.drawerClose} accessibilityRole="button" accessibilityLabel="Đóng menu">
                 <X size={19} color="#CBD5E1" />
@@ -562,13 +778,144 @@ function MainTabs() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const isTeacher = user?.role === 'teacher';
+  const navigationBarVisibility = useNavigationBarVisibility();
+  useFocusEffect(useCallback(() => {
+    Animated.timing(navigationBarVisibility, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  }, [navigationBarVisibility]));
+  const [unreadConversationCount, setUnreadConversationCount] = useState(0);
+  const [todayScheduleCount, setTodayScheduleCount] = useState(0);
+  const [newFinanceTransactionCount, setNewFinanceTransactionCount] = useState(0);
+  useEffect(() => {
+    DeviceEventEmitter.emit('mobile:tab-badge-messages', unreadConversationCount);
+  }, [unreadConversationCount]);
+  useEffect(() => {
+    DeviceEventEmitter.emit('mobile:tab-badge-schedule', todayScheduleCount);
+  }, [todayScheduleCount]);
+  const financeSnapshotKey = user?.id ? `mobile:seen-finance-transactions:${user.id}` : '';
   const teacherTabPositions: Record<string, number> = {
     Schedule: 0,
     Messages: 1,
     Home: 2,
-    Students: 3,
+    Finance: 3,
     Profile: 4,
   };
+  const refreshTabBadges = useCallback(async () => {
+    if (!user) {
+      setUnreadConversationCount(0);
+      setTodayScheduleCount(0);
+      return;
+    }
+
+    const [conversationsResult, schedulesResult, financeResult] = await Promise.allSettled([
+      messageService.conversations(user.role, user),
+      scheduleService.list(user.role),
+      isTeacher ? teacherFinanceService.overview(user) : Promise.resolve(null),
+    ]);
+
+    if (conversationsResult.status === 'fulfilled') {
+      setUnreadConversationCount(conversationsResult.value.filter((conversation) => conversation.unread > 0).length);
+    } else {
+      console.error('Không thể cập nhật huy hiệu tin nhắn:', conversationsResult.reason);
+    }
+
+    if (schedulesResult.status === 'fulfilled') {
+      const dateParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(new Date());
+      const dateValues = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));
+      const todayKey = `${dateValues.year}-${dateValues.month}-${dateValues.day}`;
+      setTodayScheduleCount(schedulesResult.value.filter((item) => (
+        item.date === todayKey && item.status !== 'cancelled'
+      )).length);
+    } else {
+      console.error('Không thể cập nhật huy hiệu lịch:', schedulesResult.reason);
+    }
+
+    if (financeResult.status === 'fulfilled' && isTeacher && financeResult.value && financeSnapshotKey) {
+      const confirmedIds = [...new Set(
+        financeResult.value.transactions
+          .filter((transaction) => transaction.status === 'confirmed')
+          .map((transaction) => transaction.id),
+      )];
+      try {
+        const storedSnapshot = await AsyncStorage.getItem(financeSnapshotKey);
+        if (storedSnapshot === null) {
+          await AsyncStorage.setItem(financeSnapshotKey, JSON.stringify(confirmedIds));
+          setNewFinanceTransactionCount(0);
+        } else {
+          const seenIds: unknown = JSON.parse(storedSnapshot);
+          if (!Array.isArray(seenIds) || !seenIds.every((id) => typeof id === 'string')) {
+            throw new Error('Dữ liệu giao dịch tài chính đã xem không hợp lệ.');
+          }
+          const seen = new Set(seenIds);
+          setNewFinanceTransactionCount(confirmedIds.filter((id) => !seen.has(id)).length);
+        }
+      } catch (error) {
+        console.error('Không thể cập nhật huy hiệu giao dịch tài chính:', error);
+      }
+    } else if (financeResult.status === 'rejected') {
+      console.error('Không thể tải giao dịch để cập nhật huy hiệu tài chính:', financeResult.reason);
+    }
+  }, [financeSnapshotKey, isTeacher, user]);
+
+  const markFinanceTransactionsViewed = useCallback(async () => {
+    if (!user || !isTeacher || !financeSnapshotKey) return;
+    try {
+      const overview = await teacherFinanceService.overview(user);
+      const confirmedIds = [...new Set(
+        overview.transactions
+          .filter((transaction) => transaction.status === 'confirmed')
+          .map((transaction) => transaction.id),
+      )];
+      await AsyncStorage.setItem(financeSnapshotKey, JSON.stringify(confirmedIds));
+      setNewFinanceTransactionCount(0);
+    } catch (error) {
+      console.error('Không thể đánh dấu giao dịch tài chính đã xem:', error);
+    }
+  }, [financeSnapshotKey, isTeacher, user]);
+
+  useFocusEffect(useCallback(() => {
+    void refreshTabBadges();
+  }, [refreshTabBadges]));
+
+  useEffect(() => {
+    const refresh = () => { void refreshTabBadges(); };
+    const refreshEvents = [
+      SOCKET_EVENTS.MESSAGE_RECEIVED,
+      SOCKET_EVENTS.MESSAGE_SENT_ACK,
+      SOCKET_EVENTS.READ_ACK,
+      'mobile:message-read',
+      SOCKET_EVENTS.SCHEDULE_NEW,
+      SOCKET_EVENTS.SCHEDULE_UPDATED,
+      SOCKET_EVENTS.SCHEDULE_CANCELLED,
+      SOCKET_EVENTS.ATTENDANCE_AWAITING_CONFIRM,
+      SOCKET_EVENTS.ATTENDANCE_DISPUTED,
+      SOCKET_EVENTS.ATTENDANCE_CONFIRMED,
+      SOCKET_EVENTS.ATTENDANCE_REJECTED,
+      SOCKET_EVENTS.ATTENDANCE_ADMIN_MAKEUP_COMPLETED,
+      SOCKET_EVENTS.FINANCE_TRANSACTION,
+      SOCKET_EVENTS.NOTIFICATION,
+      SOCKET_EVENTS.CONTACT_UPDATED,
+      SOCKET_EVENTS.DATA_REFRESH,
+    ];
+    const subscriptions = refreshEvents.map((eventName) => DeviceEventEmitter.addListener(eventName, refresh));
+    const financeViewedSubscription = DeviceEventEmitter.addListener('mobile:finance-viewed', () => {
+      void markFinanceTransactionsViewed();
+    });
+    const interval = setInterval(refresh, 30000);
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+      financeViewedSubscription.remove();
+      clearInterval(interval);
+    };
+  }, [markFinanceTransactionsViewed, refreshTabBadges]);
 
   return (
     <Tab.Navigator
@@ -577,13 +924,34 @@ function MainTabs() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.muted,
+        tabBarBadgeStyle: {
+          backgroundColor: '#DC2626',
+          color: '#FFFFFF',
+          fontSize: 10,
+          fontWeight: '700',
+          minWidth: 18,
+          height: 18,
+          lineHeight: 18,
+          borderRadius: 9,
+        },
         tabBarStyle: {
-          backgroundColor: 'transparent',
+          backgroundColor: colors.canvas,
           borderTopColor: 'transparent',
-          height: 76 + insets.bottom,
-          paddingTop: spacing.md,
-          paddingBottom: Math.max(insets.bottom, spacing.xs),
+          borderTopWidth: 0,
+          height: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 76 + insets.bottom] }),
+          paddingTop: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
+          paddingBottom: navigationBarVisibility.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, Math.max(insets.bottom, spacing.xs)],
+          }),
           elevation: 0,
+          opacity: navigationBarVisibility,
+          transform: [{
+            translateY: navigationBarVisibility.interpolate({
+              inputRange: [0, 1],
+              outputRange: [76 + insets.bottom, 0],
+            }),
+          }],
         },
         tabBarBackground: () => (
           <Svg
@@ -593,8 +961,7 @@ function MainTabs() {
             preserveAspectRatio="none"
             style={StyleSheet.absoluteFill}
           >
-            <Path d="M0 30 H145 C145 13 169 0 200 0 C231 0 255 13 255 30 H400 V100 H0 Z" fill={colors.brandSoft} />
-            <Path d="M151 30 C151 11 173 2 200 2 C227 2 249 11 249 30 Z" fill={colors.redSoft} />
+            <Path d="M0 26 C18 8 45 8 62 25 C78 40 77 82 106 86 C132 90 148 79 160 42 C170 9 183 0 200 0 C217 0 230 9 240 42 C252 79 268 90 294 86 C323 82 322 40 338 25 C355 8 382 8 400 26 V100 H0 Z" fill={colors.canvas} />
           </Svg>
         ),
         tabBarItemStyle: isTeacher
@@ -621,6 +988,7 @@ function MainTabs() {
             case 'Schedule': return <CalendarDays {...common} />;
             case 'Messages': return <MessageCircle {...common} />;
             case 'CourseVideos': return <Clapperboard {...common} />;
+            case 'Finance': return <WalletCards {...common} />;
             case 'Profile': return <UserRound {...common} />;
             case 'Students': return <Users {...common} />;
             default: return <FileText {...common} />;
@@ -631,14 +999,51 @@ function MainTabs() {
       {isTeacher ? (
         <>
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Tổng quan' }} />
-          <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Lịch dạy' }} />
-          <Tab.Screen name="Students" component={StudentsScreen} options={{ title: 'Học viên' }} />
-          <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Tin nhắn' }} />
+          <Tab.Screen
+            name="Schedule"
+            component={ScheduleScreen}
+            options={{
+              title: 'Lịch dạy',
+              tabBarBadge: todayScheduleCount ? (todayScheduleCount > 99 ? '99+' : todayScheduleCount) : undefined,
+            }}
+          />
+          <Tab.Screen
+            name="Finance"
+            component={TeacherFinanceScreen}
+            options={{
+              title: 'Tài chính',
+              tabBarBadge: newFinanceTransactionCount
+                ? (newFinanceTransactionCount > 99 ? '99+' : newFinanceTransactionCount)
+                : undefined,
+            }}
+          />
+          <Tab.Screen
+            name="Messages"
+            component={MessagesScreen}
+            options={{
+              title: 'Tin nhắn',
+              tabBarBadge: unreadConversationCount ? (unreadConversationCount > 99 ? '99+' : unreadConversationCount) : undefined,
+            }}
+          />
         </>
       ) : (
         <>
-          <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Lịch học' }} />
-          <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Tin nhắn' }} />
+          <Tab.Screen
+            name="Schedule"
+            component={ScheduleScreen}
+            options={{
+              title: 'Lịch học',
+              tabBarBadge: todayScheduleCount ? (todayScheduleCount > 99 ? '99+' : todayScheduleCount) : undefined,
+            }}
+          />
+          <Tab.Screen
+            name="Messages"
+            component={MessagesScreen}
+            options={{
+              title: 'Tin nhắn',
+              tabBarBadge: unreadConversationCount ? (unreadConversationCount > 99 ? '99+' : unreadConversationCount) : undefined,
+            }}
+          />
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
           <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập kỹ năng' }} />
         </>
@@ -646,6 +1051,35 @@ function MainTabs() {
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: isTeacher ? 'Hồ sơ' : 'Cá nhân' }} />
     </Tab.Navigator>
   );
+}
+
+function useNavigationBarVisibility() {
+  const visibility = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT,
+      (visible: boolean) => {
+        Animated.timing(visibility, {
+          toValue: visible ? 1 : 0,
+          duration: 220,
+          useNativeDriver: false,
+        }).start();
+      },
+    );
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      Animated.timing(visibility, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => {
+      subscription.remove();
+      appStateSubscription.remove();
+    };
+  }, [visibility]);
+  return visibility;
 }
 
 const styles = StyleSheet.create({
@@ -665,12 +1099,14 @@ const styles = StyleSheet.create({
   incomingCallName: { color: colors.ink, fontSize: typography.title, fontWeight: '700', marginTop: spacing.sm },
   incomingCallSubtitle: { color: colors.muted, fontSize: typography.body, marginTop: spacing.xs },
   incomingCallActions: { width: '100%', flexDirection: 'row', justifyContent: 'center', gap: spacing.md, marginTop: spacing.xl },
-  incomingCallButton: { minWidth: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: 999 },
+  incomingCallButton: { minWidth: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.sm },
   rejectCallButton: { backgroundColor: '#DC2626' },
   acceptCallButton: { backgroundColor: '#16A34A' },
   incomingCallButtonText: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '700' },
-  persistentTabBar: { position: 'absolute', zIndex: 15, left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingTop: spacing.md },
+  persistentTabBar: { position: 'absolute', zIndex: 15, left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingTop: spacing.md, backgroundColor: colors.canvas },
   persistentTabItem: { flex: 1, height: 42, alignItems: 'center', justifyContent: 'center' },
+  persistentTabIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
   persistentHomeItem: { transform: [{ translateY: -12 }] },
   floatingMenuHandle: { position: 'absolute', right: 0, zIndex: 20 },
   floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopLeftRadius: 12, borderBottomLeftRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: -2, height: 2 }, elevation: 6 },

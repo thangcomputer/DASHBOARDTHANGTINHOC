@@ -81,12 +81,12 @@ function DeviceAccountBadges({ student }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1 mt-1">
       {locked && (
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-700 border border-red-100">
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold  tracking-wide bg-red-50 text-red-700 border border-red-100">
           Khóa đăng nhập
         </span>
       )}
       {!locked && count > 2 && (
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold  tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
           {count} trình duyệt
         </span>
       )}
@@ -988,7 +988,7 @@ export default function AdminStudentsTab() {
                       </p>
                     )}
                     {locked && (
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Đã hoàn · khóa thao tác</p>
+                      <p className="text-[11px] font-bold  tracking-wide text-slate-400">Đã hoàn · khóa thao tác</p>
                     )}
                     <ModeBranchBadges s={s} safeBranches={safeBranches} />
                   </div>
@@ -997,9 +997,9 @@ export default function AdminStudentsTab() {
 
               <div className="mt-3 pt-3 border-t border-slate-100">
                 <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(4.5rem,0.9fr)_minmax(4.25rem,auto)] gap-x-2 gap-y-2 items-start min-w-0">
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden sm:block">Giảng viên HD</p>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide hidden sm:block">Học phí</p>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide text-right hidden sm:block">Trạng thái</p>
+                  <p className="text-[10px] font-semibold text-slate-500  tracking-wide hidden sm:block">Giảng viên HD</p>
+                  <p className="text-[10px] font-semibold text-slate-500  tracking-wide hidden sm:block">Học phí</p>
+                  <p className="text-[10px] font-semibold text-slate-500  tracking-wide text-right hidden sm:block">Trạng thái</p>
 
                   {hasMultiCourse ? (
                     <>
@@ -1011,7 +1011,7 @@ export default function AdminStudentsTab() {
                         return (
                           <div key={enrId} className="contents">
                             <div className="min-w-0 space-y-1">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden">Giảng viên HD</p>
+                              <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden">Giảng viên HD</p>
                               <p className="text-[11px] font-semibold text-sky-700 truncate" title={courseLabel}>
                                 {courseLabel}
                               </p>
@@ -1032,7 +1032,7 @@ export default function AdminStudentsTab() {
                               </CmsSelect>
                             </div>
                             <div className="min-w-0 pt-0.5">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden">Học phí</p>
+                              <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden">Học phí</p>
                               <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
                                 {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
                               </p>
@@ -1041,7 +1041,7 @@ export default function AdminStudentsTab() {
                               </p>
                             </div>
                             <div className="flex justify-start sm:justify-end pt-0.5 min-w-0">
-                              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden mr-2 self-center">Trạng thái</p>
+                              <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden mr-2 self-center">Trạng thái</p>
                               <PaidBadge paid={isEnrollmentPaidFlag(enr)} />
                             </div>
                           </div>
@@ -1060,7 +1060,7 @@ export default function AdminStudentsTab() {
                   ) : (
                     <>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden mb-1">Giảng viên HD</p>
+                        <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden mb-1">Giảng viên HD</p>
                         {locked ? (
                           <span className="text-xs text-slate-400 font-semibold">—</span>
                         ) : (
@@ -1068,11 +1068,11 @@ export default function AdminStudentsTab() {
                         )}
                       </div>
                       <div className="min-w-0 pt-0.5">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden mb-1">Học phí</p>
+                        <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden mb-1">Học phí</p>
                         {renderTuition(s, enrollments.length ? enrollments : (primaryEnr ? [primaryEnr] : []), false)}
                       </div>
                       <div className="flex justify-start sm:justify-end pt-0.5 min-w-0 items-center gap-2">
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide sm:hidden">Trạng thái</p>
+                        <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden">Trạng thái</p>
                         {locked ? (
                           <span className="cms-students-badge-neutral text-slate-400">Đã hoàn</span>
                         ) : (
@@ -1093,12 +1093,12 @@ export default function AdminStudentsTab() {
         <table className="w-full text-left border-collapse min-w-[900px]">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-slate-100 bg-slate-50/95 backdrop-blur-sm">
-              <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Học viên</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Khóa học</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Giáo viên</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50/95">Học phí</th>
-              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center bg-slate-50/95">Trạng thái</th>
-              <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center w-14 bg-slate-50/95" />
+              <th className="px-5 py-3 text-xs font-semibold text-slate-500  tracking-wide bg-slate-50/95">Học viên</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide bg-slate-50/95">Khóa học</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide bg-slate-50/95">Giáo viên</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide bg-slate-50/95">Học phí</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide text-center bg-slate-50/95">Trạng thái</th>
+              <th className="px-3 py-3 text-xs font-semibold text-slate-500  tracking-wide text-center w-14 bg-slate-50/95" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -1170,7 +1170,7 @@ export default function AdminStudentsTab() {
                       </span>
                     )}
                     {locked && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-0.5 block">Đã hoàn</span>
+                      <span className="text-[10px] font-bold  tracking-wide text-slate-400 mt-0.5 block">Đã hoàn</span>
                     )}
                     <div className="mt-1.5">
                       <ModeBranchBadges s={s} safeBranches={safeBranches} />
@@ -1277,7 +1277,7 @@ export default function AdminStudentsTab() {
             </div>
 
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 min-w-0">
-              <p className="text-xs font-black text-red-700 uppercase tracking-wide mb-0.5">Khóa học bị hủy</p>
+              <p className="text-xs font-black text-red-700  tracking-wide mb-0.5">Khóa học bị hủy</p>
               <p className="text-sm font-bold text-slate-800 break-words">{refundModal.enr.courseName || refundModal.enr.name}</p>
               <p className="text-xs text-red-600 mt-1">
                 Đã thanh toán:{' '}
@@ -1287,7 +1287,7 @@ export default function AdminStudentsTab() {
 
             <div className="space-y-3 mb-5">
               <div>
-                <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">Lý do hủy</label>
+                <label className="text-xs font-black text-slate-700  tracking-wide block mb-1">Lý do hủy</label>
                 <input
                   type="text"
                   value={refundModal.reason}
@@ -1299,7 +1299,7 @@ export default function AdminStudentsTab() {
               <div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end min-w-0">
                   <div className="flex-1 min-w-0">
-                    <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">
+                    <label className="text-xs font-black text-slate-700  tracking-wide block mb-1">
                       Số tiền hoàn
                     </label>
                     <input
@@ -1324,7 +1324,7 @@ export default function AdminStudentsTab() {
                     </p>
                   </div>
                   <div className="w-full sm:w-[96px] shrink-0">
-                    <label className="text-xs font-black text-slate-700 uppercase tracking-wide block mb-1">% hoàn</label>
+                    <label className="text-xs font-black text-slate-700  tracking-wide block mb-1">% hoàn</label>
                     <div className="relative">
                       <input
                         type="number"

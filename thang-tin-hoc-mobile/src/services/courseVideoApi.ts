@@ -1,4 +1,4 @@
-import { mobileApiRequest } from './apiClient';
+import { mobileApiRequest, resolveMobilePublicUrl } from './apiClient';
 
 export type LessonPracticeSubject = {
   id: string;
@@ -126,14 +126,6 @@ type CatalogPayload = {
   };
 };
 
-function apiMediaUrl(path: string) {
-  const value = path.trim();
-  if (/^https?:\/\//i.test(value)) return value;
-  const apiBaseUrl = String(process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL || '').trim();
-  if (!apiBaseUrl || !value) return '';
-  return new URL(value, `${apiBaseUrl.replace(/\/+$/, '')}/`).toString();
-}
-
 export async function getCourseVideoCatalog() {
   const payload = await mobileApiRequest<CatalogPayload>('/lesson-practice/my/subjects');
   if (!Array.isArray(payload.data?.subjects) || !Array.isArray(payload.data?.courses)) {
@@ -143,7 +135,7 @@ export async function getCourseVideoCatalog() {
     subjects: payload.data.subjects,
     courses: payload.data.courses.map((course) => ({
       ...course,
-      thumbnail: course.thumbnail ? apiMediaUrl(course.thumbnail) : '',
+      thumbnail: course.thumbnail ? resolveMobilePublicUrl(course.thumbnail) : '',
     })),
   };
 }

@@ -42,7 +42,13 @@ export const SOCKET_EVENTS = {
   ATTENDANCE_CONFIRMED: 'socket:attendance:confirmed',
   ATTENDANCE_REJECTED: 'socket:attendance:rejected',
   ATTENDANCE_ADMIN_MAKEUP_COMPLETED: 'socket:attendance:admin-makeup-completed',
+  FINANCE_TRANSACTION: 'socket:finance:transaction',
   LMS_QA_UPDATED: 'socket:lms_qa:updated',
+  QUIZ_SUBMITTED: 'socket:quiz:submitted',
+  QUIZ_CHANGED: 'socket:quiz:changed',
+  ASSIGNMENT_CHANGED: 'socket:assignment:changed',
+  SUBMISSION_CHANGED: 'socket:submission:changed',
+  STUDENT_CHANGED: 'socket:student:changed',
 } as const;
 
 let socket: Socket | null = null;
@@ -51,6 +57,24 @@ let currentUserId = '';
 let currentRole = '';
 let onlineUsersSnapshot: unknown[] = [];
 let lastSeenUsersSnapshot: Record<string, string> = {};
+let notificationSignalTimeout: ReturnType<typeof setTimeout> | null = null;
+let notificationSignalPayload: unknown;
+
+function queueNotificationSignal(data?: unknown) {
+  if (data !== undefined) notificationSignalPayload = data;
+  if (notificationSignalTimeout) clearTimeout(notificationSignalTimeout);
+  notificationSignalTimeout = setTimeout(() => {
+    notificationSignalTimeout = null;
+    emitDeviceEvent(SOCKET_EVENTS.NOTIFICATION, notificationSignalPayload);
+    notificationSignalPayload = undefined;
+  }, 80);
+}
+
+function clearNotificationSignal() {
+  if (notificationSignalTimeout) clearTimeout(notificationSignalTimeout);
+  notificationSignalTimeout = null;
+  notificationSignalPayload = undefined;
+}
 
 export function getOnlineUsersSnapshot() {
   return onlineUsersSnapshot;
@@ -64,7 +88,7 @@ function emitDeviceEvent(name: string, data?: unknown) {
   DeviceEventEmitter.emit(name, data);
 }
 
-function bindSocketEvents(instance: Socket) {
+function bindSocketEvents(instance: Socket, token: string) {
   instance.on('connect', () => {
     instance.emit('register', {});
     emitDeviceEvent(SOCKET_EVENTS.CONNECTED, {});
@@ -75,6 +99,7 @@ function bindSocketEvents(instance: Socket) {
     emitDeviceEvent(SOCKET_EVENTS.DISCONNECTED, { reason });
   });
   instance.on('connect_error', (error: Error) => emitDeviceEvent(SOCKET_EVENTS.ERROR, { message: error.message }));
+  instance.on('auth:session-replaced', () => emitDeviceEvent('mobile:session-replaced', { token }));
   instance.on('message:receive', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_RECEIVED, data));
   instance.on('message:sent', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_SENT_ACK, data));
   instance.on('message:error', (data) => emitDeviceEvent(SOCKET_EVENTS.MESSAGE_SEND_ERROR, data));
@@ -95,8 +120,20 @@ function bindSocketEvents(instance: Socket) {
       emitDeviceEvent(SOCKET_EVENTS.LAST_SEEN_USERS, lastSeenUsersSnapshot);
     }
   });
-  instance.on('new-notification', (data) => emitDeviceEvent(SOCKET_EVENTS.NOTIFICATION, data));
+  instance.on('RECEIVE_NOTIFICATION', queueNotificationSignal);
+  instance.on('new-notification', queueNotificationSignal);
   instance.on('lms_qa:updated', (data) => emitDeviceEvent(SOCKET_EVENTS.LMS_QA_UPDATED, data));
+  instance.on('quiz:submitted', (data) => emitDeviceEvent(SOCKET_EVENTS.QUIZ_SUBMITTED, data));
+  instance.on('quiz:changed', (data) => emitDeviceEvent(SOCKET_EVENTS.QUIZ_CHANGED, data));
+  for (const eventName of ['student:new', 'student:assigned', 'student:updated', 'student:history_reset', 'exam:locked', 'exam:unlocked']) {
+    instance.on(eventName, (data) => emitDeviceEvent(SOCKET_EVENTS.STUDENT_CHANGED, data));
+  }
+  for (const eventName of ['assignment:new', 'assignment:updated', 'assignment:deleted']) {
+    instance.on(eventName, (data) => emitDeviceEvent(SOCKET_EVENTS.ASSIGNMENT_CHANGED, data));
+  }
+  for (const eventName of ['submission:new', 'submission:graded']) {
+    instance.on(eventName, (data) => emitDeviceEvent(SOCKET_EVENTS.SUBMISSION_CHANGED, data));
+  }
   instance.on('group:new', (data) => emitDeviceEvent(SOCKET_EVENTS.GROUP_NEW, data));
   instance.on('group:deleted', (data) => emitDeviceEvent(SOCKET_EVENTS.GROUP_DELETE, data));
   instance.on('CONTACT_LIST_UPDATED', (data) => emitDeviceEvent(SOCKET_EVENTS.CONTACT_UPDATED, data));
@@ -109,6 +146,8 @@ function bindSocketEvents(instance: Socket) {
   instance.on('attendance:confirmed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_CONFIRMED, data));
   instance.on('attendance:rejected', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_REJECTED, data));
   instance.on('attendance:admin-makeup-completed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_ADMIN_MAKEUP_COMPLETED, data));
+  instance.on('transactions:new', (data) => emitDeviceEvent(SOCKET_EVENTS.FINANCE_TRANSACTION, data));
+  instance.on('teacher:financeUpdated', (data) => emitDeviceEvent(SOCKET_EVENTS.FINANCE_TRANSACTION, data));
   const callEvents = [
     ['call:incoming', SOCKET_EVENTS.CALL_INCOMING],
     ['call:checking', SOCKET_EVENTS.CALL_CHECKING],
@@ -150,6 +189,7 @@ export function connect(token: string, userId: string, role: string) {
     lastSeenUsersSnapshot = {};
   }
   if (socket) {
+    clearNotificationSignal();
     socket.removeAllListeners();
     socket.disconnect();
   }
@@ -174,10 +214,11 @@ export function connect(token: string, userId: string, role: string) {
     reconnectionDelayMax: 15000,
     timeout: 20000,
   });
-  bindSocketEvents(socket);
+  bindSocketEvents(socket, token);
 }
 
 export function disconnect() {
+  clearNotificationSignal();
   currentToken = '';
   currentUserId = '';
   currentRole = '';

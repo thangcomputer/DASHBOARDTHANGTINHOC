@@ -219,9 +219,15 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       // Do not keep stale green indicators while the socket is offline or
       // reconnecting.
       setOnlineUsers([]);
-      if (reason === 'io server disconnect') {
+      if (reason === 'io server disconnect' && !sessionReplaced) {
         newSocket.connect();
       }
+    };
+
+    let sessionReplaced = false;
+    const onSessionReplaced = () => {
+      sessionReplaced = true;
+      window.dispatchEvent(new CustomEvent('cms:session-replaced', { detail: { token } }));
     };
 
     const onUsersOnline = (users) => {
@@ -405,6 +411,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
     newSocket.on('connect', onConnect);
     newSocket.on('connect_error', onConnectError);
     newSocket.on('disconnect', onDisconnect);
+    newSocket.on('auth:session-replaced', onSessionReplaced);
     newSocket.on('users:online', onUsersOnline);
     newSocket.on('users:lastSeen', onUsersLastSeen);
     newSocket.on('message:receive', onMessageReceive);
@@ -461,6 +468,7 @@ export const SocketProvider = ({ userId, role, name, token, adminRole, children 
       newSocket.off('connect', onConnect);
       newSocket.off('connect_error', onConnectError);
       newSocket.off('disconnect', onDisconnect);
+      newSocket.off('auth:session-replaced', onSessionReplaced);
       newSocket.off('users:online', onUsersOnline);
       newSocket.off('users:lastSeen', onUsersLastSeen);
       newSocket.off('message:receive', onMessageReceive);

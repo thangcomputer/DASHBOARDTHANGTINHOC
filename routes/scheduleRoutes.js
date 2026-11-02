@@ -1019,6 +1019,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
             title: '📅 Lịch học mới',
             content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
             receivers: studentId.toString(),
+            payload: { scheduleId: String(schedule._id || schedule.id), type: 'schedule' },
             link: '/student#schedule',
           });
         }
@@ -1080,6 +1081,18 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     const schedule = await Schedule.findById(req.params.scheduleId);
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+
+    if (
+      role === 'teacher'
+      && String(schedule.studentConfirmStatus || '') === 'admin_approved'
+      && ['date', 'startTime', 'endTime'].some((field) => Object.prototype.hasOwnProperty.call(req.body || {}, field))
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'ATTENDANCE_MAKEUP_ALREADY_APPROVED',
+        message: 'Buổi học đã được điểm danh bù — không thể sửa lịch.',
+      });
     }
 
     if (isRejectMakeup) {
@@ -1504,6 +1517,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
            title: '🔄 Lịch học đã thay đổi',
            content: `Lịch học đã cập nhật thành: ${updated.startTime || schedule.startTime} ngày ${notifDate}.`,
            receivers: String(scheduleScope.studentId),
+           payload: { scheduleId: String(updated._id || schedule._id), type: 'schedule' },
            link: '/student#schedule'
          }).catch((e) => logger.warn('[SCHEDULE] reschedule notif:', e.message));
       }

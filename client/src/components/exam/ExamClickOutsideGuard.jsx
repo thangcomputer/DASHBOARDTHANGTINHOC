@@ -155,7 +155,7 @@ export default function ExamClickOutsideGuard({
             <div>
               <h2
                 id="exam-click-outside-title"
-                className="text-gray-900 font-extrabold text-2xl sm:text-3xl uppercase tracking-tighter leading-none"
+                className="text-gray-900 font-extrabold text-2xl sm:text-3xl  tracking-tighter leading-none"
               >
                 Cảnh báo!
               </h2>
@@ -163,7 +163,7 @@ export default function ExamClickOutsideGuard({
                 Bạn vừa thao tác ngoài vùng làm bài. Hãy quay lại màn hình thi và tiếp tục làm bài.
               </p>
               {typeof onMaxStrikes === 'function' && maxStrikes > 0 && (
-                <p className="text-orange-600 font-extrabold mt-3 text-xs uppercase tracking-wide">
+                <p className="text-orange-600 font-extrabold mt-3 text-xs  tracking-wide">
                   Cảnh báo {strikeCount}/{maxStrikes}
                   {strikeCount < maxStrikes
                     ? ` — còn ${maxStrikes - strikeCount} lần, lần sau bài thi sẽ bị hủy.`
@@ -176,7 +176,7 @@ export default function ExamClickOutsideGuard({
               onClick={dismiss}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-black text-sm tracking-wide shadow-lg shadow-red-500/25 hover:from-orange-400 hover:to-red-500 transition active:scale-[0.98]"
             >
-              TÔI ĐÃ HIỂU, TIẾP TỤC THI
+              Tôi đã hiểu, tiếp tục thi
             </button>
           </div>
         </div>

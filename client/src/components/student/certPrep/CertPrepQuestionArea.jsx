@@ -25,7 +25,7 @@ export default function CertPrepQuestionArea({
   return (
     <div className="space-y-5">
       <div className={`flex flex-wrap items-center justify-between gap-2 border-b pb-3 ${exam ? 'border-white/10' : 'border-slate-100'}`}>
-        <span className={`text-[11px] font-black uppercase tracking-widest ${exam ? 'text-sky-400' : 'text-slate-400'}`}>
+        <span className={`text-[11px] font-black  tracking-widest ${exam ? 'text-sky-400' : 'text-slate-400'}`}>
           Câu hỏi {index + 1} / {total}
         </span>
         {showFeedback ? (
@@ -101,7 +101,7 @@ export default function CertPrepQuestionArea({
             : 'border border-indigo-100 bg-indigo-50/80 text-indigo-950'
         }`}
         >
-          <p className={`text-[11px] font-black uppercase tracking-wide mb-1 ${exam ? 'text-indigo-300' : 'text-indigo-600'}`}>Giải thích</p>
+          <p className={`text-[11px] font-black  tracking-wide mb-1 ${exam ? 'text-indigo-300' : 'text-indigo-600'}`}>Giải thích</p>
           {question.explanation ? <p className="whitespace-pre-wrap font-medium">{question.explanation}</p> : null}
           {question.explanationImage ? (
             <img src={resolveMediaUrl(question.explanationImage)} alt="Hình giải thích" className="max-h-40 mt-2 rounded-xl" />

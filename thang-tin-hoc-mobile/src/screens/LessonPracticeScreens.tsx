@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import {
   AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, ProgressBar,
+  useBrandingHeaderScrollHandler,
 } from '../components/ui';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
@@ -93,7 +94,7 @@ export function LessonPracticeCatalogScreen() {
   if (loading) {
     return (
       <AppScreen>
-        <AppHeader title="Luyện bài theo bài học" icon={BookOpen} />
+        <AppHeader title="Luyện bài theo bài học" />
         <LoadingSkeleton rows={4} />
       </AppScreen>
     );
@@ -102,7 +103,7 @@ export function LessonPracticeCatalogScreen() {
   if (error) {
     return (
       <AppScreen>
-        <AppHeader title="Luyện bài theo bài học" icon={BookOpen} />
+        <AppHeader title="Luyện bài theo bài học" />
         <ErrorState onRetry={load} />
       </AppScreen>
     );
@@ -112,7 +113,6 @@ export function LessonPracticeCatalogScreen() {
     <AppScreen>
       <AppHeader
         title="Luyện bài theo bài học"
-        icon={BookOpen}
         subtitle="Học và luyện tập từng bài theo khóa học của bạn"
       />
       <View style={styles.catalogList}>
@@ -127,7 +127,7 @@ export function LessonPracticeCatalogScreen() {
                   ? <GraduationCap size={20} color="#FFFFFF" />
                   : <Clapperboard size={20} color="#FFFFFF" />}
                 <Text style={styles.courseCardBannerLabel}>
-                  {course.deliveryMode === 'instructor' ? 'HỌC CÙNG GIẢNG VIÊN' : 'TỰ HỌC QUA VIDEO'}
+                  {course.deliveryMode === 'instructor' ? 'Học cùng giảng viên' : 'Tự học qua video'}
                 </Text>
                 {!course.enrolled ? <Lock size={16} color="#FFFFFF" style={{ marginLeft: 'auto' }} /> : null}
               </View>
@@ -297,6 +297,7 @@ type PlayerRouteProps = NativeStackScreenProps<AppStackParamList, 'LessonPractic
 export function LessonPracticePlayerScreen() {
   const navigation = useNavigation<Navigation>();
   const route = useRoute<PlayerRouteProps>();
+  const handleHeaderScroll = useBrandingHeaderScrollHandler();
   const { unitId, unitTitle, subjectName, courseName } = route.params;
   const { user } = useAuth();
   const [lessons, setLessons] = useState<LPLesson[]>([]);
@@ -402,7 +403,7 @@ export function LessonPracticePlayerScreen() {
         subtitle={`${subjectName} • ${currentLessonIndex + 1}/${lessons.length}`}
         onBack={() => navigation.goBack()}
       />
-      <ScrollView style={styles.playerBody} contentContainerStyle={styles.playerContent}>
+      <ScrollView style={styles.playerBody} contentContainerStyle={styles.playerContent} onScroll={handleHeaderScroll} scrollEventThrottle={16}>
         {currentLesson ? (
           <>
             {/* Lesson Title */}
@@ -530,7 +531,7 @@ const styles = StyleSheet.create({
   // Units
   chapterList: { padding: spacing.lg, gap: spacing.lg },
   chapter: { gap: spacing.sm },
-  chapterTitle: { color: colors.muted, fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  chapterTitle: { color: colors.muted, fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.8 },
   unitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line },
   unitLocked: { opacity: 0.55 },
   unitStatus: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },

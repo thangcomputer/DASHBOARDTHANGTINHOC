@@ -227,7 +227,7 @@ export default function AdminOverviewTab({ session }) {
 
       {/* Quick access */}
       <section>
-        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 px-0.5">
+        <h3 className="text-xs sm:text-sm font-bold  tracking-wider text-slate-400 mb-3 px-0.5">
           Truy cập nhanh hệ thống
         </h3>
         <div className="cms-quick-grid">

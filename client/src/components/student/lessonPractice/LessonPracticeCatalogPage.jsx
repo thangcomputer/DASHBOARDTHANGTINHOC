@@ -108,7 +108,7 @@ function CourseCatalogCard({
                   : <Clapperboard size={16} strokeWidth={2.4} />}
               </span>
               <span className="whitespace-nowrap text-center leading-none">
-                {course.deliveryMode === 'instructor' ? 'HỌC CÙNG GIẢNG VIÊN' : 'TỰ HỌC QUA VIDEO'}
+                {course.deliveryMode === 'instructor' ? 'Học cùng giảng viên' : 'Tự học qua video'}
               </span>
             </span>
           </span>
@@ -348,7 +348,7 @@ function CourseSubjectsModal({
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white p-5 sm:p-6">
           <div>
-            <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Nội dung khóa học</p>
+            <p className="text-xs font-black  tracking-wider text-emerald-700">Nội dung khóa học</p>
             <h2 id="course-subjects-title" className="mt-1 text-lg font-black text-slate-900 sm:text-xl">{course.name}</h2>
             <p className="mt-1 text-sm text-slate-500">
               {course.offerType === 'single'
@@ -399,7 +399,7 @@ function CourseSubjectsModal({
                       </span>
                       <span className="relative z-10 mt-4 block rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
                         <span className="mb-2 flex items-center justify-between text-[11px] font-bold">
-                          <span className="text-slate-500">TIẾN ĐỘ HỌC</span>
+                          <span className="text-slate-500">Tiến độ học</span>
                           <span className={progressPercent === 100 ? 'text-emerald-700' : 'text-slate-700'}>{progressPercent}%</span>
                         </span>
                         <span

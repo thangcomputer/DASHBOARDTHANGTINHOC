@@ -1,6 +1,7 @@
 const jwt       = require('jsonwebtoken');
 const Teacher   = require('../models/Teacher');
 const Student   = require('../models/Student');
+const SystemSettings = require('../models/SystemSettings');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
@@ -53,6 +54,17 @@ const authMiddleware = async (req, res, next) => {
       }
       req.sessionId = decoded.sid;
       req.authSession = session;
+    }
+
+    if (decoded.id === 'admin') {
+      const settings = await SystemSettings.findOne({ _key: 'main' }).select('adminTokenVersion').lean();
+      if ((settings?.adminTokenVersion || 0) !== decoded.tokenVersion) {
+        return res.status(401).json({
+          success: false,
+          code: 'TOKEN_VERSION_MISMATCH',
+          message: 'Tài khoản đã đăng nhập ở thiết bị khác. Phiên này đã bị vô hiệu.',
+        });
+      }
     }
 
     // ⭐ Fix 1: Kiểm tra tokenVersion + trạng thái tài khoản (khóa/vô hiệu)

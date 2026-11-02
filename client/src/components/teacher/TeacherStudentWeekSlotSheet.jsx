@@ -401,7 +401,7 @@ export default function TeacherStudentWeekSlotSheet({
               type="button"
               disabled={saving || dirtyKeys.length === 0}
               onClick={handleCommit}
-              className="flex-[1.6] h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-black uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-[1.6] h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-black  tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? 'Đang lưu...' : 'Xếp lịch ngay'}
             </button>

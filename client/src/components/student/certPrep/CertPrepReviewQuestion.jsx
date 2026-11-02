@@ -46,7 +46,7 @@ export default function CertPrepReviewQuestion({ question, total }) {
   return (
     <article className="cms-card p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-black uppercase tracking-wide text-slate-500">
+        <p className="text-sm font-black  tracking-wide text-slate-500">
           Câu {question.order} / {total}
         </p>
         <p className={`text-sm font-black ${badgeCls}`}>{badge}</p>

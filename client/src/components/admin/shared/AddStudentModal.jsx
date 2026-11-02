@@ -39,8 +39,8 @@ function isOnlineBranch(branch) {
 export default function AddStudentModal({
   onAdd, onClose, teachers, examSubjectsCatalog, isSubmitting,
 }) {
-  const toast    = useToast();
-  const API      = import.meta.env.VITE_API_URL || '';
+  const toast = useToast();
+  const API = import.meta.env.VITE_API_URL || '';
   const TOTAL_PAYMENT_SECS = 900; // 15 phút
 
   const {
@@ -119,17 +119,17 @@ export default function AddStudentModal({
           const ep = getEffectiveCoursePrice(first);
           let defaultBranchId = '';
           if (selectedBranchId && selectedBranchId !== 'all') {
-             defaultBranchId = selectedBranchId;
+            defaultBranchId = selectedBranchId;
           } else if (branches && branches.length > 0) {
-             defaultBranchId = branches[0]._id || branches[0].id || '';
+            defaultBranchId = branches[0]._id || branches[0].id || '';
           }
-          
+
           let mode = 'OFFLINE';
           if (defaultBranchId) {
-             const checkBranch = branches.find(b => toBranchId(b) === String(defaultBranchId));
-             if (checkBranch && isOnlineBranch(checkBranch)) {
-                mode = 'ONLINE';
-             }
+            const checkBranch = branches.find(b => toBranchId(b) === String(defaultBranchId));
+            if (checkBranch && isOnlineBranch(checkBranch)) {
+              mode = 'ONLINE';
+            }
           }
 
           const bCode = defaultBranchId ? (branches.find(b => toBranchId(b) === String(defaultBranchId))?.code || '') : '';
@@ -137,7 +137,7 @@ export default function AddStudentModal({
           setForm(f => ({ ...f, courseId: first._id, course: first.name, price: ep, totalSessions: sessions, branchId: defaultBranchId, branchCode: bCode, learningMode: mode }));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [API, isSuperAdmin, selectedBranchId, branches]);
 
   const locationBranches = useMemo(() => {
@@ -171,7 +171,7 @@ export default function AddStudentModal({
       }));
       return;
     }
-    
+
     if (name === 'branchId') {
       const selectedB = branches.find(b => toBranchId(b) === String(value));
       setForm(f => {
@@ -215,15 +215,15 @@ export default function AddStudentModal({
   };
 
   // ── QR payment state ──────────────────────────────────────────────────────
-  const [bankInfo, setBankInfo]     = useState(null);
-  const [timeLeft, setTimeLeft]     = useState(TOTAL_PAYMENT_SECS);
+  const [bankInfo, setBankInfo] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(TOTAL_PAYMENT_SECS);
   const [pollStatus, setPollStatus] = useState('pending'); // 'pending' | 'paid'
-  const [sessionId, setSessionId]   = useState(null);
+  const [sessionId, setSessionId] = useState(null);
   const [reservedStudentCode, setReservedStudentCode] = useState('');
   const [pollError, setPollError] = useState(false);
-  const pollRef                     = React.useRef(null);
-  const timerRef                    = React.useRef(null);
-  const paidProcessedRef            = React.useRef(false);
+  const pollRef = React.useRef(null);
+  const timerRef = React.useRef(null);
+  const paidProcessedRef = React.useRef(false);
 
   const ckContent = useMemo(() => {
     if (!reservedStudentCode) return '';
@@ -322,7 +322,7 @@ export default function AddStudentModal({
   // Real-time Socket.io listener
   useEffect(() => {
     if (step !== 'qr' || pollStatus === 'paid' || !socket) return;
-    
+
     const handlePaid = (data) => {
       if (sessionId && data.sessionId === sessionId && !paidProcessedRef.current) {
         paidProcessedRef.current = true;
@@ -330,7 +330,7 @@ export default function AddStudentModal({
         clearInterval(timerRef.current);
         setPollStatus('paid');
         setStep('success'); // Show success screen (blue check)
-        
+
         // Wait 2 seconds before closing and adding student
         setTimeout(() => {
           Promise.resolve(onAdd({
@@ -367,7 +367,7 @@ export default function AddStudentModal({
           clearInterval(timerRef.current);
           setPollStatus('paid');
           setStep('success'); // Show success screen
-          
+
           setTimeout(() => {
             Promise.resolve(onAdd({
               ...form,
@@ -443,7 +443,7 @@ export default function AddStudentModal({
     await submitStudent(false);
   };
 
-  const formatTime = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const qrUrl = sessionId && bankInfo?.centerBankCode && bankInfo?.centerBankAccountNumber
     ? generateVietQRUrl(
       bankInfo.centerBankCode,
@@ -614,8 +614,8 @@ export default function AddStudentModal({
                   name="name"
                   value={form.name}
                   onChange={handleChange}
-                  className="cms-input uppercase"
-                  placeholder="VD: NGUYỄN VĂN A"
+                  className="cms-input "
+                  placeholder="Vd: nguyễn văn a"
                 />
               </div>
 
@@ -625,24 +625,22 @@ export default function AddStudentModal({
                   <button
                     type="button"
                     onClick={() => setForm(f => ({ ...f, gender: 'male' }))}
-                    className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
-                      form.gender === 'male' || form.gender === 'Nam'
+                    className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${form.gender === 'male' || form.gender === 'Nam'
                         ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
-                    <span>👨 Nam (Cartoon Nam)</span>
+                    <span>👨 Nam</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setForm(f => ({ ...f, gender: 'female' }))}
-                    className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
-                      form.gender === 'female' || form.gender === 'Nữ'
+                    className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${form.gender === 'female' || form.gender === 'Nữ'
                         ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
-                    <span>👩 Nữ (Cartoon Nữ)</span>
+                    <span>👩 Nữ</span>
                   </button>
                 </div>
               </div>

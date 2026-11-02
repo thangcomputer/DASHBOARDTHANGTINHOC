@@ -329,7 +329,7 @@ export function useAdminTeachers({
           toast.error(`${errors.length} dòng lỗi: ${errors.slice(0, 2).join(' — ')}${errors.length > 2 ? '…' : ''}`);
         }
       } catch {
-        toast.error('Không đọc được file. Dùng mẫu .xlsx Giảng viên và thử lại.');
+        toast.error('Không đọc được file. Dùng mẫu .XLSX Giảng viên và thử lại.');
       }
     };
     reader.readAsBinaryString(file);

@@ -308,7 +308,7 @@
   }
 
   .cms-label {
-    @apply text-xs font-semibold uppercase tracking-wide text-slate-600;
+    @apply text-xs font-semibold  tracking-wide text-slate-600;
   }
 
   .cms-form-stack {
@@ -729,7 +729,7 @@
   }
   .cms-lms-attention.is-dismissed { display: none; }
   .cms-lms-attention__label {
-    @apply hidden sm:inline-flex items-center px-2 text-[10px] font-black uppercase tracking-wide text-slate-400;
+    @apply hidden sm:inline-flex items-center px-2 text-[10px] font-black  tracking-wide text-slate-400;
   }
   .cms-lms-attention__item {
     @apply inline-flex items-center gap-1.5 min-h-9 rounded-lg px-2.5 text-[11px] font-bold transition;
@@ -1835,7 +1835,7 @@ html.cms-app-shell #root {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+
   color: var(--cms-neutral-600);
 }
 .cms-chip-grid {
@@ -3261,7 +3261,7 @@ details[open] > summary .cms-rbac-accordion-chevron { transform: rotate(180deg);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
+
   color: #64748b;
 }
 .cms-rbac-section-num {

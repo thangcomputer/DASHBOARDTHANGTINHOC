@@ -93,7 +93,7 @@ export function CertPrepCatalogScreen() {
   if (loading) {
     return (
       <AppScreen>
-        <AppHeader title="Ôn thi MOS / IC3" icon={BookOpen} />
+        <AppHeader title="Ôn thi MOS / IC3" />
         <LoadingSkeleton rows={4} />
       </AppScreen>
     );
@@ -102,8 +102,8 @@ export function CertPrepCatalogScreen() {
   if (error) {
     return (
       <AppScreen>
-        <AppHeader title="Ôn thi MOS / IC3" icon={BookOpen} />
-        <ErrorState onRetry={loadCatalog} />
+        <AppHeader title="Ôn thi MOS / IC3" />
+        <ErrorState message={error} onRetry={loadCatalog} />
       </AppScreen>
     );
   }
@@ -146,7 +146,7 @@ export function CertPrepCatalogScreen() {
 
   return (
     <AppScreen>
-      <AppHeader title="Ôn thi MOS / IC3" icon={BookOpen} subtitle="Luyện tập và kiểm tra kiến thức theo từng cấp độ" />
+      <AppHeader title="Ôn thi MOS / IC3" subtitle="Luyện tập và kiểm tra kiến thức theo từng cấp độ" />
       {catalog.length === 0 ? (
         <EmptyState title="Chưa có khóa ôn thi" message="Bạn chưa được cấp quyền truy cập khóa ôn thi nào." />
       ) : (
@@ -262,7 +262,7 @@ export function CertPrepLevelScreen() {
     return (
       <AppScreen>
         <AppHeader title="Đề thi" onBack={() => navigation.goBack()} />
-        <ErrorState onRetry={load} />
+        <ErrorState message={error} onRetry={load} />
       </AppScreen>
     );
   }
@@ -338,12 +338,16 @@ export function CertPrepPlayerScreen() {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
   const [submitDialogVisible, setSubmitDialogVisible] = useState(false);
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
   const [navVisible, setNavVisible] = useState(false);
   const [error, setError] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveQueueRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAnswersRef = useRef<Record<string, unknown>>({});
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
 
   const loadSession = useCallback(async () => {
     if (user?.previewMode || sessionId === 'demo-session') {
@@ -355,20 +359,18 @@ export function CertPrepPlayerScreen() {
         { id: 'q4', type: 'single_choice', text: 'Tab nào chứa công cụ định dạng chữ?', options: ['Home', 'Insert', 'View', 'Review'], correctAnswer: 0 },
         { id: 'q5', type: 'single_choice', text: 'Để tạo bảng trong Word, vào tab nào?', options: ['Insert', 'Home', 'Layout', 'Design'], correctAnswer: 0 },
       ]);
+      setAnswers({});
       setRemainingSeconds(30 * 60);
       setLoading(false);
       return;
     }
     setLoading(true);
+    setError('');
     try {
       const session = await certPrepApi.getSession(sessionId);
       setQuestions(session.questions || []);
-      if (session.timeLimitSeconds) {
-        const elapsed = session.startedAt
-          ? Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000)
-          : 0;
-        setRemainingSeconds(Math.max(0, session.timeLimitSeconds - elapsed));
-      }
+      setAnswers(session.answers || {});
+      setRemainingSeconds(session.remainingSeconds || 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không thể tải phiên làm bài.');
     } finally {
@@ -377,6 +379,33 @@ export function CertPrepPlayerScreen() {
   }, [sessionId, user]);
 
   useEffect(() => { void loadSession(); }, [loadSession]);
+
+  const flushPendingAnswers = useCallback(async () => {
+    if (saveQueueRef.current) {
+      clearTimeout(saveQueueRef.current);
+      saveQueueRef.current = null;
+    }
+    if (saveInFlightRef.current) await saveInFlightRef.current;
+    const pending = pendingAnswersRef.current;
+    if (Object.keys(pending).length === 0 || user?.previewMode || sessionId === 'demo-session') return;
+
+    pendingAnswersRef.current = {};
+    setSaveStatus('saving');
+    setSaveError('');
+    const request = certPrepApi.saveAnswers(sessionId, pending);
+    saveInFlightRef.current = request;
+    try {
+      await request;
+      setSaveStatus(Object.keys(pendingAnswersRef.current).length ? 'saving' : 'saved');
+    } catch (e) {
+      pendingAnswersRef.current = { ...pending, ...pendingAnswersRef.current };
+      setSaveStatus('error');
+      setSaveError(e instanceof Error ? e.message : 'Không thể lưu câu trả lời.');
+      throw e;
+    } finally {
+      if (saveInFlightRef.current === request) saveInFlightRef.current = null;
+    }
+  }, [sessionId, user]);
 
   // Countdown timer
   useEffect(() => {
@@ -396,14 +425,20 @@ export function CertPrepPlayerScreen() {
 
   const selectAnswer = useCallback((qId: string, value: unknown) => {
     setAnswers((prev) => ({ ...prev, [qId]: value }));
-    // Debounce save
+    pendingAnswersRef.current[qId] = value;
+    setSaveStatus('saving');
+    setSaveError('');
     if (saveQueueRef.current) clearTimeout(saveQueueRef.current);
     saveQueueRef.current = setTimeout(async () => {
       if (!user?.previewMode && sessionId !== 'demo-session') {
-        try { await certPrepApi.saveAnswer(sessionId, qId, value); } catch { /* ignore */ }
+        try {
+          await flushPendingAnswers();
+        } catch (e) {
+          console.error('Không thể tự động lưu câu trả lời ôn thi.', e);
+        }
       }
     }, 600);
-  }, [sessionId, user]);
+  }, [flushPendingAnswers, sessionId, user]);
 
   const handleSubmit = useCallback(async (auto = false) => {
     if (submitting) return;
@@ -411,6 +446,7 @@ export function CertPrepPlayerScreen() {
     setSubmitDialogVisible(false);
     try {
       if (!user?.previewMode && sessionId !== 'demo-session') {
+        await flushPendingAnswers();
         await certPrepApi.submitSession(sessionId);
       }
       navigation.replace('CertPrepResult', { sessionId, testTitle });
@@ -418,7 +454,7 @@ export function CertPrepPlayerScreen() {
       Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không thể nộp bài.');
       setSubmitting(false);
     }
-  }, [submitting, sessionId, testTitle, navigation, user]);
+  }, [submitting, sessionId, testTitle, navigation, user, flushPendingAnswers]);
 
   const q = questions[currentIndex];
   const answeredCount = Object.keys(answers).filter((id) => answers[id] !== undefined && answers[id] !== null).length;
@@ -456,6 +492,11 @@ export function CertPrepPlayerScreen() {
         <View style={styles.examHeaderCenter}>
           <Text style={styles.examTitle} numberOfLines={1}>{testTitle}</Text>
           <Text style={styles.examProgress}>{currentIndex + 1}/{questions.length} câu • {answeredCount} đã trả lời</Text>
+          {saveStatus !== 'idle' ? (
+            <Text style={[styles.examSaveStatus, saveStatus === 'error' && styles.examSaveStatusError]}>
+              {saveStatus === 'saving' ? 'Đang lưu câu trả lời...' : saveStatus === 'saved' ? 'Đã lưu câu trả lời' : `Lỗi lưu: ${saveError}`}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.examTimer}>
           <Clock size={14} color={remainingSeconds < 120 ? '#F87171' : '#94A3B8'} />
@@ -568,11 +609,16 @@ export function CertPrepPlayerScreen() {
                 <Text style={styles.dialogCancelText}>Tiếp tục làm</Text>
               </Pressable>
               <Pressable style={styles.dialogConfirm} onPress={async () => {
-                setExitDialogVisible(false);
-                if (!user?.previewMode && sessionId !== 'demo-session') {
-                  try { await certPrepApi.pauseSession(sessionId); } catch { /* ignore */ }
+                try {
+                  if (!user?.previewMode && sessionId !== 'demo-session') {
+                    await flushPendingAnswers();
+                    await certPrepApi.pauseSession(sessionId);
+                  }
+                  setExitDialogVisible(false);
+                  navigation.goBack();
+                } catch (e) {
+                  Alert.alert('Lỗi', e instanceof Error ? e.message : 'Không thể lưu tiến độ bài thi.');
                 }
-                navigation.goBack();
               }}>
                 <Text style={styles.dialogConfirmText}>Thoát</Text>
               </Pressable>
@@ -652,7 +698,7 @@ export function CertPrepResultScreen() {
   const route = useRoute<ResultRouteProps>();
   const { sessionId, testTitle } = route.params;
   const { user } = useAuth();
-  const [result, setResult] = useState<{ score: number; total: number; correctCount: number } | null>(null);
+  const [result, setResult] = useState<{ score: number; total: number; correctCount: number; passed?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -688,12 +734,12 @@ export function CertPrepResultScreen() {
     return (
       <AppScreen>
         <AppHeader title="Kết quả" onBack={() => navigation.navigate('CertPrepCatalog')} />
-        <ErrorState onRetry={() => navigation.replace('CertPrepResult', { sessionId, testTitle })} />
+        <ErrorState message={error} onRetry={() => navigation.replace('CertPrepResult', { sessionId, testTitle })} />
       </AppScreen>
     );
   }
 
-  const passed = result.score >= 70;
+  const passed = result.passed ?? result.score >= 70;
 
   return (
     <AppScreen>
@@ -775,6 +821,8 @@ const styles = StyleSheet.create({
   examHeaderCenter: { flex: 1, alignItems: 'center' },
   examTitle: { color: '#E2E8F0', fontSize: typography.small, fontWeight: '800' },
   examProgress: { color: '#64748B', fontSize: typography.micro, marginTop: 2 },
+  examSaveStatus: { color: '#94A3B8', fontSize: typography.micro, marginTop: 2 },
+  examSaveStatusError: { color: '#F87171' },
   examTimer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   examTimerText: { color: '#94A3B8', fontSize: typography.caption, fontWeight: '700', fontVariant: ['tabular-nums'] },
   examBody: { flex: 1 },

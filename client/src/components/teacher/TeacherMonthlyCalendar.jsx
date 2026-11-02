@@ -181,7 +181,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
           {/* Day labels */}
           <div className="grid grid-cols-7 text-center border-b border-slate-100 pb-2.5 mb-2.5">
             {['CN','T2','T3','T4','T5','T6','T7'].map((d, i) => (
-              <div key={d} className={`text-[11px] sm:text-xs font-black uppercase tracking-wider ${i === 0 ? 'text-red-500' : 'text-slate-400'}`}>
+              <div key={d} className={`text-[11px] sm:text-xs font-black  tracking-wider ${i === 0 ? 'text-red-500' : 'text-slate-400'}`}>
                 {d}
               </div>
             ))}
@@ -285,7 +285,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-2xl sm:rounded-3xl p-4 text-white shadow-xl shadow-slate-900/10 border border-slate-800/60 flex-1 min-h-[170px] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10 shrink-0">
-              <span className="text-xs font-black uppercase tracking-wider text-blue-300 flex items-center gap-1.5">
+              <span className="text-xs font-black  tracking-wider text-blue-300 flex items-center gap-1.5">
                 <Calendar size={13} className="text-yellow-400" />
                 {selectedDay
                   ? `Lịch dạy ngày ${selectedDay}/${month + 1}/${year}`
@@ -318,7 +318,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                           <h4 className="font-bold text-xs sm:text-sm text-white line-clamp-1">
                             👤 {s.studentName || 'Học viên'}
                           </h4>
-                          <span className={`text-[10px] font-black px-1.5 py-0.2 rounded uppercase shrink-0 border ${cfg.badge}`}>
+                          <span className={`text-[10px] font-black px-1.5 py-0.2 rounded  shrink-0 border ${cfg.badge}`}>
                             {cfg.label}
                           </span>
                         </div>
@@ -430,7 +430,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   <div key={s._id || s.id} className={`py-2 px-1 flex items-center justify-between gap-2 transition group ${displayStatus === 'ongoing' ? 'bg-green-50/50 rounded-lg' : 'hover:bg-amber-50/30'}`}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center shrink-0 shadow-sm ${displayStatus === 'ongoing' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
-                        <span className="text-[8px] font-bold uppercase leading-none">{monthNames[d.getMonth()].replace('Tháng ', 'T')}</span>
+                        <span className="text-[8px] font-bold  leading-none">{monthNames[d.getMonth()].replace('Tháng ', 'T')}</span>
                         <span className="text-xs font-black leading-none mt-0.5">{d.getDate()}</span>
                       </div>
                       <div className="min-w-0">
@@ -440,7 +440,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border uppercase ${cfg.badge}`}>
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border  ${cfg.badge}`}>
                         {displayStatus === 'ongoing' ? 'Đang dạy' : s.startTime}
                       </span>
                       {new Date(s.date) >= today && displayStatus !== 'ongoing' && (
@@ -485,7 +485,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                 Hành động này sẽ <strong>hủy buổi học</strong> này và cập nhật hệ thống.
               </p>
               <div>
-                <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Lý do hủy *</label>
+                <label className="text-[11px] font-black text-slate-500  tracking-wider block mb-1.5">Lý do hủy *</label>
                 <textarea
                   rows={3}
                   value={cancelReason}

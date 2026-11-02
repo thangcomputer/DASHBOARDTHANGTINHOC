@@ -92,8 +92,8 @@ export default function StudentImportModal({ onClose, branchId }) {
                  <FileSpreadsheet size={24} />
               </div>
               <div>
-                 <h3 className="font-black uppercase tracking-widest text-sm">Nhập Học Viên Từ Excel</h3>
-                 <p className="text-[10px] opacity-70 font-bold uppercase tracking-widest">Bulk Import Module</p>
+                 <h3 className="font-black  tracking-widest text-sm">Nhập Học Viên Từ Excel</h3>
+                 <p className="text-[10px] opacity-70 font-bold  tracking-widest">Bulk Import Module</p>
               </div>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition">
@@ -114,7 +114,7 @@ export default function StudentImportModal({ onClose, branchId }) {
                   </div>
                   <div>
                     <p className="text-sm font-black text-slate-700">Kéo thả file hoặc Click để tải lên</p>
-                    <p className="text-xs text-slate-400 font-bold">Hỗ trợ .xlsx / .xls — cột giống form Thêm học viên</p>
+                    <p className="text-xs text-slate-400 font-bold">Hỗ trợ .XLSX / .XLS — cột giống form Thêm học viên</p>
                   </div>
                   <input ref={fileInputRef} type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUpload} />
                </div>
@@ -128,11 +128,11 @@ export default function StudentImportModal({ onClose, branchId }) {
                <div className="w-full pt-4 space-y-3">
                  <button 
                   onClick={downloadTemplate}
-                  className="w-full py-4 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-100 transition"
+                  className="w-full py-4 bg-slate-50 border border-slate-200 text-slate-600 rounded-2xl text-[11px] font-black  tracking-widest flex items-center justify-center gap-2 hover:bg-slate-100 transition"
                  >
                    <Download size={14} /> Tải file mẫu chuẩn
                  </button>
-                 <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold justify-center uppercase tracking-tighter italic">
+                 <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold justify-center  tracking-tighter italic">
                     <Info size={12} /> Dữ liệu trùng SĐT sẽ được bỏ qua tự động
                  </div>
                </div>
@@ -154,9 +154,9 @@ export default function StudentImportModal({ onClose, branchId }) {
                     <table className="w-full text-left text-xs min-w-[500px]">
                        <thead className="sticky top-0 bg-slate-50 border-b border-slate-100">
                           <tr>
-                             <th className="p-3 font-black text-slate-400 uppercase">Họ tên</th>
-                             <th className="p-3 font-black text-slate-400 uppercase">SĐT/Zalo</th>
-                             <th className="p-3 font-black text-slate-400 uppercase">Khóa học</th>
+                             <th className="p-3 font-black text-slate-400 ">Họ tên</th>
+                             <th className="p-3 font-black text-slate-400 ">SĐT/Zalo</th>
+                             <th className="p-3 font-black text-slate-400 ">Khóa học</th>
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-50">
@@ -168,7 +168,7 @@ export default function StudentImportModal({ onClose, branchId }) {
                              </tr>
                           ))}
                           {data.length > 10 && (
-                            <tr><td colSpan={3} className="p-3 text-center text-slate-400 font-black tracking-widest text-[9px]">VÀ {data.length - 10} BẢN GHI KHÁC...</td></tr>
+                            <tr><td colSpan={3} className="p-3 text-center text-slate-400 font-black tracking-widest text-[9px]">Và {data.length - 10} bản ghi khác...</td></tr>
                           )}
                        </tbody>
                     </table>
@@ -176,8 +176,8 @@ export default function StudentImportModal({ onClose, branchId }) {
                </div>
 
                <div className="flex gap-3">
-                  <button onClick={() => setStep('upload')} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition">Quay lại</button>
-                  <button onClick={startImport} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+                  <button onClick={() => setStep('upload')} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl text-[11px] font-black  tracking-widest hover:bg-slate-200 transition">Quay lại</button>
+                  <button onClick={startImport} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl text-[11px] font-black  tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition flex items-center justify-center gap-2">
                     Bắt đầu nhập dữ liệu <ChevronRight size={14} />
                   </button>
                </div>
@@ -193,7 +193,7 @@ export default function StudentImportModal({ onClose, branchId }) {
                   </div>
                </div>
                <div className="text-center">
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Đang xử lý dữ liệu</h4>
+                  <h4 className="text-sm font-black text-slate-700  tracking-widest">Đang xử lý dữ liệu</h4>
                   <p className="text-xs text-slate-400 font-bold mt-1">Đang mã hóa và đẩy {data.length} bản ghi lên máy chủ...</p>
                </div>
             </div>
@@ -210,12 +210,12 @@ export default function StudentImportModal({ onClose, branchId }) {
                     Đã hoàn tất nhập <span className="text-emerald-600">{stats.success}</span>/{stats.total} học viên.
                   </p>
                   {stats.total > stats.success && (
-                    <p className="text-[10px] text-amber-500 font-bold uppercase">{stats.total - stats.success} bản ghi trùng lặp đã bị loại bỏ.</p>
+                    <p className="text-[10px] text-amber-500 font-bold ">{stats.total - stats.success} bản ghi trùng lặp đã bị loại bỏ.</p>
                   )}
                </div>
                <button 
                 onClick={onClose} 
-                className="w-full py-4 bg-slate-900 text-white rounded-[24px] text-[11px] font-black uppercase tracking-widest hover:opacity-90 transition shadow-xl"
+                className="w-full py-4 bg-slate-900 text-white rounded-[24px] text-[11px] font-black  tracking-widest hover:opacity-90 transition shadow-xl"
                >
                  Về danh sách
                </button>

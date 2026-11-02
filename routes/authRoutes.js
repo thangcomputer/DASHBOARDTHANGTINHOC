@@ -112,8 +112,34 @@ function mobileSessionRevocationFailure(res) {
   return res.status(503).json({
     success: false,
     code: 'MOBILE_SESSION_REVOCATION_FAILED',
-    message: 'Tài khoản đã bị khóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+    message: 'Không thể cập nhật an toàn các phiên đăng nhập trước. Vui lòng thử lại.',
   });
+}
+
+function disconnectUserSockets(io, userId) {
+  if (!io || !userId) return;
+  try {
+    const userRoom = io.in(String(userId));
+    userRoom.emit('auth:session-replaced', {});
+    userRoom.disconnectSockets(true);
+  } catch (error) {
+    logger.warn({ err: error.message, userId: String(userId) }, '[AUTH] failed to disconnect replaced user sockets');
+  }
+}
+
+async function revokePreviousMobileSessions({ userId, role, io }) {
+  try {
+    return await revokeMobileSessionsForUser({
+      userId,
+      role,
+      reason: 'new_login',
+      io,
+    });
+  } catch (cause) {
+    const error = new Error('Failed to revoke previous mobile sessions', { cause });
+    error.code = 'MOBILE_SESSION_REVOCATION_FAILED';
+    throw error;
+  }
 }
 
 // In-memory CAPTCHA store (cid → { text, expiresAt })
@@ -252,8 +278,9 @@ function issueUserMfaChallenge(user, deviceFingerprint = null) {
  * ký token aud='internal' và lưu refresh token.
  * Dùng chung bởi /login/internal và /mfa/verify.
  */
-async function completeInternalLogin(user, userRole, deviceFingerprint) {
+async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
   if (deviceFingerprint) user.deviceFingerprint = deviceFingerprint;
+  disconnectUserSockets(io, user._id);
 
   const newTokenVersion = (user.tokenVersion || 0) + 1;
   user.tokenVersion = newTokenVersion;
@@ -296,9 +323,16 @@ async function completeInternalLogin(user, userRole, deviceFingerprint) {
   };
 }
 
-async function issueAdminTokens(sysSettings, audience = 'public') {
+async function issueAdminTokens(sysSettings, audience = 'public', io) {
   const dbAdminName = (sysSettings?.adminName && sysSettings.adminName.trim()) ? sysSettings.adminName.trim() : 'Admin';
   const dbAdminAvatar = sysSettings?.adminAvatar || '';
+  const versionSettings = await SystemSettings.findOneAndUpdate(
+    { _key: 'main' },
+    { $inc: { adminTokenVersion: 1 } },
+    { upsert: true, new: true },
+  ).select('adminTokenVersion');
+  const tokenVersion = versionSettings?.adminTokenVersion || 1;
+  disconnectUserSockets(io, 'admin');
   const { accessToken, refreshToken } = generateTokens(
     {
       id: 'admin',
@@ -308,7 +342,7 @@ async function issueAdminTokens(sysSettings, audience = 'public') {
       permissions: [],
       branchId: null,
       branchCode: '',
-      tokenVersion: 0,
+      tokenVersion,
     },
     audience,
   );
@@ -439,6 +473,7 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
         role: decoded.role,
         currentRefreshJtiHash: sessionService.hashRefreshJti(decoded.jti),
         nextRefreshJtiHash: sessionService.hashRefreshJti(nextJti),
+        nextExpiresAt: new Date(nextRefreshClaims.exp * 1000),
       });
       if (!rotated) {
         const session = await sessionService.getSession(decoded.sid);
@@ -478,6 +513,14 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
 
     // Tài khoản admin cứng — không lưu refresh trong DB, chỉ ký JWT
     if (id === 'admin') {
+      const currentSettings = await SystemSettings.findOne({ _key: 'main' }).select('adminTokenVersion').lean();
+      if ((currentSettings?.adminTokenVersion || 0) !== decoded.tokenVersion) {
+        return res.status(401).json({
+          success: false,
+          code: 'TOKEN_VERSION_MISMATCH',
+          message: 'Tài khoản đã đăng nhập ở thiết bị khác. Phiên này đã bị vô hiệu.',
+        });
+      }
       await blacklist.add(refreshToken, expSec);
       const { accessToken, refreshToken: newRefresh } = generateTokens({
         id: 'admin',
@@ -502,17 +545,11 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
     }
 
     if (!safeEqualRefresh(dbUser.refreshToken, refreshToken)) {
-      const bump = (dbUser.tokenVersion || 0) + 1000;
-      if (role === 'student') {
-        await Student.findByIdAndUpdate(id, { $unset: { refreshToken: 1 }, $set: { tokenVersion: bump } });
-      } else {
-        await Teacher.findByIdAndUpdate(id, { $unset: { refreshToken: 1 }, $set: { tokenVersion: bump } });
-      }
       await blacklist.add(refreshToken, Math.min(expSec, 86400));
       return res.status(401).json({
         success: false,
         code: 'REFRESH_REUSE',
-        message: 'Phát hiện tái sử dụng refresh token. Vui lòng đăng nhập lại.',
+        message: 'Phiên này đã được thay thế bằng lần đăng nhập mới hơn. Vui lòng đăng nhập lại.',
       });
     }
 
@@ -599,16 +636,14 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
       return res.status(403).json({ success: false, message: 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.' });
     }
 
-    // ⭐ Kiểm tra Device Fingerprint (── 1 máy / 1 tài khoản ──)
-    const { deviceFingerprint: fp1, force: force1 } = req.body;
-    const conflict1 = await checkDeviceConflict(
-      userRole === 'student' ? Student : Teacher,
-      user._id,
-      fp1,
-      force1,
-      req,
-    );
-    if (conflict1) return res.status(409).json(conflict1);
+    // Lần đăng nhập mới thay thế phiên cũ trên web và mobile.
+    const { deviceFingerprint: fp1 } = req.body;
+    await revokePreviousMobileSessions({
+      userId: user._id,
+      role: userRole,
+      io: req.app.get('io'),
+    });
+    disconnectUserSockets(req.app.get('io'), user._id);
     if (fp1) user.deviceFingerprint = fp1;
     const knownDevice1 = trackStudentKnownDevice(user, userRole, fp1, req);
 
@@ -749,16 +784,14 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
       });
     }
 
-    // ⭐ Kiểm tra Device Fingerprint
-    const { deviceFingerprint: fp2, force: force2 } = req.body;
-    const conflict2 = await checkDeviceConflict(
-      userRole === 'student' ? Student : Teacher,
-      user._id,
-      fp2,
-      force2,
-      req,
-    );
-    if (conflict2) return res.status(409).json(conflict2);
+    // Lần đăng nhập mới thay thế phiên cũ trên web và mobile.
+    const { deviceFingerprint: fp2 } = req.body;
+    await revokePreviousMobileSessions({
+      userId: user._id,
+      role: userRole,
+      io: req.app.get('io'),
+    });
+    disconnectUserSockets(req.app.get('io'), user._id);
     if (fp2) user.deviceFingerprint = fp2;
     const knownDevice2 = trackStudentKnownDevice(user, userRole, fp2, req);
 
@@ -816,7 +849,7 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
   }
 });
 
-// Mobile sessions are additive; the existing web login path remains unchanged.
+// A new login replaces the previous account session across web and mobile.
 router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), async (req, res) => {
   if (!isMobileMultiSessionAuthEnabled()) {
     return res.status(404).json({
@@ -873,6 +906,20 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
       });
     }
 
+    await revokePreviousMobileSessions({
+      userId: user._id,
+      role: userRole,
+      io: req.app.get('io'),
+    });
+    disconnectUserSockets(req.app.get('io'), user._id);
+
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    user.refreshToken = undefined;
+    user.lastLogin = new Date();
+    user.loginAttempts = 0;
+    user.markModified('tokenVersion');
+    await user.save({ validateModifiedOnly: true });
+
     const sessionId = crypto.randomUUID();
     const refreshJti = crypto.randomUUID();
     const tokenPayload = {
@@ -883,7 +930,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
       permissions: [],
       branchId: null,
       branchCode: '',
-      tokenVersion: user.tokenVersion || 0,
+      tokenVersion: user.tokenVersion,
       sid: sessionId,
       jti: refreshJti,
     };
@@ -1002,7 +1049,7 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
       if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
         return res.json(issueAdminMfaChallenge(sysSettings, 'internal'));
       }
-      const tokens = await issueAdminTokens(sysSettings, 'internal');
+      const tokens = await issueAdminTokens(sysSettings, 'internal', req.app.get('io'));
       return res.json({
         success: true,
         data: {
@@ -1040,26 +1087,15 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
       });
     }
 
-    // ⭐ Kiểm tra Device Fingerprint (internal/admin)
-    const { deviceFingerprint: fp3, force: force3 } = req.body;
-    const conflict3 = await checkDeviceConflict(Teacher, user._id, fp3, force3 || forceFromTicket, req);
-    if (conflict3) {
-      return res.status(409).json({
-        ...conflict3,
-        forceTicket: jwt.sign(
-          { purpose: 'device_force', phone },
-          process.env.JWT_SECRET,
-          { expiresIn: '3m' },
-        ),
-      });
-    }
+    // Lần đăng nhập nội bộ mới cũng thay thế phiên trước đó trên thiết bị khác.
+    const { deviceFingerprint: fp3 } = req.body;
 
     // Bước 5: MFA — nếu tài khoản đã bật TOTP thì dừng ở đây, chưa cấp token
     if (user.mfaEnabled && user.mfaSecret) {
       return res.json(issueUserMfaChallenge(user, fp3));
     }
 
-    return res.json(await completeInternalLogin(user, userRole, fp3));
+    return res.json(await completeInternalLogin(user, userRole, fp3, req.app.get('io')));
   } catch (err) {
     logger.error('[AUTH] login/internal error:', err);
     res.status(500).json({ success: false, message: 'Lỗi server. Vui lòng thử lại.' });
@@ -1098,7 +1134,7 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
         if (user.incLoginAttempts) await user.incLoginAttempts();
         return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
       }
-      return res.json(await completeInternalLogin(user, user.role, decoded.fp || null));
+      return res.json(await completeInternalLogin(user, user.role, decoded.fp || null, req.app.get('io')));
     }
 
     const sysSettings = await SystemSettings.findOne({ _key: 'main' }).select('+adminMfaSecret');
@@ -1109,7 +1145,7 @@ router.post('/mfa/verify', loginLimiter, policyShadowAuth('mfa_verify'), async (
       return res.status(401).json({ success: false, message: 'Mã OTP không đúng' });
     }
     const audience = decoded.aud === 'internal' ? 'internal' : 'public';
-    const tokens = await issueAdminTokens(sysSettings, audience);
+    const tokens = await issueAdminTokens(sysSettings, audience, req.app.get('io'));
     if (audience === 'internal') {
       return res.json({
         success: true,
@@ -1345,6 +1381,18 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
       }
     }
 
+    if (verifiedIdentity && userId === 'admin') {
+      const logoutClaims = verifiedAccessClaims?.id === 'admin'
+        ? verifiedAccessClaims
+        : (verifiedRefreshClaims?.id === 'admin' ? verifiedRefreshClaims : null);
+      if (logoutClaims?.tokenVersion !== undefined) {
+        await SystemSettings.updateOne(
+          { _key: 'main', adminTokenVersion: logoutClaims.tokenVersion },
+          { $inc: { adminTokenVersion: 1 } },
+        );
+      }
+    }
+
     const accessSession = verifiedAccessClaims?.sid ? verifiedAccessClaims : null;
     const refreshSession = verifiedRefreshClaims?.sid ? verifiedRefreshClaims : null;
     const sessionClaims = accessSession || refreshSession;
@@ -1359,6 +1407,11 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
       ) {
         return res.status(400).json({ success: false, message: 'Thông tin phiên không khớp.' });
       }
+      await require('../models/MobilePushToken').deleteMany({
+        userId: String(sessionClaims.id),
+        role: sessionClaims.role,
+        sessionId: String(sessionClaims.sid),
+      });
       const revoked = await require('../services/mobileAuthSessionService').revokeSession({
         sessionId: sessionClaims.sid,
         userId: sessionClaims.id,
@@ -1378,14 +1431,25 @@ router.post('/logout', policyShadowAuth('logout'), async (req, res) => {
       return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
     }
 
-    // Chỉ xóa refreshToken trong DB khi đã verify chữ ký JWT (tránh logout giả mạo)
+    // Chỉ xóa phiên DB nếu token logout vẫn thuộc phiên hiện tại.
     if (verifiedIdentity && userId && userId !== 'admin') {
-      const unset = { $unset: { refreshToken: 1, deviceFingerprint: 1 } };
       const uid = String(userId);
-      if (role === 'student') {
-        await Student.findByIdAndUpdate(uid, unset);
-      } else {
-        await Teacher.findByIdAndUpdate(uid, unset);
+      const Model = role === 'student' ? Student : Teacher;
+      const currentUser = await Model.findById(uid).select('+refreshToken tokenVersion').lean();
+      const refreshMatches = Boolean(bodyRefresh && safeEqualRefresh(currentUser?.refreshToken, bodyRefresh));
+      const accessMatches = Boolean(
+        !bodyRefresh
+        && verifiedAccessClaims
+        && String(verifiedAccessClaims.id) === uid
+        && verifiedAccessClaims.tokenVersion === currentUser?.tokenVersion,
+      );
+      if (refreshMatches) {
+        await Model.updateOne({ _id: uid, refreshToken: bodyRefresh }, { $unset: { refreshToken: 1, deviceFingerprint: 1 } });
+      } else if (accessMatches) {
+        await Model.updateOne(
+          { _id: uid, tokenVersion: verifiedAccessClaims.tokenVersion },
+          { $unset: { refreshToken: 1, deviceFingerprint: 1 } },
+        );
       }
     }
 
@@ -1487,6 +1551,11 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req, res) => {
     return res.status(403).json({ success: false, message: 'Không có quyền thu hồi phiên đăng nhập.' });
   }
   try {
+    await require('../models/MobilePushToken').deleteMany({
+      userId: String(req.user.id),
+      role: req.user.role,
+      sessionId: String(req.params.sessionId),
+    });
     const revoked = await require('../services/mobileAuthSessionService').revokeSession({
       sessionId: req.params.sessionId,
       userId: req.user.id,
@@ -1554,6 +1623,7 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
         role,
         reason: 'password_changed',
         io: req.app.get('io'),
+        excludeSessionId: req.sessionId,
       });
     } catch (revokeError) {
       logger.error('[AUTH] Password changed but mobile session revocation failed:', revokeError);

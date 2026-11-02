@@ -125,7 +125,7 @@ export default function AdminLogsTab() {
           ) : rows.length > 0 ? (
             <table className="w-full text-sm min-w-[720px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-left text-[11px] font-black uppercase tracking-wider text-slate-500">
+                <tr className="bg-slate-50 border-b border-slate-100 text-left text-[11px] font-black  tracking-wider text-slate-500">
                   <th className="px-4 py-3 w-14">STT</th>
                   <th className="px-4 py-3 w-44">Ngày tháng</th>
                   <th className="px-4 py-3">Nội dung</th>
@@ -145,7 +145,7 @@ export default function AdminLogsTab() {
                       <td className="px-4 py-3 text-slate-800">
                         <div className="font-medium leading-snug">{log.message || log.action || '—'}</div>
                         {log.action && log.message && log.message !== log.action && (
-                          <div className="text-[11px] text-slate-400 mt-0.5 font-semibold uppercase tracking-wide">
+                          <div className="text-[11px] text-slate-400 mt-0.5 font-semibold  tracking-wide">
                             {log.action}
                           </div>
                         )}

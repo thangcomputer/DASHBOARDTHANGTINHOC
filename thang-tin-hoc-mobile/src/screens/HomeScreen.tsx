@@ -11,7 +11,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../app/AuthContext';
 import { Avatar, AppScreen, Card, ErrorState, LoadingSkeleton, SectionHeading, StatusBadge, ProgressBar } from '../components/ui';
 import {
-  assignmentService, evaluationService, learningService, materialService, messageService,
+  assignmentService, evaluationService, materialService, messageService,
   quizService, scheduleService, studentProfileService, studentService,
 } from '../services/mockService';
 import { useMockResource } from '../hooks/useMockResource';
@@ -76,7 +76,6 @@ export function HomeScreen() {
   const [failedBannerImages, setFailedBannerImages] = useState<string[]>([]);
   const schedulesLoader = useCallback(() => scheduleService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const assignmentsLoader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
-  const learningLoader = useCallback(() => learningService.courses(), []);
   const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
   const teacherMetricsLoader = useCallback(() => isTeacher && user
     ? getTeacherDashboardMetrics(user)
@@ -95,7 +94,6 @@ export function HomeScreen() {
   const messagesLoader = useCallback(() => messageService.conversations(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const schedules = useMockResource(schedulesLoader);
   const assignments = useMockResource(assignmentsLoader);
-  const learning = useMockResource(learningLoader);
   const students = useMockResource(studentsLoader);
   const teacherMetrics = useMockResource(teacherMetricsLoader);
   const profile = useMockResource(profileLoader);
@@ -245,10 +243,10 @@ export function HomeScreen() {
     return () => clearInterval(interval);
   }, [availableBannerItems.length, banners.data?.speedSeconds]);
   const quickActions = [
-    { title: 'Bảng tin', icon: MessageCircle, route: 'Feed' as const, tint: colors.blueSoft },
-    { title: 'Giao bài tập & kiểm tra', icon: FileText, route: 'Assignments' as const, tint: colors.goldSoft },
-    { title: 'Khóa đào tạo', icon: GraduationCap, route: 'TeacherTraining' as const, tint: colors.purpleSoft },
-    { title: 'Tài chính', icon: WalletCards, route: 'TeacherFinance' as const, tint: colors.greenSoft },
+    { title: 'Bảng tin', icon: MessageCircle, route: 'Feed' as const, tint: colors.blueSoft, tone: colors.blue },
+    { title: 'Giao bài tập & kiểm tra', icon: FileText, route: 'Assignments' as const, tint: colors.goldSoft, tone: '#B7791F' },
+    { title: 'Khóa đào tạo', icon: GraduationCap, route: 'TeacherTraining' as const, tint: colors.purpleSoft, tone: colors.purple },
+    { title: 'Tài chính', icon: WalletCards, route: 'TeacherFinance' as const, tint: colors.greenSoft, tone: colors.green },
   ];
   const todayDate = new Date();
   const todayKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
@@ -274,22 +272,24 @@ export function HomeScreen() {
   return (
     <AppScreen contentStyle={isTeacher ? styles.screen : styles.studentScreen}>
       <View style={styles.topRow}>
+        <View style={styles.greetingIcon}>
+          <GraduationCap size={27} color="#FFFFFF" strokeWidth={2.6} />
+        </View>
         <View style={styles.greeting}>
+          <Text style={styles.greetingMeta}>{isTeacher ? 'Không gian giảng dạy' : 'Trung tâm Thắng Tin Học'}</Text>
           <Text style={styles.greetingTitle}>{isTeacher ? `Chào mừng, ${user?.name || 'Giảng viên'}!` : `Chào mừng, ${user?.name}! 👋`}</Text>
           <Text style={styles.greetingSub}>{isTeacher ? 'Ưu tiên điểm danh, lịch dạy và học viên được phân công.' : '“Học hôm nay, thành công mai sau.”'}</Text>
-          <Text style={styles.greetingMeta}>{isTeacher ? 'KHÔNG GIAN GIẢNG DẠY' : 'TRUNG TÂM THẮNG TIN HỌC'}</Text>
         </View>
       </View>
 
-      {schedules.loading || assignments.loading || students.loading || (isTeacher && (learning.loading || teacherMetrics.loading)) || (!isTeacher && (profile.loading || materials.loading || quizzes.loading || evaluationActivity.loading || messages.loading))
+      {schedules.loading || assignments.loading || students.loading || (isTeacher && teacherMetrics.loading) || (!isTeacher && (profile.loading || materials.loading || quizzes.loading || evaluationActivity.loading || messages.loading))
         ? <LoadingSkeleton rows={1} />
         : null}
-      {schedules.error || assignments.error || students.error || (isTeacher && (learning.error || teacherMetrics.error)) || (!isTeacher && (profile.error || materials.error || quizzes.error || evaluationActivity.error || messages.error)) ? (
+      {schedules.error || assignments.error || students.error || (isTeacher && teacherMetrics.error) || (!isTeacher && (profile.error || materials.error || quizzes.error || evaluationActivity.error || messages.error)) ? (
         <ErrorState onRetry={() => {
           schedules.reload();
           assignments.reload();
           students.reload();
-          learning.reload();
           teacherMetrics.reload();
           profile.reload();
           banners.reload();
@@ -344,52 +344,6 @@ export function HomeScreen() {
 
       {isTeacher ? (
         <>
-          <View style={styles.sectionWrap}>
-            <SectionHeading title="Công việc cần xử lý ngay" />
-            <View style={styles.teacherActionGrid}>
-              {[
-                {
-                  title: 'Điểm danh',
-                  detail: schedules.loading ? '—' : `${teacherTodaySchedules.length} buổi hôm nay`,
-                  icon: ClipboardCheck,
-                  onPress: () => navigation?.navigate('Attendance', {
-                    scheduleId: teacherTodaySchedules[0]?.id,
-                  }),
-                  tint: colors.greenSoft,
-                },
-                {
-                  title: 'Chấm điểm',
-                  detail: assignments.loading ? '—' : assignmentsToGrade.length ? `${assignmentsToGrade.length} bài chờ chấm` : 'Không có bài chờ chấm',
-                  icon: FileText,
-                  onPress: () => navigation?.navigate('Assignments'),
-                  tint: colors.goldSoft,
-                },
-                {
-                  title: 'Tin nhắn',
-                  detail: 'Mở hộp thư',
-                  icon: MessageCircle,
-                  onPress: () => tabNavigation.navigate('Messages'),
-                  tint: colors.purpleSoft,
-                },
-                {
-                  title: 'Xếp lịch',
-                  detail: 'Thêm buổi dạy mới',
-                  icon: CalendarDays,
-                  onPress: () => tabNavigation.navigate('Schedule'),
-                  tint: colors.blueSoft,
-                },
-              ].map(({ title, detail, icon: Icon, onPress, tint }) => (
-                <Pressable key={title} onPress={onPress} style={styles.teacherAction} accessibilityRole="button" accessibilityLabel={`${title}. ${detail}`}>
-                  <View style={[styles.teacherActionIcon, { backgroundColor: tint }]}><Icon size={19} color={colors.brandDark} /></View>
-                  <View style={styles.flex}>
-                    <Text style={styles.cardTitle}>{title}</Text>
-                    <Text numberOfLines={2} style={styles.muted}>{detail}</Text>
-                  </View>
-                  <ArrowRight size={17} color={colors.muted} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
           {firstSchedule && scheduleIsLive(firstSchedule) ? (
             <Pressable
               onPress={() => firstSchedule.meetingUrl && void openDashboardLink(firstSchedule.meetingUrl)}
@@ -399,7 +353,7 @@ export function HomeScreen() {
             >
               <View style={styles.liveClassIcon}><Video size={20} color="#FFFFFF" /></View>
               <View style={styles.flex}>
-                <Text style={styles.liveClassEyebrow}>CA DẠY ĐANG DIỄN RA</Text>
+                <Text style={styles.liveClassEyebrow}>Ca dạy đang diễn ra</Text>
                 <Text numberOfLines={1} style={styles.liveClassTitle}>{firstSchedule.studentName || 'Học viên'} · {firstSchedule.courseName || firstSchedule.subject}</Text>
                 <Text style={styles.liveClassTime}>{firstSchedule.time}</Text>
               </View>
@@ -407,60 +361,130 @@ export function HomeScreen() {
             </Pressable>
           ) : null}
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Tổng quan tháng này" />
-            <View style={styles.teacherStatsGrid}>
+            <SectionHeading title="Công việc cần xử lý ngay" />
+            <View style={styles.teacherActionGrid}>
               {[
-                { label: `Thu nhập T${todayDate.getMonth() + 1}`, value: teacherMetrics.data ? formatCurrency(teacherMetrics.data.monthlyIncome) : '—', detail: 'Chi tiết thu nhập', icon: WalletCards, route: 'TeacherFinance' as const },
-                { label: 'Đang dạy', value: students.data ? String(students.data.filter((student) => student.enrollmentStatus === 'active').length) : '—', detail: 'học viên', icon: Users, route: 'Students' as const },
-                { label: 'HV mới', value: students.data ? String(newStudentsThisMonth) : '—', detail: 'trong 30 ngày', icon: UserPlus, route: 'Students' as const },
-                { label: '5 sao', value: teacherMetrics.data ? `${teacherMetrics.data.fiveStarStudentCount}/5` : '—', detail: teacherMetrics.data?.fiveStarStudentCount && teacherMetrics.data.fiveStarStudentCount >= 5 ? 'Đạt trong tháng này' : 'Trong tháng này', icon: Award, route: 'Students' as const },
-                { label: 'Uy tín', value: teacherMetrics.data?.ratingAverage ? String(teacherMetrics.data.ratingAverage) : '—', detail: `${teacherMetrics.data?.ratingCount || 0} đánh giá`, icon: Star, route: 'Students' as const },
-              ].map(({ label, value, detail, icon: Icon, route }) => (
+                {
+                  title: 'Điểm danh',
+                  detail: schedules.loading ? '—' : `${teacherTodaySchedules.length} buổi hôm nay`,
+                  icon: ClipboardCheck,
+                  iconColor: colors.green,
+                  onPress: () => navigation?.navigate('Attendance', {
+                    scheduleId: teacherTodaySchedules[0]?.id,
+                  }),
+                  tint: colors.greenSoft,
+                },
+                {
+                  title: 'Chấm điểm',
+                  detail: assignments.loading ? '—' : assignmentsToGrade.length ? `${assignmentsToGrade.length} HV chờ chấm điểm` : 'Không có bài chờ chấm',
+                  icon: FileText,
+                  iconColor: '#B7791F',
+                  onPress: () => navigation?.navigate('Assignments'),
+                  tint: colors.goldSoft,
+                },
+                {
+                  title: 'Tin nhắn',
+                  detail: messages.loading ? '—' : unreadMessages ? `${unreadMessages} tin chưa đọc` : 'Không có tin mới',
+                  icon: MessageCircle,
+                  iconColor: colors.purple,
+                  onPress: () => tabNavigation.navigate('Messages'),
+                  tint: colors.purpleSoft,
+                },
+                {
+                  title: 'Xếp lịch',
+                  detail: 'Thêm buổi dạy mới',
+                  icon: CalendarDays,
+                  iconColor: colors.blue,
+                  onPress: () => tabNavigation.navigate('Schedule'),
+                  tint: colors.blueSoft,
+                },
+              ].map(({ title, detail, icon: Icon, iconColor, onPress, tint }) => (
                 <Pressable
-                  key={label}
-                  onPress={() => route === 'TeacherFinance' ? navigation?.navigate(route) : tabNavigation.navigate(route)}
-                  style={[styles.teacherStatCard, { padding: width < 360 ? spacing.sm : spacing.md }]}
+                  key={title}
+                  onPress={onPress}
+                  style={[styles.teacherAction, { width: width < 360 ? '100%' : '48%', backgroundColor: tint }]}
                   accessibilityRole="button"
-                  accessibilityLabel={`${label}: ${value}. ${detail}`}
+                  accessibilityLabel={`${title}. ${detail}`}
                 >
-                  <View style={styles.teacherStatTop}>
-                    <View style={styles.teacherStatIcon}><Icon size={17} color={colors.brand} /></View>
-                    <Text numberOfLines={2} style={styles.teacherStatLabel}>{label}</Text>
+                  <View style={styles.teacherActionTop}>
+                    <View style={[styles.teacherActionIcon, { borderColor: `${iconColor}30` }]}><Icon size={22} color={iconColor} strokeWidth={2.6} /></View>
+                    <ArrowRight size={17} color={colors.muted} />
                   </View>
-                  <Text numberOfLines={1} adjustsFontSizeToFit style={styles.teacherStatValue}>{value}</Text>
-                  <Text style={styles.muted}>{detail}</Text>
+                  <Text style={styles.cardTitle}>{title}</Text>
+                  <Text numberOfLines={2} style={styles.muted}>{detail}</Text>
                 </Pressable>
               ))}
             </View>
           </View>
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Ca tiếp theo hôm nay" action="Xem lịch" onPress={() => tabNavigation.navigate('Schedule')} />
-            {teacherTodaySchedules.length ? teacherTodaySchedules.map((item) => {
-              const assignedStudent = students.data?.find((student) => student.id === item.studentId);
-              const isLive = scheduleIsLive(item);
-              return (
+            <SectionHeading title="Lịch dạy trong tháng" action="Xem lịch" onPress={() => tabNavigation.navigate('Schedule')} />
+            {upcomingTeacherSchedules.slice(0, 3).map((item) => (
+              <Pressable key={item.id} onPress={() => tabNavigation.navigate('Schedule')} style={styles.upcomingSessionRow} accessibilityRole="button">
+                <View style={styles.upcomingDate}>
+                  <Text style={styles.upcomingDateDay}>{item.date?.slice(8, 10)}</Text>
+                  <Text style={styles.upcomingDateMonth}>{item.date?.slice(5, 7)}</Text>
+                </View>
+                <View style={styles.flex}>
+                  <Text numberOfLines={1} style={styles.cardTitle}>{item.studentName || item.courseName || 'Buổi dạy'}</Text>
+                  <Text numberOfLines={1} style={styles.muted}>{item.startTime || item.time} · {item.courseName || item.subject}</Text>
+                </View>
+                <ArrowRight size={16} color={colors.muted} />
+              </Pressable>
+            ))}
+            {!upcomingTeacherSchedules.length ? <Card><Text style={styles.muted}>Chưa có lịch dạy sắp tới.</Text></Card> : null}
+          </View>
+          <View style={styles.sectionWrap}>
+            <SectionHeading title="Bài tập cần chấm" action="Mở danh sách" onPress={() => navigation?.navigate('Assignments')} />
+            {!assignments.loading && !assignments.error && assignmentsToGrade.length ? (
+              <Card style={styles.reviewCard}>
+                <View style={styles.reviewIcon}><ClipboardCheck size={22} color="#FFFFFF" strokeWidth={2.5} /></View>
+                <View style={styles.flex}>
+                  <Text style={styles.cardTitle}>{assignmentsToGrade.length} bài nộp đang chờ</Text>
+                  <Text style={styles.muted}>Cập nhật từ {assignmentsToGrade[0].subject}</Text>
+                </View>
+                <ArrowRight size={18} color={colors.muted} />
+              </Card>
+            ) : null}
+            {!assignments.loading && !assignments.error && !assignmentsToGrade.length
+              ? <Card><Text style={styles.muted}>{assignments.data ? 'Không có bài nộp cần chấm.' : '—'}</Text></Card>
+              : null}
+          </View>
+          <View style={styles.sectionWrap}>
+            <SectionHeading title="Tổng quan tháng này" />
+            <View style={styles.teacherStatsGrid}>
+              {[
+                { label: `Thu nhập T${todayDate.getMonth() + 1}`, value: teacherMetrics.data ? formatCurrency(teacherMetrics.data.monthlyIncome) : '—', detail: 'Chi tiết thu nhập', icon: WalletCards, iconTint: colors.blue, iconBackground: colors.blueSoft, route: 'TeacherFinance' as const },
+                { label: 'Đang dạy', value: students.data ? String(students.data.filter((student) => student.enrollmentStatus === 'active').length) : '—', detail: 'học viên', icon: Users, iconTint: '#4F46E5', iconBackground: '#EEF2FF', route: 'Students' as const },
+                { label: 'HV mới', value: students.data ? String(newStudentsThisMonth) : '—', detail: 'trong 30 ngày', icon: UserPlus, iconTint: colors.purple, iconBackground: colors.purpleSoft, route: 'Students' as const },
+                { label: '5 sao', value: teacherMetrics.data ? `${teacherMetrics.data.fiveStarStudentCount}/5` : '—', detail: teacherMetrics.data?.fiveStarStudentCount && teacherMetrics.data.fiveStarStudentCount >= 5 ? 'Đạt trong tháng này' : 'Trong tháng này', icon: Award, iconTint: '#D97706', iconBackground: colors.goldSoft, route: 'Students' as const },
+                { label: 'Uy tín', value: teacherMetrics.data?.ratingAverage ? String(teacherMetrics.data.ratingAverage) : '—', detail: `${teacherMetrics.data?.ratingCount || 0} đánh giá`, icon: Star, iconTint: colors.green, iconBackground: colors.greenSoft, route: 'Students' as const },
+              ].map(({ label, value, detail, icon: Icon, iconTint, iconBackground, route }, index) => (
                 <Pressable
-                  key={item.id}
-                  onPress={() => item.meetingUrl && isLive ? void openDashboardLink(item.meetingUrl) : tabNavigation.navigate('Schedule')}
-                  style={[styles.teacherSessionCard, isLive && styles.teacherSessionLive]}
+                  key={label}
+                  onPress={() => route === 'TeacherFinance' ? navigation?.navigate(route) : tabNavigation.navigate(route)}
+                  style={[
+                    styles.teacherStatCard,
+                    width < 640 && index === 4 ? styles.teacherStatCardWide : null,
+                    { padding: width < 360 ? spacing.sm : spacing.md },
+                  ]}
                   accessibilityRole="button"
-                  accessibilityLabel={`${item.studentName || 'Học viên'}, ${item.time}${isLive ? ', đang diễn ra' : ''}`}
+                  accessibilityLabel={`${label}: ${value}. ${detail}`}
                 >
-                  <View style={styles.flex}>
-                    <Text style={[styles.cardTitle, isLive && styles.liveClassTitle]}>{item.studentName || assignedStudent?.name || 'Học viên'}</Text>
-                    <Text style={[styles.muted, isLive && styles.liveClassCopy]}>{item.courseName || item.subject}</Text>
-                    <Text style={[styles.teacherSessionTime, isLive && styles.liveClassTime]}>{item.time}</Text>
+                  <View style={[styles.teacherStatTop, width < 640 && index === 4 ? styles.teacherStatTopWide : null]}>
+                    <View style={[styles.teacherStatIcon, { backgroundColor: iconBackground }]}><Icon size={20} color={iconTint} strokeWidth={2.5} /></View>
+                    <Text numberOfLines={2} style={styles.teacherStatLabel}>{label}</Text>
                   </View>
-                  {isLive && item.meetingUrl ? <Video size={18} color="#FFFFFF" /> : <ArrowRight size={17} color={colors.muted} />}
+                  <View style={[styles.teacherStatValueGroup, width < 640 && index === 4 ? styles.teacherStatValueGroupWide : null]}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit style={styles.teacherStatValue}>{value}</Text>
+                    <Text style={styles.muted}>{detail}</Text>
+                  </View>
                 </Pressable>
-              );
-            }) : (
-              <Card><Text style={styles.muted}>Chưa có ca dạy hôm nay.</Text></Card>
-            )}
+              ))}
+            </View>
           </View>
           <View style={styles.sectionWrap}>
             <SectionHeading title="Học viên được phân công" action="Xem tất cả" onPress={() => tabNavigation.navigate('Students')} />
-            {students.data?.filter((student) => student.enrollmentStatus === 'active').slice(0, 5).map((student) => (
+            {students.data?.filter((student) => student.enrollmentStatus === 'active').slice(0, 3).map((student) => (
               <Card key={student.id} style={styles.teacherStudentCard}>
                 <Avatar name={student.name} color={student.color} size={42} />
                 <View style={styles.flex}>
@@ -478,41 +502,8 @@ export function HomeScreen() {
             ) : null}
           </View>
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Lịch dạy sắp tới trong tháng" action="Xem tất cả" onPress={() => tabNavigation.navigate('Schedule')} />
-            {upcomingTeacherSchedules.slice(0, 5).map((item) => (
-              <Pressable key={item.id} onPress={() => tabNavigation.navigate('Schedule')} style={styles.upcomingSessionRow} accessibilityRole="button">
-                <View style={styles.upcomingDate}>
-                  <Text style={styles.upcomingDateDay}>{item.date?.slice(8, 10)}</Text>
-                  <Text style={styles.upcomingDateMonth}>{item.date?.slice(5, 7)}</Text>
-                </View>
-                <View style={styles.flex}>
-                  <Text numberOfLines={1} style={styles.cardTitle}>{item.studentName || item.courseName || 'Buổi dạy'}</Text>
-                  <Text numberOfLines={1} style={styles.muted}>{item.startTime || item.time} · {item.courseName || item.subject}</Text>
-                </View>
-                <ArrowRight size={16} color={colors.muted} />
-              </Pressable>
-            ))}
-            {!upcomingTeacherSchedules.length ? <Card><Text style={styles.muted}>Chưa có lịch dạy sắp tới trong tháng.</Text></Card> : null}
-          </View>
-          <View style={styles.sectionWrap}>
-            <SectionHeading title="Bài tập cần chấm" action="Mở danh sách" onPress={() => navigation?.navigate('Assignments')} />
-            {!assignments.loading && !assignments.error && assignmentsToGrade.length ? (
-              <Card style={styles.reviewCard}>
-                <View style={styles.reviewIcon}><ClipboardCheck size={20} color={colors.purple} /></View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{assignmentsToGrade.length} bài nộp đang chờ</Text>
-                  <Text style={styles.muted}>Cập nhật từ {assignmentsToGrade[0].subject}</Text>
-                </View>
-                <ArrowRight size={18} color={colors.muted} />
-              </Card>
-            ) : null}
-            {!assignments.loading && !assignments.error && !assignmentsToGrade.length
-              ? <Card><Text style={styles.muted}>{assignments.data ? 'Không có bài nộp cần chấm.' : '—'}</Text></Card>
-              : null}
-          </View>
-          <View style={styles.sectionWrap}>
             <SectionHeading title="Đánh giá từ học viên" />
-            {teacherMetrics.data?.recentRatings.length ? teacherMetrics.data.recentRatings.slice(0, 3).map((rating) => (
+            {teacherMetrics.data?.recentRatings.length ? teacherMetrics.data.recentRatings.slice(0, 2).map((rating) => (
               <Card key={rating.id || `${rating.studentName}-${rating.createdAt}`} style={styles.ratingCard}>
                 <View style={styles.ratingTop}>
                   <Text style={styles.cardTitle}>{rating.studentName}</Text>
@@ -529,7 +520,7 @@ export function HomeScreen() {
         <>
           {courseOptions.length > 1 ? (
             <View style={styles.courseSwitcher}>
-              <Text style={styles.courseSwitcherLabel}>KHÓA HỌC CỦA BẠN</Text>
+              <Text style={styles.courseSwitcherLabel}>Khóa học của bạn</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.courseSwitcherList}>
                 {courseOptions.map((enrollment) => {
                   const active = enrollment.courseName === currentCourse;
@@ -549,7 +540,7 @@ export function HomeScreen() {
                       accessibilityState={{ selected: active }}
                     >
                       <Text numberOfLines={2} style={[styles.coursePillText, active && styles.coursePillTextActive]}>{enrollment.courseName}</Text>
-                      {completed ? <Text style={styles.courseCompleted}>ĐÃ HOÀN THÀNH</Text> : null}
+                      {completed ? <Text style={styles.courseCompleted}>Đã hoàn thành</Text> : null}
                       <Text numberOfLines={1} style={styles.courseTeacher}>GV: {enrollment.teacherName || 'Chưa phân công'}</Text>
                       <View style={styles.courseProgressTrack}>
                         <View style={[styles.courseProgress, { width: progressWidth }, completed && styles.courseProgressCompleted, active && styles.courseProgressActive]} />
@@ -569,7 +560,7 @@ export function HomeScreen() {
               <View style={styles.studentCourseStatus}>
                 {firstScheduleIsLive ? <Video size={14} color="#FCA5A5" /> : firstSchedule ? <Zap size={14} color="#FCA5A5" /> : <Calendar size={14} color="#FCA5A5" />}
                 <Text style={styles.studentCourseEyebrow}>
-                  {firstScheduleIsLive ? 'BUỔI HỌC ĐANG DIỄN RA' : firstSchedule ? 'LỚP HỌC SẮP DIỄN RA' : 'CHƯA CÓ LỊCH SẮP TỚI'}
+                  {firstScheduleIsLive ? 'Buổi học đang diễn ra' : firstSchedule ? 'Lớp học sắp diễn ra' : 'Chưa có lịch sắp tới'}
                 </Text>
               </View>
             </View>
@@ -588,7 +579,7 @@ export function HomeScreen() {
             {firstScheduleIsLive ? (
               <Pressable onPress={() => studentJoinUrl && void openDashboardLink(studentJoinUrl)} style={styles.studentJoinAction} accessibilityRole="button">
                 <Video size={16} color="#B91C1C" />
-                <Text style={styles.studentJoinActionText}>{studentJoinUrl ? 'VÀO LỚP NGAY' : 'Chưa có link học'}</Text>
+                <Text style={styles.studentJoinActionText}>{studentJoinUrl ? 'Vào lớp ngay' : 'Chưa có link học'}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -600,7 +591,7 @@ export function HomeScreen() {
               { label: 'Tiến độ', value: studentProgress == null ? '—' : `${studentProgress}%`, sub: 'hoàn thành', icon: TrendingUp, iconBackground: '#34D399', tone: colors.green },
             ].map(({ label, value, sub, icon: Icon, iconBackground, tone }) => (
               <Card key={label} style={styles.studentKpi}>
-                <View style={[styles.studentKpiIcon, { backgroundColor: iconBackground }]}><Icon size={18} color="#FFFFFF" /></View>
+                <View style={[styles.studentKpiIcon, { backgroundColor: iconBackground }]}><Icon size={21} color="#FFFFFF" strokeWidth={2.5} /></View>
                 <View style={styles.studentKpiContent}>
                   <Text style={styles.studentKpiLabel}>{label}</Text>
                   <View style={styles.studentKpiMetric}>
@@ -620,7 +611,7 @@ export function HomeScreen() {
                   <Text style={styles.cardTitle}>Việc cần làm hôm nay</Text>
                   <Text style={styles.todoSubtitle}>Các hoạt động đang chờ bạn</Text>
                 </View>
-                {width >= 640 ? <Text style={styles.todoOverviewPill}>TỔNG QUAN</Text> : null}
+                {width >= 640 ? <Text style={styles.todoOverviewPill}>Tổng quan</Text> : null}
               </View>
               <View style={[styles.todoCards, width >= 640 && styles.todoCardsWide]}>
               {[
@@ -755,7 +746,7 @@ export function HomeScreen() {
       {isTeacher ? <View style={styles.sectionWrap}>
         <SectionHeading title="Truy cập nhanh" />
         <View style={styles.quickGrid}>
-          {quickActions.map(({ title, icon: Icon, route, tint }) => (
+          {quickActions.map(({ title, icon: Icon, route, tint, tone }) => (
             <Pressable
               key={title}
               onPress={() => {
@@ -796,7 +787,7 @@ export function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel={title}
             >
-              <View style={[styles.quickIcon, { backgroundColor: tint }]}><Icon size={20} color={colors.brandDark} /></View>
+              <View style={[styles.quickIcon, { backgroundColor: tint, borderColor: `${tone}25` }]}><Icon size={23} color={tone} strokeWidth={2.5} /></View>
               <Text style={styles.quickTitle}>{title}</Text>
             </Pressable>
           ))}
@@ -820,7 +811,7 @@ function StudentHero({ progress, compact, onPress }: { progress: number; compact
   return (
     <Pressable onPress={onPress} style={[styles.heroCard, compact && styles.heroCompact]} accessibilityRole="button">
       <View style={styles.heroTop}>
-        <View style={styles.courseTag}><GraduationCap size={14} color="#D8F3EF" /><Text style={styles.courseTagText}>KHÓA HỌC CỦA BẠN</Text></View>
+        <View style={styles.courseTag}><GraduationCap size={14} color="#D8F3EF" /><Text style={styles.courseTagText}>Khóa học của bạn</Text></View>
         <ArrowRight size={18} color="#FFFFFF" />
       </View>
       <Text style={styles.heroTitle}>{user?.course}</Text>
@@ -838,13 +829,14 @@ function formatCurrency(value: number) {
 }
 
 const styles = StyleSheet.create({
-  screen: { paddingTop: spacing.lg, gap: spacing.xl },
-  studentScreen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  screen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.lg, backgroundColor: '#F5F8FC' },
+  studentScreen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md, backgroundColor: '#F5F8FC' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: '#DFEAF2', backgroundColor: '#F0F6FA' },
+  greetingIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, borderWidth: 1, borderColor: '#FCA5A5', shadowColor: colors.brandDark, shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   greeting: { flex: 1, gap: 4 },
-  greetingMeta: { color: colors.brand, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1.3 },
-  greetingTitle: { color: colors.ink, fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
-  greetingSub: { color: colors.muted, fontSize: typography.small, lineHeight: 19 },
+  greetingMeta: { color: colors.brand, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1.1 },
+  greetingTitle: { color: '#17314C', fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
+  greetingSub: { color: '#63778B', fontSize: typography.small, lineHeight: 19 },
   bannerWrap: { position: 'relative', borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas },
   dashboardBanner: { width: '100%', aspectRatio: 5, minHeight: 72, maxHeight: 150 },
   bannerDots: { position: 'absolute', bottom: spacing.sm, alignSelf: 'center', flexDirection: 'row', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: 'rgba(15, 23, 42, 0.3)' },
@@ -863,25 +855,27 @@ const styles = StyleSheet.create({
   heroPercent: { color: '#FFFFFF', fontSize: typography.heading, fontWeight: '800' },
   sectionWrap: { gap: spacing.md },
   teacherActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
-  teacherAction: { width: '48%', minHeight: 76, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  teacherActionIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  liveClassCard: { minHeight: 80, padding: spacing.md, borderRadius: radius.lg, backgroundColor: '#C81E3A', flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: '#F87171' },
+  teacherAction: { minHeight: 112, borderRadius: radius.md, borderWidth: 1, borderColor: '#E1EAF1', padding: spacing.md, justifyContent: 'space-between', gap: spacing.xs, shadowColor: '#1E3A5F', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  teacherActionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  teacherActionIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, shadowColor: '#1E3A5F', shadowOpacity: 0.08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  liveClassCard: { minHeight: 80, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.brandDark, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.brand },
   liveClassIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
-  liveClassEyebrow: { color: '#FEE2E2', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.7 },
+  liveClassEyebrow: { color: '#FECACA', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.7 },
   liveClassTitle: { color: '#FFFFFF', fontSize: typography.small, fontWeight: '800' },
   liveClassTime: { color: '#FEF08A', fontSize: typography.caption, fontWeight: '800', marginTop: 2 },
   liveClassCopy: { color: '#FEE2E2' },
   liveClassNoLink: { color: '#FEE2E2', fontSize: typography.micro, fontWeight: '700' },
   teacherStatsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between' },
-  teacherStatCard: { width: '48%', padding: spacing.md, gap: spacing.xs },
+  teacherStatCard: { width: '48%', minHeight: 116, padding: spacing.md, gap: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: colors.surface, shadowColor: '#1E3A5F', shadowOpacity: 0.045, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  teacherStatCardWide: { width: '100%', minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   teacherStatTop: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  teacherStatIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  teacherStatTopWide: { flex: 1 },
+  teacherStatValueGroup: { gap: spacing.xs },
+  teacherStatValueGroupWide: { alignItems: 'flex-end' },
+  teacherStatIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   teacherStatLabel: { flex: 1, color: colors.muted, fontSize: typography.caption, fontWeight: '700', lineHeight: 16 },
   teacherStatValue: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' },
   teacherStudentCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  teacherSessionCard: { minHeight: 72, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  teacherSessionLive: { backgroundColor: '#C81E3A', borderColor: '#F87171' },
-  teacherSessionTime: { color: colors.brand, fontSize: typography.caption, fontWeight: '900', marginTop: 2 },
   upcomingSessionRow: { minHeight: 62, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   upcomingDate: { width: 38, height: 42, borderRadius: 11, backgroundColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
   upcomingDateDay: { color: colors.blue, fontSize: typography.small, fontWeight: '900' },
@@ -904,21 +898,21 @@ const styles = StyleSheet.create({
   courseProgressActive: { backgroundColor: '#3B82F6' },
   courseProgressMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   courseProgressText: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
-  studentCourseCard: { backgroundColor: '#DC2626', borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: '#B91C1C', overflow: 'hidden' },
+  studentCourseCard: { backgroundColor: '#123F5A', borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: '#2A7180', overflow: 'hidden' },
   studentCourseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   studentCourseStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  studentCourseEyebrow: { color: '#FCA5A5', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.8 },
+  studentCourseEyebrow: { color: '#BDEBE5', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.8 },
   studentCourseTitle: { color: '#FFFFFF', fontSize: typography.heading, lineHeight: 25, fontWeight: '800' },
   studentCourseMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  studentCourseCopy: { color: '#FEE2E2', fontSize: typography.small, lineHeight: 20, fontWeight: '600' },
+  studentCourseCopy: { color: '#D7E8F2', fontSize: typography.small, lineHeight: 20, fontWeight: '600' },
   studentCourseFooter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.25)', paddingTop: spacing.sm },
   studentCourseTeacher: { flex: 1, color: '#FFFFFF', fontSize: typography.small, fontWeight: '700' },
   studentRating: { color: '#FDE68A', fontSize: typography.small, fontWeight: '800' },
   studentJoinAction: { minHeight: 40, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: 12, backgroundColor: '#FFFFFF' },
-  studentJoinActionText: { color: '#B91C1C', fontSize: typography.caption, fontWeight: '900', letterSpacing: 0.4 },
+  studentJoinActionText: { color: '#123F5A', fontSize: typography.caption, fontWeight: '900', letterSpacing: 0.4 },
   studentKpiGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: spacing.sm },
   studentKpi: { width: '48%', minHeight: 92, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: 14 },
-  studentKpiIcon: { width: 38, height: 38, flexShrink: 0, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  studentKpiIcon: { width: 44, height: 44, flexShrink: 0, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.78)', shadowColor: '#1E3A5F', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   studentKpiContent: { flex: 1, minWidth: 0, gap: spacing.xs },
   studentKpiLabel: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
   studentKpiMetric: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: spacing.xs },
@@ -949,7 +943,7 @@ const styles = StyleSheet.create({
   todoCtaText: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
   materialPanel: { backgroundColor: '#334155', borderRadius: 16, padding: spacing.lg, gap: spacing.sm },
   materialHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
-  materialHeadingText: { color: '#CBD5E1', fontSize: typography.small, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  materialHeadingText: { color: '#CBD5E1', fontSize: typography.small, fontWeight: '800', letterSpacing: 0.5 },
   materialRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(71, 85, 105, 0.75)', borderRadius: 12, paddingHorizontal: spacing.md },
   materialType: { color: '#FFFFFF', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 3, fontSize: typography.micro, fontWeight: '900' },
   materialTypePdf: { backgroundColor: '#EF4444' },
@@ -969,19 +963,19 @@ const styles = StyleSheet.create({
   gradeEmptyTitle: { color: '#475569', fontSize: typography.caption, fontWeight: '800' },
   gradeEmptyCopy: { color: '#94A3B8', fontSize: typography.caption, textAlign: 'center' },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  quickAction: { width: '47.8%', minHeight: 91, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: spacing.md, justifyContent: 'space-between' },
+  quickAction: { width: '47.8%', minHeight: 96, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', padding: spacing.md, justifyContent: 'space-between', shadowColor: '#1E3A5F', shadowOpacity: 0.04, shadowRadius: 7, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   quickActionSmall: { width: '47%' },
-  quickIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  quickTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
+  quickIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, shadowColor: '#1E3A5F', shadowOpacity: 0.08, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  quickTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '700', lineHeight: 20 },
   flex: { flex: 1 },
   muted: { color: colors.muted, fontSize: typography.small, lineHeight: 19 },
   cardTitle: { color: colors.ink, fontWeight: '700', fontSize: typography.body, lineHeight: 21 },
   reviewCard: { flexDirection: 'row', alignItems: 'center' },
-  reviewIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: colors.purpleSoft, alignItems: 'center', justifyContent: 'center' },
+  reviewIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', shadowColor: colors.purple, shadowOpacity: 0.2, shadowRadius: 7, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   taskCard: { gap: spacing.sm },
   taskTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   taskIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  helpCard: { backgroundColor: colors.brand, borderRadius: radius.md, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs },
+  helpCard: { backgroundColor: colors.brandDark, borderRadius: radius.md, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, shadowColor: colors.brandDark, shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   helpIcon: { width: 38, height: 38, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   helpTitle: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.body },
   helpText: { color: '#D8F3EF', fontSize: typography.caption, marginTop: 2 },

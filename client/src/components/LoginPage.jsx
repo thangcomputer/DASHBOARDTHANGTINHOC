@@ -206,7 +206,7 @@ const LoginPage = ({ onLogin }) => {
           <div className="absolute top-10 left-10">
             <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
-               <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Hệ thống quản lý trực tuyến</span>
+               <span className="text-xs font-black text-slate-300  tracking-widest">Hệ thống quản lý trực tuyến</span>
             </div>
           </div>
           <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000">
@@ -233,8 +233,8 @@ const LoginPage = ({ onLogin }) => {
               <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-12 sm:h-14 mb-4 sm:mb-6 max-w-[min(100%,200px)] brightness-110 object-contain" />
               <div className="space-y-4 w-full">
                 <div className="inline-flex bg-white/5 p-1 rounded-2xl border border-white/10 mb-2 max-w-full" role="tablist" aria-label="Chọn vai trò đăng nhập">
-                  <button type="button" role="tab" aria-selected={role === 'student'} onClick={() => setRole('student')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'student' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Học viên</button>
-                  <button type="button" role="tab" aria-selected={role === 'teacher'} onClick={() => setRole('teacher')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${role === 'teacher' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Giảng viên</button>
+                  <button type="button" role="tab" aria-selected={role === 'student'} onClick={() => setRole('student')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black  tracking-widest transition-all ${role === 'student' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Học viên</button>
+                  <button type="button" role="tab" aria-selected={role === 'teacher'} onClick={() => setRole('teacher')} className={`px-4 xs:px-6 py-2 rounded-xl text-xs font-black  tracking-widest transition-all ${role === 'teacher' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Giảng viên</button>
                 </div>
                 <h2 className="text-fluid-2xl font-black text-white">Đăng nhập tài khoản</h2>
                 <p className="text-slate-400 font-medium">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
@@ -261,7 +261,7 @@ const LoginPage = ({ onLogin }) => {
                         if (phone) q.set('phone', normalizePhone(phone) || phone);
                         navigate(`/dangkykhoahoc?${q.toString()}`);
                       }}
-                      className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
+                      className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black  tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
                     >
                       Đăng ký / thanh toán khóa học
                       <NavArrow size={14} className="text-white" />
@@ -271,7 +271,7 @@ const LoginPage = ({ onLogin }) => {
               )}
               <div className="space-y-3 sm:space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">SỐ ĐIỆN THOẠI</label>
+                  <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">Số điện thoại</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><User size={18} className="text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" /></div>
                     <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel"
@@ -280,7 +280,7 @@ const LoginPage = ({ onLogin }) => {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="login-password" className="text-xs font-bold text-slate-400 block ml-1">MẬT KHẨU</label>
+                  <label htmlFor="login-password" className="text-xs font-bold text-slate-400 block ml-1">Mật khẩu</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Lock size={18} className="text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" /></div>
                     <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
@@ -299,7 +299,7 @@ const LoginPage = ({ onLogin }) => {
                 </button>
               </div>
               <button type="submit" disabled={loading}
-                className="w-full btn-primary rounded-2xl py-4 font-black uppercase tracking-[0.1em] shadow-xl shadow-red-900/20 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-3">
+                className="w-full btn-primary rounded-2xl py-4 font-black  tracking-[0.1em] shadow-xl shadow-red-900/20 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-3">
                 {loading ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" /> : 'Đăng nhập ngay'}
               </button>
             </form>
@@ -307,7 +307,7 @@ const LoginPage = ({ onLogin }) => {
             <div className="text-center pt-6 animate-in fade-in duration-1000 delay-500">
               <p className="text-slate-400 text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open(`https://zalo.me/${ADMIN_ZALO_PHONE}`, '_blank', 'noopener,noreferrer')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
               <div className="mt-6 sm:mt-8 flex flex-col items-center gap-2">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Hỗ trợ kỹ thuật</p>
+                <p className="text-xs font-black text-slate-500  tracking-widest">Hỗ trợ kỹ thuật</p>
                 <p className="text-xs font-bold text-slate-400">Hotline: 093 5758 462</p>
               </div>
             </div>
@@ -339,7 +339,7 @@ const LoginPage = ({ onLogin }) => {
               {forgotStep === 1 && (
                 <>
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Vai trò</label>
+                    <label className="text-xs font-bold text-gray-400  block mb-2">Vai trò</label>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setForgotRole('student')}
                         className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition border-2 ${forgotRole === 'student' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-white/10 text-gray-400 hover:border-white/20'}`}>Học viên</button>
@@ -348,7 +348,7 @@ const LoginPage = ({ onLogin }) => {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1.5">Số điện thoại đăng ký</label>
+                    <label className="text-xs font-bold text-gray-400  block mb-1.5">Số điện thoại đăng ký</label>
                     <div className="relative">
                       <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                       <input type="tel" inputMode="tel" autoComplete="tel" value={forgotPhone} onChange={e => { setForgotPhone(e.target.value); setForgotError(''); }}
@@ -360,7 +360,7 @@ const LoginPage = ({ onLogin }) => {
 
                   {forgotConfirmLine ? (
                     <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3.5 py-3">
-                      <p className="text-[11px] font-bold text-emerald-400/80 uppercase tracking-wide mb-1">Dòng xác nhận</p>
+                      <p className="text-[11px] font-bold text-emerald-400/80  tracking-wide mb-1">Dòng xác nhận</p>
                       <p className="text-sm font-bold text-emerald-200">{forgotConfirmLine}</p>
                       <p className="text-[11px] text-emerald-300/70 mt-1">Kiểm tra đúng vai trò &amp; SĐT rồi bấm Xác nhận.</p>
                     </div>
@@ -374,7 +374,7 @@ const LoginPage = ({ onLogin }) => {
 
                   {forgotError && <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center gap-2 text-red-400 text-sm font-bold"><AlertCircle size={14} /> {forgotError}</div>}
                   <button type="button" onClick={handleCheckPhone} disabled={forgotLoading || !forgotConfirmLine}
-                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-orange-600 text-white font-black rounded-xl uppercase tracking-wider text-sm hover:from-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-orange-600 text-white font-black rounded-xl  tracking-wider text-sm hover:from-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
                     {forgotLoading
                       ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       : <><CheckCircle2 size={16} /> Xác nhận</>}
@@ -396,13 +396,13 @@ const LoginPage = ({ onLogin }) => {
                   </div>
 
                   <div className="bg-[#0f172a] border border-white/10 rounded-xl p-3">
-                    <p className="text-[11px] font-bold text-gray-500 uppercase mb-1.5">Nội dung tin nhắn</p>
+                    <p className="text-[11px] font-bold text-gray-500  mb-1.5">Nội dung tin nhắn</p>
                     <p className="font-mono text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">{forgotContact.message}</p>
                   </div>
 
                   <div className={`rounded-xl p-3 text-xs font-bold ${copied ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-sky-500/10 border border-sky-500/20 text-sky-300'}`}>
                     {copied
-                      ? '✓ Đã copy — mở Zalo Admin rồi dán (Ctrl+V / giữ để dán) và gửi.'
+                      ? '✓ Đã copy — mở Zalo Admin rồi dán (Ctrl+VN? / giữ để dán) và gửi.'
                       : '① Bấm Copy › ② Bấm Zalo Admin › dán tin nhắn và gửi.'}
                   </div>
 

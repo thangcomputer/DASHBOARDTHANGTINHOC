@@ -300,7 +300,7 @@ export function VideoLessonTabs({
             <View style={styles.formTitleWrap}>
               <View style={styles.formIcon}><MessageSquare size={16} color="#FFFFFF" /></View>
               <View>
-                <Text style={styles.formLabel}>ĐẶT CÂU HỎI</Text>
+                <Text style={styles.formLabel}>Đặt câu hỏi</Text>
                 <Text style={styles.formHint}>Trao đổi về nội dung bài học</Text>
               </View>
             </View>
@@ -512,7 +512,7 @@ export function VideoLessonTabs({
           <Text style={styles.reviewCount}>{reviewCount} đánh giá</Text>
         </View>
         <View style={[styles.formCard, styles.reviewFormCard]}>
-          <Text style={styles.formLabel}>VIẾT ĐÁNH GIÁ</Text>
+          <Text style={styles.formLabel}>Viết đánh giá</Text>
           <View style={styles.reviewStars}>
             {[1, 2, 3, 4, 5].map((star) => (
               <Pressable key={star} onPress={() => setReviewRating(star)} accessibilityRole="button" accessibilityLabel={`${star} sao`}>
@@ -665,7 +665,7 @@ const styles = {
   errorText: { color: '#B91C1C', fontSize: typography.micro, fontWeight: '700' as const },
   successText: { color: '#047857', fontSize: typography.micro, fontWeight: '700' as const },
   loader: { paddingVertical: spacing.md },
-  iconButton: { width: 36, height: 36, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.pill, backgroundColor: '#ECFDF5' },
+  iconButton: { width: 36, height: 36, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: radius.sm, backgroundColor: '#ECFDF5' },
   filterRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.xs },
   filterButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 9, backgroundColor: '#FFFFFF' },
   filterButtonActive: { borderColor: '#059669', backgroundColor: '#ECFDF5' },

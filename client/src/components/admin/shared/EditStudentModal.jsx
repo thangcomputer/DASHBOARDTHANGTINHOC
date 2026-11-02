@@ -260,7 +260,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
 
             <div>
               <label className="cms-label">Họ tên học viên <span className="text-red-500">*</span></label>
-              <input name="name" value={form.name} onChange={handleChange} className="cms-input uppercase" placeholder="VD: Nguyễn Văn A" />
+              <input name="name" value={form.name} onChange={handleChange} className="cms-input " placeholder="VD: Nguyễn Văn A" />
             </div>
 
             <div className="cms-form-row">

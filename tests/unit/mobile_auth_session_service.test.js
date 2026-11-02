@@ -14,6 +14,14 @@ function makeQuery(value) {
   };
 }
 
+function matchesFilter(session, filter) {
+  return Object.entries(filter).every(([key, value]) => {
+    if (key === 'absoluteExpiresAt') return session.absoluteExpiresAt > value.$gt;
+    if (value && typeof value === 'object' && '$ne' in value) return session[key] !== value.$ne;
+    return session[key] === value;
+  });
+}
+
 function makeFakeModel(initial = []) {
   const sessions = initial.map((session) => ({ ...session }));
   return {
@@ -23,33 +31,19 @@ function makeFakeModel(initial = []) {
       return session;
     },
     findOne(filter) {
-      return makeQuery(sessions.find((session) => (
-        Object.entries(filter).every(([key, value]) => {
-          if (key === 'absoluteExpiresAt') return session.absoluteExpiresAt > value.$gt;
-          return session[key] === value;
-        })
-      )) || null);
+      return makeQuery(sessions.find((session) => matchesFilter(session, filter)) || null);
     },
     find(filter) {
-      return makeQuery(sessions.filter((session) => (
-        Object.entries(filter).every(([key, value]) => session[key] === value)
-      )));
+      return makeQuery(sessions.filter((session) => matchesFilter(session, filter)));
     },
     async updateOne(filter, update) {
-      const session = sessions.find((candidate) => (
-        Object.entries(filter).every(([key, value]) => {
-          if (key === 'absoluteExpiresAt') return candidate.absoluteExpiresAt > value.$gt;
-          return candidate[key] === value;
-        })
-      ));
+      const session = sessions.find((candidate) => matchesFilter(candidate, filter));
       if (!session) return { matchedCount: 0, modifiedCount: 0 };
       Object.assign(session, update.$set);
       return { matchedCount: 1, modifiedCount: 1 };
     },
     async updateMany(filter, update) {
-      const matched = sessions.filter((session) => (
-        Object.entries(filter).every(([key, value]) => session[key] === value)
-      ));
+      const matched = sessions.filter((session) => matchesFilter(session, filter));
       for (const session of matched) Object.assign(session, update.$set);
       return { matchedCount: matched.length, modifiedCount: matched.length };
     },
@@ -124,6 +118,26 @@ test('rotateRefreshToken is an atomic compare-and-swap with one concurrent winne
 
   assert.equal(results.filter(Boolean).length, 1);
   assert.equal(model.sessions[0].currentRefreshJtiHash, args.nextRefreshJtiHash);
+  assert.equal(model.sessions[0].absoluteExpiresAt, future);
+});
+
+test('revoking all sessions can preserve the current mobile session', async () => {
+  const current = makeSession({ sessionId: 'current' });
+  const previous = makeSession({ sessionId: 'previous', userId: current.userId });
+  const model = makeFakeModel([current, previous]);
+  const service = createMobileAuthSessionService(model);
+
+  const result = await service.revokeAllSessions({
+    userId: current.userId,
+    role: current.role,
+    reason: 'password_changed',
+    excludeSessionId: current.sessionId,
+  });
+
+  assert.deepEqual(result.sessionIds, ['previous']);
+  assert.equal(result.revokedCount, 1);
+  assert.equal(model.sessions.find((session) => session.sessionId === current.sessionId).revokedAt, null);
+  assert.ok(model.sessions.find((session) => session.sessionId === previous.sessionId).revokedAt);
 });
 
 test('rotating one device does not change another device refresh state', async () => {

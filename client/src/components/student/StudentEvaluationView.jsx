@@ -100,7 +100,7 @@ export const EvaluationView = ({
       <div className="flex w-full max-w-xl mx-auto bg-slate-100 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-slate-200/50 gap-1">
         <button 
           onClick={() => setActiveTab('admin')}
-          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black  tracking-wide sm:tracking-widest transition-all ${
             activeTab === 'admin' ? 'bg-white text-red-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -110,7 +110,7 @@ export const EvaluationView = ({
         </button>
         <button 
           onClick={() => setActiveTab('teacher')}
-          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide sm:tracking-widest transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black  tracking-wide sm:tracking-widest transition-all ${
             activeTab === 'teacher' ? 'bg-white text-yellow-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -150,7 +150,7 @@ export const EvaluationView = ({
                            <div className="flex flex-wrap items-center gap-2">
                              <h4 className="font-bold text-slate-800 truncate">{c.name}</h4>
                              {existingEval && (
-                               <span className="bg-green-100 text-green-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-widest uppercase flex items-center gap-1 shrink-0">
+                               <span className="bg-green-100 text-green-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-widest  flex items-center gap-1 shrink-0">
                                  <CheckCircle size={8} /> Đã gửi
                                </span>
                              )}
@@ -171,7 +171,7 @@ export const EvaluationView = ({
                              setPrivateForm({ satisfied: 'yes', lessonClear: 'yes', comment: '' });
                            }
                          }}
-                         className={`w-full sm:w-auto shrink-0 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                         className={`w-full sm:w-auto shrink-0 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-black  tracking-widest transition-all ${
                            isEvaluating ? 'bg-slate-100 text-slate-500' : 
                            existingEval ? 'bg-green-50 text-green-600 hover:bg-green-100 shadow-sm' : 
                            'bg-red-50 text-red-600 hover:bg-red-100 shadow-sm'
@@ -185,16 +185,16 @@ export const EvaluationView = ({
                           <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100 space-y-4">
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                <div className="space-y-3">
-                                 <p className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">Mức độ hài lòng với trung tâm?</p>
+                                 <p className="text-xs font-black text-slate-500  tracking-widest px-1">Mức độ hài lòng với trung tâm?</p>
                                  <div className="flex gap-2">
                                    {[
-                                     { label: 'RẤT HÀI LÒNG', val: 'yes' },
-                                     { label: 'BÌNH THƯỜNG', val: 'no' }
+                                     { label: 'Rất hài lòng', val: 'yes' },
+                                     { label: 'Bình thường', val: 'no' }
                                    ].map(v => (
                                      <button 
                                        key={v.val} 
                                        onClick={() => setPrivateForm(prev => ({ ...prev, satisfied: v.val }))}
-                                       className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all uppercase ${
+                                       className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all  ${
                                          privateForm.satisfied === v.val ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
                                        }`}
                                      >
@@ -204,16 +204,16 @@ export const EvaluationView = ({
                                  </div>
                                </div>
                                <div className="space-y-3">
-                                 <p className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">Giảng viên dạy dễ hiểu không?</p>
+                                 <p className="text-xs font-black text-slate-500  tracking-widest px-1">Giảng viên dạy dễ hiểu không?</p>
                                  <div className="flex gap-2">
                                    {[
-                                     { label: 'DỄ HIỂU', val: 'yes' },
-                                     { label: 'HƠI KHÓ HIỂU', val: 'no' }
+                                     { label: 'Dễ hiểu', val: 'yes' },
+                                     { label: 'Hơi khó hiểu', val: 'no' }
                                    ].map(v => (
                                      <button 
                                        key={v.val} 
                                        onClick={() => setPrivateForm(prev => ({ ...prev, lessonClear: v.val }))}
-                                       className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all uppercase ${
+                                       className={`flex-1 py-2 border-2 rounded-xl text-xs cms-min-text-xs font-black transition-all  ${
                                          privateForm.lessonClear === v.val ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-400 hover:border-red-200'
                                        }`}
                                      >
@@ -225,7 +225,7 @@ export const EvaluationView = ({
                              </div>
 
                              <div className="space-y-2">
-                               <p className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">Góp ý riêng cho Trung tâm điều chỉnh (Bảo mật):</p>
+                               <p className="text-xs font-black text-slate-500  tracking-widest px-1">Góp ý riêng cho Trung tâm điều chỉnh (Bảo mật):</p>
                                <textarea 
                                  value={privateForm.comment}
                                  onChange={e => setPrivateForm(prev => ({ ...prev, comment: e.target.value }))}
@@ -251,9 +251,9 @@ export const EvaluationView = ({
                                      type: 'success' 
                                  });
                                }}
-                               className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
+                               className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 py-2.5 rounded-xl text-white font-black text-xs  tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-100"
                              >
-                               <Star size={14} className="fill-white" /> {existingEval ? 'CẬP NHẬT PHẢN HỒI' : 'GỬI PHẢN HỒI CHO TRUNG TÂM'}
+                               <Star size={14} className="fill-white" /> {existingEval ? 'Cập nhật phản hồi' : 'Gửi phản hồi cho trung tâm'}
                              </button>
                              <p className="text-xs cms-min-text-xs text-center text-slate-400 italic">Mọi thông tin bạn gửi ở đây Giảng viên sẽ KHÔNG biết.</p>
                           </div>
@@ -378,7 +378,7 @@ export const EvaluationView = ({
                               }).catch(() => {});
                             }
                           }}
-                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wide border transition-all ${
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black  tracking-wide border transition-all ${
                             String(activeTeacher.id) === String(t.id)
                               ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
                               : 'bg-slate-50 border-slate-200 text-slate-500'
@@ -397,7 +397,7 @@ export const EvaluationView = ({
                     </div>
                     <div className="min-w-0 text-left">
                       <h4 className="text-base sm:text-lg font-black text-slate-800 truncate">{teacherLabel}</h4>
-                      <p className="text-[10px] sm:text-xs text-slate-400 font-black uppercase tracking-[0.15em] mt-0.5">
+                      <p className="text-[10px] sm:text-xs text-slate-400 font-black  tracking-[0.15em] mt-0.5">
                         Giảng viên · {activeTeacher.courseName || 'Khóa học'}
                       </p>
                     </div>
@@ -424,7 +424,7 @@ export const EvaluationView = ({
                               <Star key={`lg-${i}`} size={24} className={`hidden sm:block ${i < Math.round(existingRating?.criteria?.stars || 5) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
                             ))}
                           </div>
-                          <p className="text-xs font-black text-yellow-700/50 uppercase tracking-widest mt-1">Điểm bạn đã đánh giá</p>
+                          <p className="text-xs font-black text-yellow-700/50  tracking-widest mt-1">Điểm bạn đã đánh giá</p>
                        </div>
                        {(existingRating?.comment || existingRating?.content) && (
                          <div className="relative pt-2 italic px-2">
@@ -432,14 +432,14 @@ export const EvaluationView = ({
                          </div>
                        )}
                        {ratingLocked ? (
-                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                         <p className="text-[11px] font-bold text-slate-400  tracking-wider">
                            Đã khóa sau đánh giá cuối khóa · không thể sửa
                          </p>
                        ) : halfway.ok ? (
                          <button
                            type="button"
                            onClick={startEditRating}
-                           className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide bg-white border border-yellow-200 text-yellow-800 hover:bg-yellow-50 transition-all"
+                           className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-[11px] font-black  tracking-wide bg-white border border-yellow-200 text-yellow-800 hover:bg-yellow-50 transition-all"
                          >
                            Cập nhật lại đánh giá
                          </button>
@@ -450,7 +450,7 @@ export const EvaluationView = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {RATING_CRITERIA && Object.entries(RATING_CRITERIA).map(([catKey, cat]) => (
                           <div key={catKey} className="bg-slate-50/80 p-3 sm:p-3.5 rounded-xl sm:rounded-[20px] border border-slate-100/80 flex flex-col gap-2">
-                            <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest text-center leading-tight">{cat.label}</p>
+                            <p className="text-[10px] sm:text-xs font-black text-slate-500  tracking-widest text-center leading-tight">{cat.label}</p>
                             <div className={`grid gap-1.5 ${cat.options.length === 2 ? 'grid-cols-2' : 'grid-cols-1 min-[400px]:grid-cols-3'}`}>
                               {cat.options.map(opt => (
                                 <button
@@ -472,7 +472,7 @@ export const EvaluationView = ({
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest px-1">Lời nhắn cho giảng viên (tùy chọn)</p>
+                        <p className="text-[10px] sm:text-xs font-black text-slate-500  tracking-widest px-1">Lời nhắn cho giảng viên (tùy chọn)</p>
                         <textarea
                           value={ratingComment}
                           onChange={e => setRatingComment(e.target.value)}
@@ -554,21 +554,21 @@ export const EvaluationView = ({
                             showModal({ title: 'Không gửi được', content: msg, type: 'error' });
                           }
                         }}
-                        className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-[0.2em] transition-all ${
+                        className={`w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs  tracking-wide sm:tracking-[0.2em] transition-all ${
                           Object.keys(RATING_CRITERIA || {}).some(k => !ratingCriteria[k]) 
                             ? 'bg-slate-100 text-slate-300 cursor-not-allowed' 
                             : 'bg-gradient-to-r from-orange-400 to-yellow-500 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.98]'
                         }`}
                       >
                         {Object.keys(RATING_CRITERIA || {}).some(k => !ratingCriteria[k])
-                          ? 'CHỌN ĐỦ TIÊU CHÍ ĐỂ GỬI'
+                          ? 'Chọn đủ tiêu chí để gửi'
                           : (isEditingRating ? 'CẬP NHẬT ĐÁNH GIÁ' : 'GỬI ĐÁNH GIÁ CÔNG KHAI')}
                       </button>
                       {isEditingRating ? (
                         <button
                           type="button"
                           onClick={() => setIsEditingRating(false)}
-                          className="w-full py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wide text-slate-500 hover:text-slate-700"
+                          className="w-full py-2.5 rounded-xl text-[10px] sm:text-xs font-black  tracking-wide text-slate-500 hover:text-slate-700"
                         >
                           Hủy
                         </button>

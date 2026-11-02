@@ -4,6 +4,8 @@
 **Web:** local `http://localhost:5173`
 **Purpose:** inspect the current Student role screens and safe UI interactions, then apply source-backed UI structure to the existing Expo mobile app.
 
+**Historical snapshot:** this file records one prior UI/runtime pass and should not be read as a current-source inventory. Since that pass, Student profile editing, test-result mapping, overall payment status, and narrow-screen profile layout have changed; see [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md) for current source status and explicit verification limits.
+
 ## Safety and test method
 
 - Logged into the local web app using the Student credentials supplied by the user. Credentials and account identifiers are intentionally not recorded here or in mobile fixtures.

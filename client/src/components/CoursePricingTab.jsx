@@ -470,13 +470,13 @@ function CourseModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
             {/* Cột trái: Thông tin & học phí */}
             <div className="space-y-5 md:border-r border-gray-100 md:pr-10">
-              <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">
+              <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2  tracking-[0.2em]">
                 <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">1</span>
                 Thông tin khóa học
               </h4>
 
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">
                   Tên khóa học <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -489,7 +489,7 @@ function CourseModal({
               </div>
 
               <fieldset>
-                <legend className="mb-2 block text-xs font-black uppercase tracking-widest text-gray-500">
+                <legend className="mb-2 block text-xs font-black  tracking-widest text-gray-500">
                   Hình thức học
                 </legend>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -532,7 +532,7 @@ function CourseModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Số buổi học</label>
+                  <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Số buổi học</label>
                   <input
                     type="number"
                     value={form.totalSessions}
@@ -542,7 +542,7 @@ function CourseModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Giảm giá (%)</label>
+                  <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Giảm giá (%)</label>
                   <div className="flex items-center bg-gray-50 border-2 border-transparent focus-within:border-red-400 focus-within:bg-white rounded-[20px] px-4 py-4 transition-all shadow-sm gap-1">
                     <Percent size={14} className="text-red-400 flex-shrink-0" />
                     <input
@@ -559,7 +559,7 @@ function CourseModal({
               </div>
 
               <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
-                <p className="mb-3 text-xs font-black uppercase tracking-wider text-amber-800">
+                <p className="mb-3 text-xs font-black  tracking-wider text-amber-800">
                   Thời gian khuyến mãi
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -590,7 +590,7 @@ function CourseModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">
+                  <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">
                     Giá gốc (VNĐ) <span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center bg-gray-50 border-2 border-transparent focus-within:border-blue-600 focus-within:bg-white rounded-[20px] px-4 py-4 transition-all shadow-sm gap-1">
@@ -607,7 +607,7 @@ function CourseModal({
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Giá thu thực tế</label>
+                  <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Giá thu thực tế</label>
                   <div className={`rounded-[20px] px-4 py-3 border-2 min-h-[56px] flex flex-col justify-center shadow-sm transition ${
                     hasDiscount ? 'border-red-200 bg-red-50' : 'border-transparent bg-gray-50'
                   }`}>
@@ -637,7 +637,7 @@ function CourseModal({
               )}
 
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Mô tả ngắn (tùy chọn)</label>
+                <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Mô tả ngắn (tùy chọn)</label>
                 <textarea
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -648,7 +648,7 @@ function CourseModal({
               </div>
 
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-2">Ảnh banner khóa học (tùy chọn)</label>
+                <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Ảnh banner khóa học (tùy chọn)</label>
                 {form.thumbnail ? (
                   <div className="relative overflow-hidden rounded-[20px] border border-gray-100 shadow-sm">
                     <img src={resolveMediaUrl(form.thumbnail)} alt="" className="h-36 w-full object-cover" />
@@ -694,7 +694,7 @@ function CourseModal({
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500">
+                    <label className="block text-xs font-black  tracking-widest text-gray-500">
                       Tinh chỉnh màu banner khóa học
                     </label>
                     <p className="mt-1 text-xs text-gray-400">Để trống để dùng màu mặc định.</p>
@@ -745,7 +745,7 @@ function CourseModal({
 
             {/* Cột phải: Môn thi */}
             <div className="space-y-5 md:pl-2">
-              <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2 uppercase tracking-[0.2em]">
+              <h4 className="font-black text-gray-400 text-xs mb-2 flex items-center gap-2  tracking-[0.2em]">
                 <span className="w-6 h-6 rounded-lg bg-red-600 text-white flex items-center justify-center text-xs shadow-lg shadow-red-200">2</span>
                 Môn thi trong Phòng Thi ({selectedCount})
               </h4>
@@ -760,7 +760,7 @@ function CourseModal({
                           value={groupLabelDraft}
                           onChange={(e) => setGroupLabelDraft(e.target.value)}
                           maxLength={60}
-                          className="flex-1 min-w-0 bg-white border-2 border-purple-300 rounded-xl px-3 py-1.5 text-xs font-black text-gray-700 uppercase tracking-widest outline-none focus:border-purple-500"
+                          className="flex-1 min-w-0 bg-white border-2 border-purple-300 rounded-xl px-3 py-1.5 text-xs font-black text-gray-700  tracking-widest outline-none focus:border-purple-500"
                           aria-label="Tên nhóm môn Admin tạo"
                           autoFocus
                           onKeyDown={(e) => {
@@ -798,7 +798,7 @@ function CourseModal({
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                        <p className="text-[11px] font-black text-gray-500  tracking-widest">
                           {getExamSubjectGroupLabel(groupKey, groupLabelOverrides)}
                         </p>
                         {groupKey === 'admin' && typeof updateExamAdminGroupLabel === 'function' ? (
@@ -843,7 +843,7 @@ function CourseModal({
                             <span className="text-sm font-semibold text-gray-700 min-w-0 flex-1 truncate">{label}</span>
                             {isCustom && (
                               <>
-                                <span className="text-[9px] font-black uppercase text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded group-hover:opacity-0 transition-opacity">Mới</span>
+                                <span className="text-[9px] font-black  text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded group-hover:opacity-0 transition-opacity">Mới</span>
                                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 flex items-center gap-0.5">
                                   <button
                                     type="button"
@@ -887,7 +887,7 @@ function CourseModal({
 
               {otherCourses.length > 0 && (
                 <div className="pt-3 border-t border-dashed border-gray-200 space-y-2">
-                  <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Gộp môn từ khóa học khác</p>
+                  <p className="text-[11px] font-black text-gray-500  tracking-widest">Gộp môn từ khóa học khác</p>
                   <div className="flex gap-2">
                     <CmsSelect
                       value={importCourseId}
@@ -945,7 +945,7 @@ function CourseModal({
                   </button>
                 ) : (
                   <div className="space-y-2 bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3">
-                    <p className="text-[11px] font-bold text-emerald-800 uppercase">Tạo môn thi mới</p>
+                    <p className="text-[11px] font-bold text-emerald-800 ">Tạo môn thi mới</p>
                     <input
                       type="text"
                       value={newSubjectLabel}
@@ -1010,7 +1010,7 @@ function CourseModal({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-red-200 hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 uppercase active:scale-95 disabled:opacity-50"
+              className="px-12 py-4 bg-gradient-to-r from-red-600 to-red-600 text-white rounded-[22px] text-xs font-black tracking-widest shadow-xl shadow-red-200 hover:shadow-red-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3  active:scale-95 disabled:opacity-50"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Thêm khóa học')}
@@ -1036,7 +1036,7 @@ function CourseModal({
               </p>
             ) : (
               <label className="block space-y-1.5">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tên môn</span>
+                <span className="text-xs font-bold text-slate-500  tracking-wide">Tên môn</span>
                 <input
                   autoFocus
                   value={editLabel}

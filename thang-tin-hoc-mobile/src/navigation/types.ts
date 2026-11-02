@@ -4,7 +4,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type AppStackParamList = {
   Login: undefined;
   MainTabs: NavigatorScreenParams<MainTabsParamList> | undefined;
-  Assignments: undefined;
+  Assignments: { assignmentId?: string } | undefined;
   Materials: undefined;
   Students: undefined;
   Attendance: { scheduleId?: string } | undefined;
@@ -15,6 +15,7 @@ export type AppStackParamList = {
     conversationName?: string;
     participantId?: string;
     participantRole?: string;
+    participantAdminRole?: string | null;
     participantOnline?: boolean;
     participantAvatarUri?: string;
   };
@@ -30,7 +31,7 @@ export type AppStackParamList = {
   };
   MobileMenu: undefined;
   StudentLearning: undefined;
-  StudentExam: undefined;
+  StudentExam: { quizId?: string } | undefined;
   LearningLesson: { courseId: string; unitId: string; lessonId: string };
   Evaluations: undefined;
   Feed: undefined;
@@ -53,17 +54,18 @@ export type AppStackParamList = {
 
 export type MainTabsParamList = {
   Home: undefined;
-  Schedule: undefined;
+  Schedule: { focusScheduleId?: string } | undefined;
   Messages: undefined;
   CourseVideos: undefined;
   Feed: undefined;
   Notifications: undefined;
   Profile: undefined;
   Students: undefined;
+  Finance: undefined;
 };
 
 export function getTabItems(role: UserRole) {
   return role === 'student'
     ? ['Schedule', 'Messages', 'CourseVideos', 'Home', 'Feed', 'Profile'] as const
-    : ['Home', 'Schedule', 'Students', 'Messages', 'Profile'] as const;
+    : ['Home', 'Schedule', 'Finance', 'Messages', 'Profile'] as const;
 }

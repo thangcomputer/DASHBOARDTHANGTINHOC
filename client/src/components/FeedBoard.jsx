@@ -722,7 +722,7 @@ export default function FeedBoard({ session, role }) {
 
               {showVisibilityMenu && (
                 <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                  <p className="text-[11px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider">Ai có thể xem bài viết?</p>
+                  <p className="text-[11px] font-bold text-slate-400 px-2 py-1  tracking-wider">Ai có thể xem bài viết?</p>
                   {availablePrivacyOptions.map((opt) => {
                     const Icon = opt.icon;
                     const isSelected = postVisibility === opt.value;

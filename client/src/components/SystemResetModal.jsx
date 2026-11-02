@@ -55,10 +55,10 @@ export default function SystemResetModal({ onClose, onSubmit }) {
         <div className="bg-gradient-to-r from-red-600 to-red-700 px-4 py-3 flex items-center gap-3 shrink-0">
           <AlertTriangle size={22} className="text-white shrink-0" />
           <div className="min-w-0 text-left">
-            <h2 className="text-sm font-black text-white uppercase tracking-wider leading-tight">
+            <h2 className="text-sm font-black text-white  tracking-wider leading-tight">
               Trung tâm kiểm soát
             </h2>
-            <p className="text-red-100/90 text-[10px] font-bold uppercase tracking-wide truncate">
+            <p className="text-red-100/90 text-[10px] font-bold  tracking-wide truncate">
               Nguy hiểm cấp 1 · Không hoàn tác
             </p>
           </div>
@@ -67,7 +67,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
         <div className="px-4 py-3 space-y-3 overflow-y-auto custom-scrollbar flex-1 min-h-0">
           {/* Bước 1 */}
           <div className="space-y-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+            <p className="text-[10px] font-black text-slate-400  tracking-wider">
               1. Chọn dữ liệu làm mới
             </p>
 
@@ -107,7 +107,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
                   }`}
                 >
                   <cat.icon className={`shrink-0 ${options[cat.key] ? cat.color : 'text-slate-400'}`} size={14} />
-                  <span className={`text-[10px] font-black uppercase tracking-tight leading-tight truncate ${
+                  <span className={`text-[10px] font-black  tracking-tight leading-tight truncate ${
                     options[cat.key] ? 'text-slate-800' : 'text-slate-400'
                   }`}>
                     {cat.label}
@@ -124,7 +124,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
 
           {/* Bước 2 */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+            <p className="text-[10px] font-black text-slate-400  tracking-wider">
               2. Xác thực Super Admin
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -155,7 +155,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="flex-1 py-2.5 rounded-xl font-black text-slate-500 hover:bg-slate-200 transition text-[10px] uppercase tracking-wider"
+            className="flex-1 py-2.5 rounded-xl font-black text-slate-500 hover:bg-slate-200 transition text-[10px]  tracking-wider"
           >
             Hủy bỏ
           </button>
@@ -163,7 +163,7 @@ export default function SystemResetModal({ onClose, onSubmit }) {
             type="button"
             onClick={handleSubmit}
             disabled={!isValid || submitting}
-            className={`flex-[1.6] py-2.5 rounded-xl font-black uppercase tracking-wider text-[10px] flex justify-center items-center gap-1.5 transition-all ${
+            className={`flex-[1.6] py-2.5 rounded-xl font-black  tracking-wider text-[10px] flex justify-center items-center gap-1.5 transition-all ${
               isValid
                 ? 'bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-200 cursor-pointer'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'

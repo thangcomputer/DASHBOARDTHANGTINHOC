@@ -11,12 +11,12 @@ export default function TransferPaymentDetails({
     <section className="space-y-2.5">
       {(courseName || amount != null) && (
         <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 px-3 py-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Khóa học</p>
-          <p className="truncate pr-12 text-sm font-black uppercase leading-5 text-slate-800">
+          <p className="text-[10px] font-bold  tracking-wide text-slate-500">Khóa học</p>
+          <p className="truncate pr-12 text-sm font-black  leading-5 text-slate-800">
             {courseName || 'Thanh toán'}
           </p>
           <div className="mt-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Số tiền thanh toán</p>
+            <p className="text-[10px] font-bold  tracking-wide text-slate-500">Số tiền thanh toán</p>
             {amount != null && (
               <p className="text-2xl font-black leading-7 text-red-600 tabular-nums">
                 {Number(amount || 0).toLocaleString('vi-VN')}đ

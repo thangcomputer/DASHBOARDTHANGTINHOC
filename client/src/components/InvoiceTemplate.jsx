@@ -155,7 +155,7 @@ const InvoiceTemplate = ({ data = {} }) => {
 
           <div className="w-[50%] text-center">
             <h1 className="font-bold leading-tight text-[#d32f2f]" style={{ fontSize: '18pt', marginTop: '2mm', letterSpacing: 'normal' }}>
-              TRUNG TÂM ĐÀO TẠO THẮNG TIN HỌC
+              Trung tâm đào tạo Thắng Tin Học
             </h1>
           </div>
         </div>
@@ -163,7 +163,7 @@ const InvoiceTemplate = ({ data = {} }) => {
         {/* ===== TIÊU ĐỀ ===== */}
         <div className="text-center mb-3">
            <h2 className="text-[#d32f2f] font-bold underline inline-block" style={{ fontSize: '18pt' }}>
-             THU HỌC PHÍ
+             Thu học phí
            </h2>
         </div>
 
@@ -206,7 +206,7 @@ const InvoiceTemplate = ({ data = {} }) => {
            {/* Chữ ký & Stamp bên phải */}
            <div className="absolute right-6 bottom-4 w-[75mm] flex flex-col items-center">
               <p className="font-bold italic text-[11pt] mb-1">Ngày {day} tháng {month} năm {year}</p>
-              <p className="font-bold text-[11pt] mb-1 uppercase">Người nhận tiền</p>
+              <p className="font-bold text-[11pt] mb-1 ">Người nhận tiền</p>
               
               <div className="h-[20mm] w-full flex items-center justify-center relative">
                  {invoiceSettings.signature ? (

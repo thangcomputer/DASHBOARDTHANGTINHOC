@@ -7,7 +7,7 @@ export default function CertPrepResultSummary({ result }) {
   const title = [result.course?.name, result.level?.title].filter(Boolean).join(' — ');
   return (
     <section className="cms-card p-5 sm:p-8 text-center space-y-4">
-      <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Kết quả bài thi</p>
+      <p className="text-[11px] font-black  tracking-wide text-slate-400">Kết quả bài thi</p>
       <div>
         {title ? <p className="text-sm font-bold text-slate-500">{title}</p> : null}
         <h2 className="text-xl sm:text-2xl font-black text-slate-900">{result.test?.name || 'Bài kiểm tra'}</h2>
@@ -17,7 +17,7 @@ export default function CertPrepResultSummary({ result }) {
         {result.score} <span className="text-2xl text-slate-400">/ {result.scoreMax}</span>
       </p>
       <p className={`text-lg font-black ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
-        {passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+        {passed ? 'Đạt' : 'Chưa đạt'}
       </p>
       <p className="text-sm text-slate-600">
         Điểm đạt: <span className="font-bold">{result.passingScore}</span>

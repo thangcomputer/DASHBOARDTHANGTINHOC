@@ -111,6 +111,36 @@ describe('Messaging hardening', { concurrency: false }, () => {
     assert.ok(policy.includes('canAccessDirectConversation'));
   });
 
+  it('records last-seen for mobile sessions without replacing active-user status', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+    const disconnectStart = src.indexOf("socket.on('disconnect', async () => {");
+    const disconnectEnd = src.indexOf("});", disconnectStart);
+    const disconnectHandler = src.slice(disconnectStart, disconnectEnd);
+    assert.ok(disconnectHandler.includes('hit?.user.userId || (socket.user ? socketUserId(socket.user) : \'\')'));
+    assert.ok(disconnectHandler.includes('io.in(String(disconnectedUserId)).fetchSockets()'));
+    assert.ok(disconnectHandler.includes('if (remainingSockets.length === 0)'));
+    assert.ok(disconnectHandler.includes('lastSeenMap.set(String(disconnectedUserId), disconnectedAt.toISOString())'));
+    assert.ok(disconnectHandler.includes('{ $set: { lastAccessAt: disconnectedAt } }'));
+    const studentModel = fs.readFileSync(path.join(ROOT, 'models/Student.js'), 'utf8');
+    assert.ok(studentModel.includes('lastAccessAt: { type: Date, default: null }'));
+    const detailCard = fs.readFileSync(path.join(ROOT, 'client/src/components/teacher/TeacherStudentCard.jsx'), 'utf8');
+    const studentList = fs.readFileSync(path.join(ROOT, 'client/src/components/teacher/TeacherStudentsTab.jsx'), 'utf8');
+    assert.ok(detailCard.includes('lastSeenUsers[studentPresenceId] || student.lastAccessAt'));
+    assert.ok(studentList.includes('lastSeenUsers?.[aId] || a.lastAccessAt'));
+    assert.ok(studentList.includes('lastSeenUsers[String(sId)] || s.lastAccessAt'));
+  });
+
+  it('includes mobile sessions in online presence without duplicating users', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+    assert.ok(src.includes('const presenceKey = socket.sessionId ? `${key}:mobile:${socket.sessionId}` : key'));
+    assert.ok(src.includes('const fullByUser = new Map()'));
+    assert.ok(src.includes('if (!fullByUser.has(key)) fullByUser.set(key, row)'));
+    const studentList = fs.readFileSync(path.join(ROOT, 'client/src/components/teacher/TeacherStudentsTab.jsx'), 'utf8');
+    const detailCard = fs.readFileSync(path.join(ROOT, 'client/src/components/teacher/TeacherStudentCard.jsx'), 'utf8');
+    assert.ok(studentList.includes('Trực tuyến'));
+    assert.ok(detailCard.includes("isStudentOnline ? 'Trực tuyến' : 'Offline'"));
+  });
+
   it('10 Staff A vs Staff B distinct threads for same student', () => {
     const a = buildConversationId('staff', 'aaaaaaaaaaaaaaaaaaaaaaaa', 'student', 'cccccccccccccccccccccccc');
     const b = buildConversationId('staff', 'bbbbbbbbbbbbbbbbbbbbbbbb', 'student', 'cccccccccccccccccccccccc');

@@ -25,7 +25,7 @@ function StatusPill({ status }) {
       ? 'bg-amber-50 text-amber-800 border-amber-200'
       : 'bg-red-50 text-red-700 border-red-200';
   return (
-    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${cls}`}>
+    <span className={`text-[10px] font-black  px-2 py-0.5 rounded-full border ${cls}`}>
       {status}
     </span>
   );
@@ -38,7 +38,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'text-indigo-600', bg
         <div className={`w-9 h-9 rounded-xl ${bg} ${color} flex items-center justify-center`}>
           <Icon size={18} />
         </div>
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide">{label}</p>
+        <p className="text-[10px] font-black text-gray-400  tracking-wide">{label}</p>
       </div>
       <p className="text-xl font-black text-gray-900 truncate">{value}</p>
       {sub && <p className="text-[11px] text-gray-500 font-medium mt-1">{sub}</p>}

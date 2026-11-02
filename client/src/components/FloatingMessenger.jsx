@@ -1155,7 +1155,7 @@ function ChatWindow({
                 type="button"
                 disabled={escalating}
                 onClick={() => onEscalate?.(tab)}
-                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-200 disabled:opacity-50 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-100 text-amber-900 text-[10px] font-black  tracking-wide hover:bg-amber-200 disabled:opacity-50 transition-colors"
               >
                 {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
                 Chuyển sang hỗ trợ trực tiếp
@@ -1171,7 +1171,7 @@ function ChatWindow({
               type="button"
               disabled={resettingAi}
               onClick={() => onResetAi?.(tab)}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-900 text-[10px] font-black uppercase tracking-wide hover:bg-violet-100 disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-900 text-[10px] font-black  tracking-wide hover:bg-violet-100 disabled:opacity-50 transition-colors"
             >
               {resettingAi ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
               Hỏi Trợ lý AI
@@ -1188,11 +1188,11 @@ function ChatWindow({
                   <p className="text-[11px] text-slate-500 text-center font-semibold">Bạn đồng ý câu trả lời này không?</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => onAgree?.(tab)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black  tracking-wide hover:bg-emerald-100 transition-colors">
                       <Check size={14} /> Có
                     </button>
                     <button type="button" onClick={() => onDisagree?.(tab)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black  tracking-wide hover:bg-slate-50 transition-colors">
                       <X size={14} /> Không
                     </button>
                   </div>
@@ -1233,11 +1233,11 @@ function ChatWindow({
                   <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn có đồng ý với kết quả tiếp theo này không?</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => onAgree?.(tab)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black  tracking-wide hover:bg-emerald-100 transition-colors">
                       <Check size={14} /> Có
                     </button>
                     <button type="button" onClick={() => onDisagree2?.(tab)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black  tracking-wide hover:bg-slate-50 transition-colors">
                       <X size={14} /> Không
                     </button>
                   </div>
@@ -1250,13 +1250,13 @@ function ChatWindow({
                   <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn muốn?</p>
                   <div className="flex flex-col gap-1.5">
                     <button type="button" onClick={() => onFinalExplain?.(tab)}
-                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-[10px] font-black uppercase tracking-wide hover:bg-blue-100 transition-colors">
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 text-[10px] font-black  tracking-wide hover:bg-blue-100 transition-colors">
                       <Bot size={14} /> Giải thích thêm 1 lần nữa
                     </button>
                     <button type="button"
                       disabled={escalating}
                       onClick={() => onFinalStaff?.(tab)}
-                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black  tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
                       {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
                       Gặp nhân viên trực tiếp
                     </button>
@@ -1270,11 +1270,11 @@ function ChatWindow({
                   <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn cần hỗ trợ thêm câu hỏi nào nữa không?</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => onMoreYes?.(tab)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black uppercase tracking-wide hover:bg-emerald-100 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-[10px] font-black  tracking-wide hover:bg-emerald-100 transition-colors">
                       <Check size={14} /> Có
                     </button>
                     <button type="button" onClick={() => onMoreNo?.(tab)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black uppercase tracking-wide hover:bg-slate-50 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-[10px] font-black  tracking-wide hover:bg-slate-50 transition-colors">
                       <X size={14} /> Không
                     </button>
                   </div>
@@ -1293,7 +1293,7 @@ function ChatWindow({
               ) : null}
               {feedbackPhase === 'staff' ? (
                 <button type="button" disabled={escalating} onClick={() => onEscalate?.(tab)}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-[10px] font-black  tracking-wide hover:bg-amber-100 disabled:opacity-50 transition-colors">
                   {escalating ? <Loader2 size={14} className="animate-spin" /> : <UserRound size={14} />}
                   Cần nhân viên hỗ trợ
                 </button>
@@ -2465,7 +2465,7 @@ export default function FloatingMessenger({ session, role }) {
             <div className="cms-fm-support__body">
               {unreadConversations.length > 0 && (
                 <div className="px-2 pb-2 mb-1 border-b border-slate-50">
-                  <p className="text-[10px] font-black uppercase tracking-wide text-red-500 px-1 mb-1">
+                  <p className="text-[10px] font-black  tracking-wide text-red-500 px-1 mb-1">
                     Tin chưa đọc
                   </p>
                   <ul className="space-y-0.5">
@@ -2508,7 +2508,7 @@ export default function FloatingMessenger({ session, role }) {
               ) : (
                 directory.groups.map((group) => (
                   <div key={group.key} className="px-1 pb-2 mb-1">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-400 px-1.5 mb-1">
+                    <p className="text-[10px] font-black  tracking-wide text-slate-400 px-1.5 mb-1">
                       {group.label}
                     </p>
                     <ul className="space-y-0.5">

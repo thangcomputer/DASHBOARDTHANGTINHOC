@@ -237,7 +237,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
       return;
     }
     if (!/^https?:\/\//i.test(url) && !url.startsWith('/uploads/')) {
-      toast.error('Link phải bắt đầu bằng http(s):// hoặc /uploads/');
+      toast.error('Link phải bắt đầu bằng HTTP(s):// hoặc /uploads/');
       return;
     }
     const nextFiles = [
@@ -463,7 +463,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                         {editingLessonId === lesson.id ? (
                           <div className="space-y-3 min-w-0">
                             <div>
-                              <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Tên bài học</label>
+                              <label className="text-[10px]  font-bold text-slate-500 block mb-1">Tên bài học</label>
                               <input
                                 value={tempTitle}
                                 onChange={(e) => setTempTitle(e.target.value)}
@@ -472,7 +472,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-[1fr_7.5rem] gap-3 min-w-0">
                               <div className="min-w-0">
-                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">URL / YouTube ID</label>
+                                <label className="text-[10px]  font-bold text-slate-500 block mb-1">URL / YouTube ID</label>
                                 <input
                                   value={tempUrl}
                                   onChange={(e) => setTempUrl(e.target.value)}
@@ -481,7 +481,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                 />
                               </div>
                               <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                                <label className="text-[10px]  font-bold text-slate-500 block mb-1">
                                   Thời lượng (s){probingDuration ? ' · đang lấy từ YT…' : ''}
                                 </label>
                                 <div className="relative">
@@ -591,18 +591,18 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                 <span>{lesson.videoUrl || lesson.url || 'Chưa thiết lập URL'}</span>
                                 <span className="text-slate-300"> · </span>
                                 <span>{Number(lesson.duration) > 0 ? `${lesson.duration}s` : 'Chưa có thời lượng'}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${
                                   lesson.antiSeek !== false ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 }`}>
                                   {lesson.antiSeek !== false ? 'Chống tua: BẬT' : 'Tua tự do'}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${
                                   lesson.allowEarlyAccess === true ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-50 text-slate-500 border border-slate-200'
                                 }`}>
                                   {lesson.allowEarlyAccess === true ? 'Mở sớm: BẬT' : 'Mở sớm: TẮT'}
                                 </span>
                                 {lesson.isPreview === true && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-pink-50 text-pink-700 border border-pink-200">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black  bg-pink-50 text-pink-700 border border-pink-200">
                                     Xem thử
                                   </span>
                                 )}
@@ -678,7 +678,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
 
             <div className="p-4 sm:p-5 space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <label className={`inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 text-emerald-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-emerald-100 transition-colors ${fileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                <label className={`inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 text-emerald-800 text-xs font-black  tracking-wide cursor-pointer hover:bg-emerald-100 transition-colors ${fileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                   {fileUploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                   {fileUploading ? 'Đang tải...' : 'Tải tệp lên'}
                   <input
@@ -692,7 +692,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
-                <p className="text-[11px] font-black uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+                <p className="text-[11px] font-black  tracking-wide text-slate-500 flex items-center gap-1.5">
                   <Link2 size={12} /> Hoặc thêm bằng link (Drive / URL)
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_auto] gap-2">
@@ -705,7 +705,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                   <input
                     value={linkDraft.url}
                     onChange={(e) => setLinkDraft((d) => ({ ...d, url: e.target.value }))}
-                    placeholder="https://drive.google.com/..."
+                    placeholder="HTTPS://drive.google.com/..."
                     className="w-full min-h-11 border border-slate-200 px-3 rounded-xl text-sm outline-none focus:border-emerald-400"
                   />
                   <button

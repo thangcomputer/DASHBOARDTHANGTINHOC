@@ -58,7 +58,7 @@ export default function TeacherQuizManager({
   const [questions, setQuestions] = useState([]);
 
   // Load danh sách bài trắc nghiệm của giảng viên
-  const fetchQuizzes = async () => {
+  const fetchQuizzes = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.quizzes.getTeacherQuizzes();
@@ -70,7 +70,7 @@ export default function TeacherQuizManager({
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const openTeacherQuizDetailByNotification = useCallback(async (detail = {}) => {
     const quizId = detail?.quizId || detail?.payload?.quizId || null;
@@ -115,16 +115,20 @@ export default function TeacherQuizManager({
 
   useEffect(() => {
     if (createOnly || !socket) return undefined;
-    const onQuizSubmitted = () => {
+    const refreshQuizzes = () => {
       fetchQuizzes();
     };
-    socket.on('quiz:submitted', onQuizSubmitted);
-    return () => socket.off('quiz:submitted', onQuizSubmitted);
-  }, [createOnly, socket]);
+    socket.on('quiz:submitted', refreshQuizzes);
+    socket.on('quiz:changed', refreshQuizzes);
+    return () => {
+      socket.off('quiz:submitted', refreshQuizzes);
+      socket.off('quiz:changed', refreshQuizzes);
+    };
+  }, [createOnly, socket, fetchQuizzes]);
 
   useEffect(() => {
     if (!createOnly) fetchQuizzes();
-  }, [createOnly]);
+  }, [createOnly, fetchQuizzes]);
 
   useEffect(() => {
     if (!autoOpenCreate) return;
@@ -479,7 +483,7 @@ export default function TeacherQuizManager({
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black ">
                       {quiz.targetStudentIds?.length
                         ? `${quiz.targetStudentIds.length} học viên`
                         : (quiz.courseName || 'Tất cả lớp')}
@@ -736,7 +740,7 @@ export default function TeacherQuizManager({
                 </div>
                 <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-fuchsia-50/70 p-3.5 shadow-sm">
                   <div>
-                    <label className="block text-violet-700 text-[10px] font-black uppercase mb-1">Số câu AI</label>
+                    <label className="block text-violet-700 text-[10px] font-black  mb-1">Số câu AI</label>
                     <select
                       value={aiCount}
                       onChange={(e) => setAiCount(Number(e.target.value))}
@@ -748,7 +752,7 @@ export default function TeacherQuizManager({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-violet-700 text-[10px] font-black uppercase mb-1">Độ khó</label>
+                    <label className="block text-violet-700 text-[10px] font-black  mb-1">Độ khó</label>
                     <select
                       value={aiDifficulty}
                       onChange={(e) => setAiDifficulty(e.target.value)}

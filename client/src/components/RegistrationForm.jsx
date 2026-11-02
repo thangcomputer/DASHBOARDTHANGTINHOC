@@ -20,7 +20,7 @@ import { isValidVNPhone } from '../utils/validators';
 import { toBranchId, branchOptionLabel } from '../utils/branchIds';
 import { getEffectiveCoursePrice, isCourseDiscountActive } from '../utils/coursePricing';
 
-const API   = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
+const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 const TOTAL = 5 * 60; // 5 phút = 300 giây
 
 function readReEnrollPhone(searchParams) {
@@ -35,7 +35,7 @@ function readReEnrollPhone(searchParams) {
 
 // ── Đồng hồ đếm ngược đẹp ────────────────────────────────────────────────────
 function Countdown({ seconds, total }) {
-  const pct  = (seconds / total) * 100;
+  const pct = (seconds / total) * 100;
   const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
   const secs = String(seconds % 60).padStart(2, '0');
   const color = seconds > 60 ? '#22c55e' : seconds > 30 ? '#f59e0b' : '#ef4444';
@@ -96,25 +96,25 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
     || (() => { try { return sessionStorage.getItem('cms_re_enroll_notice') === '1'; } catch { return false; } })();
   const reEnrollPhone = readReEnrollPhone(searchParams);
 
-  const [step, setStep]         = useState(1);
+  const [step, setStep] = useState(1);
   const [exporting, setExporting] = useState(false);
 
   // Bank
-  const [centerBank, setCenterBank]   = useState(null);
+  const [centerBank, setCenterBank] = useState(null);
   const [bankLoading, setBankLoading] = useState(false);
 
   // Countdown + Session + Polling
-  const [timeLeft, setTimeLeft]     = useState(TOTAL);
-  const [expired, setExpired]       = useState(false);
+  const [timeLeft, setTimeLeft] = useState(TOTAL);
+  const [expired, setExpired] = useState(false);
   const [pollStatus, setPollStatus] = useState('pending'); // pending | paid | expired
   const [pollSeconds, setPollSeconds] = useState(0);
 
   const countdownRef = useRef(null);
-  const pollRef      = useRef(null);
-  const sessionRef   = useRef(null); // tránh tạo session 2 lần
+  const pollRef = useRef(null);
+  const sessionRef = useRef(null); // tránh tạo session 2 lần
 
   // Courses from DB
-  const [dbCourses, setDbCourses]     = useState([]);
+  const [dbCourses, setDbCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
 
   const [formData, setFormData] = useState({
@@ -122,17 +122,17 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
     age: initialData.age != null ? String(initialData.age) : '',
     zalo: reEnrollPhone || initialData.phone || initialData.zalo || '',
     gender: initialData.gender || 'male',
-    courseId:        '',
-    course:          '',
-    price:           0,
+    courseId: '',
+    course: '',
+    price: 0,
     discountPercent: 0,
-    effectivePrice:  0,
-    branchId:        toBranchId(initialData.branchId),
-    branchCode:      initialData.branchCode || '',
+    effectivePrice: 0,
+    branchId: toBranchId(initialData.branchId),
+    branchCode: initialData.branchCode || '',
   });
 
   // Fetch branches
-  const [branches, setBranches]             = useState([]);
+  const [branches, setBranches] = useState([]);
   const [branchesLoading, setBranchesLoading] = useState(true);
   useEffect(() => {
     fetch(`${API}/api/branches`)
@@ -150,7 +150,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
           });
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setBranchesLoading(false));
   }, []);
 
@@ -180,7 +180,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
           }));
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setCoursesLoading(false));
   }, []);
 
@@ -280,14 +280,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
               zalo: formData.zalo,
               course: formData.course,
               price: formData.effectivePrice || formData.price,
-              branchId:   formData.branchId   || undefined,
+              branchId: formData.branchId || undefined,
               branchCode: formData.branchCode || '',
               paid: true,
             };
 
             const handleSuccess = () => {
               showModal({
-                title: 'HÓA ĐƠN ĐĂNG KÝ HỌC',
+                title: 'Hóa đơn đăng ký học',
                 content: (
                   <div className="flex flex-col items-center gap-4 w-full rounded-2xl bg-slate-100 p-3 sm:p-5">
                     <InvoicePreviewFrame
@@ -305,14 +305,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                         onClick={() => printInvoice()}
                         className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                       >
-                        <Printer size={18} /> IN (PRINT)
+                        <Printer size={18} />  In (print)
                       </button>
                       <button
                         type="button"
                         onClick={() => exportPDF({ studentName: formData.name })}
                         className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                       >
-                        <Download size={18} /> TẢI PDF
+                        <Download size={18} />    Tải PDF
                       </button>
                       <button
                         type="button"
@@ -322,7 +322,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                         }}
                         className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center"
                       >
-                        ĐÓNG
+                        Đóng
                       </button>
                       <button
                         type="button"
@@ -367,14 +367,14 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             setPollStatus('expired');
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 3000);
 
     return () => {
       clearInterval(countdownRef.current);
       clearInterval(pollRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   const handleBack = () => {
@@ -412,21 +412,21 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
   const { showModal, closeModal } = useModal();
 
   const handleNext = () => {
-    if (!formData.name.trim()) { 
-        showModal({ title: 'Thiếu thông tin', content: 'Vui lòng nhập họ tên học viên!', type: 'warning' }); 
-        return; 
+    if (!formData.name.trim()) {
+      showModal({ title: 'Thiếu thông tin', content: 'Vui lòng nhập họ tên học viên!', type: 'warning' });
+      return;
     }
-    if (!formData.zalo.trim()) { 
-        showModal({ title: 'Thiếu thông tin', content: 'Vui lòng nhập số Zalo!', type: 'warning' }); 
-        return; 
+    if (!formData.zalo.trim()) {
+      showModal({ title: 'Thiếu thông tin', content: 'Vui lòng nhập số Zalo!', type: 'warning' });
+      return;
     }
     if (!isValidVNPhone(formData.zalo)) {
-        showModal({ title: 'Số không hợp lệ', content: 'Số Zalo/SĐT phải là 10 chữ số, bắt đầu bằng 0.', type: 'warning' });
-        return;
+      showModal({ title: 'Số không hợp lệ', content: 'Số Zalo/SĐT phải là 10 chữ số, bắt đầu bằng 0.', type: 'warning' });
+      return;
     }
     if (branches.length > 0 && !toBranchId(formData.branchId)) {
-        showModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn chi nhánh / cơ sở đăng ký học!', type: 'warning' });
-        return;
+      showModal({ title: 'Thiếu thông tin', content: 'Vui lòng chọn chi nhánh / cơ sở đăng ký học!', type: 'warning' });
+      return;
     }
     sessionRef.current = null; // reset để tạo session mới
     setStep(2);
@@ -467,7 +467,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             <div className="flex items-center gap-3">
               <img src="/logo-thang-tin-hoc.svg" alt="Thắng Tin Học" className="h-10 brightness-0 invert" />
               <div>
-                <h1 className="text-white text-lg font-bold tracking-wide">TRUNG TÂM THẮNG TIN HỌC</h1>
+                <h1 className="text-white text-lg font-bold tracking-wide">Trung tâm Thắng Tin Học</h1>
                 <p className="text-red-100 text-xs">Đăng ký khóa học trực tuyến</p>
               </div>
             </div>
@@ -478,9 +478,8 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             <div className="flex items-center gap-2">
               {['Thông tin', 'Thanh toán', 'Hoàn tất'].map((label, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div className={`h-2 w-full rounded-full transition-all duration-500 ${
-                    step > i + 1 ? 'bg-green-500' : step === i + 1 ? 'bg-red-600' : 'bg-gray-200'
-                  }`} />
+                  <div className={`h-2 w-full rounded-full transition-all duration-500 ${step > i + 1 ? 'bg-green-500' : step === i + 1 ? 'bg-red-600' : 'bg-gray-200'
+                    }`} />
                   <span className={`text-xs font-medium ${step >= i + 1 ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
                 </div>
               ))}
@@ -493,7 +492,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
             {step === 1 && (
               <div className="space-y-5">
                 <h2 className="text-2xl font-bold text-red-700 flex items-center gap-2">
-                  <GraduationCap size={28} /> ĐĂNG KÝ KHÓA HỌC
+                  <GraduationCap size={28} />  Đăng ký khóa học
                 </h2>
                 {isReEnroll && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 leading-snug">
@@ -507,36 +506,34 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
                     <User size={14} /> Họ và tên học viên
                   </label>
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="NGUYỄN VĂN A"
-                    className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none uppercase font-semibold text-gray-800 placeholder:font-normal placeholder:text-gray-400 placeholder:uppercase transition-all" />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nguyễn văn a"
+                    className="w-full p-3.5 border-2 border-gray-200 rounded-xl focus:border-red-500 outline-none  font-semibold text-gray-800 placeholder:font-normal placeholder:text-gray-400 placeholder: transition-all" />
                 </div>
 
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-                    Giới tính chọn ảnh đại diện Cartoon
+                    Giới tính chọn ảnh đại diện
                   </label>
                   <div className="flex items-center gap-3 pt-0.5">
                     <button
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, gender: 'male' }))}
-                      className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
-                        formData.gender === 'male' || formData.gender === 'Nam'
-                          ? 'bg-red-50 text-red-700 border-red-500 shadow-sm'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                      }`}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
+                        ? 'bg-red-50 text-red-700 border-red-500 shadow-sm'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                        }`}
                     >
-                      <span>👨 Nam (Cartoon Nam)</span>
+                      <span>👨 Nam</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, gender: 'female' }))}
-                      className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
-                        formData.gender === 'female' || formData.gender === 'Nữ'
-                          ? 'bg-rose-50 text-rose-700 border-rose-500 shadow-sm'
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                      }`}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border-2 flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
+                        ? 'bg-rose-50 text-rose-700 border-rose-500 shadow-sm'
+                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                        }`}
                     >
-                      <span>👩 Nữ (Cartoon Nữ)</span>
+                      <span>👩 Nữ</span>
                     </button>
                   </div>
                 </div>
@@ -618,7 +615,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                       <div className="bg-gradient-to-r from-red-600 to-red-500 px-5 py-4">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="bg-yellow-400 text-red-800 text-xs font-black px-2.5 py-1 rounded-full animate-pulse">
-                            ⚡ GIẢM {formData.discountPercent}%
+                            ⚡ Giảm {formData.discountPercent}%
                           </span>
                           <span className="line-through text-red-200 text-base">
                             {formData.price.toLocaleString('vi-VN')}đ
@@ -644,7 +641,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
 
                 <button onClick={handleNext} disabled={!formData.course || coursesLoading}
                   className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
-                  TIẾP TỤC THANH TOÁN
+                  Tiếp tục thanh toán
                   <NavArrow size={20} className="text-white" />
                 </button>
               </div>
@@ -698,7 +695,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   </div>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800">ĐĂNG KÝ THÀNH CÔNG!</h2>
+                  <h2 className="text-2xl font-bold text-gray-800">Đăng ký thành công!</h2>
                   <p className="text-gray-500 mt-2">Thông tin của <span className="font-semibold text-gray-700">{formData.name}</span> đã được lưu vào hệ thống.</p>
                 </div>
                 <div className="bg-gray-50 rounded-xl p-5 text-left space-y-2 text-sm">
@@ -707,31 +704,31 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   <div className="flex justify-between"><span className="text-gray-500">Học phí:</span><span className="font-bold text-red-700">{(formData.effectivePrice || formData.price).toLocaleString('vi-VN')} VNĐ</span></div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Trạng thái:</span>
-                    <span className="font-bold text-green-600 flex items-center gap-1"><CheckCircle size={14} /> ĐÃ THANH TOÁN</span>
+                    <span className="font-bold text-green-600 flex items-center gap-1"><CheckCircle size={14} />  Đã thanh toán</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                  <button 
+                  <button
                     onClick={() => {
                       const { printInvoice } = require('../utils/exportPDF');
                       printInvoice();
                     }}
                     className="py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                   >
-                    <Printer size={20} /> IN
+                    <Printer size={20} /> In
                   </button>
-                  <button 
-                    onClick={handleExportPDF} 
+                  <button
+                    onClick={handleExportPDF}
                     disabled={exporting}
                     className="py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    {exporting ? <Loader2 size={20} className="animate-spin"/> : <Download size={20} />} TẢI PDF
+                    {exporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}    Tải PDF
                   </button>
-                  <button 
+                  <button
                     onClick={() => onNavigate('login')}
                     className="py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all flex items-center justify-center gap-2"
                   >
-                    <LayoutDashboard size={20} /> ĐĂNG NHẬP
+                    <LayoutDashboard size={20} />  Đăng nhập
                   </button>
                 </div>
                 <div className="pt-2">

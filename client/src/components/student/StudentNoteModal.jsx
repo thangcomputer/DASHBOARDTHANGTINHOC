@@ -7,7 +7,7 @@ export function StudentNoteModal({ schedule, onClose, onSubmit }) {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
         <div className="bg-gradient-to-r from-red-600 to-red-600 px-6 py-6 text-center text-white relative">
-           <h3 className="text-xl font-black uppercase tracking-tight">Ghi Chú & Phản Hồi</h3>
+           <h3 className="text-xl font-black  tracking-tight">Ghi Chú & Phản Hồi</h3>
            <p className="text-red-100 text-xs mt-1 font-medium">Gửi trực tiếp cho Giảng viên trên lịch này</p>
         </div>
         <div className="p-6">

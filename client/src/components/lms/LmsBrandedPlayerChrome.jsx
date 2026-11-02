@@ -230,7 +230,7 @@ export default function LmsBrandedPlayerChrome({
           onContextMenu={(e) => e.preventDefault()}
         >
           <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
-            <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest uppercase shadow-lg">
+            <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest  shadow-lg">
               {brandLabel}
             </div>
           </div>

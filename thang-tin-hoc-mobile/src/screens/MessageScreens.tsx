@@ -12,17 +12,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   CalendarDays, Camera, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, ImagePlus, Info, MessageCircle,
   MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, Video, X,
 } from 'lucide-react-native';
-import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
+import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField, useBrandingHeaderScrollHandler } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { messageService, scheduleService } from '../services/mockService';
 import { getMobileImageSource } from '../services/apiClient';
@@ -175,7 +176,8 @@ function formatLastSeenStatus(timestamp?: string) {
     ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
   });
   const timeLabel = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  return `Truy cập lần cuối: ${dateLabel}, ${timeLabel}`;
+  const isToday = date.toDateString() === now.toDateString();
+  return isToday ? `Lần cuối: ${timeLabel}` : `Lần cuối: ${dateLabel} ${timeLabel}`;
 }
 
 function normalizeMeetingUrl(value: unknown) {
@@ -321,16 +323,11 @@ export function MessagesScreen() {
     ? [
         { id: 'all' as const, label: 'Tất cả' },
         { id: 'student' as const, label: 'Học viên' },
-        { id: 'admin' as const, label: 'Admin' },
-        { id: 'recruitment' as const, label: 'Tuyển sinh' },
-        { id: 'support' as const, label: 'Hỗ trợ' },
-        { id: 'group' as const, label: 'Nhóm' },
-      ]
+      { id: 'group' as const, label: 'Nhóm' },
+    ]
     : [
         { id: 'all' as const, label: 'Tất cả' },
         { id: 'teacher' as const, label: 'Giảng viên' },
-        { id: 'recruitment' as const, label: 'Tuyển sinh' },
-        { id: 'support' as const, label: 'Hỗ trợ' },
         { id: 'group' as const, label: 'Nhóm' },
       ];
   const loader = useCallback(() => messageService.conversations(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
@@ -416,14 +413,14 @@ export function MessagesScreen() {
       <AppHeader title="Hộp thư" icon={MessageCircle} />
       <SearchField value={query} onChangeText={setQuery} placeholder="Tìm họ, tên, tên đệm, SĐT..." />
       {socketStatus ? <Text style={styles.socketStatus}>{socketStatus}</Text> : null}
-      {isTeacher ? (
-        <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
-          <Plus size={17} color={colors.brand} />
-          <Text style={styles.createGroupText}>Tạo nhóm chat</Text>
-        </Pressable>
-      ) : null}
-      <View style={styles.filtersWrapper}>
+      <View style={[styles.inboxFilterRow, !isTeacher && styles.inboxFilterRowStudent]}>
+        {isTeacher ? (
+          <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
+            <Plus size={25} color={colors.brand} strokeWidth={2.8} />
+          </Pressable>
+        ) : null}
         <ScrollView
+          style={styles.filtersWrapper}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filtersScroll}
@@ -472,6 +469,7 @@ export function MessagesScreen() {
                   conversationName: conversation.name,
                   participantId: conversation.participantId,
                   participantRole: conversation.participantRole || conversation.category,
+                  participantAdminRole: conversation.adminRole,
                   participantOnline: isOnline,
                   participantAvatarUri: conversation.avatarUri,
                 })}
@@ -582,7 +580,10 @@ export function MessagesScreen() {
 export function ConversationScreen() {
   const route = useRoute<NativeStackScreenProps<AppStackParamList, 'Conversation'>['route']>();
   const navigation = useNavigation<Navigation>();
+  const isFocused = useIsFocused();
+  const { width: windowWidth } = useWindowDimensions();
   const { user } = useAuth();
+  const handleHeaderScroll = useBrandingHeaderScrollHandler();
   const isTeacher = user?.role === 'teacher';
   const isPreview = Boolean(user?.previewMode);
   const [showInfo, setShowInfo] = useState(false);
@@ -1432,13 +1433,24 @@ export function ConversationScreen() {
     setPinnedId(pinned?.id || null);
   }, [thread]);
 
+  const markCurrentConversationRead = useCallback(() => {
+    if (!isFocused || isPreview || resource.loading || resource.error || !user) return;
+    messageService.markRead(route.params.conversationId, user)
+      .then(() => DeviceEventEmitter.emit('mobile:message-read'))
+      .catch((error: unknown) => {
+        Alert.alert('Không cập nhật được hộp thư', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+      });
+  }, [isFocused, isPreview, resource.error, resource.loading, route.params.conversationId, user]);
+
   useEffect(() => {
     if (isPreview || !user) return;
     const handleLiveMessage = (payload: unknown) => {
       if (!payload || typeof payload !== 'object') return;
       const raw = payload as Record<string, unknown>;
       if (String(raw.conversationId || '') !== route.params.conversationId) return;
-      appendMessage(mapLiveChatMessage(raw, user));
+      const message = mapLiveChatMessage(raw, user);
+      appendMessage(message);
+      if (!message.mine && isFocused) markCurrentConversationRead();
     };
     const subscriptions = [
       DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_RECEIVED, handleLiveMessage),
@@ -1449,7 +1461,7 @@ export function ConversationScreen() {
       }),
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
-  }, [appendMessage, isPreview, route.params.conversationId, user]);
+  }, [appendMessage, isFocused, isPreview, markCurrentConversationRead, route.params.conversationId, user]);
 
   useEffect(() => {
     if (isPreview || !user) return;
@@ -1500,11 +1512,21 @@ export function ConversationScreen() {
         pinned: isPinned ? message.id === messageId : message.id === messageId ? false : message.pinned,
       })) || null);
     });
+    const readAckSubscription = DeviceEventEmitter.addListener(SOCKET_EVENTS.READ_ACK, (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return;
+      const event = payload as Record<string, unknown>;
+      if (String(event.conversationId || '') !== route.params.conversationId) return;
+      const markOwnMessagesRead = (message: ChatMessage) =>
+        message.mine && !message.recipientRejected ? { ...message, state: 'read' as const } : message;
+      setMessages((current) => (current || resource.data || []).map(markOwnMessagesRead));
+      setSearchResults((current) => current?.map(markOwnMessagesRead) || null);
+    });
     return () => {
       reactionSubscription.remove();
       recallSubscription.remove();
       deleteSubscription.remove();
       pinnedSubscription.remove();
+      readAckSubscription.remove();
     };
   }, [isPreview, resource.data, route.params.conversationId, user]);
 
@@ -1837,11 +1859,14 @@ export function ConversationScreen() {
   }, [resource.loading, thread.length]);
 
   useEffect(() => {
-    if (isPreview || resource.loading || resource.error) return;
-    messageService.markRead(route.params.conversationId, user).catch((error: unknown) => {
-      Alert.alert('Không cập nhật được hộp thư', error instanceof Error ? error.message : 'Vui lòng thử lại.');
-    });
-  }, [isPreview, resource.error, resource.loading, route.params.conversationId, user]);
+    if (!isFocused || isPreview || resource.loading || resource.error || !user) return undefined;
+    const connectedSubscription = DeviceEventEmitter.addListener(
+      SOCKET_EVENTS.CONNECTED,
+      markCurrentConversationRead,
+    );
+    markCurrentConversationRead();
+    return () => connectedSubscription.remove();
+  }, [isFocused, isPreview, markCurrentConversationRead, resource.error, resource.loading, user]);
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 4 : 0}>
@@ -1854,7 +1879,7 @@ export function ConversationScreen() {
             <Image
               source={getContactAvatarSource(
                 route.params.participantRole,
-                undefined,
+                route.params.participantAdminRole,
                 route.params.participantAvatarUri,
               )}
               style={styles.chatHeaderAvatarImg}
@@ -1866,71 +1891,6 @@ export function ConversationScreen() {
               {contactStatus}
             </Text>
           </View>
-          {teacherAttendanceSchedule ? (
-            <Pressable
-              onPress={() => {
-                if (teacherAttendancePending?.scheduleId === teacherAttendanceSchedule.id) {
-                  cancelTeacherAttendance();
-                } else if (!teacherAttendanceBusy && !teacherAttendanceLocked) {
-                  openTeacherAttendanceModal();
-                }
-              }}
-              disabled={
-                teacherAttendanceBusy
-                || (teacherAttendanceLocked && teacherAttendancePending?.scheduleId !== teacherAttendanceSchedule.id)
-              }
-              style={[
-                styles.chatHeaderAction,
-                styles.teacherAttendanceHeaderAction,
-                teacherAttendancePending?.scheduleId === teacherAttendanceSchedule.id
-                  ? styles.teacherAttendanceHeaderActionCancel
-                  : teacherAttendanceAwaitingConfirm || teacherAttendanceUnderReview
-                    ? styles.teacherAttendanceHeaderActionWaiting
-                    : teacherAttendanceMarked || teacherAttendanceBusy
-                  ? styles.teacherAttendanceHeaderActionDone
-                  : styles.teacherAttendanceHeaderActionPending,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={teacherAttendancePending?.scheduleId === teacherAttendanceSchedule.id
-                ? `Hủy điểm danh, còn ${teacherAttendanceRemaining} giây`
-                : teacherAttendanceBusy
-                  ? 'Đang ghi nhận điểm danh'
-                  : teacherAttendanceAwaitingConfirm
-                    ? 'Chờ xác nhận'
-                    : teacherAttendanceUnderReview
-                      ? 'Đang xử lý xác nhận'
-                      : teacherAttendanceMarked ? 'Đã điểm danh' : 'Điểm danh học viên'}
-            >
-              <CheckCircle2
-                size={16}
-                color={teacherAttendancePending?.scheduleId === teacherAttendanceSchedule.id
-                  ? '#FFFFFF'
-                  : teacherAttendanceAwaitingConfirm || teacherAttendanceUnderReview
-                    ? '#1D4ED8'
-                    : teacherAttendanceMarked || teacherAttendanceBusy ? '#047857' : '#A16207'}
-              />
-              <Text style={[
-                styles.teacherAttendanceHeaderText,
-                teacherAttendancePending?.scheduleId === teacherAttendanceSchedule.id
-                  ? styles.teacherAttendanceHeaderTextCancel
-                  : teacherAttendanceAwaitingConfirm || teacherAttendanceUnderReview
-                    ? styles.teacherAttendanceHeaderTextWaiting
-                    : teacherAttendanceMarked || teacherAttendanceBusy
-                  ? styles.teacherAttendanceHeaderTextDone
-                  : styles.teacherAttendanceHeaderTextPending,
-              ]}>
-                {teacherAttendancePending?.scheduleId === teacherAttendanceSchedule.id
-                  ? `Hủy điểm danh (${teacherAttendanceRemaining}s)`
-                  : teacherAttendanceBusy
-                    ? 'Đang ghi nhận'
-                    : teacherAttendanceAwaitingConfirm
-                      ? 'Chờ xác nhận'
-                      : teacherAttendanceUnderReview
-                        ? 'Đang xử lý'
-                        : teacherAttendanceMarked ? 'Đã điểm danh' : 'Điểm danh'}
-              </Text>
-            </Pressable>
-          ) : null}
           {canShowMeetButton ? (
             <Pressable
               onPress={() => {
@@ -2026,7 +1986,7 @@ export function ConversationScreen() {
                 <Pin size={13} color="#2563EB" style={{ transform: [{ rotate: '45deg' }] }} />
               </View>
               <View style={styles.pinnedBannerContent}>
-                <Text style={styles.pinnedBannerTitle}>TIN NHẮN ĐÃ GHIM</Text>
+                <Text style={styles.pinnedBannerTitle}>Tin nhắn đã ghim</Text>
                 <Text numberOfLines={1} style={styles.pinnedBannerText}>
                   {pinnedMessage.recalled
                     ? 'Tin nhắn đã được thu hồi'
@@ -2044,13 +2004,17 @@ export function ConversationScreen() {
             </Pressable>
           </View>
         ) : null}
-        <ScrollView
-          ref={threadRef}
-          contentContainerStyle={styles.thread}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: true })}
-        >
+        <View style={styles.threadSurface}>
+          <ScrollView
+            ref={threadRef}
+            style={styles.threadScroll}
+            contentContainerStyle={styles.thread}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onScroll={handleHeaderScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: true })}
+          >
           {resource.loading ? <LoadingSkeleton rows={2} /> : null}
           {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
           {!resource.loading && !resource.error && !thread.length ? <EmptyState title="Bắt đầu cuộc trò chuyện" message="Gửi lời chào đầu tiên nhé." /> : null}
@@ -2102,6 +2066,11 @@ export function ConversationScreen() {
               );
             }
             const isMine = message.mine;
+            const bubbleWidth = bubbleWidthsRef.current[message.id] || 0;
+            const menuAlignLeft = isMine
+              ? bubbleWidth >= windowWidth * 0.45
+              : bubbleWidth < windowWidth * 0.45;
+            const reactionPopupAlignLeft = !isMine && bubbleWidth < windowWidth * 0.45;
             const previousMessage = visibleMessages[index - 1];
             const nextMessage = visibleMessages[index + 1];
             const continuesPreviousGroup = Boolean(
@@ -2209,6 +2178,9 @@ export function ConversationScreen() {
                   {message.text && message.attachmentType === 'file' && !message.recalled ? (
                     <Text style={[styles.fileAttachmentCaption, isMine ? styles.messageTextMine : styles.messageTextOther]}>{message.text}</Text>
                   ) : null}
+                  {endsSenderGroup && message.time ? (
+                    <Text style={styles.messageBubbleTime}>{message.time}</Text>
+                  ) : null}
                 </Pressable>
 
                 {/* Bottom-right Corner: Reactions Badge + Like Button */}
@@ -2235,10 +2207,16 @@ export function ConversationScreen() {
                         onMouseLeave={handleLikeHoverOut}
                       >
                         {reactionPopupMsgId === message.id ? (
-                          <View style={[
-                            styles.reactionPopupBridge,
-                            !isMine && styles.reactionPopupBridgeOther,
-                          ]}>
+                          <View
+                            style={[
+                              styles.reactionPopupBridge,
+                              {
+                                width: Math.min(174, windowWidth - 24),
+                                left: reactionPopupAlignLeft ? 0 : undefined,
+                                right: reactionPopupAlignLeft ? undefined : -10,
+                              },
+                            ]}
+                          >
                             <View style={styles.reactionPopupBar}>
                               {ALL_REACTIONS.map((emoji) => (
                                 <Pressable
@@ -2323,7 +2301,13 @@ export function ConversationScreen() {
                 </View>
 
                 {optionsMenuMsgId === message.id ? (
-                  <View nativeID="chat-options-menu" style={isMine ? styles.optionsMenuCardMine : styles.optionsMenuCardOther}>
+                  <View
+                    nativeID="chat-options-menu"
+                    style={[
+                      isMine ? styles.optionsMenuCardMine : styles.optionsMenuCardOther,
+                      { width: Math.min(164, windowWidth - 32), left: menuAlignLeft ? 0 : undefined, right: menuAlignLeft ? undefined : 0 },
+                    ]}
+                  >
                     {message.attachmentUrl && message.attachmentName && !message.recalled ? (
                       <Pressable
                         onPress={() => {
@@ -2413,7 +2397,6 @@ export function ConversationScreen() {
                     </View>
                     {endsSenderGroup ? (
                       <View style={styles.msgFooterMine}>
-                        <Text style={styles.msgFooterTime}>{message.time}</Text>
                         {!message.recipientRejected ? (
                           <View style={styles.readStatusWrap}>
                             <Clock size={11} color="#94A3B8" />
@@ -2442,7 +2425,7 @@ export function ConversationScreen() {
                   <Image
                     source={getContactAvatarSource(
                       route.params.participantRole,
-                      undefined,
+                      route.params.participantAdminRole,
                       route.params.participantAvatarUri,
                     )}
                     style={styles.otherAvatarImg}
@@ -2453,11 +2436,6 @@ export function ConversationScreen() {
                     {bubble}
                     {actions}
                   </View>
-                  {endsSenderGroup ? (
-                    <View style={styles.msgFooterOther}>
-                      <Text style={styles.msgFooterTime}>{message.time}</Text>
-                    </View>
-                  ) : null}
                 </View>
               </View>
             );
@@ -2467,7 +2445,8 @@ export function ConversationScreen() {
               <Text style={styles.typingIndicatorText}>{route.params.conversationName || 'Đối phương'} đang nhập...</Text>
             </View>
           ) : null}
-        </ScrollView>
+          </ScrollView>
+        </View>
         {replyingTo ? (
           <View style={styles.replyBar}>
             <Text numberOfLines={1} style={styles.replyBarText}>
@@ -2595,7 +2574,7 @@ export function ConversationScreen() {
                       <ScrollView style={styles.pickerContent} contentContainerStyle={styles.stickerSections} keyboardShouldPersistTaps="handled">
                         {recentStickers.length > 0 ? (
                           <View style={styles.stickerSection}>
-                            <Text style={styles.stickerSectionTitle}>GẦN ĐÂY</Text>
+                            <Text style={styles.stickerSectionTitle}>Gần đây</Text>
                             <View style={styles.stickerGrid}>
                               {recentStickers.map((sticker) => (
                                 <Pressable key={`recent-${sticker.id}`} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
@@ -2612,7 +2591,7 @@ export function ConversationScreen() {
                             if (!stickers.length) return null;
                             return (
                               <View key={item.id} style={styles.stickerSection}>
-                                <Text style={styles.stickerSectionTitle}>{item.label.toLocaleUpperCase('vi-VN')}</Text>
+                                <Text style={styles.stickerSectionTitle}>{item.label}</Text>
                                 <View style={styles.stickerGrid}>
                                   {stickers.map((sticker) => (
                                     <Pressable key={sticker.id} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
@@ -2699,14 +2678,14 @@ export function ConversationScreen() {
                 </View>
                 <ScrollView contentContainerStyle={styles.teacherAttendanceModalBody} keyboardShouldPersistTaps="handled">
                   <View style={styles.teacherAttendanceStudentBox}>
-                    <Text style={styles.teacherAttendanceFieldCaption}>HỌC VIÊN</Text>
+                    <Text style={styles.teacherAttendanceFieldCaption}>Học viên</Text>
                     <Text style={styles.teacherAttendanceStudentName}>{conversationName}</Text>
                     <Text style={styles.teacherAttendanceProgress}>
                       Tiến độ hiện tại: {teacherAttendanceCompleted}/{teacherAttendanceTotal} buổi
                     </Text>
                   </View>
                   <View>
-                    <Text style={styles.teacherAttendanceFieldLabel}>ĐÁNH GIÁ BUỔI HỌC (0-10)</Text>
+                    <Text style={styles.teacherAttendanceFieldLabel}>Đánh giá buổi học (0-10)</Text>
                     <View style={styles.teacherAttendanceGradeRow}>
                       <View style={styles.teacherAttendanceGradeStepper}>
                         <Pressable
@@ -2737,7 +2716,7 @@ export function ConversationScreen() {
                     </View>
                   </View>
                   <View>
-                    <Text style={styles.teacherAttendanceFieldLabel}>GHI CHÚ NHANH</Text>
+                    <Text style={styles.teacherAttendanceFieldLabel}>Ghi chú nhanh</Text>
                     <TextInput
                       value={teacherAttendanceNote}
                       onChangeText={setTeacherAttendanceNote}
@@ -2753,14 +2732,14 @@ export function ConversationScreen() {
                       style={styles.teacherAttendanceCancelButton}
                       accessibilityRole="button"
                     >
-                      <Text style={styles.teacherAttendanceCancelText}>HỦY</Text>
+                      <Text style={styles.teacherAttendanceCancelText}>Hủy</Text>
                     </Pressable>
                     <Pressable
                       onPress={confirmTeacherAttendance}
                       style={styles.teacherAttendanceConfirmButton}
                       accessibilityRole="button"
                     >
-                      <Text style={styles.teacherAttendanceConfirmText}>XÁC NHẬN ĐIỂM DANH</Text>
+                      <Text style={styles.teacherAttendanceConfirmText}>Xác nhận điểm danh</Text>
                     </Pressable>
                   </View>
                 </ScrollView>
@@ -2779,7 +2758,7 @@ export function ConversationScreen() {
           <View style={styles.infoBackdrop}>
             <View style={styles.attendancePromptCard}>
               <View style={styles.attendancePromptHeader}>
-                <Text style={styles.attendancePromptEyebrow}>XÁC NHẬN ĐIỂM DANH</Text>
+                <Text style={styles.attendancePromptEyebrow}>Xác nhận điểm danh</Text>
                 <Text style={styles.attendancePromptSessionLabel}>Buổi học</Text>
                 <Text style={styles.attendancePromptSessionNumber}>
                   {attendancePromptSchedule?.attendanceSessionNumber || '?'}
@@ -2790,7 +2769,7 @@ export function ConversationScreen() {
                 </Text>
               </View>
               <View style={styles.attendancePromptDetails}>
-                <Text style={styles.attendancePromptDetailLabel}>GIẢNG VIÊN HƯỚNG DẪN</Text>
+                <Text style={styles.attendancePromptDetailLabel}>Giảng viên hướng dẫn</Text>
                 <Text style={styles.attendancePromptTeacher}>
                   {attendancePromptSchedule?.teacherName || 'Giảng viên'}
                 </Text>
@@ -2838,7 +2817,16 @@ export function ConversationScreen() {
               accessibilityLabel="Đóng thông tin liên hệ"
             />
             <View style={styles.infoCard}>
-              <Avatar name={infoDisplayName} color="#F6E9D9" size={56} imageUri={route.params.participantAvatarUri} />
+              <Avatar
+                name={infoDisplayName}
+                color="#F6E9D9"
+                size={56}
+                imageSource={getContactAvatarSource(
+                  route.params.participantRole,
+                  route.params.participantAdminRole,
+                  route.params.participantAvatarUri,
+                )}
+              />
               <Text style={styles.infoName}>{infoDisplayName}</Text>
               <Text style={styles.infoRole}>{contactRole}</Text>
               <Text style={styles.infoStatus}>{contactStatus}</Text>
@@ -3150,8 +3138,8 @@ const styles = StyleSheet.create({
   chatScreen: { flex: 1, paddingBottom: spacing.xs, gap: spacing.xs, backgroundColor: '#FFFFFF' },
   conversation: { flexDirection: 'row', alignItems: 'center' },
   inboxScreen: { paddingBottom: spacing.xl },
-  chatHeader: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  chatHeaderBack: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
+  chatHeader: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 4, paddingRight: 8, paddingVertical: 8, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  chatHeaderBack: { width: 24, height: 40, alignItems: 'center', justifyContent: 'center' },
   chatHeaderCopy: { flex: 1, minWidth: 0, gap: 2 },
   chatHeaderName: { color: '#1E293B', fontSize: typography.body, fontWeight: '700' },
   chatHeaderStatus: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '500' },
@@ -3160,22 +3148,12 @@ const styles = StyleSheet.create({
   meetHeaderActionLive: { backgroundColor: '#DC2626' },
   meetHeaderActionUpcoming: { backgroundColor: '#F1F5F9', opacity: 0.55 },
   attendanceHeaderAction: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
-  teacherAttendanceHeaderAction: { width: 'auto', minWidth: 90, maxWidth: 142, height: 34, flexDirection: 'row', gap: 5, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1 },
-  teacherAttendanceHeaderActionPending: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
-  teacherAttendanceHeaderActionWaiting: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
-  teacherAttendanceHeaderActionDone: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  teacherAttendanceHeaderActionCancel: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
-  teacherAttendanceHeaderText: { fontSize: typography.micro, fontWeight: '800' },
-  teacherAttendanceHeaderTextPending: { color: '#A16207' },
-  teacherAttendanceHeaderTextWaiting: { color: '#1D4ED8' },
-  teacherAttendanceHeaderTextDone: { color: '#047857' },
-  teacherAttendanceHeaderTextCancel: { color: '#FFFFFF', fontSize: typography.micro },
   teacherAttendanceModal: { width: '100%', maxWidth: 440, maxHeight: '90%', overflow: 'hidden', borderRadius: 28, backgroundColor: '#FFFFFF' },
   teacherAttendanceModalHeader: { minHeight: 92, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, backgroundColor: '#0DA76B' },
   teacherAttendanceModalIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)' },
   teacherAttendanceModalHeading: { flex: 1, minWidth: 0, gap: 3 },
   teacherAttendanceModalTitle: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '900' },
-  teacherAttendanceModalSubtitle: { color: '#D1FAE5', fontSize: typography.micro, fontWeight: '800', textTransform: 'uppercase' },
+  teacherAttendanceModalSubtitle: { color: '#D1FAE5', fontSize: typography.micro, fontWeight: '800' },
   teacherAttendanceModalClose: { width: 34, height: 38, alignItems: 'center', justifyContent: 'center' },
   teacherAttendanceModalBody: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.lg },
   teacherAttendanceStudentBox: { gap: 3, padding: spacing.md, borderWidth: 1, borderColor: '#C9F5E0', borderRadius: 22, backgroundColor: '#ECFDF5' },
@@ -3228,8 +3206,10 @@ const styles = StyleSheet.create({
   callEventCopy: { flexShrink: 1, gap: 2 },
   callEventTitle: { fontSize: typography.micro, fontWeight: '700' },
   callEventSubtitle: { color: '#64748B', fontSize: typography.micro },
-  createGroupButton: { minHeight: 44, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brandSoft },
-  createGroupText: { color: colors.brand, fontSize: typography.small, fontWeight: '700' },
+  inboxFilterRow: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.xs },
+  inboxFilterRowStudent: { gap: 0 },
+  createGroupButton: { width: 42, height: 42, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA', borderRadius: radius.sm, backgroundColor: colors.brandSoft },
+  createGroupText: { color: colors.brand, fontSize: 11, fontWeight: '700' },
   groupModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
   groupModal: { maxHeight: '88%', gap: spacing.md, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, backgroundColor: colors.surface },
   closeButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.sm },
@@ -3237,9 +3217,9 @@ const styles = StyleSheet.create({
   memberRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.line },
   memberCheck: { width: 24, height: 24, textAlign: 'center', textAlignVertical: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 6, color: colors.muted, overflow: 'hidden' },
   memberCheckSelected: { color: '#FFFFFF', backgroundColor: colors.brand, borderColor: colors.brand },
-  filtersWrapper: { marginVertical: spacing.xs },
-  filtersScroll: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
-  filterChip: { minHeight: 34, borderRadius: 9999, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 14, paddingVertical: 6, justifyContent: 'center', alignItems: 'center' },
+  filtersWrapper: { flex: 1, minWidth: 0 },
+  filtersScroll: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2, paddingRight: 2 },
+  filterChip: { minHeight: 36, borderRadius: radius.sm, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 11, paddingVertical: 6, justifyContent: 'center', alignItems: 'center' },
   filterChipActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
   filterText: { color: '#475569', fontSize: typography.caption, fontWeight: '600' },
   filterTextActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -3285,7 +3265,9 @@ const styles = StyleSheet.create({
   dateDividerWrap: { alignItems: 'center', marginVertical: 10, paddingHorizontal: spacing.sm },
   dateDividerPill: { backgroundColor: '#BFC1C5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   dateDividerText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '700' },
-  thread: { paddingTop: spacing.sm, paddingHorizontal: spacing.xs, paddingBottom: 120, flexGrow: 1, backgroundColor: '#EAEBEE' },
+  threadSurface: { flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 14, backgroundColor: '#EAEBEE' },
+  threadScroll: { flex: 1, backgroundColor: 'transparent' },
+  thread: { paddingTop: spacing.sm, paddingHorizontal: spacing.sm, paddingBottom: 120, flexGrow: 1, backgroundColor: 'transparent' },
   messageRowMine: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14, position: 'relative', zIndex: 1 },
   messageRowGrouped: { marginBottom: 8 },
   messageMineContainer: { maxWidth: '85%', alignItems: 'flex-end', position: 'relative' },
@@ -3310,18 +3292,17 @@ const styles = StyleSheet.create({
   likeCornerBtnActive: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
   likeCornerEmojiText: { fontSize: typography.micro, lineHeight: 14 },
   reactionPopupBridge: { position: 'absolute', bottom: 24, right: -10, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 999999, elevation: 999999 },
-  reactionPopupBridgeOther: { right: undefined, left: -10, width: 230 },
-  reactionPopupBar: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFFFFF', borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 999999 },
-  reactionPopupEmojiBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  reactionPopupEmojiBtnHover: { backgroundColor: '#F1F5F9', transform: [{ scale: 1.25 }] },
+  reactionPopupBar: { width: '100%', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', justifyContent: 'center', gap: 2, backgroundColor: '#FFFFFF', borderRadius: 9999, paddingHorizontal: 4, paddingVertical: 3, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 999999 },
+  reactionPopupEmojiBtn: { width: 23, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  reactionPopupEmojiBtnHover: { backgroundColor: '#F1F5F9', transform: [{ scale: 1.1 }] },
   reactionPopupEmojiBtnSelected: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
-  reactionPopupEmojiText: { fontSize: typography.heading },
-  optionsMenuCardMine: { position: 'absolute', top: 32, right: 0, minWidth: 185, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 999999, zIndex: 999999 },
-  optionsMenuCardOther: { position: 'absolute', top: 32, right: 0, minWidth: 185, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 999999, zIndex: 999999 },
-  optionsMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FFFFFF' },
+  reactionPopupEmojiText: { fontSize: 15 },
+  optionsMenuCardMine: { position: 'absolute', top: 32, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 999999, zIndex: 999999 },
+  optionsMenuCardOther: { position: 'absolute', top: 32, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 24, elevation: 999999, zIndex: 999999 },
+  optionsMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#FFFFFF' },
   optionsMenuItemPressed: { backgroundColor: '#F8FAFC' },
   optionsMenuItemBorderTop: { borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  optionsMenuItemText: { fontSize: typography.small, fontWeight: '500', color: '#334155' },
+  optionsMenuItemText: { flexShrink: 1, fontSize: 12, fontWeight: '500', color: '#334155' },
   optionsMenuItemAmber: { color: '#D97706' },
   optionsMenuItemRed: { color: '#DC2626' },
   bubble: { borderRadius: 9, paddingHorizontal: 14, paddingVertical: 12, position: 'relative', maxWidth: '100%', minWidth: 0, flexShrink: 1 },
@@ -3351,11 +3332,12 @@ const styles = StyleSheet.create({
   pinnedBannerBody: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, paddingLeft: 4 },
   pinnedBannerIconWrap: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center' },
   pinnedBannerContent: { flex: 1, minWidth: 0 },
-  pinnedBannerTitle: { fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.6, color: '#1D4ED8', textTransform: 'uppercase', marginBottom: 1 },
+  pinnedBannerTitle: { fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.6, color: '#1D4ED8', marginBottom: 1 },
   pinnedBannerText: { fontSize: typography.caption, fontWeight: '500', color: '#334155' },
   pinnedBannerUnpinBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 6, marginLeft: 8 },
   messageTextMine: { color: '#1E293B', fontSize: typography.small, lineHeight: 20 },
   messageTextOther: { color: '#1E293B', fontSize: typography.small, lineHeight: 20 },
+  messageBubbleTime: { alignSelf: 'flex-start', marginTop: 4, color: '#64748B', fontSize: 11, lineHeight: 14, fontWeight: '500' },
   attachmentNameMine: { color: '#1E293B', fontSize: typography.caption, fontWeight: '600' },
   attachmentNameOther: { color: '#1E293B', fontSize: typography.caption, fontWeight: '600' },
   replyPreviewMine: { borderLeftWidth: 2, borderLeftColor: '#3B82F6', paddingLeft: 6, marginBottom: 4 },
@@ -3363,7 +3345,6 @@ const styles = StyleSheet.create({
   replyPreviewOther: { borderLeftWidth: 2, borderLeftColor: '#94A3B8', paddingLeft: 6, marginBottom: 4 },
   replyPreviewTextOther: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
   msgFooterMine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 4, paddingRight: 4, zIndex: 1 },
-  msgFooterTime: { color: '#64748B', fontSize: typography.micro, fontWeight: '500' },
   messageRejectedNotice: { marginTop: 2, paddingRight: 4, color: '#DC2626', fontSize: typography.micro, fontWeight: '700', textAlign: 'right' },
   readStatusWrap: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#BFC1C5', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   readStatusText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '600' },
@@ -3373,7 +3354,6 @@ const styles = StyleSheet.create({
   messageOtherContainer: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   bubbleAndActionsRowOther: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', zIndex: 100 },
   msgActionsOther: { position: 'relative', marginLeft: 6, zIndex: 200, flexShrink: 0 },
-  msgFooterOther: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 6, marginTop: 4, paddingLeft: 4 },
   typingIndicator: { alignSelf: 'flex-start', marginTop: spacing.xs, marginLeft: 42, paddingHorizontal: spacing.sm, paddingVertical: 4 },
   typingIndicatorText: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
   sticker: { fontSize: 38, lineHeight: 46 },

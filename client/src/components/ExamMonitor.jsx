@@ -140,7 +140,7 @@ const ExamMonitor = forwardRef(({
     if (isTerminated) return;
     stopExamWarningSound();
     setIsTerminated(true);
-    setWarningOverlay({ type: 'terminated', message: 'KẾT THÚC BÀI THI!', sub: reason, persistent: true });
+    setWarningOverlay({ type: 'terminated', message: 'Kết thúc bài thi!', sub: reason, persistent: true });
     stopStream(streamRef.current);
     streamRef.current = null;
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -495,7 +495,7 @@ const ExamMonitor = forwardRef(({
               logEvent('lens_blocked', 'warn', { durationMs: lensC.durationMs });
               confirmHard('lens_blocked', {
                 type: 'camera',
-                message: '🚫 CAMERA BỊ CHE!',
+                message: '🚫 Camera bị che!',
                 sub: `Bỏ vật cản trước ống kính. Lỗi cộng dồn — đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
               }, () => lens.reset());
             }
@@ -505,7 +505,7 @@ const ExamMonitor = forwardRef(({
               logEvent('multi_face', 'warn', { count: frameFaces.length });
               confirmHard('multi_face', {
                 type: 'camera',
-                message: '🚫 PHÁT HIỆN NHIỀU KHUÔN MẶT!',
+                message: '🚫 Phát hiện nhiều khuôn mặt!',
                 sub: `Chỉ một người trong khung hình. Lỗi cộng dồn — đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
               }, () => multi.reset());
             }
@@ -522,7 +522,7 @@ const ExamMonitor = forwardRef(({
               logEvent('face_absent', 'warn', { durationMs: absentC.durationMs });
               confirmHard('face_absent', {
                 type: 'camera',
-                message: '🚫 KHÔNG THẤY KHUÔN MẶT!',
+                message: '🚫 Không thấy khuôn mặt!',
                 sub: `Đưa mặt vào giữa vòng oval. Mất mặt > ${Math.round(CONFIG.FACE_ABSENT_CONFIRM_MS / 1000)}s.`,
               }, () => absence.reset());
             } else if (facePresent) {
@@ -543,7 +543,7 @@ const ExamMonitor = forwardRef(({
               logEvent('motion_stale', 'warn', { sinceMotion });
               confirmHard('motion_stale', {
                 type: 'camera',
-                message: '⚠ KHÔNG PHÁT HIỆN CHUYỂN ĐỘNG!',
+                message: '⚠ Không phát hiện chuyển động!',
                 sub: `Không có chuyển động trong ${Math.round(CONFIG.MOTION_STALE_MS / 1000)}s. Có thể rời chỗ hoặc dùng ảnh tĩnh.`,
               }, () => { lastMotionAtRef.current = now; });
             }
@@ -612,7 +612,7 @@ const ExamMonitor = forwardRef(({
       } else {
         setWarningOverlay({
           type: 'tab',
-          message: 'CẢNH BÁO CHUYỂN TAB!',
+          message: 'Cảnh báo chuyển tab!',
           sub: 'Hệ thống phát hiện bạn vừa rời khỏi màn hình thi. Nếu tiếp tục vi phạm nốt lần nữa, bài thi sẽ tự động HỦY.',
           count: w,
           max: cap,
@@ -660,13 +660,13 @@ const ExamMonitor = forwardRef(({
             <AlertTriangle size={48} />
           </div>
           <div>
-            <h2 className="text-gray-900 font-extrabold text-3xl uppercase tracking-tighter leading-none">{warningOverlay.message}</h2>
+            <h2 className="text-gray-900 font-extrabold text-3xl  tracking-tighter leading-none">{warningOverlay.message}</h2>
             <p className="text-gray-400 font-bold mt-3 text-sm leading-relaxed">{warningOverlay.sub}</p>
           </div>
           {warningOverlay.count != null && (
             <div className="space-y-3 pt-2">
               <div className="flex justify-between items-end">
-                <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Mức độ vi phạm</span>
+                <span className="text-xs font-black text-gray-400  tracking-widest">Mức độ vi phạm</span>
                 <span className="text-sm font-black text-red-600">{warningOverlay.count}/{warningOverlay.max}</span>
               </div>
               <div className="h-5 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-1">
@@ -676,7 +676,7 @@ const ExamMonitor = forwardRef(({
           )}
           {!warningOverlay.persistent ? (
             <button type="button" onClick={dismissWarning} className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl hover:bg-black transition-all text-lg">
-              TÔI ĐÃ HIỂU, TIẾP TỤC THI
+              Tôi đã hiểu, tiếp tục thi
             </button>
           ) : (
             <div className="pt-4">
@@ -811,7 +811,7 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
         </div>
         <div className={`absolute inset-0 pointer-events-none ${stats.lastFacePresent && stats.lastFaceDetected && !stats.lastMultiFace ? 'bg-emerald-500/10' : 'bg-red-500/25 animate-pulse'}`} />
         <div className="absolute top-1 left-1.5 flex items-center gap-1">
-          <span className="rounded-md bg-black/45 px-1.5 py-0.5 text-white/70 font-black uppercase text-[9px] tracking-wider cms-min-text-xs">Live</span>
+          <span className="rounded-md bg-black/45 px-1.5 py-0.5 text-white/70 font-black  text-[9px] tracking-wider cms-min-text-xs">Live</span>
         </div>
         {ui.code !== 'ok' && (
           <div className="absolute bottom-0.5 left-0 right-0 text-center px-0.5">
@@ -825,7 +825,7 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
         {!isCompact && (
         <div className="flex items-center gap-1.5">
           <ShieldCheck size={14} className="text-sky-400 shrink-0" />
-          <span className={`text-white/60 uppercase font-black tracking-wider ${isLarge ? 'text-xs' : 'text-xs text-white/50'}`}>Giám sát bài thi</span>
+          <span className={`text-white/60  font-black tracking-wider ${isLarge ? 'text-xs' : 'text-xs text-white/50'}`}>Giám sát bài thi</span>
         </div>
         )}
         <div className={`flex flex-col font-mono ${isLarge ? 'mt-1 gap-0' : isCompact ? 'gap-0.5' : 'mt-1.5 gap-0.5'}`}>

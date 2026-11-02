@@ -115,7 +115,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                     <div className="min-w-0">
                       <h4 className="font-extrabold text-[15px] text-slate-800 truncate flex items-center gap-2 mb-1">
                         {m.title}
-                        {isLocked && <span className="bg-slate-200 text-slate-600 px-2 py-0.5 text-xs cms-min-text-xs uppercase font-bold tracking-wider rounded border border-slate-300">Khóa</span>}
+                        {isLocked && <span className="bg-slate-200 text-slate-600 px-2 py-0.5 text-xs cms-min-text-xs  font-bold tracking-wider rounded border border-slate-300">Khóa</span>}
                       </h4>
                       <p className="text-xs text-slate-500 line-clamp-1">{htmlToPlainText(m.desc) || ''}</p>
                       <p className="text-xs font-medium text-slate-400 mt-2 flex items-center gap-4">
@@ -152,7 +152,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
               <div key={m.id} className="px-4 md:px-6 py-4 flex items-center justify-between hover:bg-blue-50/30 transition-colors group">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-10 h-10 rounded-xl ${typeColors[m.fileType] || 'bg-gray-400'} flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>
-                    {m.fileType || 'FILE'}
+                    {m.fileType || 'File'}
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-gray-800 truncate">{m.title}</p>
@@ -293,8 +293,8 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                 <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-xs font-black text-green-600 flex-shrink-0">{idx + 1}</div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs cms-min-text-xs font-black px-2 py-0.5 rounded bg-green-100 text-green-700 uppercase">{q.section || 'Tổng hợp'}</span>
-                    <span className="text-xs cms-min-text-xs font-black px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{q.type === 'essay' ? 'Tự luận' : 'Trắc nghiệm'}</span>
+                    <span className="text-xs cms-min-text-xs font-black px-2 py-0.5 rounded bg-green-100 text-green-700 ">{q.section || 'Tổng hợp'}</span>
+                    <span className="text-xs cms-min-text-xs font-black px-2 py-0.5 rounded bg-gray-100 text-gray-500 ">{q.type === 'essay' ? 'Tự luận' : 'Trắc nghiệm'}</span>
                   </div>
                   <h4 className="font-bold text-sm text-slate-800 leading-relaxed mb-3">{q.q}</h4>
 
@@ -311,7 +311,7 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
                     <div className="space-y-3">
                       {q.sampleAnswer && (
                         <div className="bg-slate-50 p-4 rounded-xl">
-                          <p className="text-xs font-black text-slate-400 uppercase mb-1">Gợi ý trả lời:</p>
+                          <p className="text-xs font-black text-slate-400  mb-1">Gợi ý trả lời:</p>
                           <p className="text-xs text-slate-600 italic leading-relaxed">{q.sampleAnswer}</p>
                         </div>
                       )}

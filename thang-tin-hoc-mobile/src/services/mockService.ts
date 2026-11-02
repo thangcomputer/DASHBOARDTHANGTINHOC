@@ -26,7 +26,7 @@ import {
   mockStudentThreads,
 } from '../mocks/data';
 import type {
-  ChatMessage, Conversation, DemoNewsItem, DemoSoftwareLink, DemoTrainingCourse, DemoUser, LearningMaterial, ScheduleItem, UserRole,
+  AppNotification, ChatMessage, Conversation, DemoNewsItem, DemoSoftwareLink, DemoTrainingCourse, DemoUser, LearningMaterial, ScheduleItem, UserRole,
 } from '../types';
 import { Platform } from 'react-native';
 import {
@@ -41,9 +41,15 @@ import {
 import {
   getStudentAccountData,
   getStudentAssignments,
+  getStudentExamResults,
+  getStudentPaymentStatus,
   getTeacherAssignedStudents,
+  getTeacherAssignedStudentDetail,
+  updateTeacherAssignedStudent,
+  failTeacherAssignedStudentExam,
   submitStudentAssignment,
   type RawStudent,
+  type StudentPaymentStatus,
 } from './studentApi';
 import {
   createTeacherAssignment,
@@ -71,6 +77,9 @@ import {
   submitTeacherRating,
 } from './evaluationApi';
 import { getStudentEvaluationActivity, getStudentQuizzes } from './studentQuizApi';
+import {
+  createTeacherQuiz, deleteTeacherQuiz, generateTeacherQuizQuestions, getTeacherQuizzes,
+} from './teacherQuizApi';
 
 const qaState = __DEV__ ? process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE : undefined;
 const delay = (duration = qaState === 'loading' ? 3000 : 280) => new Promise((resolve) => setTimeout(resolve, duration));
@@ -146,7 +155,8 @@ function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleI
     enrollmentId: String(raw?.enrollmentId?._id || raw?.enrollmentId || ''),
     startTime,
     endTime,
-    note: String(raw?.studentNote || raw?.note || '').trim(),
+    note: String(raw?.attendancePendingNote || raw?.note || '').trim(),
+    studentNote: String(raw?.studentNote || '').trim(),
     attendanceStatus,
     learningMode: raw?.linkHoc ? 'Trực tuyến' : 'Trực tiếp',
     meetingUrl: String(raw?.linkHoc || raw?.meetingUrl || '').trim(),
@@ -169,7 +179,15 @@ async function readRealScheduleList(role: UserRole): Promise<ScheduleItem[]> {
   return payload.data.map((row) => mapRealScheduleRow(row, role));
 }
 
-function mapRealNotification(raw: Record<string, any>) {
+type NotificationPage = {
+  items: AppNotification[];
+  page: number;
+  pages: number;
+  total: number;
+  unread: number;
+};
+
+function mapRealNotification(raw: Record<string, any>): AppNotification {
   const createdAt = raw?.time || raw?.createdAt;
   const createdDate = createdAt ? new Date(createdAt) : null;
   const elapsedMinutes = createdDate && !Number.isNaN(createdDate.getTime())
@@ -206,7 +224,7 @@ function mapRealNotification(raw: Record<string, any>) {
     time,
     category: categoryByType[type] || String(raw?.category || 'Thông báo'),
     type,
-    targetPath: String(raw?.link || raw?.targetPath || ''),
+    targetPath: String(raw?.path || raw?.link || raw?.targetPath || ''),
     payload: raw?.payload && typeof raw.payload === 'object' ? raw.payload : undefined,
     unread: raw?.read !== true,
   };
@@ -589,7 +607,6 @@ export const authService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ oldPassword, newPassword }),
     });
-    await clearMobileSession();
   },
 };
 
@@ -832,28 +849,86 @@ export const materialService = {
 };
 
 export const notificationService = {
-  async list(_role: UserRole = 'student') {
-    if (__DEV__ && qaState === 'notification-25-items') {
-      const source = _role === 'teacher' ? mockTeacherNotifications : mockNotifications;
-      const fixture = Array.from({ length: 25 }, (_, index) => {
-        const item = source[index % source.length];
-        const id = `qa-notice-${index + 1}`;
-        return { ...item, id, title: `${item.title} · ${index + 1}`, unread: !qaAllNotificationsRead && !qaReadNotificationIds.has(id) && index % 2 === 0 };
-      });
-      return readMockList(fixture.filter((item) => !qaDismissedNotificationIds.has(item.id)));
-    }
+  async list(_role: UserRole = 'student', page = 1, limit = 20): Promise<NotificationPage> {
     if (__DEV__ && qaState) {
-      const source = _role === 'teacher' ? mockTeacherNotifications : mockNotifications;
-      return readMockList(source.filter((item) => !qaDismissedNotificationIds.has(item.id)).map((item) => ({
-        ...item,
-        unread: !qaAllNotificationsRead && !qaReadNotificationIds.has(item.id) && item.unread,
-      })));
+      let source: AppNotification[];
+      if (qaState === 'notification-25-items') {
+        const fixtureSource = _role === 'teacher' ? mockTeacherNotifications : mockNotifications;
+        source = Array.from({ length: 25 }, (_, index) => {
+          const item = fixtureSource[index % fixtureSource.length];
+          const id = `qa-notice-${index + 1}`;
+          return {
+            ...item,
+            id,
+            title: `${item.title} · ${index + 1}`,
+            unread: !qaAllNotificationsRead && !qaReadNotificationIds.has(id) && index % 2 === 0,
+          };
+        });
+      } else {
+        const mockSource = _role === 'teacher' ? mockTeacherNotifications : mockNotifications;
+        source = mockSource.map((item) => ({
+          ...item,
+          unread: !qaAllNotificationsRead && !qaReadNotificationIds.has(item.id) && item.unread,
+        }));
+      }
+      const visibleItems = await readMockList(source.filter((item) => !qaDismissedNotificationIds.has(item.id)));
+      const unread = visibleItems.filter((item) => item.unread).length;
+      const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+      const safePage = Math.max(1, Math.floor(page));
+      return {
+        items: visibleItems.slice((safePage - 1) * safeLimit, safePage * safeLimit),
+        page: safePage,
+        pages: Math.max(1, Math.ceil(visibleItems.length / safeLimit)),
+        total: visibleItems.length,
+        unread,
+      };
     }
-    const payload = await mobileApiRequest<{ data?: Record<string, any>[] }>('/notifications?page=1&limit=100');
-    if (!Array.isArray(payload.data)) {
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const safePage = Math.max(1, Math.floor(page));
+    const payload = await mobileApiRequest<{
+      data?: Record<string, any>[];
+      pagination?: { page?: number; pages?: number; total?: number };
+      unread?: number;
+    }>(`/notifications?page=${safePage}&limit=${safeLimit}`);
+    const responsePage = payload.pagination?.page;
+    const responsePages = payload.pagination?.pages;
+    const responseTotal = payload.pagination?.total;
+    const unread = payload.unread;
+    if (!Array.isArray(payload.data)
+      || typeof responsePage !== 'number'
+      || !Number.isInteger(responsePage)
+      || typeof responsePages !== 'number'
+      || !Number.isInteger(responsePages)
+      || typeof responseTotal !== 'number'
+      || !Number.isInteger(responseTotal)
+      || typeof unread !== 'number'
+      || !Number.isInteger(unread)) {
       throw new Error('Phản hồi danh sách thông báo không hợp lệ.');
     }
-    return payload.data.map(mapRealNotification);
+    const uniqueItems = new Map<string, AppNotification>();
+    for (const raw of payload.data) {
+      const item = mapRealNotification(raw);
+      if (!uniqueItems.has(item.id)) uniqueItems.set(item.id, item);
+    }
+    return {
+      items: [...uniqueItems.values()],
+      page: responsePage,
+      pages: Math.max(1, responsePages),
+      total: responseTotal,
+      unread,
+    };
+  },
+  async unreadCount(user?: DemoUser | null): Promise<number> {
+    if (__DEV__ && qaState) {
+      const result = await this.list(user?.role === 'teacher' ? 'teacher' : 'student', 1, 100);
+      return result.unread;
+    }
+    if (!user || user.previewMode) return 0;
+    const payload = await mobileApiRequest<{ count?: number }>('/notifications/count');
+    if (typeof payload.count !== 'number' || !Number.isInteger(payload.count) || payload.count < 0) {
+      throw new Error('Phản hồi số lượng thông báo chưa đọc không hợp lệ.');
+    }
+    return payload.count;
   },
   async markRead(notificationId?: string) {
     if (__DEV__ && qaState) {
@@ -935,6 +1010,38 @@ export const studentService = {
     if (user.role !== 'teacher') return [];
     return getTeacherAssignedStudents(user);
   },
+  async updateAssigned(
+    user: DemoUser | null | undefined,
+    studentId: string,
+    courseName: string,
+    updates: { notes?: string; linkHoc?: string; avgGrade?: number },
+  ) {
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được cập nhật học viên.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      throw new Error('Không thể lưu thay đổi học viên trong chế độ xem trước.');
+    }
+    return updateTeacherAssignedStudent(user, studentId, courseName, updates);
+  },
+  async detail(user: DemoUser | null | undefined, studentId: string) {
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được xem hồ sơ chi tiết học viên.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      return { attendance: [], examResults: [] };
+    }
+    return getTeacherAssignedStudentDetail(user, studentId);
+  },
+  async failExam(user: DemoUser | null | undefined, studentId: string, reason: string) {
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Chỉ giảng viên đã đăng nhập mới được đánh trượt học viên.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) {
+      throw new Error('Không thể đánh trượt học viên trong chế độ xem trước.');
+    }
+    return failTeacherAssignedStudentExam(user, studentId, reason);
+  },
 };
 
 export const learningService = {
@@ -958,9 +1065,10 @@ export const gradeService = {
     if (__DEV__ && qaState) return readMockList([]);
     if (user?.previewMode) return readMockList([]);
     if (!user || user.role !== 'student') throw new Error('Không thể tải điểm: tài khoản học viên không hợp lệ.');
-    const [assignments, quizzes] = await Promise.all([
+    const [assignments, quizzes, examResults] = await Promise.all([
       getStudentAssignments(user),
       getStudentQuizzes(user),
+      getStudentExamResults(user),
     ]);
     const assignmentRecords = assignments.flatMap((assignment) => assignment.grade == null ? [] : [{
       id: assignment.id,
@@ -988,7 +1096,17 @@ export const gradeService = {
           : undefined,
       }];
     });
-    return [...assignmentRecords, ...quizRecords];
+    return [...assignmentRecords, ...quizRecords, ...examResults];
+  },
+};
+
+export const studentPaymentService = {
+  async get(user: DemoUser | null | undefined): Promise<StudentPaymentStatus | null> {
+    if (!user || user.role !== 'student') {
+      throw new Error('Không thể tải trạng thái học phí: tài khoản học viên không hợp lệ.');
+    }
+    if (user.previewMode || (__DEV__ && qaState)) return null;
+    return getStudentPaymentStatus(user);
   },
 };
 
@@ -1276,11 +1394,28 @@ export const softwareService = {
 };
 
 export const quizService = {
-  async list() {
+  async list(user?: DemoUser | null) {
     if (qaState === 'quiz-empty') return readMockList([]);
     if (qaState === 'quiz-draft') return readMockList([{ ...mockQuizzes[0], id: 'qa-quiz-draft', title: 'Bản nháp trắc nghiệm', submissions: [] }]);
     if (qaState === 'quiz-results') return readMockList(mockQuizzes.map((quiz) => ({ ...quiz, submissions: [...quiz.submissions, { studentName: 'Học viên demo 3', score: 90, status: 'passed' as const }] })));
-    return readMockList(mockQuizzes);
+    if (__DEV__ && qaState) return readMockList(mockQuizzes);
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Không thể tải bài trắc nghiệm: tài khoản giảng viên không hợp lệ.');
+    }
+    if (user.previewMode) return readMockList(mockQuizzes);
+    return getTeacherQuizzes(user);
+  },
+  async create(user: DemoUser, input: Parameters<typeof createTeacherQuiz>[1]) {
+    if (__DEV__ && qaState) throw new Error('Không thể tạo bài trắc nghiệm thật trong chế độ UI QA.');
+    return createTeacherQuiz(user, input);
+  },
+  async remove(user: DemoUser, quizId: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể xóa bài trắc nghiệm thật trong chế độ UI QA.');
+    return deleteTeacherQuiz(user, quizId);
+  },
+  async generateAI(user: DemoUser, input: Parameters<typeof generateTeacherQuizQuestions>[1]) {
+    if (__DEV__ && qaState) throw new Error('Không thể gọi AI thật trong chế độ UI QA.');
+    return generateTeacherQuizQuestions(user, input);
   },
   async studentList(user?: DemoUser | null) {
     if (!user || user.role !== 'student') throw new Error('Không thể tải bài trắc nghiệm: tài khoản học viên không hợp lệ.');
@@ -1330,14 +1465,48 @@ export const financeService = {
 export const teacherFinanceService = {
   async overview(user: DemoUser | null | undefined): Promise<TeacherFinanceOverview> {
     if (!user) throw new Error('Không thể tải tài chính: tài khoản giảng viên không hợp lệ.');
-    if (__DEV__ && qaState) {
+    if (user.previewMode || (__DEV__ && qaState)) {
       const transactions = await financeService.list();
+      const salaryTransaction = transactions.find((transaction) => transaction.sessions > 0);
+      const mappedTransactions = transactions.map((transaction) => {
+        const [day, month, year] = transaction.date.split('/').map(Number);
+        const date = day && month && year
+          ? new Date(year, month - 1, day).toISOString()
+          : '';
+        return {
+          id: transaction.id,
+          description: transaction.note,
+          month: transaction.month,
+          amount: transaction.amount,
+          status: transaction.status === 'Đã nhận' ? 'confirmed' as const : 'pending' as const,
+          createdAt: date,
+          confirmedBy: 'Admin',
+          note: transaction.note,
+          sessions: transaction.sessions,
+          starBonusAmount: 0,
+          paymentSessionDetails: transaction.studentName
+            ? [{
+              sessionId: `${transaction.id}-session`,
+              studentId: transaction.studentName,
+              studentName: transaction.studentName,
+              date,
+              courseName: '',
+              allocatedAmount: transaction.studentAmount ?? transaction.amount,
+            }]
+            : [],
+        };
+      });
       return {
-        totalSessions: transactions.reduce((sum, transaction) => sum + transaction.sessions, 0),
+        totalSessions: mappedTransactions.reduce((sum, transaction) => sum + transaction.sessions, 0),
         paidAmount: transactions.filter((transaction) => transaction.status === 'Đã nhận').reduce((sum, transaction) => sum + transaction.amount, 0),
         unpaidAmount: transactions.filter((transaction) => transaction.status === 'Chưa nhận').reduce((sum, transaction) => sum + transaction.amount, 0),
-        salaryPerSession: 0,
-        pendingSessionsCount: 0,
+        salaryPerSession: salaryTransaction?.amount
+          ? Math.round(salaryTransaction.amount / salaryTransaction.sessions)
+          : 0,
+        pendingSessionsCount: transactions
+          .filter((transaction) => transaction.status === 'Chưa nhận')
+          .reduce((sum, transaction) => sum + transaction.sessions, 0),
+        transactions: mappedTransactions,
         pendingSessions: [],
       };
     }

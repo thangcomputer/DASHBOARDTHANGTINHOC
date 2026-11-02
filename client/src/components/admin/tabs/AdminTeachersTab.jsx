@@ -343,7 +343,7 @@ export default function AdminTeachersTab() {
 
                 <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="flex items-center justify-between sm:block gap-2 min-w-0">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Điểm / Sao</p>
+                    <p className="text-[10px] font-semibold text-slate-500 ">Điểm / Sao</p>
                     <div className="text-right sm:text-left min-w-0">
                       <p className={`text-[13px] font-bold sm:mt-0.5 ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
                         {score == null ? 'Chưa thi' : `${score}/100`}
@@ -354,13 +354,13 @@ export default function AdminTeachersTab() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:block gap-2 min-w-0">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Lương/buổi</p>
+                    <p className="text-[10px] font-semibold text-slate-500 ">Lương/buổi</p>
                     <p className="text-[13px] font-bold text-slate-800 sm:mt-0.5 tabular-nums">
                       {(Number(t.baseSalaryPerSession) || 0).toLocaleString('vi-VN')}đ
                     </p>
                   </div>
                   <div className="flex items-center justify-between sm:flex sm:flex-col sm:items-end gap-1 min-w-0">
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Trạng thái</p>
+                    <p className="text-[10px] font-semibold text-slate-500 ">Trạng thái</p>
                     <StatusBadge active={active} pending={pending} locked={locked} suspended={String(t.status).toLowerCase() === 'suspended'} />
                   </div>
                 </div>
@@ -397,13 +397,13 @@ export default function AdminTeachersTab() {
           <table className="w-full text-left border-collapse min-w-[960px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/70">
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Giảng viên</th>
-                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Chuyên môn</th>
-                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Điểm / Sao</th>
-                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lương/buổi</th>
-                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thực hành</th>
-                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
-                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center w-14" />
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500  tracking-wide">Giảng viên</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide">Chuyên môn</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide">Điểm / Sao</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide">Lương/buổi</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide">Thực hành</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500  tracking-wide text-center">Trạng thái</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500  tracking-wide text-center w-14" />
               </tr>
             </thead>
             <tbody>
@@ -440,7 +440,7 @@ export default function AdminTeachersTab() {
                           color={active ? 'bg-emerald-500' : passed ? 'bg-amber-500' : 'bg-slate-400'}
                         />
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate uppercase tracking-wide">{t.name}</p>
+                          <p className="text-sm font-bold text-slate-900 truncate  tracking-wide">{t.name}</p>
                           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
                             {joinDate && <span>{joinDate}</span>}
                             {t.phone && (

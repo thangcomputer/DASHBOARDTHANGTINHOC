@@ -131,7 +131,7 @@ export default function TeacherScheduleTab({
             <CheckCircle size={22} strokeWidth={2.3} className="relative drop-shadow-md" />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">Đã dạy tháng này</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide">Đã dạy tháng này</p>
             <p className="text-base sm:text-xl font-black text-emerald-600 leading-tight">
               {completedCount} <span className="text-xs font-semibold text-slate-400">buổi</span>
             </p>
@@ -144,7 +144,7 @@ export default function TeacherScheduleTab({
             <Clock size={22} strokeWidth={2.3} className="relative drop-shadow-md" />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">Buổi sắp tới</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide">Buổi sắp tới</p>
             <p className="text-base sm:text-xl font-black text-slate-800 leading-tight">
               {upcomingCount} <span className="text-xs font-semibold text-slate-400">buổi</span>
             </p>
@@ -157,7 +157,7 @@ export default function TeacherScheduleTab({
             <Ban size={22} strokeWidth={2.3} className="relative drop-shadow-md" />
           </div>
           <div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">Đã hủy</p>
+            <p className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide">Đã hủy</p>
             <p className="text-base sm:text-xl font-black text-rose-600 leading-tight">
               {cancelledCount} <span className="text-xs font-semibold text-slate-400">buổi</span>
             </p>

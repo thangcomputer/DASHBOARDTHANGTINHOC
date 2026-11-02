@@ -264,7 +264,7 @@ export default function TeacherTeachingLog({
                       <button
                         type="button"
                         onClick={() => openAttendanceFor(sch)}
-                        className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 hover:underline ${tone}`}
+                        className={`inline-flex items-center gap-1 text-[10px] font-black  tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 hover:underline ${tone}`}
                         title={
                           kind === 'overdue_attendance'
                             ? 'Mở yêu cầu điểm danh bù'
@@ -274,7 +274,7 @@ export default function TeacherTeachingLog({
                         {meta.shortLabel || meta.label}
                       </button>
                     ) : (
-                      <span className={`inline-flex text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
+                      <span className={`inline-flex text-[10px] font-black  tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
                         {meta.shortLabel || meta.label}
                       </span>
                     )}
@@ -289,7 +289,7 @@ export default function TeacherTeachingLog({
                       <button
                         type="button"
                         onClick={() => openAttendanceFor(sch)}
-                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-orange-600 text-white text-[10px] font-black uppercase hover:bg-orange-700"
+                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-orange-600 text-white text-[10px] font-black  hover:bg-orange-700"
                       >
                         <UserCheck size={12} /> {attendanceLabel}
                       </button>
@@ -312,7 +312,7 @@ export default function TeacherTeachingLog({
                           }
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-600 text-white text-[10px] font-black uppercase"
+                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-600 text-white text-[10px] font-black "
                         >
                           <Video size={12} /> Vào lớp
                         </a>

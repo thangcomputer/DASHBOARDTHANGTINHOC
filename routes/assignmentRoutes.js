@@ -353,6 +353,10 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
             title: '📝 Bài tập mới',
             content: `${newAssignment.assignedByRole === 'teacher' ? 'Giảng viên' : 'Admin'} vừa giao bài tập mới: "${newAssignment.title}"`,
             receivers: studentIds,
+            payload: {
+              assignmentId: String(newAssignment._id),
+              type: 'assignment',
+            },
             link: '/student#materials-assignments'
           });
         }
@@ -719,6 +723,10 @@ router.put('/submissions/:submissionId/grade', [authMiddleware, ...assignmentsGu
             ? `Giảng viên đã sửa điểm bài tập "${assignment?.title || 'không tên'}". Điểm mới: ${grade}/10.`
             : `Giảng viên đã chấm điểm bài tập "${assignment?.title || 'không tên'}". Điểm: ${grade}/10.`,
           receivers: submission.studentId.toString(),
+          payload: {
+            assignmentId: String(assignment?._id || submission.assignmentId || ''),
+            type: 'assignment',
+          },
           link: '/student#materials-assignments'
         });
 

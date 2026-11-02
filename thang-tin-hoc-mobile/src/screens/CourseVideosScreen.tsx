@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Eye, FileText, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, Sparkles, Star, StickyNote, Trophy, Volume2, VolumeX } from 'lucide-react-native';
-import { useAudioPlayer } from 'expo-audio';
+import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
 import RenderHtml from '@native-html/render';
 import type { MixedStyleDeclaration } from '@native-html/render';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +39,6 @@ const lessonHtmlTags: Record<string, MixedStyleDeclaration> = {
   li: { marginBottom: 6 },
   a: { color: '#E11D48', textDecorationLine: 'underline' },
 };
-const PRACTICE_NEXT_QUESTION_DELAY_MS = 500;
 const practiceFireworkRays: Array<[number, string, number]> = [
   [0, '#0F766E', 16], [30, '#C4A35A', 22], [60, '#0F766E', 16], [90, '#C4A35A', 22],
   [120, '#0F766E', 16], [150, '#C4A35A', 22], [180, '#0F766E', 16], [210, '#C4A35A', 22],
@@ -603,18 +602,11 @@ export function CourseVideosScreen() {
                 {section.id.startsWith('registered') ? <CheckCircle2 size={21} color="#059669" /> : section.id.startsWith('video') ? <Clapperboard size={21} color="#B45309" /> : <GraduationCap size={21} color="#0369A1" />}
               </View>
               <View style={styles.sectionCopy}>
-                <Text style={styles.eyebrow}>{section.id.startsWith('registered') ? 'LỘ TRÌNH CỦA BẠN' : section.id.startsWith('video') ? 'CHỦ ĐỘNG HỌC TẬP' : 'HỌC CÙNG GIẢNG VIÊN'}</Text>
+                <Text style={styles.eyebrow}>{section.id.startsWith('registered') ? 'Lộ trình của bạn' : section.id.startsWith('video') ? 'Chủ động học tập' : 'Học cùng giảng viên'}</Text>
                 <View style={styles.sectionTitleRow}>
                   <Text style={styles.sectionTitle}>{section.title}</Text>
                   <Text style={[styles.sectionCount, section.id.startsWith('registered') ? styles.registeredCount : section.id.startsWith('video') ? styles.videoCount : styles.instructorCount]}>{section.courses.length}</Text>
                 </View>
-                <Text style={styles.sectionDescription}>
-                  {section.id.startsWith('registered')
-                    ? 'Các khóa học bạn đã đăng ký và có thể tiếp tục học.'
-                    : section.id.startsWith('video')
-                      ? 'Học theo video bài giảng, linh hoạt theo thời gian của bạn.'
-                      : 'Học có giảng viên hướng dẫn và đồng hành.'}
-                </Text>
               </View>
             </View>
             <CourseList
@@ -773,7 +765,7 @@ export function CourseVideosScreen() {
                                       : <Text style={[styles.unitNavNumberText, active && styles.unitNavNumberTextActive]}>{index + 1}</Text>}
                                 </View>
                                 <Text numberOfLines={2} style={[styles.unitNavItemTitle, active && styles.unitNavItemTitleActive, unit.locked && styles.unitNavItemTitleLocked]}>{unit.title}</Text>
-                                {active ? <Text style={styles.unitNavCurrent}>ĐANG HỌC</Text> : null}
+                                {active ? <Text style={styles.unitNavCurrent}>Đang học</Text> : null}
                               </Pressable>
                               {active ? getUnitLearningSections(unit).map((section) => {
                                 const sectionActive = active && selectedLearningSectionId === section.id;
@@ -795,7 +787,7 @@ export function CourseVideosScreen() {
                                   >
                                     {done ? <CheckCircle2 size={14} color="#059669" /> : <ChevronRight size={14} color={colors.brand} />}
                                     <Text numberOfLines={2} style={[styles.unitNavSubItemText, sectionActive && styles.unitNavSubItemTextActive, locked && styles.unitNavItemTitleLocked]}>{section.title}</Text>
-                                    {done ? <Text style={styles.unitNavReplay}>HỌC LẠI</Text> : null}
+                                    {done ? <Text style={styles.unitNavReplay}>Học lại</Text> : null}
                                   </Pressable>
                                 );
                               }) : null}
@@ -805,79 +797,79 @@ export function CourseVideosScreen() {
                       </ScrollView>
                     </Animated.View>
                   </Animated.View>
-                  : null}
+                    : null}
                 </View>
               ) : (
                 <ScrollView style={styles.modalContentScroll} contentContainerStyle={styles.modalContentInner} showsVerticalScrollIndicator={false}>
-                {selectedSubject ? (
-                <>
-                  {unitsLoading ? <LoadingSkeleton rows={3} /> : null}
-                  {unitsError ? <Text style={styles.errorText}>{unitsError}</Text> : null}
-                  {!unitsLoading && !unitsError && !units.length ? <EmptyState title="Chưa có bài học" message="Nội dung sẽ hiển thị tại đây." /> : null}
-                  {!unitsLoading && !unitsError && units.length ? (
-                    unitNavOpen ? units.map((unit, index) => (
-                    <Pressable
-                      key={unit.id}
-                      onPress={() => void startUnit(unit)}
-                      disabled={openingUnit}
-                      style={[
-                        styles.unitRow,
-                        unit.locked && styles.unitRowLocked,
-                        unit.status === 'completed' && styles.unitRowCompleted,
-                        openingUnit && styles.unitRowBusy,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${unit.title}, ${unit.locked ? 'đang khóa' : unit.status === 'completed' ? 'đã hoàn thành, nhấn để xem lại' : unit.status === 'in_progress' ? 'đang học, nhấn để tiếp tục' : 'sẵn sàng học'}`}
-                      accessibilityState={{ disabled: openingUnit }}
-                    >
-                      <View style={[
-                        styles.unitNumber,
-                        unit.status === 'completed' && styles.unitNumberDone,
-                        unit.locked && styles.unitNumberLocked,
-                      ]}>
-                        {unit.status === 'completed'
-                          ? <CheckCircle2 size={17} color="#059669" />
-                          : unit.locked
-                            ? <Lock size={15} color="#94A3B8" />
-                            : <Text style={styles.unitNumberText}>{index + 1}</Text>}
-                      </View>
-                      <View style={styles.flex}>
-                        <Text style={[styles.unitTitle, unit.locked && styles.unitTitleLocked]}>{unit.title}</Text>
-                        <Text style={[styles.unitStatus, unit.locked && styles.unitStatusLocked]}>
-                          {unit.locked ? 'Hoàn thành buổi trước để mở' : unit.status === 'completed' ? 'Đã hoàn thành · Có thể xem lại' : unit.status === 'in_progress' ? 'Đang học · Chạm để tiếp tục' : 'Video và nội dung bài học'}
-                        </Text>
-                      </View>
-                      <View style={[
-                        styles.unitAction,
-                        unit.locked && styles.unitActionLocked,
-                        unit.status === 'completed' && styles.unitActionCompleted,
-                      ]}>
-                        {unit.locked ? <Lock size={13} color="#64748B" /> : unit.status === 'completed' ? <CheckCircle2 size={14} color="#047857" /> : <Play size={13} color="#FFFFFF" fill="#FFFFFF" />}
-                        <Text style={[
-                          styles.unitActionText,
-                          unit.locked && styles.unitActionTextLocked,
-                          unit.status === 'completed' && styles.unitActionTextCompleted,
-                        ]}>
-                          {unit.locked ? 'Khóa' : unit.status === 'completed' ? 'Xem lại' : unit.status === 'in_progress' ? 'Tiếp tục' : 'Vào học'}
-                        </Text>
-                      </View>
-                    </Pressable>
-                    )) : null
-                  ) : null}
-                </>
-                ) : (
-                (selectedCourse?.subjects || []).map((subject, index) => (
-                  <Pressable key={subject.id || `${subject.name}-${index}`} onPress={() => selectedCourse && void openSubject(selectedCourse, subject)} style={styles.subjectCard} accessibilityRole="button">
-                    <View style={styles.unitNumber}><Text style={styles.unitNumberText}>{String(index + 1).padStart(2, '0')}</Text></View>
-                    <View style={styles.flex}>
-                      <Text style={styles.unitTitle}>{subject.name}</Text>
-                      <Text style={styles.muted}>{subject.opened ? `${subject.completedUnitCount || 0}/${subject.totalUnitCount || 0} bài đã hoàn thành` : selectedCourse?.enrolled ? 'Chưa đăng ký' : 'Có bài học thử'}</Text>
-                      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${subject.totalUnitCount ? Math.min(100, Math.round(((subject.completedUnitCount || 0) / subject.totalUnitCount) * 100)) : 0}%` }]} /></View>
-                    </View>
-                    <ChevronRight size={18} color={colors.muted} />
-                  </Pressable>
-                ))
-                )}
+                  {selectedSubject ? (
+                    <>
+                      {unitsLoading ? <LoadingSkeleton rows={3} /> : null}
+                      {unitsError ? <Text style={styles.errorText}>{unitsError}</Text> : null}
+                      {!unitsLoading && !unitsError && !units.length ? <EmptyState title="Chưa có bài học" message="Nội dung sẽ hiển thị tại đây." /> : null}
+                      {!unitsLoading && !unitsError && units.length ? (
+                        unitNavOpen ? units.map((unit, index) => (
+                          <Pressable
+                            key={unit.id}
+                            onPress={() => void startUnit(unit)}
+                            disabled={openingUnit}
+                            style={[
+                              styles.unitRow,
+                              unit.locked && styles.unitRowLocked,
+                              unit.status === 'completed' && styles.unitRowCompleted,
+                              openingUnit && styles.unitRowBusy,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${unit.title}, ${unit.locked ? 'đang khóa' : unit.status === 'completed' ? 'đã hoàn thành, nhấn để xem lại' : unit.status === 'in_progress' ? 'đang học, nhấn để tiếp tục' : 'sẵn sàng học'}`}
+                            accessibilityState={{ disabled: openingUnit }}
+                          >
+                            <View style={[
+                              styles.unitNumber,
+                              unit.status === 'completed' && styles.unitNumberDone,
+                              unit.locked && styles.unitNumberLocked,
+                            ]}>
+                              {unit.status === 'completed'
+                                ? <CheckCircle2 size={17} color="#059669" />
+                                : unit.locked
+                                  ? <Lock size={15} color="#94A3B8" />
+                                  : <Text style={styles.unitNumberText}>{index + 1}</Text>}
+                            </View>
+                            <View style={styles.flex}>
+                              <Text style={[styles.unitTitle, unit.locked && styles.unitTitleLocked]}>{unit.title}</Text>
+                              <Text style={[styles.unitStatus, unit.locked && styles.unitStatusLocked]}>
+                                {unit.locked ? 'Hoàn thành buổi trước để mở' : unit.status === 'completed' ? 'Đã hoàn thành · Có thể xem lại' : unit.status === 'in_progress' ? 'Đang học · Chạm để tiếp tục' : 'Video và nội dung bài học'}
+                              </Text>
+                            </View>
+                            <View style={[
+                              styles.unitAction,
+                              unit.locked && styles.unitActionLocked,
+                              unit.status === 'completed' && styles.unitActionCompleted,
+                            ]}>
+                              {unit.locked ? <Lock size={13} color="#64748B" /> : unit.status === 'completed' ? <CheckCircle2 size={14} color="#047857" /> : <Play size={13} color="#FFFFFF" fill="#FFFFFF" />}
+                              <Text style={[
+                                styles.unitActionText,
+                                unit.locked && styles.unitActionTextLocked,
+                                unit.status === 'completed' && styles.unitActionTextCompleted,
+                              ]}>
+                                {unit.locked ? 'Khóa' : unit.status === 'completed' ? 'Xem lại' : unit.status === 'in_progress' ? 'Tiếp tục' : 'Vào học'}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        )) : null
+                      ) : null}
+                    </>
+                  ) : (
+                    (selectedCourse?.subjects || []).map((subject, index) => (
+                      <Pressable key={subject.id || `${subject.name}-${index}`} onPress={() => selectedCourse && void openSubject(selectedCourse, subject)} style={styles.subjectCard} accessibilityRole="button">
+                        <View style={styles.unitNumber}><Text style={styles.unitNumberText}>{String(index + 1).padStart(2, '0')}</Text></View>
+                        <View style={styles.flex}>
+                          <Text style={styles.unitTitle}>{subject.name}</Text>
+                          <Text style={styles.muted}>{subject.opened ? `${subject.completedUnitCount || 0}/${subject.totalUnitCount || 0} bài đã hoàn thành` : selectedCourse?.enrolled ? 'Chưa đăng ký' : 'Có bài học thử'}</Text>
+                          <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${subject.totalUnitCount ? Math.min(100, Math.round(((subject.completedUnitCount || 0) / subject.totalUnitCount) * 100)) : 0}%` }]} /></View>
+                        </View>
+                        <ChevronRight size={18} color={colors.muted} />
+                      </Pressable>
+                    ))
+                  )}
                 </ScrollView>
               )}
             </View>
@@ -930,7 +922,7 @@ function CourseCard({ course, onOpen, onRegister }: { course: LessonPracticeCour
           <View style={[styles.courseBanner, { backgroundColor: course.bannerColorStart || '#BE123C' }]}>
             {course.thumbnail ? <Image source={{ uri: course.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <View style={[styles.bannerRing, { borderColor: 'rgba(255,255,255,0.13)' }]} />}
             {!course.enrolled ? <View style={styles.lockBadge}><Lock size={14} color="#854D0E" /></View> : null}
-            <View style={styles.courseMode}><Clapperboard size={16} color="#B45309" /><Text style={styles.courseModeText}>{isVideo ? 'TỰ HỌC QUA VIDEO' : 'HỌC CÙNG GIẢNG VIÊN'}</Text></View>
+            <View style={styles.courseMode}><Clapperboard size={16} color="#B45309" /><Text style={styles.courseModeText}>{isVideo ? 'Tự học qua video' : 'Học cùng giảng viên'}</Text></View>
             <View style={styles.offerBadge}><Text style={styles.offerText}>{course.offerType === 'single' ? 'Khóa lẻ' : 'Trọn gói'}</Text></View>
           </View>
           <View style={styles.courseInfo}>
@@ -1088,59 +1080,103 @@ function UnitDetails({
   const [practiceProgressWidth, setPracticeProgressWidth] = useState(0);
   const [practiceFireworkIndex, setPracticeFireworkIndex] = useState(0);
   const practiceClockRef = useRef<{ key: string; deadline: number } | null>(null);
-  const praiseSoundPlayer = useAudioPlayer(require('../assets/audio/lesson-practice/praise-wonderful-male.mp3'));
-  const praiseQueueRef = useRef<Array<{ audio: number; resolve: () => void }>>([]);
-  const activePraiseRef = useRef<{ resolve: () => void; delayTimer: ReturnType<typeof setTimeout> | null; started: boolean } | null>(null);
-  const playNextPracticePraiseRef = useRef<() => void>(() => {});
+  const praiseSoundPlayersRef = useRef<Array<ReturnType<typeof createAudioPlayer>>>([]);
+  const praiseStartRefs = useRef<Array<() => void>>([]);
+  const praiseHasPlayedRef = useRef<boolean[]>([]);
+  const praiseQueueRef = useRef<number[]>([]);
+  const activePraiseRef = useRef<{
+    player: ReturnType<typeof createAudioPlayer>;
+    started: boolean;
+    starting: boolean;
+  } | null>(null);
+  const playNextPracticePraiseRef = useRef<() => void>(() => { });
   const playNextPracticePraise = useCallback(() => {
     if (activePraiseRef.current) return;
-    const queuedPraise = praiseQueueRef.current.shift();
-    if (!queuedPraise) return;
-    activePraiseRef.current = { resolve: queuedPraise.resolve, delayTimer: null, started: false };
-    try {
-      praiseSoundPlayer.replace(queuedPraise.audio);
-      praiseSoundPlayer.volume = 0.85;
-      praiseSoundPlayer.play();
-    } catch (error) {
-      activePraiseRef.current = null;
-      queuedPraise.resolve();
-      console.warn('Không thể phát âm thanh khen luyện tập.', error);
+    if (!praiseSoundPlayersRef.current.length) return;
+    const queuedPraiseIndex = praiseQueueRef.current.shift();
+    if (queuedPraiseIndex === undefined) return;
+    const player = praiseSoundPlayersRef.current[queuedPraiseIndex];
+    if (!player) {
+      console.warn('Không tìm thấy âm thanh khen luyện tập đã chọn.');
       playNextPracticePraiseRef.current();
+      return;
     }
-  }, [praiseSoundPlayer]);
+    activePraiseRef.current = { player, started: false, starting: false };
+    player.volume = 0.85;
+    praiseStartRefs.current[queuedPraiseIndex]?.();
+  }, []);
   playNextPracticePraiseRef.current = playNextPracticePraise;
   const playPracticePraise = useCallback((audio: number) => {
-    return new Promise<void>((resolve) => {
-      praiseQueueRef.current.push({ audio, resolve });
-      playNextPracticePraiseRef.current();
-    });
+    const praiseIndex = practicePraises.findIndex((praise) => praise.audio === audio);
+    if (praiseIndex < 0) {
+      console.warn('Không tìm thấy âm thanh khen luyện tập đã chọn.');
+      return;
+    }
+    praiseQueueRef.current.push(praiseIndex);
+    playNextPracticePraiseRef.current();
   }, []);
   useEffect(() => {
-    const subscription = praiseSoundPlayer.addListener('playbackStatusUpdate', (status) => {
+    const players = practicePraises.map(({ audio }) => createAudioPlayer(audio, { updateInterval: 100 }));
+    praiseSoundPlayersRef.current = players;
+    praiseHasPlayedRef.current = players.map(() => false);
+    const startPlayers = players.map((player, index) => () => {
       const activePraise = activePraiseRef.current;
-      if (!activePraise) return;
-      if (status.playing) activePraise.started = true;
-      if (!status.didJustFinish || !activePraise.started || activePraise.delayTimer) return;
-      activePraise.delayTimer = setTimeout(() => {
+      if (activePraise?.player !== player || activePraise.starting || !player.isLoaded) return;
+      activePraise.starting = true;
+      const handlePlaybackError = (error: unknown) => {
+        if (activePraiseRef.current === activePraise) {
+          activePraiseRef.current = null;
+          playNextPracticePraiseRef.current();
+        }
+        console.warn('Không thể phát âm thanh khen luyện tập.', error);
+      };
+      const start = () => {
         if (activePraiseRef.current !== activePraise) return;
-        activePraiseRef.current = null;
-        activePraise.resolve();
-        playNextPracticePraiseRef.current();
-      }, PRACTICE_NEXT_QUESTION_DELAY_MS);
+        try {
+          player.play();
+          praiseHasPlayedRef.current[index] = true;
+        } catch (error) {
+          handlePlaybackError(error);
+        }
+      };
+      if (praiseHasPlayedRef.current[index]) {
+        void player.seekTo(0).then(start).catch(handlePlaybackError);
+      } else {
+        start();
+      }
     });
-    return () => subscription.remove();
-  }, [praiseSoundPlayer]);
-   useEffect(() => {
-     let active = true;
-     getMobileSoundEnabled()
-       .then((enabled) => { if (active) setPracticeSoundEnabled(enabled); })
-       .catch(() => undefined);
-     const unsubscribe = subscribeToMobileSoundPreference(setPracticeSoundEnabled);
-     return () => {
-       active = false;
-       unsubscribe();
-     };
-   }, []);
+    praiseStartRefs.current = startPlayers;
+    const subscriptions = players.map((player, index) => player.addListener('playbackStatusUpdate', (status) => {
+      const activePraise = activePraiseRef.current;
+      if (activePraise?.player !== player) return;
+      if (status.isLoaded && !activePraise.starting) startPlayers[index]();
+      if (status.playing) activePraise.started = true;
+      if (!status.didJustFinish || !activePraise.started) return;
+      activePraiseRef.current = null;
+      playNextPracticePraiseRef.current();
+    }));
+    playNextPracticePraiseRef.current();
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+      players.forEach((player) => player.remove());
+      praiseSoundPlayersRef.current = [];
+      praiseStartRefs.current = [];
+      praiseHasPlayedRef.current = [];
+      praiseQueueRef.current = [];
+      activePraiseRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    getMobileSoundEnabled()
+      .then((enabled) => { if (active) setPracticeSoundEnabled(enabled); })
+      .catch(() => undefined);
+    const unsubscribe = subscribeToMobileSoundPreference(setPracticeSoundEnabled);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
   const sectionCelebration = useRef(sectionFireworkParticles.map(() => new Animated.Value(0))).current;
   const practiceProgressCelebration = useRef(new Animated.Value(0)).current;
   const practiceCompletionRings = useRef([new Animated.Value(0), new Animated.Value(0)]).current;
@@ -1390,19 +1426,19 @@ function UnitDetails({
                 <Sparkles size={13} color="#D97706" />
                 <Text style={styles.practiceStreakText}>Chuỗi đúng: {currentPracticeStats.streak}</Text>
               </View>
-            <Pressable
-              onPress={() => {
-                void setMobileSoundEnabled(!practiceSoundEnabled)
-                  .then(() => setPracticeSoundEnabled(!practiceSoundEnabled))
-                  .catch((error: unknown) => Alert.alert('Không thể đổi âm thanh', error instanceof Error ? error.message : 'Vui lòng thử lại.'));
-              }}
-              style={styles.practiceSoundButton}
-              accessibilityRole="button"
-              accessibilityLabel={practiceSoundEnabled ? 'Tắt âm thanh luyện tập' : 'Bật âm thanh luyện tập'}
-              accessibilityState={{ checked: practiceSoundEnabled }}
-            >
-              {practiceSoundEnabled ? <Volume2 size={16} color={colors.brand} /> : <VolumeX size={16} color={colors.muted} />}
-            </Pressable>
+              <Pressable
+                onPress={() => {
+                  void setMobileSoundEnabled(!practiceSoundEnabled)
+                    .then(() => setPracticeSoundEnabled(!practiceSoundEnabled))
+                    .catch((error: unknown) => Alert.alert('Không thể đổi âm thanh', error instanceof Error ? error.message : 'Vui lòng thử lại.'));
+                }}
+                style={styles.practiceSoundButton}
+                accessibilityRole="button"
+                accessibilityLabel={practiceSoundEnabled ? 'Tắt âm thanh luyện tập' : 'Bật âm thanh luyện tập'}
+                accessibilityState={{ checked: practiceSoundEnabled }}
+              >
+                {practiceSoundEnabled ? <Volume2 size={16} color={colors.brand} /> : <VolumeX size={16} color={colors.muted} />}
+              </Pressable>
               {practiceTimeLimit > 0 ? (
                 <View style={[styles.practiceClock, practiceRemaining > 0 && practiceRemaining <= 10 && styles.practiceClockWarning]}>
                   <Clock3 size={15} color={practiceRemaining > 0 && practiceRemaining <= 10 ? '#DC2626' : '#334155'} />
@@ -1416,67 +1452,69 @@ function UnitDetails({
           {practiceItems.length ? (
             <View style={styles.practiceContent}>
               <View style={styles.practiceProgressArea}>
-              <View style={styles.practiceProgressTrack}>
-                <View style={[styles.practiceProgressFill, { width: `${(completedPracticeCount / practiceItems.length) * 100}%` }]} />
-              </View>
-              <View
-                onLayout={(event) => setPracticeProgressWidth(event.nativeEvent.layout.width)}
-                style={styles.practiceSteps}
-                accessibilityLabel={`Tiến độ câu hỏi: ${completedPracticeCount} trên ${practiceItems.length} câu đúng`}
-              >
-                {practiceItems.map((item, index) => {
-                  const done = item.confirmed === true && item.correct === true;
-                  const active = index === currentPracticeIndex;
-                  return (
-                    <View key={item.id} style={[styles.practiceStep, done && styles.practiceStepDone, currentPracticeStats.wrongIds.includes(item.id) && !done && styles.practiceStepRetry, active && styles.practiceStepActive]}>
-                      <Text style={[styles.practiceStepText, done && styles.practiceStepTextDone, active && styles.practiceStepTextActive]}>{done ? '✓' : index + 1}</Text>
-                    </View>
-                  );
-                })}
-                {currentPracticeItem && !practiceComplete ? (
-                  <View pointerEvents="none" style={styles.practiceProgressFireworkOverlay}>
-                    {[0, 1].map((ringIndex) => {
-                      const progress = practiceProgressCelebration.interpolate({
-                        inputRange: [0, 0.12 + ringIndex * 0.08, 0.84, 1],
-                        outputRange: [0, 0, 0.9, 0],
-                      });
-                      return (
+                <View style={styles.practiceProgressTrack}>
+                  <View style={[styles.practiceProgressFill, { width: `${(completedPracticeCount / practiceItems.length) * 100}%` }]} />
+                </View>
+                <View
+                  onLayout={(event) => setPracticeProgressWidth(event.nativeEvent.layout.width)}
+                  style={styles.practiceSteps}
+                  accessibilityLabel={`Tiến độ câu hỏi: ${completedPracticeCount} trên ${practiceItems.length} câu đúng`}
+                >
+                  {practiceItems.map((item, index) => {
+                    const done = item.confirmed === true && item.correct === true;
+                    const active = index === currentPracticeIndex;
+                    return (
+                      <View key={item.id} style={[styles.practiceStep, done && styles.practiceStepDone, currentPracticeStats.wrongIds.includes(item.id) && !done && styles.practiceStepRetry, active && styles.practiceStepActive]}>
+                        <Text style={[styles.practiceStepText, done && styles.practiceStepTextDone, active && styles.practiceStepTextActive]}>{done ? '✓' : index + 1}</Text>
+                      </View>
+                    );
+                  })}
+                  {currentPracticeItem && !practiceComplete ? (
+                    <View pointerEvents="none" style={styles.practiceProgressFireworkOverlay}>
+                      {[0, 1].map((ringIndex) => {
+                        const progress = practiceProgressCelebration.interpolate({
+                          inputRange: [0, 0.12 + ringIndex * 0.08, 0.84, 1],
+                          outputRange: [0, 0, 0.9, 0],
+                        });
+                        return (
+                          <Animated.View
+                            key={`ring-${ringIndex}`}
+                            style={[
+                              styles.practiceFireworkRing,
+                              {
+                                left: progressMarkerOffset,
+                                borderColor: ringIndex === 0 ? '#0F766E' : '#C4A35A',
+                                opacity: progress,
+                                transform: [{ scale: progress.interpolate({ inputRange: [0, 0.9], outputRange: [0.2, 1.8 + ringIndex * 0.6] }) }],
+                              },
+                            ]}
+                          />
+                        );
+                      })}
+                      {practiceFireworkRays.map(([angle, color, size], particleIndex) => (
                         <Animated.View
-                          key={`ring-${ringIndex}`}
+                          key={particleIndex}
                           style={[
-                            styles.practiceFireworkRing,
+                            styles.practiceFireworkRay,
                             {
+                              backgroundColor: color,
                               left: progressMarkerOffset,
-                              borderColor: ringIndex === 0 ? '#0F766E' : '#C4A35A',
-                              opacity: progress,
-                              transform: [{ scale: progress.interpolate({ inputRange: [0, 0.9], outputRange: [0.2, 1.8 + ringIndex * 0.6] }) }],
+                              top: '50%',
+                              opacity: practiceProgressCelebration.interpolate({ inputRange: [0, 0.12, 0.84, 1], outputRange: [0, 1, 0.85, 0] }),
+                            },
+                            {
+                              transform: [
+                                { rotate: `${angle}deg` },
+                                { translateY: practiceProgressCelebration.interpolate({ inputRange: [0, 1], outputRange: [0, -size] }) },
+                                { scaleY: practiceProgressCelebration.interpolate({ inputRange: [0, 0.85], outputRange: [0.2, 1] }) },
+                              ]
                             },
                           ]}
                         />
-                      );
-                    })}
-                    {practiceFireworkRays.map(([angle, color, size], particleIndex) => (
-                      <Animated.View
-                        key={particleIndex}
-                        style={[
-                          styles.practiceFireworkRay,
-                          {
-                            backgroundColor: color,
-                            left: progressMarkerOffset,
-                            top: '50%',
-                            opacity: practiceProgressCelebration.interpolate({ inputRange: [0, 0.12, 0.84, 1], outputRange: [0, 1, 0.85, 0] }),
-                          },
-                          { transform: [
-                            { rotate: `${angle}deg` },
-                            { translateY: practiceProgressCelebration.interpolate({ inputRange: [0, 1], outputRange: [0, -size] }) },
-                            { scaleY: practiceProgressCelebration.interpolate({ inputRange: [0, 0.85], outputRange: [0.2, 1] }) },
-                          ] },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                ) : null}
-              </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
               </View>
               {currentPracticeItem && !practiceComplete ? (
                 <PracticeQuestion
@@ -1494,7 +1532,7 @@ function UnitDetails({
               ) : (
                 <View style={styles.practiceResultCard}>
                   <View style={styles.practiceResultIcon}><Trophy size={30} color="#059669" /></View>
-                  <Text style={styles.practiceResultEyebrow}>ĐÃ HOÀN THÀNH BÀI LUYỆN TẬP</Text>
+                  <Text style={styles.practiceResultEyebrow}>Đã hoàn thành bài luyện tập</Text>
                   <Text style={styles.practiceResultTitle}>Bạn đã hoàn thành rất tốt!</Text>
                   <Text style={styles.practiceResultSummary}>
                     Đúng {completedPracticeCount}/{practiceItems.length} câu{currentPracticeStats.wrongAttempts ? ` với ${currentPracticeStats.wrongAttempts} lượt trả lời sai.` : '.'}
@@ -1612,11 +1650,13 @@ function UnitDetails({
                         top: '50%',
                         opacity: progress.interpolate({ inputRange: [0, 0.1, 0.84, 1], outputRange: [0, 1, 0.8, 0] }),
                       },
-                      { transform: [
-                        { rotate: `${angle}deg` },
-                        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 1.8] }) },
-                        { scaleY: progress.interpolate({ inputRange: [0, 0.85], outputRange: [0.25, 1] }) },
-                      ] },
+                      {
+                        transform: [
+                          { rotate: `${angle}deg` },
+                          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 1.8] }) },
+                          { scaleY: progress.interpolate({ inputRange: [0, 0.85], outputRange: [0.25, 1] }) },
+                        ]
+                      },
                     ]}
                   />
                 );
@@ -1815,7 +1855,7 @@ function VideoLessonPane({
           />
         ) : (
           <View style={styles.videoStartOverlay}>
-            <View style={styles.videoBrandBadge}><Text style={styles.videoBrandText}>THẮNG TIN HỌC</Text></View>
+            <View style={styles.videoBrandBadge}><Text style={styles.videoBrandText}>Thắng Tin Học</Text></View>
             <Pressable
               onPress={startVideo}
               disabled={!url}
@@ -1862,7 +1902,7 @@ function VideoLessonPane({
                 </View>
               ) : null}
             </View>
-            <Text style={styles.videoDescriptionLabel}>MÔ TẢ BÀI GIẢNG</Text>
+            <Text style={styles.videoDescriptionLabel}>Mô tả bài giảng</Text>
             <Text style={styles.videoDescription}>
               Theo dõi video để nắm kiến thức. Hệ thống ghi nhận tiến độ khi bạn xem đủ thời lượng yêu cầu.
             </Text>
@@ -1908,7 +1948,7 @@ function PracticeQuestion({
   soundEnabled: boolean;
   onChoosePraise: () => PracticePraise;
   onChooseEncouragement: () => string;
-  onPlayPraise: (audio: number) => Promise<void>;
+  onPlayPraise: (audio: number) => void;
   onCelebrateCorrect: () => void;
   onAdvancePractice: () => Promise<void>;
   onSubmit: (answer: Record<string, unknown>) => Promise<LessonPracticeItem | null>;
@@ -1970,11 +2010,10 @@ function PracticeQuestion({
       setFeedback(!correct && resultFeedback.trim() === 'Bạn sai rồi, vui lòng chọn lại đáp án'
         ? ''
         : resultFeedback || (correct ? 'Bạn đã chọn đúng đáp án!' : 'Mình cùng xem lại câu hỏi rồi thử tiếp nhé.'));
-      let feedbackPlayback: Promise<void> | null = null;
       if (correct) onCelebrateCorrect();
       if (soundEnabled) {
         if (correct && selectedPraise) {
-          feedbackPlayback = onPlayPraise(selectedPraise.audio);
+          onPlayPraise(selectedPraise.audio);
         } else if (Platform.OS === 'web') {
           playWebPracticeFeedbackSound(false);
         } else {
@@ -2006,11 +2045,6 @@ function PracticeQuestion({
         if (['mcq', 'multi', 'match', 'drag', 'hotspot'].includes(item.type)) setCooldown(10);
       }
       if (correct) {
-        if (feedbackPlayback) {
-          await feedbackPlayback;
-        } else {
-          await new Promise<void>((resolve) => setTimeout(resolve, PRACTICE_NEXT_QUESTION_DELAY_MS));
-        }
         await onAdvancePractice();
       }
     } finally {
@@ -2027,7 +2061,7 @@ function PracticeQuestion({
 
   return (
     <Animated.View style={[styles.practiceQuestion, { transform: [{ translateX: shake }] }]}>
-      <Text style={styles.practiceQuestionEyebrow}>CÂU {index + 1}</Text>
+      <Text style={styles.practiceQuestionEyebrow}>Câu {index + 1}</Text>
       <Text style={styles.practiceQuestionTitle}>{item.prompt || 'Bài luyện tập'}</Text>
       {item.imageUrl ? (
         <Pressable
@@ -2270,9 +2304,9 @@ const styles = StyleSheet.create({
   tooltipHeading: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
   tooltipLine: { color: '#475569', fontSize: typography.caption, lineHeight: 16 },
   tooltipWarning: { marginTop: 2, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#FEE2E2', color: colors.ink, fontSize: typography.micro, lineHeight: 15, fontWeight: '700' },
-  registerButton: { minHeight: 32, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: '#ECFDF5' },
+  registerButton: { minHeight: 32, justifyContent: 'center', paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#ECFDF5' },
   registerText: { color: '#047857', fontSize: typography.micro, fontWeight: '900' },
-  openButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: '#FEF2F2' },
+  openButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: '#FEF2F2' },
   openButtonActive: { backgroundColor: '#ECFDF5' },
   openButtonText: { color: '#B91C1C', fontSize: typography.micro, fontWeight: '900' },
   openButtonTextActive: { color: '#047857' },
@@ -2309,7 +2343,7 @@ const styles = StyleSheet.create({
   unitTitleLocked: { color: '#64748B' },
   unitStatus: { marginTop: 4, color: colors.muted, fontSize: typography.micro, lineHeight: 16 },
   unitStatusLocked: { color: '#94A3B8' },
-  unitAction: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.brand },
+  unitAction: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderRadius: radius.sm, backgroundColor: colors.brand },
   unitActionLocked: { backgroundColor: '#E2E8F0' },
   unitActionCompleted: { backgroundColor: '#D1FAE5' },
   unitActionText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900' },
@@ -2372,7 +2406,7 @@ const styles = StyleSheet.create({
   videoTabTextActive: { color: colors.brandDark, fontWeight: '900' },
   videoOverview: { minHeight: 155, gap: spacing.sm, padding: spacing.md },
   videoOverviewHeading: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
-  videoSubjectEyebrow: { color: '#047857', fontSize: typography.micro, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
+  videoSubjectEyebrow: { color: '#047857', fontSize: typography.micro, fontWeight: '900', letterSpacing: 1.1 },
   videoOverviewTitle: { marginTop: 5, color: colors.ink, fontSize: typography.body, fontWeight: '900' },
   videoDescriptionLabel: { marginTop: spacing.xs, color: '#64748B', fontSize: typography.micro, fontWeight: '900', letterSpacing: 1.1 },
   videoDescription: { color: '#475569', fontSize: typography.caption, lineHeight: 21 },
@@ -2417,7 +2451,7 @@ const styles = StyleSheet.create({
   practiceClockWarning: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
   practiceClockText: { color: '#334155', fontSize: typography.micro, fontWeight: '900', fontVariant: ['tabular-nums'] },
   practiceProgressText: { marginTop: 3, color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
-  practiceSoundButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.pill, backgroundColor: '#FFFFFF' },
+  practiceSoundButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.sm, backgroundColor: '#FFFFFF' },
   practiceProgressTrack: { height: 5, overflow: 'hidden', marginHorizontal: spacing.xs, borderRadius: radius.pill, backgroundColor: '#E2E8F0' },
   practiceProgressFill: { height: '100%', borderRadius: radius.pill, backgroundColor: '#10B981' },
   practiceSteps: { position: 'relative', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.xs },
@@ -2444,7 +2478,7 @@ const styles = StyleSheet.create({
   practiceChoiceTextWrong: { color: '#B91C1C' },
   practiceChoiceTextCorrect: { color: '#047857' },
   practiceHintWrap: { gap: spacing.xs, alignItems: 'flex-start' },
-  practiceHintButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#FCD34D', borderRadius: radius.pill, backgroundColor: '#FFFBEB' },
+  practiceHintButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#FCD34D', borderRadius: radius.sm, backgroundColor: '#FFFBEB' },
   practiceHintButtonText: { color: '#92400E', fontSize: typography.micro, fontWeight: '800' },
   practiceHintText: { color: '#92400E', fontSize: typography.caption, lineHeight: 18 },
   practiceInput: { minHeight: 90, padding: spacing.sm, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.sm, backgroundColor: '#FFFFFF', color: colors.ink, textAlignVertical: 'top' },

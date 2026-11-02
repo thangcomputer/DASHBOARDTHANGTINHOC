@@ -78,19 +78,19 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-center">
           <p className="text-2xl sm:text-3xl font-bold text-sky-700">{created}</p>
-          <p className="text-[10px] uppercase font-bold text-sky-500 mt-1 tracking-wider">Đã xếp</p>
+          <p className="text-[10px]  font-bold text-sky-500 mt-1 tracking-wider">Đã xếp</p>
         </div>
         <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
           <p className="text-2xl sm:text-3xl font-bold text-amber-600">{updated}</p>
-          <p className="text-[10px] uppercase font-bold text-amber-500 mt-1 tracking-wider">Đổi ca</p>
+          <p className="text-[10px]  font-bold text-amber-500 mt-1 tracking-wider">Đổi ca</p>
         </div>
         <div className="rounded-2xl border border-red-100 bg-red-50 p-3 text-center">
           <p className="text-2xl sm:text-3xl font-bold text-red-600">{cancelled}</p>
-          <p className="text-[10px] uppercase font-bold text-red-500 mt-1 tracking-wider">Đã huỷ</p>
+          <p className="text-[10px]  font-bold text-red-500 mt-1 tracking-wider">Đã huỷ</p>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center">
           <p className="text-2xl sm:text-3xl font-bold text-slate-600">{cancelRate}%</p>
-          <p className="text-[10px] uppercase font-bold text-slate-500 mt-1 tracking-wider">Tỷ lệ hủy</p>
+          <p className="text-[10px]  font-bold text-slate-500 mt-1 tracking-wider">Tỷ lệ hủy</p>
         </div>
       </div>
 
@@ -112,7 +112,7 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50/50 text-slate-500 text-[10px] uppercase font-black border-b border-slate-100 tracking-wider">
+              <thead className="bg-slate-50/50 text-slate-500 text-[10px]  font-black border-b border-slate-100 tracking-wider">
                 <tr>
                   <th className="px-4 py-3 w-[130px]">Lúc</th>
                   <th className="px-4 py-3 w-[110px]">Hành động</th>

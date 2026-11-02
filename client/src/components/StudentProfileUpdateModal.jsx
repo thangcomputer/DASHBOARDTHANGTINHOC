@@ -54,12 +54,11 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
             <X size={16} />
           </button>
         </div>
-        
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Họ và Tên</label>
-            <input 
-              type="text" 
+            <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Họ và Tên</label>
+            <input
+              type="text"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
@@ -69,39 +68,36 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Giới tính chọn ảnh đại diện</label>
+            <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Giới tính chọn ảnh đại diện</label>
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: 'male' })}
-                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
-                  formData.gender === 'male' || formData.gender === 'Nam'
+                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'male' || formData.gender === 'Nam'
                     ? 'bg-teal-50 text-teal-700 border-teal-300 ring-2 ring-teal-400/20 shadow-sm'
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                }`}
+                  }`}
               >
-                <span>👨 Nam (Cartoon Nam)</span>
+                <span>👨 Nam</span>
               </button>
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, gender: 'female' })}
-                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
-                  formData.gender === 'female' || formData.gender === 'Nữ'
+                className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${formData.gender === 'female' || formData.gender === 'Nữ'
                     ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
                     : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                }`}
+                  }`}
               >
-                <span>👩 Nữ (Cartoon Nữ)</span>
+                <span>👩 Nữ</span>
               </button>
             </div>
           </div>
-          
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Số điện thoại</label>
+              <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Số điện thoại</label>
               <div className="relative">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
@@ -112,10 +108,10 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               <p className="text-[9px] text-red-500 mt-1 pl-1 italic">* Liên hệ Admin để đổi SĐT.</p>
             </div>
             <div>
-              <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">SĐT Liên hệ 2</label>
+              <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">SĐT Liên hệ 2</label>
               <div className="relative">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.zalo}
                   onChange={e => setFormData({ ...formData, zalo: e.target.value })}
                   className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
@@ -124,12 +120,11 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
               </div>
             </div>
           </div>
-          
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Email</label>
+            <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Email</label>
             <div className="relative">
-              <input 
-                type="email" 
+              <input
+                type="email"
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
@@ -140,10 +135,10 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest pl-1 mb-1 block">Địa chỉ</label>
+            <label className="text-[10px] font-black  text-gray-500 tracking-widest pl-1 mb-1 block">Địa chỉ</label>
             <div className="relative">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={formData.address}
                 onChange={e => setFormData({ ...formData, address: e.target.value })}
                 className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition"
@@ -153,10 +148,10 @@ const StudentProfileUpdateModal = ({ student, onClose }) => {
             </div>
           </div>
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl shadow-lg shadow-teal-200 transition active:scale-95 disabled:opacity-50"
+            className="w-full mt-6 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black text-xs  tracking-widest py-3.5 rounded-xl shadow-lg shadow-teal-200 transition active:scale-95 disabled:opacity-50"
           >
             {loading ? 'Đang lưu...' : <><Save size={16} /> Lưu thông tin</>}
           </button>

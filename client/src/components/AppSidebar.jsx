@@ -29,7 +29,7 @@ const formatTime = (date) => {
 // ─── Cấu hình menu theo role ──────────────────────────────────────────────────
 const MENU_CONFIG = {
   student: {
-    brand: { label: 'HỌC VIÊN', color: 'from-slate-900 to-indigo-950' },
+    brand: { label: 'Học viên', color: 'from-slate-900 to-indigo-950' },
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/student', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
@@ -50,7 +50,7 @@ const MENU_CONFIG = {
     activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md',
   },
   teacher: {
-    brand: { label: 'GIẢNG VIÊN', color: 'from-slate-900 to-indigo-950' },
+    brand: { label: 'Giảng viên', color: 'from-slate-900 to-indigo-950' },
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/teacher' },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/teacher/inbox' },
@@ -71,7 +71,7 @@ const MENU_CONFIG = {
     activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md',
   },
   admin: {
-    brand: { label: 'QUẢN TRỊ', color: 'from-slate-900 to-indigo-950' },
+    brand: { label: 'Quản trị', color: 'from-slate-900 to-indigo-950' },
     items: [
       {
         key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard', permission: [

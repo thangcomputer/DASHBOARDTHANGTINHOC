@@ -4,6 +4,8 @@
 
 Đây là bản kiểm kê UI/UX lịch sử, không phản ánh các tích hợp API đã được thêm sau đó. Trạng thái API hiện tại được theo dõi trong [`MOBILE_WEB_API_PARITY_REPORT.md`](./MOBILE_WEB_API_PARITY_REPORT.md). Các nội dung bên dưới chỉ mô tả trạng thái khi kiểm kê.
 
+**Ghi chú cập nhật:** các nhận định lịch sử trong bảng không phải trạng thái hiện tại. Source hiện đã có API cập nhật hồ sơ/đổi mật khẩu, kết quả kiểm tra từ `full-detail`, trạng thái thanh toán tổng thể, và form hồ sơ xếp số điện thoại theo cột trên màn hình hẹp. Xem báo cáo API hiện tại ở trên; các mục chưa xác minh staging/native vẫn được ghi rõ tại đó.
+
 ## Nguồn web đã đối chiếu
 
 - `client/src/components/student/StudentOverviewTab.jsx`

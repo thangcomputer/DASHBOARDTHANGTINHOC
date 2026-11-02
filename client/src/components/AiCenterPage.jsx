@@ -167,7 +167,7 @@ export default function AiCenterPage() {
       {result && (
         <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-black text-gray-500 uppercase">
+            <p className="text-xs font-black text-gray-500 ">
               Ket qua · {result.source || 'llm'}
               {result.model ? ` · ${result.model}` : ''}
             </p>

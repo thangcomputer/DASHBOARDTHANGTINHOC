@@ -137,14 +137,14 @@ export default function StudentQuizList() {
               >
                 <div className="min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black uppercase break-words min-w-0">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-black  break-words min-w-0">
                       {quiz.courseName || 'Bài thi buổi học'}
                     </span>
                     {hasSubmitted && (
-                      <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                      <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-black  border ${
                         isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
                       }`}>
-                        {isForfeit ? 'RỚT · THOÁT' : (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT')}
+                        {isForfeit ? 'Rớt · thoát' : (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT')}
                       </span>
                     )}
                   </div>

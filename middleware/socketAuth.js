@@ -5,13 +5,18 @@ const jwt = require('jsonwebtoken');
 const blacklist = require('./tokenBlacklist');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
+const SystemSettings = require('../models/SystemSettings');
 const logger = require('../config/logger');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 
 async function verifyTokenVersion(decoded) {
-  if (!decoded.id || decoded.id === 'admin' || decoded.tokenVersion === undefined) {
-    return true;
+  if (!decoded.id) return true;
+  if (decoded.id === 'admin') {
+    if (decoded.tokenVersion === undefined) return false;
+    const settings = await SystemSettings.findOne({ _key: 'main' }).select('adminTokenVersion').lean();
+    return (settings?.adminTokenVersion || 0) === decoded.tokenVersion;
   }
+  if (decoded.tokenVersion === undefined) return true;
 
   let dbUser = null;
   if (decoded.role === 'student') {

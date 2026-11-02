@@ -41,6 +41,7 @@ export type TeacherProfileUpdate = {
   bio: string;
   voiceRegion: string;
   bankAccount: {
+    bankCode: string;
     bankName: string;
     accountNumber: string;
     accountHolder: string;
@@ -54,6 +55,26 @@ export type TeacherFinanceOverview = {
   unpaidAmount: number;
   salaryPerSession: number;
   pendingSessionsCount: number;
+  transactions: Array<{
+    id: string;
+    description: string;
+    month: string;
+    amount: number;
+    status: 'pending' | 'confirmed' | 'cancelled';
+    createdAt: string;
+    confirmedBy: string;
+    note: string;
+    sessions: number;
+    starBonusAmount: number;
+    paymentSessionDetails: Array<{
+      sessionId: string;
+      studentId: string;
+      studentName: string;
+      date: string;
+      courseName: string;
+      allocatedAmount: number;
+    }>;
+  }>;
   pendingSessions: Array<{
     id: string;
     date: string;
@@ -257,55 +278,133 @@ export async function getTeacherTrainingCourses(user: DemoUser): Promise<DemoTra
           title: asText(lessonRecord.title, `Bài ${lessonIndex + 1}`),
           duration: asText(lessonRecord.duration, '—'),
           completed: lessonRecord.completed === true,
+          url: asText(lessonRecord.url),
+          watchedSeconds: Math.max(0, asNumber(lessonRecord.watchedSeconds)),
+          antiSeek: lessonRecord.antiSeek === true,
         };
       }),
       files: files.map((file) => {
         const fileRecord = asRecord(file);
         return asText(fileRecord.title || fileRecord.name, 'Tài liệu');
       }),
+      fileLinks: files.map((file) => {
+        const fileRecord = asRecord(file);
+        return {
+          title: asText(fileRecord.title || fileRecord.name, 'Tài liệu'),
+          url: asText(fileRecord.url || fileRecord.fileUrl || fileRecord.link),
+          type: asText(fileRecord.type, 'Tài liệu'),
+          size: asText(fileRecord.size),
+        };
+      }),
       notices: notices.filter((notice): notice is string => typeof notice === 'string'),
     };
   });
+}
+
+export async function saveTeacherTrainingWatchProgress(
+  user: DemoUser,
+  input: { courseId: string; lessonId: string; watchedSeconds: number; videoDuration: number },
+) {
+  if (user.role !== 'teacher' || !user.id) {
+    throw new Error('Không thể lưu tiến độ đào tạo: tài khoản giảng viên không hợp lệ.');
+  }
+  if (!input.courseId || !input.lessonId || !Number.isFinite(input.watchedSeconds) || !Number.isFinite(input.videoDuration)) {
+    throw new Error('Không thể lưu tiến độ đào tạo: dữ liệu bài học không hợp lệ.');
+  }
+  await mobileApiRequest('/training-lms/save-watch-progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function completeTeacherTrainingLesson(
+  user: DemoUser,
+  input: { courseId: string; lessonId: string; watchedSeconds: number; videoDuration: number },
+) {
+  if (user.role !== 'teacher' || !user.id) {
+    throw new Error('Không thể hoàn tất bài đào tạo: tài khoản giảng viên không hợp lệ.');
+  }
+  if (!input.courseId || !input.lessonId || !Number.isFinite(input.watchedSeconds) || !Number.isFinite(input.videoDuration)) {
+    throw new Error('Không thể hoàn tất bài đào tạo: dữ liệu bài học không hợp lệ.');
+  }
+  const response = await mobileApiRequest<{ data?: { status?: string } }>(
+    '/training-lms/complete-lesson',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  );
+  if (response.data?.status !== 'completed') {
+    throw new Error('Máy chủ chưa xác nhận hoàn thành bài đào tạo.');
+  }
 }
 
 export async function getTeacherFinanceOverview(user: DemoUser): Promise<TeacherFinanceOverview> {
   if (user.role !== 'teacher' || !user.id) {
     throw new Error('Không thể tải tài chính: tài khoản giảng viên không hợp lệ.');
   }
-  const [summaryResponse, pendingResponse] = await Promise.all([
+  const [summaryResponse, transactionsResponse] = await Promise.all([
     mobileApiRequest<{ data?: Record<string, unknown> }>(
       `/teachers/${encodeURIComponent(user.id)}/finance`,
     ),
-    mobileApiRequest<{ data?: Record<string, unknown> }>(
-      `/teachers/${encodeURIComponent(user.id)}/finance/pending`,
+    mobileApiRequest<{ data?: unknown }>(
+      `/transactions/teacher/${encodeURIComponent(user.id)}`,
     ),
   ]);
   const summary = summaryResponse.data;
-  const pending = pendingResponse.data;
-  if (!summary || !pending || !Array.isArray(pending.pendingSessions)) {
+  if (!summary || !Array.isArray(transactionsResponse.data)) {
     throw new Error('Phản hồi dữ liệu tài chính giảng viên không hợp lệ.');
   }
-  const salaryPerSession = asNumber(summary.salaryPerSession ?? pending.salaryPerSession);
+  const salaryPerSession = asNumber(summary.salaryPerSession);
+  const unpaidAmount = asNumber(summary.unpaidAmount);
   return {
     totalSessions: asNumber(summary.totalSessions),
     paidAmount: asNumber(summary.paidAmount),
-    unpaidAmount: asNumber(summary.unpaidAmount ?? pending.unpaidAmount),
+    unpaidAmount,
     salaryPerSession,
-    pendingSessionsCount: asNumber(pending.pendingSessionsCount),
-    pendingSessions: pending.pendingSessions.map((entry) => {
-      const session = asRecord(entry);
-      const id = asText(session.id || session._id);
-      if (!id) throw new Error('Buổi dạy chưa thanh toán thiếu mã định danh.');
+    pendingSessionsCount: salaryPerSession > 0 ? Math.round(unpaidAmount / salaryPerSession) : 0,
+    transactions: transactionsResponse.data.map((entry) => {
+      const transaction = asRecord(entry);
+      const id = asText(transaction.id || transaction._id);
+      const status = asText(transaction.status);
+      if (!id || (status !== 'pending' && status !== 'confirmed' && status !== 'cancelled')) {
+        throw new Error('Lịch sử giao dịch có dữ liệu không hợp lệ.');
+      }
       return {
         id,
-        date: asText(session.date),
-        startTime: asText(session.startTime),
-        endTime: asText(session.endTime),
-        course: asText(session.course, 'Buổi dạy'),
-        studentName: asText(session.studentName, 'Học viên'),
-        sessionNo: session.sessionNo == null ? null : asNumber(session.sessionNo),
-        amount: salaryPerSession,
+        description: asText(transaction.description),
+        month: asText(transaction.month),
+        amount: asNumber(transaction.amount),
+        status,
+        createdAt: asText(transaction.confirmedAt || transaction.createdAt),
+        confirmedBy: asText(transaction.confirmedBy, 'Admin'),
+        note: asText(transaction.note),
+        sessions: Array.isArray(transaction.paymentSessionDetails)
+          ? transaction.paymentSessionDetails.length
+          : Array.isArray(transaction.paymentSessionIds)
+            ? transaction.paymentSessionIds.length
+            : 0,
+        starBonusAmount: asNumber(transaction.starBonusAmount),
+        paymentSessionDetails: Array.isArray(transaction.paymentSessionDetails)
+          ? transaction.paymentSessionDetails.map((detail, index) => {
+            const session = asRecord(detail);
+            const paymentSessionIds = Array.isArray(transaction.paymentSessionIds)
+              ? transaction.paymentSessionIds
+              : [];
+            return {
+              sessionId: asText(session.id || session.sessionId || paymentSessionIds[index]),
+              studentId: asText(session.studentId),
+              studentName: asText(session.studentName, 'Học viên'),
+              date: asText(session.date),
+              courseName: asText(session.courseName),
+              allocatedAmount: asNumber(session.allocatedAmount),
+            };
+          })
+          : [],
       };
     }),
+    pendingSessions: [],
   };
 }

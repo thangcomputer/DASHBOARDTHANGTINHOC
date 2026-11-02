@@ -528,7 +528,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
           <div className="lp-cele-anim mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white/95" style={{ animation: 'lp-cele-trophy .9s ease-out both, lp-cele-glow 2s ease-in-out .9s infinite' }}>
             <Trophy size={64} className="text-amber-500" strokeWidth={2} />
           </div>
-          <p className="mt-4 text-xs font-black uppercase tracking-[0.3em] text-white/90">Hoàn thành môn học</p>
+          <p className="mt-4 text-xs font-black  tracking-[0.3em] text-white/90">Hoàn thành môn học</p>
           <h2 className="mt-1 text-2xl font-black text-white">Chúc mừng bạn!</h2>
         </div>
         <div className="px-6 pb-6 pt-5">

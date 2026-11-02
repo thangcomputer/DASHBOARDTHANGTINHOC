@@ -76,7 +76,7 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
           >
             <X size={18} aria-hidden="true" />
           </button>
-          <p className={`text-[11px] font-bold uppercase tracking-[0.25em] ${eyebrowTone}`}>
+          <p className={`text-[11px] font-bold  tracking-[0.25em] ${eyebrowTone}`}>
             {rejected ? 'Buổi không được tính' : (adminMakeup ? 'Admin đã điểm danh bù' : 'Học viên đã xác nhận')}
           </p>
           <p id="teacher-attendance-confirmed-title" className={`mt-3 text-sm font-semibold ${titleTone}`}>
@@ -96,11 +96,11 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
         <div className="px-6 py-6 space-y-3">
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-left space-y-2.5">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Học viên</p>
+              <p className="text-[11px] font-bold  tracking-wide text-slate-400">Học viên</p>
               <p className="text-base font-bold text-slate-900">{studentName}</p>
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ca</p>
+              <p className="text-[11px] font-bold  tracking-wide text-slate-400">Ca</p>
               <p className="text-sm font-semibold text-slate-800">
                 {timeRange || '—'}
               </p>
@@ -110,7 +110,7 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
             </div>
             {!rejected && (
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{adminMakeup ? 'Điểm danh lúc' : 'Xác nhận lúc'}</p>
+                <p className="text-[11px] font-bold  tracking-wide text-slate-400">{adminMakeup ? 'Điểm danh lúc' : 'Xác nhận lúc'}</p>
                 <p className="text-sm font-semibold text-slate-800">{formatConfirmedAt(confirmedAt)}</p>
               </div>
             )}

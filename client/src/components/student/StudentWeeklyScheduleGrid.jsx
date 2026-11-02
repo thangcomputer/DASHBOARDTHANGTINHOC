@@ -119,7 +119,7 @@ export default function StudentWeeklyScheduleGrid({
         <table className="w-full min-w-[44rem] border-collapse text-left">
           <thead>
             <tr className="bg-slate-50/80">
-              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 text-[11px] font-black uppercase tracking-wide text-slate-500 w-40 min-w-[9rem] border-b border-slate-100">
+              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 text-[11px] font-black  tracking-wide text-slate-500 w-40 min-w-[9rem] border-b border-slate-100">
                 Khóa học
               </th>
               {dateKeys.map((key, i) => {

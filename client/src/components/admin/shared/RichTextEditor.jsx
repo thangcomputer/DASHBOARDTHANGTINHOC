@@ -317,7 +317,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
             value={linkUrl}
             onChange={e => setLinkUrl(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') applyLink(); if (e.key === 'Escape') setShowLinkInput(false); }}
-            placeholder="https://example.com"
+            placeholder="HTTPS://example.com"
             className="flex-1 border border-blue-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-blue-400"
             autoFocus
           />

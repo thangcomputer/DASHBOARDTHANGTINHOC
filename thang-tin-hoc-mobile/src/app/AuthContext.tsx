@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { DeviceEventEmitter, Platform } from 'react-native';
 import { authService } from '../services/mockService';
-import { getMobileApiTokens, saveMobileSession } from '../services/apiClient';
+import { clearMobileSession, getMobileApiTokens, saveMobileSession } from '../services/apiClient';
 import { connect as connectSocket, disconnect as disconnectSocket } from '../services/socketService';
+import { registerMobilePushNotifications, unregisterMobilePushNotifications } from '../services/mobilePushNotifications';
+import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import type { DemoUser, UserRole } from '../types';
 
 type AuthContextValue = {
@@ -41,17 +43,45 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, [user]);
 
   useEffect(() => {
+    if (!user || user.previewMode) return undefined;
+    const registerPush = () => {
+      void registerMobilePushNotifications().catch((error: unknown) => {
+        console.warn('Không thể đăng ký thông báo đẩy cho thiết bị.', error);
+      });
+    };
+    registerPush();
+    const unsubscribe = subscribeToMobileSoundPreference(registerPush);
+    return unsubscribe;
+  }, [user]);
+
+  useEffect(() => {
     let active = true;
+    let sessionReplaced = false;
     const subscription = DeviceEventEmitter.addListener('mobile:session-expired', () => {
       setUser(null);
       setAuthError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     });
+    const replacedSubscription = DeviceEventEmitter.addListener(
+      'mobile:session-replaced',
+      async (event?: { token?: string }) => {
+        if (!event?.token || getMobileApiTokens()?.accessToken !== event.token) return;
+        sessionReplaced = true;
+        try {
+          await clearMobileSession();
+        } catch (error) {
+          setAuthError(error instanceof Error ? error.message : 'Không thể xóa phiên đăng nhập đã bị thay thế.');
+        }
+        disconnectSocket();
+        setUser(null);
+        setAuthError('Tài khoản đã đăng nhập trên thiết bị khác. Vui lòng đăng nhập lại.');
+      },
+    );
     authService.restore()
       .then((session) => {
-        if (active && session) setUser(session.user);
+        if (active && !sessionReplaced && session) setUser(session.user);
       })
       .catch((error: unknown) => {
-        if (active) setAuthError(error instanceof Error ? error.message : 'Không thể khôi phục phiên đăng nhập.');
+        if (active && !sessionReplaced) setAuthError(error instanceof Error ? error.message : 'Không thể khôi phục phiên đăng nhập.');
       })
       .finally(() => {
         if (active) setIsRestoringSession(false);
@@ -59,6 +89,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     return () => {
       active = false;
       subscription.remove();
+      replacedSubscription.remove();
     };
   }, []);
 
@@ -87,6 +118,11 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     },
     async signOut() {
       try {
+        try {
+          await unregisterMobilePushNotifications();
+        } catch (error) {
+          console.warn('Không thể hủy đăng ký thông báo đẩy trước khi đăng xuất.', error);
+        }
         await authService.signOut();
       } finally {
         setUser(null);

@@ -120,9 +120,9 @@ export default function TenantManagementPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-gray-900 truncate">
                   {t.code} — {t.name}
-                  {t.isDefault && <span className="ml-1 text-[10px] text-red-600">DEFAULT</span>}
+                  {t.isDefault && <span className="ml-1 text-[10px] text-red-600">Default</span>}
                 </p>
-                <p className="text-[10px] text-gray-400 font-bold uppercase">{t.status} · {t.branchCount ?? 0} chi nhánh</p>
+                <p className="text-[10px] text-gray-400 font-bold ">{t.status} · {t.branchCount ?? 0} chi nhánh</p>
               </div>
               {!t.isDefault && (
                 <button type="button" onClick={(e) => { e.stopPropagation(); toggleStatus(t); }} className="text-[10px] font-bold text-gray-500 px-2 py-1 border border-gray-200 rounded-lg">
@@ -149,7 +149,7 @@ export default function TenantManagementPage() {
                 </div>
               )}
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Chi nhánh</p>
+                <p className="text-[10px] font-black text-gray-400  mb-1">Chi nhánh</p>
                 <ul className="text-xs space-y-1">
                   {(stats?.branches || []).map((b) => (
                     <li key={b._id} className="font-bold text-gray-700">{b.code} — {b.name}</li>
@@ -158,7 +158,7 @@ export default function TenantManagementPage() {
               </div>
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase">Gán chi nhánh</label>
+                  <label className="text-[10px] font-black text-gray-400 ">Gán chi nhánh</label>
                   <CmsSelect value={assignBranchId} onChange={(e) => setAssignBranchId(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold mt-1">
                     <option value="">Chọn...</option>
                     {branches.map((b) => (

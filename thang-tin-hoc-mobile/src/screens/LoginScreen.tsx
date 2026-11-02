@@ -47,8 +47,8 @@ export function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.brandMark}><BookOpen color="#FFFFFF" size={27} strokeWidth={2.2} /></View>
-          <Text style={styles.brandName}>THẮNG TIN HỌC</Text>
-          <Text style={styles.eyebrow}>HỌC TẬP, THEO CÁCH CỦA BẠN</Text>
+          <Text style={styles.brandName}>Thắng Tin Học</Text>
+          <Text style={styles.eyebrow}>Học tập, theo cách của bạn</Text>
           <Text style={styles.welcome}>Chào mừng{'\n'}bạn quay trở lại</Text>
           <Text style={styles.intro}>Dùng số điện thoại và mật khẩu thật đang sử dụng trên website.</Text>
 

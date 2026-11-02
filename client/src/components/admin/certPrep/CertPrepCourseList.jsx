@@ -73,7 +73,7 @@ export default function CertPrepCourseList({
       />
       <div className="overflow-x-auto cms-card p-0">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500 uppercase">
+          <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500 ">
             <tr>
               <th className="px-4 py-3">Tên</th>
               <th className="px-4 py-3">Slug</th>

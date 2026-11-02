@@ -73,6 +73,13 @@ router.post('/create', [authMiddleware, ...quizzesGuard('create')], async (req, 
       notifyUser: typeof req.app.notifyUser === 'function' ? req.app.notifyUser.bind(req.app) : null,
       io: req.app.get('io'),
     });
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`teacher_${teacherId}`).emit('quiz:changed', {
+        action: 'create',
+        quizId: String(quiz._id),
+      });
+    }
 
     return res.json({ success: true, data: quiz, message: 'Tạo bài trắc nghiệm thành công' });
   } catch (err) {
@@ -117,6 +124,13 @@ router.delete('/:id', [authMiddleware, ...quizzesGuard('delete')], async (req, r
     const quiz = await LessonQuiz.findOneAndDelete({ _id: quizId, teacherId });
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy bài trắc nghiệm' });
+    }
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`teacher_${teacherId}`).emit('quiz:changed', {
+        action: 'delete',
+        quizId: String(quiz._id),
+      });
     }
     return res.json({ success: true, message: 'Đã xóa bài trắc nghiệm' });
   } catch (err) {

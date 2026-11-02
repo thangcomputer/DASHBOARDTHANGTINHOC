@@ -427,7 +427,7 @@ export default function TeacherWeeklySlotGrid({
           <thead>
             <tr className="bg-slate-50/80">
               <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-slate-500 w-48 min-w-[11rem] border-b border-slate-100 align-bottom">
-                <div className="text-[11px] font-black uppercase tracking-wide">Học viên</div>
+                <div className="text-[11px] font-black  tracking-wide">Học viên</div>
                 <input
                   type="search"
                   value={nameQuery}
@@ -557,7 +557,7 @@ export default function TeacherWeeklySlotGrid({
                   <button
                     type="button"
                     onClick={() => setRosterExpanded((v) => !v)}
-                    className="text-[11px] font-black text-red-600 hover:text-red-700 hover:underline uppercase tracking-wide"
+                    className="text-[11px] font-black text-red-600 hover:text-red-700 hover:underline  tracking-wide"
                   >
                     {rosterExpanded
                       ? 'Thu gọn'

@@ -244,7 +244,7 @@ function OverviewPanel({
     <div className={`space-y-5 w-full ${light ? 'mx-0 text-slate-800' : 'max-w-3xl mx-auto'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className={`inline-block text-[9px] font-black uppercase tracking-[0.15em] mb-2 ${light ? 'text-emerald-700' : 'text-emerald-400/80'}`}>
+          <span className={`inline-block text-[9px] font-black  tracking-[0.15em] mb-2 ${light ? 'text-emerald-700' : 'text-emerald-400/80'}`}>
             {currentLesson.chapterTitle || selectedCourse?.title || 'Bài giảng'}
           </span>
           <h1 className={`text-lg sm:text-xl font-bold leading-snug ${light ? 'text-slate-900' : 'text-white'}`}>
@@ -267,7 +267,7 @@ function OverviewPanel({
       {teacherAntiSeekSlot}
 
       <div className="pt-1 space-y-2">
-        <p className={`text-[11px] font-black uppercase tracking-widest ${light ? 'text-slate-500' : 'text-slate-500'}`}>Mô tả bài giảng</p>
+        <p className={`text-[11px] font-black  tracking-widest ${light ? 'text-slate-500' : 'text-slate-500'}`}>Mô tả bài giảng</p>
         {currentLesson.description && /<[a-z][\s\S]*>/i.test(currentLesson.description) ? (
           <div
             className={`${light ? 'text-slate-600 [&_a]:text-emerald-700' : 'text-slate-400 [&_a]:text-emerald-400'} leading-relaxed text-[13px] break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:underline`}
@@ -283,7 +283,7 @@ function OverviewPanel({
 
       {courseDesc ? (
         <div className={`pt-3 border-t space-y-2 ${light ? 'border-slate-200' : 'border-white/[0.06]'}`}>
-          <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Về khóa học</p>
+          <p className="text-[11px] font-black text-slate-500  tracking-widest">Về khóa học</p>
           {/<[a-z][\s\S]*>/i.test(courseDesc) ? (
             <div
               className={`${light ? 'text-slate-600' : 'text-slate-400'} leading-relaxed text-[13px] break-words [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5`}
@@ -735,7 +735,7 @@ function QaPanel({
 
       <div className={`rounded-xl border p-4 space-y-2 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.08] bg-white/[0.02]'}`}>
         <div className="flex items-center justify-between gap-2">
-          <p className={`text-[11px] font-black uppercase tracking-widest ${light ? 'text-slate-700' : 'text-slate-500'}`}>Đặt câu hỏi</p>
+          <p className={`text-[11px] font-black  tracking-widest ${light ? 'text-slate-700' : 'text-slate-500'}`}>Đặt câu hỏi</p>
           <span className={`text-[11px] font-semibold tabular-nums ${light ? 'text-emerald-800' : 'text-emerald-400/90'}`}>
             Tại {formatLmsTimestamp(liveAtSec)}
           </span>
@@ -834,7 +834,7 @@ function QaPanel({
                         <ChevronDown size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                       </button>
                       <span
-                        className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] font-bold  tracking-wide px-2 py-0.5 rounded-full ${
                           it.status === 'answered'
                             ? isRead
                               ? 'bg-emerald-100 text-emerald-800'
@@ -864,7 +864,7 @@ function QaPanel({
                               : 'border border-emerald-500/20 bg-emerald-500/10'
                           }`}
                         >
-                          <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${staffish ? 'text-red-700' : light ? 'text-emerald-800' : 'text-emerald-300'}`}>
+                          <p className={`text-[10px] font-black  tracking-widest mb-1 ${staffish ? 'text-red-700' : light ? 'text-emerald-800' : 'text-emerald-300'}`}>
                             {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Phản hồi · ${msg.authorName || 'Học viên'}`}
                           </p>
                           <p className={`text-[13px] whitespace-pre-wrap ${staffish || light ? 'text-slate-800' : 'text-slate-200'}`}>
@@ -1023,7 +1023,7 @@ function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student', l
       </div>
 
       <div className={`rounded-xl border p-4 space-y-3 ${light ? 'border-slate-200 bg-white' : 'border-white/[0.08]'}`}>
-        <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Viết đánh giá</p>
+        <p className="text-[11px] font-black  tracking-widest text-slate-500">Viết đánh giá</p>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((s) => (
             <button
@@ -1169,7 +1169,7 @@ function ListPanel({
     <div className="max-w-3xl mx-auto w-full space-y-3 lg:hidden">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
+          <h3 className="text-[11px] font-black  tracking-widest text-slate-300">Nội dung khóa học</h3>
           <p className="text-[10px] text-slate-500 mt-0.5">
             {lessons.filter((l) => l.isCompleted).length}/{lessons.length} bài · {overallProgress}%
           </p>

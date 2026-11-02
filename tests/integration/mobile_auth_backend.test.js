@@ -335,13 +335,27 @@ test('mobile auth works with isolated MongoDB and Redis across API and Socket.IO
       assert.equal(disabledRefresh.status, 200);
       assert.equal(jwt.decode(disabledRefresh.body.accessToken).aud, 'public');
 
-      const logout = await request('POST', '/api/auth/logout', {
-        accessToken: disabledRefresh.body.accessToken,
+      const replacementLogin = await request('POST', '/api/auth/login', {
+        body: { identifier: student.phone, password: 'mobile-test-password', role: 'student' },
+      });
+      assert.equal(replacementLogin.status, 200);
+      const staleRefresh = await request('POST', '/api/auth/refresh', {
         body: { refreshToken: disabledRefresh.body.refreshToken },
+      });
+      assert.equal(staleRefresh.status, 401);
+      const currentSession = await request('GET', '/api/mobile-auth-test/protected', {
+        accessToken: replacementLogin.body.data.accessToken,
+        csrf: false,
+      });
+      assert.equal(currentSession.status, 200, 'a stale device refresh must not invalidate the newest login');
+
+      const logout = await request('POST', '/api/auth/logout', {
+        accessToken: replacementLogin.body.data.accessToken,
+        body: { refreshToken: replacementLogin.body.data.refreshToken },
       });
       assert.equal(logout.status, 200);
       const loggedOut = await request('GET', '/api/mobile-auth-test/protected', {
-        accessToken: disabledRefresh.body.accessToken,
+        accessToken: replacementLogin.body.data.accessToken,
         csrf: false,
       });
       assert.equal(loggedOut.status, 401);
@@ -353,15 +367,28 @@ test('mobile auth works with isolated MongoDB and Redis across API and Socket.IO
     let studentC;
     let otherSession;
     let teacherSession;
-    await t.test('Student and active Teacher logins issue independent mobile claims', async () => {
+    await t.test('a new mobile login replaces the previous account session', async () => {
       studentA = tokenSet(await mobileLogin(student));
       studentB = tokenSet(await mobileLogin(student));
       teacherSession = tokenSet(await mobileLogin(teacher, 'teacher'));
 
       assert.notEqual(studentA.sessionId, studentB.sessionId);
-      assert.equal((await AuthSession.countDocuments({ userId: student._id, revokedAt: null })), 2);
-      assert.equal((await AuthSession.findOne({ sessionId: studentA.sessionId })).role, 'student');
+      assert.equal((await AuthSession.countDocuments({ userId: student._id, revokedAt: null })), 1);
+      assert.ok((await AuthSession.findOne({ sessionId: studentA.sessionId })).revokedAt);
+      assert.equal((await AuthSession.findOne({ sessionId: studentB.sessionId })).revokedAt, null);
       assert.equal((await AuthSession.findOne({ sessionId: teacherSession.sessionId })).role, 'teacher');
+
+      const changedPassword = await request('POST', '/api/auth/change-password', {
+        accessToken: teacherSession.accessToken,
+        body: { oldPassword: 'mobile-test-password', newPassword: 'mobile-test-password-updated' },
+      });
+      assert.equal(changedPassword.status, 200);
+      const stillSignedIn = await request('GET', '/api/mobile-auth-test/protected', {
+        accessToken: teacherSession.accessToken,
+        csrf: false,
+      });
+      assert.equal(stillSignedIn.status, 200);
+      assert.equal((await AuthSession.findOne({ sessionId: teacherSession.sessionId })).revokedAt, null);
 
       const invalid = await request('POST', '/api/auth/login/mobile', {
         body: {
@@ -396,103 +423,79 @@ test('mobile auth works with isolated MongoDB and Redis across API and Socket.IO
       assert.equal((await AuthSession.findOne({ sessionId: pending.sessionId })).role, 'teacher');
     });
 
-    let studentANew;
     let studentBNew;
     await t.test('refresh race has one winner, while refresh state remains session-scoped', async () => {
       const raced = await Promise.all([
-        request('POST', '/api/auth/refresh', { body: { refreshToken: studentA.refreshToken } }),
-        request('POST', '/api/auth/refresh', { body: { refreshToken: studentA.refreshToken } }),
+        request('POST', '/api/auth/refresh', { body: { refreshToken: studentB.refreshToken } }),
+        request('POST', '/api/auth/refresh', { body: { refreshToken: studentB.refreshToken } }),
       ]);
       assert.deepEqual(raced.map((result) => result.status).sort(), [200, 401]);
       const winner = raced.find((result) => result.status === 200);
       assert.ok(winner);
-      studentANew = {
+      studentBNew = {
         accessToken: winner.body.accessToken,
         refreshToken: winner.body.refreshToken,
         sessionId: winner.body.sessionId,
       };
-      assert.equal(jwt.decode(studentANew.refreshToken).sid, studentA.sessionId);
+      assert.equal(jwt.decode(studentBNew.refreshToken).sid, studentB.sessionId);
 
-      const key = `jwtbl:${tokenBlacklist.hashToken(studentA.refreshToken)}`;
+      const key = `jwtbl:${tokenBlacklist.hashToken(studentB.refreshToken)}`;
       assert.equal(await getRedis().exists(key), 1, 'refresh revocation must be stored in isolated Redis');
-      assert.ok(await tokenBlacklist.isBlacklisted(studentA.refreshToken));
+      assert.ok(await tokenBlacklist.isBlacklisted(studentB.refreshToken));
 
       const oldReplay = await request('POST', '/api/auth/refresh', {
-        body: { refreshToken: studentA.refreshToken },
+        body: { refreshToken: studentB.refreshToken },
       });
       assert.equal(oldReplay.status, 401);
 
-      const refreshB = await request('POST', '/api/auth/refresh', {
-        body: { refreshToken: studentB.refreshToken },
-      });
-      assert.equal(refreshB.status, 200);
-      studentBNew = {
-        accessToken: refreshB.body.accessToken,
-        refreshToken: refreshB.body.refreshToken,
-        sessionId: refreshB.body.sessionId,
-      };
-      assert.equal(studentBNew.sessionId, studentB.sessionId);
-
-      const sessionARecord = await AuthSession.findOne({ sessionId: studentA.sessionId });
       const sessionBRecord = await AuthSession.findOne({ sessionId: studentB.sessionId });
-      assert.equal(
-        sessionARecord.currentRefreshJtiHash,
-        require('../../services/mobileAuthSessionService').hashRefreshJti(jwt.decode(studentANew.refreshToken).jti),
-      );
       assert.equal(
         sessionBRecord.currentRefreshJtiHash,
         require('../../services/mobileAuthSessionService').hashRefreshJti(jwt.decode(studentBNew.refreshToken).jti),
       );
-      assert.notEqual(sessionARecord.currentRefreshJtiHash, sessionBRecord.currentRefreshJtiHash);
+      assert.equal(
+        sessionBRecord.absoluteExpiresAt.getTime(),
+        jwt.decode(studentBNew.refreshToken).exp * 1000,
+      );
     });
 
-    let socketA;
     let socketB;
     let socketC;
-    await t.test('two Socket.IO instances authenticate independent sessions over Redis', async () => {
-      socketA = await connectSocket(socketPort, studentANew.accessToken);
+    await t.test('the replaced mobile session is invalid and current session authenticates over Redis', async () => {
       socketB = await connectSocket(socketPort, studentBNew.accessToken);
-      clientSockets.push(socketA, socketB);
-      assert.equal(socketA.connected, true);
+      clientSockets.push(socketB);
       assert.equal(socketB.connected, true);
 
-      const protectedA = await request('GET', '/api/mobile-auth-test/protected', {
-        accessToken: studentANew.accessToken,
+      const replacedSession = await request('GET', '/api/mobile-auth-test/protected', {
+        accessToken: studentA.accessToken,
         csrf: false,
       });
       const protectedB = await request('GET', '/api/mobile-auth-test/protected', {
         accessToken: studentBNew.accessToken,
         csrf: false,
       });
-      assert.equal(protectedA.status, 200);
+      assert.equal(replacedSession.status, 401);
       assert.equal(protectedB.status, 200);
     });
 
-    await t.test('logout revokes only current session and disconnects only its remote socket', async () => {
-      const disconnected = waitForDisconnect(socketA);
+    await t.test('logout revokes the active session and disconnects its remote socket', async () => {
+      const disconnected = waitForDisconnect(socketB);
       const logout = await request('POST', '/api/auth/logout', {
-        accessToken: studentANew.accessToken,
-        body: { refreshToken: studentANew.refreshToken },
+        accessToken: studentBNew.accessToken,
+        body: { refreshToken: studentBNew.refreshToken },
       });
       assert.equal(logout.status, 200);
       await disconnected;
 
       const revokedAccess = await request('GET', '/api/mobile-auth-test/protected', {
-        accessToken: studentANew.accessToken,
+        accessToken: studentBNew.accessToken,
         csrf: false,
       });
       assert.equal(revokedAccess.status, 401);
       const revokedRefresh = await request('POST', '/api/auth/refresh', {
-        body: { refreshToken: studentANew.refreshToken },
+        body: { refreshToken: studentBNew.refreshToken },
       });
       assert.equal(revokedRefresh.status, 401);
-
-      const stillConnected = await request('GET', '/api/mobile-auth-test/protected', {
-        accessToken: studentBNew.accessToken,
-        csrf: false,
-      });
-      assert.equal(stillConnected.status, 200);
-      assert.equal(socketB.connected, true);
     });
 
     await t.test('session list, cross-user isolation, and one-session revoke', async () => {
@@ -513,28 +516,23 @@ test('mobile auth works with isolated MongoDB and Redis across API and Socket.IO
       assert.equal(list.status, 200);
       const listed = list.body.data;
       assert.ok(listed.some((session) => session.sessionId === studentA.sessionId && session.status === 'revoked'));
-      assert.ok(listed.some((session) => session.sessionId === studentB.sessionId && session.status === 'active'));
+      assert.ok(listed.some((session) => session.sessionId === studentB.sessionId && session.status === 'revoked'));
       assert.ok(listed.some((session) => session.sessionId === studentC.sessionId && session.status === 'active'));
       assert.ok(listed.every((session) => session.sessionId !== otherSession.sessionId));
       assert.ok(listed.every((session) => !('currentRefreshJtiHash' in session)));
 
-      const disconnected = waitForDisconnect(socketB);
-      const revoked = await request('DELETE', `/api/auth/sessions/${studentB.sessionId}`, {
+      const disconnected = waitForDisconnect(socketC);
+      const revoked = await request('DELETE', `/api/auth/sessions/${studentC.sessionId}`, {
         accessToken: studentC.accessToken,
       });
       assert.equal(revoked.status, 200);
       await disconnected;
 
-      const revokedB = await request('GET', '/api/mobile-auth-test/protected', {
-        accessToken: studentBNew.accessToken,
-        csrf: false,
-      });
-      assert.equal(revokedB.status, 401);
-      const activeC = await request('GET', '/api/mobile-auth-test/protected', {
+      const revokedC = await request('GET', '/api/mobile-auth-test/protected', {
         accessToken: studentC.accessToken,
         csrf: false,
       });
-      assert.equal(activeC.status, 200);
+      assert.equal(revokedC.status, 401);
 
       const crossUserList = await request('GET', '/api/auth/sessions', {
         accessToken: otherSession.accessToken,

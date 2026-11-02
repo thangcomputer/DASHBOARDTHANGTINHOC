@@ -111,7 +111,7 @@ export default function AttendanceMakeupRequestModal({
       >
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
           <div>
-            <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
+            <h3 className="font-black text-lg  tracking-tight">Điểm danh bù</h3>
             <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
           </div>
           <button
@@ -125,7 +125,7 @@ export default function AttendanceMakeupRequestModal({
         </div>
         <div className="p-6 space-y-4 text-sm">
           <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Thông tin buổi học</p>
+            <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
             <p className="font-bold text-slate-800">HV: {summary.name}</p>
             {summary.course ? (
               <p className="text-slate-600">

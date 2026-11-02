@@ -325,7 +325,13 @@ function mapOnlineUser(u) {
  *  Ops roles must not join presence_* (see register) or the second emit overwrites. */
 function broadcastOnlinePresence() {
   const all = presenceStore.listPresence();
-  const full = all.map(mapOnlineUser);
+  const fullByUser = new Map();
+  for (const user of all) {
+    const row = mapOnlineUser(user);
+    const key = `${row.role}_${row.userId}`;
+    if (!fullByUser.has(key)) fullByUser.set(key, row);
+  }
+  const full = [...fullByUser.values()];
   io.to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').emit('users:online', full);
 
   const byBranch = new Map();
@@ -423,21 +429,18 @@ io.on('connection', (socket) => {
     const resolvedBranchId = socket.user.branchId || null;
     const resolvedBranchCode = socket.user.branchCode || '';
 
-    // The legacy presence store keeps one socket per user. Do not let a mobile
-    // session overwrite a live web socket until presence supports many sockets.
-    if (!socket.sessionId) {
-      await presenceStore.upsertPresence(key, {
-        socketId: socket.id,
-        userId,
-        role: messagingRole,
-        adminRole: socket.user.adminRole || null,
-        name,
-        avatar: socket.user.avatar || '',
-        branchId: resolvedBranchId,
-        branchCode: resolvedBranchCode,
-        connectedAt: new Date().toISOString(),
-      });
-    }
+    const presenceKey = socket.sessionId ? `${key}:mobile:${socket.sessionId}` : key;
+    await presenceStore.upsertPresence(presenceKey, {
+      socketId: socket.id,
+      userId,
+      role: messagingRole,
+      adminRole: socket.user.adminRole || null,
+      name,
+      avatar: socket.user.avatar || '',
+      branchId: resolvedBranchId,
+      branchCode: resolvedBranchCode,
+      connectedAt: new Date().toISOString(),
+    });
 
     console.log(`👤 Online (Verified): ${name} (${messagingRole}) - ${key}`);
 
@@ -728,10 +731,22 @@ io.on('connection', (socket) => {
 
       if (activeCallSessions.get(callId) !== call) return;
       if (!peerSockets.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1_200));
-        if (activeCallSessions.get(callId) !== call) return;
-        await abandonCall(call, 'missed', 'offline');
-        sendCallError('USER_OFFLINE', callId);
+        const pushScheduled = await require('./services/mobilePushService').dispatchToUser(
+          peer.role,
+          peer.id,
+          'call:incoming',
+          {
+            callId,
+            conversationId,
+            caller: { id: caller.id, role: caller.role, name: caller.name },
+          },
+        );
+        if (!pushScheduled) {
+          await abandonCall(call, 'missed', 'offline');
+          sendCallError('USER_OFFLINE', callId);
+          return;
+        }
+        socket.emit('call:ringing', { callId, conversationId });
         return;
       }
 
@@ -755,6 +770,16 @@ io.on('connection', (socket) => {
         callType: 'audio',
         caller: { id: caller.id, role: caller.role, name: caller.name },
       });
+      void require('./services/mobilePushService').dispatchToUser(
+        peer.role,
+        peer.id,
+        'call:incoming',
+        {
+          callId,
+          conversationId,
+          caller: { id: caller.id, role: caller.role, name: caller.name },
+        },
+      );
       logger.info({
         callId,
         conversationId,
@@ -1149,9 +1174,31 @@ io.on('connection', (socket) => {
     }
     const hit = presenceStore.findPresenceBySocketId(socket.id);
     if (hit) {
-      lastSeenMap.set(String(hit.user.userId), new Date().toISOString());
-      trimLastSeenMap();
       await presenceStore.removePresence(hit.key, socket.id);
+    }
+    const disconnectedUserId = hit?.user.userId || (socket.user ? socketUserId(socket.user) : '');
+    if (disconnectedUserId) {
+      try {
+        const remainingSockets = await io.in(String(disconnectedUserId)).fetchSockets();
+        if (remainingSockets.length === 0) {
+          const disconnectedAt = new Date();
+          lastSeenMap.set(String(disconnectedUserId), disconnectedAt.toISOString());
+          trimLastSeenMap();
+          if (socket.user?.role === 'student') {
+            try {
+              const Student = require('./models/Student');
+              await Student.updateOne(
+                { _id: disconnectedUserId },
+                { $set: { lastAccessAt: disconnectedAt } },
+              );
+            } catch (error) {
+              logger.error({ err: error.message, studentId: disconnectedUserId }, 'student last-access persistence failed');
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn({ err: error.message, userId: disconnectedUserId }, 'last-seen lookup failed');
+      }
     }
     // Cleanup socket rate map
     socketRateMap.clear();
@@ -1177,6 +1224,7 @@ app.notifyUser = (role, userId, eventName, data) => {
   // intentionally do not replace the legacy single-socket presence record.
   io.to(strUserId).emit(eventName, data);
   logDelivery({ eventName, targetRole: role, targetUserId: strUserId, mode: 'userId_room_all_sessions', ok: true });
+  require('./services/mobilePushService').dispatchToUser(role, strUserId, eventName, data);
   return true;
 };
 
@@ -1206,6 +1254,7 @@ const branchRoutes = require('./routes/branchRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');  // ← Revenue Analytics
 const employeeRoutes = require('./routes/employeeRoutes');   // ← HR & Payroll
 const notificationRoutes = require('./routes/notificationRoutes');
+const mobilePushTokenRoutes = require('./routes/mobilePushTokenRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const backupRoutes = require('./routes/backupRoutes');
 const monitoringRoutes = require('./routes/monitoringRoutes');
@@ -1248,6 +1297,7 @@ app.use('/api/branches', branchRoutes);
 app.use('/api/analytics', analyticsRoutes);    // ← Revenue Analytics
 app.use('/api/employees', employeeRoutes);     // ← HR & Payroll
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/mobile-push-tokens', mobilePushTokenRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/backups', backupRoutes);
 app.use('/api/monitoring', monitoringRoutes);

@@ -34,6 +34,7 @@ function createMobileAuthSessionService(Model = AuthSession) {
     role,
     currentRefreshJtiHash,
     nextRefreshJtiHash,
+    nextExpiresAt,
     now = new Date(),
   }) {
     if (!sessionId || !userId || !['student', 'teacher'].includes(role)) return false;
@@ -48,6 +49,7 @@ function createMobileAuthSessionService(Model = AuthSession) {
       $set: {
         currentRefreshJtiHash: nextRefreshJtiHash,
         lastUsedAt: now,
+        ...(nextExpiresAt ? { absoluteExpiresAt: nextExpiresAt } : {}),
       },
     });
     return result.matchedCount === 1;
@@ -66,12 +68,19 @@ function createMobileAuthSessionService(Model = AuthSession) {
     return result.matchedCount === 1;
   }
 
-  async function revokeAllSessions({ userId, role, reason = 'security_event', now = new Date() }) {
+  async function revokeAllSessions({
+    userId,
+    role,
+    reason = 'security_event',
+    excludeSessionId,
+    now = new Date(),
+  }) {
     if (!userId || !['student', 'teacher'].includes(role)) {
       return { revokedCount: 0, sessionIds: [] };
     }
     const filter = { userId, revokedAt: null };
     filter.role = role;
+    if (excludeSessionId) filter.sessionId = { $ne: excludeSessionId };
     const sessions = await Model.find(filter).select('sessionId').lean();
     const result = await Model.updateMany(filter, {
       $set: { revokedAt: now, revocationReason: reason },

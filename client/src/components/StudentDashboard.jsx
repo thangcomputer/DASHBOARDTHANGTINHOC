@@ -730,7 +730,7 @@ const StudentDashboard = ({ onNavigate }) => {
             </div>
             <div className="p-4 sm:p-6">
               <div className="mb-6">
-                <p className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1">Tên bài tập</p>
+                <p className="text-xs text-slate-500  font-black tracking-widest mb-1">Tên bài tập</p>
                 <p className="font-bold text-slate-800 text-lg">{activeAssignment.title}</p>
               </div>
               <div className="space-y-4">
@@ -739,7 +739,7 @@ const StudentDashboard = ({ onNavigate }) => {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <input 
                       type="url"
-                      placeholder="https://drive.google.com/... hoặc link file" 
+                      placeholder="HTTPS://drive.google.com/... hoặc link file"
                       className="flex-1 border-2 border-slate-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-300 font-medium"
                       value={submissionLink}
                       onChange={(e) => setSubmissionLink(e.target.value)}

@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, DeviceEventEmitter, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
+  ActivityIndicator, Alert, BackHandler, DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import {
   AlertCircle, Award, CheckCircle, ChevronLeft, ChevronRight, Clock, GraduationCap, HelpCircle,
   LayoutGrid, Lock, Monitor, Play, RefreshCw, Trophy, User,
 } from 'lucide-react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../app/AuthContext';
-import { AppHeader, AppScreen, Card, EmptyState } from '../components/ui';
+import { AppHeader, AppScreen, Card, EmptyState, useBrandingHeaderScrollHandler } from '../components/ui';
 import {
   getStudentQuizForExam, submitStudentQuiz,
   type StudentQuiz, type StudentQuizDetail, type StudentQuizResult,
@@ -48,8 +49,10 @@ function formatDate(value: string) {
 export function StudentExamScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<Navigation>();
+  const route = useRoute<RouteProp<AppStackParamList, 'StudentExam'>>();
   const { width } = useWindowDimensions();
-  const [activeTab, setActiveTab] = useState<RoomTab>('quiz');
+  const handleHeaderScroll = useBrandingHeaderScrollHandler();
+  const [activeTab, setActiveTab] = useState<RoomTab | null>(null);
   const [quizzes, setQuizzes] = useState<StudentQuiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,7 +63,11 @@ export function StudentExamScreen() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [submitConfirmationVisible, setSubmitConfirmationVisible] = useState(false);
   const submitLock = useRef(false);
+  const handledQuizId = useRef('');
+  const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const [notificationQuizId, setNotificationQuizId] = useState<string | null>(null);
   const isPreview = Boolean(user?.previewMode)
     || (__DEV__ && Boolean(process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE));
 
@@ -160,6 +167,25 @@ export function StudentExamScreen() {
     }
   };
 
+  useEffect(() => {
+    const quizId = route.params?.quizId;
+    if (!quizId) {
+      handledQuizId.current = '';
+      return;
+    }
+    if (loading || handledQuizId.current === quizId) return;
+    handledQuizId.current = quizId;
+    const quiz = quizzes.find((item) => item.id === quizId);
+    if (quiz) {
+      setActiveTab('quiz');
+      setNotificationQuizId(quiz.id);
+      setTimeout(() => screenScrollRef.current?.scrollTo({ y: 0, animated: true }), 120);
+    } else {
+      Alert.alert('Không tìm thấy bài trắc nghiệm', 'Bài thi trong thông báo không còn khả dụng.');
+    }
+    navigation.setParams({ quizId: undefined });
+  }, [loading, navigation, quizzes, route.params?.quizId]);
+
   const requestExit = useCallback(() => {
     if (!quizDetail) return;
     if (result) {
@@ -200,15 +226,8 @@ export function StudentExamScreen() {
   }, [quizDetail, result]);
 
   const askSubmit = () => {
-    const answered = Object.keys(answers).length;
-    Alert.alert(
-      'Xác nhận nộp bài?',
-      `Bạn đã hoàn thành ${answered}/${quizDetail?.questions.length ?? 0} câu. Bạn có chắc chắn muốn nộp bài ngay?`,
-      [
-        { text: 'Làm tiếp', style: 'cancel' },
-        { text: 'Nộp bài ngay', onPress: () => void submitAnswers() },
-      ],
-    );
+    if (submitting || result) return;
+    setSubmitConfirmationVisible(true);
   };
 
   const tabs: Array<{ key: RoomTab; title: string; subtitle: string; Icon: typeof Trophy; tone: string }> = [
@@ -225,29 +244,46 @@ export function StudentExamScreen() {
       <AppScreen scroll={false} contentStyle={styles.examScreen}>
         <AppHeader
           title={result ? 'Kết quả bài trắc nghiệm' : 'Phòng thi trắc nghiệm'}
-          subtitle={quizDetail.title}
+          subtitle={result ? undefined : quizDetail.title}
           onBack={requestExit}
         />
         {result ? (
-          <ScrollView contentContainerStyle={styles.resultContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.examScroll} contentContainerStyle={styles.resultContent} showsVerticalScrollIndicator={false} onScroll={handleHeaderScroll} scrollEventThrottle={16}>
             <Card style={styles.resultCard}>
-              <View style={[styles.resultIcon, isPassed ? styles.resultPassed : styles.resultFailed]}>
-                {isPassed ? <Award size={34} color="#34D399" /> : <AlertCircle size={34} color="#F87171" />}
+              <View style={styles.resultHero}>
+                <View style={styles.resultInfo}>
+                  <Text style={styles.resultTitle}>{quizDetail.title}</Text>
+                  <Text style={styles.resultTeacher}>Giảng viên · {quizDetail.teacherName}</Text>
+                </View>
+                <View style={styles.resultScoreBlock}>
+                  <Text style={[styles.resultScore, isPassed ? styles.passText : styles.failText]}>{result.score}%</Text>
+                  <View style={[styles.resultStatusBadge, isPassed ? styles.resultPassed : styles.resultFailed]}>
+                    <Text style={[styles.resultStatus, isPassed ? styles.passText : styles.failText]}>
+                    {result.forfeit ? 'Rớt · thoát giữa giờ' : isPassed ? 'Đạt yêu cầu' : 'Chưa đạt'}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <Text style={styles.resultTitle}>{quizDetail.title}</Text>
-              <Text style={styles.examMuted}>Giảng viên: {quizDetail.teacherName}</Text>
-              <Text style={[styles.resultScore, isPassed ? styles.passText : styles.failText]}>{result.score}%</Text>
-              <Text style={[styles.resultStatus, isPassed ? styles.passText : styles.failText]}>
-                {result.forfeit ? 'RỚT · THOÁT GIỮA GIỜ' : isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT'}
-              </Text>
               <View style={styles.resultMetrics}>
-                <View style={styles.resultMetric}><Text style={styles.metricLabel}>Số câu đúng</Text><Text style={styles.metricValue}>{result.correctCount}/{result.totalQuestions}</Text></View>
-                <View style={styles.resultMetric}><Text style={styles.metricLabel}>Số câu sai</Text><Text style={styles.metricValue}>{Math.max(0, result.totalQuestions - result.correctCount)}</Text></View>
-                <View style={styles.resultMetric}><Text style={styles.metricLabel}>Thời gian</Text><Text style={styles.metricValue}>{quizDetail.timeLimitMinutes} phút</Text></View>
-                <View style={styles.resultMetric}><Text style={styles.metricLabel}>Ngày nộp</Text><Text style={styles.metricValue}>{formatDate(result.submittedAt)}</Text></View>
+                <View style={styles.resultMetric}>
+                  <Text style={styles.metricLabel}>Số câu đúng</Text>
+                  <Text style={styles.metricValue}>{result.correctCount}/{result.totalQuestions}</Text>
+                </View>
+                <View style={styles.resultMetric}>
+                  <Text style={styles.metricLabel}>Số câu sai</Text>
+                  <Text style={styles.metricValue}>{Math.max(0, result.totalQuestions - result.correctCount)}</Text>
+                </View>
+                <View style={styles.resultMetric}>
+                  <Text style={styles.metricLabel}>Thời gian</Text>
+                  <Text style={styles.metricValue}>{quizDetail.timeLimitMinutes} phút</Text>
+                </View>
+                <View style={styles.resultMetric}>
+                  <Text style={styles.metricLabel}>Ngày nộp</Text>
+                  <Text numberOfLines={1} style={styles.metricValue}>{formatDate(result.submittedAt)}</Text>
+                </View>
               </View>
-              {result.exitReason ? <Text style={styles.failText}>{result.exitReason}</Text> : null}
-              <Pressable onPress={closeQuiz} style={styles.primaryButton} accessibilityRole="button">
+              {result.exitReason ? <Text style={styles.resultExitReason}>{result.exitReason}</Text> : null}
+              <Pressable onPress={closeQuiz} style={styles.resultBackButton} accessibilityRole="button">
                 <Text style={styles.primaryButtonText}>Quay lại danh sách</Text>
               </Pressable>
             </Card>
@@ -256,10 +292,23 @@ export function StudentExamScreen() {
                 <Text style={styles.sectionTitle}>Xem lại đáp án</Text>
                 {result.detailedReview.map((item, index) => (
                   <Card key={item.id} style={styles.reviewCard}>
-                    <Text style={styles.questionLabel}>Câu {index + 1} · {item.isCorrect ? 'Đúng' : 'Chưa đúng'}</Text>
-                    <Text style={styles.questionText}>{item.questionText}</Text>
-                    <Text style={styles.reviewAnswer}>Đáp án của bạn: {item.userAnswer == null ? 'Chưa trả lời' : item.options[item.userAnswer] || '—'}</Text>
-                    <Text style={styles.reviewCorrect}>Đáp án đúng: {item.options[item.correctAnswer] || '—'}</Text>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewQuestionNumber}>Câu {index + 1}</Text>
+                      <View style={[styles.reviewStatusBadge, item.isCorrect ? styles.reviewCorrectBadge : styles.reviewIncorrectBadge]}>
+                        <Text style={[styles.reviewStatusText, item.isCorrect ? styles.reviewCorrect : styles.reviewIncorrect]}>
+                          {item.isCorrect ? 'Đúng' : 'Chưa đúng'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.reviewQuestionText}>{item.questionText}</Text>
+                    <View style={[styles.reviewAnswerBox, !item.isCorrect && styles.reviewAnswerWrong]}>
+                      <Text style={styles.reviewAnswerLabel}>Câu trả lời của bạn</Text>
+                      <Text style={styles.reviewAnswer}>{item.userAnswer == null ? 'Chưa trả lời' : item.options[item.userAnswer] || '—'}</Text>
+                    </View>
+                    <View style={styles.reviewAnswerBox}>
+                      <Text style={styles.reviewAnswerLabel}>Đáp án đúng</Text>
+                      <Text style={styles.reviewCorrect}>{item.options[item.correctAnswer] || '—'}</Text>
+                    </View>
                     {item.explanation ? <Text style={styles.examMuted}>{item.explanation}</Text> : null}
                   </Card>
                 ))}
@@ -267,15 +316,29 @@ export function StudentExamScreen() {
             ) : null}
           </ScrollView>
         ) : (
-          <ScrollView contentContainerStyle={styles.roomContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.examScroll} contentContainerStyle={styles.roomContent} showsVerticalScrollIndicator={false} onScroll={handleHeaderScroll} scrollEventThrottle={16}>
             <View style={styles.roomHeader}>
               <View style={styles.flex}>
-                <Text style={styles.roomTitle}>{quizDetail.title}</Text>
-                <Text style={styles.examMuted}>{quizDetail.courseName} · GV: {quizDetail.teacherName}</Text>
+                <Text numberOfLines={1} style={styles.roomTitle}>{quizDetail.courseName}</Text>
+                <Text numberOfLines={1} style={styles.roomSubtitle}>GV: {quizDetail.teacherName}</Text>
               </View>
               <View style={[styles.timerBadge, timeLeft <= 60 && styles.timerUrgent]}>
                 <Clock size={17} color={timeLeft <= 60 ? '#F87171' : '#67E8F9'} />
                 <Text style={[styles.timerText, timeLeft <= 60 && styles.failText]}>{formatExamClock(timeLeft)}</Text>
+              </View>
+            </View>
+            <View style={styles.examProgress}>
+              <View style={styles.examProgressTop}>
+                <Text style={styles.examProgressLabel}>Tiến độ làm bài</Text>
+                <Text style={styles.examProgressCount}>{Object.keys(answers).length}/{quizDetail.questions.length} câu</Text>
+              </View>
+              <View style={styles.examProgressTrack}>
+                <View
+                  style={[
+                    styles.examProgressFill,
+                    { width: `${quizDetail.questions.length ? (Object.keys(answers).length / quizDetail.questions.length) * 100 : 0}%` },
+                  ]}
+                />
               </View>
             </View>
             <View style={styles.answerLayout}>
@@ -328,23 +391,29 @@ export function StudentExamScreen() {
               </View>
               <Card style={styles.questionGridPanel}>
                 <View style={styles.gridHeading}><LayoutGrid size={17} color="#38BDF8" /><Text style={styles.gridHeadingText}>Danh sách câu hỏi</Text></View>
-                <View style={styles.questionGrid}>
-                  {quizDetail.questions.map((item, index) => {
-                    const selected = currentQuestion === index;
-                    const answered = answers[index] !== undefined;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => setCurrentQuestion(index)}
-                        style={[styles.questionNumber, selected && styles.questionNumberCurrent, answered && !selected && styles.questionNumberAnswered]}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Câu hỏi ${index + 1}${answered ? ', đã trả lời' : ', chưa trả lời'}`}
-                      >
-                        <Text style={[styles.questionNumberText, (selected || answered) && styles.questionNumberTextActive]}>{index + 1}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.questionGrid}>
+                    {quizDetail.questions.map((item, index) => {
+                      const selected = currentQuestion === index;
+                      const answered = answers[index] !== undefined;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => setCurrentQuestion(index)}
+                          style={[
+                            styles.questionNumber,
+                            answered ? styles.questionNumberAnswered : styles.questionNumberUnanswered,
+                            selected && styles.questionNumberCurrent,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Câu hỏi ${index + 1}${answered ? ', đã trả lời' : ', chưa trả lời'}`}
+                        >
+                          <Text style={[styles.questionNumberText, answered && styles.questionNumberTextActive]}>{index + 1}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
                 <Text style={styles.gridLegend}>Đã làm: {Object.keys(answers).length} · Chưa làm: {quizDetail.questions.length - Object.keys(answers).length}</Text>
                 <Pressable onPress={askSubmit} disabled={submitting} style={styles.submitButton} accessibilityRole="button">
                   <Text style={styles.primaryButtonText}>{submitting ? 'Đang nộp...' : 'Nộp bài thi'}</Text>
@@ -353,6 +422,41 @@ export function StudentExamScreen() {
             </View>
           </ScrollView>
         )}
+        <Modal
+          visible={submitConfirmationVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSubmitConfirmationVisible(false)}
+        >
+          <View style={styles.submitModalOverlay}>
+            <View style={styles.submitModalCard}>
+              <Text style={styles.submitModalTitle}>Xác nhận nộp bài?</Text>
+              <Text style={styles.submitModalMessage}>
+                Bạn đã hoàn thành {Object.keys(answers).length}/{quizDetail.questions.length} câu. Bạn có chắc chắn muốn nộp bài ngay?
+              </Text>
+              <View style={styles.submitModalActions}>
+                <Pressable
+                  onPress={() => setSubmitConfirmationVisible(false)}
+                  style={styles.submitModalCancel}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.submitModalCancelText}>Làm tiếp</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setSubmitConfirmationVisible(false);
+                    void submitAnswers();
+                  }}
+                  disabled={submitting}
+                  style={[styles.submitModalConfirm, submitting && styles.disabledButton]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.primaryButtonText}>{submitting ? 'Đang nộp...' : 'Nộp bài ngay'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </AppScreen>
     );
   }
@@ -361,52 +465,50 @@ export function StudentExamScreen() {
   const submittedQuizzes = quizzes.filter((quiz) => quiz.mySubmission);
 
   return (
-    <AppScreen>
-      <AppHeader title="Phòng thi" subtitle="Các bài thi và kết quả học tập" showBackButton={false} centered />
-      <View style={[styles.tabGrid, columns === 2 && styles.tabGridWide]}>
-        {tabs.map(({ key, title, subtitle, Icon, tone }) => {
-          const isCertification = key === 'cert';
-          const active = activeTab === key;
-          return (
-            <View key={key} style={[styles.tabCardWrap, columns === 2 && styles.tabCardWrapWide]}>
-              <Pressable
-                onPress={() => isCertification ? null : key === 'mos-ic3'
-                  ? navigation.navigate('CertPrepCatalog')
-                  : setActiveTab(key)}
-                disabled={isCertification}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: isCertification, selected: active }}
-                accessibilityLabel={isCertification ? `${title}, chỉ sử dụng trên máy tính` : title}
-                style={[styles.tabCard, active && styles.tabCardActive, isCertification && styles.tabCardDisabled]}
-              >
-                <View style={[styles.tabIcon, { backgroundColor: tone }]}><Icon size={25} color="#FFFFFF" strokeWidth={2.2} /></View>
-                <View style={styles.flex}>
-                  <Text style={styles.tabTitle}>{title}</Text>
-                  <Text style={styles.tabSubtitle}>{isCertification ? 'Chỉ làm bài trên máy tính' : subtitle}</Text>
-                </View>
-                <ChevronRight size={19} color={colors.muted} />
-              </Pressable>
-              {isCertification ? (
-                <View pointerEvents="none" style={styles.certificationVeil}>
-                  <View style={styles.computerOnly}><Lock size={15} color="#64748B" /><Text style={styles.computerOnlyText}>CHỈ DÀNH CHO MÁY TÍNH</Text></View>
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </View>
+    <AppScreen scrollViewRef={screenScrollRef}>
+      <AppHeader
+        title={activeTab ? tabs.find((tab) => tab.key === activeTab)?.title || 'Phòng thi' : 'Phòng thi'}
+        subtitle={activeTab ? tabs.find((tab) => tab.key === activeTab)?.subtitle : 'Các bài thi và kết quả học tập'}
+        showBackButton={activeTab !== null}
+        onBack={activeTab ? () => setActiveTab(null) : undefined}
+        centered={activeTab === null}
+      />
+      {activeTab === null ? (
+        <View style={[styles.tabGrid, columns === 2 && styles.tabGridWide]}>
+          {tabs.map(({ key, title, subtitle, Icon, tone }) => {
+            const isCertification = key === 'cert';
+            return (
+              <View key={key} style={[styles.tabCardWrap, columns === 2 && styles.tabCardWrapWide]}>
+                <Pressable
+                  onPress={() => isCertification ? null : key === 'mos-ic3'
+                    ? navigation.navigate('CertPrepCatalog')
+                    : setActiveTab(key)}
+                  disabled={isCertification}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isCertification }}
+                  accessibilityLabel={isCertification ? `${title}, chỉ sử dụng trên máy tính` : title}
+                  style={[styles.tabCard, isCertification && styles.tabCardDisabled]}
+                >
+                  <View style={[styles.tabIcon, { backgroundColor: tone }]}><Icon size={25} color="#FFFFFF" strokeWidth={2.2} /></View>
+                  <View style={styles.flex}>
+                    <Text style={styles.tabTitle}>{title}</Text>
+                    <Text style={styles.tabSubtitle}>{isCertification ? 'Chỉ làm bài trên máy tính' : subtitle}</Text>
+                  </View>
+                  <ChevronRight size={19} color={colors.muted} />
+                </Pressable>
+                {isCertification ? (
+                  <View pointerEvents="none" style={styles.certificationVeil}>
+                    <View style={styles.computerOnly}><Lock size={15} color="#64748B" /><Text style={styles.computerOnlyText}>Chỉ dành cho máy tính</Text></View>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
 
-      {activeTab === 'quiz' ? (
+      {activeTab !== null ? (activeTab === 'quiz' ? (
         <>
-          <Card style={styles.listHeading}>
-            <View style={styles.flex}>
-              <View style={styles.headingWithIcon}><Award size={18} color={colors.brand} /><Text style={styles.sectionTitle}>Trắc nghiệm bài học từ Giảng viên</Text></View>
-              <Text style={styles.examMuted}>Danh sách các bài thi trắc nghiệm được giảng viên giao theo từng buổi học.</Text>
-            </View>
-            <Pressable onPress={() => void loadQuizzes()} disabled={loading} style={styles.refreshButton} accessibilityRole="button" accessibilityLabel="Tải lại danh sách">
-              <RefreshCw size={17} color={colors.muted} />
-            </Pressable>
-          </Card>
           {loading ? (
             <View style={styles.centerState}><ActivityIndicator color={colors.brand} size="large" /><Text style={styles.stateText}>Đang tải danh sách bài trắc nghiệm...</Text></View>
           ) : error ? (
@@ -418,7 +520,7 @@ export function StudentExamScreen() {
             <EmptyState title="Hiện chưa có bài trắc nghiệm mới nào" message="Khi giảng viên giao bài thi buổi học, danh sách sẽ hiển thị tại đây." />
           ) : (
             <View style={[styles.quizGrid, width >= 680 && styles.quizGridWide]}>
-              {quizzes.map((quiz) => {
+              {[...quizzes].sort((left, right) => Number(right.id === notificationQuizId) - Number(left.id === notificationQuizId)).map((quiz) => {
                 const submission = quiz.mySubmission;
                 const hasSubmitted = Boolean(submission);
                 const isPassed = !submission?.forfeit && (submission?.passed || (submission?.score ?? 0) >= 70);
@@ -433,10 +535,18 @@ export function StudentExamScreen() {
                     ? expired ? 'Đã hết hạn' : `Hết hạn sau: ${countdownText(deadlineAt - now)}`
                     : '';
                 return (
-                  <Card key={quiz.id} style={width >= 680 ? { ...styles.quizCard, ...styles.quizCardWide } : styles.quizCard}>
+                  <Card
+                    key={quiz.id}
+                    style={{
+                      ...styles.quizCard,
+                      ...(notificationQuizId === quiz.id ? styles.notificationQuizCard : {}),
+                      ...(width >= 680 ? styles.quizCardWide : {}),
+                    }}
+                  >
+                    {notificationQuizId === quiz.id ? <Text style={styles.notificationQuizLabel}>Bài trắc nghiệm trong thông báo</Text> : null}
                     <View style={styles.quizCardTop}>
                       <Text style={styles.coursePill}>{quiz.courseName || 'Bài thi buổi học'}</Text>
-                      {hasSubmitted ? <Text style={[styles.statusPill, isPassed ? styles.statusPassed : styles.statusFailed]}>{submission?.forfeit ? 'RỚT · THOÁT' : isPassed ? 'ĐẠT' : 'CHƯA ĐẠT'}</Text> : null}
+                      {hasSubmitted ? <Text style={[styles.statusPill, isPassed ? styles.statusPassed : styles.statusFailed]}>{submission?.forfeit ? 'Rớt · thoát' : isPassed ? 'Đạt' : 'Chưa đạt'}</Text> : null}
                     </View>
                     <Text style={styles.quizTitle}>{quiz.title}</Text>
                     <View style={styles.quizMeta}><Clock size={13} color={colors.muted} /><Text style={styles.metaText}>{quiz.timeLimitMinutes} phút</Text></View>
@@ -473,7 +583,7 @@ export function StudentExamScreen() {
           {loading ? <View style={styles.centerState}><ActivityIndicator color={colors.brand} /></View> : submittedQuizzes.length ? submittedQuizzes.map((quiz) => (
             <Pressable key={quiz.id} onPress={() => void openQuiz(quiz)} style={styles.scoreRow} accessibilityRole="button">
               <View style={styles.flex}><Text style={styles.quizTitle}>{quiz.title}</Text><Text style={styles.metaText}>{quiz.courseName} · {quiz.mySubmission?.submittedAt ? formatDate(quiz.mySubmission.submittedAt) : 'Đã nộp'}</Text></View>
-              <Text style={[styles.scoreText, quiz.mySubmission?.passed ? styles.passText : styles.failText]}>{quiz.mySubmission?.forfeit ? 'RỚT' : `${quiz.mySubmission?.score ?? 0}%`}</Text>
+              <Text style={[styles.scoreText, quiz.mySubmission?.passed ? styles.passText : styles.failText]}>{quiz.mySubmission?.forfeit ? 'Rớt' : `${quiz.mySubmission?.score ?? 0}%`}</Text>
             </Pressable>
           )) : <EmptyState title="Chưa có kết quả trắc nghiệm" message="Kết quả bài làm sẽ hiển thị tại đây sau khi nộp bài." />}
         </View>
@@ -481,14 +591,15 @@ export function StudentExamScreen() {
         <Card style={styles.disabledInfo}><Monitor size={24} color={colors.muted} /><Text style={styles.sectionTitle}>Thi chứng nhận chỉ trên máy tính</Text><Text style={styles.examMuted}>Để bảo đảm camera và giám sát bài thi, hãy mở Phòng thi trên máy tính.</Text></Card>
       ) : (
         <Card style={styles.disabledInfo}><GraduationCap size={24} color={colors.purple} /><Text style={styles.sectionTitle}>MOS / IC3</Text><Text style={styles.examMuted}>Mở mục ôn tập chứng chỉ để xem đề luyện tập.</Text><Pressable onPress={() => navigation.navigate('CertPrepCatalog')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>Mở ôn tập MOS / IC3</Text></Pressable></Card>
-      )}
+      )) : null}
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  examScreen: { flex: 1 },
+  examScreen: { flex: 1, paddingBottom: spacing.sm },
+  examScroll: { flex: 1 },
   tabGrid: { gap: spacing.md, marginBottom: spacing.lg },
   tabGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
   tabCardWrap: { position: 'relative' },
@@ -502,8 +613,7 @@ const styles = StyleSheet.create({
   certificationVeil: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.68)', borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   computerOnly: { flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.92)', borderColor: colors.line, borderWidth: 1, borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 9 },
   computerOnlyText: { color: '#475569', fontSize: typography.micro, fontWeight: '900' },
-  listHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-  headingWithIcon: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  listHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.sm, marginBottom: spacing.md },
   sectionTitle: { color: colors.ink, fontSize: typography.small, fontWeight: '900', flexShrink: 1 },
   examMuted: { color: colors.muted, fontSize: typography.caption, lineHeight: 18, marginTop: 3 },
   refreshButton: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas },
@@ -514,6 +624,8 @@ const styles = StyleSheet.create({
   quizGrid: { gap: spacing.md },
   quizGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
   quizCard: { gap: spacing.sm },
+  notificationQuizCard: { borderColor: colors.brand, borderWidth: 2, backgroundColor: '#FFF7F5' },
+  notificationQuizLabel: { color: colors.brand, fontSize: typography.micro, fontWeight: '900' },
   quizCardWide: { width: '48%' },
   quizCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
   coursePill: { color: '#4338CA', backgroundColor: '#EEF2FF', borderColor: '#E0E7FF', borderWidth: 1, borderRadius: 7, paddingVertical: 3, paddingHorizontal: 7, fontSize: typography.micro, fontWeight: '900', flexShrink: 1, overflow: 'hidden' },
@@ -534,7 +646,7 @@ const styles = StyleSheet.create({
   quizActionText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900' },
   lockedActionText: { color: '#475569' },
   scoreSection: { gap: spacing.sm },
-  scoreHeader: { backgroundColor: colors.brand, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  scoreHeader: { backgroundColor: colors.brand, borderRadius: radius.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   scoreHeaderText: { color: colors.surface, fontSize: typography.small, fontWeight: '900' },
   scoreTabs: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: radius.sm, padding: 5, gap: 5 },
   scoreTabActive: { flex: 1, textAlign: 'center', color: colors.brand, backgroundColor: colors.surface, padding: spacing.sm, borderRadius: radius.sm, fontSize: typography.micro, fontWeight: '900', overflow: 'hidden' },
@@ -542,59 +654,92 @@ const styles = StyleSheet.create({
   scoreRow: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   disabledInfo: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
   examMutedCenter: { textAlign: 'center' },
-  roomContent: { paddingBottom: spacing.xxl, gap: spacing.md },
-  roomHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: '#0F172A', borderRadius: radius.md },
-  roomTitle: { color: '#F8FAFC', fontSize: typography.heading, fontWeight: '900' },
-  timerBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.sm, backgroundColor: '#0E2938', padding: spacing.sm },
+  roomContent: { paddingBottom: spacing.lg, gap: spacing.sm },
+  roomHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, backgroundColor: '#0F172A', borderRadius: radius.md },
+  roomTitle: { color: '#F8FAFC', fontSize: typography.small, fontWeight: '900' },
+  roomSubtitle: { color: '#94A3B8', fontSize: typography.micro, marginTop: 2 },
+  timerBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.sm, backgroundColor: '#0E2938', paddingVertical: 6, paddingHorizontal: spacing.sm },
   timerUrgent: { backgroundColor: '#3F1D24' },
-  timerText: { color: '#67E8F9', fontSize: typography.heading, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  timerText: { color: '#67E8F9', fontSize: typography.small, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  examProgress: { gap: 5, paddingHorizontal: 2 },
+  examProgressTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  examProgressLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  examProgressCount: { color: colors.ink, fontSize: typography.micro, fontWeight: '900' },
+  examProgressTrack: { height: 5, overflow: 'hidden', borderRadius: radius.pill, backgroundColor: '#E2E8F0' },
+  examProgressFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.green },
   failText: { color: '#F87171' },
   passText: { color: '#34D399' },
-  answerLayout: { gap: spacing.md },
-  questionPanel: { padding: spacing.md, borderRadius: radius.md, backgroundColor: '#111827', borderColor: '#263244', borderWidth: 1 },
-  questionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  answerLayout: { gap: spacing.sm },
+  questionPanel: { padding: spacing.sm, borderRadius: radius.md, backgroundColor: '#111827', borderColor: '#263244', borderWidth: 1 },
+  questionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   questionLabel: { color: '#7DD3FC', fontSize: typography.micro, fontWeight: '900' },
-  questionText: { color: '#F8FAFC', fontSize: typography.body, fontWeight: '800', lineHeight: 24, marginBottom: spacing.lg },
-  optionsList: { gap: spacing.sm },
-  option: { minHeight: 52, borderRadius: radius.sm, backgroundColor: '#1E293B', borderWidth: 1, borderColor: '#334155', padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  questionText: { color: '#F8FAFC', fontSize: typography.body, fontWeight: '800', lineHeight: 23, marginBottom: spacing.md },
+  optionsList: { gap: spacing.xs },
+  option: { minHeight: 44, borderRadius: radius.sm, backgroundColor: '#1E293B', borderWidth: 1, borderColor: '#334155', paddingVertical: 6, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   optionSelected: { backgroundColor: '#0C4A6E', borderColor: '#38BDF8' },
   optionLetter: { width: 28, height: 28, textAlign: 'center', textAlignVertical: 'center', color: '#94A3B8', backgroundColor: '#0F172A', borderRadius: 14, overflow: 'hidden', fontWeight: '900', paddingTop: 5 },
   optionLetterSelected: { color: '#082F49', backgroundColor: '#7DD3FC' },
   optionText: { flex: 1, color: '#CBD5E1', fontSize: typography.caption, lineHeight: 18 },
   optionTextSelected: { color: '#F0F9FF', fontWeight: '800' },
-  questionNavigation: { marginTop: spacing.lg, flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
-  secondaryButton: { backgroundColor: '#334155', borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  questionNavigation: { marginTop: spacing.md, flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  secondaryButton: { backgroundColor: '#334155', borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
   secondaryButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900' },
-  nextButton: { backgroundColor: '#38BDF8', borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  nextButton: { backgroundColor: '#38BDF8', borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
   nextButtonText: { color: '#082F49', fontSize: typography.micro, fontWeight: '900' },
   disabledButton: { opacity: 0.45 },
-  questionGridPanel: { backgroundColor: '#0E1420', borderColor: '#263244', gap: spacing.sm },
+  questionGridPanel: { padding: spacing.sm, backgroundColor: '#0E1420', borderColor: '#263244', gap: spacing.sm },
   gridHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   gridHeadingText: { color: '#CBD5E1', fontSize: typography.caption, fontWeight: '900' },
-  questionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  questionNumber: { minWidth: 42, height: 40, paddingHorizontal: spacing.sm, borderRadius: radius.sm, borderColor: '#334155', borderWidth: 1, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' },
-  questionNumberCurrent: { backgroundColor: '#0EA5E9', borderColor: '#7DD3FC' },
+  questionGrid: { flexDirection: 'row', gap: spacing.xs },
+  questionNumber: { minWidth: 38, height: 36, paddingHorizontal: spacing.sm, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  questionNumberUnanswered: { backgroundColor: '#374151', borderColor: '#6B7280' },
   questionNumberAnswered: { backgroundColor: '#065F46', borderColor: '#34D399' },
+  questionNumberCurrent: { borderWidth: 2, borderColor: '#38BDF8' },
   questionNumberText: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '800' },
   questionNumberTextActive: { color: colors.surface },
   gridLegend: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '700' },
-  submitButton: { minHeight: 44, backgroundColor: colors.brand, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  submitButton: { minHeight: 40, backgroundColor: colors.brand, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  submitModalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.62)' },
+  submitModalCard: { width: '100%', maxWidth: 380, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  submitModalTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '900' },
+  submitModalMessage: { color: colors.muted, fontSize: typography.body, lineHeight: 23, marginTop: spacing.sm },
+  submitModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.lg },
+  submitModalCancel: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.canvas },
+  submitModalCancelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
+  submitModalConfirm: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.brand },
   primaryButton: { minHeight: 42, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.brand, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '900' },
-  resultContent: { paddingBottom: spacing.xxl, gap: spacing.lg },
-  resultCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, backgroundColor: '#111827', borderColor: '#263244' },
-  resultIcon: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
-  resultPassed: { backgroundColor: '#064E3B' },
-  resultFailed: { backgroundColor: '#7F1D1D' },
-  resultTitle: { color: '#F8FAFC', fontSize: typography.heading, fontWeight: '900', textAlign: 'center' },
-  resultScore: { fontSize: 46, lineHeight: 56, fontWeight: '900', marginTop: spacing.md },
-  resultStatus: { fontSize: typography.micro, fontWeight: '900', letterSpacing: 1 },
-  resultMetrics: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginVertical: spacing.md },
-  resultMetric: { width: '48%', minHeight: 58, backgroundColor: '#1E293B', borderRadius: radius.sm, padding: spacing.sm },
-  metricLabel: { color: '#94A3B8', fontSize: typography.micro, fontWeight: '700' },
-  metricValue: { color: '#F8FAFC', fontSize: typography.micro, fontWeight: '900', marginTop: 4 },
+  resultContent: { paddingBottom: spacing.xxl, gap: spacing.sm },
+  resultCard: { gap: spacing.md, padding: spacing.md, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
+  resultHero: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  resultInfo: { flex: 1, gap: 4 },
+  resultScoreBlock: { alignItems: 'flex-end', gap: 4 },
+  resultTeacher: { color: '#64748B', fontSize: typography.micro, lineHeight: 16 },
+  resultPassed: { backgroundColor: '#DCFCE7' },
+  resultFailed: { backgroundColor: '#FEE2E2' },
+  resultTitle: { color: '#0F172A', fontSize: typography.body, fontWeight: '900' },
+  resultScore: { fontSize: 34, lineHeight: 38, fontWeight: '900' },
+  resultStatusBadge: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  resultStatus: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.4 },
+  resultMetrics: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  resultMetric: { width: '48%', minHeight: 48, backgroundColor: '#F1F5F9', borderRadius: radius.sm, padding: spacing.sm, justifyContent: 'center' },
+  metricLabel: { color: '#64748B', fontSize: typography.micro, fontWeight: '700' },
+  metricValue: { color: '#0F172A', fontSize: typography.caption, fontWeight: '900', marginTop: 2 },
+  resultExitReason: { color: '#B91C1C', fontSize: typography.caption, fontWeight: '700' },
+  resultBackButton: { minHeight: 40, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, backgroundColor: colors.brand, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   reviewList: { gap: spacing.sm },
-  reviewCard: { backgroundColor: '#111827', borderColor: '#263244' },
-  reviewAnswer: { color: '#CBD5E1', fontSize: typography.caption, marginBottom: 4 },
-  reviewCorrect: { color: '#34D399', fontSize: typography.caption, fontWeight: '800', marginBottom: 4 },
+  reviewCard: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', padding: spacing.md, gap: spacing.sm },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewQuestionNumber: { color: '#0F172A', fontSize: typography.caption, fontWeight: '900' },
+  reviewQuestionText: { color: '#0F172A', fontSize: typography.body, fontWeight: '700', lineHeight: 22 },
+  reviewStatusBadge: { borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  reviewCorrectBadge: { backgroundColor: '#DCFCE7' },
+  reviewIncorrectBadge: { backgroundColor: '#FEE2E2' },
+  reviewStatusText: { fontSize: typography.micro, fontWeight: '800' },
+  reviewIncorrect: { color: '#B91C1C' },
+  reviewAnswerBox: { padding: spacing.sm, borderRadius: radius.sm, backgroundColor: '#F0FDF4', gap: 3 },
+  reviewAnswerWrong: { backgroundColor: '#FFF1F2' },
+  reviewAnswerLabel: { color: '#64748B', fontSize: typography.micro, fontWeight: '700' },
+  reviewAnswer: { color: '#0F172A', fontSize: typography.caption, fontWeight: '700' },
+  reviewCorrect: { color: '#15803D', fontSize: typography.caption, fontWeight: '800' },
 });

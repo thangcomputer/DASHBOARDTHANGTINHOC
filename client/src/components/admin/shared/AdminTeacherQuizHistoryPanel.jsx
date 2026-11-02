@@ -98,7 +98,7 @@ export default function AdminTeacherQuizHistoryPanel() {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[10px] font-black uppercase">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[10px] font-black ">
                       {quiz.courseName || 'Toàn hệ thống'}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">
@@ -122,7 +122,7 @@ export default function AdminTeacherQuizHistoryPanel() {
 
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Đã nộp bài</p>
+                    <p className="text-[10px] font-bold  text-slate-400">Đã nộp bài</p>
                     <p className="text-sm font-black text-slate-800">
                       {subCount} lượt {avgScore !== null && <span className="text-emerald-600 text-xs font-bold">(TB: {avgScore}%)</span>}
                     </p>
@@ -147,7 +147,7 @@ export default function AdminTeacherQuizHistoryPanel() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-slate-900 p-5 text-white flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase bg-red-600 text-white px-2 py-0.5 rounded">
+                <span className="text-[10px] font-black  bg-red-600 text-white px-2 py-0.5 rounded">
                   {selectedQuiz.courseName || 'Trắc nghiệm'}
                 </span>
                 <h3 className="font-bold text-base mt-1">{selectedQuiz.title}</h3>
@@ -164,8 +164,8 @@ export default function AdminTeacherQuizHistoryPanel() {
 
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="flex items-center justify-between text-xs font-bold text-slate-500 border-b pb-2">
-                <span>DANH SÁCH HỌC VIÊN ĐÃ NỘP BÀI ({selectedQuiz.submissions?.length || 0})</span>
-                <span>TỔNG {selectedQuiz.questions?.length || 0} CÂU HỎI</span>
+                <span>Danh sách học viên đã nộp bài ({selectedQuiz.submissions?.length || 0})</span>
+                <span>Tổng {selectedQuiz.questions?.length || 0}  Câu hỏi</span>
               </div>
 
               {(!selectedQuiz.submissions || selectedQuiz.submissions.length === 0) ? (
@@ -181,10 +181,10 @@ export default function AdminTeacherQuizHistoryPanel() {
                           <p className="text-[11px] text-slate-400">SĐT: {sub.studentPhone || '---'} · Nộp: {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('vi-VN') : ''}</p>
                         </div>
                         <div className="text-right">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${
                             isPassed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                           }`}>
-                            {isPassed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                            {isPassed ? 'Đạt' : 'Chưa đạt'}
                           </span>
                           <p className={`text-base font-black mt-1 ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
                             {sub.correctCount ?? 0}/{(sub.totalQuestions ?? selectedQuiz.questions?.length) || 0} câu ({sub.score ?? 0}%)

@@ -103,7 +103,7 @@ export default function WorkflowCenterPage() {
 
       {status === 'open' && (
         <div className="bg-white border border-gray-100 rounded-xl p-3 shrink-0">
-          <label className="text-[10px] font-black text-gray-400 uppercase">Ghi chú khi duyệt / từ chối</label>
+          <label className="text-[10px] font-black text-gray-400 ">Ghi chú khi duyệt / từ chối</label>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -123,7 +123,7 @@ export default function WorkflowCenterPage() {
             {items.map((w) => (
               <li key={w._id} className="p-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${STATUS_CLS[w.status] || STATUS_CLS.open}`}>
+                  <span className={`text-[10px] font-black  px-2 py-0.5 rounded-full border ${STATUS_CLS[w.status] || STATUS_CLS.open}`}>
                     {w.status}
                   </span>
                   <span className="text-[10px] font-bold text-teal-700 uppercase">{w.definitionName || w.definitionKey}</span>

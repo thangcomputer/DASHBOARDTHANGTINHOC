@@ -2410,18 +2410,18 @@ const ChangePasswordModal = ({ session, role }) => {
               {error && <div role="alert" className="bg-red-50 text-red-700 text-xs font-bold p-3 rounded-xl border border-red-100">{error}</div>}
               {session?.isFirstLogin !== true && (
                 <div>
-                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Mật khẩu hiện tại</label>
+                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600  block mb-1">Mật khẩu hiện tại</label>
                   <input id="cms-old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoComplete="current-password"
                     className="input-field" />
                 </div>
               )}
               <div>
-                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Mật khẩu mới</label>
+                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600  block mb-1">Mật khẩu mới</label>
                 <input id="cms-new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
                   className="input-field" />
               </div>
               <div>
-                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Nhập lại mật khẩu mới</label>
+                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600  block mb-1">Nhập lại mật khẩu mới</label>
                 <input id="cms-confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password"
                   className="input-field" />
               </div>

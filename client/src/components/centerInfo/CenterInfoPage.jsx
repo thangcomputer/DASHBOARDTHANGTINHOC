@@ -55,7 +55,7 @@ function OverviewView({ overview }) {
           </h1>
           {overview.intro ? <p className="mt-2 text-slate-600 leading-relaxed">{overview.intro}</p> : null}
           {overview.foundedYear ? (
-            <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+            <p className="mt-2 text-xs font-bold  tracking-wide text-slate-400">
               Thành lập {overview.foundedYear}
             </p>
           ) : null}
@@ -69,14 +69,14 @@ function OverviewView({ overview }) {
           { label: 'Giá trị cốt lõi', value: overview.coreValues },
         ].filter((x) => x.value).map((x) => (
           <div key={x.label} className="rounded-2xl border border-slate-100 bg-white p-4">
-            <p className="text-[11px] font-black uppercase tracking-wide text-red-600 mb-1">{x.label}</p>
+            <p className="text-[11px] font-black  tracking-wide text-red-600 mb-1">{x.label}</p>
             <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{x.value}</p>
           </div>
         ))}
       </div>
 
       <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 space-y-2 text-sm text-slate-700">
-        <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Liên hệ</p>
+        <p className="text-[11px] font-black  tracking-wide text-slate-400">Liên hệ</p>
         {overview.headquartersAddress ? <p>📍 {overview.headquartersAddress}</p> : null}
         {overview.contactPhone ? (
           <p className="flex items-center gap-2"><Phone size={14} /> {overview.contactPhone}</p>

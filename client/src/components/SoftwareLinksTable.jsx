@@ -62,7 +62,7 @@ export default function SoftwareLinksTable({
           </button>
 
           <header className="space-y-3 border-b border-slate-100 pb-5">
-            <p className="text-[11px] font-black uppercase tracking-wider text-red-600">
+            <p className="text-[11px] font-black  tracking-wider text-red-600">
               Hướng dẫn cài đặt
             </p>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
@@ -152,9 +152,9 @@ export default function SoftwareLinksTable({
             <table className="w-full text-left min-w-[640px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500 w-[28%]">Link / Phần mềm</th>
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500 w-[42%]">Mô tả</th>
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wide text-slate-500 w-[30%]">Hướng dẫn cài đặt</th>
+                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[28%]">Link / Phần mềm</th>
+                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[42%]">Mô tả</th>
+                  <th className="px-4 py-3 text-[11px] font-black  tracking-wide text-slate-500 w-[30%]">Hướng dẫn cài đặt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

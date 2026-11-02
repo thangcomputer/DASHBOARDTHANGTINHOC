@@ -138,8 +138,8 @@ export default function TeacherStudentsTab({
                       const aOn = !aDropped && isUserOnline(onlineUsers, a) ? 1 : 0;
                       const bOn = !bDropped && isUserOnline(onlineUsers, b) ? 1 : 0;
                       if (aOn !== bOn) return bOn - aOn;
-                      const aSeen = new Date(lastSeenUsers?.[aId] || 0).getTime() || 0;
-                      const bSeen = new Date(lastSeenUsers?.[bId] || 0).getTime() || 0;
+                      const aSeen = new Date(lastSeenUsers?.[aId] || a.lastAccessAt || 0).getTime() || 0;
+                      const bSeen = new Date(lastSeenUsers?.[bId] || b.lastAccessAt || 0).getTime() || 0;
                       if (aSeen !== bSeen) return bSeen - aSeen;
                       return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
                     })
@@ -183,23 +183,23 @@ export default function TeacherStudentsTab({
                           <div className="flex-1 text-left min-w-0">
                             <p className={`text-sm font-bold truncate ${isDropped ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</p>
                             {s.course && (
-                              <p className={`text-[10px] font-bold uppercase tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-600' : 'text-indigo-600'}`}>
+                              <p className={`text-[10px] font-bold  tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-600' : 'text-indigo-600'}`}>
                                 {s.course}
                               </p>
                             )}
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {isDropped ? (
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                                <span className="text-[10px] font-bold  tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
                                   Thôi học
                                 </span>
                               ) : isOnline ? (
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                  Đang online
+                                <span className="text-[10px] font-bold  tracking-wide text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                                  Trực tuyến
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-medium text-slate-400">
-                                  {lastSeenUsers[String(sId)]
-                                    ? `Truy cập lần cuối: ${new Date(lastSeenUsers[String(sId)]).toLocaleString('vi-VN')}`
+                                  {lastSeenUsers[String(sId)] || s.lastAccessAt
+                                    ? `Truy cập lần cuối: ${new Date(lastSeenUsers[String(sId)] || s.lastAccessAt).toLocaleString('vi-VN')}`
                                     : 'Chưa có dữ liệu truy cập'}
                                 </span>
                               )}

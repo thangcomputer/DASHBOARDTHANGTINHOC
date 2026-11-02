@@ -113,6 +113,14 @@ function findCourseInSettings(settings, courseId) {
   );
 }
 
+async function teacherMayAccessTrainingCourse(user, course) {
+  if (String(user?.role || '').toLowerCase() !== 'teacher') return true;
+  const Teacher = require('../models/Teacher');
+  const { itemMatchesSubjectIds, resolveTeacherSubjectIds } = require('../utils/trainingSubjectAccess');
+  const teacher = await Teacher.findById(user.id || user._id).select('subjectIds specialty').lean();
+  return itemMatchesSubjectIds(course, resolveTeacherSubjectIds(teacher || {}));
+}
+
 function collectCourseLessons(course) {
   let courseLessons = course.lessons || course.videos || [];
   if (courseLessons.length === 0 && course.chapters) {
@@ -318,7 +326,12 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       const SystemSettings = require('../models/SystemSettings');
       const settings = await SystemSettings.findOne() || {};
       const course = findCourseInSettings(settings, courseId);
+      if (!course) return res.status(404).json({ success: false, message: 'Khóa học không tồn tại' });
+      if (!(await teacherMayAccessTrainingCourse(req.user, course))) {
+        return res.status(403).json({ success: false, message: 'Khóa học này không thuộc chuyên môn của bạn' });
+      }
       const lesson = course ? findLessonInCourse(course, lessonId) : null;
+      if (!lesson) return res.status(404).json({ success: false, message: 'Bài học không tồn tại trong khóa' });
       const effectiveDuration = resolveEffectiveDuration(lesson?.duration, videoDuration);
       const credited = clampWatchProgressIncrease({
         previous: serverWatched,
@@ -345,6 +358,9 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
     const course = findCourseInSettings(settings, courseId);
     if (!course) {
       return res.status(404).json({ success: false, message: 'Khóa học không tồn tại' });
+    }
+    if (!(await teacherMayAccessTrainingCourse(req.user, course))) {
+      return res.status(403).json({ success: false, message: 'Khóa học này không thuộc chuyên môn của bạn' });
     }
     const lesson = findLessonInCourse(course, lessonId);
     if (!lesson) {
@@ -460,7 +476,7 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
   }
 });
 
-function mapLessonForTeacherUi(lesson, index) {
+function mapLessonForTeacherUi(lesson, index, progress) {
   const url = lesson.videoUrl || lesson.url || lesson.youtubeUrl || lesson.link || '';
   let duration = lesson.duration || '';
   if (typeof duration === 'number' && duration > 0) {
@@ -469,9 +485,13 @@ function mapLessonForTeacherUi(lesson, index) {
     duration = `${m}:${String(s).padStart(2, '0')}`;
   }
   return {
+    id: String(lesson._id || lesson.id || `ls-${index}`),
     title: lesson.title || `Bài ${index + 1}`,
     url,
     duration: duration || '—',
+    completed: progress?.status === 'completed',
+    watchedSeconds: Math.max(0, Number(progress?.watchedSeconds) || 0),
+    antiSeek: isLessonAntiSeekEnabled(lesson),
   };
 }
 
@@ -537,12 +557,17 @@ router.get('/teacher/overview', lmsGuard('lms_teacher_overview'), async (req, re
       raw.files = filterTrainingItemsBySubject(raw.files, allowedSubjectIds);
     }
 
-    const progress = await TrainingProgress.find({ userId, status: 'completed' });
+    const progress = await TrainingProgress.find({ userId });
     const completedByCourse = {};
+    const progressByCourse = {};
     progress.forEach((p) => {
       const cId = String(p.courseId);
-      if (!completedByCourse[cId]) completedByCourse[cId] = new Set();
-      completedByCourse[cId].add(String(p.lessonId));
+      if (!progressByCourse[cId]) progressByCourse[cId] = new Map();
+      progressByCourse[cId].set(String(p.lessonId), p);
+      if (p.status === 'completed') {
+        if (!completedByCourse[cId]) completedByCourse[cId] = new Set();
+        completedByCourse[cId].add(String(p.lessonId));
+      }
     });
 
     const courses = (raw.videos || []).map((course) => {
@@ -561,7 +586,11 @@ router.get('/teacher/overview', lmsGuard('lms_teacher_overview'), async (req, re
         _id: cId,
         title: course.title || 'Khóa đào tạo',
         progress: progressPct,
-        videos: lessons.map(mapLessonForTeacherUi),
+        videos: lessons.map((lesson, index) => mapLessonForTeacherUi(
+          lesson,
+          index,
+          progressByCourse[cId]?.get(String(lesson._id || lesson.id)),
+        )),
         files: courseFiles,
         notices,
       };
@@ -597,41 +626,42 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
     let maxSeconds = 0;
     let course = null;
     let lesson = null;
-    try {
-      const SystemSettings = require('../models/SystemSettings');
-      const settings = await SystemSettings.findOne() || {};
-      course = findCourseInSettings(settings, courseId);
-      lesson = course ? findLessonInCourse(course, lessonId) : null;
-      maxSeconds = resolveEffectiveDuration(lesson?.duration, videoDuration);
-    } catch { /* ignore */ }
+    const SystemSettings = require('../models/SystemSettings');
+    const settings = await SystemSettings.findOne() || {};
+    course = findCourseInSettings(settings, courseId);
+    if (!course) return res.status(404).json({ success: false, message: 'Khóa học không tồn tại' });
+    if (!(await teacherMayAccessTrainingCourse(req.user, course))) {
+      return res.status(403).json({ success: false, message: 'Khóa học này không thuộc chuyên môn của bạn' });
+    }
+    lesson = findLessonInCourse(course, lessonId);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Bài học không tồn tại trong khóa' });
+    maxSeconds = resolveEffectiveDuration(lesson.duration, videoDuration);
 
     // ACCESS gate: do not accept watch progress for locked lessons
-    if (course && lesson) {
-      const watchGate = await assertStudentMayWatchLesson({ user: req.user, course, lesson });
-      if (!watchGate.ok) {
-        return res.status(403).json({ success: false, code: watchGate.code, message: watchGate.message });
-      }
-      if (!watchGate.preview && existing?.status !== 'completed') {
-        const completed = await TrainingProgress.find({
-          userId,
-          courseId: String(courseId),
-          status: 'completed',
-        }).select('lessonId').lean();
-        const completedLessonIds = completed.map((p) => String(p.lessonId));
-        const { resolveCanAccessLesson } = require('../utils/lessonLearningPolicy');
-        const access = resolveCanAccessLesson({
-          course,
-          lessonId,
-          lesson,
-          completedLessonIds,
+    const watchGate = await assertStudentMayWatchLesson({ user: req.user, course, lesson });
+    if (!watchGate.ok) {
+      return res.status(403).json({ success: false, code: watchGate.code, message: watchGate.message });
+    }
+    if (!watchGate.preview && existing?.status !== 'completed') {
+      const completed = await TrainingProgress.find({
+        userId,
+        courseId: String(courseId),
+        status: 'completed',
+      }).select('lessonId').lean();
+      const completedLessonIds = completed.map((p) => String(p.lessonId));
+      const { resolveCanAccessLesson } = require('../utils/lessonLearningPolicy');
+      const access = resolveCanAccessLesson({
+        course,
+        lessonId,
+        lesson,
+        completedLessonIds,
+      });
+      if (!access.canAccess) {
+        return res.status(403).json({
+          success: false,
+          code: 'PREVIOUS_LESSON_REQUIRED',
+          message: 'Hoàn thành bài trước để mở bài này.',
         });
-        if (!access.canAccess) {
-          return res.status(403).json({
-            success: false,
-            code: 'PREVIOUS_LESSON_REQUIRED',
-            message: 'Hoàn thành bài trước để mở bài này.',
-          });
-        }
       }
     }
 

@@ -2409,7 +2409,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           }}
                         >
                           <span className="block text-sm font-medium text-slate-800 truncate">
-                            {c.user?.name || 'Không rõ tên'}
+                            {formatDisplayName(c.user?.name) || 'Không rõ tên'}
                           </span>
                         </button>
                       </li>
@@ -2434,20 +2434,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { id: 'all', label: 'Tất cả' },
-                { id: 'student', label: 'Học viên' },
                 { id: 'teacher', label: 'Giảng viên' },
-                { id: 'admin', label: 'Admin' },
-                { id: 'staff', label: 'Tuyển sinh' },
-                { id: 'support', label: 'Hỗ trợ' },
                 { id: 'group', label: 'Nhóm' }
-              ].filter(tab => {
-                if (isSuperAdmin) return tab.id === 'all' || tab.id === 'admin';
-                if (currentUserRole === 'student' && (tab.id === 'student' || tab.id === 'admin')) return false;
-                if (currentUserRole === 'teacher' && tab.id === 'teacher') return false;
-                if (isHighAdmin && tab.id === 'student') return false;
-                if (currentUserRole === 'staff' && !isSupportAgent && tab.id === 'staff') return false;
-                return true;
-              }).map(tab => (
+              ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setContactTab(tab.id)}
@@ -2675,20 +2664,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <>
                       <button
                         onClick={() => setBroadcastConfig({ targetRole: 'admin', label: 'Kênh Admin' })}
-                        className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
+                        className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600  tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
                       >
                         📢 Gửi toàn bộ Admin
                       </button>
                       <button
                         onClick={() => setBroadcastConfig({ targetRole: 'teacher', label: 'Giảng viên' })}
-                        className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
+                        className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600  tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
                       >
                         📢 Gửi toàn bộ Giảng viên
                       </button>
                       {!isHighAdmin ? (
                         <button
                           onClick={() => setBroadcastConfig({ targetRole: 'student', label: 'Học viên' })}
-                          className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
+                          className="px-4 py-2 bg-white hover:bg-slate-50 rounded-2xl text-[10px] font-black text-slate-600  tracking-widest border border-slate-100 shadow-sm transition-all active:scale-95"
                         >
                           📢 Gửi toàn bộ Học viên
                         </button>
@@ -2696,9 +2685,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </>
                   ) : (
                     <>
-                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Kênh Admin</span>
-                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Giảng viên</span>
-                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-100 shadow-sm">Học viên</span>
+                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400  tracking-widest border border-slate-100 shadow-sm">Kênh Admin</span>
+                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400  tracking-widest border border-slate-100 shadow-sm">Giảng viên</span>
+                      <span className="px-3 py-1.5 bg-white rounded-xl text-[10px] font-black text-slate-400  tracking-widest border border-slate-100 shadow-sm">Học viên</span>
                     </>
                   )}
                 </div>
@@ -2839,7 +2828,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     >
                       {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
                       <Video size={16} aria-hidden="true" />
-                      <span className="hidden sm:inline">{isClassTime ? 'VÀO LỚP HỌC' : 'Vào lớp học ngay'}</span>
+                      <span className="hidden sm:inline">{isClassTime ? 'Vào lớp học' : 'Vào lớp học ngay'}</span>
                     </a>
                   ) : (
                     <button
@@ -3085,7 +3074,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             toast.error(err.message || 'Không đóng được yêu cầu');
                           }
                         }}
-                        className={`flex shrink-0 items-center justify-center px-3 h-9 rounded-xl text-[10px] font-black uppercase tracking-wide ${isResolved
+                        className={`flex shrink-0 items-center justify-center px-3 h-9 rounded-xl text-[10px] font-black  tracking-wide ${isResolved
                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                           : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                           }`}
@@ -3149,7 +3138,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         {pinnedSchedule ? <Calendar size={12} /> : <Pin size={12} className="rotate-45" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${pinnedSchedule ? 'text-violet-800' : 'text-blue-800'
+                        <p className={`text-[10px] font-bold  tracking-widest mb-0.5 ${pinnedSchedule ? 'text-violet-800' : 'text-blue-800'
                           }`}>
                           {pinnedSchedule ? 'Lịch học đã ghim' : 'Tin nhắn đã ghim'}
                         </p>
@@ -3201,7 +3190,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
               {showHandoffSummaryPanel ? (
                 <div className="mx-3 mt-2 mb-0 px-3 py-2 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-950 leading-snug">
-                  <p className="font-black uppercase tracking-wide text-amber-800 mb-1">Tóm tắt cho Support (nội bộ)</p>
+                  <p className="font-black  tracking-wide text-amber-800 mb-1">Tóm tắt cho Support (nội bộ)</p>
                   {handoffSummaryParts.head ? (
                     <p className="whitespace-pre-wrap">{handoffSummaryParts.head}</p>
                   ) : null}
@@ -3209,7 +3198,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <button
                       type="button"
                       onClick={() => setShowPriorAiThread((v) => !v)}
-                      className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-amber-800 hover:text-amber-950"
+                      className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-black  tracking-wide text-amber-800 hover:text-amber-950"
                     >
                       <ChevronDown size={14} className={`transition-transform ${showPriorAiThread ? 'rotate-180' : ''}`} />
                       {showPriorAiThread ? 'Thu gọn' : 'Xem lịch sử AI'}
@@ -3227,7 +3216,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             const isAi = String(msg.senderId) === AI_SUPPORT_PEER.id;
                             return (
                               <li key={msg.id} className="rounded-lg bg-white/60 border border-amber-100/80 px-2 py-1.5">
-                                <p className="text-[10px] font-black uppercase tracking-wide text-amber-800 mb-0.5">
+                                <p className="text-[10px] font-black  tracking-wide text-amber-800 mb-0.5">
                                   {isAi ? 'Trợ lý AI' : (msg.senderName || 'Học viên / Giảng viên')}
                                 </p>
                                 <div className="whitespace-pre-wrap break-words text-[11px] leading-snug">
@@ -3881,7 +3870,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             {(u.name || '?')[0].toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{u.name}</p>
+                            <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{formatDisplayName(u.name)}</p>
                             <p className="text-[11px] text-slate-500 font-medium">
                               {u.role === 'admin' ? 'Nhân viên / Admin' :
                                 u.role === 'teacher' ? 'Giảng viên' : 'Học viên'}
@@ -3945,7 +3934,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             <div className="flex gap-3">
               <button
                 onClick={() => setGroupToDelete(null)}
-                className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all"
+                className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs  hover:bg-slate-200 transition-all"
               >
                 Hủy bỏ
               </button>
@@ -3960,7 +3949,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   }
                   setGroupToDelete(null);
                 }}
-                className="flex-1 py-3.5 px-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase hover:bg-red-600 transition-all shadow-lg shadow-red-200"
+                className="flex-1 py-3.5 px-4 bg-red-500 text-white rounded-2xl font-black text-xs  hover:bg-red-600 transition-all shadow-lg shadow-red-200"
               >
                 Xóa Vĩnh Viễn
               </button>
@@ -3983,7 +3972,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 <h3 className="text-white font-black text-lg flex items-center gap-2">
                   <Megaphone size={20} /> Gửi tin nhắn hàng loạt
                 </h3>
-                <p className="text-blue-100 text-[11px] font-bold uppercase tracking-widest opacity-80 mt-1">
+                <p className="text-blue-100 text-[11px] font-bold  tracking-widest opacity-80 mt-1">
                   Đối tượng: <span className="text-white bg-white/20 px-2 py-0.5 rounded-lg ml-1">{broadcastConfig.label}</span>
                 </p>
               </div>
@@ -4001,7 +3990,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Nội dung thông báo</label>
+                  <label className="text-[10px] font-black text-slate-400  tracking-widest block mb-2 px-1">Nội dung thông báo</label>
                   <textarea
                     value={broadcastContent}
                     onChange={(e) => setBroadcastContent(e.target.value)}
@@ -4015,7 +4004,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <button
                     onClick={() => setBroadcastConfig(null)}
                     disabled={isBroadcasting}
-                    className="flex-1 py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                    className="flex-1 py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs  tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
                   >
                     Hủy bỏ
                   </button>
@@ -4039,7 +4028,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       }
                     }}
                     disabled={isBroadcasting || !broadcastContent.trim()}
-                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-2xl font-black text-xs  tracking-widest hover:shadow-xl hover:shadow-red-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
                   >
                     {isBroadcasting ? (
                       <><Loader2 size={16} className="animate-spin" /> Đang gửi...</>
@@ -4068,7 +4057,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             <div className="flex gap-3">
               <button
                 onClick={() => setGroupToLeave(null)}
-                className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-all"
+                className="flex-1 py-3.5 px-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs  hover:bg-slate-200 transition-all"
               >
                 Hủy
               </button>
@@ -4083,7 +4072,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   }
                   setGroupToLeave(null);
                 }}
-                className="flex-1 py-3.5 px-4 bg-orange-500 text-white rounded-2xl font-black text-xs uppercase hover:bg-orange-600 transition-all shadow-lg shadow-orange-200"
+                className="flex-1 py-3.5 px-4 bg-orange-500 text-white rounded-2xl font-black text-xs  hover:bg-orange-600 transition-all shadow-lg shadow-orange-200"
               >
                 Xác nhận rời
               </button>
@@ -4152,7 +4141,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           <div className="flex items-center gap-3 min-w-0">
                             <img src={resolveAvatarUrl(u)} className="w-10 h-10 rounded-full object-cover shrink-0" alt="" />
                             <div className="min-w-0 truncate">
-                              <p className="text-[13px] font-bold text-slate-800 truncate leading-tight mb-1">{u.name}</p>
+                              <p className="text-[13px] font-bold text-slate-800 truncate leading-tight mb-1">{formatDisplayName(u.name)}</p>
                               <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${roleColor}`}>{roleLabel}</span>
                             </div>
                           </div>
@@ -4261,7 +4250,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           >
             <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-emerald-700 to-green-600 px-6 py-5 text-white">
               <div>
-                <h2 id="inbox-attendance-title" className="text-base font-black uppercase tracking-wide">
+                <h2 id="inbox-attendance-title" className="text-base font-black  tracking-wide">
                   Điểm danh &amp; chấm điểm
                 </h2>
                 <p className="mt-1 text-xs font-semibold text-emerald-100">
@@ -4282,7 +4271,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             </div>
             <div className="space-y-5 p-6">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-[11px] font-black uppercase tracking-widest text-emerald-800">Học viên</p>
+                <p className="text-[11px] font-black  tracking-widest text-emerald-800">Học viên</p>
                 <p className="mt-1 text-base font-black text-emerald-700">
                   {teacherAttendanceStudent?.name || activeConv?.user?.name || 'Học viên'}
                 </p>
@@ -4295,7 +4284,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 </p>
               </div>
               <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+                <span className="mb-2 block text-xs font-black  tracking-widest text-slate-500">
                   Đánh giá buổi học (0-10)
                 </span>
                 <input
@@ -4309,7 +4298,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Ghi chú nhanh</span>
+                <span className="mb-2 block text-xs font-black  tracking-widest text-slate-500">Ghi chú nhanh</span>
                 <textarea
                   rows={3}
                   value={teacherAttendanceNote}
@@ -4322,14 +4311,14 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 <button
                   type="button"
                   onClick={() => setTeacherAttendanceModalSchedule(null)}
-                  className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-200"
+                  className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-xs font-black  tracking-wide text-slate-500 transition hover:bg-slate-200"
                 >
                   Hủy
                 </button>
                 <button
                   type="button"
                   onClick={confirmHeaderAttendance}
-                  className="min-h-11 flex-[2] rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black uppercase tracking-wide text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+                  className="min-h-11 flex-[2] rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black  tracking-wide text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
                 >
                   Xác nhận điểm danh
                 </button>

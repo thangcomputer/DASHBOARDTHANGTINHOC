@@ -73,7 +73,7 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
           >
             <X size={18} aria-hidden="true" />
           </button>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-100/90">
+          <p className="text-[11px] font-bold  tracking-[0.2em] text-red-100/90">
             Ghi chú học viên
           </p>
           <p id="teacher-student-note-title" className="mt-2 text-lg font-black">
@@ -86,16 +86,16 @@ export default function TeacherStudentNoteModal({ open, payload, onClose }) {
         <div className="px-6 py-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ngày</p>
+              <p className="text-[11px] font-bold  tracking-wide text-slate-400">Ngày</p>
               <p className="text-sm font-bold text-slate-900 mt-0.5">{dateLabel}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Giờ</p>
+              <p className="text-[11px] font-bold  tracking-wide text-slate-400">Giờ</p>
               <p className="text-sm font-bold text-slate-900 mt-0.5">{timeRange}</p>
             </div>
           </div>
           <div className="rounded-2xl border border-red-100 bg-red-50/70 px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-red-400">Nội dung ghi chú</p>
+            <p className="text-[11px] font-bold  tracking-wide text-red-400">Nội dung ghi chú</p>
             {payload.deleted ? (
               <p className="text-sm text-slate-600 mt-1.5 leading-relaxed font-semibold">
                 Học viên đã xóa ghi chú này. Không còn hoạt động trên lịch.

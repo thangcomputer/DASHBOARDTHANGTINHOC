@@ -45,7 +45,7 @@ function buildFinanceStatementNode({
     font-family:Arial,Helvetica,sans-serif;color:#0f172a;
   `);
 
-  wrap.appendChild(el('div', 'font-size:11px;letter-spacing:.12em;font-weight:700;color:#64748b;text-transform:uppercase;', 'SAO KÊ THU NHẬP'));
+  wrap.appendChild(el('div', 'font-size:11px;letter-spacing:.12em;font-weight:700;color:#64748b;', 'Sao kê thu nhập'));
   wrap.appendChild(el('div', 'font-size:22px;font-weight:800;margin:4px 0 2px;', teacherName || 'Giảng viên'));
   wrap.appendChild(el('div', 'font-size:12px;color:#64748b;margin-bottom:16px;', `Xuất ngày ${generatedAt}${filterLabel ? ` · Bộ lọc: ${filterLabel}` : ''}`));
 
@@ -56,7 +56,7 @@ function buildFinanceStatementNode({
     ['Tổng buổi đã dạy', String(totalSessions || 0), '#e11d48'],
   ].forEach(([label, value, color]) => {
     const card = el('div', 'flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;');
-    card.appendChild(el('div', 'font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;', label));
+    card.appendChild(el('div', 'font-size:10px;font-weight:700;color:#64748b;', label));
     card.appendChild(el('div', `font-size:16px;font-weight:800;margin-top:4px;color:${color};`, value));
     stats.appendChild(card);
   });
@@ -119,7 +119,7 @@ function buildDetailFinanceStatementNode({ teacherName, generatedAt, rows }) {
     font-family:Arial,Helvetica,sans-serif;color:#0f172a;
   `);
 
-  wrap.appendChild(el('div', 'font-size:11px;letter-spacing:.12em;font-weight:700;color:#64748b;text-transform:uppercase;', 'CHI TIẾT PHÂN BỔ HỌC VIÊN'));
+  wrap.appendChild(el('div', 'font-size:11px;letter-spacing:.12em;font-weight:700;color:#64748b;', 'Chi tiết phân bổ học viên'));
   wrap.appendChild(el('div', 'font-size:22px;font-weight:800;margin:4px 0 2px;', teacherName || 'Giảng viên'));
   wrap.appendChild(el('div', 'font-size:12px;color:#64748b;margin-bottom:16px;', `Xuất ngày ${generatedAt}`));
 
@@ -566,7 +566,7 @@ const TeacherFinanceAndTraining = () => {
               <div className="col-span-2 sm:col-span-1 bg-white shadow-sm border border-slate-100 rounded-2xl p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingUp size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
-                  <p className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">Tổng đã nhận</p>
+                  <p className="text-slate-500 text-[10px]  tracking-wider font-semibold">Tổng đã nhận</p>
                 </div>
                 <p className="text-2xl sm:text-3xl font-black mt-1 text-emerald-600 tabular-nums">{totalEarned.toLocaleString('vi-VN')}đ</p>
                 <div className="flex items-center gap-1.5 mt-2 text-slate-400">
@@ -577,7 +577,7 @@ const TeacherFinanceAndTraining = () => {
               <div className="bg-white shadow-sm border border-slate-100 rounded-2xl p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-1">
                   <AlertCircle size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
-                  <p className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">Chưa nhận</p>
+                  <p className="text-slate-500 text-[10px]  tracking-wider font-semibold">Chưa nhận</p>
                 </div>
                 <p className="text-xl sm:text-3xl font-black mt-1 text-amber-500 tabular-nums">{totalPending.toLocaleString('vi-VN')}đ</p>
                 <div className="flex items-center gap-1.5 mt-2 text-slate-400">
@@ -588,7 +588,7 @@ const TeacherFinanceAndTraining = () => {
               <div className="bg-white shadow-sm border border-slate-100 rounded-2xl p-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-1">
                   <CalendarIcon size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
-                  <p className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">Tổng buổi đã dạy</p>
+                  <p className="text-slate-500 text-[10px]  tracking-wider font-semibold">Tổng buổi đã dạy</p>
                 </div>
                 <p className="text-xl sm:text-3xl font-black mt-1 text-rose-500 tabular-nums">{totalSessions}</p>
                 <div className="flex items-center gap-1.5 mt-2 text-slate-400">
@@ -603,7 +603,7 @@ const TeacherFinanceAndTraining = () => {
                <div className="lg:col-span-8 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-100">
                   <div className="flex items-center gap-2 mb-3 sm:mb-4">
                      <BarChart className="text-blue-600 shrink-0" size={18} aria-hidden="true" />
-                     <h3 className="text-sm sm:text-base font-extrabold text-slate-800 uppercase tracking-tight">Biểu đồ thu nhập</h3>
+                     <h3 className="text-sm sm:text-base font-extrabold text-slate-800  tracking-tight">Biểu đồ thu nhập</h3>
                   </div>
                   <div className="min-h-[140px] sm:min-h-[180px] h-[140px] sm:h-[180px] w-full flex items-end justify-center gap-4 sm:gap-6 md:gap-10 mt-1 sm:mt-2 pb-8 sm:pb-10 border-b border-dashed border-slate-200 px-1 sm:px-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200">
                      {chartData.length > 0 ? chartData.map((d, i) => (
@@ -627,13 +627,13 @@ const TeacherFinanceAndTraining = () => {
                </div>
 
                <div className="lg:col-span-4 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-100">
-                  <h3 className="text-sm sm:text-base font-extrabold uppercase tracking-tight mb-1 flex items-center gap-2 text-slate-800">
+                  <h3 className="text-sm sm:text-base font-extrabold  tracking-tight mb-1 flex items-center gap-2 text-slate-800">
                     <Download size={18} className="text-slate-600 shrink-0" aria-hidden="true" /> Xuất Báo Cáo
                   </h3>
                   <p className="text-slate-500 text-xs font-medium mb-4">Tải xuống sao kê thu nhập của bạn</p>
                   <div className="space-y-3">
                       <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Tổng hợp</p>
+                        <p className="text-[10px] font-bold  tracking-[0.12em] text-slate-500">Tổng hợp</p>
                         <div className="grid grid-cols-2 gap-2">
                           <button type="button" onClick={handleExportPDF} className="bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
                               <FileBox size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
@@ -647,7 +647,7 @@ const TeacherFinanceAndTraining = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-600">Chi tiết theo học viên</p>
+                        <p className="text-[10px] font-bold  tracking-[0.12em] text-emerald-600">Chi tiết theo học viên</p>
                         <div className="grid grid-cols-1 gap-2">
                           <button type="button" onClick={handleExportDetailPDF} className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-medium text-xs py-2.5 px-2 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 transition-all min-h-11">
                               <FileBox size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
@@ -706,7 +706,7 @@ const TeacherFinanceAndTraining = () => {
                   return [...groups.entries()].map(([monthLabel, items]) => (
                     <div key={monthLabel} className="space-y-3">
                       <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
-                        <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                        <div className="inline-flex items-center gap-2 text-[11px] font-bold  tracking-[0.12em] text-slate-500">
                           <CalendarIcon size={12} className="text-slate-400" />
                           {monthLabel}
                         </div>
@@ -781,7 +781,7 @@ const TeacherFinanceAndTraining = () => {
                               {!p._synthetic && isExpanded && p.paymentSessionDetails?.length > 0 && (
                                 <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
                                   <div className="mb-2 flex items-center justify-between gap-2">
-                                    <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-500">Phân bổ theo học viên</p>
+                                    <p className="text-[10px]  tracking-[0.12em] font-bold text-slate-500">Phân bổ theo học viên</p>
                                     <span className="text-[10px] text-slate-400">{studentCount} học viên</span>
                                   </div>
 
@@ -866,14 +866,14 @@ const TeacherFinanceAndTraining = () => {
 
              {/* TabsMenu */}
              <div className="flex px-8 border-b border-slate-100 bg-white">
-                <button onClick={() => setCourseTab('video')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${courseTab === 'video' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                  <Video size={14} className="inline mr-2" /> BÀI GIẢNG VIDEO
+                <button onClick={() => setCourseTab('video')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'video' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
+                  <Video size={14} className="inline mr-2" />  Bài giảng video
                 </button>
-                <button onClick={() => setCourseTab('data')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${courseTab === 'data' ? 'text-green-600 border-green-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                  <FileBox size={14} className="inline mr-2" /> TÀI LIỆU CỦA KHÓA
+                <button onClick={() => setCourseTab('data')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'data' ? 'text-green-600 border-green-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
+                  <FileBox size={14} className="inline mr-2" />  Tài liệu của khóa
                 </button>
-                <button onClick={() => setCourseTab('notice')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${courseTab === 'notice' ? 'text-orange-600 border-orange-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                  <AlertCircle size={14} className="inline mr-2" /> THÔNG BÁO TỪ ADMIN
+                <button onClick={() => setCourseTab('notice')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'notice' ? 'text-orange-600 border-orange-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
+                  <AlertCircle size={14} className="inline mr-2" />  Thông báo từ qu?N tr? Vi?N
                 </button>
              </div>
 
@@ -1004,9 +1004,9 @@ const TeacherFinanceAndTraining = () => {
                       <h3 className="font-extrabold text-slate-800 text-lg group-hover:text-blue-600 transition-colors line-clamp-2 leading-tight">{course.title}</h3>
                     </div>
 
-                    <div className="flex justify-between items-center mt-4 text-slate-400 text-[10px] font-black uppercase tracking-widest z-10">
-                       <span className="flex items-center gap-1"><Video size={14} className="text-blue-400" /> {(course.videos || []).length} VIDEO</span>
-                       <span className="flex items-center gap-1"><FileBox size={14} className="text-green-400" /> {(course.files || []).length} TÀI LIỆU</span>
+                    <div className="flex justify-between items-center mt-4 text-slate-400 text-[10px] font-black  tracking-widest z-10">
+                       <span className="flex items-center gap-1"><Video size={14} className="text-blue-400" /> {(course.videos || []).length}  Video</span>
+                       <span className="flex items-center gap-1"><FileBox size={14} className="text-green-400" /> {(course.files || []).length}  Tài liệu</span>
                     </div>
                  </div>
                ))}

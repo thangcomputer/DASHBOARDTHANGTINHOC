@@ -491,7 +491,7 @@ const TeacherDashboard = ({ onNavigate }) => {
 
               {/* Quy trình */}
               <div className="space-y-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">QUY TRÌNH CẤP QUYỀN</p>
+                <p className="text-xs font-bold text-gray-400  tracking-widest text-center">Quy trình cấp quyền</p>
                 {(() => {
                   const step1Done = currentTeacher?.testScore != null;
                   const step2Done = !!currentTeacher?.practicalFile;
@@ -766,7 +766,7 @@ const TeacherDashboard = ({ onNavigate }) => {
 
               {mode === 'late' && (
                 <div>
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-widest block mb-2">
+                  <label className="text-xs font-black text-slate-700  tracking-widest block mb-2">
                     Lý do điểm danh bổ sung
                   </label>
                   <textarea
@@ -811,7 +811,7 @@ const TeacherDashboard = ({ onNavigate }) => {
 
                 {mode !== 'expired' && (
                 <div className="border border-red-100 bg-red-50/50 rounded-2xl p-4">
-                  <label className="text-xs font-black text-red-800 uppercase tracking-widest block mb-2">Học viên không học?</label>
+                  <label className="text-xs font-black text-red-800  tracking-widest block mb-2">Học viên không học?</label>
                   <textarea
                     rows={2}
                     value={noShowReason}

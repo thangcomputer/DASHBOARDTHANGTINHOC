@@ -38,6 +38,7 @@ export type DemoEnrollment = {
   totalSessions?: number;
   avgGrade?: number;
   status: 'Đang học' | 'Hoàn thành' | 'Thôi học';
+  notes?: string;
   tuitionAmount?: number;
   paidAmount?: number;
 };
@@ -69,6 +70,7 @@ export type ScheduleItem = {
   startTime?: string;
   endTime?: string;
   note?: string;
+  studentNote?: string;
   attendanceStatus?: 'pending' | 'present' | 'absent' | 'late' | 'excused';
   learningMode?: 'Trực tiếp' | 'Trực tuyến';
   meetingUrl?: string;
@@ -209,11 +211,16 @@ export type DemoStudent = {
   lastClass: string;
   status: 'Đang học' | 'Cần hỗ trợ' | 'Hoàn thành' | 'Thôi học';
   color: string;
+  avatar?: string;
   phone?: string;
+  zalo?: string;
+  lastSeenAt?: string;
   enrollments?: DemoEnrollment[];
   enrollmentStatus?: 'active' | 'completed' | 'cancelled';
   notes?: string;
+  linkHoc?: string;
   avgGrade?: number;
+  studentExamUnlocked?: boolean;
   totalSessions?: number;
   completedSessions?: number;
   remainingSessions?: number;
@@ -362,17 +369,29 @@ export type DemoQuiz = {
   deadline: string;
   questions: number;
   studentCount?: number;
+  targetStudentIds?: string[];
   assignedStudentNames?: string[];
   sampleQuestions?: Array<{ text: string; options: string[]; correctOption: number }>;
-  submissions: Array<{ studentName: string; score: number; status: 'passed' | 'submitted' }>;
+  submissions: Array<{
+    studentName: string;
+    studentPhone?: string;
+    submittedAt?: string;
+    score: number;
+    correctCount?: number;
+    totalQuestions?: number;
+    status: 'passed' | 'failed' | 'submitted';
+    forfeit?: boolean;
+    exitReason?: string;
+  }>;
 };
 
 export type DemoTrainingCourse = {
   id: string;
   title: string;
   progress: number;
-  lessons: Array<{ id: string; title: string; duration: string; completed: boolean }>;
+  lessons: Array<{ id: string; title: string; duration: string; completed: boolean; url?: string; watchedSeconds?: number; antiSeek?: boolean }>;
   files: string[];
+  fileLinks?: Array<{ title: string; url: string; type: string; size: string }>;
   notices: string[];
 };
 
