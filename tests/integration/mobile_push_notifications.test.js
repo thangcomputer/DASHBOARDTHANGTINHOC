@@ -42,9 +42,30 @@ test('mobile app registers native push tokens and configures notification handli
     path.join(ROOT, 'thang-tin-hoc-mobile/src/app/AuthContext.tsx'),
     'utf8',
   );
+  const profileScreen = fs.readFileSync(
+    path.join(ROOT, 'thang-tin-hoc-mobile/src/screens/FeatureScreens.tsx'),
+    'utf8',
+  );
+  const pushConfig = fs.readFileSync(
+    path.join(ROOT, 'thang-tin-hoc-mobile/src/services/mobilePushNotifications.ts'),
+    'utf8',
+  );
 
   assert.ok(appConfig.plugins.includes('expo-notifications'));
   assert.ok(pushService.includes('Notifications.getExpoPushTokenAsync({ projectId })'));
   assert.ok(pushService.includes("mobileApiRequest('/mobile-push-tokens'"));
   assert.ok(authContext.includes('registerMobilePushNotifications'));
+  assert.ok(pushConfig.includes('requestPermission = false'));
+  assert.ok(profileScreen.includes('enableMobilePushNotifications()'));
+  assert.ok(!profileScreen.includes("id: 'primary-course'"));
+});
+
+test('mobile API errors use safe text and enforce a bounded fetch timeout', () => {
+  const apiClient = fs.readFileSync(
+    path.join(ROOT, 'thang-tin-hoc-mobile/src/services/apiClient.ts'),
+    'utf8',
+  );
+  assert.ok(apiClient.includes('API_REQUEST_TIMEOUT_MS = 20_000'));
+  assert.ok(apiClient.includes("'NETWORK_TIMEOUT'"));
+  assert.ok(apiClient.includes('getSafeApiErrorMessage(response.status)'));
 });

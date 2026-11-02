@@ -509,7 +509,13 @@ export function MenuRow({
   borderless?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.menuRow, borderless && styles.menuRowBorderless]} accessibilityRole="button">
+    <Pressable
+      onPress={onPress}
+      style={[styles.menuRow, borderless && styles.menuRowBorderless]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
+    >
       <View style={styles.menuIcon}>{icon}</View>
       <View style={styles.menuCopy}>
         <Text style={[styles.menuTitle, destructive && { color: colors.red }]}>{title}</Text>

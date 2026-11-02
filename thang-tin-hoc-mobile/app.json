@@ -36,12 +36,13 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Cho phép truy cập ảnh để gửi hình trong tin nhắn.",
+          "photosPermission": "Cho phép chọn ảnh để đổi ảnh đại diện, gửi tin nhắn hoặc nộp bài tập.",
           "cameraPermission": "Cho phép sử dụng camera để chụp ảnh gửi trong tin nhắn.",
           "microphonePermission": false
         }
       ],
       "expo-sharing",
+      "expo-asset",
       "expo-notifications",
       [
         "@config-plugins/react-native-webrtc",

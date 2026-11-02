@@ -46,7 +46,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     if (!user || user.previewMode) return undefined;
     const registerPush = () => {
       void registerMobilePushNotifications().catch((error: unknown) => {
-        console.warn('Không thể đăng ký thông báo đẩy cho thiết bị.', error);
+        console.warn('Không thể đồng bộ đăng ký thông báo đẩy cho thiết bị.', error);
       });
     };
     registerPush();

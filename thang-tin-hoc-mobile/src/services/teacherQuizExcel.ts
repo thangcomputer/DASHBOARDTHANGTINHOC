@@ -12,6 +12,8 @@ const headers = [
   'Đáp án đúng',
   'Gợi ý trả lời (tự luận)',
 ];
+const MAX_EXCEL_BYTES = 5 * 1024 * 1024;
+const MAX_EXCEL_BASE64_LENGTH = Math.ceil(MAX_EXCEL_BYTES / 3) * 4;
 
 type ParsedQuestionBank = {
   questions: TeacherQuizQuestionInput[];
@@ -49,10 +51,13 @@ async function loadXlsx() {
 }
 
 export async function parseTeacherQuizQuestionsExcel(base64: string): Promise<ParsedQuestionBank> {
+  if (!base64 || base64.length > MAX_EXCEL_BASE64_LENGTH) {
+    return { questions: [], errors: ['Tệp Excel trống hoặc vượt quá giới hạn 5MB.'] };
+  }
   const XLSX = await loadXlsx();
   let workbook: ReturnType<typeof XLSX.read>;
   try {
-    workbook = XLSX.read(base64, { type: 'base64' });
+    workbook = XLSX.read(base64, { type: 'base64', sheetRows: 1001 });
   } catch {
     return { questions: [], errors: ['Không đọc được tệp Excel.'] };
   }

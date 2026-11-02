@@ -50,25 +50,29 @@ async function configureAndroidChannels() {
   });
 }
 
-export async function registerMobilePushNotifications() {
-  if (Platform.OS === 'web') return;
+export async function registerMobilePushNotifications(requestPermission = false) {
+  if (Platform.OS === 'web') return false;
   const projectId = getProjectId();
   if (!projectId) {
-    console.warn('Chưa cấu hình EXPO_PUBLIC_EAS_PROJECT_ID; chưa thể đăng ký push notification.');
-    return;
+    if (requestPermission) {
+      throw new Error('Chưa cấu hình EAS Project ID cho thông báo đẩy.');
+    }
+    return false;
   }
 
   await configureAndroidChannels();
   let permission = await Notifications.getPermissionsAsync();
-  if (permission.status !== 'granted') permission = await Notifications.requestPermissionsAsync();
-  if (permission.status !== 'granted') return;
+  if (permission.status !== 'granted' && requestPermission) {
+    permission = await Notifications.requestPermissionsAsync();
+  }
+  if (permission.status !== 'granted') return false;
 
   const tokens = getMobileApiTokens();
-  if (!tokens?.sessionId) return;
+  if (!tokens?.sessionId) return false;
   const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   const soundEnabled = await getMobileSoundEnabled();
   const sessionKey = `${tokens.sessionId}:${pushToken}:${soundEnabled}`;
-  if (sessionKey === registeredSessionKey) return;
+  if (sessionKey === registeredSessionKey) return true;
 
   await mobileApiRequest('/mobile-push-tokens', {
     method: 'POST',
@@ -81,6 +85,11 @@ export async function registerMobilePushNotifications() {
   });
   registeredExpoPushToken = pushToken;
   registeredSessionKey = sessionKey;
+  return true;
+}
+
+export async function enableMobilePushNotifications() {
+  return registerMobilePushNotifications(true);
 }
 
 export async function unregisterMobilePushNotifications() {

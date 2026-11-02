@@ -1438,7 +1438,14 @@ export function TeacherQuizzesScreen() {
         multiple: false,
       });
       if (result.canceled) return;
-      const content = await FileSystem.readAsStringAsync(result.assets[0].uri, {
+      const asset = result.assets[0];
+      const info = asset.size == null
+        ? await FileSystem.getInfoAsync(asset.uri)
+        : { exists: true, size: asset.size };
+      if (!info.exists || typeof info.size !== 'number' || info.size > 5 * 1024 * 1024) {
+        throw new Error('Tệp Excel phải tồn tại và không vượt quá 5MB.');
+      }
+      const content = await FileSystem.readAsStringAsync(asset.uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const parsed = await parseTeacherQuizQuestionsExcel(content);

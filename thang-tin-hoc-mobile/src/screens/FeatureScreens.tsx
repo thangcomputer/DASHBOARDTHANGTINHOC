@@ -30,6 +30,7 @@ import type { AppNotification, Assignment, Conversation, DemoGradeRecord, DemoSt
 import type { TeacherProfile, TeacherProfileUpdate } from '../services/teacherApi';
 import { updateStudentProfile } from '../services/studentApi';
 import { buildDirectConversationId } from '../services/messageApi';
+import { enableMobilePushNotifications } from '../services/mobilePushNotifications';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -3861,12 +3862,10 @@ export function ProfileScreen() {
       Alert.alert('Đăng xuất', error instanceof Error ? error.message : 'Không thể thu hồi phiên đăng nhập.');
     });
   };
-  const courseProgress = user?.completedSessions != null && user.totalSessions
-    ? Math.round((user.completedSessions / user.totalSessions) * 100)
-    : null;
   const [showStudentProfileForm, setShowStudentProfileForm] = useState(false);
   const [showTeacherProfileForm, setShowTeacherProfileForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
   const [previewStudentUpdates, setPreviewStudentUpdates] = useState<Record<string, string>>({});
   const [openStudentSections, setOpenStudentSections] = useState({
     courses: true,
@@ -3908,21 +3907,58 @@ export function ProfileScreen() {
     nam: 'Miền Nam',
     tay: 'Tây Nguyên',
   } as Record<string, string>)[teacherText('voiceRegion')] || teacherText('voiceRegion');
-  const enrollments = studentProfile?.enrollments.length ? studentProfile.enrollments : (user?.course ? [{
-    id: 'primary-course',
-    courseName: user.course,
-    teacherName: user.teacherName,
-    progress: courseProgress || 0,
-    completedSessions: user.completedSessions,
-    totalSessions: user.totalSessions,
-    avgGrade: user.avgGrade,
-    status: 'Đang học' as const,
-    tuitionAmount: undefined,
-    paidAmount: undefined,
-  }] : []);
+  const enrollments = studentProfile?.enrollments || [];
   const toggleStudentSection = (section: keyof typeof openStudentSections) => {
     setOpenStudentSections((current) => ({ ...current, [section]: !current[section] }));
   };
+  const openConfiguredUrl = (value: string, label: string) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'https:') throw new Error('Chỉ chấp nhận liên kết HTTPS.');
+      void Linking.openURL(url.toString()).catch(() => {
+        Alert.alert('Không thể mở liên kết', `Vui lòng thử lại hoặc liên hệ Trung tâm để xem ${label.toLowerCase()}.`);
+      });
+    } catch {
+      Alert.alert('Liên kết chưa sẵn sàng', `Trung tâm chưa cấu hình liên kết ${label.toLowerCase()}.`);
+    }
+  };
+  const enablePush = async () => {
+    if (enablingPush) return;
+    setEnablingPush(true);
+    try {
+      const enabled = await enableMobilePushNotifications();
+      if (enabled) {
+        Alert.alert('Đã bật thông báo', 'Thiết bị này sẽ nhận thông báo khi có cập nhật.');
+      } else {
+        Alert.alert(
+          'Chưa bật được thông báo',
+          'Hãy cho phép thông báo trong cài đặt thiết bị để nhận cập nhật.',
+          [
+            { text: 'Để sau', style: 'cancel' },
+            { text: 'Mở cài đặt', onPress: () => { void Linking.openSettings(); } },
+          ],
+        );
+      }
+    } catch (error) {
+      Alert.alert('Thông báo', error instanceof Error ? error.message : 'Không thể bật thông báo trên thiết bị.');
+    } finally {
+      setEnablingPush(false);
+    }
+  };
+  const configuredLinks = [
+    {
+      title: 'Chính sách quyền riêng tư',
+      url: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || '',
+    },
+    {
+      title: 'Điều khoản sử dụng',
+      url: process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL || '',
+    },
+    {
+      title: 'Liên hệ hỗ trợ',
+      url: process.env.EXPO_PUBLIC_SUPPORT_URL || '',
+    },
+  ].filter((item) => item.url.trim());
   return (
     <AppScreen>
       <AppHeader title="Hồ sơ" subtitle={isTeacher ? 'Thông tin hồ sơ giảng viên' : 'Thông tin tài khoản học viên'} icon={UserRound} />
@@ -4093,6 +4129,29 @@ export function ProfileScreen() {
           </Pressable>
         </>
       )}
+      {!user?.previewMode ? (
+        <Card style={styles.menuCard}>
+          <SectionHeading title="Cài đặt và hỗ trợ" />
+          <MenuRow
+            icon={<Bell size={18} color={colors.brand} />}
+            title={enablingPush ? 'Đang bật thông báo…' : 'Bật thông báo trên thiết bị'}
+            subtitle="Chỉ hỏi quyền khi bạn chọn bật"
+            onPress={() => { void enablePush(); }}
+          />
+          {configuredLinks.map((item, index) => (
+            <MenuRow
+              key={item.title}
+              icon={<Link2 size={18} color={colors.brand} />}
+              title={item.title}
+              onPress={() => openConfiguredUrl(item.url, item.title)}
+              borderless={index === configuredLinks.length - 1}
+            />
+          ))}
+          {!configuredLinks.length ? (
+            <Text style={styles.note}>Liên kết quyền riêng tư, điều khoản và hỗ trợ đang chờ Trung tâm cấu hình.</Text>
+          ) : null}
+        </Card>
+      ) : null}
       {!isTeacher && showStudentProfileForm ? (
         <StudentProfileEditModal
           user={user}

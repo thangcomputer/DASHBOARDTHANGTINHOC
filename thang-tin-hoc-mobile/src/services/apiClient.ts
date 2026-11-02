@@ -25,6 +25,7 @@ export class MobileApiError extends Error {
 }
 
 const sessionStorageKey = 'thang-tin-hoc.mobile-session.v1';
+const API_REQUEST_TIMEOUT_MS = 20_000;
 let tokens: MobileApiTokens | null = null;
 let csrfToken: string | null = null;
 let refreshPromise: Promise<void> | null = null;
@@ -94,6 +95,41 @@ function apiUrl(path: string) {
   return `${baseUrl}/api${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new MobileApiError('Máy chủ phản hồi quá lâu. Vui lòng thử lại.', 0, 'NETWORK_TIMEOUT');
+    }
+    if (error instanceof TypeError) {
+      throw new MobileApiError(
+        'Không thể kết nối máy chủ. Hãy kiểm tra Internet và thử lại.',
+        0,
+        'NETWORK_UNAVAILABLE',
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getSafeApiErrorMessage(status: number) {
+  if (status === 0) return 'Không thể kết nối máy chủ. Hãy kiểm tra Internet và thử lại.';
+  if (status === 400) return 'Yêu cầu chưa hợp lệ. Vui lòng kiểm tra thông tin và thử lại.';
+  if (status === 401) return 'Thông tin đăng nhập hoặc phiên làm việc không hợp lệ.';
+  if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+  if (status === 404) return 'Không tìm thấy nội dung yêu cầu.';
+  if (status === 409) return 'Dữ liệu vừa thay đổi. Vui lòng tải lại và thử lại.';
+  if (status === 422) return 'Thông tin chưa hợp lệ. Vui lòng kiểm tra và thử lại.';
+  if (status === 429) return 'Bạn thao tác quá nhanh. Vui lòng chờ một chút rồi thử lại.';
+  if (status >= 500) return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.';
+  return 'Không thể hoàn tất yêu cầu. Vui lòng thử lại.';
+}
+
 function isMutating(method: string) {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 }
@@ -110,7 +146,7 @@ async function parseResponse(response: Response) {
   }
   if (!response.ok || payload.success === false) {
     throw new MobileApiError(
-      String(payload.message || `Yêu cầu thất bại (HTTP ${response.status}).`),
+      getSafeApiErrorMessage(response.status),
       response.status,
       typeof payload.code === 'string' ? payload.code : undefined,
     );
@@ -124,7 +160,7 @@ function cookieHeader(token: string) {
 
 async function getCsrfToken() {
   if (csrfToken) return csrfToken;
-  const response = await fetch(apiUrl('/auth/csrf-token'), {
+  const response = await fetchWithTimeout(apiUrl('/auth/csrf-token'), {
     method: 'GET',
     credentials: 'include',
     headers: { Accept: 'application/json' },
@@ -150,7 +186,7 @@ async function rotateTokens() {
       };
       const cookie = cookieHeader(csrf);
       if (cookie) headers.Cookie = cookie;
-      const response = await fetch(apiUrl('/auth/refresh'), {
+      const response = await fetchWithTimeout(apiUrl('/auth/refresh'), {
         method: 'POST',
         credentials: 'include',
         headers,
@@ -202,7 +238,7 @@ async function request(
     if (cookie) headers.set('Cookie', cookie);
   }
 
-  const response = await fetch(apiUrl(path), {
+  const response = await fetchWithTimeout(apiUrl(path), {
     ...init,
     method,
     headers,
