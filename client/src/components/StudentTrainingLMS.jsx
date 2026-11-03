@@ -1505,11 +1505,11 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
         {/* ASSIGNMENTS TAB */}
         {mainTab === 'assignments' && (
-          <div className="bg-white rounded-[24px] p-4 sm:p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="cms-card !p-4 sm:!p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
               <BookOpen className="text-green-600" /> Bài tập được giao
             </h2>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
               {trainingData?.assignments?.map((a, idx) => {
                 const submission = a.mySubmission || localSubmissions[idx];
                 let targetDate = null;
@@ -1535,7 +1535,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   : (isTeacherAssign ? 'Giáo viên' : (a.assignedByName ? String(a.assignedByName) : 'Giáo viên'));
                 const teacherName = String(a.assignedByName || '').trim();
                 return (
-                  <div key={aKey} className="p-4 rounded-2xl border border-slate-100 transition-all flex gap-3 items-start bg-slate-50/40">
+                  <div key={aKey} className="cms-glass-card min-w-0 h-full p-3 sm:p-4 rounded-2xl border border-slate-100 transition-all flex gap-3 items-start bg-slate-50/40">
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
                       <FileUp size={20} />
                     </div>
@@ -1585,7 +1585,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                         </button>
                       ) : null}
 
-                      <div className="grid grid-cols-1 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <a href={a.fileUrl || '#'} target="_blank" className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-semibold text-sm transition-all shadow-sm">
                           <LinkIcon size={15} /> Tải đề bài
                         </a>
