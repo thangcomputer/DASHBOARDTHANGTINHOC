@@ -4,7 +4,7 @@ import {
   GitBranch, Loader2, RefreshCw, CheckCircle2, XCircle, Filter,
 } from 'lucide-react';
 import { workflowsAPI } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 function formatTime(t) {
   if (!t) return '';

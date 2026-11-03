@@ -35,7 +35,7 @@ import {
   clearMakeupPending,
   subscribeMakeupPending,
 } from '../../utils/attendanceMakeupPendingStore';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import {
   ATTENDANCE_CONFIRM_MS,
   attendanceConfirmKey,

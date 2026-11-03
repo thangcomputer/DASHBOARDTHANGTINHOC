@@ -9,7 +9,7 @@ import { DEFAULT_LEARNING_GUIDE_HTML, getLearningGuideVideoEmbedUrl } from '../.
 import LessonVideoTabs from '../LessonVideoTabs';
 import VideoCoursePayModal from '../../VideoCoursePayModal';
 import CoursePurchaseConfirmModal from './CoursePurchaseConfirmModal';
-import { useToast } from '../../../utils/toast';
+import { useToast } from '../../../utils/useToast';
 import {
   getCourseProgressPercent,
   getDirectCourseSubject,

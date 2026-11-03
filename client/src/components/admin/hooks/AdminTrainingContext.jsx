@@ -1,6 +1,6 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useData } from '../../../context/DataContext';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import api from '../../../services/api';
 import ConfirmDeleteTrainingModal from '../shared/ConfirmDeleteTrainingModal';
 

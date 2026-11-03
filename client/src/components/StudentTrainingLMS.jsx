@@ -17,7 +17,7 @@ import StudentExamRoom from './StudentExamRoom';
 import VideoCoursePayModal from './VideoCoursePayModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import api, { buildMediaDownloadUrl, downloadMediaFile, resolveMediaUrl, csrfFetch } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { htmlToPlainText, sanitizeRichHtml } from '../utils/htmlContent';
 import CmsSelect from './ui/CmsSelect';
 import SoftwareLinksTable from './SoftwareLinksTable';

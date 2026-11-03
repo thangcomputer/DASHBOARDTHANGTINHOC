@@ -1,15 +1,15 @@
 'use strict';
-const { commandBus, queryBus } = require('../../../shared/cqrs');
-const commands = require('../commands');
+const { queryBus } = require('../../../shared/cqrs');
 const queries = require('../queries');
-
-const { AnalyticsValidator, AnalyticsMapper } = require('../dto');
 
 class AnalyticsController {
   async get_revenue(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_revenueQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_revenueQuery({
+        query: req.query,
+        branchFilter: req.branchFilter,
+      }));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -22,7 +22,10 @@ class AnalyticsController {
   async get_enrollment(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_enrollmentQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_enrollmentQuery({
+        query: req.query,
+        branchFilter: req.branchFilter,
+      }));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -35,7 +38,10 @@ class AnalyticsController {
   async get_branches(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_branchesQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_branchesQuery({
+        query: req.query,
+        branchFilter: req.branchFilter,
+      }));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);

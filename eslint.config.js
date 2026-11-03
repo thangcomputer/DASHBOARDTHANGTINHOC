@@ -16,9 +16,19 @@ module.exports = [
     },
   },
   {
+    files: ['**/__tests__/**/*.{js,cjs,mjs}', '**/*.test.{js,cjs,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+  },
+  {
     ignores: [
       'node_modules/**',
       'client/**',
+      'thang-tin-hoc-mobile/dist/**',
+      'thang-tin-hoc-mobile/.expo/**',
       'uploads/**',
       'tests/**',
       'scripts/**',

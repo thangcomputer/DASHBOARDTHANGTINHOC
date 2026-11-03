@@ -4,7 +4,7 @@ import {
   CheckCircle2, Loader2, Info, ChevronRight, Table
 } from 'lucide-react';
 import api from '../services/api';
-import { useToast } from '../utils/toast.jsx';
+import { useToast } from '../utils/useToast';
 import { mutate } from 'swr';
 import {
   STUDENT_EXCEL_TEMPLATE_ROWS,

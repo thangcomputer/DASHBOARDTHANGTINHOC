@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import {
   endTimeFromStart,
   findTeacherScheduleConflict,

@@ -4,11 +4,11 @@ import {
   X, CheckCircle2, CreditCard, AlertCircle, MapPin, Loader2,
   Plus, Share2, UserPlus, Clock3,
 } from 'lucide-react';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import { useBranch } from '../../../context/BranchContext';
 import { useSocket } from '../../../context/SocketContext';
 import { apiFetch, getAccessToken } from '../../../services/api';
-import { generateVietQRUrl } from '../../BankSelect';
+import { generateVietQRUrl } from '../../bankSelectUtils';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
 import TransferPaymentHeader from '../../shared/TransferPaymentHeader';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';

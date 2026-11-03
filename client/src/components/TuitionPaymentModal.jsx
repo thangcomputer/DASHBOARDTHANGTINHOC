@@ -11,12 +11,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
-import { generateVietQRUrl } from './BankSelect';
+import { generateVietQRUrl } from './bankSelectUtils';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
 import TransferPaymentHeader from './shared/TransferPaymentHeader';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { setLoginOverlay } from '../utils/loginOverlayGate';
 
 const POLL_INTERVAL = 3000; // 3 giây

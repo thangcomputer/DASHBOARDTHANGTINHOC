@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Award, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
 import api from '../../services/api';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 
 export const PENDING_TEACHER_QUIZ_DETAIL_KEY = 'cms_pending_teacher_quiz_detail';
 

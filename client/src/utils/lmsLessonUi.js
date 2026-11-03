@@ -305,7 +305,7 @@ export function getChapterLessonIndex(lessons, lesson) {
 export function formatLessonDisplayTitle(title, index = 0) {
   let raw = String(title || '').trim();
   if (!raw) return `Bài ${index + 1}`;
-  raw = raw.replace(/^bài\s*\d+\s*[:.\-]?\s*/i, '').trim();
+  raw = raw.replace(/^bài\s*\d+\s*[:-]?\s*/i, '').trim();
   if (!raw) return `Bài ${index + 1}`;
   const nice = raw.charAt(0).toUpperCase() + raw.slice(1);
   return `Bài ${index + 1}: ${nice}`;

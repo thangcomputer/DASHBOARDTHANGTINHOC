@@ -6,7 +6,7 @@ import {
 import { BankSelect } from '../BankSelect';
 import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';
 import { useData } from '../../context/DataContext';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
 import { showGlossyAlert } from './TeacherShared';

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { biAPI, systemLogsAPI } from '../services/api';
 import { useBranch } from '../context/BranchContext';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 const PERIODS = [
   { value: '7d', label: '7 ngày' },

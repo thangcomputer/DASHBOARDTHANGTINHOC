@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { DollarSign, X, CreditCard, CheckCircle2, AlertCircle, Loader2, Star } from 'lucide-react';
 import NavArrow from '../../ui/NavArrow';
-import { generateVietQRUrl } from '../../BankSelect';
+import { generateVietQRUrl } from '../../bankSelectUtils';
 import { formatHoaHong, formatStarBonusRule } from '../../../utils/teacherCommission';
 import {
   buildTeacherPayoutTransferNote,

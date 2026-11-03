@@ -23,7 +23,7 @@ import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
 import { normalizeChatRole } from '../utils/chatConversationId';
 import { getMessagingRole } from '../lib/messagingRoles';
 import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import {
   isSuperAdminViewer,
   isElevatedPresenceDirectoryViewer,
@@ -43,7 +43,8 @@ import {
   TEACHER_WELCOME_CHIPS,
   STUDENT_WELCOME_CHIPS,
 } from '../utils/aiSupport';
-import { MessageRichText, copyableTextFromMessage } from '../utils/messageRichText';
+import { MessageRichText } from '../utils/messageRichText';
+import { copyableTextFromMessage } from '../utils/messageRichTextUtils';
 import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
 import { getChatFileType } from '../utils/chatFileType';
 import ScreenCaptureButton from './ScreenCaptureButton';

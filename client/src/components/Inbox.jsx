@@ -8,7 +8,7 @@ import {
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { messagesAPI, callHistoryAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
 import TeacherStudentWeekSlotSheet from './teacher/TeacherStudentWeekSlotSheet';
 import { displayFileName } from '../utils/validators';

@@ -10,21 +10,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
-import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
-
-const formatTime = (date) => {
-  if (!date) return '';
-  const d = new Date(date);
-  const now = new Date();
-  const diffMs = now - d;
-  if (diffMs < 60000) return 'Vừa xong';
-  if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)} phút trước`;
-  if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-};
 
 const MOBILE_NAV_ICON_TONES = {
   schedule: 'border-blue-100/80 from-blue-50 to-white text-blue-600',
@@ -197,7 +185,6 @@ const AppSidebar = ({
   role = 'student',
   userName = '',
   userAvatar = '',
-  notifications = 0,
   onLogout,
   activeKey,
   onNavigateItem,
@@ -292,8 +279,7 @@ const AppSidebar = ({
     }
   });
   const {
-    students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations, triggerBackgroundSync,
-    notifications: allNotifications, markNotificationRead
+    students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations,
   } = useData();
 
   // Session login/me có thể thiếu gender → bổ sung từ hồ sơ self (mọi role)
@@ -404,7 +390,6 @@ const AppSidebar = ({
   }, [session?.id, session?.gender, sessionStorageKey, role]);
 
   const [muted, setMutedState] = useState(() => isSoundMuted());
-  const [dynamicLogo, setDynamicLogo] = useState('');
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 
   useEffect(() => {
@@ -434,7 +419,6 @@ const AppSidebar = ({
         if (res.success && res.data?.logoUrl) {
           const url = res.data.logoUrl;
           const resolvedLogo = url.startsWith('http') ? url : `${API}${url}`;
-          setDynamicLogo(resolvedLogo);
           onBrandLogoChange?.(resolvedLogo);
         }
       })
@@ -655,6 +639,8 @@ const AppSidebar = ({
 
   // Điều hướng → mở exclusive nhóm/hub chứa trang active
   useEffect(() => {
+    // This route-driven synchronization must update the persisted menu state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenGroups((prev) => {
       const next = { ...prev };
       let changed = false;
@@ -683,15 +669,8 @@ const AppSidebar = ({
       if (!changed) return prev;
       return persistOpenGroups(next);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.hash, role]);
-
-  const initials = userName ? userName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase() : 'HV';
-  const avatarUrl = resolveAvatarUrl({
-    avatar: effectiveAvatar,
-    role,
-    adminRole: session?.id === 'admin' ? 'SUPER_ADMIN' : adminRole,
-    gender: effectiveGender,
-  });
 
   // Trả về element (không khai báo component con) — tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
   const renderSidebarContent = () => (

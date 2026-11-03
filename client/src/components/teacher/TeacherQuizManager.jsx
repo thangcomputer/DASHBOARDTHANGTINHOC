@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import {
   downloadTeacherQuestionsExcelTemplate,
   parseQuestionBankExcel,

@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api, { resolveMediaUrl } from '../../services/api';
 import RichTextEditor from '../admin/shared/RichTextEditor';
 import CmsSelect from '../ui/CmsSelect';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import { CENTER_SECTIONS, SECTION_ITEM_KEYS, blankItem } from './centerInfoConstants';
 
 function Field({ label, children }) {

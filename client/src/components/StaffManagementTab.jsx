@@ -12,7 +12,7 @@ import {
   CheckSquare, Square, Key, Phone, User, Shield, Users,
   AlertTriangle, CheckCircle2, Crown, UserCog, Building2, MoreVertical, ChevronDown, Search, MessageSquare, Headset,
 } from 'lucide-react';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useModal } from '../utils/Modal.jsx';
 import { ALL_PERMISSIONS, HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMISSIONS } from '../constants/permissions';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';

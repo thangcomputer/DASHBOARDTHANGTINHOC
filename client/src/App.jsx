@@ -507,7 +507,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 
-import { useToast } from './utils/toast.jsx';
+import { useToast } from './utils/useToast';
 function GlobalApiErrorHandler() {
   const toast = useToast();
   useEffect(() => {

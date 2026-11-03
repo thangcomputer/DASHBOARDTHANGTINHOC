@@ -8,7 +8,7 @@ import AttendanceMakeupRequestModal from './AttendanceMakeupRequestModal';
 import { getScheduleDisplayKind, isScheduleDateBeforeToday } from '../../utils/scheduleTime';
 import { isDateInCalendarMonth } from '../../utils/teacherFinance';
 import { TEACHER_WEEKLY_SLOT_GRID_EXPERIMENT, SHOW_TEACHER_MONTHLY_CALENDAR } from '../../utils/weeklySlotGrid';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 
 function resolveStudentId(sch) {
   return String(

@@ -3,7 +3,7 @@ import useSWR, { mutate } from 'swr';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
 import api from '../../../services/api';

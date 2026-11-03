@@ -4,7 +4,7 @@ import {
   Loader2, RefreshCw, Server, Timer, RotateCcw,
 } from 'lucide-react';
 import { monitoringAPI } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 function formatUptime(sec) {
   const s = Math.max(0, Number(sec) || 0);

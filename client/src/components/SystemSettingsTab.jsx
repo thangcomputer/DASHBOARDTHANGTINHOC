@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { BankSelect } from './BankSelect';
 import api, { resolveMediaUrl } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import CoursePricingTab from './CoursePricingTab';
 import BranchManagementTab from './BranchManagementTab';
 import WebSettingsTab from './WebSettingsTab';

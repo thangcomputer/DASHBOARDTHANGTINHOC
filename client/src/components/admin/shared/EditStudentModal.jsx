@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { X, Save, KeyRound, Edit3, Loader2 } from 'lucide-react';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import { useBranch } from '../../../context/BranchContext';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import { getEffectiveCoursePrice } from '../../../utils/coursePricing';

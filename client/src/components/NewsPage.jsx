@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { resolveMediaUrl, blogAPI } from '../services/api';
 import { applyAnchorNewTabPolicy } from '../utils/htmlContent';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useSocket } from '../context/SocketContext';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
 import NewsRichEditor from './NewsRichEditor';

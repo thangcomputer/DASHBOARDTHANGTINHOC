@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Edit3, Trash2, Video, ChevronDown, ChevronUp, Save, Layers,
   ArrowUp, ArrowDown, Loader2, FileBox, Upload, Link2, Download,
 } from 'lucide-react';
-import { useToast } from '../utils/toast.jsx';
+import { useToast } from '../utils/useToast';
 import { probeYouTubeDurationSeconds, extractYouTubeId } from '../utils/youtubeDuration';
 import api, { buildMediaDownloadUrl } from '../services/api';
 import { trainingUploadDisplayName } from './admin/utils/trainingUpload';

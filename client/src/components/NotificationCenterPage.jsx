@@ -9,7 +9,7 @@ import api, { notificationsAPI, apiFetch } from '../services/api';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
 import { isRetractedStudentScheduleNote } from './teacher/TeacherStudentNoteModal';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { useSearchParams } from 'react-router-dom';
 import TeacherRatingDetailModal, {

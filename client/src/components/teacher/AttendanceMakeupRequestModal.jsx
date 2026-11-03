@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Loader2, Send, X } from 'lucide-react';
 import { messagesAPI } from '../../services/api';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import {
   buildAttendanceMakeupDraft,
   getMakeupSessionSummary,

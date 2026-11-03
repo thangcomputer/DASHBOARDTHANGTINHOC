@@ -8,7 +8,7 @@ import {
   Check, X, Eye, Shield,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 function LoadingPreview({ style }) {
   const previewStyles = {

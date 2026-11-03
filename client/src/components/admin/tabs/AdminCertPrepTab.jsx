@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, ChevronRight, Plus, X } from 'lucide-react';
-import { useToast } from '../../../utils/toast';
+import { useToast } from '../../../utils/useToast';
 import certPrepApi, { certPrepErrorMessage } from '../../../services/certPrepApi';
 import useCertPrepAdmin from '../../../hooks/useCertPrepAdmin';
 import CertPrepOverview from '../certPrep/CertPrepOverview';

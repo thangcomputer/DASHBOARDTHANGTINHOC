@@ -9,7 +9,7 @@ import SoftwareLinksTable from './SoftwareLinksTable';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useModal } from '../utils/Modal.jsx';
 import PopupBanner from './PopupBanner';
 import TeacherScheduleModal from './teacher/TeacherScheduleModal';

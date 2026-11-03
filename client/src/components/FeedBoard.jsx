@@ -12,13 +12,9 @@ import {
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useSocket } from '../context/SocketContext';
-import { getPresenceUserId } from '../utils/presence';
-import { useFloatingMessenger } from '../context/FloatingMessengerContext';
-import { openSiteChat } from './FloatingMessenger';
 import SupportMascot from './SupportMascot';
-import { isSuperAdminViewer, isSuperAdminPresence } from '../utils/supportPresence';
 import { extractYouTubeId } from '../utils/youtubeDuration';
 
 const ROLE_LABEL = {
@@ -34,6 +30,19 @@ const ROLE_BADGE = {
   teacher: 'bg-amber-100 text-amber-800',
   student: 'bg-sky-100 text-sky-800',
 };
+
+function readPersonalPins(storageKey) {
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    const ids = stored ? JSON.parse(stored) : [];
+    return {
+      ids: Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [],
+      error: '',
+    };
+  } catch (error) {
+    return { ids: [], error: error?.message || 'Không thể tải danh sách bài viết đã ghim' };
+  }
+}
 
 const REACTIONS = [
   { type: 'heart', label: 'Tim', emoji: '❤️', Icon: Heart, active: 'text-rose-600', fill: 'fill-rose-600', bg: 'bg-rose-50 border-rose-200' },
@@ -138,7 +147,6 @@ export default function FeedBoard({ session, role }) {
   const location = useLocation();
   const toast = useToast();
   const { socket, onlineUsers } = useSocket() || {};
-  const { openChat, setSupportOpen } = useFloatingMessenger();
   const fileRef = useRef(null);
   const editFileRef = useRef(null);
   const meId = String(session?.id || session?._id || '');
@@ -161,14 +169,12 @@ export default function FeedBoard({ session, role }) {
       adminRole: person.authorAdminRole || person.adminRole || (isCurrentUser ? session?.adminRole : null),
     });
   }, [currentAvatar, meId, meRole, onlineUsers, session?.adminRole, session?.name]);
-  const isSuper = isSuperAdminViewer(session);
-
   const meAdminRole = String(session?.adminRole || '').toUpperCase();
   const isSuperAdminViewerUser = meId === 'admin' || meAdminRole === 'SUPER_ADMIN';
   const isHighAdminViewerUser = meAdminRole === 'HIGH_ADMIN';
   const canModerateFeed = meRole === 'admin' || meRole === 'staff' || isSuperAdminViewerUser || isHighAdminViewerUser;
 
-  const isAuthorSuperAdmin = (authorId, authorAdminRole, authorRole) => {
+  const isAuthorSuperAdmin = (authorId, authorAdminRole) => {
     const uid = String(authorId || '');
     const ar = String(authorAdminRole || '').toUpperCase();
     return uid === 'admin' || ar === 'SUPER_ADMIN';
@@ -177,7 +183,7 @@ export default function FeedBoard({ session, role }) {
   const canDeletePost = (post) => {
     if (!post) return false;
     const isPostAuthor = String(post.authorId) === meId;
-    const isFromSuper = isAuthorSuperAdmin(post.authorId, post.authorAdminRole, post.authorRole);
+    const isFromSuper = isAuthorSuperAdmin(post.authorId, post.authorAdminRole);
 
     // 1. Bài của Super Admin: CHỈ Super Admin mới xóa được
     if (isFromSuper) {
@@ -203,7 +209,7 @@ export default function FeedBoard({ session, role }) {
   const canDeleteComment = (post, c) => {
     if (!c) return false;
     const isCommentAuthor = String(c.authorId) === meId;
-    const isFromSuper = isAuthorSuperAdmin(c.authorId, c.authorAdminRole, c.authorRole);
+    const isFromSuper = isAuthorSuperAdmin(c.authorId, c.authorAdminRole);
 
     // 1. Bình luận của Super Admin: CHỈ Super Admin mới xóa được
     if (isFromSuper) {
@@ -243,36 +249,19 @@ export default function FeedBoard({ session, role }) {
     return PRIVACY_OPTIONS.filter((p) => p.value === 'public' || p.value === 'students');
   }, [isSuperAdminViewerUser, isHighAdminViewerUser, meRole]);
 
-  // Quick Support Info
-  const quickSupport = useMemo(() => {
-    const online = (onlineUsers || []).find((u) => {
-      const r = String(u.role || '').toLowerCase();
-      return r === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT';
-    });
-    return {
-      id: getPresenceUserId(online) || null,
-      name: online?.name || 'Hỗ trợ viên',
-      role: 'support',
-      online: !!online,
-    };
-  }, [onlineUsers]);
-
   const [posts, setPosts] = useState([]);
   const visiblePosts = useMemo(() => posts.filter(canViewPost), [posts, canViewPost]);
   const personalPinsStorageKey = `feed-personal-pins:${meId || 'preview'}`;
-  const [personalPinsState, setPersonalPinsState] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem(personalPinsStorageKey);
-      const ids = stored ? JSON.parse(stored) : [];
-      return {
-        ids: Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [],
-        error: '',
-      };
-    } catch (error) {
-      return { ids: [], error: error?.message || 'Không thể tải danh sách bài viết đã ghim' };
-    }
-  });
-  const personalPinnedIds = personalPinsState.ids;
+  const [personalPinsState, setPersonalPinsState] = useState(() => ({
+    storageKey: personalPinsStorageKey,
+    ...readPersonalPins(personalPinsStorageKey),
+  }));
+  const personalPinnedIds = personalPinsState.storageKey === personalPinsStorageKey
+    ? personalPinsState.ids
+    : [];
+  const personalPinsError = personalPinsState.storageKey === personalPinsStorageKey
+    ? personalPinsState.error
+    : '';
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -324,8 +313,20 @@ export default function FeedBoard({ session, role }) {
   const [resolvingReportId, setResolvingReportId] = useState(null);
 
   useEffect(() => {
-    if (personalPinsState.error) toast.error(personalPinsState.error);
-  }, [personalPinsState.error, toast]);
+    if (personalPinsState.storageKey === personalPinsStorageKey) return undefined;
+    let active = true;
+    void Promise.resolve().then(() => {
+      const nextState = readPersonalPins(personalPinsStorageKey);
+      if (active) setPersonalPinsState({ storageKey: personalPinsStorageKey, ...nextState });
+    });
+    return () => {
+      active = false;
+    };
+  }, [personalPinsStorageKey, personalPinsState.storageKey]);
+
+  useEffect(() => {
+    if (personalPinsError) toast.error(personalPinsError);
+  }, [personalPinsError, toast]);
 
   const orderedVisiblePosts = useMemo(() => visiblePosts
     .map((post, index) => ({ post, index }))
@@ -438,7 +439,6 @@ export default function FeedBoard({ session, role }) {
 
   const load = useCallback(async (p = 1, append = false) => {
     if (append) setLoadingMore(true);
-    else setLoading(true);
     try {
       const res = await api.feed.list({ page: p, limit: 20 });
       if (res.success) {
@@ -458,7 +458,7 @@ export default function FeedBoard({ session, role }) {
   }, [toast]);
 
   useEffect(() => {
-    load(1, false);
+    void Promise.resolve().then(() => load(1, false));
   }, [load]);
 
   useEffect(() => {
@@ -814,7 +814,7 @@ export default function FeedBoard({ session, role }) {
       : [...personalPinnedIds, id];
     try {
       window.localStorage.setItem(personalPinsStorageKey, JSON.stringify(next));
-      setPersonalPinsState({ ids: next, error: '' });
+      setPersonalPinsState({ storageKey: personalPinsStorageKey, ids: next, error: '' });
       toast.success(next.includes(id) ? 'Đã ghim bài viết riêng tư trên thiết bị này' : 'Đã bỏ ghim bài viết');
     } catch (error) {
       toast.error(error?.message || 'Không thể lưu bài viết đã ghim');

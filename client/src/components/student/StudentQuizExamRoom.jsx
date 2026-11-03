@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, LayoutGrid, Award, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import { useData } from '../../context/DataContext';
 import ExamClickOutsideGuard from '../exam/ExamClickOutsideGuard';
 

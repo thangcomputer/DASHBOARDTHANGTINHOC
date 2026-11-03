@@ -46,7 +46,7 @@ import {
   resolveYouTubeDisplayDuration,
   syncYouTubePlaybackState,
 } from '../utils/youtubeDuration';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 const MOCK_COURSES = [
   { _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0, 

@@ -4,7 +4,7 @@ import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Printer, Download, Camera } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
 import InvoicePreviewFrame from '../../InvoicePreviewFrame';

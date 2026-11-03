@@ -7,7 +7,7 @@ import FloatingMessenger from './FloatingMessenger';
 import { FloatingMessengerProvider } from '../context/FloatingMessengerContext';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
   Bell, MessageCircle, CheckCircle2, Clock, X, Lock,

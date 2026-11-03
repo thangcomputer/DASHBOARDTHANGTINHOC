@@ -4,7 +4,7 @@ import {
   Building2, Loader2, Plus, RefreshCw, Users, GraduationCap, Calendar,
 } from 'lucide-react';
 import { tenantsAPI } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 export default function TenantManagementPage() {
   const toast = useToast();

@@ -16,7 +16,7 @@ import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enro
 import { getExamSubjectMeta, teacherMatchesCourse } from '../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../utils/branchIds';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
 import ZaloIcon from './ZaloIcon';
 import { formatStudentGradeNote } from '../utils/studentActivityLogs';

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Camera, Loader2, Move, RotateCcw, X } from 'lucide-react';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { authAPI } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useData } from '../context/DataContext';
 
 export default function EditableAvatar({

@@ -5,7 +5,7 @@ import {
   UploadCloud, Filter, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { filesAPI, SOCKET_BASE } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { displayFileName } from '../utils/validators';
 
 function formatTime(t) {
