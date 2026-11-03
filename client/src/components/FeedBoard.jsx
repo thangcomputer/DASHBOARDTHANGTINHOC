@@ -260,7 +260,19 @@ export default function FeedBoard({ session, role }) {
   const [posts, setPosts] = useState([]);
   const visiblePosts = useMemo(() => posts.filter(canViewPost), [posts, canViewPost]);
   const personalPinsStorageKey = `feed-personal-pins:${meId || 'preview'}`;
-  const [personalPinnedIds, setPersonalPinnedIds] = useState([]);
+  const [personalPinsState, setPersonalPinsState] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem(personalPinsStorageKey);
+      const ids = stored ? JSON.parse(stored) : [];
+      return {
+        ids: Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [],
+        error: '',
+      };
+    } catch (error) {
+      return { ids: [], error: error?.message || 'Không thể tải danh sách bài viết đã ghim' };
+    }
+  });
+  const personalPinnedIds = personalPinsState.ids;
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -312,14 +324,8 @@ export default function FeedBoard({ session, role }) {
   const [resolvingReportId, setResolvingReportId] = useState(null);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(personalPinsStorageKey);
-      const ids = stored ? JSON.parse(stored) : [];
-      setPersonalPinnedIds(Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : []);
-    } catch (error) {
-      toast.error(error?.message || 'Không thể tải danh sách bài viết đã ghim');
-    }
-  }, [personalPinsStorageKey, toast]);
+    if (personalPinsState.error) toast.error(personalPinsState.error);
+  }, [personalPinsState.error, toast]);
 
   const orderedVisiblePosts = useMemo(() => visiblePosts
     .map((post, index) => ({ post, index }))
@@ -808,7 +814,7 @@ export default function FeedBoard({ session, role }) {
       : [...personalPinnedIds, id];
     try {
       window.localStorage.setItem(personalPinsStorageKey, JSON.stringify(next));
-      setPersonalPinnedIds(next);
+      setPersonalPinsState({ ids: next, error: '' });
       toast.success(next.includes(id) ? 'Đã ghim bài viết riêng tư trên thiết bị này' : 'Đã bỏ ghim bài viết');
     } catch (error) {
       toast.error(error?.message || 'Không thể lưu bài viết đã ghim');

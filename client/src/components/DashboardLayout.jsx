@@ -252,7 +252,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const location = useLocation();
   const toast = useToast();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [mobileFooterVisible, setMobileFooterVisible] = useState(true);
+  const [mobileFooterHiddenRouteKey, setMobileFooterHiddenRouteKey] = useState(null);
+  const mobileFooterRouteKey = `${location.pathname}${location.hash}`;
+  const mobileFooterVisible = mobileFooterHiddenRouteKey !== mobileFooterRouteKey;
   const [brandLogo, setBrandLogo] = useState('');
   const lastContentScrollTop = useRef(0);
   const [ratingDetail, setRatingDetail] = useState(null);
@@ -1536,17 +1538,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const delta = scrollTop - lastContentScrollTop.current;
     lastContentScrollTop.current = scrollTop;
     if (scrollTop <= 24) {
-      setMobileFooterVisible(true);
+      setMobileFooterHiddenRouteKey(null);
     } else if (delta > 4) {
-      setMobileFooterVisible(false);
+      setMobileFooterHiddenRouteKey(mobileFooterRouteKey);
     } else if (delta < -4) {
-      setMobileFooterVisible(true);
+      setMobileFooterHiddenRouteKey(null);
     }
   };
 
   useEffect(() => {
     lastContentScrollTop.current = 0;
-    setMobileFooterVisible(true);
   }, [location.pathname, location.hash]);
 
   return (

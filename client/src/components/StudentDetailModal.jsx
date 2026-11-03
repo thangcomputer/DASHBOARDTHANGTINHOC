@@ -267,6 +267,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   const { showModal } = useModal();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState(initialTab || 'summary'); // 'summary' | 'attendance' | 'finance' | 'academic' | 'edit'
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [courseFilter, setCourseFilter] = useState('all'); // 'all' | enrollmentId
   const [makeupBusyId, setMakeupBusyId] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -282,6 +283,11 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     || String(currentUser?.id || currentUser?._id || '') === 'admin';
   const [showAddEnrollment, setShowAddEnrollment] = useState(false);
   const [deviceBusy, setDeviceBusy] = useState('');
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(timerId);
+  }, []);
 
   useEffect(() => {
     setCourseFilter('all');
@@ -2380,7 +2386,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                         <h3 className="font-black text-slate-900 text-xs sm:text-sm  tracking-wider flex items-center gap-2 min-w-0">
                           <Trophy size={16} className="text-amber-500 shrink-0" /> <span className="leading-snug">Kết quả thi tốt nghiệp</span>
                         </h3>
-                        {(data.student.examProgress || []).some(ep => ep.lockUntil && ep.lockUntil > Date.now()) && (
+                        {(data.student.examProgress || []).some(ep => ep.lockUntil && new Date(ep.lockUntil).getTime() > currentTime) && (
                           <button onClick={handleUnlockExams} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black  tracking-wider shadow-sm transition-all flex items-center gap-1">
                             <Clock size={12} />  Mở khóa thi lại
                           </button>
@@ -2426,7 +2432,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   </div>
                                   <div className="bg-slate-50 rounded-xl p-2 sm:p-3 text-center min-w-0">
                                     <p className="text-[9px] font-black text-slate-400  mb-1">Khóa đến</p>
-                                    {ep.lockUntil && ep.lockUntil > Date.now() ? (
+                                    {ep.lockUntil && new Date(ep.lockUntil).getTime() > currentTime ? (
                                       <p className="text-xs font-black text-red-500">{new Date(ep.lockUntil).toLocaleDateString('vi-VN')}</p>
                                     ) : (
                                       <p className="text-xs font-bold text-slate-300">—</p>
