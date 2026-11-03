@@ -84,6 +84,7 @@ class NotificationService {
         type,
         title,
         content,
+        payload,
         notificationId: String(newNotification._id),
       });
       return newNotification;

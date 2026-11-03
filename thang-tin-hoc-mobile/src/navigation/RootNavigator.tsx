@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Image, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput,
   useWindowDimensions, View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,10 +8,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import Svg, { Path } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 import {
   BookOpen, Building2, CalendarDays, CheckSquare, Clapperboard, FileBox, FileText, GraduationCap,
-  Headphones, House, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
+  Headphones, House, LayoutDashboard, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +53,17 @@ import { navigationRef } from './navigationRef';
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
+const TAB_ICON_TONES: Record<string, string> = {
+  Schedule: '#2563EB',
+  Messages: '#7C3AED',
+  Feed: '#D97706',
+  Home: '#DC2626',
+  Finance: '#059669',
+  CourseVideos: '#0891B2',
+  Support: '#0891B2',
+  Profile: '#4F46E5',
+};
+
 type IncomingCallPrompt = {
   callId: string;
   conversationId: string;
@@ -84,6 +95,7 @@ export function RootNavigator() {
     return () => subscription.remove();
   }, []);
   useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
     let active = true;
     const handleResponse = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
@@ -312,7 +324,21 @@ export function RootNavigator() {
         setActiveTab('Students');
         return;
       }
-      if (currentRouteName !== 'MainTabs') return;
+      if (currentRouteName !== 'MainTabs') {
+        const stackRouteTabs: Record<string, string> = {
+          Attendance: 'Schedule',
+          CallHistory: 'Messages',
+          Conversation: 'Messages',
+          Feed: 'Feed',
+          TeacherFinance: 'Finance',
+          StudentLearning: 'CourseVideos',
+          LessonPracticeCatalog: 'CourseVideos',
+          LessonPracticeUnits: 'CourseVideos',
+          LessonPracticePlayer: 'CourseVideos',
+        };
+        setActiveTab(stackRouteTabs[currentRouteName ?? ''] ?? '');
+        return;
+      }
       const mainTabsRoute = state?.routes.find((route) => route.name === 'MainTabs');
       const tabState = mainTabsRoute?.state;
       if (tabState) {
@@ -394,6 +420,13 @@ export function RootNavigator() {
             });
           }}
         />
+      ) : null}
+      {!examRoomActive
+        && stackRouteName !== 'Conversation'
+        && stackRouteName !== 'Call'
+        && activeTab !== 'Support'
+        && (user.role === 'student' || user.role === 'teacher') ? (
+        <FloatingSupportButton />
       ) : null}
       {!examRoomActive && stackRouteName && stackRouteName !== 'MainTabs' && stackRouteName !== 'Conversation' && stackRouteName !== 'Call' ? (
         <PersistentTabBar
@@ -505,8 +538,12 @@ function PersistentTabBar({
   todayScheduleCount: number;
 }) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const isTeacher = role === 'teacher';
   const visibility = useNavigationBarVisibility();
+  const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
+  const barWidth = 760;
+  const barSideInset = centeredWebBar ? (windowWidth - barWidth) / 2 : 0;
   useEffect(() => {
     const unsubscribe = navigationRef.addListener('state', () => {
       Animated.timing(visibility, { toValue: 1, duration: 220, useNativeDriver: false }).start();
@@ -528,29 +565,37 @@ function PersistentTabBar({
       { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
       { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
       { name: 'Home' as const, label: 'Trang chủ', shortLabel: 'Trang chủ', icon: House },
-      { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', shortLabel: 'Luyện tập', icon: Clapperboard },
       { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
-      { name: 'Profile' as const, label: 'Cá nhân', shortLabel: 'Cá nhân', icon: UserRound },
+      { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', shortLabel: 'Luyện tập', icon: Clapperboard },
     ];
   const orderedItems = items;
-  const barHeight = 76 + insets.bottom;
+  const barHeight = 96 + insets.bottom;
   return (
     <Animated.View
       pointerEvents="box-none"
       style={[
         styles.persistentTabBar,
+        centeredWebBar && {
+          left: barSideInset,
+          right: barSideInset,
+          width: barWidth,
+        },
         {
           height: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, barHeight] }),
-          paddingTop: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
-          paddingBottom: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(insets.bottom, spacing.xs)] }),
+          paddingTop: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.lg] }),
+          paddingBottom: visibility.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(insets.bottom, spacing.sm)] }),
           opacity: visibility,
           transform: [{ translateY: visibility.interpolate({ inputRange: [0, 1], outputRange: [barHeight, 0] }) }],
         },
       ]}
     >
-      <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill}>
-        <Path d="M0 26 C18 8 45 8 62 25 C78 40 77 82 106 86 C132 90 148 79 160 42 C170 9 183 0 200 0 C217 0 230 9 240 42 C252 79 268 90 294 86 C323 82 322 40 338 25 C355 8 382 8 400 26 V100 H0 Z" fill={colors.canvas} />
-      </Svg>
+      <BlurView
+        intensity={Platform.OS === 'android' ? 75 : 60}
+        tint="light"
+        style={styles.navigationGlassBackground}
+      >
+        <View style={styles.navigationGlassTint} />
+      </BlurView>
       {orderedItems.map(({ name, label, shortLabel, icon: Icon }) => {
         const selected = name === activeTab;
         const badgeCount = name === 'Messages'
@@ -562,23 +607,31 @@ function PersistentTabBar({
             onPress={() => {
                 navigationRef.navigate('MainTabs', { screen: name });
             }}
-            style={styles.persistentTabItem}
+            style={[styles.persistentTabItem, selected && styles.persistentTabItemActive]}
             accessibilityRole="button"
             accessibilityLabel={label}
+            accessibilityState={{ selected }}
           >
-            {selected && name === 'Home' ? (
-              <View style={[styles.homeArcButton, styles.persistentHomeIcon]}><House size={23} color="#FFFFFF" strokeWidth={2.5} /></View>
-            ) : (
+            <View style={[
+              styles.persistentTabIconTile,
+              selected
+                ? styles.persistentTabIconTileActive
+                : { backgroundColor: `${TAB_ICON_TONES[name] || colors.muted}12` },
+            ]}>
               <View style={styles.persistentTabIconWrap}>
-                <Icon size={22} color={selected ? colors.brand : colors.muted} strokeWidth={2.2} />
+                <Icon
+                  size={20}
+                  color={selected ? '#FFFFFF' : TAB_ICON_TONES[name] || colors.muted}
+                  strokeWidth={2.3}
+                />
                 {badgeCount > 0 ? (
                   <Text style={styles.persistentTabBadge}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
                 ) : null}
               </View>
-            )}
+            </View>
             <Text
               numberOfLines={1}
-              style={[styles.persistentTabLabel, selected && styles.persistentTabLabelActive, selected && name === 'Home' && styles.persistentHomeLabel]}
+              style={[styles.persistentTabLabel, selected && styles.persistentTabLabelActive]}
             >
               {shortLabel}
             </Text>
@@ -592,23 +645,26 @@ function PersistentTabBar({
 type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVideos' | 'Feed'
   | 'Profile' | 'Assignments' | 'Materials' | 'StudentExam'
   | 'StudentLearning' | 'Evaluations' | 'News' | 'CenterInfo' | 'SoftwareLinks'
-  | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance';
+  | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'Support';
 
 type MenuEntry = { label: string; destination: MenuDestination; icon: LucideIcon };
 type MenuSection = { label: string; items: MenuEntry[] };
 
 function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   const { user } = useAuth();
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
+  const drawerTranslateX = useRef(new Animated.Value(0)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [handleHovered, setHandleHovered] = useState(false);
   const isTeacher = user?.role === 'teacher';
   const [activeDestination, setActiveDestination] = useState<MenuDestination | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const drawerWidth = Math.min(windowWidth * 0.82, 280);
   const handleHeight = 48;
   const headerBottom = insets.top + 58;
-  const bottomNavigationHeight = 76 + insets.bottom;
+  const bottomNavigationHeight = 96 + insets.bottom;
   const minMenuTop = headerBottom + 8;
   const maxMenuTop = Math.max(minMenuTop, windowHeight - bottomNavigationHeight - handleHeight - 8);
   const [menuTop, setMenuTop] = useState((minMenuTop + maxMenuTop) / 2);
@@ -620,9 +676,9 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       {
         label: 'KHÔNG GIAN LÀM VIỆC',
         items: [
-          { label: 'Tổng quan', destination: 'Home', icon: House },
+          { label: 'Tổng quan', destination: 'Home', icon: LayoutDashboard },
           { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-          { label: 'Học viên', destination: 'Students', icon: Users },
+          { label: 'Quản lý học viên', destination: 'Students', icon: Users },
           { label: 'Lịch dạy & điểm danh', destination: 'Schedule', icon: CalendarDays },
         ],
       },
@@ -640,6 +696,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
           { label: 'Bảng tin', destination: 'Feed', icon: Radio },
           { label: 'Tin tức', destination: 'News', icon: Newspaper },
           { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
+          { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
         ],
       },
     ]
@@ -663,10 +720,51 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
           { label: 'Đánh giá giảng viên', destination: 'Evaluations', icon: Star },
           { label: 'Thông tin học phí', destination: 'Tuition', icon: WalletCards },
           { label: 'Liên hệ Trung tâm', destination: 'CenterInfo', icon: Building2 },
+          { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
         ],
       },
     ];
   const menuItems = menuSections.flatMap((section) => section.items);
+  const openMenu = () => {
+    drawerTranslateX.stopAnimation();
+    backdropOpacity.stopAnimation();
+    drawerTranslateX.setValue(-drawerWidth);
+    backdropOpacity.setValue(0);
+    setMenuMounted(true);
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(drawerTranslateX, {
+          toValue: 0,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+  const closeMenu = () => {
+    if (!menuMounted) return;
+    drawerTranslateX.stopAnimation();
+    backdropOpacity.stopAnimation();
+    Animated.parallel([
+      Animated.timing(drawerTranslateX, {
+        toValue: -drawerWidth,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setMenuMounted(false);
+    });
+  };
   useEffect(() => {
     let active = true;
     getMobileSoundEnabled()
@@ -702,12 +800,12 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
   }), [handleHeight, maxMenuTop, minMenuTop]);
 
   const openDestination = (destination: MenuDestination) => {
-    setMenuVisible(false);
+    closeMenu();
     if (destination === 'Students') {
       navigationRef.navigate('Students');
       return;
     }
-    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile'].includes(destination)) {
+    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile', 'Support'].includes(destination)) {
       navigationRef.navigate('MainTabs', { screen: destination as keyof MainTabsParamList });
       return;
     }
@@ -737,7 +835,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     <>
       <View {...panResponder.panHandlers} style={[styles.floatingMenuHandle, { top: menuTop }]}>
         <Pressable
-          onPress={() => setMenuVisible(true)}
+          onPress={openMenu}
           onHoverIn={() => setHandleHovered(true)}
           onHoverOut={() => setHandleHovered(false)}
           style={({ pressed }) => [
@@ -750,10 +848,25 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
           <Menu size={21} color="#FFFFFF" />
         </Pressable>
       </View>
-      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+      <Modal visible={menuMounted} transparent animationType="none" onRequestClose={closeMenu}>
         <View style={styles.drawerOverlay}>
-          <Pressable style={styles.drawerDismiss} onPress={() => setMenuVisible(false)} accessibilityLabel="Đóng danh mục" />
-          <View style={[styles.drawer, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.sm }]}>
+          <Animated.View style={[styles.drawerBackdrop, { opacity: backdropOpacity }]}>
+            <Pressable style={styles.drawerDismiss} onPress={closeMenu} accessibilityLabel="Đóng danh mục" />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.drawer,
+              {
+                width: drawerWidth,
+                paddingTop: insets.top + spacing.sm,
+                paddingBottom: insets.bottom + spacing.sm,
+                transform: [{ translateX: drawerTranslateX }],
+              },
+            ]}
+          >
+            <BlurView intensity={72} tint="dark" pointerEvents="none" style={styles.drawerGlassBackground}>
+              <View style={styles.drawerGlassTint} />
+            </BlurView>
             <View style={styles.drawerHeader}>
               <View style={styles.drawerProfileCard}>
                 <View style={styles.drawerAvatar}>
@@ -765,13 +878,10 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                   <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
                   <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
                     <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
-                      {isTeacher ? 'Giảng viên' : 'Học viên'}
+                      {isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}
                     </Text>
                   </View>
                 </View>
-                <Pressable onPress={() => setMenuVisible(false)} style={styles.drawerClose} accessibilityRole="button" accessibilityLabel="Đóng menu">
-                  <X size={19} color="#CBD5E1" />
-                </Pressable>
               </View>
             </View>
             <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
@@ -818,9 +928,9 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                 </View>
                 <Text style={[styles.drawerItemText, activeDestination === 'Profile' && styles.drawerItemTextActive]}>Hồ sơ</Text>
               </Pressable>
-              <Pressable onPress={() => { setMenuVisible(false); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
+              <Pressable onPress={() => { closeMenu(); onSignOut(); }} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel="Đăng xuất">
                 <View style={styles.drawerItemIcon}><LogOut size={18} color="#FCA5A5" /></View>
-                <Text style={styles.drawerItemText}>Đăng xuất</Text>
+                <Text style={[styles.drawerItemText, styles.drawerLogoutText]}>Đăng xuất</Text>
               </Pressable>
               <Pressable onPress={toggleSound} style={styles.drawerItem} accessibilityRole="button" accessibilityLabel={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'} accessibilityState={{ checked: soundEnabled }}>
                 <View style={styles.drawerItemIcon}>
@@ -829,17 +939,67 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                 <Text style={styles.drawerItemText}>{soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}</Text>
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </>
   );
 }
 
+function FloatingSupportButton() {
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [hovered, setHovered] = useState(false);
+  const buttonSize = 52;
+  const headerBottom = insets.top + 58;
+  const bottomNavigationHeight = 96 + insets.bottom;
+  const minTop = headerBottom + 8;
+  const maxTop = Math.max(minTop, windowHeight - bottomNavigationHeight - buttonSize - 8);
+  const [top, setTop] = useState((minTop + maxTop) / 2);
+
+  useEffect(() => {
+    setTop((currentTop) => Math.max(minTop, Math.min(maxTop, currentTop)));
+  }, [maxTop, minTop]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderMove: (_event, gesture) => {
+      setTop(Math.max(minTop, Math.min(maxTop, gesture.moveY - buttonSize / 2)));
+    },
+  }), [buttonSize, maxTop, minTop]);
+
+  return (
+    <View {...panResponder.panHandlers} style={[styles.floatingSupportHandle, { top }]}>
+      <Pressable
+        onPress={() => navigationRef.navigate('MainTabs', { screen: 'Support' })}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        style={({ pressed }) => [
+          styles.floatingSupportButton,
+          Platform.OS === 'web' && { opacity: pressed || hovered ? 1 : 0.58 },
+          pressed && styles.floatingSupportButtonPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Mở hỗ trợ"
+      >
+        <View style={styles.floatingSupportLabel}>
+          <Text style={styles.floatingSupportLabelText}>Hỗ trợ</Text>
+        </View>
+        <View style={styles.floatingSupportIcon}>
+          <Headphones size={22} color="#FFFFFF" strokeWidth={2.5} />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
 function MainTabs() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const isTeacher = user?.role === 'teacher';
+  const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
+  const tabBarWidth = 760;
   const navigationBarVisibility = useNavigationBarVisibility();
   useFocusEffect(useCallback(() => {
     Animated.timing(navigationBarVisibility, {
@@ -1000,35 +1160,50 @@ function MainTabs() {
           borderRadius: 9,
         },
         tabBarStyle: {
-          backgroundColor: colors.canvas,
-          borderTopColor: 'transparent',
-          borderTopWidth: 0,
-          height: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 76 + insets.bottom] }),
+          ...(centeredWebBar ? {
+            width: tabBarWidth,
+            maxWidth: '100%',
+            alignSelf: 'center' as const,
+          } : {}),
+          position: 'absolute' as const,
+          left: centeredWebBar ? (windowWidth - tabBarWidth) / 2 : 10,
+          right: centeredWebBar ? (windowWidth - tabBarWidth) / 2 : 10,
+          bottom: centeredWebBar ? 12 : Math.max(insets.bottom, 8),
+          backgroundColor: 'transparent',
+          borderTopColor: 'rgba(255,255,255,0.96)',
+          borderTopWidth: 1,
+          borderLeftWidth: 1,
+          borderRightWidth: 1,
+          borderColor: 'rgba(255,255,255,0.96)',
+          borderRadius: 22,
+          height: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 96 + insets.bottom] }),
           paddingTop: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
           paddingBottom: navigationBarVisibility.interpolate({
             inputRange: [0, 1],
-            outputRange: [0, Math.max(insets.bottom, spacing.xs)],
+            outputRange: [0, spacing.sm],
           }),
-          elevation: 0,
+          elevation: 14,
+          shadowColor: '#0F172A',
+          shadowOpacity: 0.16,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 7 },
           opacity: navigationBarVisibility,
           transform: [{
             translateY: navigationBarVisibility.interpolate({
               inputRange: [0, 1],
-              outputRange: [76 + insets.bottom, 0],
+              outputRange: [96 + insets.bottom, 0],
             }),
           }],
         },
-        tabBarIconStyle: { height: 54 },
+        tabBarIconStyle: { height: 64 },
         tabBarBackground: () => (
-          <Svg
-            width="100%"
-            height="100%"
-            viewBox="0 0 400 100"
-            preserveAspectRatio="none"
-            style={StyleSheet.absoluteFill}
+          <BlurView
+            intensity={Platform.OS === 'android' ? 75 : 60}
+            tint="light"
+            style={styles.navigationGlassBackground}
           >
-            <Path d="M0 26 C18 8 45 8 62 25 C78 40 77 82 106 86 C132 90 148 79 160 42 C170 9 183 0 200 0 C217 0 230 9 240 42 C252 79 268 90 294 86 C323 82 322 40 338 25 C355 8 382 8 400 26 V100 H0 Z" fill={colors.canvas} />
-          </Svg>
+            <View style={styles.navigationGlassTint} />
+          </BlurView>
         ),
         tabBarItemStyle: isTeacher
           ? {
@@ -1038,7 +1213,7 @@ function MainTabs() {
             height: '100%',
           }
           : undefined,
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, size, focused }) => {
           const label = route.name === 'Schedule'
             ? isTeacher ? 'Lịch dạy' : 'Lịch'
             : route.name === 'Messages'
@@ -1054,19 +1229,11 @@ function MainTabs() {
                       : route.name === 'Support'
                         ? 'Hỗ trợ'
                         : isTeacher ? 'Hồ sơ' : 'Cá nhân';
-          if (route.name === 'Home') {
-            return (
-              <View style={styles.tabBarIconContent}>
-                <View style={[styles.homeArcButton, styles.tabBarHomeIcon]}>
-                  <House size={23} color="#FFFFFF" strokeWidth={2.5} />
-                </View>
-                <Text numberOfLines={1} style={[styles.tabBarLabel, styles.tabBarHomeLabel, { color }]}>{label}</Text>
-              </View>
-            );
-          }
-          const common = { size: size - 2, color, strokeWidth: 2.2 };
+          const iconColor = focused ? '#FFFFFF' : TAB_ICON_TONES[route.name] || color;
+          const common = { size: size - 2, color: iconColor, strokeWidth: 2.2 };
           let icon;
           switch (route.name) {
+            case 'Home': icon = <House {...common} />; break;
             case 'Schedule': icon = <CalendarDays {...common} />; break;
             case 'Messages': icon = <MessageCircle {...common} />; break;
             case 'Feed': icon = <Newspaper {...common} />; break;
@@ -1078,9 +1245,16 @@ function MainTabs() {
             default: icon = <FileText {...common} />;
           }
           return (
-            <View style={styles.tabBarIconContent}>
-              {icon}
-              <Text numberOfLines={1} style={[styles.tabBarLabel, { color }]}>{label}</Text>
+            <View style={[styles.tabBarIconContent, focused && styles.tabBarIconContentActive]}>
+              <View style={[
+                styles.tabBarIconTile,
+                focused
+                  ? styles.tabBarIconTileActive
+                  : { backgroundColor: `${TAB_ICON_TONES[route.name] || colors.muted}12` },
+              ]}>
+                {icon}
+              </View>
+              <Text numberOfLines={1} style={[styles.tabBarLabel, { color: focused ? colors.brand : colors.muted }]}>{label}</Text>
             </View>
           );
         },
@@ -1143,9 +1317,13 @@ function MainTabs() {
           />
           <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập kỹ năng' }} />
           <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
-          <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Cá nhân' }} />
+          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập kỹ năng' }} />
+          <Tab.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ title: 'Cá nhân', tabBarButton: () => null }}
+          />
         </>
       )}
     </Tab.Navigator>
@@ -1202,25 +1380,38 @@ const styles = StyleSheet.create({
   rejectCallButton: { backgroundColor: '#DC2626' },
   acceptCallButton: { backgroundColor: '#16A34A' },
   incomingCallButtonText: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '700' },
-  persistentTabBar: { position: 'absolute', zIndex: 15, left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingTop: spacing.md, backgroundColor: colors.canvas },
-  persistentTabItem: { flex: 1, minWidth: 0, height: 56, alignItems: 'center', justifyContent: 'flex-start' },
+  persistentTabBar: { position: 'absolute', zIndex: 15, left: 8, right: 8, bottom: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingHorizontal: 6, paddingTop: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.76)', shadowColor: '#0F172A', shadowOpacity: 0.16, shadowRadius: 20, shadowOffset: { width: 0, height: 7 }, elevation: 14 },
+  navigationGlassBackground: { ...StyleSheet.absoluteFill, borderRadius: 22, overflow: 'hidden' },
+  navigationGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.76)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', borderRadius: 22 },
+  persistentTabItem: { flex: 1, minWidth: 0, height: 64, alignItems: 'center', justifyContent: 'flex-start', gap: 1, paddingHorizontal: 1, paddingTop: 1, borderWidth: 1, borderColor: 'transparent', borderRadius: 15 },
+  persistentTabItemActive: { borderColor: 'rgba(220,38,38,0.28)', backgroundColor: 'rgba(255,255,255,0.4)' },
   persistentTabIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  persistentTabLabel: { maxWidth: '100%', marginTop: 3, color: colors.muted, fontSize: 8, lineHeight: 10, fontWeight: '600', textAlign: 'center' },
+  persistentTabIconTile: { width: 40, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', borderRadius: 11 },
+  persistentTabIconTileActive: { backgroundColor: colors.brand, borderColor: 'rgba(220,38,38,0.22)', shadowColor: '#DC2626', shadowOpacity: 0.24, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  persistentTabLabel: { maxWidth: '100%', marginTop: 2, color: colors.muted, fontSize: 8, lineHeight: 10, fontWeight: '600', textAlign: 'center' },
   persistentTabLabelActive: { color: colors.brand, fontWeight: '800' },
-  persistentHomeLabel: { position: 'absolute', right: 0, bottom: 0, left: 0, marginTop: 0 },
-  tabBarIconContent: { position: 'relative', width: 64, height: 54, alignItems: 'center', justifyContent: 'flex-start', gap: 2 },
+  tabBarIconContent: { position: 'relative', width: '100%', maxWidth: 64, height: 64, alignItems: 'center', justifyContent: 'flex-start', gap: 2, borderWidth: 1, borderColor: 'transparent', borderRadius: 14, paddingTop: 1 },
+  tabBarIconContentActive: { borderColor: 'rgba(220,38,38,0.28)', backgroundColor: 'rgba(255,255,255,0.4)' },
+  tabBarIconTile: { width: 40, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', borderRadius: 11 },
+  tabBarIconTileActive: { backgroundColor: colors.brand, borderColor: 'rgba(220,38,38,0.22)', shadowColor: '#DC2626', shadowOpacity: 0.24, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
   tabBarLabel: { maxWidth: '100%', fontSize: 8, lineHeight: 10, fontWeight: '700', textAlign: 'center' },
-  tabBarHomeLabel: { position: 'absolute', right: 0, bottom: 0, left: 0 },
-  tabBarHomeIcon: { position: 'absolute', top: -18 },
   persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
-  persistentHomeIcon: { position: 'absolute', top: -12 },
-  floatingMenuHandle: { position: 'absolute', right: 0, zIndex: 20 },
-  floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopLeftRadius: 12, borderBottomLeftRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: -2, height: 2 }, elevation: 6 },
-  drawerOverlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(2, 6, 23, 0.64)' },
+  floatingMenuHandle: { position: 'absolute', left: 0, zIndex: 20 },
+  floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 12, borderBottomRightRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 2, height: 2 }, elevation: 6 },
+  floatingSupportHandle: { position: 'absolute', right: 10, zIndex: 19 },
+  floatingSupportButton: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 4, paddingLeft: 10, borderWidth: 1, borderColor: '#FECACA', borderRadius: 28, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
+  floatingSupportButtonPressed: { opacity: 0.82, transform: [{ scale: 0.97 }] },
+  floatingSupportLabel: { paddingHorizontal: 2 },
+  floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
+  floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand },
+  drawerOverlay: { flex: 1, flexDirection: 'row' },
+  drawerBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
-  drawer: { width: '86%', maxWidth: 360, height: '100%', backgroundColor: '#0D1524', paddingHorizontal: spacing.md, borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden' },
+  drawer: { width: '82%', maxWidth: 280, height: '100%', backgroundColor: 'rgba(13, 21, 36, 0.9)', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', borderRightColor: 'rgba(103,232,249,0.45)', borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden', shadowColor: '#22D3EE', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 3, height: 0 }, elevation: 18 },
+  drawerGlassBackground: { ...StyleSheet.absoluteFill, borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden' },
+  drawerGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(8, 15, 28, 0.52)', borderTopRightRadius: 26, borderBottomRightRadius: 26 },
   drawerHeader: { paddingBottom: spacing.md },
-  drawerProfileCard: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.14)', borderRadius: 20, backgroundColor: '#151F30' },
+  drawerProfileCard: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.09)', shadowColor: '#FFFFFF', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   drawerAvatar: { width: 46, height: 46, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 23, backgroundColor: '#334155' },
   drawerAvatarImage: { width: 46, height: 46, borderRadius: 23 },
   drawerIdentity: { flex: 1, minWidth: 0, gap: 6 },
@@ -1229,21 +1420,21 @@ const styles = StyleSheet.create({
   drawerRoleBadgeTeacher: { backgroundColor: 'rgba(251, 191, 36, 0.12)' },
   drawerRole: { color: '#93C5FD', fontSize: typography.micro, fontWeight: '700' },
   drawerRoleTeacher: { color: '#FCD34D' },
-  drawerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: 'rgba(148, 163, 184, 0.1)' },
   drawerScroll: { flex: 1 },
-  drawerItems: { paddingTop: spacing.xs, paddingBottom: spacing.md, gap: spacing.lg },
+  drawerItems: { paddingTop: spacing.xs, paddingBottom: spacing.md, gap: spacing.md },
   drawerSection: { gap: spacing.xs },
-  drawerSectionLabel: { paddingHorizontal: spacing.sm, paddingTop: spacing.xs, paddingBottom: spacing.xs, color: '#74839A', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
+  drawerSectionLabel: { paddingHorizontal: spacing.sm, paddingTop: spacing.xs, paddingBottom: spacing.xs, color: '#8797B0', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
   drawerSectionItems: { gap: 3 },
-  drawerItem: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.sm, borderRadius: 14 },
-  drawerItemActive: { backgroundColor: '#1C2A3D' },
-  drawerItemPressed: { backgroundColor: '#223149' },
-  drawerItemIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+  drawerItem: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'transparent', borderRadius: 14 },
+  drawerItemActive: { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.12)', shadowColor: '#FFFFFF', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  drawerItemPressed: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  drawerItemIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   drawerItemIconActive: { backgroundColor: colors.brand },
   drawerItemText: { flex: 1, color: '#D5DCE7', fontSize: typography.caption, fontWeight: '600' },
+  drawerLogoutText: { color: '#FCA5A5' },
   drawerItemTextActive: { color: '#FFFFFF', fontWeight: '800' },
   drawerItemSelectedMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FCA5A5' },
-  drawerFooter: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.16)', gap: 2 },
+  drawerFooter: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.24)', gap: 2 },
   homeArcButton: {
     width: 58,
     height: 58,

@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookText, Video, UserCheck } from 'lucide-react';
+import { BookText, CalendarDays, CheckCircle, Clock3, Users, Video, UserCheck } from 'lucide-react';
 import {
   formatLocalDateKey,
   formatScheduleDateVi,
@@ -10,12 +10,30 @@ import {
 } from '../../utils/scheduleTime';
 import { startOfWeekMonday, weekDateKeys } from '../../utils/weeklySlotGrid';
 import { localizeScheduleNote } from '../../utils/studentActivityLogs';
+import {
+  clearMakeupPending,
+  getMakeupPending,
+  makeupPendingKey,
+  subscribeMakeupPending,
+} from '../../utils/attendanceMakeupPendingStore';
 
 const PENDING_KINDS = new Set(['pending_attendance', 'overdue_attendance', 'past_pending']);
 
 function isCancelledSchedule(sch) {
   const st = String(sch?.status || '').trim().toLowerCase();
   return st === 'cancelled' || st === 'canceled' || st === 'no_show';
+}
+
+function isAwaitingStudentConfirmation(sch) {
+  const confirmation = String(sch?.studentConfirmStatus || sch?.attendanceConfirmStatus || '').toLowerCase();
+  return !isCancelledSchedule(sch)
+    && (confirmation === 'pending' || Boolean(sch?.attendanceConfirmPending));
+}
+
+function isTeacherAttendancePending(sch, now) {
+  return !isCancelledSchedule(sch)
+    && !isAwaitingStudentConfirmation(sch)
+    && PENDING_KINDS.has(getScheduleDisplayKind(sch, now));
 }
 
 const COPY = {
@@ -36,6 +54,7 @@ const COPY = {
       month: 'Không có ca dạy trong tháng này.',
       all: 'Chưa có ca dạy.',
       pending: 'Không có ca chưa điểm danh.',
+      confirmation: 'Không có ca chờ xác nhận.',
       cancelled: 'Không có lịch hủy.',
     },
   },
@@ -112,6 +131,15 @@ function resolveStudentId(sch) {
   ).trim();
 }
 
+function getMakeupKey(sch) {
+  return makeupPendingKey({
+    scheduleId: scheduleKey(sch),
+    studentId: resolveStudentId(sch),
+    date: sch?.date,
+    course: sch?.course || sch?.courseName,
+  });
+}
+
 export default function TeacherTeachingLog({
   schedules = [],
   students = [],
@@ -122,6 +150,7 @@ export default function TeacherTeachingLog({
   const copy = COPY[variant] || COPY.teacher;
   const navigate = useNavigate();
   const [tab, setTab] = useState('all');
+  const [, refreshMakeupPending] = useReducer((revision) => revision + 1, 0);
   const todayKey = formatLocalDateKey(new Date());
   const now = useMemo(() => new Date(), []);
   const weekKeys = useMemo(() => weekDateKeys(startOfWeekMonday(now)), [now]);
@@ -132,6 +161,20 @@ export default function TeacherTeachingLog({
       student,
     ]),
   ), [students]);
+
+  useEffect(() => subscribeMakeupPending(() => {
+    refreshMakeupPending();
+  }), []);
+
+  useEffect(() => {
+    if (variant !== 'teacher') return;
+    (schedules || []).forEach((sch) => {
+      const status = String(sch?.status || '').toLowerCase();
+      if (status === 'completed' || isCancelledSchedule(sch)) {
+        clearMakeupPending(getMakeupKey(sch));
+      }
+    });
+  }, [schedules, variant]);
 
   const list = useMemo(() => {
     const all = schedules || [];
@@ -144,11 +187,11 @@ export default function TeacherTeachingLog({
     }
     if (tab === 'pending') {
       return sortSchedules(
-        all.filter((s) => {
-          if (isCancelledSchedule(s)) return false;
-          return PENDING_KINDS.has(getScheduleDisplayKind(s));
-        }),
+        all.filter((s) => isTeacherAttendancePending(s, now)),
       );
+    }
+    if (tab === 'confirmation') {
+      return sortSchedules(all.filter(isAwaitingStudentConfirmation));
     }
     const inRange = all.filter((s) => {
       if (isCancelledSchedule(s)) return false;
@@ -159,7 +202,7 @@ export default function TeacherTeachingLog({
       return false;
     });
     return sortSchedules(inRange);
-  }, [schedules, tab, todayKey, weekKeys, monthPrefix]);
+  }, [schedules, tab, todayKey, weekKeys, monthPrefix, now]);
 
   const emptyText = copy.empty[tab];
 
@@ -178,6 +221,200 @@ export default function TeacherTeachingLog({
     navigate(`/teacher#students?${q.toString()}`);
   };
 
+  if (variant === 'teacher') {
+    const pendingCount = (schedules || []).filter((sch) => isTeacherAttendancePending(sch, now)).length;
+    const confirmationCount = (schedules || []).filter(isAwaitingStudentConfirmation).length;
+    const cancelledCount = (schedules || []).filter(isCancelledSchedule).length;
+    const dateFilters = [
+      { id: 'day', label: 'Ngày' },
+      { id: 'week', label: 'Tuần' },
+      { id: 'month', label: 'Tháng' },
+      { id: 'cancelled', label: 'Hủy', count: cancelledCount },
+    ];
+
+    return (
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl" aria-label="Nhật ký giảng dạy">
+        <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 pb-2.5 pt-3 sm:px-5 sm:pt-4">
+          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] bg-red-50 text-red-600">
+            <BookText size={16} />
+          </div>
+          <h3 className="min-w-0 flex-1 text-sm font-black tracking-tight text-slate-900 sm:text-base">
+            {copy.title}
+          </h3>
+          <div className="flex h-9 min-w-[42px] items-center justify-center gap-1 rounded-xl bg-slate-100 px-2">
+            <span className="text-xs font-black text-red-800">{list.length}</span>
+            <span className="text-xs font-bold text-slate-500">ca</span>
+          </div>
+        </header>
+
+        <div className="space-y-2 border-b border-slate-200 bg-slate-50/70 px-4 py-2 sm:px-5">
+          <div className="grid grid-cols-4 gap-1.5" role="tablist" aria-label="Lọc nhật ký theo thời gian">
+            {dateFilters.map(({ id, label, count }) => {
+              const selected = tab === id;
+              const cancelled = id === 'cancelled';
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setTab(selected ? 'all' : id)}
+                  className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition sm:text-xs ${
+                    selected
+                      ? cancelled
+                        ? 'border-rose-700 bg-rose-700 text-white shadow-sm'
+                        : 'border-red-800 bg-red-800 text-white shadow-sm'
+                      : cancelled
+                        ? 'border-rose-200 bg-rose-50 text-rose-700'
+                        : 'border-slate-200 bg-white text-slate-500'
+                  }`}
+                >
+                  <span>{label}</span>
+                  {count !== undefined ? (
+                    <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'}`}>
+                      {count}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5" role="tablist" aria-label="Lọc trạng thái điểm danh">
+            {[
+              { id: 'pending', label: 'Chưa điểm danh', count: pendingCount, tone: 'orange' },
+              { id: 'confirmation', label: 'Chờ xác nhận', count: confirmationCount, tone: 'red' },
+            ].map(({ id, label, count, tone }) => {
+              const selected = tab === id;
+              const orange = tone === 'orange';
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setTab(selected ? 'all' : id)}
+                  className={`flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-extrabold transition sm:text-xs ${
+                    selected
+                      ? orange ? 'border-orange-700 bg-orange-700 text-white' : 'border-red-700 bg-red-700 text-white'
+                      : orange ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  <span className="truncate">{label}</span>
+                  <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : orange ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-700'}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="px-3 py-2 sm:px-4 sm:py-3">
+          {list.length === 0 ? (
+            <p className="py-8 text-center text-sm font-medium text-slate-400">{emptyText}</p>
+          ) : (
+            <ol className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+              {list.map((sch) => {
+                const kind = getScheduleDisplayKind(sch, now);
+                const meta = getScheduleDisplayMeta(sch, now);
+                const tone = KIND_TONE[kind] || KIND_TONE.upcoming;
+                const cancelled = isCancelledSchedule(sch);
+                const awaitingConfirmation = isAwaitingStudentConfirmation(sch);
+                const dateKey = normalizeScheduleDate(sch.date);
+                const validDate = /^\d{4}-\d{2}-\d{2}$/.test(dateKey);
+                const date = validDate ? new Date(`${dateKey}T00:00:00`) : null;
+                const course = String(sch.course || sch.courseName || '').trim();
+                const title = course || String(sch.topic || sch.title || 'Ca dạy').trim();
+                const startTime = String(sch.startTime || '').trim();
+                const time = sch.endTime
+                  ? `${startTime} – ${sch.endTime}`
+                  : startTime;
+                const studentName = sch.studentName || sch.student?.name || '—';
+                const makeupRequestSent = variant === 'teacher'
+                  && Boolean(getMakeupPending(getMakeupKey(sch)));
+                const canOpenAttendance = !awaitingConfirmation
+                  && PENDING_KINDS.has(kind)
+                  && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
+                const actionLabel = makeupRequestSent
+                  ? 'Đã gửi Admin'
+                  : kind === 'overdue_attendance' ? 'Điểm danh bù' : 'Điểm danh';
+
+                return (
+                  <li
+                    key={scheduleKey(sch)}
+                    className={`rounded-2xl border p-2.5 sm:p-3 ${
+                      cancelled ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className={`flex min-h-12 w-[42px] shrink-0 flex-col items-center justify-center rounded-xl ${
+                        cancelled ? 'bg-rose-50' : 'bg-blue-50'
+                      }`}>
+                        {date ? (
+                          <>
+                            <span className={`text-xs font-extrabold leading-3 ${cancelled ? 'text-rose-700' : 'text-blue-600'}`}>
+                              T{date.getMonth() + 1}
+                            </span>
+                            <span className={`text-lg font-black leading-[22px] ${cancelled ? 'text-rose-800' : 'text-blue-800'}`}>
+                              {date.getDate()}
+                            </span>
+                          </>
+                        ) : <CalendarDays size={19} className={cancelled ? 'text-rose-600' : 'text-blue-600'} />}
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <p className="text-xs font-black leading-[17px] text-slate-900 sm:text-sm">{title}</p>
+                        <div className="flex items-center gap-1 text-xs leading-[15px] text-slate-500 sm:text-xs">
+                          <Clock3 size={13} className="shrink-0" />
+                          <span>{formatScheduleDateVi(sch.date) || '—'} · {time || '—'}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs leading-[15px] text-slate-500 sm:text-xs">
+                          <Users size={13} className="shrink-0" />
+                          <span>Học viên: {studentName}</span>
+                        </div>
+                        {course ? (
+                          <span className="max-w-full self-start truncate rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 sm:text-xs">
+                            {course}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${tone}`}>
+                        {awaitingConfirmation
+                          ? 'Chờ học viên xác nhận'
+                          : makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
+                      </span>
+                      {canOpenAttendance ? (
+                        <button
+                          type="button"
+                          onClick={() => openAttendanceFor(sch)}
+                          disabled={makeupRequestSent}
+                          className={`inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-extrabold ${
+                            makeupRequestSent
+                              ? 'cursor-not-allowed bg-slate-100 text-slate-500'
+                              : `text-white ${kind === 'overdue_attendance' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-700 hover:bg-red-800'}`
+                          }`}
+                          title={makeupRequestSent
+                            ? 'Yêu cầu đã gửi Admin'
+                            : kind === 'overdue_attendance' ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
+                        >
+                          {makeupRequestSent || kind !== 'overdue_attendance'
+                            ? <CheckCircle size={12} />
+                            : <UserCheck size={12} />}
+                          {actionLabel}
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
       <div className="px-4 sm:px-5 py-4 border-b border-slate-100">
@@ -189,7 +426,7 @@ export default function TeacherTeachingLog({
             <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
               {copy.title}
             </h3>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-xs text-slate-500 font-medium">
               {copy.subtitle}
             </p>
           </div>
@@ -200,7 +437,7 @@ export default function TeacherTeachingLog({
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`px-3 h-9 rounded-xl text-[11px] sm:text-xs font-bold transition ${tab === item.id
+              className={`px-3 h-9 rounded-xl text-xs sm:text-xs font-bold transition ${tab === item.id
                   ? 'bg-red-600 text-white shadow-sm'
                   : 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
                 }`}
@@ -233,7 +470,11 @@ export default function TeacherTeachingLog({
               const needsAttendance = variant === 'teacher' && PENDING_KINDS.has(kind);
               const canOpenAttendance = needsAttendance
                 && (typeof onOpenAttendance === 'function' || Boolean(resolveStudentId(sch)));
-              const attendanceLabel = kind === 'overdue_attendance'
+              const makeupRequestSent = variant === 'teacher'
+                && Boolean(getMakeupPending(getMakeupKey(sch)));
+              const attendanceLabel = makeupRequestSent
+                ? 'Đã gửi Admin'
+                : kind === 'overdue_attendance'
                 ? 'Điểm danh bù'
                 : 'Điểm danh';
               const studentNote = String(sch.studentNote || '').trim();
@@ -252,7 +493,7 @@ export default function TeacherTeachingLog({
                     </p>
                     {variant === 'teacher' && studentNote ? (
                       <p
-                        className="shrink-0 max-w-[42%] text-right text-[11px] text-red-700 font-medium leading-relaxed line-clamp-2"
+                        className="shrink-0 max-w-[42%] text-right text-xs text-red-700 font-medium leading-relaxed line-clamp-2"
                         title={studentNote}
                       >
                         Ghi chú: {studentNote}
@@ -264,23 +505,28 @@ export default function TeacherTeachingLog({
                       <button
                         type="button"
                         onClick={() => openAttendanceFor(sch)}
-                        className={`inline-flex items-center gap-1 text-[10px] font-black  tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 hover:underline ${tone}`}
+                        disabled={makeupRequestSent}
+                        className={`inline-flex items-center gap-1 text-xs font-black tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 ${
+                          makeupRequestSent ? 'cursor-not-allowed text-slate-500' : `hover:underline ${tone}`
+                        }`}
                         title={
-                          kind === 'overdue_attendance'
+                          makeupRequestSent
+                            ? 'Yêu cầu đã gửi Admin'
+                            : kind === 'overdue_attendance'
                             ? 'Mở yêu cầu điểm danh bù'
                             : `Mở hồ sơ học viên — ${attendanceLabel}`
                         }
                       >
-                        {meta.shortLabel || meta.label}
+                        {makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
                       </button>
                     ) : (
-                      <span className={`inline-flex text-[10px] font-black  tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
-                        {meta.shortLabel || meta.label}
+                      <span className={`inline-flex text-xs font-black  tracking-wide px-1.5 py-0.5 rounded-md ${tone}`}>
+                        {makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}
                       </span>
                     )}
                   </p>
                   {note ? (
-                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
                       Ghi chú: {note}
                     </p>
                   ) : null}
@@ -289,7 +535,7 @@ export default function TeacherTeachingLog({
                       <button
                         type="button"
                         onClick={() => openAttendanceFor(sch)}
-                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-orange-600 text-white text-[10px] font-black  hover:bg-orange-700"
+                        className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-orange-600 text-white text-xs font-black  hover:bg-orange-700"
                       >
                         <UserCheck size={12} /> {attendanceLabel}
                       </button>
@@ -312,7 +558,7 @@ export default function TeacherTeachingLog({
                           }
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-600 text-white text-[10px] font-black "
+                          className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg bg-red-600 text-white text-xs font-black "
                         >
                           <Video size={12} /> Vào lớp
                         </a>
@@ -320,7 +566,7 @@ export default function TeacherTeachingLog({
                       <button
                         type="button"
                         onClick={() => onOpenSession(sch)}
-                        className="h-8 px-2.5 rounded-lg bg-white border-2 border-red-600 text-red-600 text-[10px] font-bold hover:bg-red-50"
+                        className="h-8 px-2.5 rounded-lg bg-white border-2 border-red-600 text-red-600 text-xs font-bold hover:bg-red-50"
                       >
                         Ghi chú / Đổi lịch
                       </button>

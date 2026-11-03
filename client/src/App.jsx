@@ -32,6 +32,7 @@ const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
 const NewsPage = lazy(() => import('./components/NewsPage'));
 const CenterInfoPage = lazy(() => import('./components/centerInfo/CenterInfoPage'));
+const SupportEntryPage = lazy(() => import('./components/SupportEntryPage'));
 const CenterInfoManagePage = lazy(() => import('./components/centerInfo/CenterInfoManagePage'));
 const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/CertPrepCatalogPage'));
 const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
@@ -394,6 +395,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         <Route path="/teacher/center-info" element={
           <ErrorBoundary inline><CenterInfoPage session={session} role="teacher" /></ErrorBoundary>
         } />
+        <Route path="/teacher/support" element={
+          <ErrorBoundary inline><SupportEntryPage /></ErrorBoundary>
+        } />
         <Route path="/teacher/test"    element={
           <ErrorBoundary>
             <TeacherTest teacherName={session?.name || 'Giảng Viên'} onBack={() => nav('/teacher')} />
@@ -438,6 +442,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/center-info" element={
           <ErrorBoundary inline><CenterInfoPage session={session} role="student" /></ErrorBoundary>
+        } />
+        <Route path="/student/support" element={
+          <ErrorBoundary inline><SupportEntryPage /></ErrorBoundary>
         } />
         <Route path="/student/cert-prep" element={
           <ErrorBoundary inline>

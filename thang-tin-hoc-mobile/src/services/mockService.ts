@@ -26,7 +26,7 @@ import {
   mockStudentThreads,
 } from '../mocks/data';
 import type {
-  AppNotification, ChatMessage, Conversation, DemoNewsItem, DemoSoftwareLink, DemoTrainingCourse, DemoUser, LearningMaterial, ScheduleItem, UserRole,
+  AppNotification, ChatMessage, Conversation, DemoNewsItem, DemoSoftwareLink, DemoTeacherTrainingOverview, DemoTrainingCourse, DemoTrainingFile, DemoTrainingGuide, DemoUser, LearningMaterial, ScheduleItem, UserRole,
 } from '../types';
 import { Platform } from 'react-native';
 import {
@@ -66,6 +66,7 @@ import {
   getTeacherProfile,
   getTeacherFinanceOverview,
   getTeacherTrainingCourses,
+  getTeacherTrainingOverview,
   updateTeacherProfile,
   type TeacherProfile,
   type TeacherProfileUpdate,
@@ -1456,6 +1457,19 @@ export const quizService = {
 };
 
 export const trainingService = {
+  async overview(user?: DemoUser | null): Promise<DemoTeacherTrainingOverview> {
+    if (__DEV__ && qaState) {
+      const [courses, softwareLinks] = await Promise.all([
+        readMockList(mockTrainingCourses),
+        readMockList(mockSoftwareLinks),
+      ]);
+      return { courses, guides: [], files: [], softwareLinks };
+    }
+    if (!user || user.role !== 'teacher') {
+      throw new Error('Không thể tải đào tạo: tài khoản giảng viên không hợp lệ.');
+    }
+    return getTeacherTrainingOverview(user);
+  },
   async list(user?: DemoUser | null): Promise<DemoTrainingCourse[]> {
     if (__DEV__ && qaState) return readMockList(mockTrainingCourses);
     if (!user) throw new Error('Không thể tải đào tạo: tài khoản giảng viên không hợp lệ.');

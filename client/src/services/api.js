@@ -669,6 +669,21 @@ export const apiFetch = async (endpoint, options = {}) => {
   return apiFetch(endpoint, { ...options, _retried: true });
 };
 
+export const callHistoryAPI = {
+  getForConversation: async (conversationId, limit = 100) => {
+    const query = new URLSearchParams({
+      conversationId: String(conversationId || ''),
+      limit: String(limit),
+    });
+    const res = await apiFetch(`/calls/history?${query.toString()}`);
+    const body = await res.json();
+    if (!res.ok || body?.success === false || !Array.isArray(body?.data)) {
+      throw new Error(body?.message || `Không tải được lịch sử cuộc gọi (HTTP ${res.status})`);
+    }
+    return body.data;
+  },
+};
+
 // ─── AUTH API ───────────────────────────────────────────────────────────────
 export const authAPI = {
   updateAvatar: async (file) => {
@@ -1299,6 +1314,17 @@ export const messagesAPI = {
   },
   getHiddenConversations: async () => {
     const res = await apiFetch('/messages/hidden');
+    return res.json();
+  },
+  getPinnedConversations: async () => {
+    const res = await apiFetch('/messages/pinned-conversations');
+    return res.json();
+  },
+  setConversationPinned: async (conversationId, pinned) => {
+    const res = await apiFetch(`/messages/pin-conversation/${encodeURIComponent(conversationId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ pinned }),
+    });
     return res.json();
   },
   purgeOrphans: async () => {
@@ -2418,8 +2444,11 @@ export const feedAPI = {
     const res = await apiFetch('/feed/reports');
     return res.json();
   },
-  resolveReport: async (reportId) => {
-    const res = await apiFetch(`/feed/reports/${reportId}/resolve`, { method: 'POST' });
+  resolveReport: async (reportId, action = 'keep') => {
+    const res = await apiFetch(`/feed/reports/${reportId}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
     return res.json();
   },
   uploadImages: async (files) => {

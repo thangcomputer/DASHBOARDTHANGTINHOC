@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, BookOpen, CheckCircle2, Clapperboard, Clock3, GraduationCap, Layers3, Loader2, Lock, ShoppingCart, Sparkles, CircleHelp, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, ChevronRight, Clapperboard, Clock3, GraduationCap, Layers3, Loader2, Lock, ShoppingCart, Sparkles, CircleHelp, X } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { useData } from '../../../context/DataContext';
@@ -297,7 +297,8 @@ function CourseCatalogCard({
 function CourseSubjectsModal({
   course, subjects, progressById, onOpenSubject, onClose,
 }) {
-  const closeButtonRef = useRef(null);
+  const mobileBackRef = useRef(null);
+  const desktopCloseRef = useRef(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -306,7 +307,10 @@ function CourseSubjectsModal({
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    closeButtonRef.current?.focus();
+    const focusTarget = window.matchMedia('(min-width: 576px)').matches
+      ? desktopCloseRef.current
+      : mobileBackRef.current;
+    focusTarget?.focus();
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onCloseRef.current();
     };
@@ -335,7 +339,7 @@ function CourseSubjectsModal({
         : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4';
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-6"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-white sm:bg-slate-950/55 sm:p-6 sm:backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -344,33 +348,85 @@ function CourseSubjectsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="course-subjects-title"
-        className={`flex max-h-[90vh] w-full ${dialogWidth} flex-col overflow-hidden rounded-2xl bg-white shadow-2xl`}
+        className={`flex h-full max-h-none w-full flex-col overflow-hidden rounded-none bg-white shadow-2xl sm:h-auto sm:max-h-[90vh] ${dialogWidth} sm:rounded-2xl`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white p-5 sm:p-6">
-          <div>
-            <p className="text-xs font-black  tracking-wider text-emerald-700">Nội dung khóa học</p>
-            <h2 id="course-subjects-title" className="mt-1 text-lg font-black text-slate-900 sm:text-xl">{course.name}</h2>
-            <p className="mt-1 text-sm text-slate-500">
+        <div className="flex items-center gap-2 border-b border-slate-100 bg-white px-4 py-3 sm:items-start sm:justify-between sm:gap-4 sm:bg-gradient-to-r sm:from-emerald-50 sm:to-white sm:p-6">
+          <button
+            ref={mobileBackRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Quay lại danh sách khóa học"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 sm:hidden"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="hidden text-xs font-black tracking-wider text-emerald-700 sm:block">Nội dung khóa học</p>
+            <h2 id="course-subjects-title" className="truncate text-base font-black text-slate-900 sm:mt-1 sm:text-xl">{course.name}</h2>
+            <p className="mt-0.5 text-xs text-slate-500 sm:mt-1 sm:text-sm">
               {course.offerType === 'single'
-                ? `Khóa lẻ · ${subjectCount} môn`
-                : `Trọn gói · ${subjectCount} môn`}
+                ? `${subjectCount} môn học · Khóa lẻ`
+                : `${subjectCount} môn học`}
             </p>
           </div>
           <button
-            ref={closeButtonRef}
+            ref={desktopCloseRef}
             type="button"
             onClick={onClose}
             aria-label="Đóng cửa sổ nội dung khóa học"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 sm:inline-flex"
           >
             <X size={18} strokeWidth={2.5} />
           </button>
         </div>
-        <div className="overflow-y-auto p-5 sm:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:flex-initial sm:p-6">
           {subjects.length === 0
             ? <p className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-500">Khóa học chưa được gắn môn.</p>
             : (
-              <div className={`grid ${subjectGridColumns} justify-start gap-4`}>
+              <>
+              <div className="space-y-2 sm:hidden">
+                {subjects.map((subject, index) => {
+                  const progress = progressById.get(subject.id);
+                  const done = progress?.completedUnitCount || 0;
+                  const total = progress?.totalUnitCount || 0;
+                  const progressPercent = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+                  const canOpen = subject.id && (subject.opened || !course.enrolled);
+                  const row = (
+                    <>
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-xs font-black tabular-nums text-slate-500">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-sm font-extrabold ${canOpen ? 'text-slate-800' : 'text-slate-400'}`}>{subject.name}</span>
+                        <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                          {subject.opened ? `${done}/${total} bài đã hoàn thành` : canOpen ? 'Có bài học thử' : 'Chưa đăng ký'}
+                        </span>
+                        <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-slate-200">
+                          <span className={`block h-full rounded-full ${progressPercent === 100 ? 'bg-emerald-600' : 'bg-emerald-500'}`} style={{ width: `${progressPercent}%` }} />
+                        </span>
+                      </span>
+                      {canOpen
+                        ? <ChevronRight size={18} className="shrink-0 text-slate-500" aria-hidden="true" />
+                        : <Lock size={15} className="shrink-0 text-slate-400" aria-label="Chưa đăng ký" />}
+                    </>
+                  );
+                  return canOpen ? (
+                    <button
+                      key={`${course.id}-${subject.id || subject.name}-${index}`}
+                      type="button"
+                      onClick={() => onOpenSubject(subject.id, course.id)}
+                      className="flex min-h-[76px] w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left transition active:bg-slate-50"
+                    >
+                      {row}
+                    </button>
+                  ) : (
+                    <div key={`${course.id}-${subject.id || subject.name}-${index}`} className="flex min-h-[76px] w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left">
+                      {row}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={`hidden grid ${subjectGridColumns} justify-start gap-4 sm:grid`}>
                 {subjects.map((subject, index) => {
                   const progress = progressById.get(subject.id);
                   const done = progress?.completedUnitCount || 0;
@@ -452,6 +508,7 @@ function CourseSubjectsModal({
                   );
                 })}
               </div>
+              </>
             )}
         </div>
       </section>
@@ -506,32 +563,32 @@ function CourseCollection({
   };
   const HeadingIcon = heading.icon;
   return (
-    <section className="mt-8">
-      <div className="mb-4">
+    <section className="mt-4 md:mt-8">
+      <div className="mb-3 md:mb-4">
         <div className="flex items-center gap-3 sm:gap-4">
-          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 sm:h-12 sm:w-12 ${heading.iconClass}`}>
-            <HeadingIcon size={22} strokeWidth={2.3} />
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm ring-1 md:h-12 md:w-12 ${heading.iconClass}`}>
+            <HeadingIcon size={20} strokeWidth={2.3} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-extrabold tracking-[0.16em] text-slate-400 sm:text-[11px]">
+            <p className="text-[10px] font-extrabold tracking-[0.12em] text-slate-400 md:text-[11px] md:tracking-[0.16em]">
               {heading.eyebrow}
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h2 className="text-lg font-black leading-tight tracking-tight text-slate-900 sm:text-xl">
+              <h2 className="text-base font-black leading-tight tracking-tight text-slate-900 md:text-xl">
                 {title}
               </h2>
-              <span className={`inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-xs font-black tabular-nums ${heading.countClass}`}>
+              <span className={`inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-black tabular-nums md:min-w-7 md:px-2 md:text-xs ${heading.countClass}`}>
                 {courses.length}
               </span>
             </div>
             {heading.description && (
-              <p className="mt-1 text-xs leading-relaxed text-slate-500 sm:text-sm">{heading.description}</p>
+              <p className="mt-1 hidden text-xs leading-relaxed text-slate-500 md:block md:text-sm">{heading.description}</p>
             )}
           </div>
         </div>
-        <div className={`ml-14 mt-3 h-px bg-gradient-to-r sm:ml-16 ${heading.lineClass}`} />
+        <div className={`ml-12 mt-2 h-px bg-gradient-to-r md:ml-16 md:mt-3 ${heading.lineClass}`} />
       </div>
-      <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {courses.map((course) => (
           <CourseCatalogCard
             key={course.id}
@@ -691,7 +748,7 @@ export default function LessonPracticeCatalogPage() {
   ];
 
   return (
-    <div className="w-full min-h-full bg-slate-50/60 px-1 pb-8 pt-4 sm:px-2">
+    <div className="w-full min-h-full bg-slate-50/60 px-1 pb-8 pt-2 md:px-2 md:pt-4">
       <div className="w-full">
         <LessonVideoTabs active="lesson" hidden />
         {loading && <div className="flex items-center gap-2 text-slate-400"><Loader2 className="animate-spin" size={18} /> Đang tải môn học...</div>}
@@ -701,22 +758,34 @@ export default function LessonPracticeCatalogPage() {
         )}
         {!loading && (
           <>
-            <div className="mb-5 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <div
+              className="-mx-1 mb-3 flex w-[calc(100%+0.5rem)] items-stretch gap-0 overflow-x-auto border-b border-slate-200 bg-white px-1 md:mx-0 md:mb-5 md:w-full md:gap-2 md:rounded-2xl md:border md:p-2 md:shadow-sm"
+              role="tablist"
+              aria-label="Lọc khóa học"
+            >
               {filters.map((filterOption) => (
                 <button
                   key={filterOption.id}
                   type="button"
-                  aria-pressed={filter === filterOption.id}
+                  role="tab"
+                  aria-selected={filter === filterOption.id}
                   onClick={() => { setFilter(filterOption.id); setSelectedCourseId(''); }}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold transition sm:px-4 ${filter === filterOption.id
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  className={`relative flex min-h-[68px] min-w-0 flex-1 flex-col items-center justify-center gap-1 border-b-2 border-transparent px-0.5 py-2 text-center text-[10px] font-bold leading-tight transition-colors md:min-h-0 md:flex-row md:shrink-0 md:flex-initial md:gap-2 md:rounded-xl md:border-0 md:px-3.5 md:py-2.5 md:text-sm md:text-left md:transition md:px-4 ${filter === filterOption.id
+                    ? 'border-b-red-600 text-red-700 md:bg-red-600 md:text-white md:shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 md:text-slate-600 md:hover:bg-slate-100'
                     }`}
                 >
-                  <filterOption.icon size={16} />
-                  {filterOption.label}
+                  <span className="relative flex h-6 items-center justify-center md:h-auto">
+                    <filterOption.icon size={17} className="shrink-0 md:h-4 md:w-4" aria-hidden="true" />
+                    {filterOption.count !== undefined && (
+                      <span className={`absolute -right-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black leading-4 md:hidden ${filter === filterOption.id ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                        {filterOption.count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="line-clamp-2 whitespace-pre-line">{filterOption.label}</span>
                   {filterOption.count !== undefined && (
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${filter === filterOption.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{filterOption.count}</span>
+                    <span className={`hidden rounded-full px-2 py-0.5 text-[11px] md:inline-flex ${filter === filterOption.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{filterOption.count}</span>
                   )}
                 </button>
               ))}

@@ -303,6 +303,7 @@ export type DemoFeedPost = {
     avatar?: string;
     role?: string;
     time?: string;
+    images?: string[];
   }>;
   commentsCount?: number;
   reactionCount: number;
@@ -321,6 +322,7 @@ export type DemoFeedPost = {
     avatar?: string;
     role?: string;
     time?: string;
+    images?: string[];
   }>;
 };
 
@@ -401,6 +403,28 @@ export type DemoTrainingCourse = {
   files: string[];
   fileLinks?: Array<{ title: string; url: string; type: string; size: string }>;
   notices: string[];
+};
+
+export type DemoTrainingGuide = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+};
+
+export type DemoTrainingFile = {
+  id: string;
+  title: string;
+  type: string;
+  size: string;
+  url: string;
+};
+
+export type DemoTeacherTrainingOverview = {
+  courses: DemoTrainingCourse[];
+  guides: DemoTrainingGuide[];
+  files: DemoTrainingFile[];
+  softwareLinks: DemoSoftwareLink[];
 };
 
 export type DemoFinanceTransaction = {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  MessageCircle, Send, X, Search, ChevronLeft,
+  MessageCircle, Send, X, Search, ChevronLeft, Phone,
   User, Circle, Image, Paperclip, Download,
   Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video
 } from 'lucide-react';
@@ -9,7 +9,7 @@ import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../utils/toast';
-import { messagesAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
+import { messagesAPI, callHistoryAPI, aiSupportAPI, resolveMediaUrl } from '../services/api';
 import TeacherStudentWeekSlotSheet from './teacher/TeacherStudentWeekSlotSheet';
 import { displayFileName } from '../utils/validators';
 import { isRealAvatar, resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -449,6 +449,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [contactsLoaded, setContactsLoaded] = useState(false);
   const [seedContact, setSeedContact] = useState(null); // navigation intent — gated by resolveMessagingDeepLink
   const [hiddenList, setHiddenList] = useState([]);
+  const [pinnedConversationIds, setPinnedConversationIds] = useState(() => new Set());
+  const [pinningConversationId, setPinningConversationId] = useState(null);
   const [contactTab, setContactTab] = useState('all'); // 'all', 'student', 'teacher', 'admin', 'group'
 
   const isUserOnline = useCallback((userId) => {
@@ -512,6 +514,24 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       }
     })();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await messagesAPI.getPinnedConversations();
+        if (!res?.success || !Array.isArray(res.data)) {
+          throw new Error(res?.message || 'Không thể tải danh sách hội thoại đã ghim.');
+        }
+        if (!cancelled) setPinnedConversationIds(new Set(res.data.map(String)));
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(error?.message || 'Không thể tải danh sách hội thoại đã ghim.');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUserId, toast]);
 
   const refreshHiddenList = useCallback(async () => {
     try {
@@ -585,6 +605,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [callHistoryState, setCallHistoryState] = useState({ conversationId: '', calls: [] });
   const [conversationDrafts, setConversationDrafts] = useState({});
   const activeDraftStorageKey = getConversationDraftStorageKey(currentUserId, activeConv?.id);
   const newMsg = activeDraftStorageKey
@@ -619,6 +640,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [showPeerInfo, setShowPeerInfo] = useState(false);
   const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
+  const [touchActionsMessageId, setTouchActionsMessageId] = useState(null);
   const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
   const [teacherAttendanceModalSchedule, setTeacherAttendanceModalSchedule] = useState(null);
   const [teacherAttendanceGrade, setTeacherAttendanceGrade] = useState('0');
@@ -642,6 +664,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     document.addEventListener('mousedown', handleOutsidePopupClick);
     return () => document.removeEventListener('mousedown', handleOutsidePopupClick);
   }, [showPeerInfo, showMessageSearch]);
+
+  useEffect(() => {
+    const closeTouchActions = (event) => {
+      if (event.target.closest?.('[data-message-actions-row]')) return;
+      setTouchActionsMessageId(null);
+    };
+    document.addEventListener('pointerdown', closeTouchActions);
+    return () => document.removeEventListener('pointerdown', closeTouchActions);
+  }, []);
 
   const peerProfile = useMemo(() => {
     if (!activeConv?.user || activeConv.isGroup) return null;
@@ -1105,6 +1136,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           avatar: c.avatar || existingConv?.user?.avatar,
           gender: c.gender,
           phone: c.phone || '',
+          personalPhone: c.personalPhone || '',
+          branchPhone: c.branchPhone || '',
+          branchName: c.branchName || '',
+          branchCode: c.branchCode || '',
+          address: c.address || '',
           online: isUserOnline(c.id),
         },
         lastMessage: existingConv?.lastMessage || 'Bắt đầu cuộc trò chuyện',
@@ -1342,6 +1378,55 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   // ─── Load messages khi chọn conversation (tránh loop: không phụ thuộc identity ctxGetMessages) ──
   const activeConvId = activeConv?.id ? String(activeConv.id) : '';
+  const callHistory = useMemo(
+    () => callHistoryState.conversationId === activeConvId ? callHistoryState.calls : [],
+    [activeConvId, callHistoryState],
+  );
+  const shouldLoadCallHistory = Boolean(
+    activeConvId
+    && !activeConv?.isGroup
+    && !activeConv?.isAiHandoff
+    && ['student', 'teacher'].includes(currentUserRole),
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (!shouldLoadCallHistory) return undefined;
+
+    const loadCallHistory = async () => {
+      try {
+        const calls = await callHistoryAPI.getForConversation(activeConvId);
+        if (active) setCallHistoryState({ conversationId: activeConvId, calls });
+      } catch (error) {
+        if (active) {
+          toast.error(error?.message || 'Không thể tải lịch sử cuộc gọi.');
+        }
+      }
+    };
+    const onCallHistoryChanged = (event) => {
+      if (!event?.conversationId || String(event.conversationId) === activeConvId) {
+        void loadCallHistory();
+      }
+    };
+    const callHistoryEvents = [
+      'call:incoming',
+      'call:checking',
+      'call:ringing',
+      'call:accepted',
+      'call:rejected',
+      'call:ended',
+      'call:timeout',
+      'call:error',
+    ];
+
+    void loadCallHistory();
+    callHistoryEvents.forEach((eventName) => socket?.on(eventName, onCallHistoryChanged));
+    return () => {
+      active = false;
+      callHistoryEvents.forEach((eventName) => socket?.off(eventName, onCallHistoryChanged));
+    };
+  }, [activeConvId, shouldLoadCallHistory, socket, toast]);
+
   const activeConvMsgKey = useMemo(() => {
     if (!activeConvId || !Array.isArray(contextMessages)) return '';
     const gid = activeConvId.startsWith('group_') ? activeConvId.slice(6) : '';
@@ -1469,14 +1554,46 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     : ((activeConv?.isAiHandoff && !showPriorAiThread)
       ? aiHistorySplit.visible
       : messages);
+  const callEventMessages = useMemo(() => callHistory.map((call) => {
+    const statusText = call.status === 'missed'
+      ? call.direction === 'incoming' ? 'Cuộc gọi nhỡ' : 'Không có người trả lời'
+      : call.status === 'rejected'
+        ? call.direction === 'incoming' ? 'Bạn đã từ chối cuộc gọi' : 'Cuộc gọi bị từ chối'
+        : call.status === 'busy'
+          ? 'Máy bận'
+          : call.status === 'cancelled'
+            ? call.direction === 'incoming' ? 'Cuộc gọi nhỡ' : 'Đã hủy cuộc gọi'
+            : call.status === 'completed'
+              ? 'Cuộc gọi đã kết thúc'
+              : call.status === 'failed'
+                ? 'Cuộc gọi không kết nối được'
+                : call.status === 'active' ? 'Cuộc gọi thoại' : 'Đang gọi';
+    return {
+      id: `call-${call.callId}`,
+      time: call.startedAt,
+      content: statusText,
+      senderName: call.participantName || '',
+      callEvent: call,
+    };
+  }), [callHistory]);
+  const conversationItemsToRender = useMemo(() => (
+    [...messagesToRender, ...callEventMessages]
+      .map((item, index) => ({
+        item,
+        index,
+        timestamp: toValidActivityDate(item.time)?.getTime() || 0,
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp || a.index - b.index)
+      .map(({ item }) => item)
+  ), [callEventMessages, messagesToRender]);
   const normalizedMessageSearch = messageSearch.trim().toLocaleLowerCase('vi-VN');
   const displayedMessages = normalizedMessageSearch
-    ? messagesToRender.filter((message) => (
+    ? conversationItemsToRender.filter((message) => (
       `${message.content || ''} ${message.senderName || ''}`
         .toLocaleLowerCase('vi-VN')
         .includes(normalizedMessageSearch)
     ))
-    : messagesToRender;
+    : conversationItemsToRender;
 
   const markedReadConvRef = useRef('');
   useEffect(() => {
@@ -2261,16 +2378,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }).slice(0, 8);
   }, [search, conversations, isSupportAgent, handoffUserIds]);
 
-  // Ưu tiên người đang online; trong mỗi nhóm, tin nhắn mới nhất lên trước.
+  // Ưu tiên hội thoại đã ghim, sau đó người đang online và hoạt động mới nhất.
   // Các conversation chưa có hoạt động giữ nguyên thứ tự danh bạ.
   const sortedConvs = filteredConvs
     .map((conversation, index) => ({
       conversation,
       index,
+      pinned: pinnedConversationIds.has(String(conversation.id)) ? 1 : 0,
       online: !conversation.isGroup && isUserOnline(conversation.user?.id) ? 1 : 0,
       activityTime: toValidActivityDate(conversation.lastTime)?.getTime() || 0,
     }))
     .sort((a, b) => {
+      if (a.pinned !== b.pinned) return b.pinned - a.pinned;
       if (a.online !== b.online) return b.online - a.online;
       const aHasActivity = a.activityTime > 0 ? 1 : 0;
       const bHasActivity = b.activityTime > 0 ? 1 : 0;
@@ -2279,6 +2398,31 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       return a.index - b.index;
     })
     .map(({ conversation }) => conversation);
+
+  const toggleConversationPin = async (event, conversation) => {
+    event.stopPropagation();
+    if (pinningConversationId) return;
+    const conversationId = String(conversation.id);
+    const pinned = !pinnedConversationIds.has(conversationId);
+    setPinningConversationId(conversationId);
+    try {
+      const res = await messagesAPI.setConversationPinned(conversationId, pinned);
+      if (!res?.success) {
+        throw new Error(res?.message || 'Không thể cập nhật ghim cuộc trò chuyện.');
+      }
+      setPinnedConversationIds((previous) => {
+        const next = new Set(previous);
+        if (pinned) next.add(conversationId);
+        else next.delete(conversationId);
+        return next;
+      });
+      toast.success(pinned ? 'Đã ghim cuộc trò chuyện' : 'Đã bỏ ghim cuộc trò chuyện');
+    } catch (error) {
+      toast.error(error?.message || 'Không thể cập nhật ghim cuộc trò chuyện.');
+    } finally {
+      setPinningConversationId(null);
+    }
+  };
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
@@ -2431,7 +2575,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
             </div>
 
             {/* Hàng Tabs (Pills) Phân loại danh bạ */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible">
               {[
                 { id: 'all', label: 'Tất cả' },
                 currentUserRole === 'teacher'
@@ -2448,10 +2592,20 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                 </button>
               ))}
             </div>
+            {!isConnected && (
+              <div
+                className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+                role="status"
+                aria-live="polite"
+              >
+                <AlertCircle size={14} className="shrink-0" aria-hidden="true" />
+                <span>Đang kết nối lại để đồng bộ tin nhắn…</span>
+              </div>
+            )}
           </div>
 
           {/* Conversation list */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 bg-white space-y-1 overscroll-contain">
+          <div className={`flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1 overscroll-contain ${currentUserRole === 'teacher' ? 'bg-[#F5F8FC]' : 'bg-white'}`}>
             {isSupportAgent ? (
               <SupportAiHandoffPanel
                 onQueueChange={setHandoffQueue}
@@ -2495,7 +2649,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       selectConversation({ ...conv, isGroup });
                     }
                   }}
-                  className={`cms-chat-conv-row group ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'}`}
+                  className={`cms-chat-conv-row group border border-slate-100 bg-white shadow-sm ${activeConv?.id === conv.id ? 'cms-chat-conv-row-active' : 'hover:bg-gray-50'}`}
                 >
                   <div className="relative shrink-0">
                     <div className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-md relative z-10 overflow-hidden ${isGroup ? 'bg-red-500' : 'bg-white ring-2 ' + (
@@ -2553,6 +2707,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <div className="flex justify-between items-center gap-2 mb-0.5">
                       <div className="flex items-center gap-1 min-w-0 flex-1">
                         <h4 className="font-semibold text-[#1E293B] text-base truncate">{formatDisplayName(conv.user.name)}</h4>
+                        {pinnedConversationIds.has(String(conv.id)) && (
+                          <Pin size={12} className="shrink-0 rotate-45 text-blue-600" aria-label="Cuộc trò chuyện đã ghim" />
+                        )}
                         {!isGroup && (
                           isUserOnline(conv.user.id) ? (
                             <span className="shrink-0 text-[9px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 px-1 py-0.5 rounded">
@@ -2595,19 +2752,34 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               e.stopPropagation();
                               setShowConvOptions(showConvOptions === conv.id ? null : conv.id);
                             }}
-                            className="text-slate-400 hover:text-slate-700 bg-white shadow-sm border border-slate-200 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-slate-50"
+                            aria-label="Tùy chọn cuộc trò chuyện"
+                            aria-expanded={showConvOptions === conv.id}
+                            className="text-slate-400 hover:text-slate-700 bg-white shadow-sm border border-slate-200 opacity-100 transition-opacity p-1 rounded-lg hover:bg-slate-50 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100"
                             title="Tùy chọn"
                           >
                             <MoreHorizontal size={14} />
                           </button>
                           {showConvOptions === conv.id && (
-                            <div className="absolute right-0 top-full mt-1 z-[100] animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                            <div className="absolute right-0 top-full mt-1 z-[100] min-w-48 animate-in fade-in zoom-in-95 duration-100 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_8px_32px_rgba(0,0,0,0.18)]">
+                              <button
+                                type="button"
+                                disabled={pinningConversationId === String(conv.id)}
+                                aria-pressed={pinnedConversationIds.has(String(conv.id))}
+                                onClick={(e) => {
+                                  setShowConvOptions(null);
+                                  toggleConversationPin(e, conv);
+                                }}
+                                className="flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                {pinnedConversationIds.has(String(conv.id)) ? <PinOff size={13} /> : <Pin size={13} />}
+                                {pinnedConversationIds.has(String(conv.id)) ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}
+                              </button>
                               <button
                                 onClick={(e) => {
                                   setShowConvOptions(null);
                                   handleHideConversation(e, conv.id);
                                 }}
-                                className="flex items-center gap-2 whitespace-nowrap bg-white px-3 py-2 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-slate-100 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                                className="flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"
                               >
                                 <EyeOff size={12} /> Ẩn trò chuyện
                               </button>
@@ -3265,12 +3437,39 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     : null;
                   const showDateDivider = messageDate && messageDate.key !== previousMessageDate?.key;
                   const dateDivider = showDateDivider ? (
-                    <div className="flex justify-center py-1" aria-label={messageDate.label}>
+                    <div className="my-2 flex justify-center px-2" aria-label={messageDate.label}>
                       <span className="rounded-lg bg-[#BFC1C5] px-2.5 py-1 text-[11px] font-bold text-white">
                         {messageDate.label}
                       </span>
                     </div>
                   ) : null;
+                  if (msg.callEvent) {
+                    const call = msg.callEvent;
+                    const callColor = ['missed', 'rejected', 'busy', 'failed'].includes(call.status)
+                      ? 'text-red-600'
+                      : 'text-green-600';
+                    const duration = call.durationSeconds > 0
+                      ? ` · ${Math.floor(call.durationSeconds / 60)}:${String(call.durationSeconds % 60).padStart(2, '0')}`
+                      : '';
+                    return (
+                      <React.Fragment key={msg.id}>
+                        {dateDivider}
+                        <div className="flex w-full justify-center py-1.5">
+                          <div className="flex max-w-[90%] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <Phone size={15} className={`shrink-0 ${callColor}`} aria-hidden="true" />
+                            <div className="min-w-0">
+                              <p className={`text-xs font-bold ${callColor}`}>{msg.content}{duration}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {call.direction === 'outgoing' ? 'Cuộc gọi đi' : 'Cuộc gọi đến'}
+                                {call.participantName ? ` · ${call.participantName}` : ''}
+                                {msg.time ? ` · ${formatMessageTime(msg.time)}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  }
                   const isMine = messageIsFromMe(msg, currentUserId, currentUserRole);
                   const nextMessage = displayedMessages[index + 1];
                   const previousMessageContinuesGroup = areConsecutiveMessagesInGroup(previousMessage, msg);
@@ -3359,7 +3558,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   return (
                     <React.Fragment key={msg.id}>
                       {dateDivider}
-                      <div id={`msg-${msg.id}`} className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative group-hover/msg:z-20 group-focus-within/msg:z-20 ${previousMessageContinuesGroup ? '-mt-1.5' : ''}`}>
+                      <div
+                        id={`msg-${msg.id}`}
+                        data-message-actions-row
+                        onClick={(event) => {
+                          if (window.matchMedia?.('(hover: none)').matches
+                            && !event.target.closest?.('button, a, input, textarea')) {
+                            setTouchActionsMessageId((current) => current === msg.id ? null : msg.id);
+                          }
+                        }}
+                        className={`flex ${isMine ? 'justify-end' : 'justify-start'} group/msg relative group-hover/msg:z-20 group-focus-within/msg:z-20 ${touchActionsMessageId === msg.id ? 'is-message-actions-active' : ''} ${previousMessageContinuesGroup ? '-mt-1.5' : ''}`}
+                      >
                         <div className={`relative ${isMine ? 'max-w-[85%] items-end' : 'w-full items-start gap-2'} flex ${isMine ? 'flex-col' : 'flex-row'}`}>
                           {!isMine && (
                             <img
@@ -3484,6 +3693,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                     <MessageRichText text={msg.content} payload={msg.payload} mine={isMine} highlight={normalizedMessageSearch} />
                                   </div>
                                 )}
+                                {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
+                                  <div className="mt-1 self-start text-[11px] leading-[14px] font-medium tabular-nums text-slate-500">
+                                    {formatMessageTime(msg.time)}
+                                  </div>
+                                )}
                                 {!msg.isRecalled && (
                                   <div className="cms-chat-reaction-corner right-1">
                                     {reactionCounts.length > 0 && (
@@ -3524,7 +3738,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                     <div className="cms-chat-message-actions flex shrink-0 items-center gap-1">
                                       <button
                                         type="button"
-                                        onClick={() => startReply(msg)}
+                                        onClick={() => {
+                                          startReply(msg);
+                                          setTouchActionsMessageId(null);
+                                        }}
                                         className="cms-chat-hover-action flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800"
                                         title="Trả lời tin nhắn"
                                         aria-label="Trả lời tin nhắn"
@@ -3533,7 +3750,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id)}
+                                        onClick={() => {
+                                          setShowMessageOptions(showMessageOptions === msg.id ? null : msg.id);
+                                          setTouchActionsMessageId(null);
+                                        }}
                                         className="cms-chat-hover-action flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-100 hover:text-slate-800 active:scale-90"
                                         title="Tùy chọn"
                                         aria-label="Tùy chọn tin nhắn"
@@ -3633,14 +3853,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                               </ChatFlipWrap>
                             </div>
 
-                            {/* Message time and delivery status stay in normal flow below the message/actions row. */}
+                            {/* Delivery status stays below the message/actions row. */}
                             <div className={`mt-1 flex w-full flex-col gap-1 ${isMine ? 'items-end' : 'items-start'}`}>
                               <div className="flex items-center gap-1.5">
-                                {(showMessageTimestamp || isStickerMessage) && formatMessageTime(msg.time) && (
-                                  <span className={`text-[11px] leading-3 font-medium tabular-nums ${isMine ? 'text-slate-500' : 'text-slate-400'}`}>
-                                    {formatMessageTime(msg.time)}
-                                  </span>
-                                )}
                                 {activeConv?.metadata?.pinnedMessageId === String(msg.id) && (
                                   <span className="text-[10px] text-blue-500 font-bold flex items-center gap-0.5" title="Tin nhắn này đang được ghim">
                                     <Pin size={10} className="rotate-45" />

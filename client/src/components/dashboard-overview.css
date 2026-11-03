@@ -99,16 +99,20 @@
 }
 
 .th-dashboard-overview--teacher .th-dashboard-overview__metrics > * {
-  min-height: 9.5rem;
+  min-height: 8.5rem;
   border-color: var(--overview-line);
-  border-radius: 1.1rem;
-  box-shadow: 0 5px 18px rgba(28, 57, 82, 0.055);
+  border-radius: 1rem;
+  box-shadow: 0 5px 14px rgba(28, 57, 82, 0.055);
 }
 
 @media (max-width: 639px) {
   .th-dashboard-overview__header {
     padding: 1rem !important;
     border-radius: 1rem;
+  }
+
+  .th-dashboard-overview--teacher .th-dashboard-overview__metrics > * {
+    min-height: 138px;
   }
 
   .th-dashboard-overview__class-card {

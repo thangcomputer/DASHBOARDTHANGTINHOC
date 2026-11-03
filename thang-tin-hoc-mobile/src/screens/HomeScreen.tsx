@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, DeviceEventEmitter, Easing, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Animated, DeviceEventEmitter, Easing, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import {
   ArrowRight, Award, BookOpen, Bot, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardCheck, ClipboardList,
   Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, Sparkles, Star, TrendingUp, Users,
@@ -20,7 +20,6 @@ import { getDashboardBanners } from '../services/webSettingsApi';
 import { getMobileImageSource } from '../services/apiClient';
 import { getTeacherDashboardMetrics } from '../services/teacherApi';
 import { buildStudentDashboardActivity } from '../services/studentDashboardActivity';
-import { openAiSupportConversation } from '../services/aiSupportApi';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 
@@ -75,8 +74,6 @@ export function HomeScreen() {
   const [selectedCourse, setSelectedCourse] = useState('');
   const [bannerIndex, setBannerIndex] = useState(0);
   const [failedBannerImages, setFailedBannerImages] = useState<string[]>([]);
-  const [openingSupport, setOpeningSupport] = useState(false);
-  const [supportOpenError, setSupportOpenError] = useState('');
   const supportBotMotion = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const motion = Animated.loop(Animated.sequence([
@@ -114,26 +111,6 @@ export function HomeScreen() {
   const quizzes = useMockResource(quizzesLoader);
   const evaluationActivity = useMockResource(evaluationActivityLoader);
   const messages = useMockResource(messagesLoader);
-  const openSupportChat = async () => {
-    if (!user || openingSupport) return;
-    setOpeningSupport(true);
-    setSupportOpenError('');
-    try {
-      const support = await openAiSupportConversation();
-      navigation?.navigate('Conversation', {
-        conversationId: support.conversationId,
-        conversationName: 'Trợ lý Thắng Tin Học',
-        participantId: 'ai_support',
-        participantRole: 'system',
-        participantOnline: true,
-        supportStatus: support.status,
-      });
-    } catch (error) {
-      setSupportOpenError(error instanceof Error ? error.message : 'Không thể mở kênh hỗ trợ. Vui lòng thử lại.');
-    } finally {
-      setOpeningSupport(false);
-    }
-  };
   useFocusEffect(useCallback(() => {
     schedules.reload();
     assignments.reload();
@@ -827,12 +804,10 @@ export function HomeScreen() {
       </View> : null}
 
       {user && !user.previewMode ? <Pressable
-        onPress={() => { void openSupportChat(); }}
-        disabled={openingSupport}
-        style={[styles.helpCard, openingSupport && styles.helpCardDisabled]}
+        onPress={() => tabNavigation.navigate('Support')}
+        style={styles.helpCard}
         accessibilityRole="button"
-        accessibilityLabel="Mở Trợ lý AI hoặc nhân viên hỗ trợ"
-        accessibilityState={{ disabled: openingSupport }}
+        accessibilityLabel="Mở lựa chọn hỗ trợ"
       >
         <View style={styles.helpRobotStage} pointerEvents="none">
           <View style={styles.helpRobotHalo} />
@@ -844,21 +819,13 @@ export function HomeScreen() {
         </View>
         <View style={styles.flex}>
           <View style={styles.helpTitleRow}>
-            <Text style={styles.helpTitle}>{openingSupport ? 'Đang kết nối…' : 'Trợ lý AI'}</Text>
+            <Text style={styles.helpTitle}>Hỗ trợ Thắng Tin Học</Text>
             <View style={styles.helpOnline}><View style={styles.helpOnlineDot} /><Text style={styles.helpOnlineText}>SẴN SÀNG</Text></View>
           </View>
-          <Text style={styles.helpText}>Hỏi đáp cùng AI hoặc kết nối nhân viên hỗ trợ</Text>
+          <Text style={styles.helpText}>Chọn Trợ lý AI hoặc nhân viên hỗ trợ</Text>
         </View>
-        {openingSupport ? <ActivityIndicator size="small" color="#FFFFFF" /> : <View style={styles.helpArrow}><ArrowRight size={17} color="#FFFFFF" /></View>}
+        <View style={styles.helpArrow}><ArrowRight size={17} color="#FFFFFF" /></View>
       </Pressable> : null}
-      {supportOpenError ? (
-        <View style={styles.helpError}>
-          <Text style={styles.helpErrorText}>{supportOpenError}</Text>
-          <Pressable onPress={() => setSupportOpenError('')} accessibilityRole="button" accessibilityLabel="Đóng lỗi hỗ trợ">
-            <Text style={styles.helpErrorClose}>Đóng</Text>
-          </Pressable>
-        </View>
-      ) : null}
     </AppScreen>
   );
 }
@@ -1036,7 +1003,6 @@ const styles = StyleSheet.create({
   taskTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   taskIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
   helpCard: { minHeight: 104, position: 'relative', overflow: 'hidden', backgroundColor: '#123B4A', borderRadius: 22, borderWidth: 1, borderColor: 'rgba(167,243,208,0.26)', paddingHorizontal: spacing.md, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs, shadowColor: '#0F766E', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 6 },
-  helpCardDisabled: { opacity: 0.78 },
   helpRobotStage: { width: 60, height: 64, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   helpRobotHalo: { position: 'absolute', width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(45,212,191,0.18)', borderWidth: 1, borderColor: 'rgba(153,246,228,0.22)' },
   helpRobot: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0F766E', borderWidth: 1, borderColor: 'rgba(204,251,241,0.45)', alignItems: 'center', justifyContent: 'center', shadowColor: '#5EEAD4', shadowOpacity: 0.35, shadowRadius: 9, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
@@ -1051,8 +1017,5 @@ const styles = StyleSheet.create({
   helpOnlineText: { color: '#A7F3D0', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.5 },
   helpText: { color: '#D1FAE5', fontSize: typography.caption, lineHeight: 17, marginTop: 4 },
   helpArrow: { width: 32, height: 32, flexShrink: 0, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-  helpError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  helpErrorText: { flex: 1, color: '#991B1B', fontSize: typography.caption, lineHeight: 18 },
-  helpErrorClose: { color: '#991B1B', fontSize: typography.caption, fontWeight: '800' },
   pressed: { opacity: 0.8 },
 });

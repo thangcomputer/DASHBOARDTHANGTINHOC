@@ -162,7 +162,7 @@ router.get('/student', [authMiddleware, ...quizzesGuard('student_list')], async 
                 { targetStudentIds: { $exists: false } },
               ],
             },
-            { courseName: { $in: studentCourses } },
+            { courseName: { $in: ['', ...studentCourses] } },
           ],
         },
       ],

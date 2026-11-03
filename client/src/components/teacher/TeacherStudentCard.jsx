@@ -1303,7 +1303,7 @@ export const StudentCard = ({
                          {isCompleted 
                            ? 'Hoàn thành'
                            : makeupPending
-                             ? 'Đang xét duyệt'
+                             ? 'Đã gửi Admin'
                            : isOverdueMakeup
                              ? 'Điểm danh bù'
                              : isCommittingAttendance
@@ -1810,17 +1810,17 @@ export const StudentCard = ({
         {/* Makeup modal — phải có trong isDetailed (tab Học viên) */}
         {showMakeupModal && (
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-3 sm:p-4 animate-in fade-in duration-300"
             role="presentation"
             onClick={() => !sendingMakeup && setShowMakeupModal(false)}
           >
             <div
-              className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+              className="bg-white rounded-[26px] w-full max-w-[22rem] max-h-[calc(100dvh-1.5rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
               role="dialog"
               aria-modal="true"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-4 sm:px-5 text-white flex justify-between items-start gap-3">
                 <div>
                   <h3 className="font-black text-lg  tracking-tight">Điểm danh bù</h3>
                   <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
@@ -1834,8 +1834,8 @@ export const StudentCard = ({
                   <X size={20} />
                 </button>
               </div>
-              <div className="p-6 space-y-4 text-sm">
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
+              <div className="p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-1">
                   <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
                   <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
                   {makeupSummary.course ? (
@@ -1847,18 +1847,18 @@ export const StudentCard = ({
                   <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
                   <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-slate-700 leading-relaxed">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-slate-700 leading-relaxed">
                   <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
                   <p>Bạn chịu trách nhiệm về buổi học này.</p>
                   <p>Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa. Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.</p>
                 </div>
               </div>
-              <div className="bg-slate-50 px-6 py-5 flex gap-3">
+              <div className="bg-slate-50 px-4 py-3 sm:px-5 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowMakeupModal(false)}
                   disabled={sendingMakeup}
-                  className="flex-1 py-3.5 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                  className="flex-1 py-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
                 >
                   Hủy
                 </button>
@@ -1866,7 +1866,7 @@ export const StudentCard = ({
                   type="button"
                   onClick={sendMakeupRequestToAdmin}
                   disabled={sendingMakeup}
-                  className="flex-[1.4] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-[1.4] py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {sendingMakeup ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                   Gửi
@@ -1879,7 +1879,7 @@ export const StudentCard = ({
         {/* Attendance Modal - Added to Detailed View */}
         {showAttendanceModal && (
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-3 sm:p-4 animate-in fade-in duration-300"
             role="presentation"
             onClick={() => setShowAttendanceModal(false)}
           >
@@ -2130,7 +2130,7 @@ export const StudentCard = ({
                     {isCompleted 
                       ? 'Hoàn thành'
                       : makeupPending
-                        ? <>Đang<br/>Xét duyệt</>
+                        ? <>Đã gửi<br/>Admin</>
                       : isOverdueMakeup
                         ? <>Điểm danh<br/>Bù</>
                         : isCommittingAttendance
@@ -2228,11 +2228,11 @@ export const StudentCard = ({
           onClick={() => !sendingMakeup && setShowMakeupModal(false)}
         >
           <div
-            className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+            className="bg-white rounded-[26px] w-full max-w-[22rem] max-h-[calc(100dvh-1.5rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-          >            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+          >                      <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-4 sm:px-5 text-white flex justify-between items-start gap-3">
               <div>
                 <h3 className="font-black text-lg  tracking-tight">Điểm danh bù</h3>
                 <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
@@ -2246,8 +2246,8 @@ export const StudentCard = ({
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4 text-sm">
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
+            <div className="p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-1">
                 <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
                 <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
                 {makeupSummary.course ? (
@@ -2259,18 +2259,18 @@ export const StudentCard = ({
                 <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
                 <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-slate-700 leading-relaxed">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-slate-700 leading-relaxed">
                 <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
                 <p>Bạn chịu trách nhiệm về buổi học này.</p>
                 <p>Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa. Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.</p>
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-5 flex gap-3">
+            <div className="bg-slate-50 px-4 py-3 sm:px-5 flex gap-3">
               <button
                 type="button"
                 onClick={() => setShowMakeupModal(false)}
                 disabled={sendingMakeup}
-                className="flex-1 py-3.5 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                className="flex-1 py-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
               >
                 Hủy
               </button>
@@ -2278,7 +2278,7 @@ export const StudentCard = ({
                 type="button"
                 onClick={sendMakeupRequestToAdmin}
                 disabled={sendingMakeup}
-                className="flex-[1.4] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-[1.4] py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {sendingMakeup ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 Gửi

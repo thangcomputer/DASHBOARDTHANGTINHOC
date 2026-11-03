@@ -3,11 +3,12 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Headphones, ImagePlus, Send, Trash2, MessageCircle, Flag, Pin, PinOff,
   Loader2, X, Newspaper, RefreshCw, Reply, Sparkles, Heart, ThumbsUp, Laugh, Frown,
   Globe, GraduationCap, Users, Lock, Edit3, Check, ChevronDown, Eye, AlertCircle,
-  Play, ExternalLink,
+  Play, ExternalLink, MoreVertical,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
@@ -134,6 +135,7 @@ function fallbackFeedAvatar(event, person) {
 }
 
 export default function FeedBoard({ session, role }) {
+  const location = useLocation();
   const toast = useToast();
   const { socket, onlineUsers } = useSocket() || {};
   const { openChat, setSupportOpen } = useFloatingMessenger();
@@ -257,10 +259,21 @@ export default function FeedBoard({ session, role }) {
 
   const [posts, setPosts] = useState([]);
   const visiblePosts = useMemo(() => posts.filter(canViewPost), [posts, canViewPost]);
+  const personalPinsStorageKey = `feed-personal-pins:${meId || 'preview'}`;
+  const [personalPinnedIds, setPersonalPinnedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const focusRequestKey = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const postId = params.get('postId') || '';
+    const commentId = params.get('commentId') || '';
+    const parentCommentId = params.get('parentCommentId') || '';
+    return postId ? { key: `${postId}:${commentId}:${parentCommentId}`, postId, commentId, parentCommentId } : null;
+  }, [location.search]);
+  const handledFocusRequest = useRef('');
+  const [focusTarget, setFocusTarget] = useState(null);
   const [content, setContent] = useState('');
   const [postVisibility, setPostVisibility] = useState('public');
   const [showVisibilityMenu, setShowVisibilityMenu] = useState(false);
@@ -292,10 +305,84 @@ export default function FeedBoard({ session, role }) {
   const [pendingReports, setPendingReports] = useState([]);
   const [reportQueueError, setReportQueueError] = useState('');
   const [reportingPost, setReportingPost] = useState(null);
+  const [postMenuOpenId, setPostMenuOpenId] = useState(null);
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
   const [resolvingReportId, setResolvingReportId] = useState(null);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(personalPinsStorageKey);
+      const ids = stored ? JSON.parse(stored) : [];
+      setPersonalPinnedIds(Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : []);
+    } catch (error) {
+      toast.error(error?.message || 'Không thể tải danh sách bài viết đã ghim');
+    }
+  }, [personalPinsStorageKey, toast]);
+
+  const orderedVisiblePosts = useMemo(() => visiblePosts
+    .map((post, index) => ({ post, index }))
+    .sort((a, b) => Number(personalPinnedIds.includes(String(b.post.id))) - Number(personalPinnedIds.includes(String(a.post.id))) || a.index - b.index)
+    .map(({ post }) => post), [visiblePosts, personalPinnedIds]);
+
+  const anyCommentsOpen = Object.values(commentsOpen).some(Boolean);
+
+  useEffect(() => {
+    if (!anyCommentsOpen) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (!(event.target instanceof Element)) return;
+      if (event.target.closest('[data-feed-comments]')) return;
+      const trigger = event.target.closest('[data-feed-comments-trigger]');
+      const triggerPostId = trigger?.getAttribute('data-feed-comments-trigger');
+      setCommentsOpen((open) => Object.fromEntries(
+        Object.entries(open).filter(([id, isOpen]) => isOpen && id === triggerPostId)
+      ));
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setCommentsOpen({});
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [anyCommentsOpen]);
+
+  useEffect(() => {
+    if (!reactOpen) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (event.target instanceof Element && event.target.closest('.cms-feed-reaction')) return;
+      setReactOpen(null);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setReactOpen(null);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [reactOpen]);
+
+  useEffect(() => {
+    if (!postMenuOpenId) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (event.target instanceof Element && event.target.closest('.cms-feed-post-menu')) return;
+      setPostMenuOpenId(null);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setPostMenuOpenId(null);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [postMenuOpenId]);
 
   const reportReasons = [
     { value: 'spam', label: 'Spam hoặc quảng cáo' },
@@ -367,6 +454,54 @@ export default function FeedBoard({ session, role }) {
   useEffect(() => {
     load(1, false);
   }, [load]);
+
+  useEffect(() => {
+    if (!focusRequestKey || loading || handledFocusRequest.current === focusRequestKey.key) return undefined;
+    handledFocusRequest.current = focusRequestKey.key;
+    let active = true;
+    const loadTargetPost = async () => {
+      try {
+        const foundPosts = [];
+        let targetPage = 1;
+        let pages = 1;
+        for (let currentPage = 1; currentPage <= pages; currentPage += 1) {
+          const response = await api.feed.list({ page: currentPage, limit: 20 });
+          if (!response.success) throw new Error(response.message || 'Không thể tìm bài viết được thông báo.');
+          const pagePosts = Array.isArray(response.data) ? response.data : [];
+          foundPosts.push(...pagePosts);
+          pages = response.pagination?.totalPages || pages;
+          if (pagePosts.some((post) => String(post.id) === focusRequestKey.postId)) {
+            targetPage = currentPage;
+            break;
+          }
+        }
+        if (!foundPosts.some((post) => String(post.id) === focusRequestKey.postId)) {
+          throw new Error('Bài viết trong thông báo không còn tồn tại hoặc bạn không có quyền xem.');
+        }
+        if (!active) return;
+        setPosts(foundPosts);
+        setPage(targetPage);
+        setTotalPages(pages);
+        setCommentsOpen({ [focusRequestKey.postId]: true });
+        setFocusTarget(focusRequestKey);
+      } catch (error) {
+        if (active) toast.error(error?.message || 'Không thể mở vị trí bình luận.');
+      }
+    };
+    void loadTargetPost();
+    return () => { active = false; };
+  }, [focusRequestKey, loading, toast]);
+
+  useEffect(() => {
+    if (!focusTarget || !commentsOpen[focusTarget.postId]) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const target = focusTarget.commentId
+        ? document.getElementById(`feed-comment-${focusTarget.commentId}`)
+        : document.getElementById(`feed-post-${focusTarget.postId}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [commentsOpen, focusTarget, posts]);
 
   useEffect(() => {
     if (!canModerateFeed) return undefined;
@@ -666,23 +801,17 @@ export default function FeedBoard({ session, role }) {
     }
   };
 
-  const handleTogglePin = async (post) => {
-    setBusyId(post.id);
+  const handleTogglePersonalPin = (post) => {
+    const id = String(post.id);
+    const next = personalPinnedIds.includes(id)
+      ? personalPinnedIds.filter((pinnedId) => pinnedId !== id)
+      : [...personalPinnedIds, id];
     try {
-      const res = await api.feed.togglePin(post.id);
-      if (!res.success || !res.data) {
-        toast.error(res.message || 'Không thể cập nhật ghim thông báo');
-        return;
-      }
-      setPosts((prev) => prev
-        .map((item) => item.id === post.id ? { ...item, ...res.data } : item)
-        .sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned)
-          || new Date(b.pinnedAt || b.createdAt || 0).getTime() - new Date(a.pinnedAt || a.createdAt || 0).getTime()));
-      toast.success(res.data.isPinned ? 'Đã ghim thông báo lên đầu bảng tin' : 'Đã bỏ ghim thông báo');
+      window.localStorage.setItem(personalPinsStorageKey, JSON.stringify(next));
+      setPersonalPinnedIds(next);
+      toast.success(next.includes(id) ? 'Đã ghim bài viết riêng tư trên thiết bị này' : 'Đã bỏ ghim bài viết');
     } catch (error) {
-      toast.error(error?.message || 'Không thể cập nhật ghim thông báo');
-    } finally {
-      setBusyId(null);
+      toast.error(error?.message || 'Không thể lưu bài viết đã ghim');
     }
   };
 
@@ -710,17 +839,19 @@ export default function FeedBoard({ session, role }) {
     }
   };
 
-  const resolvePostReport = async (report) => {
+  const resolvePostReport = async (report, action = 'keep') => {
     if (resolvingReportId) return;
+    if (action === 'delete' && !(await window.cmsConfirm('Xóa bài viết này và đóng tất cả báo cáo liên quan?'))) return;
     setResolvingReportId(report.id);
     try {
-      const res = await api.feed.resolveReport(report.id);
+      const res = await api.feed.resolveReport(report.id, action);
       if (!res.success) {
         toast.error(res.message || 'Không thể xử lý báo cáo');
         return;
       }
-      setPendingReports((prev) => prev.filter((item) => item.id !== report.id));
-      toast.success('Đã đánh dấu báo cáo là đã xử lý');
+      setPendingReports((prev) => prev.filter((item) => action === 'delete' ? item.postId !== report.postId : item.id !== report.id));
+      if (action === 'delete') setPosts((prev) => prev.filter((post) => String(post.id) !== String(report.postId)));
+      toast.success(res.message || (action === 'delete' ? 'Đã xóa bài viết' : 'Đã giữ lại bài viết'));
     } catch (error) {
       toast.error(error?.message || 'Không thể xử lý báo cáo');
     } finally {
@@ -804,14 +935,24 @@ export default function FeedBoard({ session, role }) {
                 <p className="mt-1 line-clamp-2 text-sm text-slate-800">{report.post?.content || 'Bài viết không còn tồn tại.'}</p>
                 <p className="mt-1 text-[11px] text-slate-500">Báo cáo bởi {report.reporterName} · {report.reporterRole}</p>
                 {report.details && <p className="mt-1 text-xs italic text-slate-500">{report.details}</p>}
-                <button
-                  type="button"
-                  disabled={resolvingReportId === report.id}
-                  onClick={() => resolvePostReport(report)}
-                  className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                >
-                  <Check size={14} />{resolvingReportId === report.id ? 'Đang lưu…' : 'Đánh dấu đã xử lý'}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={resolvingReportId === report.id}
+                    onClick={() => resolvePostReport(report, 'delete')}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <Trash2 size={14} />{resolvingReportId === report.id ? 'Đang xử lý…' : 'Xóa bài viết'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={resolvingReportId === report.id}
+                    onClick={() => resolvePostReport(report, 'keep')}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    <Check size={14} />{resolvingReportId === report.id ? 'Đang xử lý…' : 'Giữ lại bài viết'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -933,6 +1074,15 @@ export default function FeedBoard({ session, role }) {
         </div>
 
         {/* Post Feed List */}
+        {!loading && (
+          <div className="cms-feed-list-heading flex items-center justify-between gap-2 px-1 pt-1">
+            <h2 className="text-base font-extrabold text-slate-900">Bài viết mới nhất</h2>
+            <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-indigo-50 px-3 text-sm font-extrabold text-red-600">
+              <Newspaper size={14} />
+              {visiblePosts.length} bài
+            </span>
+          </div>
+        )}
         {loading ? (
           <div className="cms-feed-skeleton-list space-y-4" aria-busy="true">
             {[0, 1, 2].map((i) => (
@@ -956,7 +1106,7 @@ export default function FeedBoard({ session, role }) {
           </div>
         ) : (
           <div className="cms-feed-list space-y-4">
-            {visiblePosts.map((post) => {
+            {orderedVisiblePosts.map((post) => {
               const postPrivacy = PRIVACY_OPTIONS.find((p) => p.value === post.visibility) || PRIVACY_OPTIONS[0];
               const PostPrivacyIcon = postPrivacy.icon;
               const reactionsObj = post.reactions || {};
@@ -966,7 +1116,7 @@ export default function FeedBoard({ session, role }) {
               const activeReactionTypes = REACTIONS.filter((r) => (reactionsObj[r.type] || 0) > 0);
 
               return (
-                <article key={post.id} className="cms-feed-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-300 transition-all">
+                <article id={`feed-post-${post.id}`} key={post.id} className="cms-feed-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-slate-300 transition-all">
                   {/* Card Head */}
                   <div className="cms-feed-card__head flex items-start gap-3">
                     <img
@@ -978,12 +1128,11 @@ export default function FeedBoard({ session, role }) {
                       className="w-11 h-11 rounded-full object-cover border border-slate-200 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm text-slate-900 truncate">{post.authorName || 'Người dùng'}</span>
-                        <span className={'text-[10px] font-bold px-2 py-0.5 rounded-full ' + (ROLE_BADGE[post.authorRole] || ROLE_BADGE.student)}>
-                          {ROLE_LABEL[post.authorRole] || post.authorRole}
-                        </span>
-                        <span className="text-xs text-slate-400">• {formatTime(post.createdAt)}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-sm text-slate-900 truncate">{post.authorName || 'Người dùng'}</span>
+                          <span className="text-xs text-slate-500">
+                            {ROLE_LABEL[post.authorRole] || post.authorRole} · {formatTime(post.createdAt)}
+                          </span>
                         {post.isEdited && (
                           <span
                             className="text-[11px] text-slate-400 italic font-medium cursor-help"
@@ -996,9 +1145,9 @@ export default function FeedBoard({ session, role }) {
 
                       {/* Privacy Badge on Post */}
                       <div className="flex items-center gap-1.5 mt-1">
-                        {post.isPinned && (
+                        {personalPinnedIds.includes(String(post.id)) && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border border-amber-200 bg-amber-50 text-amber-800">
-                            <Pin size={11} />Thông báo ghim
+                            <Pin size={11} />Đã ghim
                           </span>
                         )}
                         <span className={'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border ' + postPrivacy.badgeClass}>
@@ -1009,50 +1158,60 @@ export default function FeedBoard({ session, role }) {
                     </div>
 
                     {/* Post Action Buttons (Edit / Delete) */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {canModerateFeed && (post.visibility || 'public') === 'public' && (
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePin(post)}
-                          disabled={busyId === post.id}
-                          className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
-                          title={post.isPinned ? 'Bỏ ghim thông báo' : 'Ghim thông báo'}
-                          aria-label={post.isPinned ? 'Bỏ ghim thông báo' : 'Ghim thông báo'}
-                        >
-                          {post.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-                        </button>
-                      )}
-                      {String(post.authorId || '') !== meId && (
-                        <button
-                          type="button"
-                          onClick={() => { setReportingPost(post); setReportReason(''); setReportDetails(''); }}
-                          className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
-                          title="Báo cáo bài viết"
-                          aria-label="Báo cáo bài viết"
-                        >
-                          <Flag size={15} />
-                        </button>
-                      )}
-                      {canEditPost(post) && (
-                        <button
-                          type="button"
-                          onClick={() => startEditPost(post)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Sửa bài viết"
-                        >
-                          <Edit3 size={15} />
-                        </button>
-                      )}
-                      {canDeletePost(post) && (
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(post.id)}
-                          disabled={busyId === post.id}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Xóa bài viết"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                    <div className="cms-feed-post-menu relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPostMenuOpenId((current) => current === post.id ? null : post.id)}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100"
+                        aria-label="Tùy chọn bài viết"
+                        aria-expanded={postMenuOpenId === post.id}
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                      {postMenuOpenId === post.id && (
+                        <div className="absolute right-0 top-full z-30 mt-1 w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                          {canEditPost(post) && (
+                            <button
+                              type="button"
+                              onClick={() => { setPostMenuOpenId(null); startEditPost(post); }}
+                              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              <Edit3 size={16} className="text-blue-600" /> Chỉnh sửa
+                            </button>
+                          )}
+                          {canDeletePost(post) && (
+                            <button
+                              type="button"
+                              onClick={() => { setPostMenuOpenId(null); handleDelete(post.id); }}
+                              disabled={busyId === post.id}
+                              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <Trash2 size={16} /> Xóa
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => { setPostMenuOpenId(null); handleTogglePersonalPin(post); }}
+                            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            {personalPinnedIds.includes(String(post.id)) ? <PinOff size={16} /> : <Pin size={16} />}
+                            {personalPinnedIds.includes(String(post.id)) ? 'Bỏ ghim bài viết' : 'Ghim bài viết'}
+                          </button>
+                          {String(post.authorId || '') !== meId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPostMenuOpenId(null);
+                                setReportingPost(post);
+                                setReportReason('');
+                                setReportDetails('');
+                              }}
+                              className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              <Flag size={16} /> Báo cáo bài viết
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1124,7 +1283,7 @@ export default function FeedBoard({ session, role }) {
 
                   {/* Card Action Bar */}
                   <div className="cms-feed-action mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <div className="relative">
+                    <div className="cms-feed-reaction relative">
                       <button
                         type="button"
                         onClick={() => setReactOpen((id) => (id === post.id ? null : post.id))}
@@ -1162,6 +1321,7 @@ export default function FeedBoard({ session, role }) {
 
                     <button
                       type="button"
+                      data-feed-comments-trigger={post.id}
                       onClick={() => setCommentsOpen((d) => ({ ...d, [post.id]: !d[post.id] }))}
                       className={'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all ' + (commentsOpen[post.id] ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100')}
                     >
@@ -1174,11 +1334,11 @@ export default function FeedBoard({ session, role }) {
 
                   {/* Comments Section */}
                   {commentsOpen[post.id] && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2 bg-slate-50/70 -mx-4 -mb-4 p-4 rounded-b-2xl">
+                    <div id={`feed-comments-${post.id}`} data-feed-comments={post.id} className="mt-3 pt-3 border-t border-slate-100 space-y-2 bg-slate-50/70 -mx-4 -mb-4 p-4 rounded-b-2xl">
                       {(post.comments || []).filter((c) => !c.parentId).map((c) => {
                         const replies = (post.comments || []).filter((r) => r.parentId === c.id);
                         return (
-                          <div key={c.id} className="pt-2 space-y-1.5">
+                          <div id={`feed-comment-${c.id}`} key={c.id} className={'pt-2 space-y-1.5 scroll-mt-24 ' + (focusTarget?.commentId === c.id ? 'rounded-xl bg-indigo-50 ring-2 ring-indigo-300' : '')}>
                             <div className="flex gap-2">
                               <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border border-slate-200/80 shadow-xs">
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1291,7 +1451,7 @@ export default function FeedBoard({ session, role }) {
 
                             {/* Replies */}
                             {replies.map((r) => (
-                              <div key={r.id} className="space-y-1.5 pl-6">
+                              <div id={`feed-comment-${r.id}`} key={r.id} className={'space-y-1.5 pl-6 scroll-mt-24 ' + (focusTarget?.commentId === r.id ? 'rounded-xl bg-indigo-50 ring-2 ring-indigo-300' : '')}>
                                 <div className="flex gap-2">
                                   <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2 border border-slate-200 border-l-2 border-l-indigo-300">
                                     <div className="flex items-center gap-1.5 flex-wrap">

@@ -1519,7 +1519,7 @@ export function ScheduleScreen() {
                   <View style={[styles.teacherDiaryDateTile, cancelled && styles.teacherDiaryDateTileCancelled]}>
                     {validDate ? (
                       <>
-                        <Text style={[styles.teacherDiaryDateMonth, cancelled && styles.teacherDiaryDateMonthCancelled]}>S?T{validDate.getMonth() + 1}</Text>
+                        <Text style={[styles.teacherDiaryDateMonth, cancelled && styles.teacherDiaryDateMonthCancelled]}>T{validDate.getMonth() + 1}</Text>
                         <Text style={[styles.teacherDiaryDateDay, cancelled && styles.teacherDiaryDateDayCancelled]}>{validDate.getDate()}</Text>
                       </>
                     ) : <CalendarDays size={19} color={cancelled ? colors.red : colors.brand} />}
@@ -1830,9 +1830,9 @@ export function ScheduleScreen() {
         </View>
       </Modal>
       <Modal visible={Boolean(sortMenu)} transparent animationType="fade" onRequestClose={() => setSortMenu(null)}>
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, styles.centeredPickerBackdrop]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setSortMenu(null)} accessibilityRole="button" accessibilityLabel="Đóng sắp xếp" />
-          <View style={styles.sortMenuCard}>
+          <View style={[styles.sortMenuCard, styles.centeredPickerCard]}>
             <View style={styles.sortMenuHeading}>
               <View style={styles.sortMenuIcon}><Table2 size={17} color={colors.brand} /></View>
               <View style={styles.rowCopy}>
@@ -1882,9 +1882,9 @@ export function ScheduleScreen() {
         </View>
       </Modal>
       <Modal visible={showCoursePicker} transparent animationType="fade" onRequestClose={() => setShowCoursePicker(false)}>
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, styles.centeredPickerBackdrop]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCoursePicker(false)} accessibilityRole="button" accessibilityLabel="Đóng chọn khóa học" />
-          <View style={styles.sortMenuCard}>
+          <View style={[styles.sortMenuCard, styles.centeredPickerCard]}>
             <View style={styles.sortMenuHeading}>
               <View style={styles.sortMenuIcon}><BookOpen size={17} color={colors.brand} /></View>
               <View style={styles.rowCopy}>
@@ -2022,6 +2022,50 @@ export function ScheduleScreen() {
   );
 }
 
+function TeacherAssignmentCard({ item, courseStudentCount }: { item: Assignment; courseStudentCount: number }) {
+  const submissions = item.submissions || [];
+  const gradedCount = submissions.filter((submission) => submission.status === 'graded').length;
+  const assignedCount = !item.assignedStudentNames || item.assignedStudentNames.includes('Cả lớp')
+    ? courseStudentCount
+    : item.assignedStudentNames.length;
+  const deadlineMatch = item.deadline.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const deadlineAt = deadlineMatch
+    ? new Date(Number(deadlineMatch[3]), Number(deadlineMatch[2]) - 1, Number(deadlineMatch[1]), 23, 59, 59).getTime()
+    : new Date(item.deadline).getTime();
+  const isClosed = Number.isFinite(deadlineAt) && deadlineAt < Date.now();
+  return (
+    <Card style={styles.teacherAssignmentCard}>
+      <View style={styles.teacherAssignmentHeader}>
+        <View style={styles.teacherAssignmentTitleWrap}>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          <Text style={styles.metaText}>{item.subject}</Text>
+        </View>
+        <View style={[styles.teacherAssignmentStatus, isClosed ? styles.teacherAssignmentClosed : styles.teacherAssignmentActive]}>
+          <Text style={[styles.teacherAssignmentStatusText, isClosed ? styles.teacherAssignmentClosedText : styles.teacherAssignmentActiveText]}>
+            {isClosed ? 'Đã đóng' : 'Hoạt động'}
+          </Text>
+        </View>
+      </View>
+      <Text numberOfLines={2} style={styles.teacherAssignmentDescription}>{item.description || 'Không có mô tả.'}</Text>
+      <Text style={styles.teacherAssignmentDeadline}>Hạn chót: {item.deadline}</Text>
+      <View style={styles.teacherAssignmentMetrics}>
+        <View style={styles.teacherAssignmentMetric}>
+          <Text style={styles.teacherAssignmentMetricValue}>{submissions.length}</Text>
+          <Text style={styles.teacherAssignmentMetricLabel}>Bài nộp</Text>
+        </View>
+        <View style={styles.teacherAssignmentMetric}>
+          <Text style={styles.teacherAssignmentMetricValue}>{gradedCount}</Text>
+          <Text style={styles.teacherAssignmentMetricLabel}>Đã chấm</Text>
+        </View>
+        <View style={styles.teacherAssignmentMetric}>
+          <Text style={styles.teacherAssignmentMetricValue}>{Math.max(0, assignedCount - submissions.length)}</Text>
+          <Text style={styles.teacherAssignmentMetricLabel}>Chưa nộp</Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
 export function AssignmentsScreen({
   embedded = false,
   focusAssignmentId,
@@ -2037,6 +2081,7 @@ export function AssignmentsScreen({
   const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const isTeacher = user?.role === 'teacher';
   const [filter, setFilter] = useState('Tất cả');
+  const [courseFilter, setCourseFilter] = useState('');
   const [overrides, setOverrides] = useState<Assignment[] | null>(null);
   const [selected, setSelected] = useState<Assignment | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -2103,8 +2148,19 @@ export function AssignmentsScreen({
   }, [resource.reload]);
   const allItems = overrides || resource.data || [];
   const teacherStudents = studentsResource.data || [];
-  const courses = [...new Set(teacherStudents.flatMap((student) => student.courses?.length ? student.courses : [student.course]).filter(Boolean))];
+  const courses = useMemo(
+    () => [...new Set(teacherStudents.flatMap((student) => student.courses?.length ? student.courses : [student.course]).filter(Boolean))],
+    [teacherStudents],
+  );
+  useEffect(() => {
+    if (!courses.length) {
+      setCourseFilter('');
+      return;
+    }
+    if (!courses.includes(courseFilter)) setCourseFilter(courses[0]);
+  }, [courseFilter, courses]);
   const courseStudents = teacherStudents.filter((student) => !course || student.courses?.includes(course) || student.course === course);
+  const courseFilterStudents = teacherStudents.filter((student) => !courseFilter || student.courses?.includes(courseFilter) || student.course === courseFilter);
   const deadlineCalendarDays = useMemo(() => {
     const firstWeekday = new Date(deadlineCalendarMonth.getFullYear(), deadlineCalendarMonth.getMonth(), 1).getDay();
     const daysInMonth = new Date(deadlineCalendarMonth.getFullYear(), deadlineCalendarMonth.getMonth() + 1, 0).getDate();
@@ -2115,10 +2171,11 @@ export function AssignmentsScreen({
     });
   }, [deadlineCalendarMonth]);
   const items = useMemo(() => allItems.filter((item) => (
-    filter === 'Tất cả'
-    || (filter === 'Chờ xử lý' && ['Chưa làm', 'Cần chấm'].includes(item.status))
-    || item.status === filter
-  )), [allItems, filter]);
+    (!isTeacher || !courseFilter || item.subject === courseFilter || item.courseName === courseFilter)
+    && (filter === 'Tất cả'
+      || (filter === 'Chờ xử lý' && ['Chưa làm', 'Cần chấm'].includes(item.status))
+      || item.status === filter)
+  )), [allItems, courseFilter, filter, isTeacher]);
   const filters = isTeacher
     ? ['Tất cả', 'Cần chấm', 'Đã chấm']
     : ['Tất cả', 'Chưa làm', 'Đã nộp', 'Quá hạn'];
@@ -2293,7 +2350,7 @@ export function AssignmentsScreen({
           </View>
         ) : undefined}
       /> : null}
-      {isTeacher ? (
+      {isTeacher && !embedded ? (
         <View style={styles.assessmentTabs} accessibilityRole="tablist">
           <Pressable onPress={() => navigation.navigate('TeacherQuizzes')} style={styles.assessmentTab} accessibilityRole="tab" accessibilityState={{ selected: false }}>
             <Text style={styles.assessmentTabText}>Trắc nghiệm</Text>
@@ -2302,6 +2359,39 @@ export function AssignmentsScreen({
             <Text style={[styles.assessmentTabText, styles.assessmentTabTextActive]}>Bài tập về nhà</Text>
           </View>
         </View>
+      ) : null}
+      {isTeacher && embedded ? (
+        <Pressable
+          onPress={() => {
+            resetCreateForm();
+            setCourse(courseFilter);
+            setShowCreate(true);
+          }}
+          style={styles.assignmentEmbeddedCreateAction}
+          accessibilityRole="button"
+          accessibilityLabel="Tạo bài tập"
+        >
+          <Plus size={18} color={colors.brand} />
+          <Text style={styles.assignmentEmbeddedCreateText}>Tạo bài tập mới</Text>
+        </Pressable>
+      ) : null}
+      {isTeacher && courses.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.assignmentCourseFilters}>
+          {courses.map((courseOption) => (
+            <Pressable
+              key={courseOption}
+              onPress={() => {
+                setCourseFilter(courseOption);
+                setSelected(null);
+              }}
+              style={[styles.assignmentCourseFilter, courseFilter === courseOption && styles.assignmentCourseFilterActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: courseFilter === courseOption }}
+            >
+              <Text style={[styles.assignmentCourseFilterText, courseFilter === courseOption && styles.assignmentCourseFilterTextActive]}>{courseOption}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
       ) : null}
       <FilterChips items={filters} selected={filter} onSelect={setFilter} variant="tabs" />
       {resource.loading ? <LoadingSkeleton /> : null}
@@ -2318,7 +2408,9 @@ export function AssignmentsScreen({
           }}
           accessibilityRole="button"
         >
-          <AssignmentCard item={item} />
+          {isTeacher ? (
+            <TeacherAssignmentCard item={item} courseStudentCount={courseFilterStudents.length} />
+          ) : <AssignmentCard item={item} />}
         </Pressable>
       ))}
       {selected ? (
@@ -2524,9 +2616,13 @@ export function AssignmentsScreen({
   return (
     <View style={styles.assignmentScreen}>
       {embedded ? <View>{content}</View> : <AppScreen scrollViewRef={screenScrollRef}>{content}</AppScreen>}
-      {isTeacher && !showCreate ? (
+      {isTeacher && !embedded && !showCreate ? (
         <Pressable
-          onPress={() => setShowCreate(true)}
+          onPress={() => {
+            resetCreateForm();
+            setCourse(courseFilter);
+            setShowCreate(true);
+          }}
           style={styles.assignmentCreateAction}
           accessibilityRole="button"
           accessibilityLabel="Tạo bài tập"
@@ -2678,6 +2774,7 @@ function MaterialRow({ item }: { item: LearningMaterial }) {
 }
 
 function notificationCategory(item: AppNotification) {
+  if (item.payload?.kind === 'feed_interaction') return 'Bảng tin';
   const labels: Record<string, string> = {
     SYSTEM: 'Hệ thống',
     COURSE: 'Khóa học',
@@ -2795,6 +2892,17 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
         navigation.navigate('NewsDetail', { newsId });
         return;
       }
+    }
+    if (payload.kind === 'feed_interaction') {
+      navigation.navigate('MainTabs', {
+        screen: 'Feed',
+        params: {
+          postId: String(payload.postId || ''),
+          commentId: String(payload.commentId || ''),
+          parentCommentId: String(payload.parentCommentId || ''),
+        },
+      });
+      return;
     }
     if (path.includes('/profile')) {
       navigation.navigate('MainTabs', { screen: 'Profile' });
@@ -3193,24 +3301,24 @@ export function StudentsScreen() {
   };
   return (
     <AppScreen>
-      <AppHeader
-        title={selectedStudent ? 'Hồ sơ học viên' : 'Học viên'}
-        subtitle={selectedStudent
-          ? selectedStudent.name
-          : `${resource.data?.length || 0} học viên được phân công`}
-        onBack={selectedStudent ? closeStudentDetail : undefined}
-        showBackButton={Boolean(selectedStudent)}
-        right={selectedStudent ? (
-          <Pressable
-            onPress={() => openStudentConversation(selectedStudent)}
-            style={styles.studentHeaderAction}
-            accessibilityRole="button"
-            accessibilityLabel={`Nhắn tin với ${selectedStudent.name}`}
-          >
-            <MessageCircle size={18} color={colors.brand} />
-          </Pressable>
-        ) : undefined}
-      />
+      {selectedStudent ? (
+        <AppHeader
+          title="Hồ sơ học viên"
+          subtitle={selectedStudent.name}
+          onBack={closeStudentDetail}
+          showBackButton
+          right={
+            <Pressable
+              onPress={() => openStudentConversation(selectedStudent)}
+              style={styles.studentHeaderAction}
+              accessibilityRole="button"
+              accessibilityLabel={`Nhắn tin với ${selectedStudent.name}`}
+            >
+              <MessageCircle size={18} color={colors.brand} />
+            </Pressable>
+          }
+        />
+      ) : null}
       {!selectedStudent ? (
         <>
           <SearchField value={query} onChangeText={setQuery} placeholder="Tìm tên, SĐT, Zalo, khóa học..." />
@@ -4907,6 +5015,28 @@ const styles = StyleSheet.create({
   assessmentTabText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
   assessmentTabTextActive: { color: colors.brand, fontWeight: '800' },
   assignmentScreen: { flex: 1 },
+  assignmentEmbeddedCreateAction: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginBottom: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  assignmentEmbeddedCreateText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
+  assignmentCourseFilters: { gap: spacing.xs, paddingBottom: spacing.sm },
+  assignmentCourseFilter: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface },
+  assignmentCourseFilterActive: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
+  assignmentCourseFilterText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
+  assignmentCourseFilterTextActive: { color: colors.brandDark },
+  teacherAssignmentCard: { gap: spacing.sm, padding: spacing.md },
+  teacherAssignmentHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  teacherAssignmentTitleWrap: { flex: 1, minWidth: 0, gap: 3 },
+  teacherAssignmentStatus: { paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.sm },
+  teacherAssignmentActive: { backgroundColor: colors.greenSoft },
+  teacherAssignmentClosed: { backgroundColor: colors.redSoft },
+  teacherAssignmentStatusText: { fontSize: typography.micro, fontWeight: '800' },
+  teacherAssignmentActiveText: { color: colors.green },
+  teacherAssignmentClosedText: { color: colors.red },
+  teacherAssignmentDescription: { color: colors.muted, fontSize: typography.caption, lineHeight: 19 },
+  teacherAssignmentDeadline: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  teacherAssignmentMetrics: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
+  teacherAssignmentMetric: { flex: 1, minWidth: 0, alignItems: 'center', gap: 3, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.canvas },
+  teacherAssignmentMetricValue: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
+  teacherAssignmentMetricLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '700', textAlign: 'center' },
   assignmentCreateAction: { position: 'absolute', right: spacing.lg, bottom: 76, zIndex: 10, width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.brand, elevation: 6, shadowColor: '#0F172A', shadowOpacity: 0.22, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   assignmentTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   assignmentTab: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm },
@@ -5182,6 +5312,7 @@ const styles = StyleSheet.create({
   slotOptionTextSelected: { color: colors.brandDark },
   slotOptionTextDisabled: { color: colors.muted },
   sortMenuCard: { width: '100%', maxWidth: 420, gap: spacing.xs, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  centeredPickerCard: { maxHeight: '80%' },
   sortMenuHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.line },
   sortMenuIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.brandSoft },
   sortMenuOption: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.sm, borderRadius: radius.sm },
@@ -5442,6 +5573,7 @@ const styles = StyleSheet.create({
   infoValue: { color: colors.ink, fontSize: typography.small, fontWeight: '600' },
   menuCard: { paddingVertical: spacing.xs, paddingHorizontal: spacing.lg },
   modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+  centeredPickerBackdrop: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.xl },
   modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
   assignmentModalCard: { maxHeight: '92%', backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm },
   assignmentModalScroll: { flexShrink: 1 },

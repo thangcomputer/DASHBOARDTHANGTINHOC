@@ -203,8 +203,8 @@ export default function StudentOverviewTab({
       key: 'quiz',
       onClick: () => navigate('/student/exam'),
       tone: pendingQuizCount > 0
-        ? 'bg-red-50 border-red-200 text-red-600 ring-2 ring-red-200/80 shadow-sm shadow-red-100'
-        : 'bg-red-50/80 border-red-100 text-red-600',
+        ? 'bg-red-50/65 border-red-200 text-red-600 ring-2 ring-red-200/80 shadow-sm shadow-red-100'
+        : 'bg-red-50/55 border-red-100 text-red-600',
       icon: Trophy,
       iconTone: 'from-rose-500 via-red-500 to-red-700 shadow-red-200/70',
       title: 'Trắc nghiệm buổi học',
@@ -221,8 +221,8 @@ export default function StudentOverviewTab({
         navigate('/student#materials-assignments');
       },
       tone: pendingHw > 0
-        ? 'bg-orange-50 border-orange-200 text-orange-600 ring-1 ring-orange-100'
-        : 'bg-orange-50/70 border-orange-100 text-orange-600',
+        ? 'bg-orange-50/65 border-orange-200 text-orange-600 ring-1 ring-orange-100'
+        : 'bg-orange-50/55 border-orange-100 text-orange-600',
       icon: ClipboardList,
       iconTone: 'from-orange-400 via-orange-500 to-red-600 shadow-orange-200/70',
       title: 'Bài tập về nhà',
@@ -234,7 +234,7 @@ export default function StudentOverviewTab({
     {
       key: 'schedule',
       onClick: () => navigate('/student#schedule'),
-      tone: 'bg-blue-50/70 border-blue-100 text-blue-600',
+      tone: 'bg-blue-50/55 border-blue-100 text-blue-600',
       icon: Calendar,
       iconTone: 'from-sky-400 via-blue-500 to-indigo-700 shadow-blue-200/70',
       title: 'Lịch học sắp tới',
@@ -247,8 +247,8 @@ export default function StudentOverviewTab({
       key: 'messages',
       onClick: () => navigate('/student/inbox'),
       tone: myUnreadMsgs > 0
-        ? 'bg-purple-50 border-purple-200 text-purple-600 ring-1 ring-purple-100'
-        : 'bg-purple-50/70 border-purple-100 text-purple-600',
+        ? 'bg-purple-50/65 border-purple-200 text-purple-600 ring-1 ring-purple-100'
+        : 'bg-purple-50/55 border-purple-100 text-purple-600',
       icon: MessageSquare,
       iconTone: 'from-violet-400 via-purple-500 to-fuchsia-700 shadow-purple-200/70',
       title: 'Tin nhắn & Phản hồi',
@@ -436,20 +436,20 @@ export default function StudentOverviewTab({
                   Tổng quan
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
                 {todoItems.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={item.onClick}
-                    className={`${item.tone} group relative overflow-hidden border p-4 rounded-[18px] flex flex-col gap-4 text-left min-h-[150px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.985]`}
+                    className={`${item.tone} cms-glass-card group relative overflow-hidden border p-3 sm:p-4 rounded-[18px] flex flex-col gap-2 text-left min-h-[148px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.985]`}
                   >
                     <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/50 blur-2xl transition-transform duration-500 group-hover:scale-125" aria-hidden="true" />
-                    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-3 w-full min-w-0 relative z-10">
-                      <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
+                    <div className="flex w-full min-w-0 flex-col items-start gap-2 relative z-10">
+                      <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
                         <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/50 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" aria-hidden="true" />
                         <span className="absolute bottom-1 left-2 h-1.5 w-5 rounded-full bg-white/40 blur-[2px]" aria-hidden="true" />
-                        <item.icon size={25} strokeWidth={2.4} className="relative drop-shadow-md" aria-hidden="true" />
+                        <item.icon size={21} strokeWidth={2.4} className="relative drop-shadow-md" aria-hidden="true" />
                         {item.badge != null && (
                           <span className="absolute -right-2 -top-2 min-w-[20px] h-[20px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center leading-none shadow-sm ring-2 ring-white">
                             {item.badge > 99 ? '99+' : item.badge}
@@ -457,9 +457,9 @@ export default function StudentOverviewTab({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-sm sm:text-[15px] font-bold text-slate-900 leading-snug">{item.title}</h4>
-                        <p className={`text-xs lg:text-sm font-bold mt-1 ${item.metaClass}`}>{item.meta}</p>
-                        <span className="relative z-10 mt-3 inline-flex items-center justify-center min-h-[36px] px-3.5 rounded-xl bg-white/95 border border-white text-xs font-extrabold text-slate-800 shadow-sm transition-all group-hover:bg-red-600 group-hover:border-red-600 group-hover:text-white group-hover:shadow-red-300/50">
+                        <h4 className="text-[13px] sm:text-[15px] font-bold text-slate-900 leading-snug">{item.title}</h4>
+                        <p className={`text-[11px] sm:text-xs lg:text-sm font-bold mt-1 ${item.metaClass}`}>{item.meta}</p>
+                        <span className="relative z-10 mt-2 inline-flex items-center justify-center min-h-[34px] px-3 rounded-xl bg-white/95 border border-white text-xs font-extrabold text-slate-800 shadow-sm transition-all group-hover:bg-red-600 group-hover:border-red-600 group-hover:text-white group-hover:shadow-red-300/50">
                           {item.cta}
                           <ChevronRight size={14} className="ml-0.5 opacity-70" aria-hidden="true" />
                         </span>

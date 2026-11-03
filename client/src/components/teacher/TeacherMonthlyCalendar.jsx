@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useReducer } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, Calendar, Clock, X, Ban,
   CheckCircle, Video, MessageSquare, Edit3, Trash2, User, Sparkles
@@ -6,6 +6,12 @@ import {
 import { csrfFetch } from '../../services/api';
 import { isScheduleOngoingNow, getScheduleDisplayKind, isScheduleUpcomingDisplay } from '../../utils/scheduleTime';
 import { showGlossyAlert } from './TeacherShared';
+import {
+  clearMakeupPending,
+  getMakeupPending,
+  makeupPendingKey,
+  subscribeMakeupPending,
+} from '../../utils/attendanceMakeupPendingStore';
 
 const STATUS_COLORS = {
   completed: {
@@ -65,11 +71,30 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [, setLiveTick] = useState(0);
+  const [, refreshMakeupPending] = useReducer((revision) => revision + 1, 0);
 
   useEffect(() => {
     const timer = setInterval(() => setLiveTick((n) => n + 1), 30000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => subscribeMakeupPending(() => {
+    refreshMakeupPending();
+  }), []);
+
+  useEffect(() => {
+    (schedules || []).forEach((schedule) => {
+      const status = String(schedule?.status || '').toLowerCase();
+      if (status === 'completed' || status === 'cancelled' || status === 'canceled' || status === 'no_show') {
+        clearMakeupPending(makeupPendingKey({
+          scheduleId: schedule?._id || schedule?.id,
+          studentId: schedule?.studentId?._id || schedule?.studentId?.id || schedule?.studentId,
+          date: schedule?.date,
+          course: schedule?.course || schedule?.courseName,
+        }));
+      }
+    });
+  }, [schedules]);
 
   const getDisplayStatus = (schedule) => getScheduleDisplayKind(schedule);
 
@@ -99,16 +124,18 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
   // Group schedules by date
   const scheduleMap = useMemo(() => {
     const map = {};
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
     (schedules || []).forEach(s => {
       const d = new Date(s.date);
-      if (d.getMonth() === month && d.getFullYear() === year) {
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         const day = d.getDate();
         if (!map[day]) map[day] = [];
         map[day].push(s);
       }
     });
     return map;
-  }, [schedules, month, year]);
+  }, [schedules, currentDate]);
 
   const selectedSchedules = selectedDay ? (scheduleMap[selectedDay] || []) : [];
 
@@ -309,6 +336,13 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   {selectedSchedules.map(s => {
                     const past = isPast(selectedDay);
                     const displayStatus = getDisplayStatus(s);
+                    const makeupRequestSent = displayStatus === 'overdue_attendance'
+                      && Boolean(getMakeupPending(makeupPendingKey({
+                        scheduleId: s?._id || s?.id,
+                        studentId: s?.studentId?._id || s?.studentId?.id || s?.studentId,
+                        date: s?.date,
+                        course: s?.course || s?.courseName,
+                      })));
                     const isCancellable = !past && s.status === 'scheduled' && displayStatus !== 'ongoing';
                     const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
 
@@ -319,7 +353,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                             👤 {s.studentName || 'Học viên'}
                           </h4>
                           <span className={`text-[10px] font-black px-1.5 py-0.2 rounded  shrink-0 border ${cfg.badge}`}>
-                            {cfg.label}
+                            {makeupRequestSent ? '✓ Đã gửi Admin' : cfg.label}
                           </span>
                         </div>
 

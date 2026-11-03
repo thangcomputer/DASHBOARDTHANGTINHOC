@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
   Image,
+  Platform,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -18,6 +19,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Search, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -157,7 +159,7 @@ function BrandingTopBar() {
 
   return (
     <Animated.View style={[styles.brandingTopBarContainer, { height: headerHeight }]}>
-      <View style={styles.brandingTopBar}>
+      <BlurView intensity={Platform.OS === 'android' ? 65 : 48} tint="light" style={styles.brandingTopBar}>
         <Pressable
           onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
           style={styles.topBarAction}
@@ -199,7 +201,7 @@ function BrandingTopBar() {
             ) : null}
           </View>
         </Pressable>
-      </View>
+      </BlurView>
     </Animated.View>
   );
 }
@@ -238,7 +240,11 @@ export function AppHeader({
   if (isMainTab) return null;
 
   return (
-    <View style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, centered ? styles.headerCentered : null, containerStyle]}>
+    <BlurView
+      intensity={Platform.OS === 'android' ? 55 : 38}
+      tint="light"
+      style={[styles.header, Icon ? styles.headerWithIcon : null, compact ? styles.headerCompact : null, centered ? styles.headerCentered : null, containerStyle]}
+    >
       {Icon ? <View style={styles.headerIcon}><Icon size={19} color={colors.brand} /></View> : null}
       {handleBack ? (
         <Pressable onPress={handleBack} style={[styles.headerAction, compact ? styles.headerActionCompact : null]} accessibilityRole="button" accessibilityLabel="Quay lại">
@@ -255,7 +261,7 @@ export function AppHeader({
         {subtitle ? <Text style={[styles.headerSubtitle, compact ? styles.headerSubtitleCompact : null, centered ? styles.headerSubtitleCentered : null]}>{subtitle}</Text> : null}
       </View>
       {right}
-    </View>
+    </BlurView>
   );
 }
 
@@ -542,20 +548,20 @@ export const uiStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
   brandingTopBarContainer: { overflow: 'hidden' },
-  brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.line },
-  brandingHomeCentered: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
+  brandingHomeCentered: { position: 'absolute', left: '50%', top: '50%', width: 148, height: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.94)', borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.78)', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 9, shadowOffset: { width: 0, height: 3 }, elevation: 3, transform: [{ translateX: -74 }, { translateY: -21 }] },
   brandingLogo: { width: 108, height: 40 },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
-  topBarAction: { zIndex: 1, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  topBarAction: { zIndex: 1, width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.72)', shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   notificationBell: { position: 'relative' },
   notificationUnreadBadge: { position: 'absolute', top: -7, right: -9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: colors.surface, borderRadius: 9, backgroundColor: colors.brand },
   notificationUnreadBadgeText: { color: '#FFFFFF', fontSize: 8, lineHeight: 11, fontWeight: '800' },
   fill: { flex: 1 },
   screenContent: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.lg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.line },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.68)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.86)', borderRadius: 18, shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
   headerCentered: { justifyContent: 'center' },
   headerCompact: { minHeight: 48, gap: spacing.sm, paddingVertical: spacing.xs },
-  headerWithIcon: { minHeight: 64, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 0, backgroundColor: '#FFFEFE' },
+  headerWithIcon: { minHeight: 64, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(255,255,255,0.76)' },
   headerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
   headerText: { flex: 1 },
   headerTextCentered: { position: 'absolute', left: spacing.xl, right: spacing.xl, alignItems: 'center' },
@@ -568,7 +574,7 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.muted, fontSize: typography.small, marginTop: 3 },
   headerSubtitleCentered: { textAlign: 'center' },
   headerSubtitleCompact: { fontSize: typography.caption, lineHeight: 16, marginTop: 1 },
-  headerAction: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  headerAction: { width: 44, height: 44, borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', borderRadius: radius.sm, backgroundColor: 'rgba(255,255,255,0.78)', alignItems: 'center', justifyContent: 'center', shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   headerActionCompact: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brand },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.line, gap: spacing.md },

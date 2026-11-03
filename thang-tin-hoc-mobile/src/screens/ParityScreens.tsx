@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -8,9 +8,11 @@ import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../app/AuthContext';
 import { StudentExamScreen as MobileStudentExamScreen } from './StudentExamScreen';
 import { CourseVideosScreen } from './CourseVideosScreen';
+import { AssignmentsScreen } from './FeatureScreens';
 import {
   AlertCircle, BarChart3, BookOpen, Building2, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight,
   ClipboardList, Clock3, CreditCard, Download, FileSpreadsheet, FileText, Flag, Frown, Globe,
@@ -25,7 +27,7 @@ import {
 import { useMockResource } from '../hooks/useMockResource';
 import {
   commentFeedPost, createFeedPost, deleteFeedComment, deleteFeedPost, fetchFeedPosts, fetchFeedReports, reactFeedPost,
-  reportFeedPost, resolveFeedReport, toggleFeedPostPin, updateFeedPost, uploadFeedImages,
+  reportFeedPost, resolveFeedReport, updateFeedPost, uploadFeedImages,
 } from '../services/feedApi';
 import type { FeedPostReport, FeedReportReason } from '../services/feedApi';
 import {
@@ -366,6 +368,12 @@ export function EvaluationsScreen() {
 
 export function FeedScreen() {
   const { user } = useAuth();
+  const route = useRoute<RouteProp<AppStackParamList, 'Feed'>>();
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const focusCommentRef = useRef<React.ComponentRef<typeof View> | null>(null);
+  const focusPostRef = useRef<React.ComponentRef<typeof View> | null>(null);
+  const handledFeedFocus = useRef('');
+  const [feedFocusTarget, setFeedFocusTarget] = useState<{ postId: string; commentId: string } | null>(null);
   const isTeacher = user?.role === 'teacher';
   const canModerateFeed = ['admin', 'staff'].includes(String(user?.role || '').toLowerCase())
     || ['SUPER_ADMIN', 'HIGH_ADMIN'].includes(String(user?.adminRole || '').toUpperCase());
@@ -387,6 +395,10 @@ export function FeedScreen() {
   const live = !!user && !user.previewMode;
   const loader = useCallback(() => (live ? fetchFeedPosts() : feedService.posts()), [live]);
   const resource = useMockResource(loader);
+  const focusPostId = route.params?.postId || '';
+  const focusCommentId = route.params?.commentId || '';
+  const focusParentCommentId = route.params?.parentCommentId || '';
+  const feedFocusKey = `${focusPostId}:${focusCommentId}:${focusParentCommentId}`;
   const loadPendingReports = useCallback(async () => {
     if (!live || !canModerateFeed) return;
     try {
@@ -398,6 +410,8 @@ export function FeedScreen() {
   }, [canModerateFeed, live]);
   useEffect(() => { void loadPendingReports(); }, [loadPendingReports]);
   const hiddenPostsStorageKey = `mobile-feed-hidden:${user?.id || 'preview'}`;
+  const personalPinsStorageKey = `mobile-feed-pins:${user?.id || 'preview'}`;
+  const [personalPinnedPostIds, setPersonalPinnedPostIds] = useState<string[]>([]);
   useEffect(() => {
     if (!postMenuId || Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
     const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -431,6 +445,22 @@ export function FeedScreen() {
     return () => { active = false; };
   }, [hiddenPostsStorageKey]);
   useEffect(() => {
+    let active = true;
+    const loadPersonalPins = async () => {
+      try {
+        const stored = Platform.OS === 'web'
+          ? globalThis.localStorage.getItem(personalPinsStorageKey)
+          : await AsyncStorage.getItem(personalPinsStorageKey);
+        const ids: unknown = stored ? JSON.parse(stored) : [];
+        if (active) setPersonalPinnedPostIds(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []);
+      } catch (error) {
+        if (active) Alert.alert('Bảng tin', error instanceof Error ? `Không thể tải bài viết đã ghim: ${error.message}` : 'Không thể tải bài viết đã ghim.');
+      }
+    };
+    void loadPersonalPins();
+    return () => { active = false; };
+  }, [personalPinsStorageKey]);
+  useEffect(() => {
     if (!live) return undefined;
     const timer = setInterval(() => {
       if (editingPostId || busy) return;
@@ -445,6 +475,31 @@ export function FeedScreen() {
     }, 8000);
     return () => clearInterval(timer);
   }, [live, busy, editingPostId]);
+  useEffect(() => {
+    if (!live || !focusPostId || handledFeedFocus.current === feedFocusKey) return undefined;
+    handledFeedFocus.current = feedFocusKey;
+    let active = true;
+    const openCommentLocation = async () => {
+      try {
+        const targetPosts = await fetchFeedPosts(focusPostId);
+        if (!active) return;
+        setPosts(targetPosts);
+        setVisiblePostCount(targetPosts.length);
+        setCommentsOpen((current) => ({ ...current, [focusPostId]: true }));
+        if (focusParentCommentId) {
+          setExpandedReplyThreads((current) => ({ ...current, [focusParentCommentId]: true }));
+        }
+        setFeedFocusTarget({ postId: focusPostId, commentId: focusCommentId });
+      } catch (error) {
+        if (!active) return;
+        const message = error instanceof Error ? error.message : 'Không thể mở vị trí bình luận.';
+        setFeedActionError(message);
+        Alert.alert('Bảng tin', message);
+      }
+    };
+    void openCommentLocation();
+    return () => { active = false; };
+  }, [live, focusPostId, focusCommentId, focusParentCommentId, feedFocusKey]);
   const apiRun = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     try {
@@ -482,12 +537,20 @@ export function FeedScreen() {
       setReportSubmitting(false);
     }
   };
-  const handleResolveFeedReport = async (report: FeedPostReport) => {
+  const handleResolveFeedReport = async (report: FeedPostReport, action: 'keep' | 'delete') => {
     if (resolvingReportId) return;
     setResolvingReportId(report.id);
     try {
-      await resolveFeedReport(report.id);
-      setPendingReports((current) => current.filter((entry) => entry.id !== report.id));
+      const result = await resolveFeedReport(report.id, action);
+      if (result.success !== true) throw new Error(result.message || 'Không thể cập nhật báo cáo.');
+      setPendingReports((current) => current.filter((entry) => action === 'delete' ? entry.postId !== report.postId : entry.id !== report.id));
+      if (action === 'delete') {
+        setPosts((current) => (current || []).filter((post) => post.id !== report.postId));
+        setFeedActionNotice(result.message || 'Đã xóa bài viết.');
+      } else {
+        setFeedActionNotice(result.message || 'Đã giữ lại bài viết.');
+      }
+      setFeedActionError('');
       setReportQueueError('');
     } catch (error) {
       setReportQueueError(error instanceof Error ? error.message : 'Không thể cập nhật báo cáo.');
@@ -505,16 +568,14 @@ export function FeedScreen() {
   const selectFeedImages = async () => {
     if (busy) return;
     try {
-      if (Platform.OS !== 'web') {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Cần quyền truy cập ảnh', 'Cho phép ứng dụng truy cập thư viện ảnh để đính kèm ảnh.');
-          return;
-        }
-      }
       const remaining = 6 - selectedImages.length;
       if (remaining <= 0) {
         Alert.alert('Đã đủ ảnh', 'Mỗi bài đăng tối đa 6 ảnh.');
+        return;
+      }
+      const permission = Platform.OS === 'web' ? null : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission && !permission.granted) {
+        Alert.alert('Cần quyền truy cập ảnh', 'Cho phép ứng dụng truy cập thư viện ảnh để đính kèm ảnh.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -538,6 +599,7 @@ export function FeedScreen() {
     }
   };
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentImages, setCommentImages] = useState<Record<string, ImagePicker.ImagePickerAsset[]>>({});
   const [draft, setDraft] = useState('');
   const [audience, setAudience] = useState('Công khai');
   const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -549,12 +611,75 @@ export function FeedScreen() {
   const reactionPickerCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showAudienceMenu, setShowAudienceMenu] = useState(false);
   const [editDraft, setEditDraft] = useState('');
+  const selectCommentImages = async (postId: string) => {
+    if (busy) return;
+    const remaining = 3 - (commentImages[postId] || []).length;
+    if (remaining <= 0) {
+      Alert.alert('Đã đủ ảnh', 'Mỗi bình luận tối đa 3 ảnh.');
+      return;
+    }
+    try {
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Cần quyền truy cập ảnh', 'Cho phép ứng dụng truy cập thư viện ảnh để đính kèm ảnh.');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.85,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
+      if (result.canceled) return;
+      const accepted = result.assets.filter((asset) => (
+        (!asset.mimeType || asset.mimeType.toLowerCase().startsWith('image/'))
+        && (asset.fileSize == null || asset.fileSize <= 5 * 1024 * 1024)
+      ));
+      if (accepted.length !== result.assets.length) {
+        Alert.alert('Một số ảnh không hợp lệ', 'Chỉ nhận ảnh tối đa 5MB mỗi ảnh.');
+      }
+      setCommentImages((current) => ({
+        ...current,
+        [postId]: [...(current[postId] || []), ...accepted].slice(0, 3),
+      }));
+    } catch (error) {
+      Alert.alert('Không thể chọn ảnh', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    }
+  };
   useEffect(() => () => {
     if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
   }, []);
   const items = posts || resource.data || [];
-  const visibleItems = items.filter((post) => !hiddenPostIds.includes(post.id));
+  const visibleItems = items
+    .filter((post) => !hiddenPostIds.includes(post.id))
+    .map((post, index) => ({ post, index }))
+    .sort((a, b) => Number(personalPinnedPostIds.includes(b.post.id)) - Number(personalPinnedPostIds.includes(a.post.id)) || a.index - b.index)
+    .map(({ post }) => post);
   const visiblePosts = visibleItems.slice(0, visiblePostCount);
+  useEffect(() => {
+    if (!feedFocusTarget || !commentsOpen[feedFocusTarget.postId]) return undefined;
+    const timer = setTimeout(() => {
+      const target = focusCommentRef.current || focusPostRef.current;
+      const scrollView = scrollViewRef.current;
+      if (!target || !scrollView) return;
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const targetId = feedFocusTarget.commentId
+          ? `feed-comment-${feedFocusTarget.commentId}`
+          : `feed-post-${feedFocusTarget.postId}`;
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      target.measureLayout(
+        scrollView,
+        (_x, y) => scrollView.scrollTo({ y: Math.max(0, y - 100), animated: true }),
+        () => {},
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [feedFocusTarget, commentsOpen, items, visiblePosts.length]);
   const roleLabel = isTeacher ? 'Giảng viên' : 'Học viên';
   const audienceOptions = [
     { value: 'Công khai', title: 'Công khai', description: 'Tất cả mọi người đều xem được', icon: Globe },
@@ -587,6 +712,11 @@ export function FeedScreen() {
     setCommentsOpen((current) => ({ ...current, [postId]: opening }));
     if (!opening && replyTarget?.postId === postId) setReplyTarget(null);
     setReactionPickerPostId(null);
+  };
+  const closeCommentsOnOutsideTouch = () => {
+    if (!Object.values(commentsOpen).some(Boolean)) return;
+    setCommentsOpen({});
+    setReplyTarget(null);
   };
   const openReactionPicker = (postId: string) => {
     if (reactionPickerCloseTimer.current) clearTimeout(reactionPickerCloseTimer.current);
@@ -631,6 +761,26 @@ export function FeedScreen() {
     if (Platform.OS === 'web') globalThis.localStorage.setItem(hiddenPostsStorageKey, serialized);
     else await AsyncStorage.setItem(hiddenPostsStorageKey, serialized);
   };
+  const persistPersonalPins = async (ids: string[]) => {
+    const serialized = JSON.stringify(ids);
+    if (Platform.OS === 'web') globalThis.localStorage.setItem(personalPinsStorageKey, serialized);
+    else await AsyncStorage.setItem(personalPinsStorageKey, serialized);
+  };
+  const togglePersonalPin = (postId: string) => {
+    const next = personalPinnedPostIds.includes(postId)
+      ? personalPinnedPostIds.filter((id) => id !== postId)
+      : [...personalPinnedPostIds, postId];
+    setPersonalPinnedPostIds(next);
+    void persistPersonalPins(next).then(() => {
+      setFeedActionError('');
+      setFeedActionNotice(next.includes(postId) ? 'Đã ghim bài viết riêng tư trên thiết bị này.' : 'Đã bỏ ghim bài viết.');
+    }).catch((error: unknown) => {
+      setPersonalPinnedPostIds(personalPinnedPostIds);
+      setFeedActionError(error instanceof Error ? `Không thể lưu bài viết đã ghim: ${error.message}` : 'Không thể lưu bài viết đã ghim.');
+      setFeedActionNotice('');
+      if (Platform.OS !== 'web') Alert.alert('Bảng tin', error instanceof Error ? error.message : 'Không thể lưu bài viết đã ghim.');
+    });
+  };
   const hidePost = (postId: string) => {
     const next = [...new Set([...hiddenPostIds, postId])];
     setHiddenPostIds(next);
@@ -653,59 +803,125 @@ export function FeedScreen() {
       Alert.alert('Không thể ẩn bài viết', error instanceof Error ? error.message : 'Không lưu được thay đổi trên thiết bị.');
     });
   };
-  const renderCommentComposer = (post: DemoFeedPost) => (
-    <View style={styles.commentComposer}>
-      {replyTarget?.postId === post.id ? (
-        <View style={styles.feedReplyingTo}>
-          <Text style={styles.feedReplyingText}>Đang trả lời {replyTarget.author}</Text>
-          <Pressable onPress={() => setReplyTarget(null)} accessibilityRole="button" accessibilityLabel="Hủy trả lời"><Text style={styles.feedReplyCancel}>×</Text></Pressable>
-        </View>
-      ) : null}
-      <View style={styles.commentComposerInputRow}>
-        <TextInput
-          value={commentDrafts[post.id] || ''}
-          onChangeText={(text) => setCommentDrafts((current) => ({ ...current, [post.id]: text }))}
-          placeholder={replyTarget?.postId === post.id ? `Trả lời ${replyTarget.author}...` : 'Viết bình luận thảo luận...'}
-          style={styles.commentInput}
-          onFocus={() => setCommentsOpen((current) => ({ ...current, [post.id]: true }))}
-          accessibilityLabel="Nội dung bình luận"
-        />
-        <Pressable onPress={() => {
-          const text = (commentDrafts[post.id] || '').trim();
-          if (!text || busy) return;
-          const parentId = replyTarget?.postId === post.id ? replyTarget.parentId : undefined;
-          if (live) {
-            void apiRun(() => commentFeedPost(post.id, text, parentId)).then((success) => {
-              if (success) {
-                setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
-                setReplyTarget(null);
-                setCommentsOpen((current) => ({ ...current, [post.id]: true }));
-              }
-            });
-            return;
-          }
-          updatePost(post.id, (current) => {
-            if (parentId) return {
-              ...current,
-              commentsCount: (current.commentsCount ?? current.comments.length + (current.replies || []).length) + 1,
-              replies: [...(current.replies || []), { id: `reply-${Date.now()}`, parentId, author: user?.name || 'Bạn', authorId: user?.id, text }],
-            };
-            return {
-              ...current,
-              commentsCount: (current.commentsCount ?? current.comments.length + (current.replies || []).length) + 1,
-              comments: [...current.comments, { id: `comment-${Date.now()}`, author: user?.name || 'Bạn', authorId: user?.id, text }],
-            };
-          });
-          setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
-          setReplyTarget(null);
-        }} accessibilityRole="button" accessibilityLabel="Gửi bình luận">
-          <Send size={18} color={colors.red} />
+  const renderCommentImages = (images: string[] | undefined, label: string) => images?.length ? (
+    <View style={styles.feedCommentImages}>
+      {images.map((image, index) => (
+        <Pressable
+          key={`${image}-${index}`}
+          onPress={() => { void openExternalUrl(resolveMobilePublicUrl(image), label); }}
+          style={styles.feedCommentImageFrame}
+          accessibilityRole="button"
+          accessibilityLabel={`Mở ảnh ${index + 1} ${label.toLowerCase()}`}
+        >
+          <Image source={getMobileImageSource(image)} style={styles.feedCommentImage} resizeMode="cover" />
         </Pressable>
-      </View>
+      ))}
     </View>
-  );
+  ) : null;
+  const renderCommentComposer = (post: DemoFeedPost) => {
+    const images = commentImages[post.id] || [];
+    const text = (commentDrafts[post.id] || '').trim();
+    const canSubmit = (!!text || images.length > 0) && !busy;
+    return (
+      <View style={styles.commentComposer}>
+        {replyTarget?.postId === post.id ? (
+          <View style={styles.feedReplyingTo}>
+            <Text style={styles.feedReplyingText}>Đang trả lời {replyTarget.author}</Text>
+            <Pressable onPress={() => setReplyTarget(null)} accessibilityRole="button" accessibilityLabel="Hủy trả lời"><Text style={styles.feedReplyCancel}>×</Text></Pressable>
+          </View>
+        ) : null}
+        {images.length ? (
+          <View style={styles.feedCommentImagePreviews}>
+            {images.map((asset, index) => (
+              <View key={`${asset.uri}-${index}`} style={styles.feedCommentImagePreview}>
+                <Image source={{ uri: asset.uri }} style={styles.feedCommentImage} />
+                <Pressable
+                  onPress={() => setCommentImages((current) => ({
+                    ...current,
+                    [post.id]: (current[post.id] || []).filter((_, itemIndex) => itemIndex !== index),
+                  }))}
+                  style={styles.feedCommentImageRemove}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Bỏ ảnh bình luận ${index + 1}`}
+                >
+                  <X size={12} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.commentComposerInputRow}>
+          <TextInput
+            value={commentDrafts[post.id] || ''}
+            onChangeText={(value) => setCommentDrafts((current) => ({ ...current, [post.id]: value }))}
+            placeholder={replyTarget?.postId === post.id ? `Trả lời ${replyTarget.author}...` : 'Viết bình luận thảo luận...'}
+            style={styles.commentInput}
+            onFocus={() => setCommentsOpen((current) => ({ ...current, [post.id]: true }))}
+            accessibilityLabel="Nội dung bình luận"
+          />
+          <Pressable
+            onPress={() => { void selectCommentImages(post.id); }}
+            style={styles.feedCommentImageAction}
+            accessibilityRole="button"
+            accessibilityLabel={`Thêm ảnh vào bình luận (${images.length}/3)`}
+            disabled={busy || images.length >= 3}
+          >
+            <ImagePlus size={19} color={images.length >= 3 ? colors.muted : colors.green} />
+          </Pressable>
+          <Pressable
+            disabled={!canSubmit}
+            style={[styles.feedCommentSend, !canSubmit && styles.feedCommentSendDisabled]}
+            onPress={() => {
+              if (!canSubmit) return;
+              const parentId = replyTarget?.postId === post.id ? replyTarget.parentId : undefined;
+              if (live) {
+                void apiRun(async () => {
+                  const uploadedImages = await uploadFeedImages(images.map((asset, index) => ({
+                    uri: asset.uri,
+                    name: asset.fileName || `comment-${Date.now()}-${index + 1}.jpg`,
+                    mimeType: asset.mimeType || 'image/jpeg',
+                    file: asset.file || undefined,
+                  })), 3);
+                  await commentFeedPost(post.id, text, parentId, uploadedImages);
+                }).then((success) => {
+                  if (success) {
+                    setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
+                    setCommentImages((current) => ({ ...current, [post.id]: [] }));
+                    setReplyTarget(null);
+                    setCommentsOpen((current) => ({ ...current, [post.id]: true }));
+                  }
+                });
+                return;
+              }
+              const localImages = images.map((asset) => asset.uri);
+              updatePost(post.id, (current) => {
+                if (parentId) return {
+                  ...current,
+                  commentsCount: (current.commentsCount ?? current.comments.length + (current.replies || []).length) + 1,
+                  replies: [...(current.replies || []), { id: `reply-${Date.now()}`, parentId, author: user?.name || 'Bạn', authorId: user?.id, text, images: localImages }],
+                };
+                return {
+                  ...current,
+                  commentsCount: (current.commentsCount ?? current.comments.length + (current.replies || []).length) + 1,
+                  comments: [...current.comments, { id: `comment-${Date.now()}`, author: user?.name || 'Bạn', authorId: user?.id, text, images: localImages }],
+                };
+              });
+              setCommentDrafts((current) => ({ ...current, [post.id]: '' }));
+              setCommentImages((current) => ({ ...current, [post.id]: [] }));
+              setReplyTarget(null);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Gửi bình luận"
+          >
+            <Send size={18} color={canSubmit ? colors.red : colors.muted} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
   return (
-    <AppScreen>
+    <AppScreen scrollViewRef={scrollViewRef}>
+      <View onPointerDown={closeCommentsOnOutsideTouch} onTouchStart={closeCommentsOnOutsideTouch}>
       <AppHeader title="Bảng tin chung" subtitle="Học viên và giảng viên đều có thể đăng bài" icon={Newspaper} />
       {canModerateFeed && reportQueueError ? (
         <View style={styles.feedReportError}><Text style={styles.feedReportErrorText}>{reportQueueError}</Text></View>
@@ -727,16 +943,37 @@ export function FeedScreen() {
                 <Text style={styles.feedReportReporter}>Báo cáo bởi {report.reporterName} · {report.reporterRole}</Text>
                 {report.details ? <Text style={styles.feedReportDetails}>{report.details}</Text> : null}
               </View>
-              <Pressable
-                onPress={() => { void handleResolveFeedReport(report); }}
-                disabled={resolvingReportId === report.id}
-                style={styles.feedReportResolve}
-                accessibilityRole="button"
-                accessibilityLabel="Đánh dấu báo cáo đã xử lý"
-              >
-                <Check size={15} color="#047857" />
-                <Text style={styles.feedReportResolveText}>{resolvingReportId === report.id ? 'Đang lưu' : 'Đã xử lý'}</Text>
-              </Pressable>
+              <View style={styles.feedReportActions}>
+                <Pressable
+                  onPress={() => {
+                    if (Platform.OS === 'web') {
+                      if (globalThis.confirm('Xóa bài viết này và đóng tất cả báo cáo liên quan?')) void handleResolveFeedReport(report, 'delete');
+                      return;
+                    }
+                    Alert.alert('Xóa bài viết?', 'Bài viết sẽ bị xóa và các báo cáo liên quan được đóng.', [
+                      { text: 'Hủy', style: 'cancel' },
+                      { text: 'Xóa bài viết', style: 'destructive', onPress: () => { void handleResolveFeedReport(report, 'delete'); } },
+                    ]);
+                  }}
+                  disabled={resolvingReportId === report.id}
+                  style={[styles.feedReportResolve, styles.feedReportDelete]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa bài viết bị báo cáo"
+                >
+                  <Trash2 size={15} color={colors.red} />
+                  <Text style={[styles.feedReportResolveText, styles.feedReportDeleteText]}>{resolvingReportId === report.id ? 'Đang xử lý' : 'Xóa bài viết'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void handleResolveFeedReport(report, 'keep'); }}
+                  disabled={resolvingReportId === report.id}
+                  style={styles.feedReportResolve}
+                  accessibilityRole="button"
+                  accessibilityLabel="Giữ lại bài viết"
+                >
+                  <Check size={15} color="#047857" />
+                  <Text style={styles.feedReportResolveText}>{resolvingReportId === report.id ? 'Đang xử lý' : 'Giữ lại bài viết'}</Text>
+                </Pressable>
+              </View>
             </View>
           ))}
         </Card>
@@ -852,7 +1089,12 @@ export function FeedScreen() {
       {feedActionError ? <Text style={styles.note}>Không thể hoàn tất thao tác: {feedActionError}</Text> : null}
       {feedActionNotice ? <Text style={styles.feedActionNotice}>{feedActionNotice}</Text> : null}
       {visiblePosts.map((post) => (
-        <Card key={post.id} style={styles.feedPostCard}>
+        <View
+          key={post.id}
+          nativeID={`feed-post-${post.id}`}
+          ref={feedFocusTarget?.postId === post.id ? focusPostRef : undefined}
+        >
+        <Card style={styles.feedPostCard}>
           <View style={styles.feedAuthorRow}><Avatar name={post.author} color={colors.brandSoft} size={42} imageSource={post.authorAvatar ? getMobileImageSource(post.authorAvatar) : undefined} /><View style={styles.flex}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.caption}>{post.role} · {post.time}</Text></View>
             <View nativeID="feed-post-menu" style={styles.feedPostMenuAnchor}>
               <Pressable
@@ -886,19 +1128,17 @@ export function FeedScreen() {
                       </Pressable>
                     </>
                   ) : null}
-                  {live && canModerateFeed && post.audience === 'Công khai' ? (
-                    <Pressable
-                      onPress={() => {
-                        setPostMenuId(null);
-                        void apiRun(() => toggleFeedPostPin(post.id));
-                      }}
-                      style={styles.feedPostMenuItem}
-                      accessibilityRole="button"
-                    >
-                      {post.isPinned ? <PinOff size={15} color={colors.brand} /> : <Pin size={15} color={colors.brand} />}
-                      <Text style={styles.feedPostMenuText}>{post.isPinned ? 'Bỏ ghim thông báo' : 'Ghim thông báo'}</Text>
-                    </Pressable>
-                  ) : null}
+                  <Pressable
+                    onPress={() => {
+                      setPostMenuId(null);
+                      togglePersonalPin(post.id);
+                    }}
+                    style={styles.feedPostMenuItem}
+                    accessibilityRole="button"
+                  >
+                    {personalPinnedPostIds.includes(post.id) ? <PinOff size={15} color={colors.brand} /> : <Pin size={15} color={colors.brand} />}
+                    <Text style={styles.feedPostMenuText}>{personalPinnedPostIds.includes(post.id) ? 'Bỏ ghim bài viết' : 'Ghim bài viết'}</Text>
+                  </Pressable>
                   {live && !ownPost(post) ? (
                     <Pressable
                       onPress={() => {
@@ -923,8 +1163,8 @@ export function FeedScreen() {
             </View>
           </View>
           <View style={styles.feedPostMeta}>
-            {post.isPinned ? (
-              <View style={styles.feedPinnedBadge}><Pin size={12} color="#B45309" /><Text style={styles.feedPinnedText}>Thông báo ghim</Text></View>
+            {personalPinnedPostIds.includes(post.id) ? (
+              <View style={styles.feedPinnedBadge}><Pin size={12} color="#B45309" /><Text style={styles.feedPinnedText}>Đã ghim</Text></View>
             ) : null}
             <View style={styles.feedAudience}>
               {post.audience === 'Công khai' ? <Globe size={12} color={colors.green} /> : <Users size={12} color={colors.brand} />}
@@ -1024,9 +1264,18 @@ export function FeedScreen() {
             </View>
           </View>
           {commentsOpen[post.id] ? (
-            <View style={styles.feedCommentsSection}>
+            <View
+              style={styles.feedCommentsSection}
+              onPointerDown={(event) => event.stopPropagation()}
+              onTouchStart={(event) => event.stopPropagation()}
+            >
               {(post.comments || []).map((item) => (
-                <View key={item.id} style={styles.feedCommentThread}>
+                <View
+                  key={item.id}
+                  nativeID={`feed-comment-${item.id}`}
+                  ref={feedFocusTarget?.commentId === item.id ? focusCommentRef : undefined}
+                  style={[styles.feedCommentThread, feedFocusTarget?.commentId === item.id && styles.feedFocusHighlight]}
+                >
                   <View style={styles.feedCommentRow}>
                     <Avatar name={item.author} size={30} color={colors.brandSoft} imageSource={item.avatar ? getMobileImageSource(item.avatar) : undefined} />
                     <View style={styles.feedCommentHeader}>
@@ -1038,6 +1287,7 @@ export function FeedScreen() {
                           <Text style={styles.feedCommentTime}>{item.time || ''}</Text>
                         </View>
                         <Text style={styles.feedCommentText}>{item.text}</Text>
+                        {renderCommentImages(item.images, 'bình luận')}
                         <View style={styles.feedCommentActions}>
                           <Pressable onPress={() => {
                             setReplyTarget({ postId: post.id, parentId: item.id, author: item.author });
@@ -1067,7 +1317,12 @@ export function FeedScreen() {
                       <>
                         <View style={styles.feedReplyBranch}>
                           {visibleReplies.map((reply) => (
-                            <View key={reply.id} style={styles.feedReplyRow}>
+                            <View
+                              key={reply.id}
+                              nativeID={`feed-comment-${reply.id}`}
+                              ref={feedFocusTarget?.commentId === reply.id ? focusCommentRef : undefined}
+                              style={[styles.feedReplyRow, feedFocusTarget?.commentId === reply.id && styles.feedFocusHighlight]}
+                            >
                               <Avatar name={reply.author} size={26} color={colors.brandSoft} imageSource={reply.avatar ? getMobileImageSource(reply.avatar) : undefined} />
                               <View style={styles.feedReplyContent}>
                                 <View style={styles.feedCommentTitleLine}>
@@ -1077,6 +1332,7 @@ export function FeedScreen() {
                                   <Text style={styles.feedCommentTime}>{reply.time || ''}</Text>
                                 </View>
                                 <Text style={styles.feedCommentText}>{reply.text}</Text>
+                                {renderCommentImages(reply.images, 'câu trả lời')}
                                 <View style={styles.feedCommentActions}>
                                   <Pressable onPress={() => {
                                     setReplyTarget({ postId: post.id, parentId: item.id, author: reply.author });
@@ -1104,6 +1360,7 @@ export function FeedScreen() {
             </View>
           ) : null}
         </Card>
+        </View>
       ))}
       {visibleItems.length > visiblePostCount ? <PrimaryButton title="Xem thêm bài cũ hơn" variant="secondary" onPress={() => setVisiblePostCount((count) => count + 3)} /> : null}
       {!resource.loading && !resource.error && !visibleItems.length ? <EmptyState title={items.length ? 'Bạn đã ẩn tất cả bài viết' : 'Chưa có bài đăng'} message={items.length ? 'Bài viết mới sẽ hiển thị tại đây.' : 'Bài đăng mới sẽ hiển thị tại đây.'} /> : null}
@@ -1166,6 +1423,7 @@ export function FeedScreen() {
           </View>
         </View>
       </Modal>
+      </View>
     </AppScreen>
   );
 }
@@ -1520,18 +1778,19 @@ export function SoftwareLinksScreen() {
 
 export function TeacherQuizzesScreen() {
   const { user } = useAuth();
-  const navigation = useNavigation<Navigation>();
+  const { width, height } = useWindowDimensions();
   const loader = useCallback(() => quizService.list(user), [user]);
   const resource = useMockResource(loader);
   const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
   const studentsResource = useMockResource(studentsLoader);
   const [quizzes, setQuizzes] = useState<DemoQuiz[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [activeAssessmentTab, setActiveAssessmentTab] = useState<'quiz' | 'homework'>('quiz');
   const [savingQuiz, setSavingQuiz] = useState(false);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
   const [questionExcelBusy, setQuestionExcelBusy] = useState(false);
   const [title, setTitle] = useState('');
-  const [titlePromptError, setTitlePromptError] = useState(false);
+  const [aiTopicError, setAiTopicError] = useState(false);
   const [courseName, setCourseName] = useState('');
   const [targetAll, setTargetAll] = useState(true);
   const [targetStudentIds, setTargetStudentIds] = useState<string[]>([]);
@@ -1539,13 +1798,16 @@ export function TeacherQuizzesScreen() {
   const [timeLimit, setTimeLimit] = useState('20');
   const [startTime, setStartTime] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [schedulePickerTarget, setSchedulePickerTarget] = useState<'start' | 'deadline' | null>(null);
+  const [schedulePickerDate, setSchedulePickerDate] = useState(() => new Date());
+  const [schedulePickerMonth, setSchedulePickerMonth] = useState(() => new Date());
+  const [schedulePickerHour, setSchedulePickerHour] = useState('09');
+  const [schedulePickerMinute, setSchedulePickerMinute] = useState('00');
   const [aiQuestionCount, setAiQuestionCount] = useState(10);
   const [aiDifficulty, setAiDifficulty] = useState('trung bình');
   const [aiTopic, setAiTopic] = useState('');
   const [quizToolsMessage, setQuizToolsMessage] = useState('');
-  const [questions, setQuestions] = useState<Array<{ text: string; options: string[]; correctOption: number; explanation: string }>>([
-    { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' },
-  ]);
+  const [questions, setQuestions] = useState<Array<{ text: string; options: string[]; correctOption: number; explanation: string }>>([]);
   const isPreview = Boolean(user?.previewMode)
     || (__DEV__ && Boolean(process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE));
   const loadedItems = quizzes || resource.data || [];
@@ -1565,6 +1827,35 @@ export function TeacherQuizzesScreen() {
   });
   const courseStudents = students.filter((student) => !courseName || student.course === courseName || student.courses?.includes(courseName));
   const visibleTargetStudents = courseStudents.filter((student) => `${student.name} ${student.course}`.toLowerCase().includes(targetSearch.trim().toLowerCase()));
+  const scheduleCalendarOffset = (new Date(schedulePickerMonth.getFullYear(), schedulePickerMonth.getMonth(), 1).getDay() + 6) % 7;
+  const scheduleDaysInMonth = new Date(schedulePickerMonth.getFullYear(), schedulePickerMonth.getMonth() + 1, 0).getDate();
+  const scheduleCalendarCells = Array.from({ length: Math.ceil((scheduleCalendarOffset + scheduleDaysInMonth) / 7) * 7 }, (_, index) => {
+    const day = index - scheduleCalendarOffset + 1;
+    return day > 0 && day <= scheduleDaysInMonth ? day : null;
+  });
+  const openSchedulePicker = (target: 'start' | 'deadline') => {
+    const value = target === 'start' ? startTime : deadline;
+    const parsedDate = value ? new Date(value.replace(' ', 'T')) : new Date();
+    const date = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+    setSchedulePickerDate(date);
+    setSchedulePickerMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    setSchedulePickerHour(String(date.getHours()).padStart(2, '0'));
+    setSchedulePickerMinute(String(date.getMinutes()).padStart(2, '0'));
+    setSchedulePickerTarget(target);
+  };
+  const applySchedulePicker = () => {
+    const hour = Number(schedulePickerHour);
+    const minute = Number(schedulePickerMinute);
+    if (!/^\d{1,2}$/.test(schedulePickerHour) || !/^\d{1,2}$/.test(schedulePickerMinute) || hour > 23 || minute > 59) {
+      Alert.alert('Giờ không hợp lệ', 'Nhập giờ từ 00 đến 23 và phút từ 00 đến 59.');
+      return;
+    }
+    const pad = (part: number) => String(part).padStart(2, '0');
+    const value = `${schedulePickerDate.getFullYear()}-${pad(schedulePickerDate.getMonth() + 1)}-${pad(schedulePickerDate.getDate())} ${pad(hour)}:${pad(minute)}`;
+    if (schedulePickerTarget === 'start') setStartTime(value);
+    if (schedulePickerTarget === 'deadline') setDeadline(value);
+    setSchedulePickerTarget(null);
+  };
   useFocusEffect(useCallback(() => {
     resource.reload();
   }, [resource.reload]));
@@ -1581,25 +1872,23 @@ export function TeacherQuizzesScreen() {
       changeSubscription.remove();
     };
   }, [resource.reload]);
-  useEffect(() => {
-    if (!courseName && courses.length) setCourseName(courses[0]);
-  }, [courseName, courses]);
   const updateQuestion = (questionIndex: number, update: (question: typeof questions[number]) => typeof questions[number]) => {
     setQuestions((current) => current.map((question, index) => index === questionIndex ? update(question) : question));
   };
   const resetCreateForm = () => {
     setTitle('');
-    setTitlePromptError(false);
+    setAiTopicError(false);
     setTargetAll(true);
     setTargetStudentIds([]);
     setTargetSearch('');
     setTimeLimit('20');
     setStartTime('');
     setDeadline('');
+    setSchedulePickerTarget(null);
     setAiQuestionCount(10);
     setAiTopic('');
     setQuizToolsMessage('');
-    setQuestions([{ text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }]);
+    setQuestions([]);
   };
   const handleGenerateQuestions = async () => {
     if (!user || user.role !== 'teacher') {
@@ -1610,18 +1899,18 @@ export function TeacherQuizzesScreen() {
       Alert.alert('Chế độ xem trước', 'Tạo câu hỏi AI chỉ dùng được với tài khoản giảng viên thật.');
       return;
     }
-    const prompt = title.trim();
+    const prompt = aiTopic.trim();
     if (!prompt) {
-      setTitlePromptError(true);
-      Alert.alert('Thiếu prompt', 'Nhập tên bài kiểm tra trước khi tạo bằng AI.');
+      setAiTopicError(true);
+      Alert.alert('Thiếu chủ đề AI', 'Nhập chủ đề câu hỏi trong phần AI trước khi tạo.');
       return;
     }
-    const topic = [prompt, aiTopic.trim()].filter(Boolean).join('\n');
+    setAiTopicError(false);
     setGeneratingQuestions(true);
     setQuizToolsMessage('');
     try {
       const generated = await quizService.generateAI(user, {
-        topic,
+        topic: prompt,
         courseName,
         count: aiQuestionCount,
         difficulty: aiDifficulty,
@@ -1721,7 +2010,6 @@ export function TeacherQuizzesScreen() {
   const handleCreateQuiz = async () => {
     const value = title.trim();
     if (!value) {
-      setTitlePromptError(true);
       Alert.alert('Thiếu tên bài', 'Nhập tên bài trắc nghiệm trước khi tạo.');
       return;
     }
@@ -1730,10 +2018,6 @@ export function TeacherQuizzesScreen() {
     ));
     if (!validQuestions.length || validQuestions.length !== questions.length) {
       Alert.alert('Thiếu nội dung', 'Nhập nội dung và đủ bốn phương án cho từng câu hỏi.');
-      return;
-    }
-    if (courses.length && !courseName) {
-      Alert.alert('Chưa chọn khóa học', 'Chọn khóa học trước khi tạo bài trắc nghiệm.');
       return;
     }
     const limit = Number(timeLimit);
@@ -1854,7 +2138,7 @@ export function TeacherQuizzesScreen() {
   };
   const handleRecreateQuiz = (quiz: DemoQuiz) => {
     setTitle(`${quiz.title} (Bản sao)`);
-    setCourseName(quiz.courseName === 'Chưa chọn khóa học' ? '' : quiz.courseName);
+    setCourseName(['Chưa chọn khóa học', '—', 'Tất cả'].includes(quiz.courseName) ? '' : quiz.courseName);
     setTargetStudentIds(quiz.targetStudentIds || []);
     setTargetAll(!quiz.targetStudentIds?.length);
     setTimeLimit(String(quiz.timeLimitMinutes));
@@ -1879,167 +2163,437 @@ export function TeacherQuizzesScreen() {
     <AppScreen>
       <AppHeader
         title="Giao bài tập & kiểm tra"
-        subtitle="Quản lý trắc nghiệm mỗi buổi học"
+        subtitle="Quản lý bài kiểm tra, bài tập và kết quả"
         centered
         showBackButton={false}
       />
       <View style={styles.assessmentTabs} accessibilityRole="tablist">
-        <View style={[styles.assessmentTab, styles.assessmentTabActive]} accessible accessibilityRole="tab" accessibilityState={{ selected: true }}>
-          <Text style={[styles.assessmentTabText, styles.assessmentTabTextActive]}>Trắc nghiệm</Text>
-        </View>
-        <Pressable onPress={() => navigation.navigate('Assignments')} style={styles.assessmentTab} accessibilityRole="tab" accessibilityState={{ selected: false }}>
-          <Text style={styles.assessmentTabText}>Bài tập về nhà</Text>
+        <Pressable
+          onPress={() => setActiveAssessmentTab('quiz')}
+          style={[styles.assessmentTab, activeAssessmentTab === 'quiz' && styles.assessmentTabActive]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeAssessmentTab === 'quiz' }}
+        >
+          <Text style={[styles.assessmentTabText, activeAssessmentTab === 'quiz' && styles.assessmentTabTextActive]}>Bài thi Trắc nghiệm</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setActiveAssessmentTab('homework')}
+          style={[styles.assessmentTab, activeAssessmentTab === 'homework' && styles.assessmentTabActive]}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeAssessmentTab === 'homework' }}
+        >
+          <Text style={[styles.assessmentTabText, activeAssessmentTab === 'homework' && styles.assessmentTabTextActive]}>Bài tập về nhà (Nộp file)</Text>
         </Pressable>
       </View>
-      <View style={styles.quizCreateRow}>
+      {activeAssessmentTab === 'quiz' ? (
+      <>
+      <Card style={styles.quizManagerIntro}>
+        <View style={styles.quizManagerIntroHeading}>
+          <BookOpen size={20} color={colors.brand} />
+          <Text style={styles.quizManagerIntroTitle}>Quản lý Trắc nghiệm mỗi buổi học</Text>
+        </View>
+        <Text style={styles.quizManagerIntroDescription}>Tạo câu hỏi trắc nghiệm, gán cho học viên và chấm điểm tự động theo chuẩn phòng thi chứng chỉ.</Text>
         <Pressable
-          onPress={() => setShowCreate(!showCreate)}
-          style={styles.quizCreateAction}
+          onPress={() => setShowCreate(true)}
+          style={styles.quizManagerCreateButton}
           accessibilityRole="button"
-          accessibilityLabel={showCreate ? 'Đóng biểu mẫu tạo bài' : 'Tạo bài trắc nghiệm'}
+          accessibilityLabel="Tạo bài trắc nghiệm mới"
           accessibilityState={{ expanded: showCreate }}
         >
-          {showCreate ? <X size={18} color={colors.brand} /> : <Plus size={19} color={colors.brand} />}
-          <Text style={styles.quizCreateActionText}>{showCreate ? 'Đóng' : 'Tạo bài'}</Text>
+          <Plus size={18} color="#FFFFFF" />
+          <Text style={styles.quizManagerCreateButtonText}>Tạo bài trắc nghiệm mới</Text>
         </Pressable>
-      </View>
-      {showCreate ? (
-        <Card style={styles.quizCreateCard}>
-          <View>
+      </Card>
+      <Modal visible={showCreate} transparent animationType="fade" onRequestClose={() => setShowCreate(false)} statusBarTranslucent>
+        <View style={styles.quizModalOverlay}>
+          <View style={[styles.quizModalCard, width >= 760 && styles.quizModalCardWide, { maxHeight: Math.min(height * 0.92, 900) }]}>
+            <View style={styles.quizModalHeader}>
+              <View style={styles.quizModalHeaderCopy}>
+                <View style={styles.quizModalHeaderTitleRow}>
+                  <View style={styles.quizModalHeaderIcon}><Plus size={17} color="#FFFFFF" /></View>
+                  <Text style={styles.quizModalTitle}>Tạo bài thi trắc nghiệm theo buổi học</Text>
+                </View>
+                <Text style={styles.quizModalSubtitle}>Soạn nội dung trắc nghiệm và giao cho học viên.</Text>
+              </View>
+              <Pressable onPress={() => setShowCreate(false)} style={styles.quizModalClose} accessibilityRole="button" accessibilityLabel="Đóng cửa sổ tạo bài">
+                <X size={19} color={colors.muted} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.quizModalScroll}
+              contentContainerStyle={styles.quizModalContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
+          <View style={[styles.quizModalTopGrid, width >= 760 && styles.quizModalTopGridWide]}>
+            <View style={[styles.quizFormPanel, width >= 760 && styles.quizFormPanelWide]}>
+              <Text style={styles.quizModalFieldLabel}>Tên bài kiểm tra / Buổi học *</Text>
             <TextInput
               value={title}
-              onChangeText={(value) => {
-                setTitle(value);
-                if (value.trim()) setTitlePromptError(false);
-              }}
-              placeholder="Tên bài trắc nghiệm"
-              style={[styles.input, styles.quizTitleInput, titlePromptError && { borderColor: colors.red }]}
-              accessibilityLabel="Tên bài kiểm tra, cũng là prompt AI"
-              accessibilityHint={titlePromptError ? 'Bắt buộc nhập trước khi tạo câu hỏi bằng AI.' : undefined}
+              onChangeText={setTitle}
+              placeholder="Ví dụ: Trắc nghiệm Buổi 1 - MS Word"
+              style={[styles.input, styles.quizTitleInput]}
+              accessibilityLabel="Tên bài kiểm tra hoặc buổi học"
             />
-            {titlePromptError ? (
-              <Text style={{ color: colors.red, fontSize: typography.caption, fontWeight: '700', marginTop: spacing.xs }}>
-                Bắt buộc nhập prompt trước khi tạo bằng AI.
-              </Text>
-            ) : null}
           </View>
-          <Text style={styles.fieldLabel}>Khóa học</Text>
+          <View style={[styles.quizFormPanel, styles.quizAssignmentPanel]}>
+          <Text style={styles.quizModalFieldLabel}>Giao cho học viên</Text>
           {studentsResource.loading ? <LoadingSkeleton rows={1} /> : null}
           {studentsResource.error ? <ErrorState onRetry={studentsResource.reload} /> : null}
-          <View style={styles.chips}>
-            {courses.map((course) => <Pressable key={course} onPress={() => { setCourseName(course); setTargetStudentIds([]); }} style={[styles.choice, courseName === course && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: courseName === course }}><Text style={[styles.choiceText, courseName === course && styles.choiceTextActive]}>{course}</Text></Pressable>)}
-          </View>
-          {!courses.length && !studentsResource.loading ? <Text style={styles.note}>Chưa có khóa học được phân công để giao trắc nghiệm.</Text> : null}
-          <Text style={styles.fieldLabel}>Đối tượng</Text>
-          <View style={styles.chips}>
-            <Pressable onPress={() => setTargetAll(true)} style={[styles.choice, targetAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: targetAll }}><Text style={[styles.choiceText, targetAll && styles.choiceTextActive]}>Cả lớp ({courseStudents.length || '—'})</Text></Pressable>
-            <Pressable onPress={() => setTargetAll(false)} style={[styles.choice, !targetAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: !targetAll }}><Text style={[styles.choiceText, !targetAll && styles.choiceTextActive]}>Chọn học viên</Text></Pressable>
-          </View>
+          <View style={styles.quizAssignmentColumns}>
+            <View style={styles.quizAssignmentColumn}>
+              <Text style={styles.quizAssignmentColumnTitle}>Khóa học</Text>
+              <ScrollView style={styles.quizAssignmentChoiceList} contentContainerStyle={styles.quizAssignmentChoices} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                <Pressable
+                  onPress={() => { setCourseName(''); setTargetAll(true); setTargetStudentIds([]); }}
+                  style={[styles.quizAssignmentChoice, !courseName && styles.quizAssignmentChoiceActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !courseName }}
+                >
+                  <Text style={[styles.quizAssignmentChoiceText, !courseName && styles.quizAssignmentChoiceTextActive]}>Tất cả</Text>
+                  {!courseName ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                </Pressable>
+                {courses.map((course) => {
+                  const selected = courseName === course;
+                  return (
+                  <Pressable
+                    key={course}
+                    onPress={() => { setCourseName(course); setTargetAll(true); setTargetStudentIds([]); }}
+                    style={[styles.quizAssignmentChoice, selected && styles.quizAssignmentChoiceActive]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.quizAssignmentChoiceText, selected && styles.quizAssignmentChoiceTextActive]}>{course}</Text>
+                    {selected ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                  </Pressable>
+                  );
+                })}
+              </ScrollView>
+              {!courses.length && !studentsResource.loading ? <Text style={styles.note}>Chưa có khóa học được phân công.</Text> : null}
+            </View>
+            <View style={styles.quizAssignmentColumn}>
+              <Text style={styles.quizAssignmentColumnTitle}>Đối tượng</Text>
+              <View style={styles.quizAssignmentChoices}>
+                <Pressable onPress={() => setTargetAll(true)} style={[styles.quizAssignmentChoice, targetAll && styles.quizAssignmentChoiceActive]} accessibilityRole="button" accessibilityState={{ selected: targetAll }}>
+                  <Text style={[styles.quizAssignmentChoiceText, targetAll && styles.quizAssignmentChoiceTextActive]}>Tất cả</Text>
+                  {targetAll ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                </Pressable>
+                <Pressable onPress={() => setTargetAll(false)} style={[styles.quizAssignmentChoice, !targetAll && styles.quizAssignmentChoiceActive]} accessibilityRole="button" accessibilityState={{ selected: !targetAll }}>
+                  <Text style={[styles.quizAssignmentChoiceText, !targetAll && styles.quizAssignmentChoiceTextActive]}>Chọn học viên</Text>
+                  {!targetAll ? <Text style={styles.quizAssignmentChoiceCheck}>✓</Text> : null}
+                </Pressable>
+              </View>
           {!targetAll ? (
             <View style={styles.studentTargetList}>
               <TextInput value={targetSearch} onChangeText={setTargetSearch} placeholder="Tìm học viên" style={[styles.input, styles.quizCompactInput]} accessibilityLabel="Tìm học viên để giao trắc nghiệm" />
-              <View style={styles.quizActions}>
-                <Pressable onPress={() => setTargetStudentIds((current) => [...new Set([...current, ...visibleTargetStudents.map((student) => student.id)])])} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Chọn tất cả đang hiển thị</Text></Pressable>
-                <Pressable onPress={() => setTargetStudentIds([])} style={styles.quizAction} accessibilityRole="button"><Text style={styles.quizActionText}>Bỏ chọn</Text></Pressable>
+              <View style={styles.quizAssignmentActions}>
+                <Pressable onPress={() => setTargetStudentIds((current) => [...new Set([...current, ...visibleTargetStudents.map((student) => student.id)])])} style={styles.quizAssignmentAction} accessibilityRole="button"><Text style={styles.quizAssignmentActionText}>Chọn hiển thị</Text></Pressable>
+                <Pressable onPress={() => setTargetStudentIds([])} style={styles.quizAssignmentAction} accessibilityRole="button"><Text style={styles.quizAssignmentActionText}>Bỏ chọn</Text></Pressable>
               </View>
-              {visibleTargetStudents.map((student) => {
-                const selected = targetStudentIds.includes(student.id);
-                return <Pressable key={student.id} onPress={() => setTargetStudentIds((current) => selected ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.studentTarget, selected && styles.studentTargetSelected]} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><Text style={styles.studentTargetText}>{selected ? '✓  ' : ''}{student.name} · {student.course}</Text></Pressable>;
-              })}
+              <Text style={styles.quizAssignmentStatus}>
+                {targetStudentIds.length
+                  ? `Đã chọn ${targetStudentIds.length}/${courseStudents.length} học viên`
+                  : `Mặc định: cả lớp (${courseStudents.length} HV)`}
+              </Text>
+              <ScrollView style={[styles.quizStudentList, styles.quizAssignmentStudentList]} contentContainerStyle={styles.quizAssignmentStudentListContent} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                {visibleTargetStudents.map((student) => {
+                  const selected = targetStudentIds.includes(student.id);
+                  return <Pressable key={student.id} onPress={() => setTargetStudentIds((current) => selected ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.studentTarget, selected && styles.studentTargetSelected]} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><Text numberOfLines={1} style={styles.studentTargetText}>{selected ? '✓  ' : ''}{student.name}</Text></Pressable>;
+                })}
+              </ScrollView>
               {!visibleTargetStudents.length ? <Text style={styles.note}>{courseStudents.length ? 'Không tìm thấy học viên phù hợp.' : 'Khóa học này chưa có học viên được phân công.'}</Text> : null}
             </View>
           ) : null}
+          </View>
+          </View>
+          </View>
+          </View>
           <View style={styles.quizScheduleFields}>
-            <Text style={styles.fieldLabel}>Lịch làm bài</Text>
+            <View style={[styles.quizScheduleGrid, width >= 760 && styles.quizScheduleGridWide]}>
+            <View style={styles.quizScheduleField}>
+            <Text style={styles.quizModalFieldLabel}>Thời gian (phút)</Text>
             <TextInput value={timeLimit} onChangeText={setTimeLimit} keyboardType="number-pad" placeholder="Thời lượng (phút)" style={[styles.input, styles.quizCompactInput]} />
-            <TextInput value={startTime} onChangeText={setStartTime} placeholder="Bắt đầu · YYYY-MM-DD HH:mm" style={[styles.input, styles.quizCompactInput]} />
-            <TextInput value={deadline} onChangeText={setDeadline} placeholder="Kết thúc · YYYY-MM-DD HH:mm" style={[styles.input, styles.quizCompactInput]} />
+            </View>
+            <View style={styles.quizScheduleField}>
+            <Text style={styles.quizModalFieldLabel}>Thời điểm bắt đầu (tuỳ chọn)</Text>
+            <Pressable onPress={() => openSchedulePicker('start')} style={styles.quizDateTimeButton} accessibilityRole="button" accessibilityLabel={startTime ? `Thời điểm bắt đầu: ${startTime}` : 'Chọn thời điểm bắt đầu'}>
+              <CalendarDays size={17} color={colors.brand} />
+              <Text style={[styles.quizDateTimeText, !startTime && styles.quizDateTimePlaceholder]}>{startTime || 'Chọn ngày và giờ'}</Text>
+              <Clock3 size={16} color={colors.muted} />
+            </Pressable>
+            </View>
+            <View style={styles.quizScheduleField}>
+            <Text style={styles.quizModalFieldLabel}>Hạn chót (tuỳ chọn)</Text>
+            <Pressable onPress={() => openSchedulePicker('deadline')} style={styles.quizDateTimeButton} accessibilityRole="button" accessibilityLabel={deadline ? `Hạn chót: ${deadline}` : 'Chọn hạn chót'}>
+              <CalendarDays size={17} color={colors.brand} />
+              <Text style={[styles.quizDateTimeText, !deadline && styles.quizDateTimePlaceholder]}>{deadline || 'Chọn ngày và giờ'}</Text>
+              <Clock3 size={16} color={colors.muted} />
+            </Pressable>
+            </View>
+            </View>
           </View>
           <View style={styles.quizTools}>
-            <Text style={styles.fieldLabel}>Ngân hàng câu hỏi</Text>
-            <View style={styles.quizActions}>
+            <Text style={styles.quizModalFieldLabel}>Ngân hàng câu hỏi</Text>
+            <View style={styles.quizExcelActions}>
               <Pressable onPress={() => { void handleImportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
                 <Text style={styles.quizActionText}>{questionExcelBusy ? 'Đang xử lý…' : 'Nhập Excel'}</Text>
               </Pressable>
               <Pressable onPress={() => { void handleDownloadQuestionTemplate(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
-                <Text style={styles.quizActionText}>Tải mẫu</Text>
+                <Text style={styles.quizActionText}>Mẫu</Text>
               </Pressable>
               <Pressable onPress={() => { void handleExportQuestionExcel(); }} style={styles.quizAction} accessibilityRole="button" disabled={questionExcelBusy}>
-                <Text style={styles.quizActionText}>Xuất Excel</Text>
+                <Text style={styles.quizActionText}>Xuất</Text>
               </Pressable>
-              <Text style={styles.note}>Câu hỏi Excel sẽ được thêm vào bài và lưu lên hệ thống khi bạn tạo bài trắc nghiệm.</Text>
             </View>
-            <TextInput value={aiTopic} onChangeText={setAiTopic} placeholder="Chủ đề câu hỏi AI (tùy chọn)" style={[styles.input, styles.quizCompactInput]} />
-            <Text style={styles.fieldLabel}>Số câu AI</Text>
-            <View style={styles.radioChoices} accessibilityRole="radiogroup">
-              {[5, 10, 15].map((count) => {
-                const selected = aiQuestionCount === count;
-                return (
-                  <Pressable key={count} onPress={() => setAiQuestionCount(count)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
-                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-                      {selected ? <View style={styles.radioInner} /> : null}
-                    </View>
-                    <Text style={styles.radioChoiceText}>{count} câu</Text>
-                  </Pressable>
-                );
-              })}
+            <Text style={styles.note}>Câu hỏi Excel sẽ được thêm vào bài và lưu lên hệ thống khi bạn tạo bài trắc nghiệm.</Text>
+            <View style={styles.quizAiPanel}>
+              <TextInput
+                value={aiTopic}
+                onChangeText={(value) => {
+                  setAiTopic(value);
+                  if (value.trim()) setAiTopicError(false);
+                }}
+                placeholder="Chủ đề câu hỏi AI * (prompt tạo câu hỏi)"
+                style={[styles.input, styles.quizCompactInput, aiTopicError && { borderColor: colors.red }]}
+                accessibilityLabel="Chủ đề câu hỏi AI, prompt tạo câu hỏi"
+                accessibilityHint={aiTopicError ? 'Bắt buộc nhập trước khi tạo câu hỏi bằng AI.' : undefined}
+              />
+              {aiTopicError ? <Text style={{ color: colors.red, fontSize: typography.micro, fontWeight: '700' }}>Nhập chủ đề câu hỏi để AI tạo câu hỏi.</Text> : null}
+              <View style={[styles.quizAiControls, width >= 760 && styles.quizAiControlsWide]}>
+                <View style={[styles.quizAiChoiceGroup, width >= 760 && styles.quizAiChoiceGroupWide]}>
+                  <Text style={styles.quizAiLabel}>Số câu AI</Text>
+                  <View style={styles.radioChoices} accessibilityRole="radiogroup">
+                    {[5, 10, 15].map((count) => {
+                      const selected = aiQuestionCount === count;
+                      return (
+                        <Pressable key={count} onPress={() => setAiQuestionCount(count)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
+                          <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                            {selected ? <View style={styles.radioInner} /> : null}
+                          </View>
+                          <Text style={styles.radioChoiceText}>{count} câu</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <View style={[styles.quizAiChoiceGroup, width >= 760 && styles.quizAiChoiceGroupWide]}>
+                  <Text style={styles.quizAiLabel}>Độ khó</Text>
+                  <View style={styles.radioChoices} accessibilityRole="radiogroup">
+                    {['dễ', 'trung bình', 'khó'].map((difficulty) => {
+                      const selected = aiDifficulty === difficulty;
+                      return (
+                        <Pressable key={difficulty} onPress={() => setAiDifficulty(difficulty)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
+                          <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                            {selected ? <View style={styles.radioInner} /> : null}
+                          </View>
+                          <Text style={styles.radioChoiceText}>{difficulty}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <Pressable onPress={() => { void handleGenerateQuestions(); }} style={[styles.quizAiButton, width >= 760 && styles.quizAiButtonWide, generatingQuestions && styles.quizAiButtonDisabled]} disabled={generatingQuestions} accessibilityRole="button" accessibilityState={{ disabled: generatingQuestions }}>
+                  <Sparkles size={16} color="#FFFFFF" />
+                  <Text style={styles.quizAiButtonText}>{generatingQuestions ? 'Đang soạn…' : 'Tạo bằng AI (Gemini)'}</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.quizAiHint}>AI chỉ điền câu hỏi vào form. Bạn kiểm tra đáp án rồi mới bấm “Tạo bài trắc nghiệm”.</Text>
+              {quizToolsMessage ? <Text style={styles.note}>{quizToolsMessage}</Text> : null}
             </View>
-            <Text style={styles.fieldLabel}>Độ khó</Text>
-            <View style={styles.radioChoices} accessibilityRole="radiogroup">
-              {['dễ', 'trung bình', 'khó'].map((difficulty) => {
-                const selected = aiDifficulty === difficulty;
-                return (
-                  <Pressable key={difficulty} onPress={() => setAiDifficulty(difficulty)} style={styles.radioChoice} accessibilityRole="radio" accessibilityState={{ selected }}>
-                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-                      {selected ? <View style={styles.radioInner} /> : null}
-                    </View>
-                    <Text style={styles.radioChoiceText}>{difficulty}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <PrimaryButton title={generatingQuestions ? 'Đang tạo câu hỏi…' : 'Tạo câu hỏi bằng AI (Gemini)'} variant="secondary" loading={generatingQuestions} disabled={generatingQuestions} onPress={() => { void handleGenerateQuestions(); }} />
-            {quizToolsMessage ? <Text style={styles.note}>{quizToolsMessage}</Text> : null}
           </View>
-          <SectionHeading title={`Câu hỏi (${questions.length})`} action="Thêm câu" onPress={() => setQuestions((current) => [...current, { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }])} />
+          <View style={styles.quizQuestionSectionHeader}>
+            <Text style={styles.quizQuestionSectionTitle}>Danh sách câu hỏi ({questions.length} câu)</Text>
+            <Pressable onPress={() => setQuestions((current) => [...current, { text: '', options: ['', '', '', ''], correctOption: 0, explanation: '' }])} style={styles.quizAddQuestionButton} accessibilityRole="button">
+              <Plus size={14} color="#FFFFFF" />
+              <Text style={styles.quizAddQuestionText}>Thêm câu hỏi</Text>
+            </Pressable>
+          </View>
+          {!questions.length ? (
+            <View style={styles.quizEmptyQuestions}>
+              <Text style={styles.quizEmptyQuestionsTitle}>Chưa có câu hỏi</Text>
+              <Text style={styles.quizEmptyQuestionsText}>Nhập câu hỏi từ Excel, hoặc dùng AI trước khi tạo bài.</Text>
+            </View>
+          ) : null}
           {questions.map((question, questionIndex) => (
             <View key={`question-${questionIndex}`} style={styles.questionEditor}>
               <View style={styles.rowBetween}>
-                <Text style={styles.cardTitle}>Câu {questionIndex + 1}</Text>
-                {questions.length > 1 ? <Pressable onPress={() => setQuestions((current) => current.filter((_, index) => index !== questionIndex))} style={styles.questionRemove} accessibilityRole="button" accessibilityLabel={`Xóa câu hỏi ${questionIndex + 1}`}><Text style={styles.quizDeleteText}>Xóa câu</Text></Pressable> : null}
+                <Text style={styles.quizQuestionNumber}>Câu hỏi số {questionIndex + 1}</Text>
+                <Pressable onPress={() => setQuestions((current) => current.filter((_, index) => index !== questionIndex))} style={styles.questionRemove} accessibilityRole="button" accessibilityLabel={`Xóa câu hỏi ${questionIndex + 1}`}>
+                  <Trash2 size={13} color={colors.red} />
+                  <Text style={styles.quizDeleteText}>Xóa câu</Text>
+                </Pressable>
               </View>
-              <TextInput value={question.text} onChangeText={(text) => updateQuestion(questionIndex, (current) => ({ ...current, text }))} placeholder="Nội dung câu hỏi" style={[styles.input, styles.textArea, styles.quizQuestionText]} />
-              {question.options.map((option, optionIndex) => (
-                <View key={`option-${questionIndex}-${optionIndex}`} style={styles.optionRow}>
-                  <Pressable onPress={() => updateQuestion(questionIndex, (current) => ({ ...current, correctOption: optionIndex }))} accessibilityRole="radio" accessibilityLabel={`Đánh dấu phương án ${String.fromCharCode(65 + optionIndex)} câu ${questionIndex + 1} là đáp án đúng`} accessibilityState={{ selected: question.correctOption === optionIndex }}>
-                    <Text style={[styles.optionToggle, question.correctOption === optionIndex && styles.optionToggleActive]}>{question.correctOption === optionIndex ? '✓' : String.fromCharCode(65 + optionIndex)}</Text>
-                  </Pressable>
-                  <TextInput value={option} onChangeText={(value) => updateQuestion(questionIndex, (current) => ({ ...current, options: current.options.map((item, index) => index === optionIndex ? value : item) }))} placeholder={`Phương án ${String.fromCharCode(65 + optionIndex)}`} style={[styles.input, styles.quizCompactInput, styles.flex]} />
-                </View>
-              ))}
-              <TextInput value={question.explanation} onChangeText={(explanation) => updateQuestion(questionIndex, (current) => ({ ...current, explanation }))} placeholder="Giải thích đáp án (nếu có)" multiline style={[styles.input, styles.textArea, styles.quizQuestionText]} />
+              <TextInput value={question.text} onChangeText={(text) => updateQuestion(questionIndex, (current) => ({ ...current, text }))} placeholder="Nhập nội dung câu hỏi..." style={[styles.input, styles.quizQuestionText]} />
+              <View style={[styles.quizOptionGrid, width >= 600 && styles.quizOptionGridWide]}>
+                {question.options.map((option, optionIndex) => {
+                  const letter = String.fromCharCode(65 + optionIndex);
+                  const isCorrect = question.correctOption === optionIndex;
+                  return (
+                    <View key={`option-${questionIndex}-${optionIndex}`} style={[styles.quizOptionRow, width >= 600 && styles.quizOptionRowWide]}>
+                      <Pressable
+                        onPress={() => updateQuestion(questionIndex, (current) => ({ ...current, correctOption: optionIndex }))}
+                        style={[styles.quizOptionToggle, isCorrect && styles.quizOptionToggleActive]}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`Đánh dấu phương án ${letter} câu ${questionIndex + 1} là đáp án đúng`}
+                        accessibilityState={{ selected: isCorrect }}
+                      >
+                        <Text style={[styles.quizOptionToggleText, isCorrect && styles.quizOptionToggleTextActive]}>{letter}</Text>
+                      </Pressable>
+                      <TextInput value={option} onChangeText={(value) => updateQuestion(questionIndex, (current) => ({ ...current, options: current.options.map((item, index) => index === optionIndex ? value : item) }))} placeholder={`Đáp án ${letter}`} style={[styles.input, styles.quizOptionInput]} />
+                    </View>
+                  );
+                })}
+              </View>
+              <TextInput value={question.explanation} onChangeText={(explanation) => updateQuestion(questionIndex, (current) => ({ ...current, explanation }))} placeholder="Lời giải thích (không bắt buộc)..." style={[styles.input, styles.quizExplanationInput]} />
             </View>
           ))}
           {isPreview ? <Text style={styles.note}>Bản xem trước: bài tạo chỉ lưu cục bộ, không gửi cho học viên.</Text> : null}
-          <PrimaryButton
-            title={savingQuiz ? 'Đang tạo bài…' : isPreview ? 'Thêm vào danh sách xem trước' : 'Tạo bài trắc nghiệm'}
-            loading={savingQuiz}
-            disabled={savingQuiz}
-            onPress={() => { void handleCreateQuiz(); }}
-          />
-        </Card>
-      ) : null}
+            </ScrollView>
+            <View style={styles.quizModalFooter}>
+              <Pressable onPress={() => setShowCreate(false)} style={styles.quizModalCancelButton} accessibilityRole="button">
+                <Text style={styles.quizModalCancelText}>Hủy</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { void handleCreateQuiz(); }}
+                style={[styles.quizModalSubmitButton, savingQuiz && styles.quizModalSubmitDisabled]}
+                disabled={savingQuiz}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: savingQuiz }}
+              >
+                {savingQuiz ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+                <Text style={styles.quizModalSubmitText}>{savingQuiz ? 'Đang tạo…' : isPreview ? 'Thêm vào danh sách xem trước' : 'Tạo bài trắc nghiệm'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={schedulePickerTarget !== null} transparent animationType="fade" onRequestClose={() => setSchedulePickerTarget(null)} statusBarTranslucent>
+        <View style={styles.quizDatePickerOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSchedulePickerTarget(null)} accessibilityRole="button" accessibilityLabel="Đóng bộ chọn ngày giờ" />
+          <View style={styles.quizDatePickerCard}>
+            <View style={styles.quizDatePickerHeader}>
+              <View style={styles.quizDatePickerTitleGroup}>
+                <View style={styles.quizDatePickerIcon}><CalendarDays size={17} color="#FFFFFF" /></View>
+                <View>
+                  <Text style={styles.quizDatePickerTitle}>{schedulePickerTarget === 'start' ? 'Thời điểm bắt đầu' : 'Hạn chót'}</Text>
+                  <Text style={styles.quizDatePickerSubtitle}>Chọn ngày và giờ</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => setSchedulePickerTarget(null)} style={styles.quizDatePickerClose} accessibilityRole="button" accessibilityLabel="Đóng bộ chọn ngày giờ">
+                <X size={18} color={colors.muted} />
+              </Pressable>
+            </View>
+            <View style={styles.quizDatePickerMonthRow}>
+              <Pressable
+                onPress={() => setSchedulePickerMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+                style={styles.quizDatePickerMonthButton}
+                accessibilityRole="button"
+                accessibilityLabel="Tháng trước"
+              >
+                <ChevronDown size={18} color={colors.ink} style={{ transform: [{ rotate: '90deg' }] }} />
+              </Pressable>
+              <Text style={styles.quizDatePickerMonth}>{schedulePickerMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</Text>
+              <Pressable
+                onPress={() => setSchedulePickerMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+                style={styles.quizDatePickerMonthButton}
+                accessibilityRole="button"
+                accessibilityLabel="Tháng sau"
+              >
+                <ChevronDown size={18} color={colors.ink} style={{ transform: [{ rotate: '-90deg' }] }} />
+              </Pressable>
+            </View>
+            <View style={styles.quizDatePickerCalendar}>
+              {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => (
+                <Text key={day} style={styles.quizDatePickerWeekday}>{day}</Text>
+              ))}
+              {scheduleCalendarCells.map((day, index) => {
+                if (!day) return <View key={`empty-${index}`} style={styles.quizDatePickerDayEmpty} />;
+                const selected = schedulePickerDate.getFullYear() === schedulePickerMonth.getFullYear()
+                  && schedulePickerDate.getMonth() === schedulePickerMonth.getMonth()
+                  && schedulePickerDate.getDate() === day;
+                const today = new Date();
+                const isToday = today.getFullYear() === schedulePickerMonth.getFullYear()
+                  && today.getMonth() === schedulePickerMonth.getMonth()
+                  && today.getDate() === day;
+                return (
+                  <Pressable
+                    key={`day-${day}`}
+                    onPress={() => setSchedulePickerDate(new Date(schedulePickerMonth.getFullYear(), schedulePickerMonth.getMonth(), day))}
+                    style={[styles.quizDatePickerDay, isToday && styles.quizDatePickerDayToday, selected && styles.quizDatePickerDaySelected]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${day} ${schedulePickerMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`}
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.quizDatePickerDayText, selected && styles.quizDatePickerDayTextSelected]}>{day}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.quizDatePickerTimeSection}>
+              <Text style={styles.quizDatePickerTimeLabel}>Giờ bắt đầu</Text>
+              <View style={styles.quizDatePickerTimeInputs}>
+                <View style={styles.quizDatePickerTimeInputGroup}>
+                  <Text style={styles.quizDatePickerTimeUnit}>Giờ</Text>
+                  <TextInput
+                    value={schedulePickerHour}
+                    onChangeText={(value) => setSchedulePickerHour(value.replace(/\D/g, '').slice(0, 2))}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    placeholder="09"
+                    style={styles.quizDatePickerTimeInput}
+                    accessibilityLabel="Giờ"
+                  />
+                </View>
+                <Text style={styles.quizDatePickerTimeSeparator}>:</Text>
+                <View style={styles.quizDatePickerTimeInputGroup}>
+                  <Text style={styles.quizDatePickerTimeUnit}>Phút</Text>
+                  <TextInput
+                    value={schedulePickerMinute}
+                    onChangeText={(value) => setSchedulePickerMinute(value.replace(/\D/g, '').slice(0, 2))}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    placeholder="00"
+                    style={styles.quizDatePickerTimeInput}
+                    accessibilityLabel="Phút"
+                  />
+                </View>
+                <Text style={styles.quizDatePickerTimeHint}>24 giờ</Text>
+              </View>
+            </View>
+            <View style={styles.quizDatePickerFooter}>
+              {schedulePickerTarget === 'start' ? (
+                <Pressable onPress={() => { setStartTime(''); setSchedulePickerTarget(null); }} style={styles.quizDatePickerClear} accessibilityRole="button">
+                  <Text style={styles.quizDatePickerClearText}>Xóa ngày giờ</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => { setDeadline(''); setSchedulePickerTarget(null); }} style={styles.quizDatePickerClear} accessibilityRole="button">
+                  <Text style={styles.quizDatePickerClearText}>Không giới hạn</Text>
+                </Pressable>
+              )}
+              <Pressable onPress={applySchedulePicker} style={styles.quizDatePickerConfirm} accessibilityRole="button">
+                <Check size={16} color="#FFFFFF" />
+                <Text style={styles.quizDatePickerConfirmText}>Xác nhận</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {items.map((quiz) => (
-        <QuizCard
-          key={quiz.id}
-          quiz={quiz}
-          onDelete={() => handleDeleteQuiz(quiz)}
-          onRecreate={() => handleRecreateQuiz(quiz)}
-        />
-      ))}
+      <View style={[styles.quizListGrid, width >= 760 && styles.quizListGridWide, width >= 1120 && styles.quizListGridExtraWide]}>
+        {items.map((quiz) => (
+          <View key={quiz.id} style={[styles.quizListItem, width >= 760 && styles.quizListItemWide, width >= 1120 && styles.quizListItemExtraWide]}>
+            <QuizCard
+              quiz={quiz}
+              onDelete={() => handleDeleteQuiz(quiz)}
+              onRecreate={() => handleRecreateQuiz(quiz)}
+            />
+          </View>
+        ))}
+      </View>
       {!resource.loading && !resource.error && !items.length ? <EmptyState title="Chưa có bài trắc nghiệm" message="Bài trắc nghiệm đã tạo sẽ hiển thị tại đây." /> : null}
+      </>
+      ) : <AssignmentsScreen embedded />}
     </AppScreen>
   );
 }
@@ -2099,18 +2653,22 @@ function QuizCard({ quiz, onDelete, onRecreate }: { quiz: DemoQuiz; onDelete: ()
 
 export function TeacherTrainingScreen() {
   const { user } = useAuth();
-  const loader = useCallback(() => trainingService.list(user), [user]);
+  const { width } = useWindowDimensions();
+  const loader = useCallback(() => trainingService.overview(user), [user]);
   const resource = useMockResource(loader);
-  const softwareLoader = useCallback(() => softwareService.list(user), [user]);
-  const software = useMockResource(softwareLoader);
-  const courses = resource.data || [];
+  const overview = resource.data;
+  const courses = overview?.courses || [];
+  const guides = overview?.guides || [];
+  const files = overview?.files || [];
+  const softwareLinks = overview?.softwareLinks || [];
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [expandedGuideIds, setExpandedGuideIds] = useState<string[]>([]);
   const [tab, setTab] = useState('Khóa học');
   const trainingTabs = [
     { label: 'Khóa học', count: courses.length, icon: Video, color: '#EF4056' },
-    { label: 'Quy trình', count: courses.reduce((total, course) => total + course.lessons.length, 0), icon: FileText, color: '#3B82F6' },
-    { label: 'Tài liệu', count: courses.reduce((total, course) => total + course.files.length, 0), icon: Download, color: '#F97316' },
-    { label: 'Phần mềm', count: software.data?.length || 0, icon: Link2, color: '#14B8A6' },
+    { label: 'Quy trình', count: guides.length, icon: FileText, color: '#3B82F6' },
+    { label: 'Tài liệu', count: files.length, icon: Download, color: '#F97316' },
+    { label: 'Phần mềm', count: softwareLinks.length, icon: Link2, color: '#14B8A6' },
   ];
   return (
     <AppScreen>
@@ -2132,22 +2690,63 @@ export function TeacherTrainingScreen() {
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {tab === 'Phần mềm' ? (
         <>
-          {software.loading ? <LoadingSkeleton /> : null}
-          {software.error ? <ErrorState onRetry={software.reload} /> : null}
-          {(software.data || []).map((item) => <Card key={item.id}>
+          {softwareLinks.map((item) => <Card key={item.id}>
             <Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.metaText}>{item.category}</Text><Text style={styles.muted}>{item.description}</Text>
             <Pressable onPress={() => { void openExternalUrl(item.url, item.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}><Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text></Pressable>
           </Card>)}
-          {!software.loading && !software.error && !software.data?.length ? <EmptyState title="Chưa có phần mềm" message="Chưa có dữ liệu phần mềm trong bản demo." /> : null}
+          {!resource.loading && !resource.error && !softwareLinks.length ? <EmptyState title="Chưa có phần mềm" message="Chưa có phần mềm nào được giao." /> : null}
         </>
       ) : tab === 'Tài liệu' ? (
-        courses.flatMap((course) => course.files.map((file, index) => {
-          const resourceFile = course.fileLinks?.[index];
-          return <Card key={`${course.id}-${file}`} style={styles.unitRow}>
-            <BookOpen size={18} color={colors.brand} /><View style={styles.flex}><Text style={styles.cardTitle}>{file}</Text><Text style={styles.metaText}>{course.title}</Text></View>
-            <Pressable onPress={() => { void openExternalUrl(resourceFile?.url, file); }} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel={`Mở tài liệu ${file}`}><Text style={styles.feedInlineActionText}>Mở</Text></Pressable>
-          </Card>;
-        }))
+        <>
+          {files.map((file) => {
+            const isLink = file.type.toLowerCase() === 'link' || /^https?:\/\//i.test(file.url);
+            return <Card key={file.id} style={styles.unitRow}>
+              <View style={[styles.trainingFileType, { backgroundColor: isLink ? '#0EA5E9' : file.type.toUpperCase() === 'PDF' ? '#EF4444' : colors.brand }]}><Text style={styles.trainingFileTypeText}>{isLink ? 'Link' : file.type || 'FILE'}</Text></View>
+              <View style={styles.flex}>
+                <Text style={styles.cardTitle}>{file.title}</Text>
+                <Text style={styles.metaText}>{isLink ? 'Liên kết ngoài' : file.size || 'N/A'}</Text>
+              </View>
+              <Pressable onPress={() => { void openExternalUrl(file.url, file.title); }} style={styles.feedInlineAction} accessibilityRole="button" accessibilityLabel={file.url ? `Mở tài liệu ${file.title}` : `Tài liệu ${file.title} chưa có liên kết`}>
+                <Text style={styles.feedInlineActionText}>{file.url ? (isLink ? 'Mở link' : 'Mở') : 'Chưa có file'}</Text>
+              </Pressable>
+            </Card>;
+          })}
+          {!resource.loading && !resource.error && !files.length ? <EmptyState title="Chưa có tài liệu" message="Chưa có tài liệu đào tạo nào được giao." /> : null}
+        </>
+      ) : tab === 'Quy trình' ? (
+        <>
+          {guides.map((guide) => {
+            const isExpanded = expandedGuideIds.includes(guide.id);
+            const hasHtml = /<[a-z][\s\S]*>/i.test(guide.description);
+            const plainText = guide.description.replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ').trim();
+            const showToggle = plainText.length > 120 || hasHtml;
+            return <Card key={guide.id} style={styles.trainingGuide}>
+              <View style={styles.trainingGuideIcon}><Text style={styles.trainingGuideIconText}>{guide.icon || '📄'}</Text></View>
+              <View style={styles.flex}>
+                <Text style={styles.cardTitle}>{guide.title}</Text>
+                {!guide.description.trim() ? (
+                  <Text style={styles.metaText}>Chưa có nội dung chi tiết.</Text>
+                ) : isExpanded && hasHtml ? (
+                  <RenderHtml
+                    contentWidth={Math.max(1, width - spacing.lg * 2 - spacing.md * 2 - 56)}
+                    source={{ html: guide.description, baseUrl: getMobileApiBaseUrl() }}
+                  />
+                ) : (
+                  <Text numberOfLines={isExpanded ? undefined : 3} style={styles.muted}>{plainText}</Text>
+                )}
+                {showToggle ? (
+                  <Pressable
+                    onPress={() => setExpandedGuideIds((ids) => isExpanded ? ids.filter((id) => id !== guide.id) : [...ids, guide.id])}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.trainingGuideToggle}>{isExpanded ? 'Thu gọn' : 'Xem thêm'}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </Card>;
+          })}
+          {!resource.loading && !resource.error && !guides.length ? <EmptyState title="Chưa có quy trình" message="Chưa có quy trình đào tạo nào được giao." /> : null}
+        </>
       ) : (
         courses.map((course) => <TrainingCard
           key={course.id}
@@ -2159,7 +2758,7 @@ export function TeacherTrainingScreen() {
           onToggle={() => setExpanded(expanded.includes(course.id) ? expanded.filter((id) => id !== course.id) : [...expanded, course.id])}
         />)
       )}
-      {!resource.loading && !resource.error && !courses.length && tab !== 'Phần mềm' ? <EmptyState title="Chưa có khóa đào tạo" message="Nội dung sẽ xuất hiện khi được giao." /> : null}
+      {!resource.loading && !resource.error && tab === 'Khóa học' && !courses.length ? <EmptyState title="Chưa có khóa đào tạo" message="Nội dung sẽ xuất hiện khi được giao." /> : null}
     </AppScreen>
   );
 }
@@ -2466,13 +3065,16 @@ const styles = StyleSheet.create({
   feedModerationTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
   feedModerationSubtitle: { color: colors.muted, fontSize: typography.micro, marginTop: 2 },
   feedReportItem: { gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F3E8C2' },
+  feedReportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   feedReportCopy: { gap: 3 },
   feedReportReason: { color: '#92400E', fontSize: typography.caption, fontWeight: '800' },
   feedReportExcerpt: { color: colors.ink, fontSize: typography.caption, lineHeight: 18 },
   feedReportReporter: { color: colors.muted, fontSize: typography.micro },
   feedReportDetails: { color: colors.muted, fontSize: typography.micro, fontStyle: 'italic' },
   feedReportResolve: { alignSelf: 'flex-start', minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: '#ECFDF5' },
+  feedReportDelete: { backgroundColor: '#FEF2F2' },
   feedReportResolveText: { color: '#047857', fontSize: typography.micro, fontWeight: '800' },
+  feedReportDeleteText: { color: colors.red },
   feedReportError: { padding: spacing.sm, borderRadius: radius.md, backgroundColor: '#FEF2F2' },
   feedReportErrorText: { color: colors.red, fontSize: typography.caption, lineHeight: 18 },
   feedReportModalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg, backgroundColor: 'rgba(15,23,42,0.56)' },
@@ -2529,6 +3131,7 @@ const styles = StyleSheet.create({
   feedActionButtonText: { flexShrink: 1, color: colors.muted, fontSize: 10, fontWeight: '700', textAlign: 'center' },
   feedCommentsSection: { gap: spacing.md, marginTop: spacing.sm, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   feedCommentThread: { gap: 0 },
+  feedFocusHighlight: { borderRadius: radius.md, backgroundColor: '#EEF2FF' },
   feedCommentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   feedCommentContent: { flex: 1, minWidth: 0 },
   feedCommentHeader: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
@@ -2539,6 +3142,15 @@ const styles = StyleSheet.create({
   feedCommentTime: { color: colors.muted, fontSize: 9 },
   feedCommentDelete: { padding: 3 },
   feedCommentText: { color: colors.ink, fontSize: typography.caption, lineHeight: 18 },
+  feedCommentImages: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  feedCommentImageFrame: { width: '48%', aspectRatio: 1.4, overflow: 'hidden', borderRadius: radius.sm, backgroundColor: colors.canvas },
+  feedCommentImagePreviews: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  feedCommentImagePreview: { position: 'relative', width: 58, height: 58, overflow: 'hidden', borderRadius: radius.sm, backgroundColor: colors.canvas },
+  feedCommentImage: { width: '100%', height: '100%' },
+  feedCommentImageRemove: { position: 'absolute', top: 3, right: 3, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: 'rgba(15, 23, 42, 0.75)' },
+  feedCommentImageAction: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center' },
+  feedCommentSend: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center' },
+  feedCommentSendDisabled: { opacity: 0.55 },
   feedCommentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 },
   feedReplyAction: { minHeight: 22, justifyContent: 'center', paddingHorizontal: 2 },
   feedCommentActionText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
@@ -2642,25 +3254,141 @@ const styles = StyleSheet.create({
   centerItemSecondaryText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
   centerBranchCount: { color: colors.ink, fontSize: typography.small, fontWeight: '700', marginBottom: spacing.sm },
   centerSectionContent: { gap: spacing.xs },
-  assessmentTabs: { flexDirection: 'row', marginBottom: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
-  assessmentTab: { flex: 1, minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  assessmentTabActive: { borderBottomColor: colors.brand },
+  assessmentTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+  assessmentTab: { flex: 1, minWidth: 132, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  assessmentTabActive: { borderColor: colors.brand, backgroundColor: colors.brand },
   assessmentTabText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
-  assessmentTabTextActive: { color: colors.brand, fontWeight: '800' },
-  quizCreateRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: -spacing.sm },
-  quizCreateAction: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: colors.redSoft },
-  quizCreateActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
-  quizCreateCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  assessmentTabTextActive: { color: '#FFFFFF', fontWeight: '800' },
+  quizManagerIntro: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.lg },
+  quizManagerIntroHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  quizManagerIntroTitle: { flex: 1, color: colors.ink, fontSize: typography.body, fontWeight: '800' },
+  quizManagerIntroDescription: { color: colors.muted, fontSize: typography.caption, lineHeight: 18 },
+  quizManagerCreateButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.brand },
+  quizManagerCreateButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800' },
+  quizListGrid: { gap: spacing.sm },
+  quizListGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  quizListGridExtraWide: { gap: spacing.md },
+  quizListItem: { minWidth: 0 },
+  quizListItemWide: { width: '48.5%' },
+  quizListItemExtraWide: { width: '31.5%' },
+  quizModalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, backgroundColor: 'rgba(15, 23, 42, 0.62)' },
+  quizModalCard: { width: '100%', minHeight: 220, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 26, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 18 },
+  quizModalCardWide: { width: '92%', maxWidth: 920, borderRadius: 28 },
+  quizModalHeader: { minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line, backgroundColor: '#FFFCFC' },
+  quizModalHeaderCopy: { flex: 1, minWidth: 0 },
+  quizModalHeaderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  quizModalHeaderIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: colors.brand },
+  quizModalTitle: { flex: 1, color: colors.ink, fontSize: typography.small, fontWeight: '900' },
+  quizModalSubtitle: { marginTop: 4, marginLeft: 40, color: colors.muted, fontSize: typography.micro },
+  quizModalClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.canvas },
+  quizModalScroll: { flexShrink: 1 },
+  quizModalContent: { gap: spacing.md, padding: spacing.md, paddingBottom: spacing.lg },
+  quizModalTopGrid: { gap: spacing.sm },
+  quizModalTopGridWide: { flexDirection: 'row', alignItems: 'stretch' },
+  quizFormPanel: { minWidth: 0, gap: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: '#EEF0F4', borderRadius: radius.lg, backgroundColor: '#F8FAFC' },
+  quizFormPanelWide: { flex: 1 },
+  quizAssignmentPanel: { flex: 1 },
+  quizAssignmentColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  quizAssignmentColumn: { flex: 1, minWidth: 0, gap: 6 },
+  quizAssignmentColumnTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  quizAssignmentChoiceList: { maxHeight: 196, borderRadius: radius.md },
+  quizAssignmentChoices: { gap: 6 },
+  quizAssignmentChoice: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingVertical: 7, paddingHorizontal: 9, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  quizAssignmentChoiceActive: { borderColor: '#FDA4AF', backgroundColor: '#FFF1F2' },
+  quizAssignmentChoiceText: { flex: 1, minWidth: 0, color: '#334155', fontSize: typography.micro, lineHeight: 16, fontWeight: '600' },
+  quizAssignmentChoiceTextActive: { color: colors.brandDark, fontWeight: '800' },
+  quizAssignmentChoiceCheck: { color: colors.brand, fontSize: typography.caption, fontWeight: '900' },
+  quizAssignmentActions: { flexDirection: 'row', gap: spacing.xs },
+  quizAssignmentAction: { flex: 1, minHeight: 34, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  quizAssignmentActionText: { color: colors.brandDark, fontSize: typography.micro, fontWeight: '700', textAlign: 'center' },
+  quizAssignmentStatus: { alignSelf: 'flex-start', color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  quizAssignmentStudentList: { maxHeight: 128, padding: 1 },
+  quizAssignmentStudentListContent: { flexDirection: 'column', gap: 5 },
+  quizDateTimeButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: '#DCE3EB', borderRadius: radius.md, backgroundColor: '#FFFFFF' },
+  quizDateTimeText: { flex: 1, color: colors.ink, fontSize: typography.caption, fontWeight: '700' },
+  quizDateTimePlaceholder: { color: colors.muted, fontWeight: '500' },
+  quizDatePickerOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(15, 23, 42, 0.56)' },
+  quizDatePickerCard: { width: '100%', maxWidth: 420, padding: spacing.md, borderRadius: 24, backgroundColor: colors.surface, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 12 },
+  quizDatePickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingBottom: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  quizDatePickerTitleGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  quizDatePickerIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand },
+  quizDatePickerTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '900' },
+  quizDatePickerSubtitle: { marginTop: 2, color: colors.muted, fontSize: typography.micro },
+  quizDatePickerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.canvas },
+  quizDatePickerMonthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
+  quizDatePickerMonthButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.canvas },
+  quizDatePickerMonth: { color: colors.ink, fontSize: typography.small, fontWeight: '900', textTransform: 'capitalize' },
+  quizDatePickerCalendar: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xs },
+  quizDatePickerWeekday: { width: '14.2857%', height: 32, textAlign: 'center', textAlignVertical: 'center', color: colors.muted, fontSize: typography.micro, fontWeight: '800' },
+  quizDatePickerDayEmpty: { width: '14.2857%', height: 40 },
+  quizDatePickerDay: { width: '14.2857%', height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
+  quizDatePickerDayToday: { borderWidth: 1, borderColor: colors.brand },
+  quizDatePickerDaySelected: { borderColor: colors.brand, backgroundColor: colors.brand },
+  quizDatePickerDayText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
+  quizDatePickerDayTextSelected: { color: '#FFFFFF', fontWeight: '900' },
+  quizDatePickerTimeSection: { gap: spacing.xs, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: '#F8FAFC' },
+  quizDatePickerTimeLabel: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  quizDatePickerTimeInputs: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  quizDatePickerTimeInputGroup: { gap: 4 },
+  quizDatePickerTimeUnit: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  quizDatePickerTimeInput: { width: 72, minHeight: 42, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface, color: colors.ink, fontSize: typography.body, fontWeight: '800', textAlign: 'center' },
+  quizDatePickerTimeSeparator: { paddingBottom: 8, color: colors.ink, fontSize: typography.body, fontWeight: '900' },
+  quizDatePickerTimeHint: { marginLeft: 'auto', paddingBottom: 10, color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  quizDatePickerFooter: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  quizDatePickerClear: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  quizDatePickerClearText: { color: colors.muted, fontSize: typography.caption, fontWeight: '800' },
+  quizDatePickerConfirm: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: radius.md, backgroundColor: colors.brand },
+  quizDatePickerConfirmText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900' },
+  quizModalFieldLabel: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  quizModalFooter: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, backgroundColor: colors.surface },
+  quizModalCancelButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
+  quizModalCancelText: { color: colors.muted, fontSize: typography.caption, fontWeight: '800' },
+  quizModalSubmitButton: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: colors.brand },
+  quizModalSubmitDisabled: { opacity: 0.7 },
+  quizModalSubmitText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900', textAlign: 'center' },
   quizTitleInput: { minHeight: 44, borderColor: '#DCE3EB', backgroundColor: '#FBFCFE', fontWeight: '700' },
   quizCompactInput: { minHeight: 42, paddingVertical: spacing.xs, borderColor: '#DCE3EB', backgroundColor: '#FFFFFF' },
-  quizScheduleFields: { gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas },
+  quizScheduleFields: { padding: spacing.sm, borderWidth: 1, borderColor: '#EEF0F4', borderRadius: radius.lg, backgroundColor: '#F8FAFC' },
+  quizScheduleGrid: { gap: spacing.sm },
+  quizScheduleGridWide: { flexDirection: 'row' },
+  quizScheduleField: { flex: 1, minWidth: 0, gap: spacing.xs },
   quizMetricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   quizMetric: { width: '47%', minHeight: 58, justifyContent: 'center', padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.canvas },
   gradeHistoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   gradeResult: { alignItems: 'flex-end', gap: spacing.xs },
   gradeScore: { color: colors.brandDark, fontSize: typography.body, fontWeight: '800' },
   quizActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
-  quizTools: { gap: spacing.xs, marginTop: spacing.xs, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas },
+  quizTools: { gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: '#EEF0F4', borderRadius: radius.lg, backgroundColor: colors.surface },
+  quizExcelActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  quizAiPanel: { gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: '#E9D5FF', borderRadius: radius.lg, backgroundColor: '#FAF5FF' },
+  quizAiControls: { gap: spacing.sm },
+  quizAiControlsWide: { flexDirection: 'row', alignItems: 'flex-end' },
+  quizAiChoiceGroup: { gap: 2 },
+  quizAiChoiceGroupWide: { flex: 1, minWidth: 0 },
+  quizAiLabel: { color: '#6B21A8', fontSize: typography.micro, fontWeight: '900' },
+  quizAiButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: '#7C3AED' },
+  quizAiButtonWide: { minWidth: 160, minHeight: 36, paddingHorizontal: spacing.sm },
+  quizAiButtonDisabled: { opacity: 0.65 },
+  quizAiButtonText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '900' },
+  quizAiHint: { color: colors.muted, fontSize: typography.micro, lineHeight: 16 },
+  quizQuestionSectionHeader: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: '#EEF0F4', borderRadius: radius.lg, backgroundColor: '#F8FAFC' },
+  quizQuestionSectionTitle: { flex: 1, color: colors.ink, fontSize: typography.small, fontWeight: '900' },
+  quizAddQuestionButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.md, backgroundColor: '#0F172A' },
+  quizAddQuestionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900' },
+  quizEmptyQuestions: { alignItems: 'center', justifyContent: 'center', gap: 4, padding: spacing.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.line, borderRadius: radius.lg, backgroundColor: '#F8FAFC' },
+  quizEmptyQuestionsTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  quizEmptyQuestionsText: { color: colors.muted, fontSize: typography.micro, textAlign: 'center' },
+  quizQuestionNumber: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' },
+  quizOptionGrid: { gap: spacing.xs },
+  quizOptionGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  quizOptionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minWidth: 0 },
+  quizOptionRowWide: { width: '48%' },
+  quizOptionToggle: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface },
+  quizOptionToggleActive: { borderColor: colors.green, backgroundColor: colors.green },
+  quizOptionToggleText: { color: colors.muted, fontSize: typography.caption, fontWeight: '900' },
+  quizOptionToggleTextActive: { color: '#FFFFFF' },
+  quizOptionInput: { flex: 1, minWidth: 0, minHeight: 40, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, backgroundColor: colors.surface },
+  quizExplanationInput: { minHeight: 40, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, backgroundColor: '#FFFFFF' },
   quizAction: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
   quizActionText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
   quizDelete: { borderColor: colors.redSoft, backgroundColor: colors.redSoft },
@@ -2677,6 +3405,12 @@ const styles = StyleSheet.create({
   trainingTabCountTextActive: { color: '#FFFFFF' },
   trainingCard: { overflow: 'hidden' },
   trainingBanner: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: -spacing.lg, marginHorizontal: -spacing.lg, marginBottom: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.brandDark },
+  trainingGuide: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  trainingGuideIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.redSoft },
+  trainingGuideIconText: { fontSize: 22 },
+  trainingGuideToggle: { marginTop: spacing.xs, color: colors.brand, fontSize: typography.micro, fontWeight: '800' },
+  trainingFileType: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
+  trainingFileTypeText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '900' },
   trainingLesson: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   trainingBannerText: { color: '#FFFFFF', fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.5 },
   trainingPlayerBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(15, 23, 42, 0.82)' },
@@ -2735,13 +3469,18 @@ const styles = StyleSheet.create({
   choiceText: { color: colors.ink, fontSize: typography.caption, fontWeight: '600' },
   choiceTextActive: { color: '#FFFFFF' },
   studentTargetList: { gap: spacing.xs, marginTop: spacing.sm },
-  studentTarget: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md },
+  quizStudentCount: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
+  quizStudentList: { maxHeight: 124, borderRadius: radius.sm },
+  quizStudentListContent: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  quizStudentListContentWide: { columnGap: spacing.xs, rowGap: 2 },
+  studentTarget: { width: '100%', minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, backgroundColor: colors.surface },
+  studentTargetWide: { width: '48%' },
   studentTargetSelected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
   studentTargetText: { color: colors.ink, fontSize: typography.small },
-  questionEditor: { gap: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: '#FFFFFF' },
-  questionRemove: { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing.sm },
+  questionEditor: { gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: radius.lg, backgroundColor: '#F8FAFC' },
+  questionRemove: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: spacing.xs },
   textArea: { minHeight: 76, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
-  quizQuestionText: { minHeight: 68, paddingVertical: spacing.sm, backgroundColor: '#FBFCFE' },
+  quizQuestionText: { minHeight: 42, paddingVertical: spacing.xs, backgroundColor: '#FFFFFF' },
   input: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: spacing.md, color: colors.ink },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   optionToggle: { width: 34, height: 34, textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden', borderRadius: 17, color: colors.ink, backgroundColor: colors.canvas, fontWeight: '800' },

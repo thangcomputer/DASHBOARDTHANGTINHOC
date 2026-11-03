@@ -656,7 +656,7 @@ export function CourseVideosScreen() {
                   accessibilityLabel={unitNavOpen ? 'Thu gọn danh sách bài học' : 'Mở danh sách bài học'}
                 >
                   <Menu size={17} color={colors.brand} />
-                  <Text style={styles.headerLessonNavText}>{`${units.length} bài`}</Text>
+                  <Text style={styles.headerLessonNavText}>Danh sách bài học</Text>
                   {unitNavOpen ? <ChevronUp size={16} color={colors.brand} /> : <ChevronDown size={16} color={colors.brand} />}
                 </Pressable>
               ) : null}

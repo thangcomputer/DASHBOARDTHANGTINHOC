@@ -1,26 +1,32 @@
 import React, { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Headphones, MessageCircle } from 'lucide-react-native';
+import { Bot, ChevronRight, Headphones, Users, X } from 'lucide-react-native';
 import { AppScreen, Card, PrimaryButton } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import { openAiSupportConversation } from '../services/aiSupportApi';
+import { messageService } from '../services/mockService';
+import type { Conversation } from '../types';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
 
 export function SupportEntryScreen() {
   const navigation = useNavigation<Navigation>();
   const { user } = useAuth();
-  const [opening, setOpening] = useState(false);
+  const [choiceVisible, setChoiceVisible] = useState(false);
+  const [opening, setOpening] = useState<'ai' | 'staff' | null>(null);
+  const [choiceError, setChoiceError] = useState('');
 
-  const openSupport = async () => {
+  const openAiSupport = async () => {
     if (!user || opening) return;
-    setOpening(true);
+    setOpening('ai');
+    setChoiceError('');
     try {
       const support = await openAiSupportConversation();
+      setChoiceVisible(false);
       navigation.navigate('Conversation', {
         conversationId: support.conversationId,
         conversationName: 'Trợ lý Thắng Tin Học',
@@ -30,13 +36,50 @@ export function SupportEntryScreen() {
         supportStatus: support.status,
       });
     } catch (error) {
-      Alert.alert(
-        'Không thể mở hỗ trợ',
-        error instanceof Error ? error.message : 'Vui lòng thử lại.',
-      );
+      setChoiceError(error instanceof Error ? error.message : 'Không thể mở hỗ trợ. Vui lòng thử lại.');
     } finally {
-      setOpening(false);
+      setOpening(null);
     }
+  };
+
+  const loadSupportContacts = async () => {
+    if (!user || opening) return;
+    setOpening('staff');
+    setChoiceError('');
+    try {
+      const contacts = await messageService.conversations(user.role, user);
+      const supportContacts = contacts.filter((contact) => (
+        contact.category === 'support'
+        || String(contact.adminRole || '').toUpperCase() === 'SUPPORT'
+      )).sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online)));
+      const contact = supportContacts[0];
+      if (!contact) {
+        setChoiceError('Hiện chưa có nhân viên hỗ trợ trong danh bạ.');
+        return;
+      }
+      openStaffConversation(contact);
+    } catch (error) {
+      setChoiceError(error instanceof Error ? error.message : 'Không thể tải danh sách hỗ trợ. Vui lòng thử lại.');
+    } finally {
+      setOpening(null);
+    }
+  };
+
+  const openStaffConversation = (contact: Conversation) => {
+    if (!contact.participantId) {
+      setChoiceError('Tài khoản hỗ trợ chưa có thông tin nhận cuộc trò chuyện.');
+      return;
+    }
+    setChoiceVisible(false);
+    navigation.navigate('Conversation', {
+      conversationId: contact.id,
+      conversationName: contact.name,
+      participantId: contact.participantId,
+      participantRole: contact.participantRole || 'staff',
+      participantAdminRole: contact.adminRole,
+      participantOnline: Boolean(contact.online),
+      ...(contact.avatarUri ? { participantAvatarUri: contact.avatarUri } : {}),
+    });
   };
 
   return (
@@ -52,12 +95,161 @@ export function SupportEntryScreen() {
           Hỏi trợ lý AI về tin học và LMS, hoặc chuyển cuộc trò chuyện cho nhân viên hỗ trợ.
         </Text>
         <PrimaryButton
-          title={opening ? 'Đang kết nối…' : 'Trò chuyện với hỗ trợ'}
-          onPress={() => { void openSupport(); }}
-          disabled={opening || !user}
-          loading={opening}
+          title="Trò chuyện với hỗ trợ"
+          onPress={() => {
+            setChoiceError('');
+            setChoiceVisible(true);
+          }}
+          disabled={!user}
         />
       </Card>
+      <Modal
+        visible={choiceVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setChoiceVisible(false);
+          setChoiceError('');
+        }}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              if (!opening) setChoiceVisible(false);
+            }}
+            accessibilityLabel="Đóng lựa chọn hỗ trợ"
+          />
+          <View style={styles.choiceCard} accessibilityRole="summary">
+            <View style={styles.choiceHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.choiceTitle}>
+                  Bạn muốn trò chuyện với ai?
+                </Text>
+                <Text style={styles.choiceSubtitle}>
+                  Chọn kênh hỗ trợ phù hợp.
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  if (!opening) {
+                    setChoiceVisible(false);
+                  }
+                }}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng lựa chọn hỗ trợ"
+              >
+                <X size={18} color={colors.muted} />
+              </Pressable>
+            </View>
+
+            {choiceError ? <Text style={styles.choiceError} accessibilityRole="alert">{choiceError}</Text> : null}
+
+            <View style={{ gap: spacing.sm }}>
+                <Pressable
+                  onPress={() => { void openAiSupport(); }}
+                  disabled={Boolean(opening)}
+                  style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.choiceIcon}><Bot size={21} color={colors.brand} /></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.choiceRowTitle}>Trợ lý AI Thắng Tin Học</Text>
+                    <Text style={styles.choiceRowDescription}>Hỏi về tin học, Office, MOS và LMS.</Text>
+                  </View>
+                  {opening === 'ai'
+                    ? <ActivityIndicator color={colors.brand} />
+                    : <ChevronRight size={18} color={colors.muted} />}
+                </Pressable>
+                <Pressable
+                  onPress={() => { void loadSupportContacts(); }}
+                  disabled={Boolean(opening)}
+                  style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.choiceIcon}><Users size={21} color={colors.brand} /></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.choiceRowTitle}>Nhân viên hỗ trợ trực tiếp</Text>
+                    <Text style={styles.choiceRowDescription}>Trò chuyện trực tiếp với chuyên viên hỗ trợ.</Text>
+                  </View>
+                  {opening === 'staff'
+                    ? <ActivityIndicator color={colors.brand} />
+                    : <ChevronRight size={18} color={colors.muted} />}
+                </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
+
+const styles = {
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: spacing.lg,
+  },
+  modalBackdrop: {
+    ...({ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const),
+    backgroundColor: colors.overlay,
+  },
+  choiceCard: {
+    width: '100%' as const,
+    maxWidth: 420,
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+  },
+  choiceHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: spacing.sm,
+  },
+  choiceTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' as const },
+  choiceSubtitle: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.caption, lineHeight: 20 },
+  closeButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: 12,
+    backgroundColor: colors.canvas,
+  },
+  choiceError: {
+    padding: spacing.sm,
+    borderRadius: 10,
+    backgroundColor: colors.redSoft,
+    color: colors.red,
+    fontSize: typography.caption,
+    lineHeight: 19,
+  },
+  choiceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.md,
+    minHeight: 72,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+  },
+  choiceRowPressed: { backgroundColor: colors.brandSoft, borderColor: '#FECACA' },
+  choiceRowDisabled: { opacity: 0.6 },
+  choiceIcon: {
+    width: 44,
+    height: 44,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: 14,
+    backgroundColor: colors.brandSoft,
+  },
+  choiceRowTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' as const },
+  choiceRowDescription: { marginTop: 3, color: colors.muted, fontSize: typography.micro, lineHeight: 18 },
+};

@@ -10,6 +10,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { policyShadowFeed } = require('../middleware/policyShadowFeed');
 const { feedCutoverGate } = require('../middleware/feedCutoverGate');
 const logger = require('../config/logger');
+const NotificationService = require('../services/NotificationService');
 
 /** Phase 7.17: auth → policyShadowFeed → feedCutoverGate → handler */
 function feedGuard(action) {
@@ -130,6 +131,62 @@ function emitFeed(io, event, payload) {
     emitter = emitter.to(String(payload.authorId));
   }
   emitter.emit(event, payload);
+}
+
+async function notifyFeedAuthor(req, post, interactionType, details = {}) {
+  const actorId = String(req.user?.id || req.user?._id || '');
+  const isReply = interactionType === 'reply';
+  const recipients = new Map();
+  const postAuthorId = String(post.authorId || '');
+  if (postAuthorId && postAuthorId !== actorId) {
+    recipients.set(postAuthorId, post.authorRole);
+  }
+  const commentAuthorId = String(details.commentAuthorId || '');
+  if (isReply && commentAuthorId && commentAuthorId !== actorId) {
+    recipients.set(commentAuthorId, details.commentAuthorRole || 'student');
+  }
+  if (!recipients.size) return;
+
+  const actorName = String(req.user?.name || 'Một người dùng').trim();
+  const content = interactionType === 'comment'
+    ? `${actorName} đã bình luận: ${details.content || 'đã thêm hình ảnh'}`
+    : isReply
+      ? `${actorName} đã trả lời bình luận của bạn: ${details.content || 'đã thêm hình ảnh'}`
+      : `${actorName} đã bày tỏ cảm xúc về bài viết của bạn.`;
+
+  await Promise.all([...recipients].map(async ([receiverId, receiverRole]) => {
+    const normalizedRole = String(receiverRole || '').toLowerCase();
+    const webRole = normalizedRole === 'admin' || normalizedRole === 'staff'
+      ? 'admin'
+      : normalizedRole === 'teacher' ? 'teacher' : 'student';
+    try {
+      await NotificationService.send(req.app.get('io'), {
+        type: 'SYSTEM',
+        title: interactionType === 'comment'
+          ? 'Bình luận mới trên bài viết'
+          : isReply ? 'Có người trả lời bình luận của bạn' : 'Cảm xúc mới trên bài viết',
+        content: content.slice(0, 500),
+        sender_id: actorId,
+        receivers: [receiverId],
+        payload: {
+          kind: 'feed_interaction',
+          interactionType,
+          postId: String(post._id),
+          ...(details.commentId ? { commentId: details.commentId } : {}),
+          ...(details.parentCommentId ? { parentCommentId: details.parentCommentId } : {}),
+          ...(details.reactionType ? { reactionType: details.reactionType } : {}),
+        },
+        link: `/${webRole}/feed?postId=${encodeURIComponent(String(post._id))}${details.commentId ? `&commentId=${encodeURIComponent(details.commentId)}` : ''}${details.parentCommentId ? `&parentCommentId=${encodeURIComponent(details.parentCommentId)}` : ''}`,
+      });
+    } catch (error) {
+      logger.error('[FEED] author notification error', {
+        error,
+        postId: String(post._id),
+        receiverId,
+        interactionType,
+      });
+    }
+  }));
 }
 
 const _feedHits = new Map();
@@ -294,7 +351,7 @@ router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
     const skip = (page - 1) * limit;
     const query = buildFeedFilter(req.user);
     const [rows, total] = await Promise.all([
-      FeedPost.find(query).sort({ isPinned: -1, pinnedAt: -1, createdAt: -1 }).skip(skip).limit(limit),
+      FeedPost.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
       FeedPost.countDocuments(query),
     ]);
     return res.json({
@@ -393,13 +450,31 @@ router.post('/:id/pin', authMiddleware, ...feedGuard('pin'), async (req, res) =>
 router.post('/reports/:reportId/resolve', authMiddleware, ...feedGuard('resolve_report'), async (req, res) => {
   try {
     if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Bạn không có quyền xử lý báo cáo.' });
-    const report = await FeedPostReport.findOneAndUpdate(
-      { _id: req.params.reportId, status: 'pending' },
-      { $set: { status: 'reviewed', resolvedBy: String(req.user.id || req.user._id), resolvedAt: new Date() } },
-      { new: true },
-    );
+    const action = req.body?.action || 'keep';
+    if (!['keep', 'delete'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Lựa chọn xử lý báo cáo không hợp lệ.' });
+    }
+    const report = await FeedPostReport.findOne({ _id: req.params.reportId, status: 'pending' });
     if (!report) return res.status(404).json({ success: false, message: 'Báo cáo không tồn tại hoặc đã được xử lý.' });
-    return res.json({ success: true, message: 'Đã đánh dấu báo cáo là đã xử lý.' });
+    const resolvedBy = String(req.user.id || req.user._id);
+    const resolvedAt = new Date();
+    if (action === 'delete') {
+      const post = await FeedPost.findById(report.postId);
+      if (post) {
+        await post.deleteOne();
+        emitFeed(req.app.get('io'), 'feed:deleted', { id: String(post._id) });
+      }
+      await FeedPostReport.updateMany(
+        { postId: report.postId, status: 'pending' },
+        { $set: { status: 'reviewed', resolvedBy, resolvedAt } },
+      );
+      return res.json({ success: true, message: 'Đã xóa bài viết và xử lý các báo cáo liên quan.' });
+    }
+    await FeedPostReport.updateMany(
+      { _id: report._id, status: 'pending' },
+      { $set: { status: 'reviewed', resolvedBy, resolvedAt } },
+    );
+    return res.json({ success: true, message: 'Đã giữ lại bài viết và xử lý báo cáo.' });
   } catch (err) {
     logger.error({ err }, '[FEED] report resolve error');
     return res.status(500).json({ success: false, message: 'Không thể xử lý báo cáo.' });
@@ -521,6 +596,7 @@ async function applyReaction(req, res, typeIn) {
 
   const uid = String(req.user.id);
   const idx = post.reactions.findIndex((r) => String(r.userId) === uid);
+  const isNewReaction = idx < 0;
   if (idx >= 0) {
     if (post.reactions[idx].type === type) post.reactions.splice(idx, 1);
     else post.reactions[idx].type = type;
@@ -534,6 +610,9 @@ async function applyReaction(req, res, typeIn) {
     });
   }
   await post.save();
+  if (isNewReaction) {
+    await notifyFeedAuthor(req, post, 'reaction', { reactionType: type });
+  }
   const data = serializePost(post, req.user.id);
   emitFeed(req.app.get('io'), 'feed:like', {
     id: data.id,
@@ -607,6 +686,7 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
         parentId = String(parent.parentId);
       }
     }
+    const parentComment = parentId ? post.comments.id(parentId) : null;
 
     post.comments.push({
       authorId: req.user.id,
@@ -621,6 +701,15 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
       createdAt: new Date(),
     });
     await post.save();
+
+    const createdComment = post.comments[post.comments.length - 1];
+    await notifyFeedAuthor(req, post, parentComment ? 'reply' : 'comment', {
+      content: content.slice(0, 240),
+      commentId: String(createdComment._id),
+      parentCommentId: parentComment ? String(parentComment._id) : '',
+      commentAuthorId: parentComment?.authorId,
+      commentAuthorRole: parentComment?.authorRole,
+    });
 
     const data = serializePost(post, req.user.id);
     emitFeed(req.app.get('io'), 'feed:comment', {

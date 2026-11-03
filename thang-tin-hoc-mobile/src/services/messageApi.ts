@@ -483,28 +483,33 @@ export async function sendChatMessage(
   if (!groupId && (!conversation.participantId || !conversation.participantRole)) {
     throw new Error('Không thể gửi tin nhắn: thiếu thông tin người nhận.');
   }
-  const payload = await mobileApiRequest<{ data?: RawMessage }>('/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      receiverId: groupId || conversation.participantId,
-      receiverName: conversation.name,
-      receiverRole: groupId ? 'group' : conversation.participantRole,
-      content,
-      messageType: attachment?.messageType || 'text',
-      ...(attachment ? { fileUrl: attachment.url, fileName: attachment.name } : {}),
-      ...(groupId ? { isGroup: true, groupId, conversationId: conversation.id } : {}),
-      ...(replyTo ? {
-        payload: {
-          replyTo: {
-            id: replyTo.id,
-            content: replyTo.text || replyTo.attachmentName || (replyTo.stickerId ? '[Sticker]' : ''),
-            ...(replyTo.attachmentType ? { messageType: replyTo.attachmentType } : {}),
+  const isAiSupport = String(conversation.participantId || '') === 'ai_support';
+  const payload = await mobileApiRequest<{ data?: RawMessage }>(
+    isAiSupport ? '/ai-support/message' : '/messages',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        receiverId: groupId || conversation.participantId,
+        receiverName: conversation.name,
+        receiverRole: isAiSupport ? 'system' : groupId ? 'group' : conversation.participantRole,
+        content,
+        messageType: attachment?.messageType || 'text',
+        ...(attachment ? { fileUrl: attachment.url, fileName: attachment.name } : {}),
+        ...(groupId ? { isGroup: true, groupId, conversationId: conversation.id } : {}),
+        ...(isAiSupport ? { conversationId: conversation.id } : {}),
+        ...(replyTo ? {
+          payload: {
+            replyTo: {
+              id: replyTo.id,
+              content: replyTo.text || replyTo.attachmentName || (replyTo.stickerId ? '[Sticker]' : ''),
+              ...(replyTo.attachmentType ? { messageType: replyTo.attachmentType } : {}),
+            },
           },
-        },
-      } : {}),
-    }),
-  });
+        } : {}),
+      }),
+    },
+  );
   if (!payload.data) throw new Error('Máy chủ không xác nhận tin nhắn đã gửi.');
   return mapMessage(payload.data, user, Date.now());
 }

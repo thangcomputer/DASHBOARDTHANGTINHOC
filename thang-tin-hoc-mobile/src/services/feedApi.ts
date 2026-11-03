@@ -43,6 +43,9 @@ export function mapFeedPost(raw: Raw): DemoFeedPost {
     role: ROLE_LABEL[String(comment.authorRole)] || '',
     time: relTime(comment.createdAt),
     text: String(comment.content || ''),
+    images: Array.isArray(comment.images)
+      ? comment.images.map((image: unknown) => String(image || '').trim()).filter(Boolean).map(resolveMobilePublicUrl)
+      : [],
   });
   const images = Array.isArray(raw.images)
     ? raw.images.map((image: unknown) => String(image || '').trim()).filter(Boolean).map(resolveMobilePublicUrl)
@@ -83,15 +86,29 @@ async function unwrap(p: Promise<{ data?: Raw }>) {
   return mapFeedPost(res.data);
 }
 
-export async function fetchFeedPosts(): Promise<DemoFeedPost[]> {
-  const res = await mobileApiRequest<{ data?: Raw[] }>('/feed?page=1&limit=50');
-  if (!Array.isArray(res.data)) throw new Error('Phản hồi bảng tin không hợp lệ.');
-  return res.data.map(mapFeedPost);
+export async function fetchFeedPosts(targetPostId?: string): Promise<DemoFeedPost[]> {
+  const posts: DemoFeedPost[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await mobileApiRequest<{
+      data?: Raw[];
+      pagination?: { totalPages?: number };
+    }>(`/feed?page=${page}&limit=50`);
+    if (!Array.isArray(res.data)) throw new Error('Phản hồi bảng tin không hợp lệ.');
+    const pagePosts = res.data.map(mapFeedPost);
+    posts.push(...pagePosts);
+    totalPages = Math.max(1, Number(res.pagination?.totalPages) || 1);
+    if (targetPostId && pagePosts.some((post) => post.id === targetPostId)) return posts;
+    page += 1;
+  } while (targetPostId && page <= totalPages);
+  if (targetPostId) throw new Error('Bài viết trong thông báo không còn tồn tại hoặc bạn không có quyền xem.');
+  return posts;
 }
 
-export async function uploadFeedImages(files: Array<{ uri: string; name: string; mimeType?: string; file?: File }>) {
+export async function uploadFeedImages(files: Array<{ uri: string; name: string; mimeType?: string; file?: File }>, maxImages = 6) {
   if (!files.length) return [];
-  if (files.length > 6) throw new Error('Mỗi bài đăng tối đa 6 ảnh.');
+  if (files.length > maxImages) throw new Error(`Chỉ được tải lên tối đa ${maxImages} ảnh.`);
   const formData = new FormData();
   files.forEach((file) => {
     if (Platform.OS === 'web' && !file.file) {
@@ -137,8 +154,8 @@ export const deleteFeedPost = async (id: string) => {
 export const reactFeedPost = (id: string, type: 'heart' | 'like' | 'haha' | 'wow' | 'sad' = 'heart') => unwrap(
   mobileApiRequest(`/feed/${encodeURIComponent(id)}/react`, { method: 'POST', headers: json, body: JSON.stringify({ type }) }),
 );
-export const commentFeedPost = (id: string, content: string, parentId?: string) => unwrap(
-  mobileApiRequest(`/feed/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: json, body: JSON.stringify({ content, parentId }) }),
+export const commentFeedPost = (id: string, content: string, parentId?: string, images: string[] = []) => unwrap(
+  mobileApiRequest(`/feed/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: json, body: JSON.stringify({ content, parentId, images }) }),
 );
 export const deleteFeedComment = (postId: string, commentId: string) => unwrap(
   mobileApiRequest(`/feed/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' }),
@@ -176,6 +193,10 @@ export async function fetchFeedReports(): Promise<FeedPostReport[]> {
   return response.data;
 }
 
-export async function resolveFeedReport(id: string) {
-  return mobileApiRequest<{ success: boolean }>(`/feed/reports/${encodeURIComponent(id)}/resolve`, { method: 'POST' });
+export async function resolveFeedReport(id: string, action: 'keep' | 'delete' = 'keep') {
+  return mobileApiRequest<{ success: boolean; message?: string }>(`/feed/reports/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ action }),
+  });
 }

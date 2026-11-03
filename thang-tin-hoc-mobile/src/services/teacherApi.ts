@@ -1,5 +1,12 @@
-import type { DemoTrainingCourse, DemoUser } from '../types';
-import { mobileApiRequest } from './apiClient';
+import type {
+  DemoSoftwareLink,
+  DemoTeacherTrainingOverview,
+  DemoTrainingCourse,
+  DemoTrainingFile,
+  DemoTrainingGuide,
+  DemoUser,
+} from '../types';
+import { mobileApiRequest, resolveMobilePublicUrl } from './apiClient';
 
 export type TeacherProfile = Record<string, unknown> & {
   _id?: string;
@@ -249,18 +256,25 @@ export async function updateTeacherProfile(user: DemoUser, updates: TeacherProfi
   return profile;
 }
 
-export async function getTeacherTrainingCourses(user: DemoUser): Promise<DemoTrainingCourse[]> {
+export async function getTeacherTrainingOverview(user: DemoUser): Promise<DemoTeacherTrainingOverview> {
   if (user.role !== 'teacher' || !user.id) {
     throw new Error('Không thể tải đào tạo: tài khoản giảng viên không hợp lệ.');
   }
   const response = await mobileApiRequest<{ data?: { courses?: unknown } }>(
     '/training-lms/teacher/overview',
   );
-  const courses = response.data?.courses;
-  if (!Array.isArray(courses)) {
+  const data = response.data as Record<string, unknown> | undefined;
+  const rawSoftwareLinks = data?.softwareLinks ?? [];
+  if (
+    !data
+    || !Array.isArray(data.courses)
+    || !Array.isArray(data.guides)
+    || !Array.isArray(data.files)
+    || !Array.isArray(rawSoftwareLinks)
+  ) {
     throw new Error('Phản hồi tổng quan đào tạo giảng viên không hợp lệ.');
   }
-  return courses.map((entry, courseIndex) => {
+  const courses: DemoTrainingCourse[] = data.courses.map((entry, courseIndex) => {
     const raw = asRecord(entry);
     const id = asText(raw.id || raw._id);
     if (!id) throw new Error('Khóa đào tạo từ máy chủ thiếu mã định danh.');
@@ -299,6 +313,41 @@ export async function getTeacherTrainingCourses(user: DemoUser): Promise<DemoTra
       notices: notices.filter((notice): notice is string => typeof notice === 'string'),
     };
   });
+  const guides: DemoTrainingGuide[] = data.guides.map((entry, index) => {
+    const raw = asRecord(entry);
+    return {
+      id: asText(raw.id || raw._id) || `guide-${index + 1}`,
+      title: asText(raw.title, `Quy trình ${index + 1}`),
+      description: asText(raw.desc || raw.description),
+      icon: asText(raw.icon, '📄'),
+    };
+  });
+  const files: DemoTrainingFile[] = data.files.map((entry, index) => {
+    const raw = asRecord(entry);
+    return {
+      id: asText(raw.id || raw._id) || `training-file-${index + 1}`,
+      title: asText(raw.title || raw.name || raw.fileOriginalName, `Tài liệu ${index + 1}`),
+      type: asText(raw.type || raw.fileType, 'FILE'),
+      size: asText(raw.size || raw.fileSize),
+      url: resolveMobilePublicUrl(asText(raw.url || raw.fileUrl || raw.link)),
+    };
+  });
+  const softwareLinks: DemoSoftwareLink[] = rawSoftwareLinks.map((entry, index) => {
+    const raw = asRecord(entry);
+    return {
+      id: asText(raw.id || raw._id) || `software-${index + 1}`,
+      name: asText(raw.name || raw.title, `Phần mềm ${index + 1}`),
+      description: asText(raw.description || raw.desc),
+      category: asText(raw.category || raw.type, 'Phần mềm khóa học'),
+      url: resolveMobilePublicUrl(asText(raw.url || raw.link)),
+    };
+  });
+  return { courses, guides, files, softwareLinks };
+}
+
+export async function getTeacherTrainingCourses(user: DemoUser): Promise<DemoTrainingCourse[]> {
+  const overview = await getTeacherTrainingOverview(user);
+  return overview.courses;
 }
 
 export async function saveTeacherTrainingWatchProgress(

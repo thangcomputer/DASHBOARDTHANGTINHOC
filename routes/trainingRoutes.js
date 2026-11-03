@@ -602,6 +602,7 @@ router.get('/teacher/overview', lmsGuard('lms_teacher_overview'), async (req, re
         courses,
         guides: raw.guides || [],
         files: (raw.files || []).map(mapFileForTeacherUi),
+        softwareLinks: raw.softwareLinks || [],
         progressMap: Object.fromEntries(courses.map((c) => [c.id, c.progress])),
       },
     });

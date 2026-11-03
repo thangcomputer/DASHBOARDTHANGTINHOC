@@ -4,6 +4,7 @@
  */
 
 const TOKEN_SPLIT = /[\s,;+/\\|_-]+/;
+const NORMALIZED_TOKEN_SPLIT = /[^a-z0-9]+/;
 const MAX_TOKENS = 8;
 
 export function unaccent(str) {
@@ -24,7 +25,8 @@ export function splitSearchTokens(query) {
 }
 
 export function matchesPersonSearch(query, fields = {}) {
-  const tokens = splitSearchTokens(query);
+  const queryN = unaccent(query);
+  const tokens = queryN.split(NORMALIZED_TOKEN_SPLIT).filter(Boolean);
   if (!tokens.length) return true;
   const nameN = unaccent(fields.name);
   const extraN = unaccent(
@@ -32,16 +34,20 @@ export function matchesPersonSearch(query, fields = {}) {
       .filter(Boolean)
       .join(' '),
   );
-  const phoneDigits = String(fields.phone || '').replace(/\D/g, '');
-  const zaloDigits = String(fields.zalo || '').replace(/\D/g, '');
+  const phoneDigits = normalizePhoneDigits(fields.phone);
+  const zaloDigits = normalizePhoneDigits(fields.zalo);
+  const nameTokens = tokens.filter((token) => !/^\d+$/.test(token)).slice(0, MAX_TOKENS);
+  const queryDigits = normalizePhoneDigits(tokens.filter((token) => /^\d+$/.test(token)).join(''));
 
-  return tokens.every((tok) => {
-    const tokN = unaccent(tok);
-    if (tokN && (nameN.includes(tokN) || extraN.includes(tokN))) return true;
-    const tokDigits = String(tok).replace(/\D/g, '');
-    if (tokDigits.length >= 2 && (phoneDigits.includes(tokDigits) || zaloDigits.includes(tokDigits))) {
-      return true;
-    }
-    return false;
-  });
+  const nameMatches = nameTokens.every((token) => nameN.includes(token) || extraN.includes(token));
+  const phoneMatches = !queryDigits || (queryDigits.length >= 2
+    && (phoneDigits.includes(queryDigits) || zaloDigits.includes(queryDigits)));
+  return nameMatches && phoneMatches;
+}
+
+function normalizePhoneDigits(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.startsWith('84') && digits.length >= 4
+    ? `0${digits.slice(2)}`
+    : digits;
 }

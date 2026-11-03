@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  Headphones, MessageCircle, MessageSquare, Minus, Send, X, Circle,
+  ArrowLeft, Headphones, Info, MessageCircle, MessageSquare, Minus, Search, Send, X, Circle,
   ImagePlus, Paperclip, Loader2, MoreVertical, Edit3, RotateCcw, Bot, UserRound, Check,
   Copy, Scaling, Calendar,
   Smile, Users,
@@ -14,7 +14,7 @@ import {
 import ScheduleMessagePreviewModal, {
   resolveScheduleMessagePayload,
 } from './ScheduleMessagePreviewModal';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 import { getPresenceUserId } from '../utils/presence';
 import { useData } from '../context/DataContext';
@@ -43,7 +43,6 @@ import {
   TEACHER_WELCOME_CHIPS,
   STUDENT_WELCOME_CHIPS,
 } from '../utils/aiSupport';
-import SupportMascot from './SupportMascot';
 import { MessageRichText, copyableTextFromMessage } from '../utils/messageRichText';
 import { buildChatStickerToken, getChatStickerFromMessage } from '../utils/chatStickers';
 import { getChatFileType } from '../utils/chatFileType';
@@ -547,11 +546,16 @@ function ChatWindow({
   imageQuota = { remaining: 5, limit: 5, used: 0 },
   questionQuota = { applies: false, remaining: null, limit: 15, used: 0 },
   viewerRole = 'student',
+  fullPage = false,
 }) {
   const toast = useToast();
   const [text, setText] = useState(() => readChatDraft(draftStorageKey));
   const [uploading, setUploading] = useState(false);
   const [pendingImage, setPendingImage] = useState(null);
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
+  const infoPopupRef = useRef(null);
   const pendingUrlRef = useRef('');
   const [activeMsgOptions, setActiveMsgOptions] = useState(null);
   const [schedulePreview, setSchedulePreview] = useState(null);
@@ -569,6 +573,15 @@ function ChatWindow({
   useEffect(() => {
     persistChatDraft(draftStorageKey, text);
   }, [draftStorageKey, text]);
+
+  useEffect(() => {
+    if (!infoOpen) return undefined;
+    const closeOnOutsidePointer = (event) => {
+      if (!infoPopupRef.current?.contains(event.target)) setInfoOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+  }, [infoOpen]);
 
   const isOnline = useMemo(() => {
     if (isAiSupportPeer(tab.user)) return true;
@@ -635,6 +648,11 @@ function ChatWindow({
       isWelcomeFallback: true,
     }, ...messages];
   }, [isAiPeer, messages, tab.id, viewerRole]);
+  const visibleMessages = useMemo(() => {
+    const query = messageSearchQuery.trim().toLocaleLowerCase('vi');
+    if (!query) return displayMessages;
+    return displayMessages.filter((message) => String(message.content || '').toLocaleLowerCase('vi').includes(query));
+  }, [displayMessages, messageSearchQuery]);
 
   const [statusFlash, setStatusFlash] = useState('');
   const prevAiStatusRef = useRef(aiStatus);
@@ -967,7 +985,7 @@ function ChatWindow({
 
   return (
     <div
-      className="cms-fm-window is-active"
+      className={`cms-fm-window is-active${fullPage ? ' is-full-page' : ''}`}
       style={{ width: winSize.w, height: winSize.h, maxWidth: 'calc(100vw - 1rem)', maxHeight: 'calc(100dvh - 5rem)' }}
     >
       <button
@@ -981,6 +999,16 @@ function ChatWindow({
         <Scaling size={14} />
       </button>
       <div className="cms-fm-window__head">
+        {fullPage ? (
+          <button
+            type="button"
+            className="cms-fm-icon-btn"
+            onClick={() => onClose(tab.id)}
+            aria-label="Quay lại trang hỗ trợ"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        ) : null}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="relative shrink-0">
             {tab.user?.isGroup ? (
@@ -1011,18 +1039,51 @@ function ChatWindow({
           </div>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            type="button"
-            className="cms-fm-icon-btn"
-            onClick={toggleWide}
-            title={winSize.w >= 560 ? 'Thu về kích thước mặc định' : 'Phóng rộng khung chat'}
-            aria-label={winSize.w >= 560 ? 'Thu nhỏ khung' : 'Phóng rộng khung chat'}
-          >
-            <Scaling size={14} />
-          </button>
-          <button type="button" className="cms-fm-icon-btn" onClick={() => onMinimize(tab.id)} aria-label="Thu nhỏ thành biểu tượng">
-            <Minus size={14} />
-          </button>
+          {fullPage && !isAiPeer ? (
+            <>
+              <button
+                type="button"
+                className="cms-fm-icon-btn"
+                onClick={() => {
+                  setMessageSearchOpen((open) => !open);
+                  setMessageSearchQuery('');
+                  setInfoOpen(false);
+                }}
+                aria-label={messageSearchOpen ? 'Đóng tìm kiếm tin nhắn' : 'Tìm kiếm tin nhắn'}
+                title="Tìm trong tin nhắn"
+              >
+                <Search size={18} />
+              </button>
+              <button
+                type="button"
+                className="cms-fm-icon-btn"
+                onClick={() => {
+                  setInfoOpen((open) => !open);
+                  setMessageSearchOpen(false);
+                }}
+                aria-label={infoOpen ? 'Đóng thông tin liên hệ' : 'Thông tin liên hệ'}
+                title="Thông tin liên hệ"
+              >
+                <Info size={18} />
+              </button>
+            </>
+          ) : null}
+          {!fullPage ? (
+            <>
+              <button
+                type="button"
+                className="cms-fm-icon-btn"
+                onClick={toggleWide}
+                title={winSize.w >= 560 ? 'Thu về kích thước mặc định' : 'Phóng rộng khung chat'}
+                aria-label={winSize.w >= 560 ? 'Thu nhỏ khung' : 'Phóng rộng khung chat'}
+              >
+                <Scaling size={14} />
+              </button>
+              <button type="button" className="cms-fm-icon-btn" onClick={() => onMinimize(tab.id)} aria-label="Thu nhỏ thành biểu tượng">
+                <Minus size={14} />
+              </button>
+            </>
+          ) : null}
           <button type="button" className="cms-fm-icon-btn" onClick={() => onClose(tab.id)} aria-label="Đóng chat">
             <X size={14} />
           </button>
@@ -1037,15 +1098,64 @@ function ChatWindow({
         </p>
       ) : null}
 
+      {fullPage && !isAiPeer && messageSearchOpen ? (
+        <div className="cms-fm-page-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            value={messageSearchQuery}
+            onChange={(event) => setMessageSearchQuery(event.target.value)}
+            placeholder="Tìm trong tin nhắn..."
+            aria-label="Tìm trong tin nhắn"
+            autoFocus
+          />
+          {messageSearchQuery ? (
+            <span>{visibleMessages.length} kết quả</span>
+          ) : null}
+        </div>
+      ) : null}
+      {fullPage && !isAiPeer && infoOpen ? (
+        <div ref={infoPopupRef} className="cms-fm-page-info" role="dialog" aria-label="Thông tin nhân viên">
+          <div className="cms-fm-page-info__title">
+            <Info size={16} aria-hidden="true" />
+            <span>{isAiPeer ? 'Thông tin trợ lý' : 'Thông tin nhân viên'}</span>
+          </div>
+          <div className="cms-fm-page-info__field">
+            <span>Tên nhân viên</span>
+            <strong>{displayName || 'Chưa cập nhật'}</strong>
+          </div>
+          <div className="cms-fm-page-info__grid">
+            <div className="cms-fm-page-info__field is-branch">
+              <span>Chi nhánh</span>
+              <strong>{tab.user.branchName || tab.user.branchCode || 'Chưa cập nhật'}</strong>
+            </div>
+            <div className="cms-fm-page-info__field is-phone">
+              <span>Số điện thoại</span>
+              <strong>{tab.user.branchPhone || tab.user.phone || 'Chưa cập nhật'}</strong>
+            </div>
+          </div>
+          <div className="cms-fm-page-info__field">
+            <span>Địa chỉ</span>
+            <strong>{tab.user.address || 'Chưa cập nhật'}</strong>
+          </div>
+        </div>
+      ) : null}
+
       <div ref={messagesBodyRef} className="cms-fm-window__body">
-        {displayMessages.length === 0 ? (
-          <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
-            {isAiPeer
-              ? 'Hỏi Trợ lý AI về tin học, Office, MOS, LMS…'
-              : `Chat với ${tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.`}
-          </p>
+        {visibleMessages.length === 0 ? (
+          messageSearchQuery ? (
+            <p className="text-center text-[12px] text-slate-500 py-8">Không tìm thấy tin nhắn phù hợp.</p>
+          ) : (
+          fullPage ? null : (
+            <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
+              {isAiPeer
+                ? 'Hỏi Trợ lý AI về tin học, Office, MOS, LMS…'
+                : `Chat với ${tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.`}
+            </p>
+          )
+          )
         ) : (
-          displayMessages.map((m, idx) => {
+          visibleMessages.map((m, idx) => {
             const sentByMe = isOutgoingMessengerMessage(m, meId);
             const alignEnd = sentByMe && !(isAiPeer && isImageMessage(m));
             const msgId = m.id || m._id;
@@ -1408,13 +1518,15 @@ function ChatWindow({
             disabled={uploading || sending || questionBlocked}
             className="cms-fm-input"
           />
-          <StickerPicker
-            key={tab.id}
-            inline
-            disabled={uploading || sending || questionBlocked || Boolean(pendingImage)}
-            onPickEmoji={handleEmojiInsert}
-            onSendSticker={handleStickerSend}
-          />
+          {!isAiPeer ? (
+            <StickerPicker
+              key={tab.id}
+              inline
+              disabled={uploading || sending || questionBlocked || Boolean(pendingImage)}
+              onPickEmoji={handleEmojiInsert}
+              onSendSticker={handleStickerSend}
+            />
+          ) : null}
           <button type="submit" disabled={(!text.trim() && !pendingImage) || uploading || sending || questionBlocked} className="cms-fm-send" aria-label={sending ? 'Đang xử lý' : 'Gửi'}>
             {uploading || sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
@@ -1432,6 +1544,7 @@ function ChatWindow({
 
 export default function FloatingMessenger({ session, role }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const isInbox = location.pathname.includes('/inbox');
   const toast = useToast();
   const {
@@ -1459,6 +1572,13 @@ export default function FloatingMessenger({ session, role }) {
   const [aiQuestionQuota, setAiQuestionQuota] = useState({
     applies: false, remaining: 15, limit: 15, used: 0,
   });
+  const [supportDirectoryMode, setSupportDirectoryMode] = useState('all');
+  const [supportChatPage, setSupportChatPage] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle('cms-support-chat-page', supportChatPage);
+    return () => document.body.classList.remove('cms-support-chat-page');
+  }, [supportChatPage]);
 
   const meId = String(session?.id || session?._id || '');
   const meName = session?.name || 'Tôi';
@@ -1540,6 +1660,7 @@ export default function FloatingMessenger({ session, role }) {
     if (!contact) return tab.user;
     return {
       ...tab.user,
+      id: peerId,
       name: contact.name || tab.user.name,
       avatar: contact.avatar
         || contact.avatarUrl
@@ -1549,6 +1670,13 @@ export default function FloatingMessenger({ session, role }) {
         || '',
       gender: contact.gender || tab.user.gender || '',
       adminRole: contact.adminRole || tab.user.adminRole || null,
+      productRole: contact.productRole || tab.user.productRole || null,
+      phone: contact.phone || tab.user.phone || '',
+      personalPhone: contact.personalPhone || tab.user.personalPhone || '',
+      branchName: contact.branchName || contact.branchCode || tab.user.branchName || tab.user.branchCode || '',
+      branchCode: contact.branchCode || tab.user.branchCode || '',
+      branchPhone: contact.branchPhone || tab.user.branchPhone || '',
+      address: contact.address || tab.user.address || '',
     };
   }, [fmContacts]);
 
@@ -1606,6 +1734,9 @@ export default function FloatingMessenger({ session, role }) {
 
   /** HV/GV dùng AI-first: không mở danh bạ. Nhân viên nhắn tới thì hiện chat-head. */
   const showHumanSupportPanel = supportOpen;
+  const visibleSupportGroups = supportDirectoryMode === 'staff'
+    ? directory.groups.filter((group) => group.key !== 'ai')
+    : directory.groups;
 
   const unreadConversations = useMemo(() => {
     const list = conversations.filter((c) => (c.unread || 0) > 0 && !c.isGroup);
@@ -1733,9 +1864,51 @@ export default function FloatingMessenger({ session, role }) {
     }
   }, [canUseAiSupport, aiOpening, syncMessages, meId, openChat, setSupportOpen, toast]);
 
-  const handleSupportFabClick = useCallback(() => {
+  useEffect(() => {
+    const onOpenSupport = () => { void handleOpenAiSupport(); };
+    window.addEventListener('cms:open-support', onOpenSupport);
+    return () => window.removeEventListener('cms:open-support', onOpenSupport);
+  }, [handleOpenAiSupport]);
+
+  useEffect(() => {
+    const onChooseSupport = (event) => {
+      if (event.detail?.mode === 'ai') {
+        setSupportChatPage(true);
+        void handleOpenAiSupport();
+      } else if (event.detail?.mode === 'staff') {
+        const onlineIds = new Set((onlineUsers || []).map((user) => String(user.userId || user.id || '')));
+        const supportContact = fmContacts
+          .filter((contact) => (
+            String(contact?.productRole || '').toUpperCase() === 'SUPPORT'
+            || String(contact?.adminRole || '').toUpperCase() === 'SUPPORT'
+            || String(contact?.role || '').toLowerCase() === 'support'
+          ))
+          .sort((a, b) => Number(onlineIds.has(String(b.id || ''))) - Number(onlineIds.has(String(a.id || '')))
+            || String(a.name || '').localeCompare(String(b.name || ''), 'vi'))[0];
+        if (!supportContact) {
+          toast.error('Hiện chưa có nhân viên hỗ trợ trong danh bạ.');
+          return;
+        }
+        setSupportChatPage(true);
+        setUserOpenedChat(true);
+        setSupportDirectoryMode('staff');
+        setSupportOpen(false);
+        openChat(supportContact, { expand: true });
+      }
+    };
+    window.addEventListener('cms:open-support-choice', onChooseSupport);
+    return () => window.removeEventListener('cms:open-support-choice', onChooseSupport);
+  }, [fmContacts, handleOpenAiSupport, onlineUsers, openChat, setSupportOpen, toast]);
+
+  const handleSupportFabClick = () => {
+    if (meRole === 'student' || meRole === 'teacher') {
+      setSupportOpen(false);
+      navigate(`/${meRole}/support`);
+      return;
+    }
+    setSupportDirectoryMode('all');
     setSupportOpen((v) => !v);
-  }, [setSupportOpen]);
+  };
 
   const handleEscalate = useCallback(async (tab) => {
     if (!tab?.id || escalatingId) return;
@@ -2101,6 +2274,14 @@ export default function FloatingMessenger({ session, role }) {
     focusChat(convId);
     if (meId) markMessagesRead?.(convId, meId);
   }, [focusChat, meId, markMessagesRead]);
+  const handleSupportPageClose = (convId) => {
+    closeChat(convId);
+    setSupportChatPage(false);
+  };
+  const handleSupportPageMinimize = (convId) => {
+    minimizeChat(convId);
+    setSupportChatPage(false);
+  };
 
   const openWindowMessages = openWindow ? (getMessages(openWindow.id) || []) : [];
   const openWindowStatus = openWindow
@@ -2141,8 +2322,6 @@ export default function FloatingMessenger({ session, role }) {
       return next;
     });
   }, [openWindowId, latestAiReplyId]);
-
-  if (!meId) return null;
 
   const handleSend = async (tab, content, payload = null) => {
     const body = String(content || '').trim();
@@ -2335,101 +2514,148 @@ export default function FloatingMessenger({ session, role }) {
     return ar === 'SUPPORT';
   });
 
-  const [fabLabel, setFabLabel] = useState(canUseAiSupport ? '' : 'Hỗ trợ viên 24/7');
-  useEffect(() => {
-    if (!canUseAiSupport) {
-      setFabLabel('Hỗ trợ viên 24/7');
-      return undefined;
+  const supportFabRef = useRef(null);
+  const supportDragRef = useRef(null);
+  const suppressSupportClickRef = useRef(false);
+  const supportClickTimeoutRef = useRef(null);
+  const [supportFabOffset, setSupportFabOffset] = useState(0);
+  const supportFabOffsetRef = useRef(0);
+
+  const clampSupportFabTop = (top, height) => {
+    const headerBottom = document.querySelector('#main-content header')?.getBoundingClientRect().bottom || 0;
+    const footer = document.querySelector('nav[aria-label="Điều hướng chính"]');
+    const footerTop = footer?.getAttribute('aria-hidden') !== 'true'
+      ? footer?.getBoundingClientRect().top
+      : null;
+    const fallbackFooterTop = window.innerHeight - (window.matchMedia('(min-width: 768px)').matches ? 100 : 76);
+    const minTop = headerBottom + 8;
+    const maxTop = Math.max(minTop, (footerTop || fallbackFooterTop) - height - 8);
+    return Math.max(minTop, Math.min(maxTop, top));
+  };
+
+  const handleSupportPointerDown = (event) => {
+    if (event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    supportDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startTop: rect.top,
+      startOffset: supportFabOffsetRef.current,
+      moved: false,
+    };
+    const captureTarget = event.target;
+    if (typeof captureTarget.setPointerCapture === 'function') {
+      captureTarget.setPointerCapture(event.pointerId);
+    } else {
+      event.currentTarget.setPointerCapture(event.pointerId);
     }
+  };
 
-    const labels = ['Trợ lý AI 24/7', 'Nhân viên trực tiếp'];
-    let labelIndex = 0;
-    let charIndex = 0;
-    let deleting = false;
-    let timeoutId;
-    let cancelled = false;
+  const handleSupportPointerMove = (event) => {
+    const drag = supportDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.moved && Math.abs(event.clientY - drag.startY) > 4) {
+      drag.moved = true;
+    }
+    if (!drag.moved) return;
+    const top = clampSupportFabTop(drag.startTop + event.clientY - drag.startY, event.currentTarget.offsetHeight);
+    const offset = drag.startOffset + top - drag.startTop;
+    supportFabOffsetRef.current = offset;
+    setSupportFabOffset(offset);
+  };
 
-    const tick = () => {
-      if (cancelled) return;
-      const target = labels[labelIndex];
-      if (!deleting) {
-        charIndex += 1;
-        setFabLabel(target.slice(0, charIndex));
-        if (charIndex === target.length) {
-          deleting = true;
-          timeoutId = window.setTimeout(tick, 1500);
-          return;
-        }
-      } else {
-        charIndex -= 1;
-        setFabLabel(target.slice(0, charIndex));
-        if (charIndex === 0) {
-          deleting = false;
-          labelIndex = (labelIndex + 1) % labels.length;
-        }
-      }
-      timeoutId = window.setTimeout(tick, deleting ? 55 : 90);
+  const handleSupportPointerUp = (event) => {
+    const drag = supportDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    supportDragRef.current = null;
+    if (!drag.moved) return;
+    suppressSupportClickRef.current = true;
+    window.clearTimeout(supportClickTimeoutRef.current);
+    supportClickTimeoutRef.current = window.setTimeout(() => {
+      suppressSupportClickRef.current = false;
+    }, 0);
+  };
+
+  const handleSupportClickCapture = (event) => {
+    if (!suppressSupportClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressSupportClickRef.current = false;
+    window.clearTimeout(supportClickTimeoutRef.current);
+  };
+
+  useEffect(() => {
+    const clampAfterResize = () => {
+      const element = supportFabRef.current;
+      if (!element) return;
+      const rect = element.getBoundingClientRect();
+      const offset = supportFabOffsetRef.current + clampSupportFabTop(rect.top, rect.height) - rect.top;
+      supportFabOffsetRef.current = offset;
+      setSupportFabOffset(offset);
     };
-
-    tick();
+    window.addEventListener('resize', clampAfterResize);
     return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
+      window.removeEventListener('resize', clampAfterResize);
+      window.clearTimeout(supportClickTimeoutRef.current);
     };
-  }, [canUseAiSupport]);
+  }, []);
+
   const fabExpanded = canUseAiSupport ? showHumanSupportPanel : supportOpen;
 
-  if (isInbox) return null;
+  if (!meId || isInbox) return null;
 
   return (
-    <div className="cms-fm-root" aria-live="polite">
+    <div className={`cms-fm-root${supportChatPage ? ' is-page-chat' : ''}`} aria-live="polite">
       {/* Cửa sổ chat đang mở (tối đa 1) */}
       {openWindow && (
-        <div className="cms-fm-stage">
-          <ChatWindow
-            key={openWindow.id}
-            tab={getFreshTab(openWindow)}
-            meId={meId}
-            draftStorageKey={`${FM_DRAFT_KEY_PREFIX}_${encodeURIComponent(meId)}_${encodeURIComponent(openWindow.id)}`}
-            onlineUsers={onlineUsers}
-            isSuper={isSuper}
-            messages={openWindowMessages}
-            onClose={closeChat}
-            onMinimize={minimizeChat}
-            onSend={handleSend}
-            onSendFile={handleSendFile}
-            onSendExistingImage={handleSendExistingImage}
-            onRecall={recallMessage}
-            onReact={toggleMessageReaction}
-            peerTyping={!!peerTypingMap[openWindow.id]}
-            sending={Boolean(sendingMap[openWindow.id] && (
-              !isAiSupportPeer(openWindow.user)
-              || openWindowStatus === AI_SUPPORT_STATUS.AI_ACTIVE
-            ))}
-            isAiPeer={isAiSupportPeer(openWindow.user)}
-            aiStatus={openWindowStatus}
-            canShowEscalate={openWindowCanEscalate}
-            feedbackPhase={openWindowFeedback}
-            supportOnline={supportOnline}
-            onEscalate={handleEscalate}
-            onResetAi={handleResetAi}
-            onAgree={handleAgree}
-            onDisagree={handleDisagree}
-            onMoreYes={handleMoreYes}
-            onMoreNo={handleMoreNo}
-            onDisagreeReason={handleDisagreeReason}
-            onDisagree2={handleDisagree2}
-            onFinalExplain={handleFinalExplain}
-            onFinalStaff={handleFinalStaff}
-            escalating={escalatingId === openWindow.id}
-            resettingAi={resettingAiId === openWindow.id}
-            onTypingStart={handleTypingStart}
-            onTypingStop={handleTypingStop}
-            imageQuota={aiImageQuota}
-            questionQuota={aiQuestionQuota}
-            viewerRole={meRole}
-          />
-        </div>
+        <>
+          <div className="cms-fm-stage">
+            <ChatWindow
+              key={openWindow.id}
+              tab={getFreshTab(openWindow)}
+              meId={meId}
+              draftStorageKey={`${FM_DRAFT_KEY_PREFIX}_${encodeURIComponent(meId)}_${encodeURIComponent(openWindow.id)}`}
+              onlineUsers={onlineUsers}
+              isSuper={isSuper}
+              messages={openWindowMessages}
+              onClose={supportChatPage ? handleSupportPageClose : closeChat}
+              onMinimize={supportChatPage ? handleSupportPageMinimize : minimizeChat}
+              onSend={handleSend}
+              onSendFile={handleSendFile}
+              onSendExistingImage={handleSendExistingImage}
+              onRecall={recallMessage}
+              onReact={toggleMessageReaction}
+              peerTyping={!!peerTypingMap[openWindow.id]}
+              sending={Boolean(sendingMap[openWindow.id] && (
+                !isAiSupportPeer(openWindow.user)
+                || openWindowStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+              ))}
+              isAiPeer={isAiSupportPeer(openWindow.user)}
+              aiStatus={openWindowStatus}
+              canShowEscalate={openWindowCanEscalate}
+              feedbackPhase={openWindowFeedback}
+              supportOnline={supportOnline}
+              onEscalate={handleEscalate}
+              onResetAi={handleResetAi}
+              onAgree={handleAgree}
+              onDisagree={handleDisagree}
+              onMoreYes={handleMoreYes}
+              onMoreNo={handleMoreNo}
+              onDisagreeReason={handleDisagreeReason}
+              onDisagree2={handleDisagree2}
+              onFinalExplain={handleFinalExplain}
+              onFinalStaff={handleFinalStaff}
+              escalating={escalatingId === openWindow.id}
+              resettingAi={resettingAiId === openWindow.id}
+              onTypingStart={handleTypingStart}
+              onTypingStop={handleTypingStop}
+              imageQuota={aiImageQuota}
+              questionQuota={aiQuestionQuota}
+              viewerRole={meRole}
+              fullPage={supportChatPage}
+            />
+          </div>
+        </>
       )}
 
       <div className="cms-fm-dock">
@@ -2439,8 +2665,10 @@ export default function FloatingMessenger({ session, role }) {
             <div className="cms-fm-support__head">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-slate-800 flex items-center gap-2">
-                  <Headphones size={15} className="text-emerald-600 shrink-0" />
-                  {usePresenceDirectory ? 'Đang hoạt động' : (canUseAiSupport ? 'Chuyên viên hỗ trợ' : 'Hỗ trợ viên')}
+                  <span className="cms-fm-support__head-icon" aria-hidden="true">
+                    <Headphones size={15} />
+                  </span>
+                  Hỗ trợ
                   {unreadTotal > 0 && (
                     <span className="cms-fm-unread-pill">{badgeLabel} mới</span>
                   )}
@@ -2449,7 +2677,9 @@ export default function FloatingMessenger({ session, role }) {
                   {usePresenceDirectory
                     ? 'Học viên, giảng viên, admin chi nhánh đang online'
                     : (canUseAiSupport
-                      ? 'Chọn chuyên viên hỗ trợ trực tiếp (sau khi Trợ lý AI chuyển tiếp)'
+                      ? (supportDirectoryMode === 'staff'
+                        ? 'Chọn một chuyên viên để trò chuyện trực tiếp'
+                        : 'Trợ lý AI và chuyên viên hỗ trợ trực tiếp')
                       : 'Gửi tin nhắn trực tiếp tới bộ phận Hỗ trợ viên')}
                 </p>
               </div>
@@ -2500,13 +2730,13 @@ export default function FloatingMessenger({ session, role }) {
                 </div>
               )}
 
-              {directory.groups.length === 0 ? (
+              {visibleSupportGroups.length === 0 ? (
                 <div className="px-3 py-8 text-center text-xs text-slate-400 font-medium">
                   <Circle size={28} className="mx-auto mb-2 text-slate-200" />
-                  {canUseAiSupport ? 'Chưa có chuyên viên hỗ trợ online' : 'Chưa có ai đang online'}
+                  {canUseAiSupport ? 'Hiện chưa có chuyên viên hỗ trợ.' : 'Chưa có ai đang online'}
                 </div>
               ) : (
-                directory.groups.map((group) => (
+                visibleSupportGroups.map((group) => (
                   <div key={group.key} className="px-1 pb-2 mb-1">
                     <p className="text-[10px] font-black  tracking-wide text-slate-400 px-1.5 mb-1">
                       {group.label}
@@ -2591,40 +2821,29 @@ export default function FloatingMessenger({ session, role }) {
         )}
 
         {/* FAB — HV/GV: mở Trợ lý AI trước; sau escalate mới mở danh bạ SUPPORT */}
-        {!isInbox && !isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
-          <div className="relative flex items-center gap-0 group">
-            {!fabExpanded && (
-              <div
-                onClick={handleSupportFabClick}
-                className="cms-fm-fab-label hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md shadow-xl shadow-slate-900/10 cursor-pointer hover:scale-105 transition-all duration-200"
-              >
-                <span className="cms-fm-fab-label__border" aria-hidden="true" />
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="relative z-10 min-w-[132px] text-sm font-black text-slate-800 tracking-tight" aria-live="polite">
-                  {fabLabel}
-                  <span className="ml-0.5 inline-block w-0.5 h-4 align-[-2px] bg-red-500 animate-pulse" aria-hidden="true" />
-                </span>
-              </div>
-            )}
-
+        {!openWindow && !fabExpanded && !isInbox && !isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
+          <div
+            ref={supportFabRef}
+            className="cms-fm-support-fab relative flex items-center gap-0 group"
+            style={{ transform: `translateY(${supportFabOffset}px)` }}
+            onPointerDown={handleSupportPointerDown}
+            onPointerMove={handleSupportPointerMove}
+            onPointerUp={handleSupportPointerUp}
+            onPointerCancel={handleSupportPointerUp}
+            onClickCapture={handleSupportClickCapture}
+          >
             <button
               type="button"
               onClick={handleSupportFabClick}
-              className={`cms-fm-fab cms-fm-fab--mascot border-2 border-white ring-2 ring-red-500/70 shadow-[0_0_0_4px_rgba(239,68,68,0.12)] ${fabExpanded ? 'is-expanded' : ''}`}
-              title={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Liên hệ Hỗ trợ viên')}
-              aria-label={fabExpanded ? 'Đóng' : (canUseAiSupport ? 'Mở Trợ lý AI' : 'Mở Hỗ trợ viên')}
+              className={`cms-fm-support-button ${fabExpanded ? 'is-expanded' : ''}`}
+              title={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
+              aria-label={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
               aria-expanded={fabExpanded}
             >
-              {fabExpanded ? (
-                <X size={24} className="text-white shrink-0" />
-              ) : (
-                <div className="relative flex items-center justify-center w-full h-full overflow-visible">
-                  <SupportMascot size={60} waving={true} className="cms-support-mascot--fab" />
-                </div>
-              )}
+              <span className="cms-fm-support-button__label">Hỗ trợ</span>
+              <span className="cms-fm-support-button__icon" aria-hidden="true">
+                {fabExpanded ? <X size={22} strokeWidth={2.5} /> : <Headphones size={22} strokeWidth={2.5} />}
+              </span>
             </button>
           </div>
         )}

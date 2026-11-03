@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
@@ -10,7 +10,7 @@ import { useSocket } from '../context/SocketContext';
 import { useToast } from '../utils/toast';
 import api, { setTokens, csrfFetch } from '../services/api';
 import { 
-  Bell, MessageCircle, LogOut, CheckCircle2, Clock, X, Lock,
+  Bell, MessageCircle, CheckCircle2, Clock, X, Lock,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
 } from 'lucide-react';
 
@@ -59,6 +59,28 @@ const PAGE_TITLES = {
   materials: 'Tài liệu',
   evaluation: 'Đánh giá',
   profile: 'Hồ sơ',
+};
+
+const ROLE_PAGE_TITLES = {
+  student: {
+    dashboard: 'Tổng quan',
+    schedule: 'Lịch học',
+    'lesson-practice': 'Luyện tập kỹ năng',
+    'materials-files': 'Bài tập và tài nguyên',
+    'materials-software': 'Bài tập và tài nguyên',
+    exam: 'Phòng thi',
+    evaluation: 'Đánh giá GV',
+    profile: 'Hồ sơ',
+  },
+  teacher: {
+    dashboard: 'Tổng quan',
+    schedule: 'Lịch dạy',
+    students: 'Quản lý học viên',
+    assignments: 'Giao bài tập & kiểm tra',
+    training: 'Khóa đào tạo',
+    finance: 'Tài chính',
+    profile: 'Hồ sơ',
+  },
 };
 
 function isTeacherAttendanceConfirmedNotif(n) {
@@ -153,10 +175,12 @@ async function enrichAttendancePayloadFromSchedules(base, studentId) {
 
 function resolvePageTitle(role, pathname, hash) {
   const key = (hash || '').replace('#', '');
+  if (key && ROLE_PAGE_TITLES[role]?.[key]) return ROLE_PAGE_TITLES[role][key];
   if (key && PAGE_TITLES[key]) return PAGE_TITLES[key];
   if (pathname.includes('/inbox')) return 'Hộp thư';
   if (pathname.includes('/feed')) return 'Bảng tin';
   if (pathname.includes('/news')) return 'Tin tức';
+  if (pathname.includes('/support')) return 'Hỗ trợ';
   if (pathname.includes('/notifications')) return 'Thông báo';
   if (pathname.includes('/bi')) return 'BI Dashboard';
   if (pathname.includes('/files')) return 'Quản lý file';
@@ -172,8 +196,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (pathname.includes('/test')) return 'Bài test';
   if (pathname.includes('/finance')) return 'Tài chính';
   if (role === 'admin') return 'Quản trị';
-  if (role === 'teacher') return 'Giảng dạy';
-  return 'Học tập';
+  return 'Tổng quan';
 }
 
 const getNotifStyle = (type) => {
@@ -229,6 +252,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const location = useLocation();
   const toast = useToast();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileFooterVisible, setMobileFooterVisible] = useState(true);
+  const [brandLogo, setBrandLogo] = useState('');
+  const lastContentScrollTop = useRef(0);
   const [ratingDetail, setRatingDetail] = useState(null);
   const [ratingDetailLoading, setRatingDetailLoading] = useState(false);
   const [ratingDetailError, setRatingDetailError] = useState('');
@@ -1497,15 +1523,31 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const isStudentsTab = adminHash === 'students' || isTeacherStudentsTab;
   const isInboxPage = location.pathname.includes('/inbox');
   const isBiPage = location.pathname.includes('/bi');
+  const isLessonPracticeCoursePage = role === 'student'
+    && /^\/student\/lesson-practice\/(subjects|units)\//.test(location.pathname);
   const isImmersivePage =
     isInboxPage
     || isBiPage
     || (role === 'teacher' && location.pathname === '/teacher/test')
     || isTeacherStudentsTab;
   const showAdminBranch = role === 'admin';
-  const roleLabel = role === 'admin'
-    ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : session?.adminRole === 'SUPPORT' ? 'Chuyên viên Hỗ trợ' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
-    : role;
+  const handleContentScroll = (event) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    const delta = scrollTop - lastContentScrollTop.current;
+    lastContentScrollTop.current = scrollTop;
+    if (scrollTop <= 24) {
+      setMobileFooterVisible(true);
+    } else if (delta > 4) {
+      setMobileFooterVisible(false);
+    } else if (delta < -4) {
+      setMobileFooterVisible(true);
+    }
+  };
+
+  useEffect(() => {
+    lastContentScrollTop.current = 0;
+    setMobileFooterVisible(true);
+  }, [location.pathname, location.hash]);
 
   return (
     <FloatingMessengerProvider
@@ -1531,6 +1573,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         userPermissions={session?.permissions || []}
         mobileOpen={mobileNavOpen}
         onMobileOpenChange={setMobileNavOpen}
+        mobileNavVisible={!isImmersivePage || isInboxPage}
+        mobileFooterVisible={mobileFooterVisible && !isLessonPracticeCoursePage}
+        onBrandLogoChange={setBrandLogo}
       />
 
       <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
@@ -1539,8 +1584,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         } ${
           role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
         }`}>
-          <div className="cms-topbar__row">
-            <button
+        <div className="cms-topbar__row">
+          <button
               type="button"
               className="cms-topbar__menu"
               onClick={() => setMobileNavOpen(true)}
@@ -1549,14 +1594,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             >
               <Menu size={20} aria-hidden="true" />
             </button>
-            <div className="min-w-0 flex-1 flex flex-col md:flex-row md:items-center md:gap-3 overflow-hidden">
-              <h1 className="cms-topbar__title">{pageTitle}</h1>
-              <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5 sm:mt-0">
-                <span className="font-medium text-slate-600">{displayName}</span>
-                <span className="text-slate-300 mx-1">·</span>
-                <span>{roleLabel}</span>
-              </p>
+            <div className="min-w-0 flex-1 flex items-center overflow-hidden">
+              <h1 className="cms-topbar__title cms-topbar__title--mobile-hidden">{pageTitle}</h1>
             </div>
+            <button
+              type="button"
+              className="cms-topbar__brand"
+              onClick={() => navigate(role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : role === 'staff' ? '/staff' : '/admin')}
+              aria-label="Về trang tổng quan"
+              title="Về trang tổng quan"
+            >
+              <img src={brandLogo || '/logo-thang-tin-hoc.svg'} alt="Logo Thắng Tin Học" />
+            </button>
 
             <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 shrink-0">
               {showAdminBranch && (
@@ -1573,7 +1622,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
                   aria-expanded={showNotif}
                   aria-haspopup="dialog"
-                  className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+                  className={`cms-topbar__action relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'is-open' : ''}`}
                 >
                   <Bell size={18} aria-hidden="true" />
                   {unreadCount > 0 && (
@@ -1584,18 +1633,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 </button>
               </div>
 
-              <div className="h-8 w-px bg-slate-100 mx-0.5 hidden md:block" />
-
-              {/* Desktop / large tablet+: logout in topbar (mobile+tablet dùng sidebar) */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                aria-label="Đăng xuất"
-                className="hidden lg:inline-flex h-11 px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors duration-200 items-center gap-1.5"
-              >
-                <LogOut size={15} aria-hidden="true" />
-                <span>Đăng xuất</span>
-              </button>
             </div>
           </div>
 
@@ -1608,13 +1645,19 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         </header>
 
         <div
+          onScroll={isImmersivePage || isInboxPage || isBiPage ? undefined : handleContentScroll}
           className={
             isInboxPage || isBiPage
-              ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col cms-page-gutter py-3 sm:py-3 md:py-4 pb-[env(safe-area-inset-bottom,0px)]'
+              ? `flex-1 min-h-0 w-full overflow-hidden flex flex-col cms-page-gutter py-3 sm:py-3 md:py-4 ${
+                isInboxPage
+                  ? ''
+                  : 'pb-[env(safe-area-inset-bottom,0px)]'
+              }`
               : isImmersivePage
                 ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-                : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:pb-6'
+                : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(6rem+env(safe-area-inset-bottom,0px))]'
           }
+          style={isInboxPage ? { paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' } : undefined}
         >
           <div
             className={
@@ -1908,6 +1951,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               minStars: n.payload.minStars,
                               teacherId: myId,
                             });
+                          } else if (n.payload?.kind === 'feed_interaction') {
+                            setShowNotif(false);
+                            const feedRole = role === 'admin' || role === 'staff'
+                              ? 'admin'
+                              : role === 'teacher' ? 'teacher' : 'student';
+                            const params = new URLSearchParams();
+                            if (n.payload?.postId) params.set('postId', String(n.payload.postId));
+                            if (n.payload?.commentId) params.set('commentId', String(n.payload.commentId));
+                            if (n.payload?.parentCommentId) params.set('parentCommentId', String(n.payload.parentCommentId));
+                            const query = params.toString();
+                            navigate(`/${feedRole}/feed${query ? `?${query}` : ''}`);
                           } else if (n.payload?.kind === 'lms_course_update') {
                             const action = n.payload?.action || '';
                             const isSoftware = String(action).startsWith('software_link');
@@ -2044,11 +2098,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               } catch (e) {}
                             }
 
-                            if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && targetPath !== '/admin/news' && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                            const targetPathname = targetPath.split(/[?#]/, 1)[0];
+                            if (targetPath.startsWith('/admin/') && !['/admin/inbox', '/admin/news', '/admin/feed'].includes(targetPathname) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                               targetPath = '/admin#' + targetPath.replace('/admin/', '');
-                            } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                            } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications', '/student/news', '/student/feed'].includes(targetPathname) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                               targetPath = '/student#' + targetPath.replace('/student/', '');
-                            } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                            } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news', '/teacher/feed'].includes(targetPathname) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
                               targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
                             }
 

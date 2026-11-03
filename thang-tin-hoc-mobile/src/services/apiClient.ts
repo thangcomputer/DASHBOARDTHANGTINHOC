@@ -117,11 +117,25 @@ async function fetchWithTimeout(url: string, init: RequestInit) {
   }
 }
 
-function getSafeApiErrorMessage(status: number) {
+function getSafeApiErrorMessage(status: number, payload: Record<string, unknown>) {
   if (status === 0) return 'Không thể kết nối máy chủ. Hãy kiểm tra Internet và thử lại.';
   if (status === 400) return 'Yêu cầu chưa hợp lệ. Vui lòng kiểm tra thông tin và thử lại.';
   if (status === 401) return 'Thông tin đăng nhập hoặc phiên làm việc không hợp lệ.';
-  if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+  if (status === 403) {
+    if (payload.code === 'NEEDS_RE_ENROLL') {
+      return 'Tài khoản học viên không còn khóa học đang học. Vui lòng liên hệ trung tâm để được hỗ trợ đăng ký khóa mới.';
+    }
+    if (payload.code === 'MOBILE_ROLE_NOT_ALLOWED') {
+      return 'Vai trò đã chọn chưa được hỗ trợ trên ứng dụng mobile.';
+    }
+    if (payload.code === 'CSRF_INVALID') {
+      return 'Phiên bảo mật đã hết hạn. Vui lòng tải lại ứng dụng rồi thử lại.';
+    }
+    if (payload.message === 'Tài khoản không thể đăng nhập. Vui lòng liên hệ quản trị.') {
+      return 'Tài khoản hiện không thể đăng nhập. Vui lòng liên hệ quản trị.';
+    }
+    return 'Bạn không có quyền thực hiện thao tác này.';
+  }
   if (status === 404) return 'Không tìm thấy nội dung yêu cầu.';
   if (status === 409) return 'Dữ liệu vừa thay đổi. Vui lòng tải lại và thử lại.';
   if (status === 422) return 'Thông tin chưa hợp lệ. Vui lòng kiểm tra và thử lại.';
@@ -146,7 +160,7 @@ async function parseResponse(response: Response) {
   }
   if (!response.ok || payload.success === false) {
     throw new MobileApiError(
-      getSafeApiErrorMessage(response.status),
+      getSafeApiErrorMessage(response.status, payload),
       response.status,
       typeof payload.code === 'string' ? payload.code : undefined,
     );

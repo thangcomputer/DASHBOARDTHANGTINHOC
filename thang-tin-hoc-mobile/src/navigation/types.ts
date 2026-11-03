@@ -35,7 +35,7 @@ export type AppStackParamList = {
   StudentExam: { quizId?: string } | undefined;
   LearningLesson: { courseId: string; unitId: string; lessonId: string };
   Evaluations: undefined;
-  Feed: undefined;
+  Feed: { postId?: string; commentId?: string; parentCommentId?: string } | undefined;
   News: undefined;
   NewsDetail: { newsId: string };
   CenterInfo: undefined;
@@ -58,7 +58,7 @@ export type MainTabsParamList = {
   Schedule: { focusScheduleId?: string } | undefined;
   Messages: undefined;
   CourseVideos: undefined;
-  Feed: undefined;
+  Feed: { postId?: string; commentId?: string; parentCommentId?: string } | undefined;
   Support: undefined;
   Notifications: undefined;
   Profile: undefined;

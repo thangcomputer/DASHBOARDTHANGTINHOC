@@ -9,14 +9,13 @@ const ROOT = path.join(__dirname, '../..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 test('mobile support entry opens the authenticated AI conversation for students and teachers', () => {
-  const home = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
+  const supportEntry = read('thang-tin-hoc-mobile/src/screens/SupportEntryScreen.tsx');
   const api = read('thang-tin-hoc-mobile/src/services/aiSupportApi.ts');
   const routes = read('routes/aiSupportRoutes.js');
 
-  assert.ok(home.includes('openAiSupportConversation()'));
-  assert.ok(home.includes('!user.previewMode ? <Pressable'));
-  assert.ok(home.includes("navigation?.navigate('Conversation'"));
-  assert.ok(home.includes("participantId: 'ai_support'"));
+  assert.ok(supportEntry.includes('openAiSupportConversation()'));
+  assert.ok(supportEntry.includes("navigation.navigate('Conversation'"));
+  assert.ok(supportEntry.includes("participantId: 'ai_support'"));
   assert.ok(api.includes("'/ai-support/open'"));
   assert.ok(routes.includes("router.post('/open'"));
   assert.ok(routes.includes('sendWelcomeIfEmpty'));
@@ -25,10 +24,14 @@ test('mobile support entry opens the authenticated AI conversation for students 
 test('mobile AI conversation supports staff escalation, live status, and return to AI', () => {
   const screen = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
   const api = read('thang-tin-hoc-mobile/src/services/aiSupportApi.ts');
+  const messageApi = read('thang-tin-hoc-mobile/src/services/messageApi.ts');
   const socket = read('thang-tin-hoc-mobile/src/services/socketService.ts');
   const routes = read('routes/aiSupportRoutes.js');
   const messageService = read('services/directMessageService.js');
 
+  assert.ok(messageApi.includes("isAiSupport ? '/ai-support/message' : '/messages'"));
+  assert.ok(routes.includes("router.post('/message'"));
+  assert.ok(routes.includes('sendCanonicalMessage'));
   assert.ok(api.includes("'/ai-support/escalate'"));
   assert.ok(api.includes("'/ai-support/reset'"));
   assert.ok(screen.includes('escalateAiSupportConversation(route.params.conversationId)'));

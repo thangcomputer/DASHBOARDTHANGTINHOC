@@ -28,6 +28,13 @@ function buildEventNotification(eventName, data = {}) {
     case 'notification': {
       const type = String(data.type || '').toUpperCase();
       if (type === 'MESSAGE') return null;
+      if (data.payload?.kind === 'feed_interaction') {
+        return {
+          title: String(data.title || 'Thông báo mới').slice(0, 100),
+          body: String(data.content || 'Bạn có thông báo mới.').slice(0, 240),
+          channelId: 'default',
+        };
+      }
       const titles = {
         SCHEDULE: 'Cập nhật lịch học',
         QUIZ: 'Bài kiểm tra mới',

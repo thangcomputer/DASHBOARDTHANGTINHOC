@@ -977,51 +977,6 @@ export default function NewsPage({ session, role = 'admin' }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 w-full">
-        <div className="relative w-52 sm:w-56 shrink-0">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') setQ(qInput.trim());
-            }}
-            placeholder="Tìm bài viết…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 bg-white transition-all"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setQ(qInput.trim())}
-          className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors"
-        >
-          Tìm
-        </button>
-        {mode !== 'manage' && (
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 shrink-0">
-            <button
-              type="button"
-              title="Xem lưới"
-              onClick={() => {
-                setNewsView('grid');
-                try { localStorage.setItem(NEWS_VIEW_KEY, 'grid'); } catch { /* ignore */ }
-              }}
-              className={`p-2 rounded-lg ${newsView === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              type="button"
-              title="Xem dọc"
-              onClick={() => {
-                setNewsView('list');
-                try { localStorage.setItem(NEWS_VIEW_KEY, 'list'); } catch { /* ignore */ }
-              }}
-              className={`p-2 rounded-lg ${newsView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <List size={15} />
-            </button>
-          </div>
-        )}
         <CmsSelect
           value={topicFilter}
           onChange={(e) => setTopicFilter(e.target.value)}
@@ -1058,6 +1013,53 @@ export default function NewsPage({ session, role = 'admin' }) {
           <option value="last_month">Tháng trước</option>
           <option value="oldest_month">Tháng cũ nhất</option>
         </CmsSelect>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative w-52 sm:w-56 shrink-0">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setQ(qInput.trim());
+              }}
+              placeholder="Tìm bài viết…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 bg-white transition-all"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setQ(qInput.trim())}
+            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors"
+          >
+            Tìm
+          </button>
+          {mode !== 'manage' && (
+            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 shrink-0">
+              <button
+                type="button"
+                title="Xem lưới"
+                onClick={() => {
+                  setNewsView('grid');
+                  try { localStorage.setItem(NEWS_VIEW_KEY, 'grid'); } catch { /* ignore */ }
+                }}
+                className={`p-2 rounded-lg ${newsView === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <LayoutGrid size={15} />
+              </button>
+              <button
+                type="button"
+                title="Xem dọc"
+                onClick={() => {
+                  setNewsView('list');
+                  try { localStorage.setItem(NEWS_VIEW_KEY, 'list'); } catch { /* ignore */ }
+                }}
+                className={`p-2 rounded-lg ${newsView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <List size={15} />
+              </button>
+            </div>
+          )}
+        </div>
         {canManage && topicFilter !== 'all' && (
           <button
             type="button"

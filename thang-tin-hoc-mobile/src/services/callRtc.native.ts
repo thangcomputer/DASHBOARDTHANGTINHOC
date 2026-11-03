@@ -1,9 +1,7 @@
-import {
-  mediaDevices,
+import type {
+  MediaStream,
   RTCPeerConnection,
   RTCIceCandidate,
-  RTCSessionDescription,
-  type MediaStream,
 } from 'react-native-webrtc';
 import type {
   CallDescription,
@@ -13,6 +11,14 @@ import type {
 } from './callRtc.types';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+type WebRtcModule = typeof import('react-native-webrtc');
+let webRtcModule: WebRtcModule | undefined;
+
+function getWebRtcModule(): WebRtcModule {
+  webRtcModule ??= require('react-native-webrtc') as WebRtcModule;
+  return webRtcModule;
+}
+
 type NativePeerConnection = RTCPeerConnection & {
   addEventListener: (type: 'icecandidate' | 'track' | 'connectionstatechange', listener: (event: {
     candidate?: RTCIceCandidate | null;
@@ -21,10 +27,12 @@ type NativePeerConnection = RTCPeerConnection & {
 };
 
 export async function getCallAudioStream(): Promise<CallMediaStream> {
+  const { mediaDevices } = getWebRtcModule();
   return mediaDevices.getUserMedia({ audio: true, video: false });
 }
 
 export function createCallPeerConnection(): CallPeerConnection {
+  const { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription } = getWebRtcModule();
   const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS }) as NativePeerConnection;
   return {
     get connectionState() {

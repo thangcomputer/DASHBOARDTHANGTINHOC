@@ -10,8 +10,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "vn.thangcomputer.thangtinhoc.mobile",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Cho phép sử dụng micro để gọi thoại với giảng viên hoặc học viên."
-      }
+        "NSMicrophoneUsageDescription": "Cho phép sử dụng micro để gọi thoại với giảng viên hoặc học viên.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bitcode": false
     },
     "android": {
       "adaptiveIcon": {
@@ -51,6 +53,12 @@
         }
       ],
       "expo-audio"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "63dc6f6a-3364-4638-b926-79d5484efdee"
+      }
+    },
+    "owner": "thangphi1995"
   }
 }

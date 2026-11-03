@@ -275,7 +275,7 @@ const CHAT_EMOJIS = [
   '😴', '😣', '🤧', '😒', '😚', '😳', '🙁', '😤',
 ];
 
-const SEARCH_TOKEN_SPLIT = /[\s,;+/\\|_-]+/;
+const SEARCH_TOKEN_SPLIT = /[^a-z0-9]+/;
 
 function getChatAttachmentType(name: string) {
   const extension = name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || '';
@@ -307,18 +307,25 @@ function unaccent(value: string) {
 }
 
 function matchesContactSearch(query: string, conversation: Conversation) {
-  const tokens = query.trim().split(SEARCH_TOKEN_SPLIT).filter(Boolean).slice(0, 8);
+  const tokens = unaccent(query).split(SEARCH_TOKEN_SPLIT).filter(Boolean);
   if (!tokens.length) return true;
   const name = unaccent(conversation.name);
   const extra = unaccent(conversation.zalo || '');
-  const phoneDigits = String(conversation.phone || '').replace(/\D/g, '');
-  const zaloDigits = String(conversation.zalo || '').replace(/\D/g, '');
-  return tokens.every((token) => {
-    const normalized = unaccent(token);
-    if (name.includes(normalized) || extra.includes(normalized)) return true;
-    const digits = token.replace(/\D/g, '');
-    return digits.length >= 2 && (phoneDigits.includes(digits) || zaloDigits.includes(digits));
-  });
+  const phoneDigits = normalizePhoneDigits(conversation.phone);
+  const zaloDigits = normalizePhoneDigits(conversation.zalo);
+  const nameTokens = tokens.filter((token) => !/^\d+$/.test(token)).slice(0, 8);
+  const queryDigits = normalizePhoneDigits(tokens.filter((token) => /^\d+$/.test(token)).join(''));
+  const nameMatches = nameTokens.every((token) => name.includes(token) || extra.includes(token));
+  const phoneMatches = !queryDigits || (queryDigits.length >= 2
+    && (phoneDigits.includes(queryDigits) || zaloDigits.includes(queryDigits)));
+  return nameMatches && phoneMatches;
+}
+
+function normalizePhoneDigits(value?: string) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.startsWith('84') && digits.length >= 4
+    ? `0${digits.slice(2)}`
+    : digits;
 }
 
 function groupMemberRoleLabel(role: string, adminRole?: string | null) {
@@ -348,6 +355,7 @@ export function MessagesScreen() {
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>(() => getPresenceUserIds(getOnlineUsersSnapshot()));
   const [socketStatus, setSocketStatus] = useState('');
   const [pinningConversationId, setPinningConversationId] = useState<string | null>(null);
+  const [conversationOptionsId, setConversationOptionsId] = useState<string | null>(null);
   const categoryFilters = user?.role === 'teacher'
     ? [
         { id: 'all' as const, label: 'Tất cả' },
@@ -511,18 +519,27 @@ export function MessagesScreen() {
             return (
               <View
                 key={conversation.id}
-                style={[styles.contactRow, !isLast && styles.contactRowDivider]}
+                style={[
+                  styles.contactRow,
+                  index === 0 && styles.contactRowFirst,
+                  isLast && styles.contactRowLast,
+                  conversationOptionsId === conversation.id && styles.contactRowMenuOpen,
+                  !isLast && styles.contactRowDivider,
+                ]}
               >
                 <Pressable
-                  onPress={() => navigation.navigate('Conversation', {
-                    conversationId: conversation.id,
-                    conversationName: conversation.name,
-                    participantId: conversation.participantId,
-                    participantRole: conversation.participantRole || conversation.category,
-                    participantAdminRole: conversation.adminRole,
-                    participantOnline: isOnline,
-                    participantAvatarUri: conversation.avatarUri,
-                  })}
+                  onPress={() => {
+                    setConversationOptionsId(null);
+                    navigation.navigate('Conversation', {
+                      conversationId: conversation.id,
+                      conversationName: conversation.name,
+                      participantId: conversation.participantId,
+                      participantRole: conversation.participantRole || conversation.category,
+                      participantAdminRole: conversation.adminRole,
+                      participantOnline: isOnline,
+                      participantAvatarUri: conversation.avatarUri,
+                    });
+                  }}
                   style={({ pressed }) => [styles.contactRowMain, pressed && styles.contactRowPressed]}
                   accessibilityRole="button"
                   accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
@@ -545,6 +562,7 @@ export function MessagesScreen() {
                         <Text numberOfLines={1} style={styles.contactNameText}>
                           {conversation.name}
                         </Text>
+                        {conversation.isPinned ? <Pin size={12} color="#2563EB" /> : null}
                         {isOnline ? (
                           <View style={styles.statusPillOnline}>
                             <Text style={styles.statusPillOnlineText}>online</Text>
@@ -580,18 +598,42 @@ export function MessagesScreen() {
                     </View>
                   </View>
                 </Pressable>
-                <Pressable
-                  onPress={() => { void toggleConversationPin(conversation); }}
-                  style={[styles.contactPinButton, conversation.isPinned && styles.contactPinButtonActive]}
-                  accessibilityRole="button"
-                  accessibilityLabel={conversation.isPinned ? `Bỏ ghim ${conversation.name}` : `Ghim ${conversation.name}`}
-                  accessibilityState={{ disabled: pinningConversationId === conversation.id, selected: Boolean(conversation.isPinned) }}
-                  disabled={pinningConversationId === conversation.id}
-                >
-                  {conversation.isPinned
-                    ? <PinOff size={16} color="#2563EB" />
-                    : <Pin size={16} color="#64748B" />}
-                </Pressable>
+                <View style={styles.contactOptionsWrap}>
+                  <Pressable
+                    onPress={() => setConversationOptionsId((current) => current === conversation.id ? null : conversation.id)}
+                    style={({ pressed }) => [styles.contactOptionsButton, pressed && styles.optionsMenuItemPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tùy chọn cuộc trò chuyện với ${conversation.name}`}
+                    accessibilityState={{ expanded: conversationOptionsId === conversation.id }}
+                  >
+                    <MoreHorizontal size={18} color="#64748B" />
+                  </Pressable>
+                  {conversationOptionsId === conversation.id ? (
+                    <View style={styles.contactOptionsMenu}>
+                      <Pressable
+                        onPress={() => {
+                          setConversationOptionsId(null);
+                          void toggleConversationPin(conversation);
+                        }}
+                        style={({ pressed, hovered }: any) => [
+                          styles.optionsMenuItem,
+                          (pressed || hovered) && styles.optionsMenuItemPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={conversation.isPinned ? `Bỏ ghim ${conversation.name}` : `Ghim ${conversation.name}`}
+                        accessibilityState={{ disabled: pinningConversationId === conversation.id, selected: Boolean(conversation.isPinned) }}
+                        disabled={pinningConversationId === conversation.id}
+                      >
+                        {conversation.isPinned
+                          ? <PinOff size={15} color="#475569" />
+                          : <Pin size={15} color="#475569" />}
+                        <Text style={styles.optionsMenuItemText}>
+                          {conversation.isPinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
               </View>
             );
           })}
@@ -3845,13 +3887,17 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
   filterText: { color: '#475569', fontSize: typography.caption, fontWeight: '600' },
   filterTextActive: { color: '#FFFFFF', fontWeight: '700' },
-  contactListCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', marginTop: spacing.xs },
+  contactListCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'visible', marginTop: spacing.xs },
   contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10, gap: 6, backgroundColor: '#FFFFFF' },
+  contactRowFirst: { borderTopLeftRadius: 15, borderTopRightRadius: 15 },
+  contactRowLast: { borderBottomLeftRadius: 15, borderBottomRightRadius: 15 },
+  contactRowMenuOpen: { zIndex: 30, elevation: 30 },
   contactRowMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4, gap: 10, borderRadius: radius.md },
   contactRowPressed: { backgroundColor: '#F8FAFC' },
   contactRowDivider: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  contactPinButton: { width: 36, height: 36, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: '#F8FAFC' },
-  contactPinButtonActive: { backgroundColor: '#EFF6FF' },
+  contactOptionsWrap: { position: 'relative', zIndex: 1 },
+  contactOptionsButton: { width: 36, height: 36, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: '#F8FAFC' },
+  contactOptionsMenu: { position: 'absolute', top: 38, right: 0, width: 220, maxWidth: 260, backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden', paddingVertical: 4, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 18, elevation: 999, zIndex: 999 },
   avatarContainer: { width: 48, height: 48, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   avatarRing: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: 44, height: 44, borderRadius: 22 },

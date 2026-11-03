@@ -54,4 +54,15 @@ describe('matchesPersonSearch (inbox / client)', async () => {
     assert.equal(matchesPersonSearch('091234', person), true);
     assert.equal(matchesPersonSearch('000000', person), false);
   });
+
+  it('matches Vietnamese phone numbers entered with the +84 country code', () => {
+    assert.equal(matchesPersonSearch('+84 902 895 444', person), true);
+    assert.equal(matchesPersonSearch('LAN +84 902', person), true);
+    assert.equal(matchesPersonSearch('LAN +84 903', person), false);
+  });
+
+  it('does not let numeric query fragments match unrelated name text', () => {
+    assert.equal(matchesPersonSearch('090 000', person), false);
+    assert.equal(matchesPersonSearch('LAN 000', person), false);
+  });
 });
