@@ -1,1 +1,1 @@
-exp://192.168.1.30:8081'use strict'; class DeviceService { register() {} check() {} } module.exports = DeviceService;
+'use strict'; class DeviceService { register() {} check() {} } module.exports = DeviceService;
