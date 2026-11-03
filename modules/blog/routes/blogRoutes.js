@@ -2,6 +2,8 @@
  * Blog / Tin tức trung tâm — mọi role đọc; Admin/Staff (manage_blog) đăng bài.
  */
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const blogController = require('../controllers/BlogController');

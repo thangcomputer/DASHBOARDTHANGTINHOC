@@ -7,7 +7,7 @@ class TrainingController {
   async get_courses(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await trainingApplicationService.get_courses(data);
+      const result = await trainingApplicationService.get_courses(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -33,7 +33,7 @@ class TrainingController {
   async post_complete_lesson(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await trainingApplicationService.post_complete_lesson(data);
+      const result = await trainingApplicationService.post_complete_lesson(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -46,7 +46,7 @@ class TrainingController {
   async get_progress_me(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await trainingApplicationService.get_progress_me(data);
+      const result = await trainingApplicationService.get_progress_me(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -59,7 +59,7 @@ class TrainingController {
   async get_teacher_overview(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await trainingApplicationService.get_teacher_overview(data);
+      const result = await trainingApplicationService.get_teacher_overview(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -72,7 +72,7 @@ class TrainingController {
   async post_save_watch_progress(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await trainingApplicationService.post_save_watch_progress(data);
+      const result = await trainingApplicationService.post_save_watch_progress(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -85,7 +85,7 @@ class TrainingController {
   async get_admin_progress_courseId(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await trainingApplicationService.get_admin_progress_courseId(data);
+      const result = await trainingApplicationService.get_admin_progress_courseId(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -98,3 +98,4 @@ class TrainingController {
 }
 
 module.exports = new TrainingController();
+

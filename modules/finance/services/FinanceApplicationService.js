@@ -49,7 +49,7 @@ class FinanceApplicationService {
 
     const ledger = await sumFinancialRevenue({ branchId, from, to, studentId });
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: {
         source: 'ledger',
@@ -66,10 +66,10 @@ class FinanceApplicationService {
         paymentCount: ledger.paymentCount,
         refundCount: ledger.refundCount,
       },
-    });
+    } };
   } catch (err) {
     logger.error('[FINANCE] summary error:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
@@ -87,10 +87,10 @@ class FinanceApplicationService {
       page: data.page || 1,
       limit: data.limit || 50,
     });
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     logger.error('[FINANCE] ledger error:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
@@ -98,16 +98,16 @@ class FinanceApplicationService {
   try {
     const student = await Student.findById(data.id).select('branchId').lean();
     if (!student) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
     if (data.branchFilter?.branchId) {
       const allowed = String(student.branchId || '') === String(data.branchFilter.branchId);
       if (!allowed) {
-        return { _status: 403, _body: ({ success: false, message: 'Không có quyền xem HV chi nhánh khác' });
+        return { _status: 403, _body: { success: false, message: 'Không có quyền xem HV chi nhánh khác' } };
       }
     }
     const card = await getStudentFinanceCard(data.id);
-    return { _status: 200, _body: ({ success: true, data: card });
+    return { _status: 200, _body: { success: true, data: card } };
   } catch (err) {
     const status = err.status || 500;
     logger.error('[FINANCE] student card error:', err);
@@ -123,11 +123,11 @@ class FinanceApplicationService {
       actor: actorOf(req),
       createReversal: data.body?.createReversal !== false,
     });
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       message: result.created ? 'Đã void dòng ledger' : 'Dòng đã void trước đó',
       data: result,
-    });
+    } };
   } catch (err) {
     const status = err.status || 500;
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
@@ -138,11 +138,11 @@ class FinanceApplicationService {
   try {
     const { studentId, amount, kind, enrollmentId, courseName, note, sourceRef } = data.body || {};
     if (!studentId) {
-      return { _status: 400, _body: ({ success: false, message: 'Thiếu studentId' });
+      return { _status: 400, _body: { success: false, message: 'Thiếu studentId' } };
     }
     const student = await Student.findById(studentId);
     if (!student) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
     const { entry, created } = await postDiscount({
       student,
@@ -154,7 +154,7 @@ class FinanceApplicationService {
       actor: actorOf(req),
       note: note || '',
     });
-    return { _status: 200, _body: ({ success: true, created, data: entry });
+    return { _status: 200, _body: { success: true, created, data: entry } };
   } catch (err) {
     const status = err.status || 500;
     return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
@@ -169,9 +169,9 @@ class FinanceApplicationService {
       from: data.from || null,
       to: data.to || null,
     });
-    return { _status: 200, _body: ({ success: true, data: report });
+    return { _status: 200, _body: { success: true, data: report } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
@@ -183,10 +183,10 @@ class FinanceApplicationService {
       from: data.body?.from || data.from || null,
       to: data.body?.to || data.to || null,
     });
-    return { _status: 200, _body: ({ success: true, data: result });
+    return { _status: 200, _body: { success: true, data: result } };
   } catch (err) {
     logger.error('[FINANCE] snapshot rebuild:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
@@ -194,11 +194,11 @@ class FinanceApplicationService {
   try {
     const data = await syncStudentFinanceCache(data.id);
     if (!data) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 

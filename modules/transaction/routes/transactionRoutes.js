@@ -4,6 +4,7 @@
  */
 const express     = require('express');
 const router      = express.Router();
+const transactionController = require('../controllers/TransactionController');
 const { transactionRepository } = require('../repositories');
 const Transaction = require('../models/Transaction'); // Temp for new Transaction
 const Teacher     = require('../../teacher/models/Teacher');

@@ -10,10 +10,10 @@ class BackupApplicationService {
   async get_stats(data) {
   try {
     const data = await backupService.getStats();
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     logger.error('[BACKUP] stats:', err);
-    return { _status: 500, _body: ({ success: false, message: 'Loi server' });
+    return { _status: 500, _body: { success: false, message: 'Loi server' } };
   }
 }
 
@@ -23,10 +23,10 @@ class BackupApplicationService {
       page: data.page,
       limit: data.limit,
     });
-    return { _status: 200, _body: ({ success: true, ...result });
+    return { _status: 200, _body: { success: true, ...result } };
   } catch (err) {
     logger.error('[BACKUP] list:', err);
-    return { _status: 500, _body: ({ success: false, message: 'Loi server' });
+    return { _status: 500, _body: { success: false, message: 'Loi server' } };
   }
 }
 
@@ -37,7 +37,7 @@ class BackupApplicationService {
       createdBy: String(data.currentUser.id || ''),
     });
     const queued = await enqueue('notify', 'backup', { jobId: String(job._id) }, { attempts: 1 });
-    return { _status: 202, _body: ({
+    return { _status: 202, _body: {
       success: true,
       message: 'Da xep hang backup',
       data: {
@@ -45,10 +45,10 @@ class BackupApplicationService {
         status: job.status,
         queue: queued,
       },
-    });
+    } };
   } catch (err) {
     logger.error('[BACKUP] create:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Loi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Loi server' } };
   }
 }
 
@@ -66,7 +66,7 @@ class BackupApplicationService {
   async delete_id(data) {
   try {
     const data = await backupService.deleteBackup(data.id);
-    return { _status: 200, _body: ({ success: true, message: 'Da xoa backup', data });
+    return { _status: 200, _body: { success: true, message: 'Da xoa backup', data } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message || 'Loi server' });
   }

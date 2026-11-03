@@ -1561,7 +1561,6 @@ export default function FloatingMessenger({ session, role }) {
     openChat, closeChat, minimizeChat, focusChat,
   } = useFloatingMessenger();
 
-  const [aiSupportEnabled, setAiSupportEnabled] = useState(false);
   const [aiOpening, setAiOpening] = useState(false);
   const [escalatingId, setEscalatingId] = useState(null);
   const [resettingAiId, setResettingAiId] = useState(null);
@@ -1769,13 +1768,6 @@ export default function FloatingMessenger({ session, role }) {
   const heads = uiTabs.filter((t) => t.minimized && !isAiSupportPeer(t.user));
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
-
-  useEffect(() => {
-    if (!meId || isInbox) return;
-    aiSupportAPI.status().then((res) => {
-      if (res?.success) setAiSupportEnabled(!!res.data?.enabled);
-    }).catch(() => setAiSupportEnabled(false));
-  }, [meId, isInbox]);
 
   useEffect(() => {
     if (!canUseAiSupport || !meId || isInbox) return undefined;
@@ -2434,7 +2426,7 @@ export default function FloatingMessenger({ session, role }) {
       if (sent?.failed) {
         const reason = String(sent.failReason || '');
         if (/ảnh hôm nay|AI_IMAGE_QUOTA/i.test(reason)) {
-          setAiImageQuota((prev) => ({ ...prev, remaining: 0, used: prev.limit || imageLimit }));
+          setAiImageQuota((prev) => ({ ...prev, remaining: 0, used: prev.limit || 5 }));
         }
         toast.error(sent.failReason || 'Gửi ảnh thất bại');
         return false;
@@ -2444,7 +2436,7 @@ export default function FloatingMessenger({ session, role }) {
         setAiImageQuota((prev) => ({
           ...prev,
           remaining,
-          used: Math.max(0, Number(prev.limit || imageLimit) - remaining),
+          used: Math.max(0, Number(prev.limit || 5) - remaining),
         }));
       }
       return true;

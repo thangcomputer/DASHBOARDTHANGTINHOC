@@ -7,7 +7,7 @@ class QuizController {
   async get_teacher(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await quizApplicationService.get_teacher(data);
+      const result = await quizApplicationService.get_teacher(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -20,7 +20,7 @@ class QuizController {
   async post_create(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await quizApplicationService.post_create(data);
+      const result = await quizApplicationService.post_create(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -46,7 +46,7 @@ class QuizController {
   async get_student(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await quizApplicationService.get_student(data);
+      const result = await quizApplicationService.get_student(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -85,7 +85,7 @@ class QuizController {
   async get_admin_all(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await quizApplicationService.get_admin_all(data);
+      const result = await quizApplicationService.get_admin_all(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -98,3 +98,4 @@ class QuizController {
 }
 
 module.exports = new QuizController();
+

@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const supportController = require('../controllers/SupportController');
 const supportController = require('./support.controller');
 const { requireAuth, requireRole, requirePermission } = require('../../shared/middleware/authMiddleware');
 const { UserRole, PermissionCode } = require('../../shared/enums');

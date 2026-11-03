@@ -6,12 +6,61 @@ const TrainingLesson = require('./../models/TrainingLesson'); // Temp for new Tr
 const { trainingProgressRepository } = require('./../repositories');
 const TrainingProgress = require('./../models/TrainingProgress'); // Temp for new TrainingProgress
 
+function findCourseInSettings(settings, courseId) {
+  const id = String(courseId);
+  const teacherVideos = settings.trainingRawData?.videos || [];
+  const studentVideos = settings.studentTrainingRawData?.videos || [];
+  return teacherVideos.find((course) => String(course.id || course._id) === id)
+    || studentVideos.find((course) => String(course.id || course._id) === id)
+    || null;
+}
+
+function collectCourseLessons(course) {
+  let lessons = course.lessons || course.videos || [];
+  if (lessons.length === 0 && course.chapters) {
+    course.chapters.forEach((chapter) => {
+      if (chapter.lessons) lessons = lessons.concat(chapter.lessons);
+    });
+  }
+  if (lessons.length === 0 && (course.videoUrl || course.url || course.youtubeUrl || course.link)) {
+    lessons = [{
+      id: `v-${course.id || course._id}`,
+      title: course.title,
+      videoUrl: course.videoUrl || course.url || course.youtubeUrl || course.link,
+      duration: course.duration || '',
+    }];
+  }
+  return lessons;
+}
+
+function mapLessonForTeacherUi(lesson, index) {
+  const url = lesson.videoUrl || lesson.url || lesson.youtubeUrl || lesson.link || '';
+  let duration = lesson.duration || '';
+  if (typeof duration === 'number' && duration > 0) {
+    duration = `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}`;
+  }
+  return {
+    title: lesson.title || `Bài ${index + 1}`,
+    url,
+    duration: duration || '—',
+  };
+}
+
+function mapFileForTeacherUi(file) {
+  return {
+    title: file.title || file.name || 'Tài liệu',
+    type: file.fileType || file.type || 'FILE',
+    size: file.fileSize || file.size || '',
+    url: file.url || file.fileUrl || file.link || '',
+  };
+}
+
 // Lấy danh sách khóa đào tạo
 
 class TrainingApplicationService {
   async get_courses(data) {
   try {
-    const courses = await TrainingcourseRepository.findMany({ isActive: true });
+    const courses = await trainingCourseRepository.findMany({ isActive: true });
     return { _status: 200, _body: { success: true, data: courses } };
   } catch (error) {
     return { _status: 500, _body: { success: false, message: error.message } };

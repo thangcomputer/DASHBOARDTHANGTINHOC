@@ -10,9 +10,9 @@ class CmsApplicationService {
   async get_forms(data) {
   try {
     const result = await formService.listForms({ status: data.status });
-    return { _status: 200, _body: ({ success: true, ...result });
+    return { _status: 200, _body: { success: true, ...result } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -29,17 +29,17 @@ class CmsApplicationService {
       if (!token) throw e;
       return authMiddleware(req, res, async () => {
         if (data.currentUser?.role !== 'admin' && data.currentUser?.role !== 'staff' && data.currentUser?.id !== 'admin') {
-          return { _status: 404, _body: ({ success: false, message: 'Khong tim thay form' });
+          return { _status: 404, _body: { success: false, message: 'Khong tim thay form' } };
         }
         try {
           const f = await formService.getForm(data.idOrSlug);
-          return { _status: 200, _body: ({ success: true, data: f });
+          return { _status: 200, _body: { success: true, data: f } };
         } catch (err2) {
           return res.status(err2.status || 500).json({ success: false, message: err2.message });
         }
       });
     }
-    return { _status: 200, _body: ({ success: true, data: form });
+    return { _status: 200, _body: { success: true, data: form } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -48,7 +48,7 @@ class CmsApplicationService {
   async post_forms(data) {
   try {
     const form = await formService.createForm({ ...data.body, createdBy: data.currentUser.id });
-    return { _status: 201, _body: ({ success: true, data: form });
+    return { _status: 201, _body: { success: true, data: form } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -57,7 +57,7 @@ class CmsApplicationService {
   async put_forms_id(data) {
   try {
     const form = await formService.updateForm(data.id, data.body || {});
-    return { _status: 200, _body: ({ success: true, data: form });
+    return { _status: 200, _body: { success: true, data: form } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -66,7 +66,7 @@ class CmsApplicationService {
   async delete_forms_id(data) {
   try {
     const data = await formService.deleteForm(data.id);
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -81,7 +81,7 @@ class CmsApplicationService {
       submittedByRole: user?.role || 'guest',
       meta: { ip: data.ip },
     });
-    return { _status: 201, _body: ({ success: true, data: { id: sub._id } });
+    return { _status: 201, _body: { success: true, data: { id: sub._id } } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -95,7 +95,7 @@ class CmsApplicationService {
       submittedByRole: data.currentUser.role || '',
       meta: { ip: data.ip },
     });
-    return { _status: 201, _body: ({ success: true, data: { id: sub._id } });
+    return { _status: 201, _body: { success: true, data: { id: sub._id } } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -108,7 +108,7 @@ class CmsApplicationService {
       page: data.page,
       limit: data.limit,
     });
-    return { _status: 200, _body: ({ success: true, form: { _id: form._id, name: form.name, fields: form.fields }, ...result });
+    return { _status: 200, _body: { success: true, form: { _id: form._id, name: form.name, fields: form.fields }, ...result } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -132,16 +132,16 @@ class CmsApplicationService {
   async get_reports(data) {
   try {
     const result = await reportService.listReports({ page: data.page });
-    return { _status: 200, _body: ({ success: true, ...result });
+    return { _status: 200, _body: { success: true, ...result } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_reports(data) {
   try {
     const report = await reportService.createReport({ ...data.body, createdBy: data.currentUser.id });
-    return { _status: 201, _body: ({ success: true, data: report });
+    return { _status: 201, _body: { success: true, data: report } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -150,7 +150,7 @@ class CmsApplicationService {
   async put_reports_id(data) {
   try {
     const report = await reportService.updateReport(data.id, data.body || {});
-    return { _status: 200, _body: ({ success: true, data: report });
+    return { _status: 200, _body: { success: true, data: report } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -159,7 +159,7 @@ class CmsApplicationService {
   async delete_reports_id(data) {
   try {
     const data = await reportService.deleteReport(data.id);
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -168,7 +168,7 @@ class CmsApplicationService {
   async get_reports_id_run(data) {
   try {
     const data = await reportService.runReport(data.id, { limit: data.limit });
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -199,26 +199,26 @@ class CmsApplicationService {
       page: data.page,
       limit: data.limit,
     });
-    return { _status: 200, _body: ({ success: true, ...result });
+    return { _status: 200, _body: { success: true, ...result } };
   } catch (err) {
     logger.error('[Workflow] list:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_sync(data) {
   try {
     const data = await workflowService.syncFromDomain();
-    return { _status: 200, _body: ({ success: true, message: 'Da dong bo ' + data.created + ' workflow', data });
+    return { _status: 200, _body: { success: true, message: 'Da dong bo ' + data.created + ' workflow', data } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async get_id(data) {
   try {
     const data = await workflowService.getInstance(data.id);
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -235,7 +235,7 @@ class CmsApplicationService {
       payload,
       createdBy: String(data.currentUser.id || ''),
     });
-    return { _status: 201, _body: ({ success: true, data: instance });
+    return { _status: 201, _body: { success: true, data: instance } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }
@@ -245,7 +245,7 @@ class CmsApplicationService {
   try {
     const { action, note } = data.body || {};
     if (!action) {
-      return { _status: 400, _body: ({ success: false, message: 'Thieu action' });
+      return { _status: 400, _body: { success: false, message: 'Thieu action' } };
     }
     const io = data.app.get('io');
     const instance = await workflowService.advance(
@@ -254,7 +254,7 @@ class CmsApplicationService {
       data.currentUser,
       io,
     );
-    return { _status: 200, _body: ({ success: true, message: 'Da cap nhat workflow', data: instance });
+    return { _status: 200, _body: { success: true, message: 'Da cap nhat workflow', data: instance } };
   } catch (err) {
     res.status(err.status || 500).json({ success: false, message: err.message });
   }

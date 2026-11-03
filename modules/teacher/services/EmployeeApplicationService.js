@@ -31,9 +31,9 @@ class EmployeeApplicationService {
       ];
     }
     const employees = await employeeRepository.findActive(filter);
-    return { _status: 200, _body: ({ success: true, data: employees });
+    return { _status: 200, _body: { success: true, data: employees } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -64,16 +64,16 @@ class EmployeeApplicationService {
       { $sort: { count: -1 } },
     ]);
 
-    return { _status: 200, _body: ({ success: true, data: { total, totalSalary, paidThisMonth, byPosition } });
+    return { _status: 200, _body: { success: true, data: { total, totalSalary, paidThisMonth, byPosition } } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_root(data) {
   try {
     const { name, phone, position, baseSalary, startDate, note, branchId, branchCode, linkedTeacherId, bankAccount } = data.body;
-    if (!name) return { _status: 400, _body: ({ success: false, message: 'Tên nhân viên là bắt buộc' });
+    if (!name) return { _status: 400, _body: { success: false, message: 'Tên nhân viên là bắt buộc' } };
 
     // STAFF: auto-assign branch
     const finalBranchId   = data.userBranchId || branchId || '';
@@ -92,9 +92,9 @@ class EmployeeApplicationService {
     });
 
     emitEmployeesChanged(req, 'create');
-    return { _status: 201, _body: ({ success: true, data: employee });
+    return { _status: 201, _body: { success: true, data: employee } };
   } catch (err) {
-    return { _status: 400, _body: ({ success: false, message: err.message });
+    return { _status: 400, _body: { success: false, message: err.message } };
   }
 }
 
@@ -104,7 +104,7 @@ class EmployeeApplicationService {
     if (data.userBranchId) {
       const emp = await employeeRepository.findById(data.id);
       if (emp && String(emp.branchId) !== String(data.userBranchId)) {
-        return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền sửa nhân viên chi nhánh khác' });
+        return { _status: 403, _body: { success: false, message: 'Bạn không có quyền sửa nhân viên chi nhánh khác' } };
       }
     }
     const updates = { ...data.body };
@@ -112,11 +112,11 @@ class EmployeeApplicationService {
     if (updates.startDate) updates.startDate = new Date(updates.startDate);
 
     const employee = await employeeRepository.update(data.id, updates);
-    if (!employee) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhân viên' });
+    if (!employee) return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhân viên' } };
     emitEmployeesChanged(req, 'update');
-    return { _status: 200, _body: ({ success: true, data: employee });
+    return { _status: 200, _body: { success: true, data: employee } };
   } catch (err) {
-    return { _status: 400, _body: ({ success: false, message: err.message });
+    return { _status: 400, _body: { success: false, message: err.message } };
   }
 }
 
@@ -125,30 +125,30 @@ class EmployeeApplicationService {
     if (data.userBranchId) {
       const emp = await employeeRepository.findById(data.id);
       if (emp && String(emp.branchId) !== String(data.userBranchId)) {
-        return { _status: 403, _body: ({ success: false, message: 'Không có quyền xóa nhân viên chi nhánh khác' });
+        return { _status: 403, _body: { success: false, message: 'Không có quyền xóa nhân viên chi nhánh khác' } };
       }
     }
     const employee = await employeeRepository.delete(data.id);
-    if (!employee) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhân viên' });
+    if (!employee) return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhân viên' } };
     emitEmployeesChanged(req, 'delete');
-    return { _status: 200, _body: ({ success: true, message: `Đã xóa nhân viên ${employee.name}` });
+    return { _status: 200, _body: { success: true, message: `Đã xóa nhân viên ${employee.name}` } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_id_pay(data) {
   try {
     const employee = await employeeRepository.findById(data.id);
-    if (!employee) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhân viên' });
+    if (!employee) return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhân viên' } };
 
     // Branch guard
     if (data.userBranchId && String(employee.branchId) !== String(data.userBranchId)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền trả lương nhân viên chi nhánh khác' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền trả lương nhân viên chi nhánh khác' } };
     }
 
     const { amount, note, payDate } = data.body;
-    if (!amount || isNaN(amount)) return { _status: 400, _body: ({ success: false, message: 'Số tiền không hợp lệ' });
+    if (!amount || isNaN(amount)) return { _status: 400, _body: { success: false, message: 'Số tiền không hợp lệ' } };
 
     const finalPayDate = payDate ? new Date(payDate) : new Date();
 
@@ -163,25 +163,25 @@ class EmployeeApplicationService {
     });
 
     emitEmployeesChanged(req, 'pay');
-    return { _status: 201, _body: ({ success: true, message: `Đã ghi nhận trả ${amount} cho ${employee.name}`, data: log });
+    return { _status: 201, _body: { success: true, message: `Đã ghi nhận trả ${amount} cho ${employee.name}`, data: log } };
   } catch (err) {
-    return { _status: 400, _body: ({ success: false, message: err.message });
+    return { _status: 400, _body: { success: false, message: err.message } };
   }
 }
 
   async get_id_payroll(data) {
   try {
     const employee = await employeeRepository.findById(data.id);
-    if (!employee) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhân viên' });
+    if (!employee) return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhân viên' } };
 
     if (data.userBranchId && String(employee.branchId) !== String(data.userBranchId)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền xem chi nhánh khác' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền xem chi nhánh khác' } };
     }
 
     const logs = await PayrollLog.find({ employeeId: data.id }).sort({ payDate: -1 }).lean();
-    return { _status: 200, _body: ({ success: true, data: logs });
+    return { _status: 200, _body: { success: true, data: logs } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 

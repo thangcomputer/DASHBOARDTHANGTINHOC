@@ -7,7 +7,7 @@ class StaffController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await staffApplicationService.get_root(data);
+      const result = await staffApplicationService.get_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -20,7 +20,7 @@ class StaffController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await staffApplicationService.post_root(data);
+      const result = await staffApplicationService.post_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -59,3 +59,4 @@ class StaffController {
 }
 
 module.exports = new StaffController();
+

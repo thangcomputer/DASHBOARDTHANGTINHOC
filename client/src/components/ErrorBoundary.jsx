@@ -97,7 +97,7 @@ class ErrorBoundary extends React.Component {
             </p>
 
             {/* Chi tiết lỗi (development only) */}
-            {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
+            {import.meta.env.DEV && this.state.errorInfo && (
               <pre style={{
                 background:   '#0f172a',
                 border:       '1px solid #334155',

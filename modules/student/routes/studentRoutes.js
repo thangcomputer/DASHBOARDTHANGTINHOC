@@ -109,54 +109,7 @@ router.get('/:id', [authMiddleware, branchFilter],studentController.get_id);
 
 // ─── GET /api/students/:id/full-detail (MEGA ENDPOINT) ───────────────────────
 // Tổng hợp toàn bộ hồ sơ học viên: Thông tin cá nhân, Lịch sử điểm danh, Hóa đơn, Điểm thi
-router.get('/:id/full-detail', [authMiddleware, branchFilter],studentController.get_id_full_detail); Ledger refund (không tạo Invoice gốc) — append để UI "Tài chính" hiển thị.
-    const LedgerEntry = require('../../finance/models/LedgerEntry');
-    const refundEntries = await LedgerEntry.find({
-      studentId: studentOid,
-      type: 'refund',
-      status: 'posted',
-    }).sort({ postedAt: -1 }).lean();
-
-    const refundInvoices = (refundEntries || []).map((e, idx) => ({
-      _id: e._id,
-      maHoaDon: `R-${String(e._id || idx).slice(-6)}`,
-      createdAt: e.postedAt || e.updatedAt || new Date(),
-      ngayXuat: e.postedAt || e.updatedAt || new Date(),
-      khoaHoc: e.courseName || 'Khóa học',
-      ghiChu: e.note || 'Hoàn tiền (refund)',
-      hocPhi: Number(e.amount) || 0,
-      synthetic: true,
-    }));
-
-    // 3. Kết quả thi (nếu có)
-    const ExamResult = require('../../exam/models/ExamResult');
-    const examResults = await ExamResult.find({
-      $or: [
-        { studentId: req.params.id },
-        { sbd: student.sbd }
-      ]
-    }).sort({ createdAt: -1 });
-
-    const studentDoc = student.toObject();
-    studentDoc.requireWebcam = studentDoc.requireWebcam === true;
-    await applyEnrollmentStats(studentDoc, req.params.id, Schedule);
-
-    res.json({
-      success: true,
-      data: {
-        student: studentDoc,
-        schedules: schedules || [],
-        invoices: [...(invoices || []), ...(refundInvoices || [])],
-        examResults: examResults || []
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ─── POST /api/students/import (BẢN GHI HÀNG LOẠT) ──────────────────────────
-// Nhập danh sách học viên từ file Excel (Array of Objects)
+router.get('/:id/full-detail', [authMiddleware, branchFilter],studentController.get_id_full_detail);
 router.post('/import', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_STUDENTS)), branchFilter],studentController.post_import);
 
 // ─── POST /api/students ────────────────────────────────────────────────────────

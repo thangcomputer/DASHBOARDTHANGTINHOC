@@ -20,7 +20,7 @@ class ExamResultController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await examResultApplicationService.post_root(data);
+      const result = await examResultApplicationService.post_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -59,3 +59,4 @@ class ExamResultController {
 }
 
 module.exports = new ExamResultController();
+

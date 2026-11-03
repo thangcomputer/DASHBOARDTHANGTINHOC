@@ -26,15 +26,15 @@ class ExamResultApplicationService {
       examResultRepository.findMany(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
       examResultRepository.count(filter),
     ]);
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: results,
       total,
       page: pageNum,
       limit: limitNum,
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -42,7 +42,7 @@ class ExamResultApplicationService {
   try {
     // Only Admin, Staff, or Teacher can create exam results
     if (!['admin', 'staff', 'teacher'].includes(data.currentUser.role)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền tạo kết quả thi' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền tạo kết quả thi' } };
     }
 
     const result = examResultRepository.createInstance(data.body);
@@ -89,20 +89,20 @@ class ExamResultApplicationService {
       io.emit('data:refresh', { type: 'examResult', id: result._id });
     }
 
-    return { _status: 201, _body: ({ success: true, data: result });
+    return { _status: 201, _body: { success: true, data: result } };
   } catch (err) {
-    return { _status: 400, _body: ({ success: false, message: err.message });
+    return { _status: 400, _body: { success: false, message: err.message } };
   }
 }
 
   async put_id(data) {
   try {
     if (!['admin', 'staff', 'teacher'].includes(data.currentUser.role)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền cập nhật kết quả thi' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền cập nhật kết quả thi' } };
     }
 
     const existing = await examResultRepository.findById(data.id);
-    if (!existing) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy kết quả thi' });
+    if (!existing) return { _status: 404, _body: { success: false, message: 'Không tìm thấy kết quả thi' } };
 
     const resolveScore = (doc) => {
       if (typeof doc.essayScore === 'number' && !Number.isNaN(doc.essayScore)) return doc.essayScore;
@@ -210,23 +210,23 @@ class ExamResultApplicationService {
       io.emit('data:refresh', { type: 'examResult', id: notifyDoc._id });
     }
 
-    return { _status: 200, _body: ({ success: true, data: refreshed || result });
+    return { _status: 200, _body: { success: true, data: refreshed || result } };
   } catch (err) {
-    return { _status: 400, _body: ({ success: false, message: err.message });
+    return { _status: 400, _body: { success: false, message: err.message } };
   }
 }
 
   async delete_id(data) {
   try {
     if (!['admin', 'staff'].includes(data.currentUser.role)) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền xóa kết quả thi' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền xóa kết quả thi' } };
     }
 
     const result = await examResultRepository.deleteById(data.id);
-    if (!result) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy kết quả thi' });
-    return { _status: 200, _body: ({ success: true, message: 'Đã xóa kết quả thi' });
+    if (!result) return { _status: 404, _body: { success: false, message: 'Không tìm thấy kết quả thi' } };
+    return { _status: 200, _body: { success: true, message: 'Đã xóa kết quả thi' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 

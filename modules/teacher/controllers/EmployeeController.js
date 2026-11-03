@@ -22,7 +22,7 @@ class EmployeeController {
   async get_stats(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_statsQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_statsQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -100,3 +100,4 @@ class EmployeeController {
 }
 
 module.exports = new EmployeeController();
+

@@ -9,7 +9,7 @@ class StudentController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_rootQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_rootQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -22,7 +22,7 @@ class StudentController {
   async get_stats(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_statsQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_statsQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -91,7 +91,7 @@ class StudentController {
   async post_import(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_importCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_importCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -273,3 +273,4 @@ class StudentController {
 }
 
 module.exports = new StudentController();
+

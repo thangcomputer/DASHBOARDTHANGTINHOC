@@ -17,10 +17,10 @@ class BiApplicationService {
       branchFilter: data.branchFilter || {},
       queryBranch: data.branchId || 'all',
     });
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
     logger.error('[BI] overview:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Loi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Loi server' } };
   }
 }
 
@@ -37,7 +37,7 @@ class BiApplicationService {
     res.send('\uFEFF' + csv);
   } catch (err) {
     logger.error('[BI] export:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Loi server' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Loi server' } };
   }
 }
 

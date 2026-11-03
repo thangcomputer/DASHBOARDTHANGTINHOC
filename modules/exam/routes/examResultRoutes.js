@@ -2,6 +2,7 @@ const express    = require('express');
 const router     = express.Router();
 const { examResultRepository } = require('../repositories');
 const ExamResult = require('../models/ExamResult'); // Temp for new ExamResult
+const examResultController = require('../controllers/ExamResultController');
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
 const NotificationService = require('../../notification/services/NotificationService');
 const logger = require('../../../config/logger');

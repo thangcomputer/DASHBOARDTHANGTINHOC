@@ -30,7 +30,7 @@ class ChatController {
   async get_contacts(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.get_contacts(data);
+      const result = await chatApplicationService.get_contacts(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -69,7 +69,7 @@ class ChatController {
   async get_hidden(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.get_hidden(data);
+      const result = await chatApplicationService.get_hidden(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -95,7 +95,7 @@ class ChatController {
   async get_sync_userId(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.get_sync_userId(data);
+      const result = await chatApplicationService.get_sync_userId(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -134,7 +134,7 @@ class ChatController {
   async post_hide_conversationId(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.post_hide_conversationId(data);
+      const result = await chatApplicationService.post_hide_conversationId(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -147,7 +147,7 @@ class ChatController {
   async put_read_conversationId(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.put_read_conversationId(data);
+      const result = await chatApplicationService.put_read_conversationId(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -160,7 +160,7 @@ class ChatController {
   async patch_messageId_reaction(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.patch_messageId_reaction(data);
+      const result = await chatApplicationService.patch_messageId_reaction(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -173,7 +173,7 @@ class ChatController {
   async patch_messageId_recall(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.patch_messageId_recall(data);
+      const result = await chatApplicationService.patch_messageId_recall(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -186,7 +186,7 @@ class ChatController {
   async patch_messageId_soft_delete(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.patch_messageId_soft_delete(data);
+      const result = await chatApplicationService.patch_messageId_soft_delete(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -199,7 +199,7 @@ class ChatController {
   async post_groups(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.post_groups(data);
+      const result = await chatApplicationService.post_groups(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -225,7 +225,7 @@ class ChatController {
   async delete_groups_groupId(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.delete_groups_groupId(data);
+      const result = await chatApplicationService.delete_groups_groupId(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -238,7 +238,7 @@ class ChatController {
   async get_unread_userId(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.get_unread_userId(data);
+      const result = await chatApplicationService.get_unread_userId(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -251,7 +251,7 @@ class ChatController {
   async post_broadcast(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await chatApplicationService.post_broadcast(data);
+      const result = await chatApplicationService.post_broadcast(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -264,5 +264,6 @@ class ChatController {
 }
 
 module.exports = new ChatController();
+
 
 

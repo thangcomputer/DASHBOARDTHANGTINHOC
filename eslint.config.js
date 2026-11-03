@@ -29,6 +29,7 @@ module.exports = [
       'client/**',
       'thang-tin-hoc-mobile/dist/**',
       'thang-tin-hoc-mobile/.expo/**',
+      'modules/**/*ModelName*',
       'uploads/**',
       'tests/**',
       'scripts/**',

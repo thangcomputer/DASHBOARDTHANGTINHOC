@@ -26,7 +26,7 @@ class SystemLogApplicationService {
         .lean(),
     ]);
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: logs,
       pagination: {
@@ -34,9 +34,9 @@ class SystemLogApplicationService {
         page,
         pages: Math.ceil(totalLogs / limit) || 1,
       },
-    });
+    } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: 'Lỗi khi lấy System Logs: ' + error.message });
+    return { _status: 500, _body: { success: false, message: 'Lỗi khi lấy System Logs: ' + error.message } };
   }
 }
 
@@ -44,10 +44,10 @@ class SystemLogApplicationService {
   try {
     const action = String(data.body?.action || '').trim();
     if (!isVisibleSystemLogAction(action)) {
-      return { _status: 400, _body: ({
+      return { _status: 400, _body: {
         success: false,
         message: 'Hành động không thuộc nhật ký hệ thống được phép ghi',
-      });
+      } };
     }
 
     const amount = Number(data.body?.amount);
@@ -70,9 +70,9 @@ class SystemLogApplicationService {
       userAgent: String(data.headers['user-agent'] || '').slice(0, 500),
     });
 
-    return { _status: 201, _body: ({ success: true, data: log });
+    return { _status: 201, _body: { success: true, data: log } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: error.message });
+    return { _status: 500, _body: { success: false, message: error.message } };
   }
 }
 
@@ -80,11 +80,11 @@ class SystemLogApplicationService {
   try {
     const deleted = await systemLogRepository.deleteById(data.id);
     if (!deleted) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy nhật ký' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhật ký' } };
     }
-    return { _status: 200, _body: ({ success: true, message: 'Đã xóa nhật ký' });
+    return { _status: 200, _body: { success: true, message: 'Đã xóa nhật ký' } };
   } catch (error) {
-    return { _status: 500, _body: ({ success: false, message: error.message });
+    return { _status: 500, _body: { success: false, message: error.message } };
   }
 }
 

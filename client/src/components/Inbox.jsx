@@ -411,12 +411,12 @@ function ChatFlipWrap({ open, onClose, estimatedHeight = 160, className = 'relat
 }
 
 // ─── MAIN INBOX ──────────────────────────────────────────────────────────────
-const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUserRole = 'admin', onNavigate }) => {
+const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUserRole = 'admin' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
   const socketCtx = useSocket();
-  const { isConnected, sendMessage: socketSend, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onGroupDelete, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
+  const { isConnected, onlineUsers, lastSeenUsers, joinGroupChat, onMessageReceive, onReactionReceive, onRecallReceive, onMessagePinned, onGroupDelete, onContactListUpdated, socket, emitTypingStart, emitTypingStop, onTypingChange } = socketCtx;
   const {
     getConversations, getMessages: ctxGetMessages, sendMessage: ctxSendMessage,
     markMessagesRead, syncMessages, recallMessage: ctxRecallMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers, groups,
@@ -441,9 +441,19 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     [handoffQueue],
   );
 
+  const [deletedGroupIds, setDeletedGroupIds] = useState(() => new Set());
   const dataContextConvs = useMemo(
-    () => getConversations(currentUserId),
-    [getConversations, currentUserId],
+    () => {
+      const conversations = getConversations(currentUserId);
+      if (!Array.isArray(conversations)) return [];
+      return conversations.filter((conversation) => {
+        if (!conversation?.isGroup) return true;
+        const groupId = String(conversation.user?.groupId || conversation.groupId || conversation.id || '')
+          .replace(/^group_/, '');
+        return !deletedGroupIds.has(groupId);
+      });
+    },
+    [getConversations, currentUserId, deletedGroupIds],
   );
   const [contacts, setContacts] = useState([]);
   const [contactsLoaded, setContactsLoaded] = useState(false);
@@ -507,7 +517,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         if (res?.success) setContacts(Array.isArray(res.data) ? res.data : []);
         else setContacts([]);
         if (hiddenRes?.success) setHiddenList(hiddenRes.data);
-      } catch (err) {
+      } catch {
         setContacts([]);
       } finally {
         setContactsLoaded(true);
@@ -533,20 +543,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     return () => { cancelled = true; };
   }, [currentUserId, toast]);
 
-  const refreshHiddenList = useCallback(async () => {
-    try {
-      const hiddenRes = await messagesAPI.getHiddenConversations();
-      if (hiddenRes?.success) setHiddenList(hiddenRes.data);
-    } catch (err) { }
-  }, []);
-
   // 📡 Re-fetch danh bạ khi server thông báo CONTACT_LIST_UPDATED (sau xếp lớp)
   const refreshContacts = useCallback(async () => {
     try {
       const res = await messagesAPI.getContacts();
       if (res?.success) setContacts(Array.isArray(res.data) ? res.data : []);
       else setContacts([]);
-    } catch (err) {
+    } catch {
       setContacts([]);
     } finally {
       setContactsLoaded(true);
@@ -579,7 +582,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
   useEffect(() => {
     if (!onContactListUpdated) return;
-    const unsub = onContactListUpdated((payload) => {
+    const unsub = onContactListUpdated(() => {
       refreshContacts();
     });
     return unsub;
@@ -1029,7 +1032,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       } else {
         toast.error(res?.message || 'Lỗi khi ghim tin nhắn');
       }
-    } catch (err) {
+    } catch {
       toast.error('Lỗi khi ghim tin nhắn');
     }
   };
@@ -1641,7 +1644,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         });
 
         // Xóa nhóm khỏi danh sách hội thoại
-        setConversations((prev) => (Array.isArray(prev) ? prev.filter((c) => String(c.id) !== `group_${deletedGroupId}`) : []));
+        setDeletedGroupIds((prev) => new Set(prev).add(deletedGroupId));
       });
     }
 
@@ -1788,7 +1791,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     try {
       await ctxRecallMessage(msgId);
-    } catch (err) {
+    } catch {
       // Rollback nếu API thất bại
       setMessages(prev => prev.map(m =>
         String(m.id) === String(msgId) ? { ...m, isRecalled: false } : m
@@ -1808,7 +1811,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     try {
       await ctxDeleteMessage(msgId);
       setMessages(prev => prev.filter(m => String(m.id) !== String(msgId)));
-    } catch (err) {
+    } catch {
       toast?.error('Không thể xóa lịch sử lúc này.');
     }
   }, [ctxDeleteMessage, toast]);
@@ -1832,7 +1835,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     try {
       await ctxToggleReaction(messageId, type);
-    } catch (err) {
+    } catch {
+      toast?.error('Không thể cập nhật cảm xúc cho tin nhắn.');
     }
   }, [currentUserId, currentUserName, ctxToggleReaction]);
 
@@ -2295,7 +2299,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
-    } catch (err) {
+    } catch {
       const link = document.createElement('a');
       link.href = fullUrl;
       link.download = safeName || 'download';
@@ -2327,7 +2331,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         }
         toast.success('Đã ẩn cuộc trò chuyện');
       }
-    } catch (err) {
+    } catch {
       toast.error('Lỗi khi ẩn cuộc trò chuyện');
     }
   };
@@ -2423,8 +2427,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       setPinningConversationId(null);
     }
   };
-
-  const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
   // Auto-select from navigation — Phase 7: never invent unauthorized peers
   const hasAutoSelected = useRef(false);
@@ -4122,7 +4124,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       } else {
                         toast?.error(newGroup?.message || 'Không thể tạo nhóm. Vui lòng thử lại.');
                       }
-                    } catch (err) {
+                    } catch {
                       toast?.error('Lỗi kết nối máy chủ.');
                     }
                   }}
@@ -4238,7 +4240,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         } else {
                           toast.error(res.message || 'Lỗi khi gửi tin nhắn');
                         }
-                      } catch (err) {
+                      } catch {
                         toast.error('Lỗi kết nối máy chủ');
                       } finally {
                         setIsBroadcasting(false);
@@ -4402,7 +4404,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       } else {
                         toast?.error('Không thể thêm thành viên.');
                       }
-                    } catch (err) {
+                    } catch {
                       toast?.error('Lỗi kết nối máy chủ.');
                     }
                   }}

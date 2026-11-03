@@ -33,7 +33,7 @@ class CmsController {
   async post_forms(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await cmsApplicationService.post_forms(data);
+      const result = await cmsApplicationService.post_forms(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -124,7 +124,7 @@ class CmsController {
   async get_reports_sources(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await cmsApplicationService.get_reports_sources(data);
+      const result = await cmsApplicationService.get_reports_sources(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -150,7 +150,7 @@ class CmsController {
   async post_reports(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await cmsApplicationService.post_reports(data);
+      const result = await cmsApplicationService.post_reports(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -215,7 +215,7 @@ class CmsController {
   async get_definitions(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await cmsApplicationService.get_definitions(data);
+      const result = await cmsApplicationService.get_definitions(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -241,7 +241,7 @@ class CmsController {
   async post_sync(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await cmsApplicationService.post_sync(data);
+      const result = await cmsApplicationService.post_sync(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -267,7 +267,7 @@ class CmsController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await cmsApplicationService.post_root(data);
+      const result = await cmsApplicationService.post_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -293,3 +293,4 @@ class CmsController {
 }
 
 module.exports = new CmsController();
+

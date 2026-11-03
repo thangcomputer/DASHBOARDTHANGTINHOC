@@ -7,7 +7,7 @@ class FeedController {
   async post_upload(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await feedApplicationService.post_upload(data);
+      const result = await feedApplicationService.post_upload(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -77,7 +77,7 @@ class FeedController {
   async post_id_like(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await feedApplicationService.post_id_like(data);
+      const result = await feedApplicationService.post_id_like(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -90,7 +90,7 @@ class FeedController {
   async post_id_react(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await feedApplicationService.post_id_react(data);
+      const result = await feedApplicationService.post_id_react(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -129,3 +129,4 @@ class FeedController {
 }
 
 module.exports = new FeedController();
+

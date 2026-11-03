@@ -5,16 +5,27 @@ const logger = require('./../../../config/logger');
 const cache = require('./../../../utils/cache');
 const { calculateDiscountPrice, effectiveCoursePrice } = require('./../../../utils/coursePricing');
 const { getCachedSettings } = require('./../../system/settingsCache');
+const { sanitizeRegex } = require('./../../../middleware/sanitizeRegex');
 
 const {
   sanitizeExamSubjects,
-  resolveExamSubjectsForCourse,
   inferExamSubjectsFromCourseName,
 } = require('../../exam/services/examSubjectCatalog');
 const COURSE_TTL = 120;
 const COURSE_STATS_KEY = 'courses:stats';
 async function invalidateCourseCache() {
   await cache.delByPrefix('courses:');
+}
+async function loadCustomExamSubjects() {
+  const settings = await getCachedSettings();
+  return settings?.examSubjectsCustomRaw;
+}
+async function sanitizeCourseExamSubjects(list) {
+  return sanitizeExamSubjects(list, await loadCustomExamSubjects());
+}
+async function inferExamSubjects(body) {
+  const custom = await loadCustomExamSubjects();
+  return inferExamSubjectsFromCourseName(body.name, body.category, custom);
 }
 /** Catalog mặc định ẩn soft-deleted (`deletedAt: null` khớp cả field thiếu). */
 function notDeletedFilter(includeDeleted = false) {
@@ -28,7 +39,7 @@ function notDeletedFilter(includeDeleted = false) {
 class CourseApplicationService {
   async get_stats_summary(data) {
   try {
-    const data = await cache.wrap(COURSE_STATS_KEY, COURSE_TTL, async () => {
+    const stats = await cache.wrap(COURSE_STATS_KEY, COURSE_TTL, async () => {
       const alive = { deletedAt: null };
       const total      = await courseRepository.count(alive);
       const published  = await courseRepository.count({ ...alive, status: 'published' });
@@ -40,7 +51,7 @@ class CourseApplicationService {
       return { total, published, featured, categories };
     });
 
-    return { _status: 200, _body: { success: true, data } };
+    return { _status: 200, _body: { success: true, data: stats } };
   } catch (error) {
     return { _status: 500, _body: { success: false, message: 'Lỗi server' } };
   }

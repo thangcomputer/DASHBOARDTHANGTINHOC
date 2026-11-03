@@ -20,7 +20,7 @@ class FileController {
   async get_stats(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await fileApplicationService.get_stats(data);
+      const result = await fileApplicationService.get_stats(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -33,7 +33,7 @@ class FileController {
   async get_categories(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await fileApplicationService.get_categories(data);
+      const result = await fileApplicationService.get_categories(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -46,7 +46,7 @@ class FileController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await fileApplicationService.get_root(data);
+      const result = await fileApplicationService.get_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -59,7 +59,7 @@ class FileController {
   async post_purge_expired(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await fileApplicationService.post_purge_expired(data);
+      const result = await fileApplicationService.post_purge_expired(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -85,3 +85,4 @@ class FileController {
 }
 
 module.exports = new FileController();
+

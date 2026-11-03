@@ -133,7 +133,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
 
   // Fetch branches
   const [branches, setBranches] = useState([]);
-  const [branchesLoading, setBranchesLoading] = useState(true);
+  const [, setBranchesLoading] = useState(true);
   useEffect(() => {
     fetch(`${API}/api/branches`)
       .then(r => r.json())
@@ -381,7 +381,6 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
     clearInterval(countdownRef.current);
     clearInterval(pollRef.current);
     sessionRef.current = null;
-    setSessionId(null);
     setExpired(false);
     setStep(1);
   };
@@ -710,7 +709,6 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                   <button
                     onClick={() => {
-                      const { printInvoice } = require('../utils/exportPDF');
                       printInvoice();
                     }}
                     className="py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
