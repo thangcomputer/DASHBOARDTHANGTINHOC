@@ -10,7 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import {
-  BookOpen, Building2, CalendarDays, CheckSquare, FileBox, FileText, GraduationCap,
+  BookOpen, Building2, CalendarDays, CheckSquare, FileBox, FileText, Gamepad2, GraduationCap,
   DollarSign, Headphones, House, LayoutDashboard, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -41,6 +41,7 @@ import { SupportEntryScreen } from '../screens/SupportEntryScreen';
 import {
   CertPrepCatalogScreen, CertPrepLevelScreen, CertPrepPlayerScreen, CertPrepResultScreen,
 } from '../screens/CertPrepScreens';
+import { DailyPracticeScreen } from '../screens/DailyPracticeScreen';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
 import { PinLockGate } from '../components/pinLock/PinLockGate';
@@ -91,7 +92,7 @@ const NAV_TAB_LABELS: Record<'student' | 'teacher', Record<string, string>> = {
     Feed: 'Bảng tin',
     Home: 'Tổng quan',
     Support: 'Hỗ trợ',
-    CourseVideos: 'Luyện tập',
+    CourseVideos: 'Bài giảng',
     Profile: 'Hồ sơ',
   },
   teacher: {
@@ -454,6 +455,7 @@ export function RootNavigator() {
               <Stack.Screen name="CertPrepLevel" component={CertPrepLevelScreen} />
               <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
               <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
+              <Stack.Screen name="DailyPractice" component={DailyPracticeScreen} />
             </>
           ) : null}
           {user.role === 'teacher' ? (
@@ -680,7 +682,7 @@ function PersistentTabBar({
       { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
       { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
       { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
-      { name: 'CourseVideos' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: BookOpen },
+      { name: 'CourseVideos' as const, label: 'Bài giảng', shortLabel: 'Bài giảng', icon: BookOpen },
       { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
     ];
   const orderedItems = items;
@@ -745,7 +747,7 @@ function PersistentTabBar({
 type MenuDestination = 'Home' | 'Schedule' | 'Students' | 'Messages' | 'CourseVideos' | 'Feed'
   | 'Profile' | 'Assignments' | 'Materials' | 'StudentExam'
   | 'StudentLearning' | 'Evaluations' | 'News' | 'CenterInfo' | 'SoftwareLinks'
-  | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'Support';
+  | 'Tuition' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'Support' | 'DailyPractice';
 
 type MenuEntry = { label: string; destination: MenuDestination; icon: LucideIcon };
 type MenuSection = { label: string; items: MenuEntry[] };
@@ -806,7 +808,8 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         items: [
           { label: 'Tổng quan', destination: 'Home', icon: House },
           { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-          { label: 'Luyện tập', destination: 'CourseVideos', icon: BookOpen },
+          { label: 'Bài giảng', destination: 'CourseVideos', icon: BookOpen },
+          { label: 'Luyện tập hằng ngày', destination: 'DailyPractice', icon: Gamepad2 },
           { label: 'Lịch học', destination: 'Schedule', icon: CalendarDays },
           { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
           { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
@@ -913,6 +916,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
     else if (destination === 'Materials') navigationRef.navigate('Materials');
     else if (destination === 'StudentExam') navigationRef.navigate('StudentExam');
     else if (destination === 'StudentLearning') navigationRef.navigate('StudentLearning');
+    else if (destination === 'DailyPractice') navigationRef.navigate('DailyPractice');
     else if (destination === 'Evaluations') navigationRef.navigate('Evaluations');
     else if (destination === 'News') navigationRef.navigate('News');
     else if (destination === 'CenterInfo') navigationRef.navigate('CenterInfo');
@@ -1239,7 +1243,7 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
-      initialRouteName={isTeacher ? 'Home' : 'Schedule'}
+      initialRouteName="Home"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
@@ -1366,7 +1370,7 @@ function MainTabs() {
           <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
           <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
-          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập' }} />
+          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
           <Tab.Screen
             name="Profile"
             component={ProfileScreen}

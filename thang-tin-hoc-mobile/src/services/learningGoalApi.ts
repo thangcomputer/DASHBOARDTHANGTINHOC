@@ -102,6 +102,7 @@ export type LeaderboardRow = {
   avatar: string;
   goalDays: number;
   minutes: number;
+  xp: number;
   hoursPerDay: number;
   isMe: boolean;
 };
@@ -117,6 +118,7 @@ export type LearningLeaderboard = {
     rank: number | null;
     goalDays: number;
     minutes: number;
+    xp: number;
     hoursPerDay: number;
     ahead: { rank: number; goalDays: number; minutes: number } | null;
   };

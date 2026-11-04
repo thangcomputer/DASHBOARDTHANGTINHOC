@@ -3,7 +3,7 @@ import { Alert, Animated, DeviceEventEmitter, Easing, Image, Linking, Pressable,
 import {
   ArrowRight, Award, BookOpen, Bot, Calendar, CalendarDays, CheckCircle, ChevronRight, ClipboardCheck, ClipboardList,
   Clock, Clock3, Download, ExternalLink, FileText, GraduationCap, MessageCircle, MessageSquare, Sparkles, Star, TrendingUp, Users,
-  WalletCards, UserPlus, Trophy, Video, Zap,
+  WalletCards, UserPlus, Trophy, Video, Zap, Flame, Gamepad2, type LucideIcon,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,13 +13,14 @@ import { Avatar, AppScreen, Card, ErrorState, LoadingSkeleton, SectionHeading, S
 import { LearningGoalCard } from '../components/LearningGoalCard';
 import { LearningLeaderboardCard } from '../components/LearningLeaderboardCard';
 import { CompactCoursePicker, type CoursePickerItem } from '../components/CompactCoursePicker';
+import { WelcomeHero } from '../components/WelcomeHero';
+import { dailyPracticeApi } from '../services/dailyPracticeApi';
 import {
-  assignmentService, evaluationService, materialService, messageService,
+  assignmentService, evaluationService,
   quizService, scheduleService, studentProfileService, studentService,
 } from '../services/mockService';
 import { useMockResource } from '../hooks/useMockResource';
 import { SOCKET_EVENTS } from '../services/socketService';
-import { getDashboardBanners } from '../services/webSettingsApi';
 import { getMobileImageSource } from '../services/apiClient';
 import { getTeacherDashboardMetrics } from '../services/teacherApi';
 import { buildStudentDashboardActivity } from '../services/studentDashboardActivity';
@@ -72,20 +73,13 @@ export function HomeScreen() {
   const { user } = useAuth();
   const tabNavigation = useNavigation<TabNavigation>();
   const navigation = tabNavigation.getParent<RootNavigation>();
-  const { width } = useWindowDimensions();
   const isTeacher = user?.role === 'teacher';
   const [selectedCourse, setSelectedCourse] = useState('');
-  const [bannerIndex, setBannerIndex] = useState(0);
-  const [failedBannerImages, setFailedBannerImages] = useState<string[]>([]);
-  const supportBotMotion = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const motion = Animated.loop(Animated.sequence([
-      Animated.timing(supportBotMotion, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(supportBotMotion, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    motion.start();
-    return () => motion.stop();
-  }, [supportBotMotion]);
+  const [practice, setPractice] = useState<Awaited<ReturnType<typeof dailyPracticeApi.overview>> | null>(null);
+  useFocusEffect(useCallback(() => {
+    if (isTeacher || !user || user.previewMode) return;
+    dailyPracticeApi.overview().then(setPractice).catch(() => {});
+  }, [isTeacher, user]));
   const schedulesLoader = useCallback(() => scheduleService.list(isTeacher ? 'teacher' : 'student'), [isTeacher]);
   const assignmentsLoader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const studentsLoader = useCallback(() => studentService.assigned(user), [user]);
@@ -95,50 +89,38 @@ export function HomeScreen() {
   const profileLoader = useCallback(() => !isTeacher && user
     ? studentProfileService.get(user)
     : Promise.resolve(null), [isTeacher, user]);
-  const bannersLoader = useCallback(() => getDashboardBanners(isTeacher ? 'teacher' : 'student'), [isTeacher]);
-  const materialsLoader = useCallback(() => materialService.list(user), [user]);
   const quizzesLoader = useCallback(() => !isTeacher && user
     ? quizService.studentList(user)
     : Promise.resolve([]), [isTeacher, user]);
   const evaluationActivityLoader = useCallback(() => isTeacher || !user
     ? Promise.resolve([])
     : evaluationService.activity(user), [isTeacher, user]);
-  const messagesLoader = useCallback(() => messageService.conversations(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const schedules = useMockResource(schedulesLoader);
   const assignments = useMockResource(assignmentsLoader);
   const students = useMockResource(studentsLoader);
   const teacherMetrics = useMockResource(teacherMetricsLoader);
   const profile = useMockResource(profileLoader);
-  const banners = useMockResource(bannersLoader);
-  const materials = useMockResource(materialsLoader);
   const quizzes = useMockResource(quizzesLoader);
   const evaluationActivity = useMockResource(evaluationActivityLoader);
-  const messages = useMockResource(messagesLoader);
   useFocusEffect(useCallback(() => {
     schedules.reload();
     assignments.reload();
     students.reload();
     teacherMetrics.reload();
     profile.reload();
-    banners.reload();
-    materials.reload();
     quizzes.reload();
     evaluationActivity.reload();
-    messages.reload();
   }, [
-    assignments.reload, banners.reload, materials.reload, messages.reload,
-    evaluationActivity.reload, profile.reload, quizzes.reload, schedules.reload, students.reload, teacherMetrics.reload,
+    assignments.reload, evaluationActivity.reload, profile.reload, quizzes.reload, schedules.reload, students.reload, teacherMetrics.reload,
   ]));
   useEffect(() => {
     const subscriptions = [
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_RECEIVED, messages.reload),
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_SENT_ACK, messages.reload),
       DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_NEW, schedules.reload),
       DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_UPDATED, schedules.reload),
       DeviceEventEmitter.addListener(SOCKET_EVENTS.SCHEDULE_CANCELLED, schedules.reload),
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
-  }, [messages.reload, schedules.reload]);
+  }, [schedules.reload]);
 
   const studentEnrollments = profile.data?.enrollments || user?.enrollments || [];
   const activeEnrollments = studentEnrollments.filter((enrollment) => enrollment.status === 'Đang học');
@@ -184,17 +166,6 @@ export function HomeScreen() {
       return !course || course === activeCourse;
     });
   }, [assignments.data, currentCourse, isTeacher]);
-  const dashboardMaterials = useMemo(() => (materials.data || []).filter((item) => {
-    if (isTeacher || !currentEnrollment) return true;
-    const selected = normalizeDashboardCourse(currentCourse);
-    const itemCourse = normalizeDashboardCourse(item.courseName || '');
-    if (itemCourse && itemCourse !== selected) return false;
-    if (item.courseId && currentEnrollment.courseId && item.courseId !== currentEnrollment.courseId) return false;
-    if (item.subjectIds?.length && currentEnrollment.subjectIds?.length) {
-      return item.subjectIds.some((id) => currentEnrollment.subjectIds?.includes(id));
-    }
-    return true;
-  }), [currentCourse, currentEnrollment, isTeacher, materials.data]);
   const firstSchedule = useMemo(() => {
     const today = new Date();
     const now = today.getTime();
@@ -222,13 +193,6 @@ export function HomeScreen() {
   const pendingAssignments = studentAssignments.filter((item) => item.mySubmission
     ? false
     : item.status === 'Chưa làm' || item.status === 'Quá hạn');
-  const unreadMessages = messages.data?.reduce((count, item) => count + item.unread, 0);
-  const now = Date.now();
-  const pendingQuizCount = (quizzes.data || []).filter((quiz) => {
-    if (quiz.mySubmission) return false;
-    const deadline = quiz.deadline ? new Date(quiz.deadline).getTime() : null;
-    return deadline == null || !Number.isFinite(deadline) || deadline > now;
-  }).length;
   const gradeEntries = buildStudentDashboardActivity(
     profile.data?.student,
     studentAssignments,
@@ -244,297 +208,238 @@ export function HomeScreen() {
     : completedSessions != null && totalSessions != null && totalSessions > 0
       ? Math.round((completedSessions / totalSessions) * 100)
       : null;
-  const [currentBannerSet, setCurrentBannerSet] = useState('');
-  const bannerRole = isTeacher ? 'teacher' : 'student';
-  const bannerItems = banners.data?.banners || [];
-  const availableBannerItems = bannerItems.filter((banner) => !failedBannerImages.includes(banner.imageUrl));
-  const activeBannerIndex = availableBannerItems.length ? bannerIndex % availableBannerItems.length : 0;
-  useEffect(() => {
-    if (currentBannerSet !== bannerRole) {
-      setBannerIndex(0);
-      setFailedBannerImages([]);
-      setCurrentBannerSet(bannerRole);
-    }
-  }, [bannerRole, currentBannerSet]);
-  useEffect(() => {
-    if (availableBannerItems.length && bannerIndex >= availableBannerItems.length) setBannerIndex(0);
-  }, [availableBannerItems.length, bannerIndex]);
-  useEffect(() => {
-    if (availableBannerItems.length < 2) return undefined;
-    const interval = setInterval(
-      () => setBannerIndex((index) => (index + 1) % availableBannerItems.length),
-      (banners.data?.speedSeconds || 5) * 1000,
-    );
-    return () => clearInterval(interval);
-  }, [availableBannerItems.length, banners.data?.speedSeconds]);
-  const quickActions = [
-    { title: 'Bảng tin', icon: MessageCircle, route: 'Feed' as const, tint: colors.blueSoft, tone: colors.blue },
-    { title: 'Giao bài tập & kiểm tra', icon: FileText, route: 'Assignments' as const, tint: colors.goldSoft, tone: '#B7791F' },
-    { title: 'Khóa đào tạo', icon: GraduationCap, route: 'TeacherTraining' as const, tint: colors.purpleSoft, tone: colors.purple },
-    { title: 'Tài chính', icon: WalletCards, route: 'TeacherFinance' as const, tint: colors.greenSoft, tone: colors.green },
-  ];
   const todayDate = new Date();
   const todayKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
   const teacherTodaySchedules = (schedules.data || [])
     .filter((item) => item.date === todayKey && scheduleIsCurrentOrFuture(item))
     .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-  const upcomingTeacherSchedules = (schedules.data || [])
-    .filter((item) => scheduleIsCurrentOrFuture(item) && item.date?.slice(0, 7) === todayKey.slice(0, 7))
-    .sort((a, b) => `${a.date} ${a.startTime || ''}`.localeCompare(`${b.date} ${b.startTime || ''}`));
-  const upcomingStudentSchedules = studentSchedules.filter(scheduleIsCurrentOrFuture);
-  const newStudentsThisMonth = (students.data || []).filter((student) => (
-    (student.enrollments || []).some((enrollment) => {
-      const dateText = enrollment.registeredAt || '';
-      const match = dateText.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      const registeredAt = match
-        ? new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]))
-        : new Date(dateText);
-      return Number.isFinite(registeredAt.getTime())
-        && registeredAt.getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1000;
-    })
-  )).length;
+  const nowMs = Date.now();
+  const sessionStartMs = (item: { date?: string; startTime?: string; time: string }) => {
+    const start = item.startTime || item.time.match(/\d{1,2}:\d{2}/)?.[0];
+    return start && item.date ? new Date(`${item.date}T${start}:00+07:00`).getTime() : Number.NaN;
+  };
+  const teacherTodayAll = (schedules.data || [])
+    .filter((item) => item.date === todayKey && item.status !== 'cancelled')
+    .sort((a, b) => (a.startTime || a.time).localeCompare(b.startTime || b.time));
+  const teacherUnmarked = teacherTodayAll.filter((item) => item.status === 'upcoming'
+    && !item.attendanceConfirmPending
+    && Number.isFinite(sessionStartMs(item))
+    && sessionStartMs(item) <= nowMs);
+  const teacherSessionState = (item: (typeof teacherTodayAll)[number]) => {
+    if (item.status === 'completed') return { label: 'Đã dạy', color: '#047857', background: '#ECFDF5', live: false };
+    if (scheduleIsLive(item)) return { label: 'Đang dạy', color: '#FFFFFF', background: 'rgba(255,255,255,0.22)', live: true };
+    if (item.attendanceConfirmPending) return { label: 'Chờ HV xác nhận', color: '#B45309', background: '#FFFBEB', live: false };
+    if (Number.isFinite(sessionStartMs(item)) && sessionStartMs(item) <= nowMs) return { label: 'Chưa điểm danh', color: '#DC2626', background: '#FEF2F2', live: false };
+    return { label: 'Sắp tới', color: '#2563EB', background: '#EFF6FF', live: false };
+  };
+  const taughtThisMonth = (schedules.data || [])
+    .filter((item) => item.status === 'completed' && item.date?.slice(0, 7) === todayKey.slice(0, 7)).length;
+
+  const teacherTasks: OverviewTask[] = [];
+  if (teacherUnmarked.length) {
+    const first = teacherUnmarked[0];
+    teacherTasks.push({
+      key: 'attendance',
+      icon: ClipboardCheck,
+      tone: '#059669',
+      title: `Ca chưa điểm danh (${teacherUnmarked.length})`,
+      sub: `${first.studentName || first.person || 'Học viên'} · ${first.startTime || first.time}`,
+      cta: 'Điểm danh',
+      onPress: () => navigation?.navigate('Attendance', { scheduleId: first.id }),
+    });
+  }
+  if (assignmentsToGrade.length) {
+    teacherTasks.push({
+      key: 'grading',
+      icon: FileText,
+      tone: '#D97706',
+      title: `Bài chờ chấm (${assignmentsToGrade.length})`,
+      sub: `Mới nhất: ${assignmentsToGrade[0].subject || assignmentsToGrade[0].title}`,
+      cta: 'Chấm bài',
+      onPress: () => navigation?.navigate('Assignments'),
+    });
+  }
+
+  const deadlineOf = (value?: string) => {
+    const t = value ? Date.parse(value) : Number.NaN;
+    return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+  };
+  const nextHomework = [...pendingAssignments].sort((a, b) => deadlineOf(a.deadlineDate) - deadlineOf(b.deadlineDate))[0];
+  const pendingQuizzes = (quizzes.data || [])
+    .filter((quiz) => !quiz.mySubmission && (!quiz.deadline || deadlineOf(quiz.deadline) > nowMs))
+    .sort((a, b) => deadlineOf(a.deadline) - deadlineOf(b.deadline));
+  const practiceStats = practice?.stats;
+  const studentTasks: OverviewTask[] = [];
+  if (nextHomework) {
+    studentTasks.push({
+      key: 'homework',
+      icon: ClipboardList,
+      tone: '#EA580C',
+      title: `Bài tập cần nộp (${pendingAssignments.length})`,
+      sub: `${nextHomework.title}${nextHomework.deadline ? ` · hạn ${nextHomework.deadline}` : ''}`,
+      cta: 'Nộp bài',
+      onPress: () => navigation?.navigate('Assignments', { assignmentId: nextHomework.id }),
+    });
+  }
+  if (pendingQuizzes.length) {
+    studentTasks.push({
+      key: 'quiz',
+      icon: Trophy,
+      tone: '#DC2626',
+      title: `Trắc nghiệm chưa làm (${pendingQuizzes.length})`,
+      sub: pendingQuizzes[0].title,
+      cta: 'Làm bài',
+      onPress: () => navigation?.navigate('StudentExam', { quizId: pendingQuizzes[0].id }),
+    });
+  }
+  if (practiceStats && !practiceStats.playedToday && practice?.topics.length) {
+    const atRisk = practiceStats.streakState === 'at_risk' && practiceStats.streak > 0;
+    const lost = practiceStats.streakState === 'lost';
+    studentTasks.push({
+      key: 'practice',
+      icon: lost ? Gamepad2 : Flame,
+      tone: lost ? '#64748B' : '#EA580C',
+      title: atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày',
+      sub: atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút',
+      cta: 'Chơi ngay',
+      onPress: () => navigation?.navigate('DailyPractice'),
+    });
+  }
 
   return (
     <AppScreen contentStyle={isTeacher ? styles.screen : styles.studentScreen}>
-      <View style={styles.topRow}>
-        <View style={styles.greetingIcon}>
-          <GraduationCap size={27} color="#FFFFFF" strokeWidth={2.6} />
-        </View>
-        <View style={styles.greeting}>
-          <Text style={styles.greetingMeta}>{isTeacher ? 'Không gian giảng dạy' : 'Trung tâm Thắng Tin Học'}</Text>
-          <Text style={styles.greetingTitle}>{isTeacher ? `Chào mừng, ${user?.name || 'Giảng viên'}!` : `Chào mừng, ${user?.name}! 👋`}</Text>
-          <Text style={styles.greetingSub}>{isTeacher ? 'Ưu tiên điểm danh, lịch dạy và học viên được phân công.' : '“Học hôm nay, thành công mai sau.”'}</Text>
-        </View>
-      </View>
+      {isTeacher ? (
+        <WelcomeHero
+          role="teacher"
+          name={user?.name || ''}
+          chips={firstScheduleIsLive && firstSchedule
+            ? [{ live: true, label: `Đang dạy: ${[firstSchedule.studentName || firstSchedule.person, firstSchedule.courseName || firstSchedule.title].filter(Boolean).join(' · ')}` }]
+            : firstSchedule
+              ? [{ icon: Calendar, label: `Ca tới: ${firstSchedule.startTime || firstSchedule.time} · ${firstSchedule.studentName || firstSchedule.person || 'Học viên'} · ${firstSchedule.dateLabel}` }]
+              : [{ icon: Calendar, label: 'Chưa có ca dạy sắp tới' }]}
+          joinUrl={firstScheduleIsLive ? firstSchedule?.meetingUrl || '' : ''}
+          joinHint={firstScheduleIsLive ? 'Chưa có link dạy' : teacherTodaySchedules.length ? 'Chưa đến giờ dạy' : 'Chưa có lịch dạy'}
+          onJoin={(url) => { void openDashboardLink(url); }}
+        />
+      ) : (
+        <WelcomeHero
+          role="student"
+          name={user?.name || ''}
+          chips={firstScheduleIsLive && firstSchedule
+            ? [{ live: true, label: `Đang học · ${firstSchedule.time}` }]
+            : firstSchedule
+              ? [{ icon: Calendar, label: `Buổi tới: ${firstSchedule.time} · ${firstSchedule.dateLabel}` }]
+              : []}
+          joinUrl={firstScheduleIsLive ? studentJoinUrl : ''}
+          joinHint={firstScheduleIsLive ? 'Chưa có link học' : firstSchedule ? 'Chưa đến giờ học' : 'Chưa có lịch học'}
+          onJoin={(url) => { void openDashboardLink(url); }}
+        />
+      )}
 
-      {schedules.loading || assignments.loading || students.loading || (isTeacher && teacherMetrics.loading) || (!isTeacher && (profile.loading || materials.loading || quizzes.loading || evaluationActivity.loading || messages.loading))
+      {schedules.loading || assignments.loading || students.loading || (isTeacher && teacherMetrics.loading) || (!isTeacher && (profile.loading || quizzes.loading || evaluationActivity.loading))
         ? <LoadingSkeleton rows={1} />
         : null}
-      {schedules.error || assignments.error || students.error || (isTeacher && teacherMetrics.error) || (!isTeacher && (profile.error || materials.error || quizzes.error || evaluationActivity.error || messages.error)) ? (
+      {schedules.error || assignments.error || students.error || (isTeacher && teacherMetrics.error) || (!isTeacher && (profile.error || quizzes.error || evaluationActivity.error)) ? (
         <ErrorState onRetry={() => {
           schedules.reload();
           assignments.reload();
           students.reload();
           teacherMetrics.reload();
           profile.reload();
-          banners.reload();
-          materials.reload();
           quizzes.reload();
           evaluationActivity.reload();
-          messages.reload();
         }} />
       ) : null}
-      {availableBannerItems.length ? (
-        <View style={styles.bannerWrap}>
-          <Pressable
-            onPress={() => {
-              const link = availableBannerItems[activeBannerIndex]?.linkUrl;
-              if (link) void openDashboardLink(link);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Mở banner trang tổng quan"
-          >
-            <Image
-              source={getMobileImageSource(availableBannerItems[activeBannerIndex].imageUrl)}
-              style={styles.dashboardBanner}
-              resizeMode="cover"
-              accessibilityLabel="Banner trang tổng quan"
-              onError={() => setFailedBannerImages((failed) => (
-                failed.includes(availableBannerItems[activeBannerIndex].imageUrl)
-                  ? failed
-                  : [...failed, availableBannerItems[activeBannerIndex].imageUrl]
-              ))}
-            />
-          </Pressable>
-          {availableBannerItems.length > 1 ? (
-            <View style={styles.bannerDots}>
-              {availableBannerItems.map((banner, index) => (
-                <Pressable
-                  key={`${banner.imageUrl}-${index}`}
-                  onPress={() => setBannerIndex(index)}
-                  style={[styles.bannerDot, index === activeBannerIndex && styles.bannerDotActive]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Hiển thị banner ${index + 1}`}
-                  accessibilityState={{ selected: index === activeBannerIndex }}
-                />
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ) : bannerItems.length ? (
-        <Text style={styles.inlineError}>Không tải được hình banner trang tổng quan.</Text>
-      ) : banners.error ? (
-        <Text style={styles.inlineError}>Không tải được banner trang tổng quan.</Text>
-      ) : null}
-
       {isTeacher ? (
         <>
-          {firstSchedule && scheduleIsLive(firstSchedule) ? (
-            <Pressable
-              onPress={() => firstSchedule.meetingUrl && void openDashboardLink(firstSchedule.meetingUrl)}
-              style={styles.liveClassCard}
-              accessibilityRole="button"
-              accessibilityLabel={`Ca dạy đang diễn ra với ${firstSchedule.studentName || 'học viên'}`}
-            >
-              <View style={styles.liveClassIcon}><Video size={20} color="#FFFFFF" /></View>
-              <View style={styles.flex}>
-                <Text style={styles.liveClassEyebrow}>Ca dạy đang diễn ra</Text>
-                <Text numberOfLines={1} style={styles.liveClassTitle}>{firstSchedule.studentName || 'Học viên'} · {firstSchedule.courseName || firstSchedule.subject}</Text>
-                <Text style={styles.liveClassTime}>{firstSchedule.time}</Text>
-              </View>
-              {firstSchedule.meetingUrl ? <ExternalLink size={19} color="#FFFFFF" /> : <Text style={styles.liveClassNoLink}>Chưa có link</Text>}
-            </Pressable>
-          ) : null}
-          <View style={styles.sectionWrap}>
-            <SectionHeading title="Công việc cần xử lý ngay" />
-            <View style={styles.teacherActionGrid}>
-              {[
-                {
-                  title: 'Điểm danh',
-                  detail: schedules.loading ? '—' : `${teacherTodaySchedules.length} buổi hôm nay`,
-                  icon: ClipboardCheck,
-                  iconColor: colors.green,
-                  onPress: () => navigation?.navigate('Attendance', {
-                    scheduleId: teacherTodaySchedules[0]?.id,
-                  }),
-                  tint: colors.greenSoft,
-                },
-                {
-                  title: 'Chấm điểm',
-                  detail: assignments.loading ? '—' : assignmentsToGrade.length ? `${assignmentsToGrade.length} HV chờ chấm điểm` : 'Không có bài chờ chấm',
-                  icon: FileText,
-                  iconColor: '#B7791F',
-                  onPress: () => navigation?.navigate('Assignments'),
-                  tint: colors.goldSoft,
-                },
-                {
-                  title: 'Tin nhắn',
-                  detail: messages.loading ? '—' : unreadMessages ? `${unreadMessages} tin chưa đọc` : 'Không có tin mới',
-                  icon: MessageCircle,
-                  iconColor: colors.purple,
-                  onPress: () => tabNavigation.navigate('Messages'),
-                  tint: colors.purpleSoft,
-                },
-                {
-                  title: 'Xếp lịch',
-                  detail: 'Thêm buổi dạy mới',
-                  icon: CalendarDays,
-                  iconColor: colors.blue,
-                  onPress: () => tabNavigation.navigate('Schedule'),
-                  tint: colors.blueSoft,
-                },
-              ].map(({ title, detail, icon: Icon, iconColor, onPress, tint }) => (
-                <Pressable
-                  key={title}
-                  onPress={onPress}
-                  style={[styles.teacherAction, { width: width < 360 ? '100%' : '48%', backgroundColor: tint }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${title}. ${detail}`}
-                >
-                  <View style={styles.teacherActionTop}>
-                    <View style={[styles.teacherActionIcon, { borderColor: `${iconColor}30` }]}><Icon size={22} color={iconColor} strokeWidth={2.6} /></View>
-                    <ArrowRight size={17} color={colors.muted} />
-                  </View>
-                  <Text style={styles.cardTitle}>{title}</Text>
-                  <Text numberOfLines={2} style={styles.muted}>{detail}</Text>
-                </Pressable>
-              ))}
+          <Card style={styles.ovCard}>
+            <View style={styles.ovHeadRow}>
+              <Zap size={18} color="#F59E0B" fill="#FCD34D" />
+              <Text style={styles.ovTitle}>Cần xử lý</Text>
             </View>
-          </View>
-          <View style={styles.sectionWrap}>
-            <SectionHeading title="Lịch dạy trong tháng" action="Xem lịch" onPress={() => tabNavigation.navigate('Schedule')} />
-            {upcomingTeacherSchedules.slice(0, 3).map((item) => (
-              <Pressable key={item.id} onPress={() => tabNavigation.navigate('Schedule')} style={styles.upcomingSessionRow} accessibilityRole="button">
-                <View style={styles.upcomingDate}>
-                  <Text style={styles.upcomingDateDay}>{item.date?.slice(8, 10)}</Text>
-                  <Text style={styles.upcomingDateMonth}>{item.date?.slice(5, 7)}</Text>
-                </View>
-                <View style={styles.flex}>
-                  <Text numberOfLines={1} style={styles.cardTitle}>{item.studentName || item.courseName || 'Buổi dạy'}</Text>
-                  <Text numberOfLines={1} style={styles.muted}>{item.startTime || item.time} · {item.courseName || item.subject}</Text>
-                </View>
-                <ArrowRight size={16} color={colors.muted} />
+            {teacherTasks.length
+              ? teacherTasks.map(({ key, ...task }) => <OverviewTaskRow key={key} {...task} />)
+              : <OverviewDoneBox title="Không còn việc tồn đọng" text="Các ca đã điểm danh và không có bài chờ chấm." />}
+          </Card>
+
+          <Card style={styles.ovCard}>
+            <View style={styles.ovHeadRow}>
+              <Clock size={18} color={colors.brand} />
+              <Text style={[styles.ovTitle, styles.flex]}>Lịch dạy hôm nay</Text>
+              <Pressable onPress={() => tabNavigation.navigate('Schedule')} accessibilityRole="button">
+                <Text style={styles.ovLink}>Cả tháng</Text>
               </Pressable>
-            ))}
-            {!upcomingTeacherSchedules.length ? <Card><Text style={styles.muted}>Chưa có lịch dạy sắp tới.</Text></Card> : null}
-          </View>
-          <View style={styles.sectionWrap}>
-            <SectionHeading title="Bài tập cần chấm" action="Mở danh sách" onPress={() => navigation?.navigate('Assignments')} />
-            {!assignments.loading && !assignments.error && assignmentsToGrade.length ? (
-              <Card style={styles.reviewCard}>
-                <View style={styles.reviewIcon}><ClipboardCheck size={22} color="#FFFFFF" strokeWidth={2.5} /></View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{assignmentsToGrade.length} bài nộp đang chờ</Text>
-                  <Text style={styles.muted}>Cập nhật từ {assignmentsToGrade[0].subject}</Text>
-                </View>
-                <ArrowRight size={18} color={colors.muted} />
-              </Card>
-            ) : null}
-            {!assignments.loading && !assignments.error && !assignmentsToGrade.length
-              ? <Card><Text style={styles.muted}>{assignments.data ? 'Không có bài nộp cần chấm.' : '—'}</Text></Card>
-              : null}
-          </View>
-          <View style={styles.sectionWrap}>
-            <SectionHeading title="Tổng quan tháng này" />
-            <View style={styles.teacherStatsGrid}>
-              {[
-                { label: `Thu nhập T${todayDate.getMonth() + 1}`, value: teacherMetrics.data ? formatCurrency(teacherMetrics.data.monthlyIncome) : '—', detail: 'Chi tiết thu nhập', icon: WalletCards, iconTint: colors.blue, iconBackground: colors.blueSoft, route: 'TeacherFinance' as const },
-                { label: 'Đang dạy', value: students.data ? String(students.data.filter((student) => student.enrollmentStatus === 'active').length) : '—', detail: 'học viên', icon: Users, iconTint: '#4F46E5', iconBackground: '#EEF2FF', route: 'Students' as const },
-                { label: 'HV mới', value: students.data ? String(newStudentsThisMonth) : '—', detail: 'trong 30 ngày', icon: UserPlus, iconTint: colors.purple, iconBackground: colors.purpleSoft, route: 'Students' as const },
-                { label: '5 sao', value: teacherMetrics.data ? `${teacherMetrics.data.fiveStarStudentCount}/5` : '—', detail: teacherMetrics.data?.fiveStarStudentCount && teacherMetrics.data.fiveStarStudentCount >= 5 ? 'Đạt trong tháng này' : 'Trong tháng này', icon: Award, iconTint: '#D97706', iconBackground: colors.goldSoft, route: 'Students' as const },
-                { label: 'Uy tín', value: teacherMetrics.data?.ratingAverage ? String(teacherMetrics.data.ratingAverage) : '—', detail: `${teacherMetrics.data?.ratingCount || 0} đánh giá`, icon: Star, iconTint: colors.green, iconBackground: colors.greenSoft, route: 'Students' as const },
-              ].map(({ label, value, detail, icon: Icon, iconTint, iconBackground, route }, index) => (
+            </View>
+            {teacherTodayAll.length ? teacherTodayAll.map((item) => {
+              const state = teacherSessionState(item);
+              return (
                 <Pressable
-                  key={label}
-                  onPress={() => route === 'TeacherFinance' ? navigation?.navigate(route) : tabNavigation.navigate(route)}
-                  style={[
-                    styles.teacherStatCard,
-                    width < 640 && index === 4 ? styles.teacherStatCardWide : null,
-                    { padding: width < 360 ? spacing.sm : spacing.md },
-                  ]}
+                  key={item.id}
+                  onPress={() => navigation?.navigate('Attendance', { scheduleId: item.id })}
+                  style={[styles.ovSessionRow, state.live && styles.ovSessionLive]}
                   accessibilityRole="button"
-                  accessibilityLabel={`${label}: ${value}. ${detail}`}
                 >
-                  <View style={[styles.teacherStatTop, width < 640 && index === 4 ? styles.teacherStatTopWide : null]}>
-                    <View style={[styles.teacherStatIcon, { backgroundColor: iconBackground }]}><Icon size={20} color={iconTint} strokeWidth={2.5} /></View>
-                    <Text numberOfLines={2} style={styles.teacherStatLabel}>{label}</Text>
+                  <Text style={[styles.ovSessionTime, state.live && styles.ovSessionLiveText]}>{item.startTime || item.time}</Text>
+                  <View style={styles.flex}>
+                    <Text numberOfLines={1} style={[styles.cardTitle, state.live && styles.ovSessionLiveText]}>{item.studentName || item.person || 'Học viên'}</Text>
+                    <Text numberOfLines={1} style={[styles.muted, state.live && styles.ovSessionLiveText]}>{item.courseName || item.subject}</Text>
                   </View>
-                  <View style={[styles.teacherStatValueGroup, width < 640 && index === 4 ? styles.teacherStatValueGroupWide : null]}>
-                    <Text numberOfLines={1} adjustsFontSizeToFit style={styles.teacherStatValue}>{value}</Text>
-                    <Text style={styles.muted}>{detail}</Text>
+                  <Text style={[styles.ovSessionBadge, { color: state.color, backgroundColor: state.background }]}>{state.label}</Text>
+                </Pressable>
+              );
+            }) : <Text style={styles.muted}>Hôm nay không có ca dạy.</Text>}
+          </Card>
+
+          <View style={styles.sectionWrap}>
+            <SectionHeading title="Tháng này" />
+            <View style={styles.ovStatRow}>
+              {[
+                { label: `Thu nhập T${todayDate.getMonth() + 1}`, value: teacherMetrics.data ? formatCurrency(teacherMetrics.data.monthlyIncome) : '—', icon: WalletCards, tint: colors.blue, soft: '#EFF6FF', onPress: () => navigation?.navigate('TeacherFinance') },
+                { label: 'Buổi đã dạy', value: schedules.data ? String(taughtThisMonth) : '—', icon: CalendarDays, tint: '#4F46E5', soft: '#EEF2FF', onPress: () => tabNavigation.navigate('Schedule') },
+                { label: 'Thưởng sao', value: teacherMetrics.data ? `${teacherMetrics.data.fiveStarStudentCount}/5 HV` : '—', icon: Award, tint: '#D97706', soft: '#FFFBEB', onPress: undefined },
+              ].map(({ label, value, icon: Icon, tint, soft, onPress }) => (
+                <Pressable key={label} onPress={onPress} disabled={!onPress} style={styles.ovStat} accessibilityRole={onPress ? 'button' : undefined}>
+                  <View style={[styles.ovStatIcon, { backgroundColor: soft }]}><Icon size={22} color={tint} /></View>
+                  <View style={styles.flex}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit style={styles.ovStatValue}>{value}</Text>
+                    <Text numberOfLines={1} style={styles.ovStatLabel}>{label}</Text>
                   </View>
                 </Pressable>
               ))}
             </View>
           </View>
+
           <View style={styles.sectionWrap}>
             <SectionHeading title="Học viên được phân công" action="Xem tất cả" onPress={() => tabNavigation.navigate('Students')} />
             {students.data?.filter((student) => student.enrollmentStatus === 'active').slice(0, 3).map((student) => (
-              <Card key={student.id} style={styles.teacherStudentCard}>
-                <Avatar name={student.name} color={student.color} size={42} />
-                <View style={styles.flex}>
-                  <View style={styles.taskTop}>
-                    <Text numberOfLines={1} style={styles.cardTitle}>{student.name}</Text>
-                    <StatusBadge label={student.status} />
+              <Pressable key={student.id} onPress={() => tabNavigation.navigate('Students')} accessibilityRole="button">
+                <Card style={styles.teacherStudentCard}>
+                  <Avatar name={student.name} color={student.color} size={42} />
+                  <View style={styles.flex}>
+                    <View style={styles.taskTop}>
+                      <Text numberOfLines={1} style={styles.cardTitle}>{student.name}</Text>
+                      <StatusBadge label={student.status} />
+                    </View>
+                    <Text numberOfLines={1} style={styles.muted}>{student.course} · {student.completedSessions != null && student.totalSessions != null ? `${student.completedSessions}/${student.totalSessions} buổi` : '— buổi'}</Text>
+                    {student.progress != null ? <ProgressBar value={student.progress} /> : null}
                   </View>
-                  <Text numberOfLines={1} style={styles.muted}>{student.course} · {student.completedSessions != null && student.totalSessions != null ? `${student.completedSessions}/${student.totalSessions} buổi` : '— buổi'}</Text>
-                  {student.progress != null ? <ProgressBar value={student.progress} /> : <Text style={styles.muted}>Tiến độ: —</Text>}
-                </View>
-              </Card>
+                </Card>
+              </Pressable>
             ))}
             {!students.loading && !students.error && !students.data?.some((student) => student.enrollmentStatus === 'active') ? (
               <Card><Text style={styles.muted}>Chưa được phân công học viên nào.</Text></Card>
             ) : null}
           </View>
+
           <View style={styles.sectionWrap}>
-            <SectionHeading title="Đánh giá từ học viên" />
+            <SectionHeading title="Đánh giá mới" />
             {teacherMetrics.data?.recentRatings.length ? teacherMetrics.data.recentRatings.slice(0, 2).map((rating) => (
               <Card key={rating.id || `${rating.studentName}-${rating.createdAt}`} style={styles.ratingCard}>
                 <View style={styles.ratingTop}>
                   <Text style={styles.cardTitle}>{rating.studentName}</Text>
                   <Text style={styles.ratingStars}>{'★'.repeat(Math.max(0, Math.min(5, rating.stars)))}</Text>
                 </View>
-                {rating.comment ? <Text style={styles.muted}>{rating.comment}</Text> : <Text style={styles.muted}>Chưa có nhận xét.</Text>}
+                <Text style={styles.muted}>{rating.comment || 'Chưa có nhận xét.'}</Text>
               </Card>
             )) : (
               <Card><Text style={styles.muted}>Chưa có đánh giá từ học viên.</Text></Card>
@@ -543,272 +448,104 @@ export function HomeScreen() {
         </>
       ) : (
         <>
+          <Card style={styles.ovCard}>
+            <View style={styles.ovHeadRow}>
+              <CheckCircle size={18} color={colors.brand} />
+              <Text style={styles.ovTitle}>Việc cần làm hôm nay</Text>
+            </View>
+            {studentTasks.length
+              ? studentTasks.map(({ key, ...task }) => <OverviewTaskRow key={key} {...task} />)
+              : <OverviewDoneBox title="Hôm nay bạn đã hoàn thành hết việc!" text="Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ." />}
+          </Card>
+
+          <Card style={styles.ovCard}>
+            <View style={styles.ovHeadRow}>
+              <BookOpen size={18} color={colors.brand} />
+              <Text style={styles.ovTitle}>Khóa học của tôi</Text>
+            </View>
+            <CompactCoursePicker items={coursePickerItems} activeName={currentCourse} onChange={setSelectedCourse} showProgress={false} />
+            {coursePickerItems.length <= 1 ? <Text numberOfLines={2} style={styles.ovCourseName}>{currentCourse || 'Chưa có khóa học'}</Text> : null}
+            <ProgressBar value={studentProgress ?? 0} />
+            <Text style={styles.ovCourseMeta}>
+              {[
+                sessionCountsAvailable ? `${completedSessions}/${totalSessions} buổi · ${studentProgress ?? 0}%` : '',
+                sessionCountsAvailable ? `Còn ${Math.max(0, (totalSessions || 0) - (completedSessions || 0))} buổi` : '',
+                (currentEnrollment?.avgGrade ?? user?.avgGrade) != null ? `Điểm TB ${currentEnrollment?.avgGrade ?? user?.avgGrade}/10` : '',
+                currentEnrollment?.teacherName ? `GV: ${currentEnrollment.teacherName}` : '',
+              ].filter(Boolean).join('  ·  ') || 'Tiến độ sẽ cập nhật sau buổi học đầu tiên.'}
+            </Text>
+            <View style={styles.ovButtonRow}>
+              <Pressable onPress={() => tabNavigation.navigate('CourseVideos')} style={styles.ovPrimary} accessibilityRole="button">
+                <Video size={15} color="#FFFFFF" />
+                <Text style={styles.ovPrimaryText}>Vào bài học</Text>
+              </Pressable>
+              <Pressable onPress={() => tabNavigation.navigate('Schedule')} style={styles.ovSecondary} accessibilityRole="button">
+                <Calendar size={15} color={colors.ink} />
+                <Text style={styles.ovSecondaryText}>Lịch học</Text>
+              </Pressable>
+            </View>
+          </Card>
+
           {!user?.previewMode ? <LearningGoalCard /> : null}
           {!user?.previewMode ? <LearningLeaderboardCard /> : null}
-          <CompactCoursePicker items={coursePickerItems} activeName={currentCourse} onChange={setSelectedCourse} />
-          <View style={styles.studentCourseCard}>
-            <View style={styles.studentCourseTop}>
-              <View style={styles.studentCourseStatus}>
-                {firstScheduleIsLive ? <Video size={14} color="#FCA5A5" /> : firstSchedule ? <Zap size={14} color="#FCA5A5" /> : <Calendar size={14} color="#FCA5A5" />}
-                <Text style={styles.studentCourseEyebrow}>
-                  {firstScheduleIsLive ? 'Buổi học đang diễn ra' : firstSchedule ? 'Lớp học sắp diễn ra' : 'Chưa có lịch sắp tới'}
-                </Text>
-              </View>
-            </View>
-            <Text numberOfLines={2} style={styles.studentCourseTitle}>{currentCourse || firstSchedule?.courseName || '—'}</Text>
-            {firstSchedule ? (
-              <View style={styles.studentCourseMetaRow}>
-                <Clock size={16} color="#FDE68A" />
-                <Text style={styles.studentCourseCopy}>{firstSchedule.time} · {firstSchedule.dateLabel}</Text>
-              </View>
-            ) : <Text style={styles.studentCourseCopy}>Lịch học mới sẽ hiển thị tại đây.</Text>}
-            <View style={styles.studentCourseFooter}>
-              <Calendar size={15} color="#CBD5E1" />
-              <Text numberOfLines={1} style={styles.studentCourseTeacher}>GV: {currentEnrollment?.teacherName || user?.teacherName || firstSchedule?.teacherName || firstSchedule?.person || '—'}</Text>
-              {user?.teacherRating ? <Text style={styles.studentRating}>★ {user.teacherRating}</Text> : null}
-            </View>
-            {firstScheduleIsLive ? (
-              <Pressable onPress={() => studentJoinUrl && void openDashboardLink(studentJoinUrl)} style={styles.studentJoinAction} accessibilityRole="button">
-                <Video size={16} color="#B91C1C" />
-                <Text style={styles.studentJoinActionText}>{studentJoinUrl ? 'Vào lớp ngay' : 'Chưa có link học'}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <View style={styles.studentKpiGrid}>
-            {[
-              { label: 'Đã học', value: sessionCountsAvailable ? `${completedSessions} / ${totalSessions}` : '—', sub: 'buổi', icon: BookOpen, iconBackground: '#EF4444', tone: colors.red },
-              { label: 'Còn lại', value: sessionCountsAvailable ? String(Math.max(0, totalSessions - completedSessions)) : '—', sub: 'buổi', icon: Clock, iconBackground: '#1E3A8A', tone: colors.blue },
-              { label: 'Điểm TB', value: (currentEnrollment?.avgGrade ?? user?.avgGrade) == null ? '—' : String(currentEnrollment?.avgGrade ?? user?.avgGrade), sub: '/ 10', icon: Star, iconBackground: '#F97316', tone: '#D97706' },
-              { label: 'Tiến độ', value: studentProgress == null ? '—' : `${studentProgress}%`, sub: 'hoàn thành', icon: TrendingUp, iconBackground: '#34D399', tone: colors.green },
-            ].map(({ label, value, sub, icon: Icon, iconBackground, tone }) => (
-              <Card key={label} style={styles.studentKpi}>
-                <View style={[styles.studentKpiIcon, { backgroundColor: iconBackground }]}><Icon size={21} color="#FFFFFF" strokeWidth={2.5} /></View>
-                <View style={styles.studentKpiContent}>
-                  <Text style={styles.studentKpiLabel}>{label}</Text>
-                  <View style={styles.studentKpiMetric}>
-                    <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.studentKpiValue, { color: tone }]}>{value}</Text>
-                    <Text numberOfLines={1} style={styles.studentKpiUnit}>{sub}</Text>
-                  </View>
-                </View>
-              </Card>
-            ))}
-          </View>
 
-          <View style={styles.sectionWrap}>
-            <Card style={styles.todoPanel}>
-              <View style={styles.todoHeader}>
-                <View style={styles.todoHeaderIcon}><Zap size={20} color="#FFFFFF" fill="#FFFFFF" /></View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>Việc cần làm hôm nay</Text>
-                  <Text style={styles.todoSubtitle}>Các hoạt động đang chờ bạn</Text>
-                </View>
-                {width >= 640 ? <Text style={styles.todoOverviewPill}>Tổng quan</Text> : null}
-              </View>
-              <View style={styles.todoCards}>
-              {[
-              {
-                title: 'Trắc nghiệm buổi học',
-                detail: quizzes.loading ? '—' : pendingQuizCount ? `${pendingQuizCount} bài chưa làm` : 'Không có bài chờ',
-                action: 'Làm ngay',
-                icon: Trophy,
-                route: 'StudentExam' as const,
-                tone: styles.quizTodo,
-                iconTone: styles.quizTodoIcon,
-                color: '#DC2626',
-                badge: pendingQuizCount,
-              },
-              {
-                title: 'Bài tập về nhà',
-                detail: assignments.loading ? '—' : `${pendingAssignments.length} bài cần nộp`,
-                action: pendingAssignments.length ? 'Nộp ngay' : 'Xem ngay',
-                icon: ClipboardList,
-                route: 'Assignments' as const,
-                tone: styles.homeworkTodo,
-                iconTone: styles.homeworkTodoIcon,
-                color: '#EA580C',
-                badge: pendingAssignments.length,
-              },
-              {
-                title: 'Lịch học sắp tới',
-                detail: schedules.loading ? '—' : `${(isTeacher ? upcomingTeacherSchedules : upcomingStudentSchedules).length} buổi sắp tới`,
-                action: 'Xem lịch',
-                icon: Calendar,
-                route: 'Schedule' as const,
-                tone: styles.scheduleTodo,
-                iconTone: styles.scheduleTodoIcon,
-                color: '#2563EB',
-                badge: 0,
-              },
-              {
-                title: 'Tin nhắn & Phản hồi',
-                detail: messages.loading ? '—' : `${unreadMessages ?? '—'} tin nhắn mới`,
-                action: 'Xem ngay',
-                icon: MessageSquare,
-                route: 'Messages' as const,
-                tone: styles.messagesTodo,
-                iconTone: styles.messagesTodoIcon,
-                color: '#7C3AED',
-                badge: unreadMessages ?? 0,
-              },
-            ].map(({ title, detail, action, icon: Icon, route, tone, iconTone, color, badge }) => (
-              <Pressable key={title} onPress={() => {
-                if (route === 'Messages' || route === 'Schedule') tabNavigation.navigate(route);
-                else navigation?.navigate(route);
-              }} accessibilityRole="button" style={[styles.todoCard, tone]}>
-                <View style={[styles.todoCardIcon, iconTone]}>
-                  <Icon size={24} color="#FFFFFF" strokeWidth={2.4} />
-                  {badge > 0 ? <Text style={styles.todoBadge}>{badge > 99 ? '99+' : badge}</Text> : null}
-                </View>
-                <View style={styles.todoCardContent}>
-                  <Text numberOfLines={2} style={styles.todoCardTitle}>{title}</Text>
-                  <Text numberOfLines={1} style={[styles.todoDetail, { color }]}>{detail}</Text>
-                  <View style={styles.todoCta}><Text style={styles.todoCtaText}>{action}</Text><ChevronRight size={14} color={colors.ink} /></View>
-                </View>
-              </Pressable>
-            ))}
-              </View>
-            </Card>
-          </View>
-          <View style={styles.sectionWrap}>
-            <View style={styles.materialPanel}>
-              <View style={styles.materialHeading}>
-                <Download size={16} color="#CBD5E1" />
-                <Text style={styles.materialHeadingText}>Tài liệu</Text>
-              </View>
-              {materials.loading ? <Text style={styles.materialEmpty}>Đang tải tài liệu...</Text> : null}
-              {!materials.loading && !materials.error && dashboardMaterials.length ? dashboardMaterials.slice(0, 3).map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => item.url ? void openDashboardLink(item.url) : navigation?.navigate('Materials')}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Mở tài liệu ${item.title}`}
-                  style={styles.materialRow}
-                >
-                  <Text style={[
-                    styles.materialType,
-                    item.type === 'PDF' ? styles.materialTypePdf : item.type === 'EXCEL' ? styles.materialTypeExcel : styles.materialTypeOther,
-                  ]}>{item.type || 'DOC'}</Text>
-                  <Text numberOfLines={1} style={styles.materialTitle}>{item.title}</Text>
-                  <Download size={16} color="#7DD3FC" />
-                </Pressable>
-              )) : null}
-              {!materials.loading && !materials.error && !dashboardMaterials.length ? (
-                <Text style={styles.materialEmpty}>Chưa có tài liệu.</Text>
-              ) : null}
-              <Pressable onPress={() => navigation?.navigate('Materials')} accessibilityRole="button" style={styles.materialAction}>
-                <Text style={styles.materialActionText}>Xem tất cả</Text><ArrowRight size={15} color="#BAE6FD" />
+          <Card style={styles.ovCard}>
+            <View style={styles.ovHeadRow}>
+              <ClipboardList size={18} color="#059669" />
+              <Text style={[styles.ovTitle, styles.flex]}>Hoạt động gần đây</Text>
+              <Pressable onPress={() => navigation?.navigate('Grades')} accessibilityRole="button">
+                <Text style={styles.ovLink}>Xem tất cả</Text>
               </Pressable>
             </View>
-          </View>
-          <View style={styles.sectionWrap}>
-            <Card style={styles.gradePanel}>
-              <Pressable onPress={() => navigation?.navigate('Grades')} accessibilityRole="button" style={styles.gradeHeading}>
-                <View style={styles.gradeHeadingTitle}>
-                  <View style={styles.gradeHeadingIcon}><ClipboardList size={17} color="#059669" /></View>
-                  <Text numberOfLines={2} style={styles.gradeHeadingText}>Nhật ký học tập &amp; Điểm số</Text>
+            {assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
+              ? <Text style={styles.muted}>Đang tải…</Text>
+              : gradeEntries.length ? gradeEntries.slice(0, 5).map((item) => (
+                <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
+                  <Text style={styles.gradeRowTitle}>{item.note}</Text>
+                  <Text style={styles.gradeRowMeta}>{item.date}{item.grade == null ? '' : `  ·  Điểm: ${item.grade}`}</Text>
                 </View>
-                <Text numberOfLines={1} style={styles.gradeCount}>{assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
-                  ? '—'
-                  : `${gradeEntries.length} lượt ghi nhận`}</Text>
-              </Pressable>
-              {assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
-                ? <Text style={styles.muted}>Đang tải nhật ký...</Text>
-                : (
-                <>
-                  {gradeEntries.length ? gradeEntries.slice(0, 3).map((item) => (
-                    <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
-                    <Text style={styles.gradeRowTitle}>{item.note}</Text>
-                    <Text style={styles.gradeRowMeta}>{item.date}{item.grade == null ? '' : `  ·  Điểm: ${item.grade}`}</Text>
-                    </View>
-                      )) : (
-                        <View style={styles.gradeEmpty}>
-                          <View style={styles.gradeEmptyIcon}><ClipboardList size={20} color="#CBD5E1" /></View>
-                          <Text style={styles.gradeEmptyTitle}>Chưa có dữ liệu điểm số.</Text>
-                          <Text style={styles.gradeEmptyCopy}>Bài nộp, trắc nghiệm và điểm sẽ hiện tại đây.</Text>
-                        </View>
-                      )}
-                </>
-              )}
-            </Card>
-          </View>
+              )) : <Text style={styles.muted}>Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</Text>}
+          </Card>
         </>
       )}
-
-      {isTeacher ? <View style={styles.sectionWrap}>
-        <SectionHeading title="Truy cập nhanh" />
-        <View style={styles.quickGrid}>
-          {quickActions.map(({ title, icon: Icon, route, tint, tone }) => (
-            <Pressable
-              key={title}
-              onPress={() => {
-                const routeName = route as string;
-                switch (routeName) {
-                  case 'Assignments':
-                    navigation?.navigate('Assignments');
-                    break;
-                  case 'Materials':
-                    navigation?.navigate('Materials');
-                    break;
-                  case 'TeacherTraining':
-                    navigation?.navigate('TeacherTraining');
-                    break;
-                  case 'TeacherFinance':
-                    navigation?.navigate('TeacherFinance');
-                    break;
-                  case 'Feed':
-                    navigation?.navigate('Feed');
-                    break;
-                  case 'StudentLearning':
-                    navigation?.navigate('StudentLearning');
-                    break;
-                  case 'Evaluations':
-                    navigation?.navigate('Evaluations');
-                    break;
-                  case 'Schedule':
-                    tabNavigation.navigate('Schedule');
-                    break;
-                  case 'NotificationCenter':
-                    navigation?.navigate('NotificationCenter');
-                    break;
-                  default:
-                    break;
-                }
-              }}
-              style={[styles.quickAction, width < 360 && styles.quickActionSmall]}
-              accessibilityRole="button"
-              accessibilityLabel={title}
-            >
-              <View style={[styles.quickIcon, { backgroundColor: tint, borderColor: `${tone}25` }]}><Icon size={23} color={tone} strokeWidth={2.5} /></View>
-              <Text style={styles.quickTitle}>{title}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View> : null}
-
-      {user && !user.previewMode ? <Pressable
-        onPress={() => tabNavigation.navigate('Support')}
-        style={styles.helpCard}
-        accessibilityRole="button"
-        accessibilityLabel="Mở lựa chọn hỗ trợ"
-      >
-        <View style={styles.helpRobotStage} pointerEvents="none">
-          <View style={styles.helpRobotHalo} />
-          <Animated.View style={[styles.helpRobot, { transform: [{ translateY: supportBotMotion.interpolate({ inputRange: [0, 1], outputRange: [2, -4] }) }] }]}>
-            <Bot size={28} color="#E6FFFB" strokeWidth={1.9} />
-          </Animated.View>
-          <Sparkles size={14} color="#FDE68A" style={styles.helpRobotSparkle} />
-          <View style={styles.helpRobotStatus}><View style={styles.helpRobotStatusDot} /><Text style={styles.helpRobotStatusText}>AI</Text></View>
-        </View>
-        <View style={styles.flex}>
-          <View style={styles.helpTitleRow}>
-            <Text style={styles.helpTitle}>Hỗ trợ Thắng Tin Học</Text>
-            <View style={styles.helpOnline}><View style={styles.helpOnlineDot} /><Text style={styles.helpOnlineText}>SẴN SÀNG</Text></View>
-          </View>
-          <Text style={styles.helpText}>Chọn Trợ lý AI hoặc nhân viên hỗ trợ</Text>
-        </View>
-        <View style={styles.helpArrow}><ArrowRight size={17} color="#FFFFFF" /></View>
-      </Pressable> : null}
     </AppScreen>
+  );
+}
+
+type OverviewTask = {
+  key: string;
+  icon: LucideIcon;
+  tone: string;
+  title: string;
+  sub?: string;
+  cta: string;
+  onPress: () => void;
+};
+
+/** Một dòng "việc cần làm" — bấm là tới đúng việc (mở bài tập, điểm danh ca…). */
+function OverviewTaskRow({ icon: Icon, tone, title, sub, cta, onPress }: Omit<OverviewTask, 'key'>) {
+  return (
+    <Pressable onPress={onPress} style={styles.ovTask} accessibilityRole="button" accessibilityLabel={`${title}. ${cta}`}>
+      <View style={[styles.ovTaskIcon, { backgroundColor: tone }]}><Icon size={19} color="#FFFFFF" /></View>
+      <View style={styles.flex}>
+        <Text numberOfLines={1} style={styles.cardTitle}>{title}</Text>
+        {sub ? <Text numberOfLines={1} style={styles.muted}>{sub}</Text> : null}
+      </View>
+      <View style={styles.ovTaskCta}>
+        <Text style={styles.ovTaskCtaText}>{cta}</Text>
+        <ChevronRight size={14} color={colors.brand} />
+      </View>
+    </Pressable>
+  );
+}
+
+function OverviewDoneBox({ title, text }: { title: string; text: string }) {
+  return (
+    <View style={styles.ovDone}>
+      <CheckCircle size={26} color="#10B981" />
+      <Text style={styles.ovDoneTitle}>{title}</Text>
+      <Text style={styles.ovDoneText}>{text}</Text>
+    </View>
   );
 }
 
@@ -835,6 +572,49 @@ function formatCurrency(value: number) {
 }
 
 const styles = StyleSheet.create({
+  ovCard: { gap: spacing.sm },
+  ovHeadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  ovTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
+  ovLink: { color: colors.brand, fontSize: 12, fontWeight: '900' },
+  ovTask: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 10,
+    borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+  },
+  ovTaskIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  ovTaskCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  ovTaskCtaText: { color: colors.brand, fontSize: 12, fontWeight: '900' },
+  ovDone: { alignItems: 'center', gap: 4, paddingVertical: spacing.lg, borderRadius: 14, backgroundColor: '#ECFDF5' },
+  ovDoneTitle: { color: '#047857', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  ovDoneText: { color: '#059669', fontSize: 12, textAlign: 'center', paddingHorizontal: spacing.md },
+  ovSessionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 10, borderRadius: 14,
+    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+  },
+  ovSessionLive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  ovSessionLiveText: { color: '#FFFFFF' },
+  ovSessionTime: { width: 48, color: colors.brand, fontSize: 13, fontWeight: '900' },
+  ovSessionBadge: { fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
+  ovStatRow: { flexDirection: 'row', gap: spacing.sm },
+  ovStat: {
+    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, padding: spacing.sm,
+    borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+  },
+  ovStatIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  ovStatValue: { color: colors.ink, fontSize: 15, fontWeight: '900' },
+  ovStatLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  ovCourseName: { color: colors.ink, fontSize: 16, fontWeight: '900' },
+  ovCourseMeta: { color: colors.muted, fontSize: 12, fontWeight: '700', lineHeight: 18 },
+  ovButtonRow: { flexDirection: 'row', gap: spacing.sm },
+  ovPrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: colors.brand,
+  },
+  ovPrimaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  ovSecondary: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
+    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+  },
+  ovSecondaryText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   screen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.lg, backgroundColor: '#F5F8FC' },
   studentScreen: { paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md, backgroundColor: '#F5F8FC' },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: '#DFEAF2', backgroundColor: '#F0F6FA' },
@@ -843,11 +623,6 @@ const styles = StyleSheet.create({
   greetingMeta: { color: colors.brand, fontSize: typography.micro, fontWeight: '800', letterSpacing: 1.1 },
   greetingTitle: { color: '#17314C', fontSize: typography.title, fontWeight: '800', letterSpacing: -0.5 },
   greetingSub: { color: '#63778B', fontSize: typography.small, lineHeight: 19 },
-  bannerWrap: { position: 'relative', borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas },
-  dashboardBanner: { width: '100%', aspectRatio: 5, minHeight: 72, maxHeight: 150 },
-  bannerDots: { position: 'absolute', bottom: spacing.sm, alignSelf: 'center', flexDirection: 'row', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: 'rgba(15, 23, 42, 0.3)' },
-  bannerDot: { width: 7, height: 7, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.55)' },
-  bannerDotActive: { width: 16, backgroundColor: '#FFFFFF' },
   inlineError: { color: colors.red, fontSize: typography.caption, fontWeight: '600' },
   heroCard: { backgroundColor: colors.brandDark, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.md, overflow: 'hidden' },
   heroCompact: { padding: spacing.lg },

@@ -18,10 +18,12 @@ export function CompactCoursePicker({
   items,
   activeName,
   onChange,
+  showProgress = true,
 }: {
   items: CoursePickerItem[];
   activeName: string;
   onChange: (name: string) => void;
+  showProgress?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const active = items.find((item) => item.name === activeName) || items[0];
@@ -39,10 +41,12 @@ export function CompactCoursePicker({
         <View style={styles.flex}>
           <Text style={styles.caption}>{`Khóa học đang xem · ${items.length} khóa`}</Text>
           <Text numberOfLines={1} style={styles.barName}>{active.name}</Text>
-          <View style={styles.barProgressRow}>
-            <View style={styles.track}><View style={[styles.fill, { width: `${active.pct}%` }]} /></View>
-            <Text style={styles.progressText}>{`${active.done}/${active.total} · ${active.pct}%`}</Text>
-          </View>
+          {showProgress ? (
+            <View style={styles.barProgressRow}>
+              <View style={styles.track}><View style={[styles.fill, { width: `${active.pct}%` }]} /></View>
+              <Text style={styles.progressText}>{`${active.done}/${active.total} · ${active.pct}%`}</Text>
+            </View>
+          ) : null}
         </View>
         <ChevronDown size={18} color="#94A3B8" />
       </Pressable>

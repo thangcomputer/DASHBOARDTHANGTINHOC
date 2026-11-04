@@ -1604,11 +1604,11 @@ export function CenterInfoScreen() {
   const centerSections = (center?.sections || [
     { title: 'Nhân sự', items: [] }, { title: 'Chi nhánh', items: [] }, { title: 'Mạng xã hội', items: [] },
     { title: 'Dịch vụ đào tạo', items: [] }, { title: 'Địa điểm thi', items: [] }, { title: 'Chứng chỉ', items: [] },
-  ]).filter((item: { title: string }) => item.title !== 'Tổng quan');
-  const [section, setSection] = useState('Tổng quan');
+  ]).filter((item: { title: string }) => item.title !== 'Tổng quan' && item.title !== 'Giới thiệu');
+  const [section, setSection] = useState('Giới thiệu');
   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
   const { width } = useWindowDimensions();
-  const sectionOptions = [{ title: 'Tổng quan' }, ...centerSections];
+  const sectionOptions = [{ title: 'Giới thiệu' }, ...centerSections];
   const selectedSection = centerSections.find((item) => item.title === section);
   const renderCenterItems = () => selectedSection?.items.length ? (
     <>
@@ -1703,7 +1703,7 @@ export function CenterInfoScreen() {
             </View>
             {center.intro ? <Text style={styles.body}>{center.intro}</Text> : null}
           </View>
-          {section === 'Tổng quan' ? (
+          {section === 'Giới thiệu' ? (
             <>
               {[
                 ['Sứ mệnh', center.mission],

@@ -48,13 +48,20 @@ export type AppStackParamList = {
   CertPrepLevel: { levelId: string; courseName: string };
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
+  DailyPractice: { topicId?: string } | undefined;
 };
 
 export type MainTabsParamList = {
   Home: undefined;
   Schedule: { focusScheduleId?: string } | undefined;
   Messages: undefined;
-  CourseVideos: undefined;
+  CourseVideos: {
+    resumeKey?: number;
+    resumeSubjectId?: string;
+    resumeCourseId?: string;
+    resumeUnitId?: string;
+    resumeSectionId?: string;
+  } | undefined;
   Feed: { postId?: string; commentId?: string; parentCommentId?: string } | undefined;
   Support: undefined;
   Notifications: undefined;

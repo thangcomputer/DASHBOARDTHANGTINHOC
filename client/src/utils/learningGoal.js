@@ -43,6 +43,15 @@ export function openLearningGoal() {
   window.dispatchEvent(new CustomEvent(OPEN_LEARNING_GOAL_EVENT));
 }
 
+/** Link mở đúng môn → buổi → mục (video) từ một điểm học tiếp / video liên quan. */
+export function lessonResumeUrl(point) {
+  const params = new URLSearchParams();
+  if (point.courseId) params.set('courseId', point.courseId);
+  params.set('unitId', point.unitId);
+  if (point.sectionId) params.set('section', point.sectionId);
+  return `/student/lesson-practice/subjects/${encodeURIComponent(point.subjectId)}?${params.toString()}`;
+}
+
 export function periodLabel(period) {
   return LEARNING_GOAL_PERIODS.find((p) => p.id === period)?.label || '';
 }
@@ -72,6 +81,6 @@ export function isStudyMediaPlaying() {
 
 /** Trang được tính là "đang học". */
 export function isStudyLocation(pathname = '', hash = '') {
-  if (/^\/student\/(lesson-practice|cert-prep|exam)(\/|$)/.test(pathname)) return true;
+  if (/^\/student\/(lesson-practice|daily-practice|cert-prep|exam)(\/|$)/.test(pathname)) return true;
   return pathname === '/student' && /^#materials-(files|software|videos)/.test(hash);
 }

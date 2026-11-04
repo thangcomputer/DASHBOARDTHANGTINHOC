@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Crown, Target, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../services/api';
-import { LEARNING_GOAL_CHANGED_EVENT, formatStudyMinutes, openLearningGoal } from '../../utils/learningGoal';
+import { LEARNING_GOAL_CHANGED_EVENT, formatStudyMinutes } from '../../utils/learningGoal';
 
 const MEDALS = {
   1: 'from-amber-300 to-amber-500 text-amber-950 shadow-[0_4px_10px_rgba(245,158,11,0.35),inset_0_1px_2px_rgba(255,255,255,0.6)]',
@@ -78,7 +78,7 @@ export default function LearningLeaderboardCard() {
   const meInTop = top.some((row) => row.isMe);
 
   return (
-    <section className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-amber-400 to-amber-600 text-white shadow-[0_6px_14px_rgba(217,119,6,0.3),inset_0_2px_3px_rgba(255,255,255,0.4)]">
@@ -119,7 +119,10 @@ export default function LearningLeaderboardCard() {
               <p className="flex items-center justify-end gap-1 text-xs font-black text-emerald-600">
                 <CheckCircle2 size={12} aria-hidden="true" /> {row.goalDays}/{data.daysSoFar} ngày
               </p>
-              <p className="text-[11px] font-semibold text-slate-500">{formatStudyMinutes(row.minutes)}</p>
+              <p className="text-[11px] font-semibold text-slate-500">
+                {formatStudyMinutes(row.minutes)}
+                {row.xp > 0 && <span className="ml-1 font-black text-amber-600">· {row.xp} XP</span>}
+              </p>
             </div>
           </li>
         ))}
@@ -128,12 +131,7 @@ export default function LearningLeaderboardCard() {
       {data && (
         <div className="mt-3 border-t border-slate-100 pt-3">
           {!me?.hasGoal ? (
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-slate-500">Đặt mục tiêu học để có tên trên bảng xếp hạng.</p>
-              <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-primary shrink-0 !px-3 !py-1.5 text-xs">
-                <Target size={14} /> Đặt mục tiêu
-              </button>
-            </div>
+            <p className="text-xs text-slate-500">Đặt mục tiêu ở thẻ Mục tiêu học để có tên trên bảng xếp hạng.</p>
           ) : !me.rank ? (
             <p className="text-xs text-slate-500">Tuần này bạn chưa học phút nào — vào bài học ngay để lên bảng!</p>
           ) : (
@@ -142,6 +140,7 @@ export default function LearningLeaderboardCard() {
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-slate-800">
                   Bạn đang hạng {me.rank}/{data.participants} · {me.goalDays} ngày đạt · {formatStudyMinutes(me.minutes)}
+                  {me.xp > 0 && ` · ${me.xp} XP`}
                 </p>
                 <p className="text-[11px] text-slate-500">{gapMessage(me)}</p>
               </div>

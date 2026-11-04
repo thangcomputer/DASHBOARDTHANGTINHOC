@@ -58,6 +58,11 @@ const lessonPracticeApi = {
     })),
     studyHeartbeat: async () => parse(await apiFetch('/lesson-practice/my/study-heartbeat', { method: 'POST', body: '{}' })),
     learningLeaderboard: async () => parse(await apiFetch('/lesson-practice/my/learning-leaderboard')),
+    resumePoint: async () => parse(await apiFetch('/lesson-practice/my/resume-point')),
+    saveResumePoint: async ({ unitId, sectionId, courseId }) => parse(await apiFetch('/lesson-practice/my/resume-point', {
+      method: 'PUT',
+      body: JSON.stringify({ unitId, sectionId, courseId }),
+    })),
   },
   upload: async (file) => {
     const fd = new FormData();

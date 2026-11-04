@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarCheck, CalendarDays, Check, Clock3, Flame, Loader2, Sparkles, Sprout, Target, Trophy, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CalendarCheck, CalendarDays, Check, Clock3, Flame, Loader2, PlayCircle, Sparkles, Sprout, Target, Trophy, X } from 'lucide-react';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { useToast } from '../../utils/useToast';
 import {
@@ -10,6 +11,7 @@ import {
   LEARNING_GOAL_PERIODS,
   goalEndDateLabel,
   goalMotivation,
+  lessonResumeUrl,
 } from '../../utils/learningGoal';
 
 const PERIOD_ICONS = { week: Sprout, month: Flame, quarter: Trophy };
@@ -30,10 +32,13 @@ const CELEBRATE_MS = 3000;
 /** Popup giữa màn hình: HV chọn 1 tuần / 1 tháng / 3 tháng và 1–5 giờ mỗi ngày. */
 export default function LearningGoalModal({ open, currentGoal, onClose, onSaved }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const [period, setPeriod] = useState('month');
   const [hours, setHours] = useState(2);
   const [saving, setSaving] = useState(false);
   const [celebrate, setCelebrate] = useState(null);
+  /** undefined = đang tải; null = chưa có bài học dở. */
+  const [resume, setResume] = useState(undefined);
   const currentGoalRef = useRef(currentGoal);
   const onSavedRef = useRef(onSaved);
   currentGoalRef.current = currentGoal;
@@ -44,15 +49,32 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
     if (!open) return;
     const goal = currentGoalRef.current;
     setCelebrate(null);
+    setResume(undefined);
     setPeriod(goal?.period && !goal.expired ? goal.period : 'month');
     setHours(goal?.hoursPerDay && !goal.expired ? goal.hoursPerDay : 2);
   }, [open]);
 
   useEffect(() => {
     if (!celebrate) return undefined;
+    let alive = true;
+    lessonPracticeApi.student.resumePoint()
+      .then((res) => { if (alive) setResume(res?.data?.unitId ? res.data : null); })
+      .catch(() => { if (alive) setResume(null); });
+    return () => { alive = false; };
+  }, [celebrate]);
+
+  // Có bài học dở thì giữ popup để HV bấm học tiếp; không có thì tự đóng sau vài giây.
+  useEffect(() => {
+    if (!celebrate || resume !== null) return undefined;
     const timer = setTimeout(() => onSavedRef.current?.(celebrate.data), CELEBRATE_MS);
     return () => clearTimeout(timer);
-  }, [celebrate]);
+  }, [celebrate, resume]);
+
+  const continueLearning = () => {
+    if (!resume) return;
+    onSaved?.(celebrate?.data);
+    navigate(lessonResumeUrl(resume));
+  };
 
   if (!open) return null;
 
@@ -134,9 +156,31 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
               <CalendarCheck size={15} className="text-emerald-600" aria-hidden="true" />
               Hoàn thành dự kiến <strong className="text-slate-900">{celebrate.endDate}</strong>
             </p>
-            <button type="button" onClick={() => onSaved?.(celebrate.data)} className="cms-btn cms-btn-primary mt-5 w-full">
-              Tuyệt vời!
-            </button>
+            {resume ? (
+              <>
+                <div className="cms-goal-pop mt-5 flex w-full items-center gap-3 rounded-2xl border border-red-100 bg-red-50/70 p-3 text-left">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white">
+                    <PlayCircle size={24} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] font-bold text-red-600">Đang học dở · {resume.subjectName}</span>
+                    <span className="block truncate text-sm font-black text-slate-900">{resume.unitTitle}</span>
+                    {resume.itemTitle && <span className="block truncate text-xs text-slate-500">{resume.itemTitle}</span>}
+                  </span>
+                </div>
+                <button type="button" onClick={continueLearning} className="cms-btn cms-btn-primary mt-3 w-full">
+                  <PlayCircle size={18} aria-hidden="true" />
+                  {resume.kind === 'video' ? 'Tiếp tục xem video' : 'Tiếp tục bài học'}
+                </button>
+                <button type="button" onClick={() => onSaved?.(celebrate.data)} className="mt-2 w-full py-1.5 text-sm font-bold text-slate-500 hover:text-slate-800">
+                  Để sau
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => onSaved?.(celebrate.data)} className="cms-btn cms-btn-primary mt-5 w-full" disabled={resume === undefined}>
+                {resume === undefined ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : 'Tuyệt vời!'}
+              </button>
+            )}
           </div>
         ) : (
           <>

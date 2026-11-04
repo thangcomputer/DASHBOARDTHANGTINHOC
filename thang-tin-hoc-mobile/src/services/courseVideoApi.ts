@@ -162,6 +162,29 @@ export async function openCourseVideoUnit(unitId: string) {
   return { ...payload.data.unit, items: payload.data.items || [] };
 }
 
+export type StudyResumePoint = {
+  subjectId: string;
+  subjectName: string;
+  courseId: string;
+  unitId: string;
+  unitTitle: string;
+  sectionId: string;
+  kind: 'video' | 'note' | 'practice' | '';
+  itemTitle: string;
+};
+
+export async function getStudyResumePoint() {
+  const payload = await mobileApiRequest<{ data?: StudyResumePoint | null }>('/lesson-practice/my/resume-point');
+  return payload.data?.unitId ? payload.data : null;
+}
+
+export async function saveStudyResumePoint(point: { unitId: string; sectionId: string; courseId: string }) {
+  await mobileApiRequest('/lesson-practice/my/resume-point', {
+    method: 'PUT',
+    body: JSON.stringify(point),
+  });
+}
+
 export async function markCourseUnitSection(unitId: string, section: 'video' | 'note', itemId: string) {
   await mobileApiRequest(`/lesson-practice/my/units/${encodeURIComponent(unitId)}/sections/${section}`, {
     method: 'POST',

@@ -4,7 +4,7 @@ import {
   Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
   GraduationCap, Users, DollarSign, ClipboardList, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound,
+  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2,
 } from 'lucide-react';
 import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -34,7 +34,8 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
-      { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+      { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', requiresLearningAccess: true },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
       { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
@@ -58,7 +59,7 @@ const MENU_CONFIG = {
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', mobileLabel: 'Tin nhắn', path: '/teacher/inbox' },
       { key: 'students', icon: Users, label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
       { key: 'schedule', icon: Calendar, label: 'Lịch dạy', sidebarLabel: 'Lịch dạy & điểm danh', mobileLabel: 'Lịch', path: '/teacher', hash: 'schedule' },
-      { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', sidebarLabel: 'Bài tập & kiểm tra', sectionLabel: 'QUẢN LÝ ĐÀO TẠO', path: '/teacher', hash: 'assignments' },
+      { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', sidebarLabel: 'Bài tập & kiểm tra', sectionLabel: 'QUẢN LÝ ĐÀO TẠO', path: '/teacher', hash: 'assignments', altHashes: ['quizzes', 'test'] },
       { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
       { key: 'finance', icon: DollarSign, label: 'Tài chính', mobileLabel: 'Tài chính', path: '/teacher/finance' },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', mobileLabel: 'Bảng tin', sectionLabel: 'THÔNG TIN', path: '/teacher/feed' },
@@ -101,7 +102,8 @@ const MENU_CONFIG = {
               { key: 'students', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
               { key: 'student-training', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'student-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'cert-prep', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
             ],
           },
@@ -215,9 +217,9 @@ const AppSidebar = ({
   ));
   const [menuPinned, setMenuPinned] = useState(() => {
     try {
-      return localStorage.getItem(PINNED_MENU_KEY) === '1';
+      return localStorage.getItem(PINNED_MENU_KEY) !== '0';
     } catch {
-      return false;
+      return true;
     }
   });
   const pinnedSidebarVisible = isLaptopOrLarger && menuPinned;
@@ -636,7 +638,7 @@ const AppSidebar = ({
       role === 'teacher'
       && item.key === 'dashboard'
       && location.pathname === '/teacher'
-      && ['training', 'assignments', 'quizzes', 'test', 'students', 'software-links'].includes(currentHash)
+      && currentHash === 'software-links'
     ) return true;
     // Base dashboard (Tổng quan) — chỉ active đúng path gốc, không active trên /student/feed, /teacher/finance…
     const basePaths = ['/student', '/teacher', '/admin'];
@@ -948,10 +950,10 @@ const AppSidebar = ({
       {/* ── Responsive navigation drawer ── */}
       {pinnedSidebarVisible ? (
         <>
-          <aside className="cms-sidebar-glass hidden lg:flex fixed left-0 top-0 z-30 h-[100dvh] max-h-[100dvh] w-[240px] overflow-hidden">
+          <aside className="cms-sidebar-glass hidden lg:flex fixed left-0 top-0 z-30 h-[100dvh] max-h-[100dvh] w-[264px] overflow-hidden">
             {renderSidebarContent()}
           </aside>
-          <div className="hidden lg:block w-[240px] shrink-0" aria-hidden="true" />
+          <div className="hidden lg:block w-[264px] shrink-0" aria-hidden="true" />
         </>
       ) : (
         <div

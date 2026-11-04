@@ -5,6 +5,7 @@ import { typography } from '../theme/tokens';
 import { getMobileApiBaseUrl } from '../services/apiClient';
 import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
+import { isDirectVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
 import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
 
 type PlayerMessage =
@@ -32,9 +33,9 @@ function createPlayerHtml({
   done: boolean;
   origin: string;
 }) {
-  const isDirectVideo = /\.(mp4|webm|ogg)(?:$|[?#])/i.test(videoUrl);
-  const youtubeId = videoUrl.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/)?.[1] || '';
-  const vimeoId = videoUrl.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1] || '';
+  const isDirectVideo = isDirectVideoUrl(videoUrl);
+  const youtubeId = youtubeIdFromUrl(videoUrl);
+  const vimeoId = vimeoIdFromUrl(videoUrl);
   const guardFactory = createVideoWatchGuard.toString();
   const encoded = {
     videoUrl: escapedScriptValue(videoUrl),

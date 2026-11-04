@@ -240,6 +240,60 @@ export const playLessonWrongSound = () => {
   });
 };
 
+/** Chuỗi nốt ngắn cho hiệu ứng trò chơi luyện tập hằng ngày. */
+function playNotes(notes, { type = 'sine', volume = 0.18 } = {}) {
+  unlockAudio();
+  const ctx = lessonAudio();
+  if (!ctx) return;
+  const start = ctx.currentTime;
+  notes.forEach(({ freq, at = 0, dur = 0.14, slideTo }) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const t = start + at;
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(volume, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  });
+}
+
+export const gameSounds = {
+  tap: () => playNotes([{ freq: 660, dur: 0.05 }], { type: 'triangle', volume: 0.08 }),
+  pick: () => playNotes([{ freq: 520, dur: 0.06, slideTo: 760 }], { type: 'triangle', volume: 0.1 }),
+  drop: () => playNotes([{ freq: 760, dur: 0.07, slideTo: 440 }], { type: 'triangle', volume: 0.1 }),
+  correct: () => playNotes([
+    { freq: 659, at: 0, dur: 0.12 },
+    { freq: 880, at: 0.09, dur: 0.12 },
+    { freq: 1319, at: 0.18, dur: 0.22 },
+  ], { type: 'triangle', volume: 0.16 }),
+  wrong: () => playNotes([
+    { freq: 330, at: 0, dur: 0.2, slideTo: 247 },
+    { freq: 247, at: 0.18, dur: 0.32, slideTo: 165 },
+  ], { type: 'sawtooth', volume: 0.07 }),
+  hint: () => playNotes([
+    { freq: 988, at: 0, dur: 0.1 },
+    { freq: 1319, at: 0.07, dur: 0.16 },
+  ], { type: 'sine', volume: 0.12 }),
+  win: () => playNotes([
+    { freq: 523, at: 0, dur: 0.14 },
+    { freq: 659, at: 0.12, dur: 0.14 },
+    { freq: 784, at: 0.24, dur: 0.14 },
+    { freq: 1047, at: 0.36, dur: 0.34 },
+    { freq: 1319, at: 0.5, dur: 0.4 },
+  ], { type: 'triangle', volume: 0.16 }),
+  sad: () => playNotes([
+    { freq: 392, at: 0, dur: 0.28 },
+    { freq: 349, at: 0.26, dur: 0.28 },
+    { freq: 311, at: 0.52, dur: 0.5, slideTo: 262 },
+  ], { type: 'sine', volume: 0.14 }),
+};
+
 export const stopExamWarningSound = () => {
   warningPlaybackToken += 1;
   if (currentWarningAudio) {

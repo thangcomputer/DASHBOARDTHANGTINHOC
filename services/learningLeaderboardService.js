@@ -66,6 +66,13 @@ async function weekGoals(week, filter = {}) {
     .lean();
 }
 
+/** XP luyện tập hằng ngày trong tuần — hiển thị kèm, không dùng để xếp hạng. */
+async function weekXp(week, studentIds) {
+  if (!studentIds.length) return new Map();
+  const dailyPracticeService = require('./dailyPracticeService');
+  return dailyPracticeService.xpByStudent(week.start, week.end, studentIds);
+}
+
 async function weekLogs(week, filter = {}) {
   return StudyTimeLog.find({ ...filter, day: { $gte: week.startKey, $lte: week.endKey }, minutes: { $gt: 0 } })
     .select('studentId day minutes')
@@ -85,11 +92,19 @@ async function rankedRows(week, now = Date.now()) {
   const rows = goals
     .map((goal) => scoreRow(goal, logsByStudent.get(String(goal.studentId)) || []))
     .filter((row) => row.minutes > 0);
-  const students = await Student.find({ _id: { $in: rows.map((row) => row.studentId) } }).select('name avatar').lean();
+  const [students, xpMap] = await Promise.all([
+    Student.find({ _id: { $in: rows.map((row) => row.studentId) } }).select('name avatar').lean(),
+    weekXp(week, rows.map((row) => row.studentId)),
+  ]);
   const byId = new Map(students.map((s) => [String(s._id), s]));
   const ranked = rows
     .filter((row) => byId.has(row.studentId))
-    .map((row) => ({ ...row, name: shortName(byId.get(row.studentId).name), avatar: byId.get(row.studentId).avatar || '' }))
+    .map((row) => ({
+      ...row,
+      xp: xpMap.get(row.studentId) || 0,
+      name: shortName(byId.get(row.studentId).name),
+      avatar: byId.get(row.studentId).avatar || '',
+    }))
     .sort(compareRows);
   cache = { key: week.startKey, at: now, rows: ranked };
   return ranked;
@@ -110,10 +125,11 @@ async function getWeeklyLeaderboard(studentId, now = new Date()) {
   const myId = String(studentId);
 
   const [myGoal] = await weekGoals(week, { studentId });
-  let me = { hasGoal: Boolean(myGoal), rank: null, goalDays: 0, minutes: 0, hoursPerDay: myGoal?.hoursPerDay || 0, ahead: null };
+  const myXp = (await weekXp(week, [myId])).get(myId) || 0;
+  let me = { hasGoal: Boolean(myGoal), rank: null, goalDays: 0, minutes: 0, xp: myXp, hoursPerDay: myGoal?.hoursPerDay || 0, ahead: null };
   let others = rows.filter((row) => row.studentId !== myId);
   if (myGoal) {
-    const mine = scoreRow(myGoal, await weekLogs(week, { studentId }));
+    const mine = { ...scoreRow(myGoal, await weekLogs(week, { studentId })), xp: myXp };
     me = { ...me, goalDays: mine.goalDays, minutes: mine.minutes };
     if (mine.minutes > 0) {
       me.rank = rankOf(mine, others);
@@ -134,6 +150,7 @@ async function getWeeklyLeaderboard(studentId, now = new Date()) {
     avatar: row.avatar,
     goalDays: row.goalDays,
     minutes: row.minutes,
+    xp: row.xp || 0,
     hoursPerDay: row.hoursPerDay,
     isMe: row.studentId === myId,
   }));

@@ -293,7 +293,7 @@ const AdminProgressPanel = ({ courseId }) => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, hideTabBar = true }) => {
+const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, hideTabBar = true, focusAssignmentId = '' }) => {
   const toast = useToast();
   const trainingData = trainingDataProp || { videos: [], guides: [], files: [] };
   const [courses, setCourses] = useState([]);
@@ -335,6 +335,16 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const [courseFilterPrice, setCourseFilterPrice] = useState('all'); // all | paid | free
   const [courseFilterSubject, setCourseFilterSubject] = useState('all');
   const [catalogInfoTab, setCatalogInfoTab] = useState('content'); // content | desc | info
+
+  // Mở thẳng một bài tập từ trang Tổng quan (#materials-assignments?assignmentId=…).
+  useEffect(() => {
+    if (!focusAssignmentId || mainTab !== 'assignments') return undefined;
+    setExpandedAssignKey(focusAssignmentId);
+    const timer = setTimeout(() => {
+      document.getElementById(`lms-assignment-${focusAssignmentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [focusAssignmentId, mainTab, trainingData?.assignments?.length]);
 
   useEffect(() => {
     const allowed = ['courses', 'files', 'software', 'assignments', 'exams'];
@@ -1541,7 +1551,15 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   : (isTeacherAssign ? 'Giáo viên' : (a.assignedByName ? String(a.assignedByName) : 'Giáo viên'));
                 const teacherName = String(a.assignedByName || '').trim();
                 return (
-                  <div key={aKey} className="cms-glass-card min-w-0 h-full p-3 sm:p-4 rounded-2xl border border-slate-100 transition-all flex gap-3 items-start bg-slate-50/40">
+                  <div
+                    key={aKey}
+                    id={`lms-assignment-${aKey}`}
+                    className={`cms-glass-card min-w-0 h-full p-3 sm:p-4 rounded-2xl border transition-all flex gap-3 items-start ${
+                      focusAssignmentId && String(aKey) === String(focusAssignmentId)
+                        ? 'border-orange-300 bg-orange-50/60 ring-2 ring-orange-200'
+                        : 'border-slate-100 bg-slate-50/40'
+                    }`}
+                  >
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
                       <FileUp size={20} />
                     </div>

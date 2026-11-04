@@ -7,6 +7,7 @@ const LessonUnit = require('../models/LessonUnit');
 const LessonItem = require('../models/LessonItem');
 const LessonUnitProgress = require('../models/LessonUnitProgress');
 const LessonAnswer = require('../models/LessonAnswer');
+const StudyResumePoint = require('../models/StudyResumePoint');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const { isCourseDiscountActive, effectiveCoursePrice } = require('../utils/coursePricing');
@@ -1221,6 +1222,163 @@ async function importBackup(payload, courseId = '') {
   return result;
 }
 
+// ── Vị trí học dở (Học tiếp) ────────────────────────────────────────────────
+const RESUME_KINDS = new Set(['video', 'note', 'practice']);
+
+function parseSectionId(sectionId) {
+  const raw = String(sectionId || '').slice(0, 200);
+  const at = raw.indexOf(':');
+  if (at <= 0) return null;
+  const kind = raw.slice(0, at);
+  const itemId = raw.slice(at + 1);
+  return RESUME_KINDS.has(kind) && itemId ? { kind, itemId } : null;
+}
+
+/** Mục nên mở khi học tiếp: mục đã lưu (nếu còn tồn tại) → video chưa xem đầu tiên → video/nội dung đầu tiên. */
+function resumeSection(unit, row, sectionId) {
+  const videos = rules.unitVideos(unit);
+  const contents = rules.unitContents(unit);
+  const asVideo = (video) => ({
+    sectionId: `video:${video.id}`,
+    kind: 'video',
+    itemTitle: video.title || `Video ${videos.indexOf(video) + 1}`,
+  });
+  const asNote = (content) => ({
+    sectionId: `note:${content.id}`,
+    kind: 'note',
+    itemTitle: content.title || `Nội dung ${contents.indexOf(content) + 1}`,
+  });
+  const parsed = parseSectionId(sectionId);
+  if (parsed?.kind === 'video') {
+    const video = videos.find((item) => String(item.id) === parsed.itemId);
+    if (video) return asVideo(video);
+  } else if (parsed?.kind === 'note') {
+    const content = contents.find((item) => String(item.id) === parsed.itemId);
+    if (content) return asNote(content);
+  } else if (parsed?.kind === 'practice') {
+    return { sectionId: `practice:${parsed.itemId}`, kind: 'practice', itemTitle: 'Luyện tập bài học' };
+  }
+  const watched = new Set((row?.completedVideoIds || []).map(String));
+  const video = videos.find((item) => !watched.has(String(item.id))) || videos[0];
+  if (video) return asVideo(video);
+  if (contents[0]) return asNote(contents[0]);
+  return { sectionId: '', kind: '', itemTitle: '' };
+}
+
+async function saveResumePoint(studentId, { unitId, sectionId = '', courseId = '' } = {}) {
+  const { unit } = await loadStudentUnit(studentId, unitId);
+  const parsed = parseSectionId(sectionId);
+  await StudyResumePoint.updateOne(
+    { studentId },
+    {
+      $set: {
+        subjectId: unit.subjectId,
+        unitId: unit._id,
+        courseId: String(courseId || '').slice(0, 64),
+        sectionId: parsed ? `${parsed.kind}:${parsed.itemId}` : '',
+      },
+    },
+    { upsert: true },
+  );
+  return { saved: true };
+}
+
+async function resolveResumeUnit(studentId, unitId) {
+  try {
+    return await loadStudentUnit(studentId, unitId);
+  } catch {
+    return null;
+  }
+}
+
+/** Bài đang học dở gần nhất; không có vị trí đã lưu thì lấy buổi có tiến độ mới nhất. */
+async function getResumePoint(studentId) {
+  if (!isId(studentId)) throw httpError(400, 'Học viên không hợp lệ');
+  const saved = await StudyResumePoint.findOne({ studentId }).lean();
+  let loaded = saved ? await resolveResumeUnit(studentId, saved.unitId) : null;
+  let sectionId = saved && loaded ? saved.sectionId : '';
+  const courseId = saved && loaded ? saved.courseId || '' : '';
+  if (!loaded) {
+    const recent = await LessonUnitProgress.find({ studentId })
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .select('unitId status')
+      .lean();
+    const ordered = [...recent.filter((row) => row.status !== 'completed'), ...recent.filter((row) => row.status === 'completed')];
+    for (const row of ordered) {
+      loaded = await resolveResumeUnit(studentId, row.unitId);
+      if (loaded) break;
+    }
+  }
+  if (!loaded) return null;
+
+  let { unit, subject } = loaded;
+  let row = await LessonUnitProgress.findOne({ studentId, unitId: unit._id }).lean();
+  if (row?.status === 'completed') {
+    const units = await LessonUnit.find({ subjectId: subject._id, isActive: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+    const index = units.findIndex((item) => String(item._id) === String(unit._id));
+    for (const candidate of units.slice(index + 1)) {
+      const next = await resolveResumeUnit(studentId, candidate._id);
+      if (!next) break;
+      const nextRow = await LessonUnitProgress.findOne({ studentId, unitId: candidate._id }).lean();
+      if (nextRow?.status === 'completed') continue;
+      ({ unit, subject } = next);
+      row = nextRow;
+      sectionId = '';
+      break;
+    }
+  }
+
+  const section = resumeSection(unit, row, sectionId);
+  return {
+    subjectId: String(subject._id),
+    subjectName: subject.name || '',
+    courseId,
+    unitId: String(unit._id),
+    unitTitle: unit.title || '',
+    ...section,
+  };
+}
+
+/**
+ * Video liên quan tới một chủ đề luyện tập: ưu tiên buổi HV đang học dở, rồi buổi chưa xong đầu tiên
+ * HV được vào; buổi khóa/không có quyền thì bỏ qua.
+ */
+async function relatedLessonForStudent(studentId, { subjectId, unitIds = [] } = {}) {
+  if (!isId(studentId) || !isId(subjectId)) return null;
+  const filter = { subjectId, isActive: true };
+  const ids = (unitIds || []).filter(isId);
+  if (ids.length) filter._id = { $in: ids };
+  const units = await LessonUnit.find(filter).sort({ sortOrder: 1, createdAt: 1 }).select('_id').limit(60).lean();
+  if (!units.length) return null;
+  const [saved, progress] = await Promise.all([
+    StudyResumePoint.findOne({ studentId }).lean(),
+    LessonUnitProgress.find({ studentId, unitId: { $in: units.map((unit) => unit._id) } }).lean(),
+  ]);
+  const rowByUnit = new Map(progress.map((row) => [String(row.unitId), row]));
+  const savedIndex = saved ? units.findIndex((unit) => String(unit._id) === String(saved.unitId)) : -1;
+  const ordered = savedIndex >= 0 ? [units[savedIndex], ...units.filter((_, i) => i !== savedIndex)] : units;
+  let fallback = null;
+  for (const candidate of ordered) {
+    const loaded = await resolveResumeUnit(studentId, candidate._id);
+    if (!loaded) continue;
+    const row = rowByUnit.get(String(candidate._id)) || null;
+    const sameAsSaved = saved && String(saved.unitId) === String(candidate._id);
+    const point = {
+      subjectId: String(loaded.subject._id),
+      subjectName: loaded.subject.name || '',
+      courseId: saved && String(saved.subjectId) === String(loaded.subject._id) ? saved.courseId || '' : '',
+      unitId: String(loaded.unit._id),
+      unitTitle: loaded.unit.title || '',
+      completed: row?.status === 'completed',
+      ...resumeSection(loaded.unit, row, sameAsSaved ? saved.sectionId : ''),
+    };
+    if (!point.completed) return point;
+    fallback = fallback || point;
+  }
+  return fallback;
+}
+
 module.exports = {
   exportBackup,
   importBackup,
@@ -1246,4 +1404,7 @@ module.exports = {
   markUnitSection,
   confirmItem,
   resetPractice,
+  saveResumePoint,
+  getResumePoint,
+  relatedLessonForStudent,
 };

@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { DeviceEventEmitter, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { DeviceEventEmitter, Image, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { CheckCircle2, Crown, Target, Trophy } from 'lucide-react-native';
+import { CheckCircle2, Crown, Trophy } from 'lucide-react-native';
 import { getMobileImageSource } from '../services/apiClient';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
-  OPEN_LEARNING_GOAL_EVENT,
   formatStudyMinutes,
   getLearningLeaderboard,
   type LearningLeaderboard,
@@ -109,7 +108,10 @@ export function LearningLeaderboardCard() {
                 <CheckCircle2 size={12} color="#059669" />
                 <Text style={styles.days}>{`${row.goalDays}/${data?.daysSoFar || 7} ngày`}</Text>
               </View>
-              <Text style={styles.minutes}>{formatStudyMinutes(row.minutes)}</Text>
+              <Text style={styles.minutes}>
+                {formatStudyMinutes(row.minutes)}
+                {row.xp > 0 ? <Text style={styles.xp}>{` · ${row.xp} XP`}</Text> : null}
+              </Text>
             </View>
           </View>
         ))}
@@ -118,13 +120,7 @@ export function LearningLeaderboardCard() {
       {data && me ? (
         <View style={styles.footer}>
           {!me.hasGoal ? (
-            <View style={styles.footerRow}>
-              <Text style={[styles.footerText, styles.flex]}>Đặt mục tiêu học để có tên trên bảng xếp hạng.</Text>
-              <Pressable onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} style={styles.cta} accessibilityRole="button">
-                <Target size={14} color="#FFFFFF" />
-                <Text style={styles.ctaText}>Đặt mục tiêu</Text>
-              </Pressable>
-            </View>
+            <Text style={styles.footerText}>Đặt mục tiêu ở thẻ Mục tiêu học để có tên trên bảng xếp hạng.</Text>
           ) : !me.rank ? (
             <Text style={styles.footerText}>Tuần này bạn chưa học phút nào — vào bài học ngay để lên bảng!</Text>
           ) : (
@@ -132,7 +128,7 @@ export function LearningLeaderboardCard() {
               <Text style={[styles.mineRank, { color: meInTop ? '#047857' : '#B91C1C' }]}>{`#${me.rank}`}</Text>
               <View style={styles.flex}>
                 <Text style={styles.mineTitle}>
-                  {`Bạn đang hạng ${me.rank}/${data.participants} · ${me.goalDays} ngày đạt · ${formatStudyMinutes(me.minutes)}`}
+                  {`Bạn đang hạng ${me.rank}/${data.participants} · ${me.goalDays} ngày đạt · ${formatStudyMinutes(me.minutes)}${me.xp > 0 ? ` · ${me.xp} XP` : ''}`}
                 </Text>
                 <Text style={styles.footerText}>{gapMessage(me)}</Text>
               </View>
@@ -176,6 +172,7 @@ const styles = StyleSheet.create({
   daysRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   days: { color: '#059669', fontSize: 12, fontWeight: '900' },
   minutes: { color: '#64748B', fontSize: 11, fontWeight: '700' },
+  xp: { color: '#D97706', fontWeight: '900' },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: spacing.md },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   footerText: { color: colors.muted, fontSize: 12 },

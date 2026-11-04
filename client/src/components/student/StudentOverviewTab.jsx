@@ -1,56 +1,151 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PlayCircle, Clock, CheckCircle, MessageSquare, Download,
-  BookOpen, Star, TrendingUp, Zap, Calendar, Video,
-  ClipboardList, ChevronRight, XCircle, Trophy, Award,
+  Award, BookOpen, Calendar, CheckCircle, CheckCircle2, ChevronRight, ClipboardList, Flame, Gamepad2,
+  PlayCircle, Trophy, XCircle,
 } from 'lucide-react';
-import { CourseSwitcher, StatCard } from './StudentShared';
 import LearningGoalCard from './LearningGoalCard';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
+import WelcomeHero from '../WelcomeHero';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
-import api, { downloadMediaFile, resolveMediaUrl } from '../../services/api';
+import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
+import dailyPracticeApi from '../../services/dailyPracticeApi';
+import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
 import '../dashboard-overview.css';
 
-function formatSessionDayLabel(date) {
-  const d = date ? new Date(date) : null;
-  if (!d || Number.isNaN(d.getTime())) return { weekday: '', dateLabel: '' };
-  return {
-    weekday: d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' }),
-    dateLabel: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }),
-  };
-}
+const RECENT_ACTIVITY_LIMIT = 5;
 
 function normalizeCourseName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
+function formatDayLabel(date) {
+  const d = date ? new Date(date) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const weekday = d.toLocaleDateString('vi-VN', { weekday: 'long', timeZone: 'Asia/Ho_Chi_Minh' });
+  const day = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+  return `${weekday} ${day}`;
+}
+
+function formatDeadline(deadline) {
+  const d = deadline ? new Date(deadline) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+}
+
+function deadlineMs(item) {
+  const t = new Date(item?.deadline || 0).getTime();
+  return Number.isFinite(t) && t > 0 ? t : Number.MAX_SAFE_INTEGER;
+}
+
+/** Một dòng trong "Việc cần làm hôm nay" — bấm là tới đúng việc. */
+function TaskRow({ icon: Icon, tone, title, sub, cta, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-red-200 hover:bg-red-50/40"
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
+        <Icon size={19} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-black text-slate-900">{title}</span>
+        {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
+      </span>
+      <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-red-600">
+        {cta} <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </span>
+    </button>
+  );
+}
+
+function StudyLogRow({ item }) {
+  const isCancelled = item.type === 'cancelled' || item.type === 'attendance_cancel' || item.type === 'schedule_cancel';
+  const isPastPending = ['past_pending', 'pending_attendance', 'overdue_attendance'].includes(item.type);
+  const isOverdue = item.type === 'overdue_attendance' || item.displayKind === 'overdue_attendance';
+  const isHomework = item.type === 'homework';
+  const isQuiz = item.type === 'quiz';
+  const isPassed = isQuiz ? (item.isPassed ?? item.meta?.isPassed) : undefined;
+  const isAttendance = item.type === 'attendance';
+  const isGradeUpdate = item.type === 'grade_update';
+  const isEvaluation = item.type === 'evaluation';
+  const isCourseComplete = item.type === 'course_complete';
+
+  const badge = isPastPending ? (isOverdue ? 'Quá hạn điểm danh' : 'Chưa điểm danh')
+    : isCancelled ? 'Hủy'
+      : isGradeUpdate ? 'Cập nhật điểm'
+        : isEvaluation ? 'Đánh giá'
+          : isCourseComplete ? 'Hoàn thành'
+            : isHomework ? 'Bài nộp'
+              : isQuiz ? 'Trắc nghiệm'
+                : isAttendance ? 'Điểm danh' : '';
+
+  return (
+    <div className={`flex items-start gap-2.5 px-3.5 py-3 ${isCancelled || isOverdue ? 'bg-red-50/30' : isPastPending ? 'bg-orange-50/40' : ''}`}>
+      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${
+        isCancelled || isOverdue ? 'bg-red-100 text-red-600'
+          : isPastPending ? 'bg-orange-100 text-orange-700'
+            : isHomework ? 'bg-purple-100 text-purple-600'
+              : isQuiz ? 'bg-amber-100 text-amber-600'
+                : 'bg-emerald-100 text-emerald-600'
+      }`}
+      >
+        {isCancelled ? <XCircle size={15} aria-hidden="true" />
+          : isPastPending ? <Calendar size={15} aria-hidden="true" />
+            : isHomework ? <ClipboardList size={15} aria-hidden="true" />
+              : isQuiz ? <Award size={15} aria-hidden="true" />
+                : <CheckCircle size={15} aria-hidden="true" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-xs font-bold text-slate-800">
+            {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
+          </p>
+          {badge && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold text-slate-600">{badge}</span>}
+        </div>
+        {item.note && <p className="mt-0.5 truncate text-xs text-slate-500">{item.note}</p>}
+      </div>
+      {!isCancelled && item.grade != null && (
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          {isQuiz ? (
+            <span className={`text-xs font-extrabold tabular-nums ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
+              {item.rawScore != null ? `${Math.round(item.rawScore)}%` : `${item.grade} / 10`}
+            </span>
+          ) : (
+            <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>{item.grade} / 10</span>
+          )}
+          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-extrabold ${
+            isQuiz
+              ? (isPassed ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-600')
+              : getGradePillClasses(item.grade)
+          }`}
+          >
+            {isQuiz ? (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudentOverviewTab({
   studentData,
-  enrollments,
+  enrollments = [],
   activeCourseName,
   setActiveCourseName,
   viewStudent,
   progressPct,
-  teacherRatingData,
-  isNew,
   myAssignments,
   mySchedules = [],
-  upcomingScheduleCount,
-  myUnreadMsgs,
-  studyLogs,
-  studentTrainingForLms,
+  studyLogs = [],
 }) {
   const navigate = useNavigate();
-  const pendingHw = myAssignments ? myAssignments.filter((a) => !a.mySubmission).length : 0;
-  const docs = (studentTrainingForLms?.files || []).slice(0, 3);
-  const [pendingQuizCount, setPendingQuizCount] = useState(0);
-  const [banners, setBanners] = useState([]);
-  const [bannerSpeed, setBannerSpeed] = useState(5);
-  const [lessonProgress, setLessonProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
-  /** Tick so banner flips to "Đang học" when the session window opens */
+  const [pendingQuizzes, setPendingQuizzes] = useState([]);
+  const [videoCourses, setVideoCourses] = useState({ byId: new Map(), byName: new Map(), error: '' });
+  const [practice, setPractice] = useState(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
 
   useEffect(() => {
@@ -61,7 +156,6 @@ export default function StudentOverviewTab({
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      setLessonProgress((prev) => ({ ...prev, loading: true, error: '' }));
       try {
         const res = await lessonPracticeApi.student.subjects();
         if (cancelled) return;
@@ -70,618 +164,254 @@ export default function StudentOverviewTab({
         (res.data?.courses || [])
           .filter((course) => course.enrolled && course.deliveryMode === 'video')
           .forEach((course) => {
-            const progress = {
+            const info = {
+              id: String(course.id),
               completed: Number(course.completedLessonCount) || 0,
               total: Number(course.lessonCount) || 0,
+              subjects: course.subjects || [],
             };
-            byId.set(String(course.id), progress);
-            byName.set(normalizeCourseName(course.name), progress);
+            byId.set(info.id, info);
+            byName.set(normalizeCourseName(course.name), info);
           });
-        setLessonProgress({ loading: false, error: '', byId, byName });
+        setVideoCourses({ byId, byName, error: '' });
       } catch (err) {
-        if (!cancelled) {
-          setLessonProgress({
-            loading: false,
-            error: err.message || 'Không tải được tiến độ bài học',
-            byId: new Map(),
-            byName: new Map(),
-          });
-        }
+        if (!cancelled) setVideoCourses({ byId: new Map(), byName: new Map(), error: err.message || 'Không tải được tiến độ bài học' });
       }
     };
-    const refresh = () => load();
     load();
-    window.addEventListener('focus', refresh);
-    window.addEventListener('lesson-practice-progress-updated', refresh);
+    window.addEventListener('focus', load);
+    window.addEventListener('lesson-practice-progress-updated', load);
     return () => {
       cancelled = true;
-      window.removeEventListener('focus', refresh);
-      window.removeEventListener('lesson-practice-progress-updated', refresh);
+      window.removeEventListener('focus', load);
+      window.removeEventListener('lesson-practice-progress-updated', load);
     };
   }, []);
 
-  const matchedLessonProgress = useMemo(() => {
-    const courseId = String(viewStudent?.courseId || '');
-    return (courseId && lessonProgress.byId.get(courseId))
-      || lessonProgress.byName.get(normalizeCourseName(viewStudent?.course))
-      || null;
-  }, [lessonProgress, viewStudent?.course, viewStudent?.courseId]);
-  const isActiveVideoCourse = viewStudent?.deliveryMode === 'video' || Boolean(matchedLessonProgress);
-  const activeLessonProgress = matchedLessonProgress || (isActiveVideoCourse ? { completed: 0, total: 0 } : null);
-  const activeLessonPct = activeLessonProgress?.total
-    ? Math.min(100, Math.round((activeLessonProgress.completed / activeLessonProgress.total) * 100))
-    : 0;
+  useEffect(() => {
+    let cancelled = false;
+    api.quizzes.getStudentQuizzes()
+      .then((res) => {
+        if (!res?.success || cancelled) return;
+        const nowMs = Date.now();
+        setPendingQuizzes((res.data || []).filter((q) => {
+          if (q.mySubmission) return false;
+          return !q.deadline || new Date(q.deadline).getTime() > nowMs;
+        }));
+      })
+      .catch(() => { if (!cancelled) setPendingQuizzes([]); });
+    return () => { cancelled = true; };
+  }, []);
 
+  useEffect(() => {
+    const load = () => dailyPracticeApi.student.overview().then(setPractice).catch(() => {});
+    load();
+    window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
+    return () => window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
+  }, []);
+
+  // ── Buổi học: chỉ hiển thị ở thẻ chào mừng ────────────────────────────────
   const ongoingSchedule = useMemo(() => {
     void nowTick;
     return (mySchedules || []).find((s) => s.status === 'scheduled' && isScheduleOngoingNow(s));
   }, [mySchedules, nowTick]);
 
-  const featuredSchedule = useMemo(() => {
+  const nextSchedule = useMemo(() => {
     void nowTick;
     if (ongoingSchedule) return ongoingSchedule;
-    const list = (mySchedules || []).filter((s) => {
-      if (String(s?.status || '') !== 'scheduled') return false;
-      return getScheduleDisplayKind(s) === 'upcoming';
-    });
-    list.sort((a, b) => {
-      const ka = `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`;
-      const kb = `${normalizeScheduleDate(b.date)}-${b.startTime || ''}`;
-      return ka.localeCompare(kb);
-    });
-    return list[0] || null;
+    return (mySchedules || [])
+      .filter((s) => String(s?.status || '') === 'scheduled' && getScheduleDisplayKind(s) === 'upcoming')
+      .sort((a, b) => `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`.localeCompare(`${normalizeScheduleDate(b.date)}-${b.startTime || ''}`))[0] || null;
   }, [mySchedules, ongoingSchedule, nowTick]);
 
   const isLive = Boolean(ongoingSchedule);
-  // Ưu tiên link trên lịch; fallback link hồ sơ HV (GV cập nhật ở tab Link học)
   const joinUrl = (
     ongoingSchedule?.linkHoc
-    || featuredSchedule?.linkHoc
+    || nextSchedule?.linkHoc
     || viewStudent?.joinClassUrl
     || viewStudent?.linkHoc
     || viewStudent?.online_meeting_url
     || ''
   ).trim();
-  const courseLabel = ongoingSchedule?.course || featuredSchedule?.course || viewStudent.course;
-  const sessionTimeRange = featuredSchedule
-    ? `${featuredSchedule.startTime || ''}${featuredSchedule.endTime ? ` - ${featuredSchedule.endTime}` : ''}`.trim()
+  const sessionRange = nextSchedule
+    ? `${nextSchedule.startTime || ''}${nextSchedule.endTime ? `–${nextSchedule.endTime}` : ''}`
     : '';
-  // Không fallback nextClassTime — dễ stale sau GV hủy/đổi lịch (chờ student profile refresh).
-  const sessionDay = featuredSchedule
-    ? formatSessionDayLabel(featuredSchedule.date)
-    : { weekday: '', dateLabel: '' };
-  const hasUpcomingClass = Boolean(ongoingSchedule || featuredSchedule);
-  const sessionWhenLabel = [
-    sessionTimeRange ? `Ca ${sessionTimeRange}` : '',
-    sessionDay.weekday,
-    sessionDay.dateLabel,
-  ].filter(Boolean).join(' · ');
+  const heroChips = isLive
+    ? [{ tone: 'live', label: `Đang học · Ca ${sessionRange}` }]
+    : nextSchedule
+      ? [{ icon: Calendar, label: `Buổi tới: Ca ${sessionRange} · ${formatDayLabel(nextSchedule.date)}` }]
+      : [];
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.quizzes.getStudentQuizzes();
-        if (!res?.success || cancelled) return;
-        const nowMs = Date.now();
-        const n = (res.data || []).filter((q) => {
-          if (q.mySubmission) return false;
-          if (q.deadline) {
-            const diffMs = new Date(q.deadline).getTime() - nowMs;
-            if (diffMs <= 0) return false;
-          }
-          return true;
-        }).length;
-        setPendingQuizCount(n);
-      } catch {
-        if (!cancelled) setPendingQuizCount(0);
+  // ── Khóa học của tôi: một chỗ duy nhất cho tiến độ ────────────────────────
+  const currentCourseName = activeCourseName || viewStudent?.course || '';
+  const videoCourse = (viewStudent?.courseId && videoCourses.byId.get(String(viewStudent.courseId)))
+    || videoCourses.byName.get(normalizeCourseName(currentCourseName))
+    || null;
+  const isVideoCourse = viewStudent?.deliveryMode === 'video' || Boolean(videoCourse);
+  const done = isVideoCourse ? (videoCourse?.completed || 0) : (Number(viewStudent?.completedSessions) || 0);
+  const total = isVideoCourse ? (videoCourse?.total || 0) : (Number(viewStudent?.totalSessions) || 0);
+  const unit = isVideoCourse ? 'bài' : 'buổi';
+  const pct = isVideoCourse
+    ? (total ? Math.min(100, Math.round((done / total) * 100)) : 0)
+    : (Number(progressPct) || 0);
+  const nextSubject = (videoCourse?.subjects || []).find((s) => s.opened !== false
+    && (Number(s.completedUnitCount) || 0) < (Number(s.totalUnitCount) || 0));
+  const courseCta = isVideoCourse
+    ? nextSubject
+      ? {
+        label: `Học tiếp: ${nextSubject.name}`,
+        onClick: () => navigate(`/student/lesson-practice/subjects/${nextSubject.id}?courseId=${encodeURIComponent(videoCourse.id)}`),
       }
-    })();
+      : { label: total && done >= total ? 'Ôn lại khóa học' : 'Vào học', onClick: () => navigate('/student/lesson-practice') }
+    : { label: 'Xem lịch học', onClick: () => navigate('/student#schedule') };
 
-    // Fetch Banners
-    api.settings.getWeb()
-      .then((res) => {
-        if (res?.success && !cancelled) {
-          setBanners(res.data.studentBanners || []);
-          setBannerSpeed(res.data.studentBannerSpeed || 5);
-        }
-      })
-      .catch(() => {});
-
-    return () => { cancelled = true; };
-  }, []);
-
-  const [bannerIdx, setBannerIdx] = useState(0);
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const t = setInterval(() => {
-      setBannerIdx((prev) => (prev + 1) % banners.length);
-    }, bannerSpeed * 1000);
-    return () => clearInterval(t);
-  }, [banners, bannerSpeed]);
-
-  const todoItems = [
-    {
-      key: 'quiz',
-      onClick: () => navigate('/student/exam'),
-      tone: pendingQuizCount > 0
-        ? 'bg-red-50/65 border-red-200 text-red-600 ring-2 ring-red-200/80 shadow-sm shadow-red-100'
-        : 'bg-red-50/55 border-red-100 text-red-600',
-      icon: Trophy,
-      iconTone: 'from-rose-500 via-red-500 to-red-700 shadow-red-200/70',
-      title: 'Trắc nghiệm buổi học',
-      meta: pendingQuizCount > 0
-        ? `${pendingQuizCount} bài chưa làm`
-        : 'Không có bài chờ',
-      metaClass: pendingQuizCount > 0 ? 'text-red-600 font-bold' : 'text-slate-500 font-semibold',
-      cta: 'Làm ngay',
-      badge: pendingQuizCount > 0 ? pendingQuizCount : null,
-    },
-    {
+  // ── Việc cần làm hôm nay: chỉ hiện việc còn tồn, bấm là tới đúng việc ──────
+  const pendingHomework = useMemo(
+    () => (myAssignments || []).filter((a) => !a.mySubmission).sort((a, b) => deadlineMs(a) - deadlineMs(b)),
+    [myAssignments],
+  );
+  const nearestQuiz = [...pendingQuizzes].sort((a, b) => deadlineMs(a) - deadlineMs(b))[0];
+  const practiceStats = practice?.stats;
+  const tasks = [];
+  if (pendingHomework.length) {
+    const first = pendingHomework[0];
+    const firstId = first._id || first.id;
+    tasks.push({
       key: 'hw',
-      onClick: () => {
-        navigate('/student#materials-assignments');
-      },
-      tone: pendingHw > 0
-        ? 'bg-orange-50/65 border-orange-200 text-orange-600 ring-1 ring-orange-100'
-        : 'bg-orange-50/55 border-orange-100 text-orange-600',
       icon: ClipboardList,
-      iconTone: 'from-orange-400 via-orange-500 to-red-600 shadow-orange-200/70',
-      title: 'Bài tập về nhà',
-      meta: `${pendingHw} bài cần nộp`,
-      metaClass: 'text-orange-600 font-bold',
-      cta: pendingHw > 0 ? 'Nộp ngay' : 'Xem ngay',
-      badge: pendingHw > 0 ? pendingHw : null,
-    },
-    {
-      key: 'schedule',
-      onClick: () => navigate('/student#schedule'),
-      tone: 'bg-blue-50/55 border-blue-100 text-blue-600',
-      icon: Calendar,
-      iconTone: 'from-sky-400 via-blue-500 to-indigo-700 shadow-blue-200/70',
-      title: 'Lịch học sắp tới',
-      meta: `${upcomingScheduleCount} buổi sắp tới`,
-      metaClass: 'text-blue-600 font-bold',
-      cta: 'Xem lịch',
-      badge: null,
-    },
-    {
-      key: 'messages',
-      onClick: () => navigate('/student/inbox'),
-      tone: myUnreadMsgs > 0
-        ? 'bg-purple-50/65 border-purple-200 text-purple-600 ring-1 ring-purple-100'
-        : 'bg-purple-50/55 border-purple-100 text-purple-600',
-      icon: MessageSquare,
-      iconTone: 'from-violet-400 via-purple-500 to-fuchsia-700 shadow-purple-200/70',
-      title: 'Tin nhắn & Phản hồi',
-      meta: `${myUnreadMsgs} tin nhắn mới`,
-      metaClass: 'text-purple-600 font-bold',
-      cta: 'Xem ngay',
-      badge: myUnreadMsgs > 0 ? myUnreadMsgs : null,
-    },
-  ];
+      tone: 'bg-gradient-to-b from-orange-400 to-orange-600',
+      title: `Bài tập cần nộp (${pendingHomework.length})`,
+      sub: `${first.title || 'Bài tập'}${first.deadline ? ` · hạn ${formatDeadline(first.deadline)}` : ''}`,
+      cta: 'Nộp bài',
+      onClick: () => navigate(`/student#materials-assignments${firstId ? `?assignmentId=${firstId}` : ''}`),
+    });
+  }
+  if (pendingQuizzes.length) {
+    tasks.push({
+      key: 'quiz',
+      icon: Trophy,
+      tone: 'bg-gradient-to-b from-red-500 to-red-700',
+      title: `Trắc nghiệm chưa làm (${pendingQuizzes.length})`,
+      sub: `${nearestQuiz?.title || 'Bài trắc nghiệm'}${nearestQuiz?.deadline ? ` · hạn ${formatDeadline(nearestQuiz.deadline)}` : ''}`,
+      cta: 'Làm bài',
+      onClick: () => navigate('/student/exam'),
+    });
+  }
+  if (practiceStats && !practiceStats.playedToday && practice.topics?.length) {
+    const lost = practiceStats.streakState === 'lost';
+    const atRisk = practiceStats.streakState === 'at_risk' && practiceStats.streak > 0;
+    tasks.push({
+      key: 'practice',
+      icon: lost ? Gamepad2 : Flame,
+      tone: lost ? 'bg-gradient-to-b from-slate-400 to-slate-600' : 'bg-gradient-to-b from-orange-400 to-red-600',
+      title: atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày',
+      sub: atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút',
+      cta: 'Chơi ngay',
+      onClick: () => navigate('/student/daily-practice'),
+    });
+  }
+
+  const recentActivity = (studyLogs || []).filter((item) => item.type !== 'scheduled').slice(0, RECENT_ACTIVITY_LIMIT);
 
   return (
     <div className="cms-sd cms-sd-stack min-w-0 lg:!gap-3 lg:-mb-4 th-dashboard-overview th-dashboard-overview--student">
-      <header className="cms-sd-page !py-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between th-dashboard-overview__header">
-        <div className="min-w-0 sm:w-1/3 shrink-0 th-dashboard-overview__intro">
-          <p className="th-dashboard-overview__eyebrow">Trung tâm Thắng Tin Học</p>
-          <h2 className="cms-sd-h1 truncate th-dashboard-overview__title">
-            Chào mừng,{' '}
-            <span className="text-[0.82em] font-extrabold tracking-tight">{studentData.name}</span>
-            ! 👋
-          </h2>
-          <p className="cms-sd-caption italic mt-1.5 mb-1 text-gray-500 th-dashboard-overview__subtitle">
-            &quot;Học hôm nay, thành công mai sau.&quot;
-          </p>
-        </div>
-        
-        {banners.length > 0 && (
-          <div 
-            className="relative w-full sm:w-2/3 max-w-[800px] aspect-[5/1] bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group th-dashboard-overview__banner"
-            onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
-          >
-            {banners.map((b, i) => (
-              <img 
-                key={i}
-                src={resolveMediaUrl(b.imageUrl)} 
-                alt="Banner" 
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
-              />
-            ))}
-            {banners.length > 1 && (
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
-                {banners.map((_, i) => (
-                  <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIdx ? 'bg-white shadow-sm' : 'bg-white/40'}`} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      <header className="cms-sd-page !py-0 flex min-w-0">
+        <WelcomeHero
+          role="student"
+          name={studentData.name}
+          chips={heroChips}
+          joinUrl={isLive ? joinUrl : ''}
+          joinHint={isLive ? 'Chưa có link học' : nextSchedule ? 'Chưa đến giờ học' : 'Chưa có lịch học'}
+        />
       </header>
 
       <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
-        <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:gap-3">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3">
+        {/* Cột trái: khóa học → việc cần làm → hoạt động gần đây */}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3">
+          {/* Khóa học của tôi */}
+          <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                <BookOpen size={18} className="text-red-600" aria-hidden="true" /> Khóa học của tôi
+              </h3>
+              {enrollments.length > 1 && (
+                <select
+                  value={currentCourseName}
+                  onChange={(e) => setActiveCourseName(e.target.value)}
+                  className="max-w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-red-300"
+                  aria-label="Chọn khóa học"
+                >
+                  {enrollments.map((c) => {
+                    const name = c.courseName || c.name;
+                    return <option key={c.enrollmentId || c.id || name} value={name}>{name}</option>;
+                  })}
+                </select>
+              )}
+            </div>
+            <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
+            <div>
+              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-slate-600">
+                <span><span className="text-slate-900">{done}/{total}</span> {unit} · {pct}%</span>
+                <span>Còn {Math.max(0, total - done)} {unit}</span>
+                {viewStudent?.avgGrade != null && viewStudent.avgGrade !== '' && <span>Điểm TB <span className="text-slate-900">{viewStudent.avgGrade}</span>/10</span>}
+                {!isVideoCourse && viewStudent?.teacher && <span className="truncate">GV: {viewStudent.teacher}</span>}
+              </div>
+              {videoCourses.error && <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>}
+            </div>
+            <button type="button" onClick={courseCta.onClick} className="cms-btn cms-btn-primary self-start">
+              <PlayCircle size={16} aria-hidden="true" /> <span className="max-w-[260px] truncate">{courseCta.label}</span>
+            </button>
+          </section>
+
+          {/* Việc cần làm hôm nay — ngay dưới thẻ khóa học */}
+          <section className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+              <CheckCircle2 size={18} className="text-red-600" aria-hidden="true" /> Việc cần làm hôm nay
+            </h3>
+            {tasks.length ? (
+              <div className="grid min-w-0 grid-cols-1 gap-2.5 md:grid-cols-2">
+                {tasks.map(({ key, ...task }) => <TaskRow key={key} {...task} />)}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                <CheckCircle2 size={26} className="shrink-0 text-emerald-500" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-emerald-700">Hôm nay bạn đã hoàn thành hết việc!</p>
+                  <p className="text-xs text-emerald-600">Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ.</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Hoạt động gần đây */}
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                <ClipboardList size={18} className="text-emerald-500" aria-hidden="true" /> Hoạt động gần đây
+              </h3>
+              <button type="button" onClick={() => navigate('/student#schedule')} className="flex items-center gap-0.5 text-xs font-black text-red-600 !shadow-none">
+                Xem nhật ký đầy đủ <ChevronRight size={14} aria-hidden="true" />
+              </button>
+            </div>
+            {recentActivity.length ? (
+              <div className="divide-y divide-slate-100">
+                {recentActivity.map((item, idx) => <StudyLogRow key={`${item.type}-${item.date}-${idx}`} item={item} />)}
+              </div>
+            ) : (
+              <p className="px-4 py-8 text-center text-xs font-semibold text-slate-400">Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</p>
+            )}
+          </section>
+        </div>
+
+        {/* Cột phải: mục tiêu + bảng xếp hạng, nằm ngay đầu trang */}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3">
           <LearningGoalCard />
           <LearningLeaderboardCard />
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-w-0">
-          <div className="lg:col-span-8 cms-sd-stack min-w-0 lg:!gap-3">
-            <CourseSwitcher
-              variant="compact"
-              courses={enrollments}
-              activeCourseName={activeCourseName || viewStudent.course}
-              onChange={setActiveCourseName}
-            />
-            {/* Upcoming / live class — live style mirrors TeacherOverviewTab */}
-            <section
-              className={`th-dashboard-overview__class-card ${
-                isLive
-                  ? 'th-dashboard-overview__class-card--live'
-                  : hasUpcomingClass
-                    ? 'th-dashboard-overview__class-card--upcoming'
-                    : 'th-dashboard-overview__class-card--empty'
-              }`}
-            >
-              <div className="relative z-10 space-y-3">
-                <p className="cms-sd-caption font-bold  tracking-wide text-red-100 flex items-center gap-1.5">
-                  {isLive ? (
-                    <>
-                      <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-                      </span>
-                      Buổi học đang diễn ra
-                    </>
-                  ) : hasUpcomingClass ? (
-                    <>
-                      <Zap size={14} className="shrink-0" aria-hidden="true" />
-                      Lớp học sắp diễn ra
-                    </>
-                  ) : (
-                    <>
-                      <Calendar size={14} className="shrink-0" aria-hidden="true" />
-                      Chưa có lịch sắp tới
-                    </>
-                  )}
-                </p>
-                <h2 className="cms-sd-card-title sm:text-lg md:text-xl font-extrabold  tracking-tight leading-snug line-clamp-2 text-white">
-                  {courseLabel}
-                </h2>
-                <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                  <div className="flex-1 min-w-0 space-y-2">
-                    {sessionWhenLabel ? (
-                      <p className="cms-sd-body text-white flex items-center gap-2 min-w-0">
-                        <Clock size={16} className="shrink-0 text-yellow-200" aria-hidden="true" />
-                        <span className="font-extrabold tabular-nums capitalize tracking-tight">
-                          {sessionWhenLabel}
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="cms-sd-body text-white/80">
-                        {hasUpcomingClass ? 'Đang cập nhật thời gian…' : 'Khi GV xếp lịch mới, buổi học sẽ hiện tại đây.'}
-                      </p>
-                    )}
-                    <p className="cms-sd-body text-white/90 flex items-center gap-2 min-w-0">
-                      <Calendar size={16} className="shrink-0" aria-hidden="true" />
-                      <span className="truncate">
-                        GV: {viewStudent.teacher}
-                        {!isNew && teacherRatingData.count > 0 && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 bg-yellow-400 text-red-700 px-1.5 py-0.5 rounded-md text-[11px] font-extrabold">
-                            <Star size={10} className="fill-red-700" aria-hidden="true" /> {teacherRatingData.avg}
-                          </span>
-                        )}
-                      </span>
-                    </p>
-                  </div>
-                  {isLive && joinUrl ? (
-                    <a
-                      href={joinUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`cms-sd-btn w-full md:w-auto ${
-                        isLive
-                          ? 'bg-white text-red-600 hover:bg-red-50 shadow-lg'
-                          : 'bg-white text-red-600 hover:bg-red-50'
-                      }`}
-                    >
-                      <Video size={20} aria-hidden="true" />
-                      Vào lớp ngay
-                    </a>
-                  ) : isLive ? (
-                    <span className="cms-sd-btn w-full md:w-auto bg-white/20 text-white cursor-default">
-                      <Video size={20} aria-hidden="true" />
-                      Chưa có link học
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <PlayCircle size={140} className="absolute -right-8 -bottom-8 text-white opacity-10 hidden md:block pointer-events-none" aria-hidden="true" />
-            </section>
-
-            <div className="cms-sd-stat-grid">
-              <StatCard
-                icon={BookOpen}
-                label="Đã học"
-                value={activeLessonProgress ? activeLessonProgress.completed : viewStudent.completedSessions}
-                sub={`/ ${activeLessonProgress ? activeLessonProgress.total : viewStudent.totalSessions}`}
-                color="from-red-500 to-red-600"
-              />
-              <StatCard
-                icon={Clock}
-                label="Còn lại"
-                value={activeLessonProgress
-                  ? Math.max(0, activeLessonProgress.total - activeLessonProgress.completed)
-                  : viewStudent.remainingSessions}
-                sub={activeLessonProgress ? 'bài' : 'buổi'}
-                color="from-[#1E3A8A] to-[#203DB5]"
-              />
-              <StatCard icon={Star} label="Điểm TB" value={viewStudent.avgGrade} sub="/ 10" color="from-orange-400 to-orange-500" />
-              <StatCard icon={TrendingUp} label="Tiến độ" value={`${activeLessonProgress ? activeLessonPct : progressPct}%`} sub="hoàn thành" color="from-emerald-400 to-emerald-500" />
-            </div>
-            {lessonProgress.error && (
-              <p role="status" className="mt-2 text-xs font-semibold text-amber-700">
-                Không đồng bộ được tiến độ bài học: {lessonProgress.error}
-              </p>
-            )}
-
-            {/* To-do */}
-            <section className="cms-sd-card relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 blur-2xl rounded-full pointer-events-none" aria-hidden="true" />
-              <div className="flex items-center justify-between gap-3 mb-4 relative z-10">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-200/70 ring-1 ring-white">
-                    <Zap size={21} className="fill-current" aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="cms-sd-section-title">Việc cần làm hôm nay</h3>
-                    <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Các hoạt động đang chờ bạn</p>
-                  </div>
-                </div>
-                <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black  tracking-wider text-slate-500 sm:inline-flex">
-                  Tổng quan
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
-                {todoItems.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={item.onClick}
-                    className={`${item.tone} cms-glass-card group relative overflow-hidden border p-3 sm:p-4 rounded-[18px] flex flex-col gap-2 text-left min-h-[148px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.985]`}
-                  >
-                    <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/50 blur-2xl transition-transform duration-500 group-hover:scale-125" aria-hidden="true" />
-                    <div className="flex w-full min-w-0 flex-col items-start gap-2 relative z-10">
-                      <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
-                        <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/50 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" aria-hidden="true" />
-                        <span className="absolute bottom-1 left-2 h-1.5 w-5 rounded-full bg-white/40 blur-[2px]" aria-hidden="true" />
-                        <item.icon size={21} strokeWidth={2.4} className="relative drop-shadow-md" aria-hidden="true" />
-                        {item.badge != null && (
-                          <span className="absolute -right-2 -top-2 min-w-[20px] h-[20px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center leading-none shadow-sm ring-2 ring-white">
-                            {item.badge > 99 ? '99+' : item.badge}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-[13px] sm:text-[15px] font-bold text-slate-900 leading-snug">{item.title}</h4>
-                        <p className={`text-[11px] sm:text-xs lg:text-sm font-bold mt-1 ${item.metaClass}`}>{item.meta}</p>
-                        <span className="relative z-10 mt-2 inline-flex items-center justify-center min-h-[34px] px-3 rounded-xl bg-white/95 border border-white text-xs font-extrabold text-slate-800 shadow-sm transition-all group-hover:bg-red-600 group-hover:border-red-600 group-hover:text-white group-hover:shadow-red-300/50">
-                          {item.cta}
-                          <ChevronRight size={14} className="ml-0.5 opacity-70" aria-hidden="true" />
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </div>
-
-          <aside className="lg:col-span-4 cms-sd-stack min-w-0 lg:!gap-3">
-            {/* Tài liệu */}
-            <section className="rounded-[16px] p-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] bg-slate-700">
-              <h3 className="text-xs sm:text-sm font-bold  tracking-wide text-slate-300 flex items-center gap-2 mb-3">
-                <Download size={16} aria-hidden="true" /> Tài liệu
-              </h3>
-              <div className="space-y-2">
-                {docs.length === 0 ? (
-                  <div className="cms-sd-empty !py-5 !gap-1.5">
-                    <p className="text-xs text-slate-300 font-medium">Chưa có tài liệu.</p>
-                  </div>
-                ) : (
-                  docs.map((m) => (
-                    <div
-                      key={m.id}
-                      onClick={() => m.fileUrl && downloadMediaFile(m.fileUrl, m.title)}
-                      className="flex justify-between items-center bg-slate-600/45 p-3 rounded-[12px] hover:bg-slate-600 transition-colors duration-200 cursor-pointer min-h-[44px]"
-                      title={m.title}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`text-xs font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
-                            m.fileType === 'PDF' ? 'bg-red-500' : (m.fileType === 'XLSX' || m.fileType === 'XLS') ? 'bg-green-500' : 'bg-orange-500'
-                          }`}
-                        >
-                          {m.fileType || 'DOC'}
-                        </span>
-                        <span className="text-sm font-semibold text-white truncate">{m.title}</span>
-                      </div>
-                      <Download size={16} className="text-sky-300 shrink-0 ml-2" aria-hidden="true" />
-                    </div>
-                  ))
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  navigate('/student#materials-files');
-                }}
-                className="cms-sd-btn w-full mt-3 bg-slate-600/50 text-sky-200 hover:bg-slate-600 hover:text-white"
-              >
-                Xem tất cả <ChevronRight size={16} aria-hidden="true" />
-              </button>
-            </section>
-
-            {/* Nhật ký học tập & Điểm số — dưới Tài liệu (bài nộp / TN / điểm / đánh giá) */}
-            <section className="cms-sd-card !p-0 overflow-hidden">
-              <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
-                <h3 className="cms-sd-section-title flex items-center gap-2 min-w-0">
-                  <ClipboardList size={18} className="text-emerald-500 shrink-0" aria-hidden="true" />
-                  Nhật ký học tập &amp; Điểm số
-                </h3>
-                <span className="text-xs font-bold text-slate-500 shrink-0 tabular-nums">{studyLogs.length} lượt ghi nhận</span>
-              </div>
-              <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
-                {studyLogs.map((item, idx) => {
-                  const isCancelled = item.type === 'cancelled' || item.type === 'attendance_cancel' || item.type === 'schedule_cancel';
-                  const isScheduled = item.type === 'scheduled';
-                  const isPastPending = item.type === 'past_pending'
-                    || item.type === 'pending_attendance'
-                    || item.type === 'overdue_attendance';
-                  const isOverdue = item.type === 'overdue_attendance' || item.displayKind === 'overdue_attendance';
-                  const isHomework = item.type === 'homework';
-                  const isQuiz = item.type === 'quiz';
-                  const isPassed = isQuiz ? (item.isPassed ?? item.meta?.isPassed) : undefined;
-                  const isAttendance = item.type === 'attendance';
-                  const isGradeUpdate = item.type === 'grade_update';
-                  const isEvaluation = item.type === 'evaluation';
-                  const isCourseComplete = item.type === 'course_complete';
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`px-3.5 py-3 flex flex-col justify-between gap-1.5 ${
-                        isCancelled ? 'bg-red-50/30' : isOverdue ? 'bg-red-50/40' : isPastPending ? 'bg-orange-50/50' : isScheduled ? 'bg-blue-50/30' : isQuiz ? 'bg-amber-50/20' : 'hover:bg-slate-50'
-                      } transition-colors duration-200`}
-                    >
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <div
-                          className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 mt-0.5 ${
-                            isCancelled
-                              ? 'bg-red-100 text-red-600'
-                              : isOverdue
-                              ? 'bg-red-100 text-red-600'
-                              : isPastPending
-                              ? 'bg-orange-100 text-orange-700'
-                              : isScheduled
-                              ? 'bg-blue-100 text-blue-600'
-                              : isHomework
-                              ? 'bg-purple-100 text-purple-600'
-                              : isQuiz
-                              ? 'bg-amber-100 text-amber-600'
-                              : 'bg-emerald-100 text-emerald-600'
-                          }`}
-                        >
-                          {isCancelled ? (
-                            <XCircle size={15} aria-hidden="true" />
-                          ) : isPastPending || isScheduled ? (
-                            <Calendar size={15} aria-hidden="true" />
-                          ) : isHomework ? (
-                            <ClipboardList size={15} aria-hidden="true" />
-                          ) : isQuiz ? (
-                            <Award size={15} aria-hidden="true" />
-                          ) : (
-                            <CheckCircle size={15} aria-hidden="true" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <p className={`text-xs font-bold truncate ${isCancelled || isOverdue ? 'text-red-700' : isPastPending ? 'text-orange-800' : isScheduled ? 'text-blue-900' : 'text-slate-800'}`}>
-                              {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
-                            </p>
-                            {isScheduled && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700  tracking-wide shrink-0">
-                                {item.displayKind === 'ongoing' ? 'Đang diễn ra' : 'Sắp tới'}
-                              </span>
-                            )}
-                            {isPastPending && (
-                              <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full  tracking-wide shrink-0 ${
-                                isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-800'
-                              }`}>
-                                {isOverdue ? 'Quá hạn điểm danh' : 'Chưa điểm danh'}
-                              </span>
-                            )}
-                            {isCancelled && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-red-100 text-red-700  tracking-wide shrink-0">
-                                Hủy
-                              </span>
-                            )}
-                            {isGradeUpdate && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700  tracking-wide shrink-0">
-                                Cập nhật điểm
-                              </span>
-                            )}
-                            {isEvaluation && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700  tracking-wide shrink-0">
-                                Đánh giá
-                              </span>
-                            )}
-                            {isCourseComplete && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700  tracking-wide shrink-0">
-                                Hoàn thành
-                              </span>
-                            )}
-                            {isHomework && !isGradeUpdate && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700  tracking-wide shrink-0">
-                                Bài nộp
-                              </span>
-                            )}
-                            {isQuiz && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700  tracking-wide shrink-0">
-                                Trắc nghiệm
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] lg:text-sm text-slate-500 font-medium truncate mt-0.5">{item.note}</p>
-                        </div>
-                      </div>
-
-                      {!isCancelled && item.grade != null && (
-                        <div className="flex items-center justify-end gap-1.5 shrink-0 pl-10">
-                          {isQuiz ? (
-                            /* Quiz: hiện % điểm hoặc correctCount/totalQuestions từ note nếu có */
-                            <span className={`text-xs font-extrabold tabular-nums ${
-                              isPassed ? 'text-emerald-600' : 'text-red-600'
-                            }`}>
-                              {item.rawScore != null ? `${Math.round(item.rawScore)}%` : `${item.grade} / 10`}
-                            </span>
-                          ) : (
-                            <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>
-                              {item.grade} / 10
-                            </span>
-                          )}
-                          <span className={`text-[11px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                            isQuiz
-                              ? (isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200')
-                              : getGradePillClasses(item.grade)
-                          }`}>
-                            {isQuiz ? (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
-                          </span>
-                        </div>
-                      )}
-                      {!isCancelled && item.grade == null && isAttendance && (
-                        <div className="flex items-center justify-end pl-10">
-                          <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700  tracking-wide shrink-0">
-                            Đã hoàn thành
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {studyLogs.length === 0 && (
-                  <div className="cms-sd-empty !py-6">
-                    <div className="cms-sd-empty__icon">
-                      <ClipboardList size={20} aria-hidden="true" />
-                    </div>
-                    <p className="text-xs font-bold text-slate-600">Chưa có dữ liệu điểm số.</p>
-                    <p className="text-[11px] lg:text-sm text-slate-400 mt-1">Bài nộp, trắc nghiệm và điểm sẽ hiện tại đây.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </aside>
         </div>
       </div>
     </div>
