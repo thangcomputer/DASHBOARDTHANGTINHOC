@@ -2,7 +2,7 @@
  * Draft + peer resolution for teacher → admin makeup attendance request.
  */
 
-import { buildChatDeepLinkToken, buildStudentDetailDeepLinkToken } from './messageRichTextUtils';
+import { buildStudentDetailDeepLinkToken } from './messageRichTextUtils';
 
 export function formatScheduleDateLabel(dateRaw) {
   const s = String(dateRaw || '').slice(0, 10) || '—';

@@ -20,7 +20,14 @@ function getToken() {
     const directToken = localStorage.getItem(`${role}_access_token`);
     if (directToken) return directToken;
     const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        if (u?.token) return u.token;
+      } catch {
+        // Continue checking the next available session source.
+      }
+    }
   }
   return '';
 }

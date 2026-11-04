@@ -22,7 +22,14 @@ function getToken() {
     const directToken = localStorage.getItem(`${role}_access_token`);
     if (directToken) return directToken;
     const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        if (u?.token) return u.token;
+      } catch {
+        // Continue checking the next available session source.
+      }
+    }
   }
   return '';
 }
@@ -90,7 +97,12 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '';
 // ── Session info ─────────────────────────────────────────────────────────────
 function getSession() {
   for (const k of ['admin_user','staff_user']) {
-    try { const s = JSON.parse(localStorage.getItem(k) || '{}'); if (s?.id) return s; } catch {}
+    try {
+      const s = JSON.parse(localStorage.getItem(k) || '{}');
+      if (s?.id) return s;
+    } catch {
+      // Try the next available session source.
+    }
   }
   return {};
 }

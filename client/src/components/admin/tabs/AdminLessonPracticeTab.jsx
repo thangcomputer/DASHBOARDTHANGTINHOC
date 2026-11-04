@@ -539,7 +539,9 @@ export default function AdminLessonPracticeTab() {
       const link = document.createElement('a');
       link.href = url;
       const courseSlug = course?.name
-        ? `-${course.name.trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').replace(/\s+/g, '-')}`
+        ? `-${Array.from(course.name.trim(), (char) => (
+          char.charCodeAt(0) <= 0x1f ? '-' : char
+        )).join('').replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '-')}`
         : '';
       link.download = `sao-luu-bai-hoc${courseSlug}-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);

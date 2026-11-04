@@ -101,14 +101,10 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
   const {
     sCourseBuilderMode, setSCourseBuilderMode, updateStudentTrainingItem,
     studentTrainingData, setSTrainingForm,
-    studentQuestions, studentExamMinutes, updateStudentExamMinutes,
-    studentExamFiles, setStudentExamFile,
-    resetStudentQuestions, setSqForm,
-    studentQuestionsExcelInputRef, handleStudentQuestionsExcelFile,
+    studentQuestions,
     sTrainingForm, sTrainingFileUploading, handleTrainingDocUpload,
     addStudentTrainingItem,
-    sqSection, setSqSection, sqType, setSqType, sqSearch, setSqSearch, removeStudentQuestion,
-    removeStudentTrainingItem, sqForm, updateStudentQuestion, addStudentQuestion,
+    removeStudentTrainingItem,
     updateExamResult, addExamResult, examSubjectsCatalog,
   } = useAdminTraining();
   const { examAdminGroupLabel, setStudentTrainingData } = useData();
@@ -934,7 +930,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                     } else if (finalResult === 'khong_dat') {
                       addNotification(studentId, 'student', `❌ Bạn CHƯA ĐẠT môn ${subjectLabel}. Môn thi sẽ bị khóa 7 ngày trước khi thi lại.`);
                     }
-                  } catch (err) {
+                  } catch {
                     toast.error('Lỗi khi lưu điểm!');
                   }
                 };
@@ -1002,10 +998,9 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {filtered.map((r, idx) => {
+                          {filtered.map((r) => {
                             const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
                             const isLocked = r.lockUntil && r.lockUntil > Date.now();
-                            const tnPass = pct >= 50;
                             // Đang thi: không lấy điểm TN=0 thành RỚT. Sau khi đạt TN,
                             // phân biệt rõ trạng thái đang chờ học viên nộp file thực hành.
                             const finalStatus = getExamProgressDisplayStatus(r);
@@ -1176,7 +1171,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                                                 toast.success(`Đã mở khóa "${r.subjectLabel}" cho ${r.studentName}. Học viên có thể thi lại!`);
                                                 // 🔔 Thông báo cho học viên
                                                 addNotification(r.studentId, 'student', `🔓 Môn ${r.subjectLabel} đã được mở khóa! Bạn có thể thi lại ngay bây giờ.`);
-                                              } catch (err) {
+                                              } catch {
                                                 toast.error('Lỗi khi mở khóa!');
                                               }
                                             }
@@ -1216,7 +1211,7 @@ export default function AdminStudentTrainingTab({ videoCoursesOnly = false, reso
                                               toast.success(`Đã mở cho ${r.studentName} thi lại "${r.subjectLabel}"!`);
                                               // 🔔 Thông báo cho học viên
                                               addNotification(r.studentId, 'student', `🔓 Môn ${r.subjectLabel} đã được cấp quyền thi lại! Bạn có thể vào thi ngay.`);
-                                            } catch (err) {
+                                            } catch {
                                               toast.error('Lỗi khi reset bài thi!');
                                             }
                                           }

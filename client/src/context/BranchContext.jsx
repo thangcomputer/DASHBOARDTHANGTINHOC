@@ -22,7 +22,14 @@ function getToken() {
     const t = localStorage.getItem(`${role}_access_token`);
     if (t) return t;
     const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        if (u?.token) return u.token;
+      } catch {
+        // Continue checking the next available session source.
+      }
+    }
   }
   return '';
 }

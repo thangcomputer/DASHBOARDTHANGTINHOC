@@ -239,14 +239,6 @@ const formatTime = (date) => {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
 
-const getGreetingTime = () => {
-  const currentHour = new Date().getHours();
-  if (currentHour < 11) return 'buổi sáng';
-  if (currentHour < 14) return 'buổi trưa';
-  if (currentHour < 18) return 'buổi chiều';
-  return 'buổi tối';
-};
-
 const DashboardLayout = ({ role, session, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -375,10 +367,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               localStorage.setItem(key, JSON.stringify({ ...stored, token: res.accessToken, accessToken: res.accessToken, refreshToken: nextRefresh }));
               setTokens(res.accessToken, nextRefresh, role);
             }
-          }).catch(() => {});
+          }).catch((error) => {
+            console.warn('Unable to refresh the stored access token:', error);
+          });
         }
       }
-    } catch {}
+    } catch {
+      // The persisted session is optional; the in-memory session remains usable.
+    }
   }, []);
 
   const sessionTeacherId = session?.id || session?._id;
@@ -392,11 +388,6 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const isTeacherPending = (role === 'teacher' && sessionTeacherId) ? (
      String(session?.status || '').toLowerCase() !== 'active' && 
      (!currentTeacher || String(currentTeacher.status || '').toLowerCase() !== 'active')
-  ) : false;
-
-  const isTeacherActive = (role === 'teacher' && sessionTeacherId) ? (
-     String(session?.status || '').toLowerCase() === 'active' || 
-     (currentTeacher && String(currentTeacher.status || '').toLowerCase() === 'active')
   ) : false;
 
   useEffect(() => {
@@ -2096,7 +2087,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                               try {
                                 const urlObj = new URL(targetPath);
                                 targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                              } catch (e) {}
+                              } catch {
+                                // Keep the original target when it is not a valid absolute URL.
+                              }
                             }
 
                             const targetPathname = targetPath.split(/[?#]/, 1)[0];

@@ -4,11 +4,6 @@ export function normalizeChatRole(role) {
   return r;
 }
 
-function isMongoObjectId24(id) {
-  const s = String(id || '');
-  return /^[a-f0-9]{24}$/i.test(s);
-}
-
 /** Dong bo voi server utils/chatConversationId.js */
 export function buildConversationId(senderRole, senderId, receiverRole, receiverId) {
   const sr = normalizeChatRole(senderRole);

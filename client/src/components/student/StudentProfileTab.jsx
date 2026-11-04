@@ -4,7 +4,6 @@ import {
   Mail, Phone, MessageCircle, MapPin, Lock, ChevronRight, ChevronDown,
   GraduationCap, BadgeDollarSign, Wallet, Receipt,
 } from 'lucide-react';
-import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';

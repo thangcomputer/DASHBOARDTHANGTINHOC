@@ -48,17 +48,13 @@ export function useDataAdminCrud({
         : {}),
     };
 
-    try {
-      const res = await api.students.create(payload);
-      if (res?.success && res.data) {
-        const saved = { ...res.data, id: res.data._id };
-        setStudents(prev => [...prev, saved]);
-        return saved;
-      } else {
-        throw new Error(res?.message || 'Lỗi từ máy chủ khi thêm học viên');
-      }
-    } catch (err) {
-      throw err;
+    const res = await api.students.create(payload);
+    if (res?.success && res.data) {
+      const saved = { ...res.data, id: res.data._id };
+      setStudents(prev => [...prev, saved]);
+      return saved;
+    } else {
+      throw new Error(res?.message || 'Lỗi từ máy chủ khi thêm học viên');
     }
   }, [setStudents]);
 
@@ -82,17 +78,13 @@ export function useDataAdminCrud({
       baseSalaryPerSession: Math.max(0, Number(teacher.baseSalaryPerSession) || 0),
     };
 
-    try {
-      const res = await api.teachers.create(payload);
-      if (res?.success && res.data) {
-        const saved = { ...res.data, id: res.data._id };
-        setTeachers(prev => [...prev, saved]);
-        return saved;
-      } else {
-        throw new Error(res?.message || 'Lỗi từ máy chủ khi thêm giảng viên');
-      }
-    } catch (err) {
-      throw err;
+    const res = await api.teachers.create(payload);
+    if (res?.success && res.data) {
+      const saved = { ...res.data, id: res.data._id };
+      setTeachers(prev => [...prev, saved]);
+      return saved;
+    } else {
+      throw new Error(res?.message || 'Lỗi từ máy chủ khi thêm giảng viên');
     }
   }, [setTeachers]);
 
@@ -123,17 +115,13 @@ export function useDataAdminCrud({
   }, [setTeachers]);
 
   const removeTeacher = useCallback(async (teacherId) => {
-    try {
-      const res = await api.teachers.remove(teacherId);
-      if (res?.success) {
-        setTeachers(prev => prev.filter(t => String(t.id) !== String(teacherId) && String(t._id) !== String(teacherId)));
-        setStudents(prev => prev.map(s => String(typeof s.teacherId === 'object' && s.teacherId !== null ? s.teacherId._id || s.teacherId.id : s.teacherId) === String(teacherId) ? { ...s, teacherId: null, teacherName: null } : s));
-        return true;
-      } else {
-        throw new Error(res?.message || 'Xoá thất bại');
-      }
-    } catch (err) {
-      throw err;
+    const res = await api.teachers.remove(teacherId);
+    if (res?.success) {
+      setTeachers(prev => prev.filter(t => String(t.id) !== String(teacherId) && String(t._id) !== String(teacherId)));
+      setStudents(prev => prev.map(s => String(typeof s.teacherId === 'object' && s.teacherId !== null ? s.teacherId._id || s.teacherId.id : s.teacherId) === String(teacherId) ? { ...s, teacherId: null, teacherName: null } : s));
+      return true;
+    } else {
+      throw new Error(res?.message || 'Xoá thất bại');
     }
   }, [setTeachers, setStudents]);
 
@@ -443,19 +431,15 @@ export function useDataAdminCrud({
 
   // Xóa học viên
   const removeStudent = useCallback(async (studentId) => {
-    try {
-      const res = await api.students.remove(studentId);
-      if (res?.success) {
-        setStudents(prev => prev.filter(s => String(s.id) !== String(studentId) && String(s._id) !== String(studentId)));
-        setTeachers(prev => prev.map(t => ({
-          ...t, assignedStudents: (t.assignedStudents || []).filter(id => String(id) !== String(studentId))
-        })));
-        return true;
-      } else {
-        throw new Error(res?.message || 'Xoá thất bại');
-      }
-    } catch (err) {
-      throw err;
+    const res = await api.students.remove(studentId);
+    if (res?.success) {
+      setStudents(prev => prev.filter(s => String(s.id) !== String(studentId) && String(s._id) !== String(studentId)));
+      setTeachers(prev => prev.map(t => ({
+        ...t, assignedStudents: (t.assignedStudents || []).filter(id => String(id) !== String(studentId))
+      })));
+      return true;
+    } else {
+      throw new Error(res?.message || 'Xoá thất bại');
     }
   }, [setStudents, setTeachers]);
 
@@ -575,7 +559,7 @@ export function useDataAdminCrud({
   }, [students, setStudents, triggerBackgroundSync]);
 
   // Admin thu hồi quyền thi (không qua lock-exam — dùng khi chỉ revoke quyền)
-  const revokeStudentExam = useCallback(async (studentId, reason = '') => {
+  const revokeStudentExam = useCallback(async (studentId) => {
     const previousStudents = [...students];
     setStudents(prev => prev.map(s =>
       (String(s.id) === String(studentId) || String(s._id) === String(studentId))

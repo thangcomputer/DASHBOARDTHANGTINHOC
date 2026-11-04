@@ -9,10 +9,9 @@ import {
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import TeacherQuestionBankPanel from './TeacherQuestionBankPanel';
 import RichTextEditor from '../shared/RichTextEditor';
-import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalFileUrl, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
+import { resolveTeacherExamDate, isTeacherExamDateApproximate, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
-import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import { BUILTIN_EXAM_SUBJECTS, getExamSubjectOptions } from '../../../utils/examSubjects';
 import { useData } from '../../../context/DataContext';
@@ -44,7 +43,6 @@ export default function AdminTrainingTab({ section }) {
     courseBuilderMode, setCourseBuilderMode, trainingData, updateTrainingItem, trainingTab: storedTrainingTab, setTrainingTab,
     trainingForm, setTrainingForm, questions, setErGvForm, BLANK_ER_GV, trainingFileUploading,
     handleTrainingDocUpload, addTrainingItem, setDeleteConfirm,
-    setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes,
     examSubjectsCatalog,
   } = useAdminTab();
 

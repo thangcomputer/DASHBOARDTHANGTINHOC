@@ -51,7 +51,7 @@ export const StudentVideoPlayer = ({
   };
   const yId = extractYouTubeId(videoId);
   const [isReady, setIsReady] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [, setIsPaused] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [hasEnded, setHasEnded] = useState(false);
@@ -178,7 +178,11 @@ export const StudentVideoPlayer = ({
       if (document.hidden) {
         setIsTabActive(false);
         if (playerRef.current?.pauseVideo) {
-          try { playerRef.current.pauseVideo(); } catch (e) { void 0; }
+          try {
+            playerRef.current.pauseVideo();
+          } catch {
+            // The embedded player may reject pause during teardown.
+          }
         }
       } else {
         setIsTabActive(true);

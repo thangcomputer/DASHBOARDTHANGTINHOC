@@ -4,12 +4,8 @@ import {
   Calendar, Award, AlertCircle, Clock, DollarSign, ChevronDown,
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
-import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';
 import { useData } from '../../context/DataContext';
-import { useToast } from '../../utils/useToast';
-import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
-import { showGlossyAlert } from './TeacherShared';
 import CmsSelect from '../ui/CmsSelect';
 import { VOICE_REGION_OPTIONS, voiceRegionLabel } from '../../constants/voiceRegions';
 
@@ -84,7 +80,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
       } else {
         setSaveMsg('❌ ' + (result?.message || 'Lỗi khi lưu'));
       }
-    } catch (err) {
+    } catch {
       setSaveMsg('❌ Lỗi kết nối server');
     } finally {
       setSaving(false);
@@ -110,7 +106,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
       } else {
         setSaveMsg('❌ ' + (result?.message || 'Lỗi khi lưu'));
       }
-    } catch (err) {
+    } catch {
       setSaveMsg('❌ Lỗi kết nối server');
     } finally {
       setSaving(false);
@@ -124,16 +120,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     setTimeout(() => setCopiedField(''), 1500);
   };
 
-  const initials = currentTeacher?.name
-    ? currentTeacher.name.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase()
-    : 'GV';
-
   const bankFilled = bankForm.bankName && bankForm.accountNumber && bankForm.accountName;
-  const teacherAvatarUrl = resolveAvatarUrl({
-    avatar: currentTeacher?.avatar,
-    role: 'teacher',
-    gender: currentTeacher?.gender,
-  });
 
   return (
     <div className="w-full py-2 sm:py-6 lg:py-8 space-y-4 lg:space-y-5">

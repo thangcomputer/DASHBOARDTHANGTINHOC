@@ -224,7 +224,9 @@ const AdminProgressPanel = ({ courseId }) => {
     try {
       const res = await lmsApiFetch(`/admin/progress/${courseId}`);
       if (res.success) setData(res.data);
-    } catch (e) { void 0 }
+    } catch {
+      // Keep the existing local view when optional progress data is unavailable.
+    }
     setLoading(false);
   };
 
@@ -403,7 +405,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       } else {
         toast?.error('Lỗi tải file: ' + res.message);
       }
-    } catch (e) {
+    } catch {
       toast?.error('Lỗi mạng khi tải file. Vui lòng thử lại sau.');
     }
     setUploadingAssignId(null);
@@ -628,7 +630,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         res.data.forEach(l => { chapters[l.chapterTitle || 'Chương 1'] = true; });
         setExpandedChapters(chapters);
       }
-    } catch (e) { void 0 }
+    } catch {
+      // The course view can still render without the lesson list refresh.
+    }
     setLoading(false);
   };
 
@@ -694,7 +698,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         if (prog?.success && prog.data) setCourseProgressMap(prog.data);
       } catch { /* ignore */ }
       return true;
-    } catch (e) { 
+    } catch {
       toast.error('Lỗi mạng khi ghi nhận hoàn thành');
       return false; 
     }
@@ -746,7 +750,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         const prog = await lmsApiFetch('/progress/me');
         if (prog?.success && prog.data) setCourseProgressMap(prog.data);
       } catch { /* ignore */ }
-    } catch (e) { void 0 }
+    } catch {
+      // Keep local progress when the optional server refresh is unavailable.
+    }
     setCompleting(false);
   }, [currentLesson, selectedCourse, completing, toast, completeLessonOnServer]);
 
@@ -794,7 +800,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         watchedSeconds: watchedSeconds,
         videoDuration,
       }),
-    }).catch(e => void 0);
+    }).catch(() => undefined);
   }, [selectedCourse, patchLessonWatchLocal]);
 
   const overallProgress = lessons.length > 0

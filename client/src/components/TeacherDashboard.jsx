@@ -27,7 +27,7 @@ import { classifyAttendancePrompt, resolveCheckInGate } from '../utils/attendanc
 import { getAttendanceAction, formatGraceRemaining } from '../utils/attendanceAction';
 import { isScheduleDateBeforeToday } from '../utils/scheduleTime';
 
-const TeacherDashboard = ({ onNavigate }) => {
+const TeacherDashboard = () => {
   const { showModal } = useModal();
   let session = {};
   try {
@@ -41,15 +41,16 @@ const TeacherDashboard = ({ onNavigate }) => {
     students: allStudents, teachers, schedules,
     getStudentsByTeacher, getTeacherStats,
     markAttendance: ctxMarkAttendance,
-    updateStudentLink,
+    updateStudentLink, updateStudent,
     getConversations,
-    getSchedulesByTeacher, getTeacherRating, RATING_CRITERIA, getTransactionsByTeacher,
+    getSchedulesByTeacher, RATING_CRITERIA, getTransactionsByTeacher,
     addSchedule, updateSchedule, cancelSchedule,
-    revokeStudentExam, updateStudent, updateTeacher, failStudentExam,
+    failStudentExam,
     trainingData, setTrainingData,
   } = useData();
 
   const { socket, onlineUsers, lastSeenUsers } = useSocket();
+  const currentTeacher = teachers.find(t => String(t.id) === String(TEACHER_ID) || String(t._id) === String(TEACHER_ID));
 
 
   // Helper: tính "X phút trước" từ ISO string
@@ -83,13 +84,6 @@ const TeacherDashboard = ({ onNavigate }) => {
       });
     }
   };
-
-  // Trạng thái hiện tại của GV
-  const currentTeacher = teachers.find(t => String(t.id) === String(TEACHER_ID) || String(t._id) === String(TEACHER_ID));
-  // Vấn đề: `teachers` ở frontend đôi lúc không chứa giáo viên hiện tại do phân quyền gọi getAll.
-  // Giải pháp: Sử dụng thêm session.status để kiểm tra fallback chuẩn xác nhất.
-  const currentStatus = String(currentTeacher?.status || session.status || '').toLowerCase();
-  const isApproved = currentStatus === 'active';
 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
@@ -417,7 +411,7 @@ const TeacherDashboard = ({ onNavigate }) => {
         const avg = count > 0 ? (Math.round((validRatings.reduce((s, r) => s + r.criteria.stars, 0) / count) * 10) / 10) : 0;
         setTeacherRating({ avg, count, ratings: res.data });
       }
-    }).catch(err => void 0);
+    }).catch(() => undefined);
   }, [TEACHER_ID]);
   const myTransactions = useMemo(() => getTransactionsByTeacher(TEACHER_ID), [getTransactionsByTeacher, TEACHER_ID]);
 
@@ -841,5 +835,3 @@ const TeacherDashboard = ({ onNavigate }) => {
 };
 
 export default TeacherDashboard;
-
-

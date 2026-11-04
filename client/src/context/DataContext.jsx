@@ -43,7 +43,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
     if (savedUser) {
       try {
         setCurrentUser(JSON.parse(savedUser));
-      } catch (e) {
+      } catch {
+        // Ignore invalid cached user data and keep the current session.
       }
     }
   }, []);
@@ -54,12 +55,12 @@ export const DataProvider = ({ children, user, onLogout }) => {
       const updated = { ...prev, avatar: newAvatarUrl };
       try {
         localStorage.setItem('thvp_user', JSON.stringify(updated));
-      } catch (e) { }
+      } catch {
+        // Keep the in-memory avatar update when browser storage is unavailable.
+      }
       return updated;
     });
-    try {
-      window.dispatchEvent(new CustomEvent('user:avatar-updated', { detail: newAvatarUrl }));
-    } catch (e) { }
+    window.dispatchEvent(new CustomEvent('user:avatar-updated', { detail: newAvatarUrl }));
   }, []);
 
   const {
@@ -86,8 +87,8 @@ export const DataProvider = ({ children, user, onLogout }) => {
   useEffect(() => { localStorage.setItem('thvp_staffs', JSON.stringify(staffs)); }, [staffs]);
 
   const {
-    trainingData, setTrainingData,
-    studentTrainingData, setStudentTrainingData,
+    trainingData,
+    studentTrainingData,
     setTrainingDataFromSync,
     setStudentTrainingDataFromSync,
     questions, setQuestions,
@@ -95,7 +96,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
     teacherExamTimeLimitMinutes, setTeacherExamTimeLimitMinutes,
     teacherExamMinutes, updateTeacherExamMinutes,
     teacherEssayExamMinutes, updateTeacherEssayExamMinutes,
-    studentQuestions, setStudentQuestions,
+    studentQuestions,
     studentExamMinutes, updateStudentExamMinutes,
     studentEssayExamMinutes, updateStudentEssayExamMinutes,
     studentEssayRequired, updateStudentEssayRequired,
@@ -156,7 +157,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
   // Messages: vẫn useDataMessaging (staffs / SUPER_ADMIN mailbox / onReadAck).
   // MessagesContext chưa mount ở App — tránh double socket/SWR cho đến khi migrate đủ API.
   const {
-    messages, setMessages, groups, setGroups,
+    messages, groups, setGroups,
     sendMessage, syncMessages, toggleMessageReaction, recallMessage,
     softDeleteMessage, createChatGroup, deleteChatGroup, leaveChatGroup, addGroupMembers,
     markMessagesRead, getConversations, getMessages,

@@ -841,7 +841,6 @@ export default function NewsPage({ session, role = 'admin' }) {
                       {a.kind === 'image' ? (
                         <img src={resolveMediaUrl(a.url)} alt={a.name || ''} className="rounded-xl max-h-80 object-contain" />
                       ) : a.kind === 'video' ? (
-                        // eslint-disable-next-line jsx-a11y/media-has-caption
                         <video src={resolveMediaUrl(a.url)} controls className="rounded-xl w-full max-h-96 bg-black" />
                       ) : (
                         <a
@@ -1176,7 +1175,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                       } else {
                         toast.error(res?.message || 'Không thể xóa bài viết');
                       }
-                    } catch (err) {
+                    } catch {
                       toast.error('Lỗi kết nối khi xóa bài viết');
                     }
                   }}

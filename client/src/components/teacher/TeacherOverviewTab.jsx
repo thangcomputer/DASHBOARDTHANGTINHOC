@@ -55,8 +55,8 @@ function getNextScheduleForStudent(schedules, student, now = new Date()) {
 }
 
 export default function TeacherOverviewTab({
-  navigate, totalMonthlyIncome, completed, totalDone, teacherName, currentTeacher,
-  teacherRating, students, totalSess, avgGrade, mySchedules = [], myNotifs, RATING_CRITERIA,
+  navigate, totalMonthlyIncome, teacherName, currentTeacher,
+  teacherRating, students, mySchedules = [], myNotifs, RATING_CRITERIA,
   teacherId,
 }) {
   const [banners, setBanners] = useState([]);

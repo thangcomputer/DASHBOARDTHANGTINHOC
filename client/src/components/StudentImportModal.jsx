@@ -45,7 +45,7 @@ export default function StudentImportModal({ onClose, branchId }) {
         setData(mapped);
         setStep('preview');
         setError(null);
-      } catch (err) {
+      } catch {
         setError('Lỗi khi đọc file Excel. Vui lòng kiểm tra lại định dạng.');
       }
     };
@@ -65,7 +65,7 @@ export default function StudentImportModal({ onClose, branchId }) {
         setError(res.message);
         setStep('upload');
       }
-    } catch (err) {
+    } catch {
       setError('Lỗi hệ thống khi nhập dữ liệu.');
       setStep('upload');
     }

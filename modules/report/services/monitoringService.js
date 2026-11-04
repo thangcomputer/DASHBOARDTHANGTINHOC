@@ -74,7 +74,7 @@ function getHealth() {
     queue,
     socketAdapter,
     mail: {
-      status: Boolean(process.env.SMTP_HOST && process.env.SMTP_FROM) ? 'up' : 'disabled',
+      status: process.env.SMTP_HOST && process.env.SMTP_FROM ? 'up' : 'disabled',
     },
     storage: {
       status: 'up',

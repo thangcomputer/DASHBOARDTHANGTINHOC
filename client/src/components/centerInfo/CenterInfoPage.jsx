@@ -122,7 +122,6 @@ function OverviewView({ overview }) {
               allowFullScreen
             />
           ) : (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
             <video src={resolveMediaUrl(overview.introVideoUrl)} controls className="w-full h-full" />
           )}
         </div>

@@ -339,7 +339,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                 status: res.student.status,
               };
               await updateStudent(res.student._id || studentId, patch, { localOnly: true });
-            } catch (_) { /* sync bên dưới sẽ bù */ }
+            } catch { /* sync bên dưới sẽ bù */ }
           }
           reloadProfile();
           if (typeof triggerBackgroundSync === 'function') {
@@ -693,7 +693,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 
   const handleConfirmCancelEnrollment = async () => {
     if (!cancelEnrModal) return;
-    const { sid, enrId, enr, reason, refundAmount } = cancelEnrModal;
+    const { sid, enrId, reason, refundAmount } = cancelEnrModal;
     const tid = toast.loading('Đang hủy khóa...');
     try {
       const res = await api.students.deleteEnrollment(sid, enrId, {
@@ -730,7 +730,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         content: 'Đã gỡ bỏ đếm ngược 7 ngày! Học viên có thể thi lại ngay.',
         type: 'success'
       });
-    } catch (err) { }
+    } catch {
+      toast.error('Không thể mở khóa bài thi. Vui lòng thử lại.');
+    }
   };
 
   const toggleEnrollmentSetting = async (enr, field) => {
@@ -843,7 +845,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
           });
         }
       })
-      .catch(err => void 0)
+      .catch(() => undefined)
       .finally(() => setLoading(false));
   }, [studentId]);
 
@@ -919,7 +921,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       const want = norm(course);
       const rows = (res.success ? res.data : []) || [];
       setAssignments(rows.filter((a) => !want || norm(a.courseId) === want));
-    } catch (err) { void 0; setAssignments([]); }
+    } catch {
+      setAssignments([]);
+    }
     finally { setLoadingAssign(false); }
   };
 
@@ -949,7 +953,9 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       });
       merged.sort((a, b) => new Date(b.deadline || b.createdAt || 0) - new Date(a.deadline || a.createdAt || 0));
       setAssignments(merged);
-    } catch (err) { void 0; setAssignments([]); }
+    } catch {
+      setAssignments([]);
+    }
     finally { setLoadingAssign(false); }
   };
 
@@ -1002,7 +1008,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
       } else {
         toast.error(res?.message || 'Không giao được bài tập');
       }
-    } catch (err) {
+    } catch {
       toast.error('Lỗi kết nối khi giao bài tập');
     }
   };
@@ -1079,9 +1085,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
   };
 
   // Tổng đã thanh toán = cộng tất cả hóa đơn thu (kể cả khóa sau này hủy), không lấy 1 khóa đang theo
-  const paymentInvoices = invoiceList.filter((inv) => !isRefundInvoice(inv) && invoiceInScope(inv));
   const refundInvoices = invoiceList.filter((inv) => isRefundInvoice(inv) && invoiceInScope(inv));
-  const financePaidFromInvoices = paymentInvoices.reduce((s, inv) => s + (Number(inv.hocPhi) || 0), 0);
   const financeRefundFromInvoices = refundInvoices.reduce((s, inv) => s + Math.abs(Number(inv.hocPhi) || 0), 0);
   // P1: ưu tiên Ledger card TO-BE; fallback invoice/enrollment
   const financeRegisteredFee = ledgerCard
@@ -1714,9 +1718,6 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                 {enrollments.filter(e => !e.cancelledAt && e.status !== 'cancelled' && e.status !== 'refunded').map((enr) => {
                                   const enrId = enr.enrollmentId || enr._id || enr.id;
                                   const isCancelled = enr.status === 'cancelled';
-                                  const progress = enr.totalSessions
-                                    ? Math.round(((enr.completedSessions || 0) / enr.totalSessions) * 100)
-                                    : 0;
                                   const isPaid = enr.paid === true || enr.paid === 'Đã đóng phí';
                                   return (
                                     <div key={enrId} className={`p-4 rounded-2xl border space-y-3 ${isCancelled ? 'border-red-200 bg-red-50/60 opacity-80' : 'border-slate-100 bg-slate-50/50'}`}>

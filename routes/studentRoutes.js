@@ -1142,9 +1142,9 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         name: student.name,
         course: student.course,
       });
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', action: 'create' });
+      studentDataRefresh(io, student, { type: 'student', action: 'create' });
       if (createdInvoice) {
-        studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: price, studentName: student.name });
+        studentRealtime(io, student, 'revenue:updated', { amount: price, studentName: student.name });
       }
     }
 
@@ -1583,8 +1583,8 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
 
     const io = req.app.get('io');
     if (io) {
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
 
       // ── Notification: duyệt/thu hồi quyền thi (khi admin/staff cập nhật qua PUT /students/:id)
       // AdminDashboard hiện dùng endpoint này cho approve/revoke exam, nên cần bắn noti ở đây.
@@ -2237,7 +2237,7 @@ router.patch('/:id/price', [authMiddleware, branchFilter, policyShadowStudentMut
     await student.save({ validateModifiedOnly: true });
 
     const io = req.app.get('io');
-    if (io) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
+    if (io) studentRealtime(io, student, 'student:updated', student._id);
 
     res.json({
       success: true,
@@ -2389,8 +2389,8 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
         link: '/student#profile'
       });
 
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: student.price, studentName: student.name });
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'revenue:updated', { amount: student.price, studentName: student.name });
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
 
     await syncCertPrepFromEnrollment(student, req);
@@ -2550,7 +2550,7 @@ router.put('/:id/unlock-exam', [authMiddleware, branchFilter, policyShadowStuden
           studentName: student.name,
           enrollmentId: hasEnrollmentId ? String(enrollmentId) : null,
         });
-        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+        studentDataRefresh(io, student, { type: 'student', id: student._id });
       } catch (notifErr) {
         logger.warn('[STUDENTS] unlock-exam notify: %s', notifErr.message);
       }
@@ -2725,8 +2725,8 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, policyShadowStudentM
       };
       io.to(`student_${student._id}`).emit('exam:locked', lockPayload);
       studentRealtime(io, student, 'exam:locked', lockPayload);
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
 
     res.json({
@@ -3008,7 +3008,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
     const io = req.app.get('io');
-    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+    if (io) studentDataRefresh(io, student, { type: 'student', id: student._id });
 
     if (typeof examUnlocked === 'boolean' && prevExamUnlocked !== Boolean(student.enrollments[idx].examUnlocked)) {
       const unlocked = Boolean(student.enrollments[idx].examUnlocked);
@@ -3165,7 +3165,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
     }
 
     const io = req.app.get('io');
-    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: fresh._id });
+    if (io) studentDataRefresh(io, student, { type: 'student', id: student._id });
 
     const maHD = invoice?.maHoaDon || invoice?.maHD || '';
     await notifyStudentBell(io, fresh._id, {
@@ -3371,8 +3371,8 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
 
     const io = req.app.get('io');
     if (io) {
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
-      if (refundAmt > 0) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: -refundAmt, studentName: student.name });
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+      if (refundAmt > 0) studentRealtime(io, student, 'revenue:updated', { amount: -refundAmt, studentName: student.name });
     }
     await notifyStudentBell(io, student._id, {
       type: 'COURSE',
@@ -3729,10 +3729,10 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
         studentRealtime(io, student, 'student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
-        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+        studentDataRefresh(io, student, { type: 'student', id: student._id });
       } else if (io && isUnassign) {
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId: null });
-        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+        studentDataRefresh(io, student, { type: 'student', id: student._id });
       }
     } catch (notifErr) {
       logger.error('[ASSIGN_TEACHER] Notification error:', notifErr);

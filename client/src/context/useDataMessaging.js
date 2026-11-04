@@ -3,7 +3,6 @@ import api from '../services/api';
 import { buildConversationId } from '../utils/chatConversationId';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
-import { getMessagingRole } from '../lib/messagingRoles';
 import { resolveMessagingActor, normalizeMessage } from '../lib/messagingIdentity';
 import { sortConversationsByLastMessageAt } from '../lib/conversationList';
 import { isAiSupportConversationId } from '../utils/aiSupport';
@@ -568,10 +567,6 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
     const safeTeachers = Array.isArray(teachers) ? teachers.filter(Boolean) : [];
     const safeStaffs = Array.isArray(staffs) ? staffs.filter(Boolean) : [];
     const safeMessages = Array.isArray(messages) ? messages.filter(Boolean) : [];
-    const isSupportStaff = currentUser?.role === 'staff'
-      || currentUser?.adminRole === 'STAFF'
-      || currentUser?.adminRole === 'SUPPORT'
-      || safeStaffs.some(st => String(st.id || st._id) === sId);
     const isSuperAdmin = sId === 'admin'
       || currentUser?.adminRole === 'SUPER_ADMIN';
 

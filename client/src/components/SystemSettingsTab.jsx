@@ -185,7 +185,7 @@ export default function SystemSettingsTab() {
       } else {
          toast.error(res.message || 'Lỗi khi đặt lại dữ liệu');
       }
-    } catch (err) {
+    } catch {
       toast.error('Có lỗi xảy ra, thử lại sau');
     }
   };
@@ -335,7 +335,9 @@ export default function SystemSettingsTab() {
             const session = JSON.parse(localStorage.getItem('admin_user') || '{}');
             session.name = res.data.name;
             localStorage.setItem('admin_user', JSON.stringify(session));
-          } catch {}
+          } catch {
+            // The profile is already saved remotely; local session data refresh is best-effort.
+          }
         }
       } else {
         toast.error(res.message || 'Cập nhật thất bại');

@@ -172,7 +172,6 @@ export function getStudentPracticeFilesForSubject(studentQuestions, subjectId, s
     .map((q) => getEssayQuestionFile(q))
     .filter(Boolean);
   if (fromEssays.length > 0) return fromEssays;
-  const subject = normalizeSubjectSection(subjectId);
   const legacy = studentExamFiles?.[subjectId];
   if (legacy?.fileUrl) {
     return [{ fileUrl: legacy.fileUrl, fileName: legacy.fileName || 'De_thuc_hanh' }];
@@ -225,8 +224,6 @@ export function computeTeacherExamTotalMinutes(
     let mins = null;
     const n = Number(teacherExamMinutes?.[s]);
     if (Number.isFinite(n) && n >= 1) mins = Math.round(n);
-    if (mins == null) {
-    }
     total += mins ?? 90;
   }
   return total > 0 ? total : null;

@@ -116,7 +116,7 @@ export function useAdminDashboardState() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashRaw = (location.hash || '').replace(/^#/, '');
-  const activeTab = (hashRaw.split(/[?#]/)[0] || 'dashboard') || 'dashboard';
+  const activeTab = hashRaw.split(/[?#]/)[0] || 'dashboard';
   const hashQuery = hashRaw.includes('?') ? hashRaw.slice(hashRaw.indexOf('?') + 1) : '';
 
   // Chặn mở tab bằng URL hash khi không có quyền (menu đã ẩn nhưng URL vẫn vào được)
@@ -491,7 +491,7 @@ export function useAdminDashboardState() {
   const [qSearch, setQSearch] = useState('');
   const [qSection, setQSection] = useState('mon-kiem-thu');
   const [qDifficulty, setQDifficulty] = useState('all');
-  const [qSort, setQSort] = useState('newest');
+  const [qSort] = useState('newest');
   const [qForm, setQForm] = useState(null);
 
   // Student question bank / exam results UI

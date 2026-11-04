@@ -4,7 +4,7 @@ import CmsSelect from './ui/CmsSelect';
 import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
 import NavArrow from './ui/NavArrow';
 import { useLocation } from 'react-router-dom';
-import api, { resolveMediaUrl, buildMediaDownloadUrl } from '../services/api';
+import api, { buildMediaDownloadUrl } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { getGradeTextClasses } from '../utils/gradeColors';
 import { useModal } from '../utils/Modal.jsx';

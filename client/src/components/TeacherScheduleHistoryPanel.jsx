@@ -8,7 +8,14 @@ function getToken() {
     const directToken = localStorage.getItem(`${role}_access_token`);
     if (directToken) return directToken;
     const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        if (u?.token) return u.token;
+      } catch {
+        // Continue checking the next available session source.
+      }
+    }
   }
   return '';
 }
@@ -38,7 +45,7 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
         } else {
           setError(result.message || 'Lỗi tải lịch sử');
         }
-      } catch (err) {
+      } catch {
         if (active) setError('Lỗi kết nối máy chủ');
       } finally {
         if (active) setLoading(false);
@@ -70,7 +77,7 @@ export default function TeacherScheduleHistoryPanel({ teacherId }) {
 
   if (!data) return null;
 
-  const { total = 0, created = 0, cancelled = 0, updated = 0, cancelRate = 0, history = [] } = data;
+  const { created = 0, cancelled = 0, updated = 0, cancelRate = 0, history = [] } = data;
 
   return (
     <div className="space-y-5">
