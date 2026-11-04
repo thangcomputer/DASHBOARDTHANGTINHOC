@@ -479,7 +479,9 @@ function isOff(v) {
   return s === 'false' || s === '0' || s === 'off' || s === 'no';
 }
 
-test('Wave6.1 config: .env CQRS flags ALL OFF', () => {
+test('Wave6.1 config: .env CQRS flags ALL OFF', {
+  skip: fs.existsSync(path.join(ROOT, '.env')) ? false : 'no .env on this machine (CI)',
+}, () => {
   const flags = parseEnvCqrs(path.join(ROOT, '.env'));
   assert.ok(flags, '.env missing');
   for (const key of Object.keys(flags)) {
