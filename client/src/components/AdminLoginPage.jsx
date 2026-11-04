@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Lock, User, Eye, EyeOff, AlertTriangle, ChevronRight, Fingerprint, Activity, MonitorX } from 'lucide-react';
+import {
+  ShieldCheck, Lock, User, Eye, EyeOff, AlertTriangle, ChevronRight, Fingerprint, Activity, MonitorX,
+  RefreshCw, KeyRound, Users, ScrollText, LayoutDashboard, BarChart3,
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { setTokens, clearOtherRoleSessions, API_BASE, SOCKET_BASE, ensureCsrfToken } from '../services/api';
 import { unlockAudio } from '../utils/sound';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
-import { isValidVNPhone, normalizePhone } from '../utils/validators';
+import { isValidVNPhone, limitPhoneInput, normalizePhone, PHONE_MAX_DIGITS } from '../utils/validators';
+
+const ADMIN_HIGHLIGHTS = [
+  { label: 'Bảo mật 2 lớp', icon: KeyRound },
+  { label: 'Phân quyền chi tiết', icon: Users },
+  { label: 'Nhật ký truy cập', icon: ScrollText },
+];
 
 const AdminLoginPage = ({ onLogin }) => {
   const navigate = useNavigate();
@@ -205,208 +214,214 @@ const AdminLoginPage = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#020617] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto selection:bg-red-500/30 relative">
-      
-      {/* Background Decor - Cyber Dots */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+    <div className="cms-login-bg relative min-h-[100dvh] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto selection:bg-red-500/30">
+      <div className="cms-login-aura cms-login-aura--red" aria-hidden="true" />
+      <div className="cms-login-aura cms-login-aura--blue" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden text-white/[0.05]" aria-hidden="true">
+        <ShieldCheck size={88} className="absolute left-[5%] top-[9%] -rotate-12" />
+        <LayoutDashboard size={72} className="absolute right-[6%] top-[28%] rotate-12" />
+        <BarChart3 size={64} className="absolute bottom-[18%] left-[4%] rotate-6" />
+        <Fingerprint size={76} className="absolute bottom-[6%] right-[9%] -rotate-6" />
+      </div>
 
-      <div className="w-full min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row relative z-10 overflow-x-clip md:overflow-hidden">
-        
-        {/* LEFT COLUMN: CYBER COMMAND CENTER */}
-        <div className="hidden md:flex md:w-[60%] bg-transparent p-10 lg:p-20 flex-col justify-center relative border-r border-white/5 min-w-0">
-          <div className="relative z-10 space-y-12 animate-in fade-in slide-in-from-left-20 duration-1000">
-            <div className="inline-flex items-center gap-3 bg-red-600/10 border border-red-500/20 px-4 py-2 rounded-xl">
-               <ShieldCheck size={18} className="text-red-500" aria-hidden="true" />
-               <span className="text-xs font-black text-red-400  tracking-[0.3em]">Hệ thống quản trị tối cao</span>
+      <div className="relative z-10 w-full min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row overflow-x-clip md:overflow-hidden">
+
+        {/* CỘT TRÁI: GIỚI THIỆU TRUNG TÂM ĐIỀU HÀNH */}
+        <div className="hidden md:flex md:w-[55%] p-10 lg:p-20 flex-col justify-center relative min-w-0">
+          <div className="relative z-10 space-y-10 animate-in fade-in slide-in-from-left-20 duration-1000">
+            <div className="cms-login-chip">
+              <ShieldCheck size={14} aria-hidden="true" />
+              <span>Hệ thống quản trị tối cao</span>
             </div>
 
             <div className="space-y-4">
-               <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
+              <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
                 LMS <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-800">Central</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-400 to-red-700">Central</span>
               </h1>
               <p className="text-slate-400 text-lg lg:text-xl font-medium max-w-xl leading-relaxed">
-                Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng. 
+                Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng.
                 Kiểm soát dữ liệu, phân quyền giảng viên và theo dõi tăng trưởng doanh thu theo thời gian thực.
               </p>
             </div>
 
-            {/* Quick Stats Grid - Premium Feel */}
-            <div className="grid grid-cols-2 gap-6 max-w-lg pt-10">
-               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] group hover:border-red-500/50 transition-all duration-500">
-                  <Activity size={24} className="text-red-500 mb-4 group-hover:scale-110 transition-transform" />
-                  <p className="text-3xl font-black text-white">99.9%</p>
-                  <p className="text-xs font-black text-slate-500  tracking-widest mt-1">Uptime System</p>
-               </div>
-               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] group hover:border-red-500/50 transition-all duration-500">
-                  <Fingerprint size={24} className="text-red-500 mb-4 group-hover:scale-110 transition-transform" />
-                  <p className="text-3xl font-black text-white">AES-256</p>
-                  <p className="text-xs font-black text-slate-500  tracking-widest mt-1">Data Security</p>
-               </div>
+            <div className="grid grid-cols-2 gap-4 max-w-lg">
+              {[
+                { value: '99.9%', label: 'Uptime System', icon: Activity },
+                { value: 'AES-256', label: 'Data Security', icon: Fingerprint },
+              ].map((stat) => (
+                <div key={stat.label} className="cms-login-highlight !items-start !gap-2 !p-5 !text-left">
+                  <span className="cms-login-highlight__icon"><stat.icon size={17} aria-hidden="true" /></span>
+                  <span className="text-3xl font-black text-white">{stat.value}</span>
+                  <span className="text-xs font-black text-slate-500 tracking-widest">{stat.label}</span>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* Glowing Orbs */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-0 w-64 h-64 bg-red-600/5 rounded-full blur-[100px]" />
         </div>
 
-        {/* RIGHT COLUMN: ADMIN GATEWAY */}
-        <div className="w-full md:w-[40%] flex flex-col px-[15px] py-6 sm:p-8 lg:py-10 lg:px-14 xl:py-14 relative bg-[#020617]/50 backdrop-blur-3xl min-w-0 overflow-y-auto">
-          
-          <div className="w-full max-w-md space-y-6 sm:space-y-8 z-10 my-auto mx-auto">
-            <div className="text-center space-y-4 animate-in fade-in zoom-in duration-700">
-              <div className="relative inline-block">
-                <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-12 sm:h-16 max-w-[min(100%,180px)] relative z-10 object-contain mx-auto" />
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Cổng Admin</h2>
-                <p className="text-slate-400 font-bold  text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em]">Xác thực quyền truy cập hệ thống</p>
+        {/* CỘT PHẢI: CỔNG ĐĂNG NHẬP */}
+        <div className="w-full md:w-[45%] flex-1 flex flex-col px-[15px] py-6 sm:p-8 lg:py-10 lg:px-14 xl:py-14 relative min-w-0 overflow-y-auto">
+          <div className="w-full max-w-md space-y-6 z-10 my-auto mx-auto">
+            <div className="flex justify-center animate-in fade-in zoom-in duration-700">
+              <div className="cms-login-logo">
+                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-11 sm:h-12 max-w-[200px] object-contain" />
+                <span className="cms-login-shine" aria-hidden="true" />
               </div>
             </div>
 
-            <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-4 sm:space-y-5 animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
-              {error && (
-                <div role="alert" className="bg-[#1a0505] border-l-4 border-red-600 p-5 rounded-2xl flex items-center gap-4 text-red-400 text-[11px] font-black tracking-widest shadow-2xl">
-                  <AlertTriangle size={20} className="flex-shrink-0" aria-hidden="true" />
-                  <span className="break-anywhere">{error}</span>
+            <div className="cms-login-card px-5 py-6 sm:px-7 sm:py-8 space-y-5 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+              <div className="text-center space-y-2">
+                <div className="cms-login-chip mx-auto">
+                  <ShieldCheck size={14} aria-hidden="true" />
+                  <span>Cổng quản trị</span>
                 </div>
-              )}
-
-              {mfaToken ? (
-                <div className="space-y-4">
-                  <p className="text-slate-400 text-sm font-medium">Nhập mã 6 số từ Google Authenticator / Authy</p>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl px-5 py-5 text-white text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-red-600/50 placeholder:text-slate-500"
-                    placeholder="000000"
-                    autoFocus
-                    aria-label="Mã xác thực 2 bước"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => { setMfaToken(null); setMfaCode(''); setError(null); }}
-                    className="text-xs font-bold text-slate-400 hover:text-white underline"
-                  >
-                    Quay lại đăng nhập
-                  </button>
-                </div>
-              ) : (
-              <>
-              <div className="space-y-3">
-                <label htmlFor="admin-phone" className="text-xs font-black text-slate-400  tracking-[0.2em] block ml-1">Số điện thoại</label>
-                <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
-                    <User size={20} aria-hidden="true" />
-                  </div>
-                  <input
-                    id="admin-phone"
-                    type="tel"
-                    inputMode="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    autoComplete="tel"
-                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-5 py-3.5 sm:py-4 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
-                    placeholder="VD: 0912345678"
-                  />
-                </div>
+                <h2 className="text-fluid-2xl font-black text-white">Cổng Admin</h2>
+                <p className="text-sm text-slate-400 font-medium">
+                  {mfaToken ? 'Nhập mã 6 số từ Google Authenticator / Authy' : 'Xác thực quyền truy cập hệ thống'}
+                </p>
               </div>
 
-              <div className="space-y-3">
-                <label htmlFor="admin-password" className="text-xs font-black text-slate-400  tracking-[0.2em] block ml-1">Master Password</label>
-                <div className="relative group">
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
-                    <Lock size={20} aria-hidden="true" />
+              <form onSubmit={mfaToken ? handleMfaVerify : handleLogin} className="space-y-4">
+                {error && (
+                  <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 text-sm font-bold">
+                    <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />
+                    <span className="break-anywhere">{error}</span>
                   </div>
-                  <input
-                    id="admin-password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className="w-full bg-white/[0.03] border-2 border-white/10 rounded-3xl pl-14 pr-14 py-3.5 sm:py-4 text-white outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all font-black placeholder:text-slate-400 shadow-inner"
-                    placeholder="••••••••••••"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                    className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
-                  </button>
-                </div>
-              </div>
+                )}
 
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500  tracking-[0.2em] block ml-1">Mã bảo vệ</label>
-                <div className="flex gap-3">
-                  <div className="flex-1 bg-white/5 border-2 border-white/5 rounded-3xl p-4 flex items-center justify-center relative overflow-hidden h-16 select-none shadow-inner">
-                    {captchaSvg ? (
-                      <img src={captchaSvg} alt="Mã bảo vệ" className="h-12 w-auto rounded-lg" />
-                    ) : (
-                      <span className="text-xs font-bold text-slate-500  tracking-widest">Đang tải mã…</span>
-                    )}
+                {mfaToken ? (
+                  <div className="space-y-3">
+                    <div className="cms-login-field">
+                      <KeyRound size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={mfaCode}
+                        onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="cms-login-input !text-center !text-2xl !font-black !tracking-[0.4em]"
+                        placeholder="000000"
+                        autoFocus
+                        aria-label="Mã xác thực 2 bước"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setMfaToken(null); setMfaCode(''); setError(null); }}
+                      className="text-xs font-bold text-slate-400 hover:text-white underline"
+                    >
+                      Quay lại đăng nhập
+                    </button>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={generateCaptcha}
-                    className="w-16 h-16 rounded-3xl bg-white/5 border-2 border-white/5 flex items-center justify-center text-slate-500 hover:text-white transition-all hover:bg-white/10 active:scale-95"
-                  >
-                    <Activity size={24} className={loading ? 'animate-pulse' : ''} />
-                  </button>
-                </div>
-                
-                <input
-                  type="text"
-                  required={!mfaToken}
-                  value={userInputCaptcha}
-                  onChange={(e) => setUserInputCaptcha(e.target.value)}
-                  className="w-full bg-white/[0.03] border-2 border-white/5 rounded-2xl px-5 py-4 text-white text-center text-xs font-black outline-none focus:border-red-600/50 focus:bg-white/[0.05] transition-all placeholder:text-slate-700 uppercase tracking-widest"
-                  placeholder="Nhập mã hiển thị ở trên"
-                />
-              </div>
-              </>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="group w-full bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-3xl py-4 font-black  tracking-[0.2em] shadow-2xl shadow-red-900/40 hover:from-red-700 hover:to-rose-800 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-4 border border-white/10"
-              >
-                {loading ? (
-                  <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    {mfaToken ? 'Xác thực OTP' : 'Khởi tạo truy cập'}
-                    <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                    <div className="space-y-1.5">
+                      <label htmlFor="admin-phone" className="text-xs font-bold text-slate-400 block ml-1">Số điện thoại</label>
+                      <div className="cms-login-field group">
+                        <User size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                        <input
+                          id="admin-phone"
+                          type="tel"
+                          inputMode="tel"
+                          required
+                          value={phone}
+                          onChange={(e) => setPhone(limitPhoneInput(e.target.value))}
+                          maxLength={PHONE_MAX_DIGITS + 1}
+                          autoComplete="tel"
+                          className="cms-login-input"
+                          placeholder="VD: 0912345678"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="admin-password" className="text-xs font-bold text-slate-400 block ml-1">Mật khẩu quản trị</label>
+                      <div className="cms-login-field group">
+                        <Lock size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                        <input
+                          id="admin-password"
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          autoComplete="current-password"
+                          className="cms-login-input"
+                          placeholder="••••••••••••"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          className="shrink-0 text-slate-400 hover:text-white transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label htmlFor="admin-captcha" className="text-xs font-bold text-slate-400 block ml-1">Mã bảo vệ</label>
+                      <div className="flex gap-2">
+                        <div className="cms-login-field flex-1 justify-center !min-h-[60px] select-none">
+                          {captchaSvg ? (
+                            <img src={captchaSvg} alt="Mã bảo vệ" className="h-11 w-auto rounded-lg" />
+                          ) : (
+                            <span className="text-xs font-bold text-slate-500">Đang tải mã…</span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={generateCaptcha}
+                          aria-label="Đổi mã bảo vệ khác"
+                          title="Đổi mã bảo vệ khác"
+                          className="cms-login-icon-btn"
+                        >
+                          <RefreshCw size={20} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <div className="cms-login-field">
+                        <input
+                          id="admin-captcha"
+                          type="text"
+                          required={!mfaToken}
+                          value={userInputCaptcha}
+                          onChange={(e) => setUserInputCaptcha(e.target.value)}
+                          className="cms-login-input !text-center !tracking-[0.3em] uppercase placeholder:normal-case placeholder:!tracking-normal"
+                          placeholder="Nhập mã hiển thị ở trên"
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
-              </button>
-            </form>
 
-            {/* Terminal Style Footer */}
-            <div className="text-center pt-6 animate-in fade-in duration-1000 delay-500">
-               <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-4 inline-block">
-                  <p className="text-xs font-mono text-slate-600">
-                    Terminal ID: <span className="text-red-500/70">ADMIN-01X8</span> <br />
-                    Location: <span className="text-slate-400">Vietnam central hub</span>
-                  </p>
-               </div>
+                <button type="submit" disabled={loading} className="cms-login-submit group">
+                  <span className="cms-login-shine" aria-hidden="true" />
+                  {loading ? (
+                    <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                  ) : (
+                    <>
+                      {mfaToken ? 'Xác thực OTP' : 'Khởi tạo truy cập'}
+                      <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
-          </div>
 
-          <div className="absolute bottom-6 text-[9px] font-black text-slate-700  tracking-[0.5em]">
-            Authorized Personnel Only © 2026
+            <div className="grid grid-cols-3 gap-2">
+              {ADMIN_HIGHLIGHTS.map((item) => (
+                <div key={item.label} className="cms-login-highlight">
+                  <span className="cms-login-highlight__icon"><item.icon size={15} aria-hidden="true" /></span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-[11px] font-bold text-slate-500 tracking-widest">
+              Chỉ dành cho nhân sự được cấp quyền · © 2026
+            </p>
           </div>
         </div>
       </div>

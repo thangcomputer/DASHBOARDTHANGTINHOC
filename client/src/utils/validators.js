@@ -17,6 +17,15 @@ export function normalizePhone(value) {
   return /^0[35789]\d{8}$/.test(canonical) ? canonical : '';
 }
 
+export const PHONE_MAX_DIGITS = 11;
+
+/** Lọc khi gõ SĐT: chỉ chữ số (cho phép "+" ở đầu), tối đa PHONE_MAX_DIGITS chữ số. */
+export function limitPhoneInput(value, maxDigits = PHONE_MAX_DIGITS) {
+  const raw = String(value || '');
+  const plus = raw.trimStart().startsWith('+') ? '+' : '';
+  return plus + raw.replace(/\D/g, '').slice(0, maxDigits);
+}
+
 const MOJIBAKE_RE = /\u00c3.|\u00e1\u00ba|\u00e1\u00bb|\u00c4|\u00c6\u00b0/;
 
 export function fixMojibakeText(text) {

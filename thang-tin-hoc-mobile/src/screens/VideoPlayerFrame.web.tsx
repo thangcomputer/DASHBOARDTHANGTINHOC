@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { typography } from '../theme/tokens';
+import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
 import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
 
@@ -187,6 +188,7 @@ export function VideoPlayerFrame({
         playing,
       };
       progressRef.current = snapshot;
+      noteStudyMediaProgress(playing);
       if (now - lastProgressSentAt >= 500) {
         lastProgressSentAt = now;
         callbackRef.current(snapshot);

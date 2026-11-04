@@ -69,6 +69,11 @@ const transactionSchema = new mongoose.Schema({
     allocatedAmount: { type: Number, default: 0, min: 0 },
   }],
 
+  /** Số buổi được trả trong phiếu (hiển thị popup cho GV) */
+  sessionsCount: { type: Number, default: 0, min: 0 },
+  /** GV chưa xem popup "Bạn vừa nhận được thanh toán" cho phiếu đã xác nhận này */
+  teacherPaymentNoticePending: { type: Boolean, default: false },
+
   /** Thưởng sao cộng kèm (VNĐ) — tách khỏi lương cứng × buổi */
   starBonusAmount: { type: Number, default: 0, min: 0 },
   /** Các tháng YYYY-MM đã chi thưởng trong phiếu này */
@@ -95,6 +100,10 @@ transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ status: 1, createdAt: -1 });
 transactionSchema.index({ branchId: 1, status: 1 });
 transactionSchema.index({ branchId: 1, createdAt: -1 });
+transactionSchema.index(
+  { teacherId: 1, confirmedAt: 1 },
+  { partialFilterExpression: { teacherPaymentNoticePending: true } },
+);
 transactionSchema.index(
   { idempotencyKey: 1 },
   { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }

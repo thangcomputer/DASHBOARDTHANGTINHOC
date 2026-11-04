@@ -1,20 +1,89 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
+  Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookOpen, Eye, EyeOff, GraduationCap, UserRound } from 'lucide-react-native';
-import { FormField, PrimaryButton } from '../components/ui';
+import { StatusBar } from 'expo-status-bar';
+import {
+  AlertCircle, Award, BookOpen, CheckCircle2, Eye, EyeOff, GraduationCap, Headphones, KeyRound, Lock, LogIn,
+  MessageCircle, Monitor, Phone, Share2, UserRound, X,
+} from 'lucide-react-native';
 import { useAuth } from '../app/AuthContext';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { mobileApiRequest } from '../services/apiClient';
+import { getWebLogoUrl } from '../services/webSettingsApi';
 import type { UserRole } from '../types';
+
+const ADMIN_ZALO_PHONE = String(process.env.EXPO_PUBLIC_SUPPORT_PHONE || '0935758462').replace(/\D/g, '');
+const SUPPORT_HOTLINE_LABEL = '093 5758 462';
+
+const palette = {
+  page: '#0F172A',
+  panel: '#1E293B',
+  field: 'rgba(30, 41, 59, 0.5)',
+  fieldFocus: '#1E293B',
+  border: 'rgba(255, 255, 255, 0.1)',
+  white: '#FFFFFF',
+  text: '#E2E8F0',
+  muted: '#94A3B8',
+  subtle: '#64748B',
+  red: '#DC2626',
+  redSoft: 'rgba(239, 68, 68, 0.1)',
+  redBorder: 'rgba(239, 68, 68, 0.2)',
+  redText: '#F87171',
+  emeraldSoft: 'rgba(16, 185, 129, 0.1)',
+  emeraldBorder: 'rgba(16, 185, 129, 0.25)',
+  emeraldText: '#A7F3D0',
+  skySoft: 'rgba(14, 165, 233, 0.1)',
+  skyBorder: 'rgba(14, 165, 233, 0.2)',
+  skyText: '#7DD3FC',
+};
+
+/** Same rule as web validators.normalizePhone: 0… or +84…, mobile prefixes 3/5/7/8/9. */
+function normalizePhone(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw || !/^\+?[\d\s.\-()]+$/.test(raw) || raw.slice(1).includes('+')) return '';
+  const compact = raw.replace(/[\s.\-()]/g, '');
+  const canonical = compact.startsWith('+84') ? `0${compact.slice(3)}` : compact.startsWith('+') ? '' : compact;
+  return /^0[35789]\d{8}$/.test(canonical) ? canonical : '';
+}
+
+const PHONE_MAX_DIGITS = 11;
+
+/** Same rule as web validators.limitPhoneInput: digits only (leading "+" allowed), at most 11 digits. */
+function limitPhoneInput(value: string) {
+  const raw = String(value || '');
+  const plus = raw.trimStart().startsWith('+') ? '+' : '';
+  return plus + raw.replace(/\D/g, '').slice(0, PHONE_MAX_DIGITS);
+}
+
+function roleLabel(role: UserRole) {
+  return role === 'teacher' ? 'Giảng viên' : 'Học viên';
+}
+
+function forgotPasswordMessage(role: UserRole, phone: string) {
+  return '[THẮNG TIN HỌC] Yêu cầu cấp lại mật khẩu\n\n'
+    + `Vai trò: ${roleLabel(role)}\n`
+    + 'Họ tên: (chưa rõ tên)\n'
+    + `SĐT: ${phone}\n\n`
+    + 'Anh/chị Admin vui lòng cấp mật khẩu mới giúp em. Xin cảm ơn!';
+}
+
+function openAdminZalo(message = '') {
+  const base = `https://zalo.me/${ADMIN_ZALO_PHONE}`;
+  void Linking.openURL(message ? `${base}?text=${encodeURIComponent(message)}` : base);
+}
 
 export function LoginScreen() {
   const { signIn, isSigningIn, authError } = useAuth();
@@ -23,6 +92,26 @@ export function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [focused, setFocused] = useState<'phone' | 'password' | null>(null);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [logoFailed, setLogoFailed] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getWebLogoUrl().then((url) => { if (alive) setLogoUrl(url); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return undefined;
+    // Chrome autofill tô nền xanh nhạt + chữ đen lên ô nhập nền tối.
+    const style = document.createElement('style');
+    style.textContent = 'input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active'
+      + '{-webkit-text-fill-color:#fff;caret-color:#fff;transition:background-color 600000s 0s,color 600000s 0s;}';
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
 
   const chooseRole = (nextRole: UserRole) => {
     setRole(nextRole);
@@ -31,132 +120,607 @@ export function LoginScreen() {
 
   const submit = async () => {
     setError('');
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      setError('Số điện thoại không hợp lệ (hỗ trợ 0... hoặc +84...)');
+      return;
+    }
     try {
-      await signIn(role, phone, password);
+      await signIn(role, normalized, password);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể đăng nhập.');
     }
   };
 
+  const message = error || authError;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StatusBar style="light" />
+      <View style={styles.backdrop} pointerEvents="none">
+        <View style={[styles.aura, styles.auraRed]} />
+        <View style={[styles.aura, styles.auraBlue]} />
+        <GraduationCap size={64} color="rgba(255,255,255,0.05)" style={[styles.motif, { top: '8%', left: '6%', transform: [{ rotate: '-14deg' }] }]} />
+        <BookOpen size={52} color="rgba(255,255,255,0.045)" style={[styles.motif, { top: '30%', right: '5%', transform: [{ rotate: '12deg' }] }]} />
+        <Award size={48} color="rgba(255,255,255,0.04)" style={[styles.motif, { bottom: '20%', left: '4%', transform: [{ rotate: '10deg' }] }]} />
+        <Monitor size={56} color="rgba(255,255,255,0.04)" style={[styles.motif, { bottom: '6%', right: '8%', transform: [{ rotate: '-8deg' }] }]} />
+      </View>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.brandMark}><BookOpen color="#FFFFFF" size={27} strokeWidth={2.2} /></View>
-          <Text style={styles.brandName}>Thắng Tin Học</Text>
-          <Text style={styles.eyebrow}>Học tập, theo cách của bạn</Text>
-          <Text style={styles.welcome}>Chào mừng{'\n'}bạn quay trở lại</Text>
-          <Text style={styles.intro}>Dùng số điện thoại và mật khẩu thật đang sử dụng trên website.</Text>
-
-          <View style={styles.form}>
-            <Text style={styles.label}>Bạn đang đăng nhập với vai trò</Text>
-            <View style={styles.roleSwitch}>
-              <RoleButton active={role === 'student'} title="Học viên" icon={<GraduationCap size={18} color={role === 'student' ? colors.brandDark : colors.muted} />} onPress={() => chooseRole('student')} />
-              <RoleButton active={role === 'teacher'} title="Giảng viên" icon={<UserRound size={18} color={role === 'teacher' ? colors.brandDark : colors.muted} />} onPress={() => chooseRole('teacher')} />
-            </View>
-
-            <FormField
-              label="Số điện thoại"
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Số điện thoại tài khoản Web"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-              accessibilityLabel="Số điện thoại"
-            />
-            <View style={styles.passwordField}>
-              <FormField
-                label="Mật khẩu"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Nhập mật khẩu"
-                secureTextEntry={!showPassword}
-                autoComplete="password"
-                textContentType="password"
-                accessibilityLabel="Mật khẩu"
+          <View style={styles.logoDroplet}>
+            {logoUrl && !logoFailed ? (
+              <Image
+                source={{ uri: logoUrl }}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="Thắng Tin Học"
+                onError={() => setLogoFailed(true)}
               />
-              <Pressable
-                style={styles.eyeButton}
-                onPress={() => setShowPassword((shown) => !shown)}
-                accessibilityRole="button"
-                accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-              >
-                {showPassword ? <EyeOff size={19} color={colors.muted} /> : <Eye size={19} color={colors.muted} />}
-              </Pressable>
+            ) : (
+              <View style={styles.logoFallback}>
+                <View style={styles.logoMark}><BookOpen color={palette.white} size={20} strokeWidth={2.2} /></View>
+                <Text style={styles.logoText}>Thắng Tin Học</Text>
+              </View>
+            )}
+            <View style={styles.dropletShine} pointerEvents="none" />
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.chip}>
+              <GraduationCap size={14} color="#FCA5A5" />
+              <Text style={styles.chipText}>Nền tảng học Tin học văn phòng</Text>
             </View>
-            {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <PrimaryButton title="Đăng nhập" onPress={submit} loading={isSigningIn} />
+            <Text style={styles.title}>Đăng nhập tài khoản</Text>
+            <Text style={styles.subtitle}>Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</Text>
+
+            <View style={styles.roleTabs} accessibilityRole="tablist" accessibilityLabel="Chọn vai trò đăng nhập">
+              {(['student', 'teacher'] as const).map((value) => {
+                const active = role === value;
+                const Icon = value === 'teacher' ? UserRound : GraduationCap;
+                return (
+                  <Pressable
+                    key={value}
+                    onPress={() => chooseRole(value)}
+                    style={[styles.roleTab, active && styles.roleTabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Icon size={16} color={active ? palette.white : palette.muted} />
+                    <Text style={[styles.roleTabText, active && styles.roleTabTextActive]}>{roleLabel(value)}</Text>
+                    {active ? <View style={styles.dropletShine} pointerEvents="none" /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {message ? (
+              <View style={styles.errorBox} accessibilityRole="alert">
+                <AlertCircle size={18} color={palette.redText} />
+                <Text style={styles.errorText}>{message}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Số điện thoại</Text>
+              <View style={[styles.inputWrap, focused === 'phone' && styles.inputWrapFocused]}>
+                <UserRound size={18} color={focused === 'phone' ? palette.red : palette.muted} />
+                <TextInput
+                  value={phone}
+                  onChangeText={(value) => setPhone(limitPhoneInput(value))}
+                  maxLength={PHONE_MAX_DIGITS + 1}
+                  placeholder="VD: 0912345678"
+                  placeholderTextColor={palette.muted}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  onFocus={() => setFocused('phone')}
+                  onBlur={() => setFocused(null)}
+                  style={styles.input}
+                  accessibilityLabel="Số điện thoại"
+                />
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Mật khẩu</Text>
+              <View style={[styles.inputWrap, focused === 'password' && styles.inputWrapFocused]}>
+                <Lock size={18} color={focused === 'password' ? palette.red : palette.muted} />
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={palette.muted}
+                  secureTextEntry={!showPassword}
+                  autoComplete="password"
+                  textContentType="password"
+                  onFocus={() => setFocused('password')}
+                  onBlur={() => setFocused(null)}
+                  onSubmitEditing={() => { void submit(); }}
+                  returnKeyType="go"
+                  style={styles.input}
+                  accessibilityLabel="Mật khẩu"
+                />
+                <Pressable
+                  onPress={() => setShowPassword((shown) => !shown)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
+                  {showPassword ? <EyeOff size={18} color={palette.muted} /> : <Eye size={18} color={palette.muted} />}
+                </Pressable>
+              </View>
+            </View>
+
+            <Pressable onPress={() => setForgotOpen(true)} style={styles.forgotLink} accessibilityRole="button">
+              <KeyRound size={12} color={palette.muted} />
+              <Text style={styles.forgotLinkText}>Quên mật khẩu?</Text>
+            </Pressable>
 
             <Pressable
-              onPress={() => Alert.alert('Quên mật khẩu', 'Vui lòng liên hệ trung tâm để được hỗ trợ đặt lại mật khẩu.')}
+              onPress={() => { void submit(); }}
+              disabled={isSigningIn}
+              style={({ pressed }) => [styles.submit, (pressed || isSigningIn) && styles.submitPressed]}
               accessibilityRole="button"
-              style={styles.forgot}
+              accessibilityLabel="Đăng nhập ngay"
             >
-              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+              <View style={styles.submitShine} pointerEvents="none" />
+              {isSigningIn ? <ActivityIndicator color={palette.white} /> : (
+                <>
+                  <LogIn size={18} color={palette.white} />
+                  <Text style={styles.submitText}>Đăng nhập ngay</Text>
+                </>
+              )}
             </Pressable>
           </View>
 
-          <Text style={styles.footer}>{Platform.OS === 'web'
-            ? 'Phiên đăng nhập được giữ trong tab trình duyệt hiện tại'
-            : 'Đăng nhập an toàn bằng phiên mobile của hệ thống'}</Text>
+          <View style={styles.highlights}>
+            {[
+              { icon: BookOpen, label: 'Học mọi lúc' },
+              { icon: Award, label: 'Thi chứng nhận' },
+              { icon: Headphones, label: 'Hỗ trợ tận tâm' },
+            ].map(({ icon: Icon, label }) => (
+              <View key={label} style={styles.highlight}>
+                <View style={styles.highlightIcon}><Icon size={15} color="#FCA5A5" /></View>
+                <Text style={styles.highlightText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              Chưa có tài khoản?{' '}
+              <Text style={styles.footerLink} onPress={() => openAdminZalo()} accessibilityRole="link">Liên hệ Admin</Text>
+            </Text>
+            <Text style={styles.supportTitle}>Hỗ trợ kỹ thuật</Text>
+            <Text style={styles.supportText}>Hotline: {SUPPORT_HOTLINE_LABEL}</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ForgotPasswordModal visible={forgotOpen} initialRole={role} onClose={() => setForgotOpen(false)} />
     </SafeAreaView>
   );
 }
 
-function RoleButton({
-  active,
-  title,
-  icon,
-  onPress,
-}: {
-  active: boolean;
-  title: string;
-  icon: React.ReactNode;
-  onPress: () => void;
-}) {
+function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boolean; initialRole: UserRole; onClose: () => void }) {
+  const [role, setRole] = useState<UserRole>(initialRole);
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sentMessage, setSentMessage] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    setRole(initialRole);
+    setPhone('');
+    setError('');
+    setSentMessage('');
+  }, [initialRole, visible]);
+
+  const normalized = normalizePhone(phone);
+
+  const confirm = async () => {
+    if (!normalized) {
+      setError('Số điện thoại không hợp lệ');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await mobileApiRequest('/auth/forgot-password/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalized, role }),
+      }, false);
+      setSentMessage(forgotPasswordMessage(role, normalized));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Không gửi được yêu cầu. Thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={[styles.roleButton, active && styles.roleButtonActive]}
-    >
-      <View style={[styles.roleIcon, active && styles.roleIconActive]}>{icon}</View>
-      <Text style={[styles.roleText, active && styles.roleTextActive]}>{title}</Text>
-    </Pressable>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeaderIcon}><KeyRound size={20} color={palette.white} /></View>
+            <View style={styles.flex}>
+              <Text style={styles.modalTitle}>Quên mật khẩu</Text>
+              <Text style={styles.modalSubtitle}>{sentMessage ? 'Tin nhắn đã sẵn — chỉ việc gửi' : 'Nhập SĐT › xác nhận'}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.modalClose} accessibilityRole="button" accessibilityLabel="Đóng">
+              <X size={16} color={palette.white} />
+            </Pressable>
+          </View>
+
+          <View style={styles.modalBody}>
+            {!sentMessage ? (
+              <>
+                <Text style={styles.modalLabel}>Vai trò</Text>
+                <View style={styles.modalRoleRow}>
+                  {(['student', 'teacher'] as const).map((value) => {
+                    const active = role === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        onPress={() => setRole(value)}
+                        style={[styles.modalRole, active && styles.modalRoleActive]}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text style={[styles.modalRoleText, active && styles.modalRoleTextActive]}>{roleLabel(value)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.modalLabel}>Số điện thoại đăng ký</Text>
+                <View style={styles.modalInputWrap}>
+                  <Phone size={16} color={palette.subtle} />
+                  <TextInput
+                    value={phone}
+                    onChangeText={(value) => { setPhone(limitPhoneInput(value)); setError(''); }}
+                    maxLength={PHONE_MAX_DIGITS + 1}
+                    placeholder="VD: 0912345678"
+                    placeholderTextColor={palette.muted}
+                    keyboardType="phone-pad"
+                    style={styles.input}
+                    accessibilityLabel="Số điện thoại đăng ký"
+                  />
+                </View>
+                {normalized ? (
+                  <View style={styles.confirmBox}>
+                    <Text style={styles.confirmLabel}>Dòng xác nhận</Text>
+                    <Text style={styles.confirmText}>{`Xác nhận: ${roleLabel(role)} · SĐT ${normalized}`}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.hintBox}>
+                    <Text style={styles.hintText}>Nhập SĐT đăng ký — sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.</Text>
+                  </View>
+                )}
+                {error ? (
+                  <View style={styles.errorBox}>
+                    <AlertCircle size={14} color={palette.redText} />
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                ) : null}
+                <Pressable
+                  onPress={() => { void confirm(); }}
+                  disabled={loading || !normalized}
+                  style={[styles.modalPrimary, (loading || !normalized) && styles.modalPrimaryDisabled]}
+                  accessibilityRole="button"
+                >
+                  {loading ? <ActivityIndicator color={palette.white} /> : (
+                    <>
+                      <CheckCircle2 size={16} color={palette.white} />
+                      <Text style={styles.modalPrimaryText}>Xác nhận</Text>
+                    </>
+                  )}
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.sentHeader}>
+                  <View style={styles.sentIcon}><CheckCircle2 size={28} color="#34D399" /></View>
+                  <Text style={styles.sentTitle}>Đã ghi nhận yêu cầu</Text>
+                  <Text style={styles.sentSubtitle}>{`${roleLabel(role)}: ${normalized}`}</Text>
+                </View>
+                <View style={styles.messageBox}>
+                  <Text style={styles.modalLabel}>Nội dung tin nhắn</Text>
+                  <Text style={styles.messageText} selectable>{sentMessage}</Text>
+                </View>
+                <View style={styles.modalActions}>
+                  <Pressable
+                    onPress={() => { void Share.share({ message: sentMessage }); }}
+                    style={styles.modalSecondary}
+                    accessibilityRole="button"
+                  >
+                    <Share2 size={16} color={palette.white} />
+                    <Text style={styles.modalSecondaryText}>Chia sẻ</Text>
+                  </Pressable>
+                  <Pressable onPress={() => openAdminZalo(sentMessage)} style={[styles.modalPrimary, styles.flex]} accessibilityRole="button">
+                    <MessageCircle size={16} color={palette.white} />
+                    <Text style={styles.modalPrimaryText}>Zalo Admin</Text>
+                  </Pressable>
+                </View>
+                <Pressable onPress={() => setSentMessage('')} style={styles.modalBack} accessibilityRole="button">
+                  <Text style={styles.modalBackText}>Quay lại</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
+  safe: { flex: 1, backgroundColor: palette.page },
   flex: { flex: 1 },
-  scroll: { width: '100%', maxWidth: 520, alignSelf: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xxl, paddingBottom: spacing.xxl },
-  brandMark: { width: 54, height: 54, borderRadius: 18, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
-  brandName: { color: colors.brandDark, fontWeight: '900', fontSize: typography.small, letterSpacing: 1.8 },
-  eyebrow: { color: colors.brand, fontWeight: '800', fontSize: typography.micro, letterSpacing: 1.4, marginTop: spacing.xxxl },
-  welcome: { color: colors.ink, fontSize: typography.hero, lineHeight: 40, letterSpacing: -1, fontWeight: '800', marginTop: spacing.md },
-  intro: { color: colors.muted, fontSize: typography.body, marginTop: spacing.sm, lineHeight: 22 },
-  form: { marginTop: spacing.xxl, gap: spacing.lg },
-  label: { color: colors.ink, fontSize: typography.small, fontWeight: '700' },
-  roleSwitch: { flexDirection: 'row', gap: spacing.md },
-  roleButton: { flex: 1, minHeight: 58, borderRadius: radius.sm, backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  roleButtonActive: { backgroundColor: colors.brandSoft, borderColor: colors.brand },
-  roleIcon: {},
-  roleIconActive: {},
-  roleText: { color: colors.muted, fontSize: typography.small, fontWeight: '600' },
-  roleTextActive: { color: colors.brandDark, fontWeight: '800' },
-  passwordField: { position: 'relative' },
-  eyeButton: { position: 'absolute', right: spacing.md, bottom: 7, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  errorText: { color: colors.red, fontSize: typography.small },
-  forgot: { alignSelf: 'center', padding: spacing.sm },
-  forgotText: { color: colors.brandDark, fontWeight: '700', fontSize: typography.small },
-  footer: { color: colors.muted, fontSize: typography.caption, textAlign: 'center', marginTop: spacing.xxxl },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    overflow: 'hidden',
+    backgroundImage: 'linear-gradient(165deg, #0B1224 0%, #0F172A 48%, #1B1230 100%)',
+  } as never,
+  aura: { position: 'absolute', width: 420, height: 420, borderRadius: 210 },
+  auraRed: {
+    top: -170,
+    right: -170,
+    backgroundImage: 'radial-gradient(circle, rgba(220, 38, 38, 0.32) 0%, rgba(220, 38, 38, 0) 68%)',
+  } as never,
+  auraBlue: {
+    bottom: -190,
+    left: -190,
+    backgroundImage: 'radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 68%)',
+  } as never,
+  motif: { position: 'absolute' },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 28,
+  },
+  logoDroplet: {
+    alignSelf: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 22,
+    overflow: 'hidden',
+    boxShadow: '0px 10px 26px rgba(2, 6, 23, 0.55), 0px 0px 0px 4px rgba(255, 255, 255, 0.06), inset 0px 3px 4px rgba(255, 255, 255, 1), inset 0px -4px 8px rgba(148, 163, 184, 0.35)',
+  },
+  dropletShine: {
+    position: 'absolute',
+    top: 2,
+    left: '12%',
+    right: '12%',
+    height: '42%',
+    borderRadius: 999,
+    backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0))',
+  } as never,
+  logo: { width: 176, height: 46 },
+  logoFallback: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoMark: { width: 38, height: 38, borderRadius: 12, backgroundColor: palette.red, alignItems: 'center', justifyContent: 'center' },
+  logoText: { color: '#B91C1C', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  card: {
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    boxShadow: '0px 28px 56px rgba(2, 6, 23, 0.6), inset 0px 1px 0px rgba(255, 255, 255, 0.1), inset 0px -1px 0px rgba(255, 255, 255, 0.03)',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.25)',
+    marginBottom: 12,
+  },
+  chipText: { color: '#FECACA', fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  roleTabs: {
+    flexDirection: 'row',
+    padding: 5,
+    gap: 4,
+    borderRadius: 18,
+    backgroundColor: 'rgba(2, 6, 23, 0.55)',
+    marginBottom: 18,
+    boxShadow: 'inset 0px 2px 6px rgba(0, 0, 0, 0.55), inset 0px -1px 0px rgba(255, 255, 255, 0.06)',
+  },
+  roleTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  roleTabActive: {
+    backgroundColor: palette.red,
+    backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
+    boxShadow: '0px 8px 18px rgba(185, 28, 28, 0.45), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -3px 6px rgba(127, 29, 29, 0.55)',
+  } as never,
+  roleTabText: { color: palette.muted, fontSize: 13, fontWeight: '800', letterSpacing: 0.4 },
+  roleTabTextActive: { color: palette.white },
+  title: { color: palette.white, fontSize: 24, fontWeight: '900', textAlign: 'center' },
+  subtitle: { color: palette.muted, fontSize: 14, fontWeight: '500', textAlign: 'center', marginTop: 6, marginBottom: 18, lineHeight: 20 },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: palette.redSoft,
+    borderWidth: 1,
+    borderColor: palette.redBorder,
+    marginBottom: 14,
+  },
+  errorText: { flex: 1, color: palette.redText, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  fieldGroup: { marginBottom: 14, gap: 6 },
+  label: { color: palette.muted, fontSize: 12, fontWeight: '700', marginLeft: 4 },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 54,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(2, 6, 23, 0.5)',
+    boxShadow: 'inset 0px 2px 6px rgba(0, 0, 0, 0.45), inset 0px -1px 0px rgba(255, 255, 255, 0.05)',
+  },
+  inputWrapFocused: {
+    borderColor: 'rgba(239, 68, 68, 0.75)',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    boxShadow: '0px 0px 0px 4px rgba(239, 68, 68, 0.16), inset 0px 2px 6px rgba(0, 0, 0, 0.45)',
+  },
+  input: { flex: 1, color: palette.white, fontSize: 16, fontWeight: '600', paddingVertical: 12, outlineStyle: 'none' } as never,
+  forgotLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', paddingVertical: 4, marginBottom: 16 },
+  forgotLinkText: { color: palette.muted, fontSize: 12, fontWeight: '700' },
+  submit: {
+    minHeight: 56,
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: palette.red,
+    backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    boxShadow: '0px 14px 28px rgba(185, 28, 28, 0.45), inset 0px 2px 4px rgba(255, 255, 255, 0.4), inset 0px -4px 8px rgba(127, 29, 29, 0.55)',
+  } as never,
+  submitShine: {
+    position: 'absolute',
+    top: 3,
+    left: '8%',
+    right: '8%',
+    height: '45%',
+    borderRadius: 999,
+    backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0))',
+  } as never,
+  submitPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  submitText: { color: palette.white, fontSize: 16, fontWeight: '900', letterSpacing: 0.8 },
+  highlights: { flexDirection: 'row', gap: 8, marginTop: 18 },
+  highlight: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 0.07)',
+  },
+  highlightIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(220, 38, 38, 0.16)',
+    boxShadow: 'inset 0px 2px 3px rgba(255, 255, 255, 0.12), inset 0px -2px 4px rgba(0, 0, 0, 0.25)',
+  },
+  highlightText: { color: palette.text, fontSize: 11, fontWeight: '700' },
+  footer: { alignItems: 'center', marginTop: 22, gap: 6 },
+  footerText: { color: palette.muted, fontSize: 14, fontWeight: '500' },
+  footerLink: { color: palette.white, fontWeight: '900' },
+  supportTitle: { color: palette.subtle, fontSize: 12, fontWeight: '900', letterSpacing: 1.4, marginTop: 18 },
+  supportText: { color: palette.muted, fontSize: 12, fontWeight: '700' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.7)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modalCard: { width: '100%', maxWidth: 420, borderRadius: 24, backgroundColor: palette.panel, borderWidth: 1, borderColor: palette.border, overflow: 'hidden' },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: palette.red,
+    backgroundImage: 'linear-gradient(90deg, #DC2626, #EA580C)',
+  } as never,
+  modalHeaderIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' },
+  modalTitle: { color: palette.white, fontSize: 18, fontWeight: '900' },
+  modalSubtitle: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 12, fontWeight: '500' },
+  modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.12)', alignItems: 'center', justifyContent: 'center' },
+  modalBody: { padding: 20, gap: 12 },
+  modalLabel: { color: palette.muted, fontSize: 12, fontWeight: '700' },
+  modalRoleRow: { flexDirection: 'row', gap: 8 },
+  modalRole: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 2, borderColor: palette.border, alignItems: 'center' },
+  modalRoleActive: { borderColor: '#EF4444', backgroundColor: palette.redSoft },
+  modalRoleText: { color: palette.muted, fontSize: 14, fontWeight: '700' },
+  modalRoleTextActive: { color: palette.redText },
+  modalInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: palette.border,
+    backgroundColor: palette.page,
+  },
+  confirmBox: { padding: 12, borderRadius: 12, backgroundColor: palette.emeraldSoft, borderWidth: 1, borderColor: palette.emeraldBorder, gap: 2 },
+  confirmLabel: { color: 'rgba(52, 211, 153, 0.8)', fontSize: 11, fontWeight: '700' },
+  confirmText: { color: palette.emeraldText, fontSize: 14, fontWeight: '700' },
+  hintBox: { padding: 12, borderRadius: 12, backgroundColor: palette.skySoft, borderWidth: 1, borderColor: palette.skyBorder },
+  hintText: { color: palette.skyText, fontSize: 12, fontWeight: '700', lineHeight: 18 },
+  modalPrimary: {
+    minHeight: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: palette.red,
+    backgroundImage: 'linear-gradient(90deg, #DC2626, #EA580C)',
+  } as never,
+  modalPrimaryDisabled: { opacity: 0.5 },
+  modalPrimaryText: { color: palette.white, fontSize: 14, fontWeight: '900' },
+  sentHeader: { alignItems: 'center', gap: 6 },
+  sentIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: palette.emeraldSoft, alignItems: 'center', justifyContent: 'center' },
+  sentTitle: { color: palette.white, fontSize: 16, fontWeight: '800' },
+  sentSubtitle: { color: palette.muted, fontSize: 14 },
+  messageBox: { padding: 12, borderRadius: 12, backgroundColor: palette.page, borderWidth: 1, borderColor: palette.border, gap: 6 },
+  messageText: { color: palette.text, fontSize: 12, lineHeight: 18, fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) },
+  modalActions: { flexDirection: 'row', gap: 8 },
+  modalSecondary: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  modalSecondaryText: { color: palette.white, fontSize: 14, fontWeight: '700' },
+  modalBack: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center' },
+  modalBackText: { color: palette.muted, fontSize: 14, fontWeight: '700' },
 });

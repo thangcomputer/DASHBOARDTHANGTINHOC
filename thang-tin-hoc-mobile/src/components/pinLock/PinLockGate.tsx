@@ -17,6 +17,7 @@ import {
   removePin,
   setLockedFlag,
   setPinActivityUser,
+  setPinLockedState,
   verifyPin,
   type PinConfig,
 } from '../../services/pinLock';
@@ -41,6 +42,11 @@ export function PinLockGate({
   const lockedRef = useRef(false);
   configRef.current = config;
   lockedRef.current = locked;
+
+  useEffect(() => {
+    setPinLockedState(locked);
+  }, [locked]);
+  useEffect(() => () => setPinLockedState(false), []);
 
   const lock = useCallback(async () => {
     if (!configRef.current) return;

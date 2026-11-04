@@ -10,6 +10,7 @@ const { policyShadowQuizAdminRead } = require('../middleware/policyShadowQuizAdm
 const { policyShadowQuiz } = require('../middleware/policyShadowQuiz');
 const { quizzesCutoverGate } = require('../middleware/quizzesCutoverGate');
 const { scheduleQuizAssignedNotify } = require('../services/quizAssignedNotifier');
+const learningGoalService = require('../services/learningGoalService');
 const {
   studentAssignedToQuiz,
   quizWindow,
@@ -371,6 +372,9 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
         success: false,
         message: 'Không thể xác nhận quyền ghi bài nộp',
       });
+    }
+    if (!isForfeit) {
+      learningGoalService.trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(userAnswers) });
     }
 
     // Thông báo GV (bỏ qua forfeit trùng khi đã nộp bình thường — đã return sớm ở trên)

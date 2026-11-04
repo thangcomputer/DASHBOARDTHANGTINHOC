@@ -49,6 +49,7 @@ import { useIsDesktopExamDevice } from './utils/examDevice';
 import { BranchProvider }                    from './context/BranchContext';
 import LoadingScreen                         from './components/LoadingScreen';
 import PopupBanner                           from './components/PopupBanner';
+import StudyHeartbeat                        from './components/student/StudyHeartbeat';
 import OfflineBanner                         from './components/OfflineBanner';
 import { ModalProvider, useModal }           from './utils/Modal.jsx';
 import SecurityGuard                         from './components/SecurityGuard';
@@ -56,7 +57,7 @@ import FaviconSwitcher                       from './components/FaviconSwitcher'
 import { unlockAudio }                       from './utils/sound';
 import { getMessagingRole }                  from './lib/messagingRoles';
 import { hasPermission, PERMISSIONS }        from './constants/permissions';
-import { snapshotLoginAlertStorage, restoreLoginAlertStorage } from './components/LoginInboxAlertPopup';
+import { clearStorageKeepingPreferences } from './utils/logoutStorage';
 import './App.css';
 
 // ── Session helpers ──────────────────────────────────────────────────────────
@@ -632,14 +633,11 @@ function App() {
       return;
     }
     const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
-    const loginAlerts = snapshotLoginAlertStorage();
     const role = session.role;
     try { await api.auth.logout(); } catch { /* ignore */ }
     clearTokens(role);
-    localStorage.clear();
-    sessionStorage.clear();
+    clearStorageKeepingPreferences();
     if (deviceId) localStorage.setItem('cms_device_id_v1', deviceId);
-    restoreLoginAlertStorage(loginAlerts);
     setSession(null);
     navigate('/login');
   }, [navigate, session]);
@@ -699,6 +697,7 @@ function App() {
                     />
                     {/* Popup thông báo — Nhân viên (cùng cấu hình với tab Popup) */}
                     {session?.role === 'staff' && <PopupBanner role="staff" />}
+                    {session?.role === 'student' && <StudyHeartbeat />}
                 </ToastProvider>
                 </BranchProvider>
             </DataProvider>

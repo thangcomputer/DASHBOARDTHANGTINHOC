@@ -16,6 +16,7 @@ const { postSalary, voidLedgerEntry } = require('../services/ledgerService');
 const LedgerEntry = require('../models/LedgerEntry');
 const { allowHardDeleteFinance } = require('../utils/financeFlags');
 const { emitFinanceEvent, emitDataRefresh } = require('../utils/realtimeEmit');
+const { notifyTeacherPaymentReceived, teacherPaymentNotice } = require('../services/teacherPaymentNotice');
 
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
@@ -116,6 +117,42 @@ router.get('/teacher/:teacherId', authMiddleware, policyShadowFinance('tx_teache
     const transactions = await Transaction.find({ teacherId: req.params.teacherId })
       .sort({ createdAt: -1 });
     res.json({ success: true, data: transactions });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── GET /api/transactions/me/payment-notices ─────────────────────────────────
+// GV: các phiếu lương đã xác nhận mà GV chưa xem popup (hiện lần lượt, mỗi phiếu một lần)
+router.get('/me/payment-notices', authMiddleware, policyShadowFinance('tx_payment_notices'), async (req, res) => {
+  try {
+    if (req.user.role !== 'teacher') return res.json({ success: true, data: [] });
+    const rows = await Transaction.find({
+      teacherId: req.user.id,
+      status: 'confirmed',
+      teacherPaymentNoticePending: true,
+    })
+      .sort({ confirmedAt: 1, createdAt: 1 })
+      .limit(20)
+      .lean();
+    res.json({ success: true, data: rows.map((row) => teacherPaymentNotice(row)) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── PUT /api/transactions/:id/payment-notice-seen ────────────────────────────
+// GV đã xem popup thanh toán của phiếu này
+router.put('/:id/payment-notice-seen', authMiddleware, policyShadowFinance('tx_payment_notice_seen'), async (req, res) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ success: false, message: 'Chỉ giảng viên mới xác nhận đã xem' });
+    }
+    await Transaction.updateOne(
+      { _id: req.params.id, teacherId: req.user.id },
+      { $set: { teacherPaymentNoticePending: false } },
+    );
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -236,9 +273,17 @@ router.put('/:id/confirm', authMiddleware, policyShadowFinance('tx_confirm'), ch
   try {
     const { confirmedBy = 'Admin' } = req.body;
 
+    const previous = await Transaction.findById(req.params.id).select('status').lean();
+    const firstConfirm = Boolean(previous) && previous.status !== 'confirmed';
+
     const transaction = await Transaction.findByIdAndUpdate(
       req.params.id,
-      { status: 'confirmed', confirmedBy, confirmedAt: new Date() },
+      {
+        status: 'confirmed',
+        confirmedBy,
+        confirmedAt: new Date(),
+        ...(firstConfirm ? { teacherPaymentNoticePending: true } : {}),
+      },
       { returnDocument: 'after' }
     ).populate('teacherId', 'name phone');
 
@@ -267,6 +312,7 @@ router.put('/:id/confirm', authMiddleware, policyShadowFinance('tx_confirm'), ch
           status: 'pending',
           confirmedBy: '',
           confirmedAt: null,
+          teacherPaymentNoticePending: false,
         });
       } catch (rbErr) {
         logger.error('[TRANSACTIONS] confirm rollback failed: %s', rbErr.message);
@@ -301,6 +347,7 @@ router.put('/:id/confirm', authMiddleware, policyShadowFinance('tx_confirm'), ch
         branchId,
         userIds: teacherUid ? [teacherUid] : [],
       });
+      if (firstConfirm) notifyTeacherPaymentReceived(io, transaction);
     }
 
     res.json({ success: true, data: transaction });
@@ -322,7 +369,7 @@ router.put('/:id/cancel', authMiddleware, policyShadowFinance('tx_cancel'), chec
 
     const transaction = await Transaction.findByIdAndUpdate(
       req.params.id,
-      { status: 'cancelled' },
+      { status: 'cancelled', teacherPaymentNoticePending: false },
       { returnDocument: 'after' }
     );
 

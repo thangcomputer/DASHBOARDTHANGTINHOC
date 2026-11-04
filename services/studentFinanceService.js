@@ -239,6 +239,8 @@ async function payTeacherForStudent({
         bankAccount: teacher.bankAccount?.accountNumber || '',
         note: `student:${studentId}`,
         idempotencyKey: key,
+        sessionsCount: actualCount,
+        teacherPaymentNoticePending: true,
       });
       await postSalary({
         teacher,

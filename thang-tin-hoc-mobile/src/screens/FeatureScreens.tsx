@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Ban, Bell, BookOpen, BookText, CalendarDays, Camera, Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileSpreadsheet,
-  FileText, Film, GraduationCap, KeyRound, Landmark, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Table2, Trash2, UserRound, Users, WalletCards, X,
+  FileText, Film, GraduationCap, KeyRound, Landmark, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Table2, Target, Trash2, UserRound, Users, WalletCards, X,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -33,6 +33,7 @@ import { buildDirectConversationId } from '../services/messageApi';
 import { enableMobilePushNotifications, requestWebNotificationPermission } from '../services/mobilePushNotifications';
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
 import { pinUserKey } from '../services/pinLock';
+import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -4261,7 +4262,8 @@ export function ProfileScreen() {
       ) : (
         <Card style={styles.menuCard}>
           <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
-          <MenuRow icon={<KeyRound size={18} color={colors.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} borderless />
+          <MenuRow icon={<KeyRound size={18} color={colors.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
+          <MenuRow icon={<Target size={18} color={colors.brand} />} title="Mục tiêu học" subtitle="Đặt hoặc đổi số giờ học mỗi ngày" onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)} borderless />
         </Card>
       )}
       {showPinSettings && user ? (

@@ -9,6 +9,8 @@ const fileService = require('../services/fileService');
 const logger = require('../config/logger');
 const service = require('../services/lessonPracticeService');
 const coursePurchaseService = require('../services/lessonPracticePurchaseService');
+const learningGoalService = require('../services/learningGoalService');
+const learningLeaderboardService = require('../services/learningLeaderboardService');
 const PaymentSession = require('../models/PaymentSession');
 
 const requireAdmin = [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENT_TRAINING)];
@@ -283,6 +285,41 @@ router.post('/my/units/:id/reset-practice', ...requireStudent, async (req, res) 
 router.post('/my/items/:id/confirm', ...requireStudent, async (req, res) => {
   try {
     const data = await service.confirmItem(studentId(req), req.params.id, req.body || {});
+    if (data && !data.retry && data.alreadyConfirmed === false) {
+      learningGoalService.trackStudyActivity(studentId(req), { questions: 1 });
+    }
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+// ── Mục tiêu học (web + mobile dùng chung) ─────────────────────────────────
+router.get('/my/learning-goal', ...requireStudent, async (req, res) => {
+  try {
+    const data = await learningGoalService.getLearningGoal(studentId(req));
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.put('/my/learning-goal', ...requireStudent, async (req, res) => {
+  try {
+    const data = await learningGoalService.setLearningGoal(studentId(req), {
+      period: String(req.body?.period || ''),
+      hoursPerDay: req.body?.hoursPerDay,
+    });
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.get('/my/learning-leaderboard', ...requireStudent, async (req, res) => {
+  try {
+    const data = await learningLeaderboardService.getWeeklyLeaderboard(studentId(req));
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.post('/my/study-heartbeat', ...requireStudent, async (req, res) => {
+  try {
+    const data = await learningGoalService.recordStudyMinute(studentId(req));
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });

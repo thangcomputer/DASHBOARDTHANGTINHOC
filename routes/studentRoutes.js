@@ -6,6 +6,7 @@ const { getTodayAgeReferenceDate } = require('../utils/studentAge');
 const FileAsset = require('../models/FileAsset');
 const Invoice = require('../models/Invoice');
 const Schedule = require('../models/Schedule');
+const learningGoalService = require('../services/learningGoalService');
 const { authMiddleware, checkPermission, isTeacher, branchFilter, userHasPermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const { assertStudentBranchAccess } = require('../middleware/studentBranchGuard');
@@ -75,6 +76,7 @@ const {
 } = require('../services/businessCodeService');
 const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../services/ledgerService');
 const { refundStudentTuition, payTeacherForStudent } = require('../services/studentFinanceService');
+const { notifyTeacherPaymentReceived } = require('../services/teacherPaymentNotice');
 const cache = require('../utils/cache');
 const { emitDataRefresh, emitBranch } = require('../utils/realtimeEmit');
 const { getCachedSettings } = require('../services/settingsCache');
@@ -1977,6 +1979,7 @@ router.post('/:id/exam-attempt/submit', studentExamGuard, async (req, res) => {
     }
 
     const entry = (student.examProgress || []).find((item) => String(item.id) === subjectId);
+    learningGoalService.trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(req.body?.answers) });
     const io = req.app.get('io');
     if (io) {
       studentRealtime(io, student, 'student:updated', student._id);
@@ -4129,6 +4132,7 @@ router.put('/:id/pay-teacher', [authMiddleware, branchFilter, policyShadowStuden
         payload: { studentId: String(student._id), action, paidSessions },
         link: '/teacher/finance',
       });
+      if (transaction) notifyTeacherPaymentReceived(io, transaction, { sessions: paidSessions });
       studentRealtime(io, student, 'student:updated', student._id.toString());
       studentDataRefresh(io, student, { type: 'student', id: student._id.toString(), action: 'pay_teacher' });
     }
