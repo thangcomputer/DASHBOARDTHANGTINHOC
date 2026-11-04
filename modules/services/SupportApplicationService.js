@@ -2,8 +2,6 @@
 const supportController = require('./../support/support.controller');
 const { UserRole, PermissionCode } = require('./../../shared/enums');
 
-// All routes require auth
-router.use(requireAuth);
 // GET /api/v2/support/agents
 // Requires ADMIN_STAFF or HIGH_ADMIN or SUPER_ADMIN
 
