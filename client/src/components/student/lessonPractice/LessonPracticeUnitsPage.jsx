@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, CheckCircle2, Clapperboard, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, Clapperboard, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
@@ -528,7 +528,7 @@ function CompletionCelebrationModal({ subjectName, onClose }) {
           <div className="lp-cele-anim mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white/95" style={{ animation: 'lp-cele-trophy .9s ease-out both, lp-cele-glow 2s ease-in-out .9s infinite' }}>
             <Trophy size={64} className="text-amber-500" strokeWidth={2} />
           </div>
-          <p className="mt-4 text-xs font-black uppercase tracking-[0.3em] text-white/90">Hoàn thành môn học</p>
+          <p className="mt-4 text-xs font-black  tracking-[0.3em] text-white/90">Hoàn thành môn học</p>
           <h2 className="mt-1 text-2xl font-black text-white">Chúc mừng bạn!</h2>
         </div>
         <div className="px-6 pb-6 pt-5">
@@ -753,14 +753,14 @@ export default function LessonPracticeUnitsPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden">
+    <div className="flex h-[calc(100dvh-4.5rem)] min-h-0 flex-col overflow-hidden md:h-[calc(100dvh-8.5rem)]">
       {celebrating && <CompletionCelebrationModal subjectName={payload?.subject?.name || ''} onClose={closeCelebration} />}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <div className="flex shrink-0 items-center gap-3">
-          <button type="button" onClick={() => navigate('/student/lesson-practice')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50">
-            <ArrowLeft size={16} /> Trở về
+      <div className="mb-3 flex min-w-0 shrink-0 items-center gap-2 border-b border-slate-100 bg-white px-1 pb-3 md:flex-wrap md:gap-3 md:border-0 md:bg-transparent md:px-0 md:pb-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-initial md:gap-3">
+          <button type="button" onClick={() => navigate('/student/lesson-practice')} aria-label="Quay lại danh sách khóa học" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:border-red-300 hover:bg-red-100 md:h-9 md:w-auto md:gap-1.5 md:rounded-lg md:border-slate-200 md:bg-white md:px-3 md:text-sm md:font-bold md:shadow-sm">
+            <ArrowLeft size={17} /> <span className="hidden md:inline">Trở về</span>
           </button>
-          {payload?.subject && <h1 className="text-lg font-black text-slate-900">{payload.subject.name}</h1>}
+          {payload?.subject && <h1 className="min-w-0 truncate text-base font-black text-slate-900 md:text-lg">{payload.subject.name}</h1>}
         </div>
         {payload?.subject?.previewOnly && units.some((unit) => unit.isPreview) && (
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
@@ -773,10 +773,11 @@ export default function LessonPracticeUnitsPage() {
             aria-expanded={lessonListOpen}
             aria-controls="lesson-list"
             onClick={() => setLessonListOpen((open) => !open)}
-            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 lg:hidden"
+            className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 text-xs font-extrabold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 md:rounded-lg md:text-sm lg:hidden"
           >
-            {lessonListOpen ? <X size={16} /> : <Menu size={16} />}
-            {lessonListOpen ? 'Đóng danh sách bài' : 'Danh sách bài học'}
+            <Menu size={14} />
+            <span>Danh sách bài học</span>
+            <ChevronDown size={14} className={`transition-transform duration-200 ${lessonListOpen ? 'rotate-180' : ''}`} />
           </button>
         )}
       </div>
@@ -784,8 +785,18 @@ export default function LessonPracticeUnitsPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!loading && !error && units.length === 0 && <p className="text-sm text-slate-500">Môn này chưa có buổi học.</p>}
       {units.length > 0 && (
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:grid-rows-1 lg:gap-4">
-          <aside id="lesson-list" className={`${lessonListOpen ? 'block' : 'hidden'} max-h-[38vh] min-h-0 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-2 lg:block lg:max-h-none`}>
+        <div className="relative grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-4">
+          <button
+            type="button"
+            tabIndex={lessonListOpen ? 0 : -1}
+            aria-label="Đóng danh sách bài học"
+            onClick={() => setLessonListOpen(false)}
+            className={`absolute inset-0 z-20 bg-slate-950/35 transition-opacity duration-300 lg:hidden ${lessonListOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          />
+          <aside
+            id="lesson-list"
+            className={`absolute inset-y-0 right-0 z-30 flex min-h-0 w-[min(72vw,380px)] max-w-[90vw] flex-col overflow-hidden rounded-l-2xl border border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${lessonListOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'} lg:pointer-events-auto lg:translate-x-0 lg:relative lg:inset-auto lg:z-auto lg:col-start-1 lg:row-start-1 lg:w-auto lg:max-w-none lg:rounded-2xl lg:shadow-none`}
+          >
             <style>{`
               .lesson-unlock-burst {
                 position: absolute;
@@ -819,6 +830,11 @@ export default function LessonPracticeUnitsPage() {
                 .lesson-unlocked-card { animation: none; }
               }
             `}</style>
+            <div className="flex shrink-0 items-center justify-between gap-1 border-b border-slate-100 px-2 py-2 sm:px-3 sm:py-3 lg:hidden">
+              <h2 className="min-w-0 truncate text-xs font-black text-slate-900 sm:text-sm">Danh sách bài học</h2>
+              <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 sm:px-2 sm:text-xs">{units.length}</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-1.5 sm:p-2">
             <ol className="space-y-1">
               {units.map((unit, index) => {
                 const opened = openUnit?.id === unit.id;
@@ -829,9 +845,9 @@ export default function LessonPracticeUnitsPage() {
                     ? { label: 'Đang học', className: 'bg-sky-50 text-sky-700' }
                     : { label: 'Chưa học', className: 'bg-slate-100 text-slate-600' };
                 return (
-                  <li key={unit.id} className="relative pb-2">
+                  <li key={unit.id} className="relative pb-1">
                     {unit.locked ? (
-                      <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left" aria-disabled="true">
+                      <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2.5 text-left" aria-disabled="true">
                         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-400">{index + 1}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-bold text-slate-400">{unit.title}</span>
@@ -853,7 +869,7 @@ export default function LessonPracticeUnitsPage() {
                       onClick={() => chooseUnit(unit)}
                       title={unit.title}
                       aria-label={`${unit.title} — ${lessonStatus.label}`}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                      className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                       <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
                       <span className="min-w-0 flex-1">
@@ -918,8 +934,9 @@ export default function LessonPracticeUnitsPage() {
                 );
               })}
             </ol>
+            </div>
           </aside>
-          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white p-2">
+          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white p-1.5 sm:rounded-2xl sm:p-2 lg:col-start-2 lg:row-start-1">
             {openUnit ? (
               <>
                 {activeSection?.kind === 'note' && (

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { generateVietQRUrl } from './BankSelect';
+import { generateVietQRUrl } from './bankSelectUtils';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
 import TransferPaymentHeader from './shared/TransferPaymentHeader';
 import { useSocket } from '../context/SocketContext';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import api from '../services/api';
 const POLL_MS = 3000;
 const IS_DEV = import.meta.env.DEV;

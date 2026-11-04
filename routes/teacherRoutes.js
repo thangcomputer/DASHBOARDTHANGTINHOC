@@ -55,6 +55,7 @@ const { claimTeacherAttempt } = require('../services/examAttemptStore');
 const { purgeTeacherSideEffects } = require('../services/userCascadeCleanup');
 const { normalizeVoiceRegion } = require('../constants/voiceRegions');
 const { attemptedTeacherExamFields } = require('../utils/teacherExamFields');
+const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 
 const router = express.Router();
 
@@ -715,11 +716,16 @@ router.get('/:id/public-card', [authMiddleware, branchFilter], async (req, res) 
     }
 
     const teacher = await Teacher.findById(teacherId)
-      .select('name age specialty averageRating ratingCount voiceRegion avatar subjectIds')
+      .select('name age specialty averageRating ratingCount voiceRegion avatar subjectIds startDate')
       .lean();
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
     }
+
+    const startedAt = teacher.startDate ? new Date(teacher.startDate).getTime() : NaN;
+    const experienceYears = Number.isFinite(startedAt)
+      ? Math.max(0, Math.floor((Date.now() - startedAt) / (365.25 * 86400000)))
+      : null;
 
     return res.json({
       success: true,
@@ -728,6 +734,7 @@ router.get('/:id/public-card', [authMiddleware, branchFilter], async (req, res) 
         _id: String(teacher._id),
         name: teacher.name || '',
         age: teacher.age == null ? null : Number(teacher.age),
+        experience: experienceYears == null ? '' : experienceYears ? `${experienceYears} năm` : 'Dưới 1 năm',
         specialty: teacher.specialty || '',
         subjectIds: Array.isArray(teacher.subjectIds) ? teacher.subjectIds : [],
         averageRating: Number(teacher.averageRating) || 0,
@@ -964,6 +971,24 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
 
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    }
+
+    if (locking) {
+      try {
+        await revokeMobileSessionsForUser({
+          userId: teacher._id,
+          role: 'teacher',
+          reason: 'account_disabled',
+          io: req.app.get('io'),
+        });
+      } catch (revokeError) {
+        logger.error('[TEACHERS] Account disabled but mobile session revocation failed:', revokeError);
+        return res.status(503).json({
+          success: false,
+          code: 'MOBILE_SESSION_REVOCATION_FAILED',
+          message: 'Tài khoản đã bị vô hiệu hóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+        });
+      }
     }
 
     const io = req.app.get('io');
@@ -1229,6 +1254,21 @@ router.put('/:id/grant-exam-access', [
       faceViolationCount: 0,
     }, { returnDocument: 'after', runValidators: true }).select('-password -refreshToken');
     if (!teacher) return res.status(404).json({ success: false, message: 'Không tìm thấy giảng viên' });
+    try {
+      await revokeMobileSessionsForUser({
+        userId: teacher._id,
+        role: 'teacher',
+        reason: 'account_suspended',
+        io: req.app.get('io'),
+      });
+    } catch (revokeError) {
+      logger.error('[TEACHERS] Account suspended but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị tạm ngưng nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
     const io = req.app.get('io');
     if (io) emitTeacherEvent(io, teacher, 'teacher:updated', {
       teacherId: String(teacher._id),
@@ -1604,6 +1644,21 @@ router.delete('/:id', [authMiddleware, ...teacherRouteGuard('delete')], async (r
     }
     const cascade = await purgeTeacherSideEffects(teacher._id, { teacherName: teacher.name });
     await Teacher.findByIdAndDelete(teacher._id);
+    try {
+      await revokeMobileSessionsForUser({
+        userId: teacher._id,
+        role: 'teacher',
+        reason: 'account_deleted',
+        io: req.app.get('io'),
+      });
+    } catch (revokeError) {
+      logger.error('[TEACHERS] Account deleted but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị xóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
     return res.json({
       success: true,
       message: `Đã xóa giảng viên ${teacher.name}`,

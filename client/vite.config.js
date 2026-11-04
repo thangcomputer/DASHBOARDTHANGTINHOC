@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
+import process from 'node:process'
 
 // Dev proxy MUST use IPv6 loopback on Windows when another process
 // (e.g. Challenge.exe) steals 127.0.0.1:5000 — Node often listens on [::]:5000 only.

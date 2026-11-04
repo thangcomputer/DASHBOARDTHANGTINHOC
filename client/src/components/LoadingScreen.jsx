@@ -107,7 +107,7 @@ export default function LoadingScreen({ onReady }) {
                 alt="Logo" className="w-20 h-20 object-contain drop-shadow-2xl" />
             ) : (
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-red-700 flex items-center justify-center shadow-2xl shadow-indigo-500/30">
-                <span className="text-white text-2xl font-black">T</span>
+                <span className="text-white text-2xl font-black">S?T</span>
               </div>
             )}
           </div>

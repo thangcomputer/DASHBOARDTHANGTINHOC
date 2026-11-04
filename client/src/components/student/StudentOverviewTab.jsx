@@ -10,6 +10,7 @@ import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../u
 import api, { downloadMediaFile, resolveMediaUrl } from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
+import '../dashboard-overview.css';
 
 function formatSessionDayLabel(date) {
   const d = date ? new Date(date) : null;
@@ -202,8 +203,8 @@ export default function StudentOverviewTab({
       key: 'quiz',
       onClick: () => navigate('/student/exam'),
       tone: pendingQuizCount > 0
-        ? 'bg-red-50 border-red-200 text-red-600 ring-2 ring-red-200/80 shadow-sm shadow-red-100'
-        : 'bg-red-50/80 border-red-100 text-red-600',
+        ? 'bg-red-50/65 border-red-200 text-red-600 ring-2 ring-red-200/80 shadow-sm shadow-red-100'
+        : 'bg-red-50/55 border-red-100 text-red-600',
       icon: Trophy,
       iconTone: 'from-rose-500 via-red-500 to-red-700 shadow-red-200/70',
       title: 'Trắc nghiệm buổi học',
@@ -220,8 +221,8 @@ export default function StudentOverviewTab({
         navigate('/student#materials-assignments');
       },
       tone: pendingHw > 0
-        ? 'bg-orange-50 border-orange-200 text-orange-600 ring-1 ring-orange-100'
-        : 'bg-orange-50/70 border-orange-100 text-orange-600',
+        ? 'bg-orange-50/65 border-orange-200 text-orange-600 ring-1 ring-orange-100'
+        : 'bg-orange-50/55 border-orange-100 text-orange-600',
       icon: ClipboardList,
       iconTone: 'from-orange-400 via-orange-500 to-red-600 shadow-orange-200/70',
       title: 'Bài tập về nhà',
@@ -233,7 +234,7 @@ export default function StudentOverviewTab({
     {
       key: 'schedule',
       onClick: () => navigate('/student#schedule'),
-      tone: 'bg-blue-50/70 border-blue-100 text-blue-600',
+      tone: 'bg-blue-50/55 border-blue-100 text-blue-600',
       icon: Calendar,
       iconTone: 'from-sky-400 via-blue-500 to-indigo-700 shadow-blue-200/70',
       title: 'Lịch học sắp tới',
@@ -246,8 +247,8 @@ export default function StudentOverviewTab({
       key: 'messages',
       onClick: () => navigate('/student/inbox'),
       tone: myUnreadMsgs > 0
-        ? 'bg-purple-50 border-purple-200 text-purple-600 ring-1 ring-purple-100'
-        : 'bg-purple-50/70 border-purple-100 text-purple-600',
+        ? 'bg-purple-50/65 border-purple-200 text-purple-600 ring-1 ring-purple-100'
+        : 'bg-purple-50/55 border-purple-100 text-purple-600',
       icon: MessageSquare,
       iconTone: 'from-violet-400 via-purple-500 to-fuchsia-700 shadow-purple-200/70',
       title: 'Tin nhắn & Phản hồi',
@@ -259,25 +260,23 @@ export default function StudentOverviewTab({
   ];
 
   return (
-    <div className="cms-sd cms-sd-stack min-w-0 lg:!gap-3 lg:-mb-4">
-      <header className="cms-sd-page !py-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 sm:w-1/3 shrink-0">
-          <h2 className="cms-sd-h1 truncate">
+    <div className="cms-sd cms-sd-stack min-w-0 lg:!gap-3 lg:-mb-4 th-dashboard-overview th-dashboard-overview--student">
+      <header className="cms-sd-page !py-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between th-dashboard-overview__header">
+        <div className="min-w-0 sm:w-1/3 shrink-0 th-dashboard-overview__intro">
+          <p className="th-dashboard-overview__eyebrow">Trung tâm Thắng Tin Học</p>
+          <h2 className="cms-sd-h1 truncate th-dashboard-overview__title">
             Chào mừng,{' '}
             <span className="text-[0.82em] font-extrabold tracking-tight">{studentData.name}</span>
             ! 👋
           </h2>
-          <p className="cms-sd-caption italic mt-1.5 mb-1 text-gray-500">
+          <p className="cms-sd-caption italic mt-1.5 mb-1 text-gray-500 th-dashboard-overview__subtitle">
             &quot;Học hôm nay, thành công mai sau.&quot;
-          </p>
-          <p className="cms-sd-caption font-bold text-red-600 uppercase tracking-wide">
-            Trung tâm Thắng Tin Học
           </p>
         </div>
         
         {banners.length > 0 && (
           <div 
-            className="relative w-full sm:w-2/3 max-w-[800px] aspect-[5/1] bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group"
+            className="relative w-full sm:w-2/3 max-w-[800px] aspect-[5/1] bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group th-dashboard-overview__banner"
             onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
           >
             {banners.map((b, i) => (
@@ -310,16 +309,16 @@ export default function StudentOverviewTab({
           <div className="lg:col-span-8 cms-sd-stack min-w-0 lg:!gap-3">
             {/* Upcoming / live class — live style mirrors TeacherOverviewTab */}
             <section
-              className={`rounded-[16px] sm:rounded-2xl p-4 text-white relative overflow-hidden border ${
+              className={`th-dashboard-overview__class-card ${
                 isLive
-                  ? 'bg-gradient-to-r from-red-600 via-rose-600 to-indigo-700 shadow-xl shadow-red-500/20 border-red-400/30 animate-pulse'
+                  ? 'th-dashboard-overview__class-card--live'
                   : hasUpcomingClass
-                    ? 'bg-gradient-to-br from-red-600 to-red-700 shadow-[0_6px_20px_rgba(0,0,0,0.06)] border-transparent'
-                    : 'bg-gradient-to-br from-slate-500 to-slate-600 shadow-[0_6px_20px_rgba(0,0,0,0.06)] border-transparent'
+                    ? 'th-dashboard-overview__class-card--upcoming'
+                    : 'th-dashboard-overview__class-card--empty'
               }`}
             >
               <div className="relative z-10 space-y-3">
-                <p className="cms-sd-caption font-bold uppercase tracking-wide text-red-100 flex items-center gap-1.5">
+                <p className="cms-sd-caption font-bold  tracking-wide text-red-100 flex items-center gap-1.5">
                   {isLive ? (
                     <>
                       <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
@@ -340,7 +339,7 @@ export default function StudentOverviewTab({
                     </>
                   )}
                 </p>
-                <h2 className="cms-sd-card-title sm:text-lg md:text-xl font-extrabold uppercase tracking-tight leading-snug line-clamp-2 text-white">
+                <h2 className="cms-sd-card-title sm:text-lg md:text-xl font-extrabold  tracking-tight leading-snug line-clamp-2 text-white">
                   {courseLabel}
                 </h2>
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -381,7 +380,7 @@ export default function StudentOverviewTab({
                       }`}
                     >
                       <Video size={20} aria-hidden="true" />
-                      VÀO LỚP NGAY
+                      Vào lớp ngay
                     </a>
                   ) : isLive ? (
                     <span className="cms-sd-btn w-full md:w-auto bg-white/20 text-white cursor-default">
@@ -433,24 +432,24 @@ export default function StudentOverviewTab({
                     <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Các hoạt động đang chờ bạn</p>
                   </div>
                 </div>
-                <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500 sm:inline-flex">
+                <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black  tracking-wider text-slate-500 sm:inline-flex">
                   Tổng quan
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
                 {todoItems.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={item.onClick}
-                    className={`${item.tone} group relative overflow-hidden border p-4 rounded-[18px] flex flex-col gap-4 text-left min-h-[150px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.985]`}
+                    className={`${item.tone} cms-glass-card group relative overflow-hidden border p-3 sm:p-4 rounded-[18px] flex flex-col gap-2 text-left min-h-[148px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 active:scale-[0.985]`}
                   >
                     <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/50 blur-2xl transition-transform duration-500 group-hover:scale-125" aria-hidden="true" />
-                    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-3 w-full min-w-0 relative z-10">
-                      <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
+                    <div className="flex w-full min-w-0 flex-col items-start gap-2 relative z-10">
+                      <div className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.iconTone} text-white shadow-lg ring-2 ring-white/80 transition-all duration-300 group-hover:scale-105 group-hover:-rotate-2`}>
                         <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/50 blur-md transition-transform duration-500 group-hover:translate-x-1 group-hover:translate-y-1" aria-hidden="true" />
                         <span className="absolute bottom-1 left-2 h-1.5 w-5 rounded-full bg-white/40 blur-[2px]" aria-hidden="true" />
-                        <item.icon size={25} strokeWidth={2.4} className="relative drop-shadow-md" aria-hidden="true" />
+                        <item.icon size={21} strokeWidth={2.4} className="relative drop-shadow-md" aria-hidden="true" />
                         {item.badge != null && (
                           <span className="absolute -right-2 -top-2 min-w-[20px] h-[20px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center leading-none shadow-sm ring-2 ring-white">
                             {item.badge > 99 ? '99+' : item.badge}
@@ -458,9 +457,9 @@ export default function StudentOverviewTab({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-sm sm:text-[15px] font-bold text-slate-900 leading-snug">{item.title}</h4>
-                        <p className={`text-xs lg:text-sm font-bold mt-1 ${item.metaClass}`}>{item.meta}</p>
-                        <span className="relative z-10 mt-3 inline-flex items-center justify-center min-h-[36px] px-3.5 rounded-xl bg-white/95 border border-white text-xs font-extrabold text-slate-800 shadow-sm transition-all group-hover:bg-red-600 group-hover:border-red-600 group-hover:text-white group-hover:shadow-red-300/50">
+                        <h4 className="text-[13px] sm:text-[15px] font-bold text-slate-900 leading-snug">{item.title}</h4>
+                        <p className={`text-[11px] sm:text-xs lg:text-sm font-bold mt-1 ${item.metaClass}`}>{item.meta}</p>
+                        <span className="relative z-10 mt-2 inline-flex items-center justify-center min-h-[34px] px-3 rounded-xl bg-white/95 border border-white text-xs font-extrabold text-slate-800 shadow-sm transition-all group-hover:bg-red-600 group-hover:border-red-600 group-hover:text-white group-hover:shadow-red-300/50">
                           {item.cta}
                           <ChevronRight size={14} className="ml-0.5 opacity-70" aria-hidden="true" />
                         </span>
@@ -475,7 +474,7 @@ export default function StudentOverviewTab({
           <aside className="lg:col-span-4 cms-sd-stack min-w-0 lg:!gap-3">
             {/* Tài liệu */}
             <section className="rounded-[16px] p-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.06)] bg-slate-700">
-              <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-300 flex items-center gap-2 mb-3">
+              <h3 className="text-xs sm:text-sm font-bold  tracking-wide text-slate-300 flex items-center gap-2 mb-3">
                 <Download size={16} aria-hidden="true" /> Tài liệu
               </h3>
               <div className="space-y-2">
@@ -585,44 +584,44 @@ export default function StudentOverviewTab({
                               {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
                             </p>
                             {isScheduled && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide shrink-0">
-                                {item.displayKind === 'ongoing' ? 'ĐANG DIỄN RA' : 'SẮP TỚI'}
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700  tracking-wide shrink-0">
+                                {item.displayKind === 'ongoing' ? 'Đang diễn ra' : 'Sắp tới'}
                               </span>
                             )}
                             {isPastPending && (
-                              <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${
+                              <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full  tracking-wide shrink-0 ${
                                 isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-800'
                               }`}>
-                                {isOverdue ? 'QUÁ HẠN ĐIỂM DANH' : 'CHƯA ĐIỂM DANH'}
+                                {isOverdue ? 'Quá hạn điểm danh' : 'Chưa điểm danh'}
                               </span>
                             )}
                             {isCancelled && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-red-100 text-red-700 uppercase tracking-wide shrink-0">
-                                HỦY
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-red-100 text-red-700  tracking-wide shrink-0">
+                                Hủy
                               </span>
                             )}
                             {isGradeUpdate && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide shrink-0">
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700  tracking-wide shrink-0">
                                 Cập nhật điểm
                               </span>
                             )}
                             {isEvaluation && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700 uppercase tracking-wide shrink-0">
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-pink-100 text-pink-700  tracking-wide shrink-0">
                                 Đánh giá
                               </span>
                             )}
                             {isCourseComplete && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide shrink-0">
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700  tracking-wide shrink-0">
                                 Hoàn thành
                               </span>
                             )}
                             {isHomework && !isGradeUpdate && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide shrink-0">
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700  tracking-wide shrink-0">
                                 Bài nộp
                               </span>
                             )}
                             {isQuiz && (
-                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide shrink-0">
+                              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700  tracking-wide shrink-0">
                                 Trắc nghiệm
                               </span>
                             )}
@@ -656,7 +655,7 @@ export default function StudentOverviewTab({
                       )}
                       {!isCancelled && item.grade == null && isAttendance && (
                         <div className="flex items-center justify-end pl-10">
-                          <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide shrink-0">
+                          <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700  tracking-wide shrink-0">
                             Đã hoàn thành
                           </span>
                         </div>

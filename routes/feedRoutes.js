@@ -4,11 +4,13 @@ const fs = require('fs');
 const multer = require('multer');
 const router = express.Router();
 const FeedPost = require('../models/FeedPost');
+const FeedPostReport = require('../models/FeedPostReport');
 const { REACTION_TYPES } = require('../models/FeedPost');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowFeed } = require('../middleware/policyShadowFeed');
 const { feedCutoverGate } = require('../middleware/feedCutoverGate');
 const logger = require('../config/logger');
+const NotificationService = require('../services/NotificationService');
 
 /** Phase 7.17: auth → policyShadowFeed → feedCutoverGate → handler */
 function feedGuard(action) {
@@ -131,6 +133,62 @@ function emitFeed(io, event, payload) {
   emitter.emit(event, payload);
 }
 
+async function notifyFeedAuthor(req, post, interactionType, details = {}) {
+  const actorId = String(req.user?.id || req.user?._id || '');
+  const isReply = interactionType === 'reply';
+  const recipients = new Map();
+  const postAuthorId = String(post.authorId || '');
+  if (postAuthorId && postAuthorId !== actorId) {
+    recipients.set(postAuthorId, post.authorRole);
+  }
+  const commentAuthorId = String(details.commentAuthorId || '');
+  if (isReply && commentAuthorId && commentAuthorId !== actorId) {
+    recipients.set(commentAuthorId, details.commentAuthorRole || 'student');
+  }
+  if (!recipients.size) return;
+
+  const actorName = String(req.user?.name || 'Một người dùng').trim();
+  const content = interactionType === 'comment'
+    ? `${actorName} đã bình luận: ${details.content || 'đã thêm hình ảnh'}`
+    : isReply
+      ? `${actorName} đã trả lời bình luận của bạn: ${details.content || 'đã thêm hình ảnh'}`
+      : `${actorName} đã bày tỏ cảm xúc về bài viết của bạn.`;
+
+  await Promise.all([...recipients].map(async ([receiverId, receiverRole]) => {
+    const normalizedRole = String(receiverRole || '').toLowerCase();
+    const webRole = normalizedRole === 'admin' || normalizedRole === 'staff'
+      ? 'admin'
+      : normalizedRole === 'teacher' ? 'teacher' : 'student';
+    try {
+      await NotificationService.send(req.app.get('io'), {
+        type: 'SYSTEM',
+        title: interactionType === 'comment'
+          ? 'Bình luận mới trên bài viết'
+          : isReply ? 'Có người trả lời bình luận của bạn' : 'Cảm xúc mới trên bài viết',
+        content: content.slice(0, 500),
+        sender_id: actorId,
+        receivers: [receiverId],
+        payload: {
+          kind: 'feed_interaction',
+          interactionType,
+          postId: String(post._id),
+          ...(details.commentId ? { commentId: details.commentId } : {}),
+          ...(details.parentCommentId ? { parentCommentId: details.parentCommentId } : {}),
+          ...(details.reactionType ? { reactionType: details.reactionType } : {}),
+        },
+        link: `/${webRole}/feed?postId=${encodeURIComponent(String(post._id))}${details.commentId ? `&commentId=${encodeURIComponent(details.commentId)}` : ''}${details.parentCommentId ? `&parentCommentId=${encodeURIComponent(details.parentCommentId)}` : ''}`,
+      });
+    } catch (error) {
+      logger.error('[FEED] author notification error', {
+        error,
+        postId: String(post._id),
+        receiverId,
+        interactionType,
+      });
+    }
+  }));
+}
+
 const _feedHits = new Map();
 function feedRateOk(userId, action, max, windowMs) {
   const key = action + ':' + String(userId || '');
@@ -213,6 +271,8 @@ function serializePost(doc, currentUserId) {
     content: o.content || '',
     images: o.images || [],
     visibility: o.visibility || 'public',
+    isPinned: !!o.isPinned,
+    pinnedAt: o.pinnedAt || null,
     isEdited: !!o.isEdited,
     editedAt: o.editedAt || null,
     reactions: counts,
@@ -302,6 +362,122 @@ router.get('/', authMiddleware, ...feedGuard('list'), async (req, res) => {
   } catch (err) {
     logger.error({ err }, '[FEED] list error');
     return res.status(500).json({ success: false, message: 'Loi server' });
+  }
+});
+
+router.get('/reports', authMiddleware, ...feedGuard('report_list'), async (req, res) => {
+  try {
+    if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Bạn không có quyền xem báo cáo.' });
+    const reports = await FeedPostReport.find({ status: 'pending' }).sort({ createdAt: 1 }).limit(100).lean();
+    const postIds = [...new Set(reports.map((report) => report.postId))];
+    const posts = await FeedPost.find({ _id: { $in: postIds } }).select('_id authorName content visibility').lean();
+    const postsById = new Map(posts.map((post) => [String(post._id), post]));
+    return res.json({
+      success: true,
+      data: reports.map((report) => {
+        const post = postsById.get(report.postId);
+        return {
+          id: String(report._id),
+          postId: report.postId,
+          reporterName: report.reporterName,
+          reporterRole: report.reporterRole,
+          reason: report.reason,
+          details: report.details,
+          createdAt: report.createdAt,
+          post: post ? { authorName: post.authorName, content: post.content, visibility: post.visibility || 'public' } : null,
+        };
+      }),
+    });
+  } catch (err) {
+    logger.error({ err }, '[FEED] reports list error');
+    return res.status(500).json({ success: false, message: 'Không thể tải báo cáo bài viết.' });
+  }
+});
+
+router.post('/:id/reports', authMiddleware, ...feedGuard('report'), async (req, res) => {
+  try {
+    const post = await FeedPost.findOne({ _id: req.params.id, ...buildFeedFilter(req.user) });
+    if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết.' });
+    if (String(post.authorId) === String(req.user.id || req.user._id)) {
+      return res.status(400).json({ success: false, message: 'Bạn không thể báo cáo bài viết của chính mình.' });
+    }
+    if (!feedRateOk(req.user.id, 'report', 5, 10 * 60 * 1000)) {
+      return res.status(429).json({ success: false, message: 'Bạn đã gửi nhiều báo cáo. Vui lòng thử lại sau.' });
+    }
+    const reasons = ['spam', 'harassment', 'inappropriate', 'misinformation', 'other'];
+    const reason = String(req.body?.reason || '');
+    const details = String(req.body?.details || '').trim();
+    if (!reasons.includes(reason)) return res.status(400).json({ success: false, message: 'Vui lòng chọn lý do báo cáo hợp lệ.' });
+    if (details.length > 500) return res.status(400).json({ success: false, message: 'Nội dung bổ sung tối đa 500 ký tự.' });
+    const report = await FeedPostReport.create({
+      postId: String(post._id),
+      reporterId: String(req.user.id || req.user._id),
+      reporterName: req.user.name || 'Người dùng',
+      reporterRole: normalizeRole(req.user.role),
+      reason,
+      details,
+    });
+    return res.status(201).json({ success: true, message: 'Đã gửi báo cáo để trung tâm xem xét.', id: String(report._id) });
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Bạn đã báo cáo bài viết này rồi.' });
+    }
+    logger.error({ err }, '[FEED] report create error');
+    return res.status(500).json({ success: false, message: 'Không thể gửi báo cáo bài viết.' });
+  }
+});
+
+router.post('/:id/pin', authMiddleware, ...feedGuard('pin'), async (req, res) => {
+  try {
+    if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Chỉ quản trị viên mới được ghim thông báo.' });
+    const post = await FeedPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ success: false, message: 'Không tìm thấy bài viết.' });
+    if ((post.visibility || 'public') !== 'public') {
+      return res.status(400).json({ success: false, message: 'Chỉ có thể ghim thông báo công khai.' });
+    }
+    post.isPinned = !post.isPinned;
+    post.pinnedAt = post.isPinned ? new Date() : null;
+    await post.save();
+    const data = serializePost(post, req.user.id);
+    emitFeed(req.app.get('io'), 'feed:updated', data);
+    return res.json({ success: true, data });
+  } catch (err) {
+    logger.error({ err }, '[FEED] pin toggle error');
+    return res.status(500).json({ success: false, message: 'Không thể cập nhật trạng thái ghim.' });
+  }
+});
+
+router.post('/reports/:reportId/resolve', authMiddleware, ...feedGuard('resolve_report'), async (req, res) => {
+  try {
+    if (!isAdminLike(req.user)) return res.status(403).json({ success: false, message: 'Bạn không có quyền xử lý báo cáo.' });
+    const action = req.body?.action || 'keep';
+    if (!['keep', 'delete'].includes(action)) {
+      return res.status(400).json({ success: false, message: 'Lựa chọn xử lý báo cáo không hợp lệ.' });
+    }
+    const report = await FeedPostReport.findOne({ _id: req.params.reportId, status: 'pending' });
+    if (!report) return res.status(404).json({ success: false, message: 'Báo cáo không tồn tại hoặc đã được xử lý.' });
+    const resolvedBy = String(req.user.id || req.user._id);
+    const resolvedAt = new Date();
+    if (action === 'delete') {
+      const post = await FeedPost.findById(report.postId);
+      if (post) {
+        await post.deleteOne();
+        emitFeed(req.app.get('io'), 'feed:deleted', { id: String(post._id) });
+      }
+      await FeedPostReport.updateMany(
+        { postId: report.postId, status: 'pending' },
+        { $set: { status: 'reviewed', resolvedBy, resolvedAt } },
+      );
+      return res.json({ success: true, message: 'Đã xóa bài viết và xử lý các báo cáo liên quan.' });
+    }
+    await FeedPostReport.updateMany(
+      { _id: report._id, status: 'pending' },
+      { $set: { status: 'reviewed', resolvedBy, resolvedAt } },
+    );
+    return res.json({ success: true, message: 'Đã giữ lại bài viết và xử lý báo cáo.' });
+  } catch (err) {
+    logger.error({ err }, '[FEED] report resolve error');
+    return res.status(500).json({ success: false, message: 'Không thể xử lý báo cáo.' });
   }
 });
 
@@ -420,6 +596,7 @@ async function applyReaction(req, res, typeIn) {
 
   const uid = String(req.user.id);
   const idx = post.reactions.findIndex((r) => String(r.userId) === uid);
+  const isNewReaction = idx < 0;
   if (idx >= 0) {
     if (post.reactions[idx].type === type) post.reactions.splice(idx, 1);
     else post.reactions[idx].type = type;
@@ -433,6 +610,9 @@ async function applyReaction(req, res, typeIn) {
     });
   }
   await post.save();
+  if (isNewReaction) {
+    await notifyFeedAuthor(req, post, 'reaction', { reactionType: type });
+  }
   const data = serializePost(post, req.user.id);
   emitFeed(req.app.get('io'), 'feed:like', {
     id: data.id,
@@ -506,6 +686,7 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
         parentId = String(parent.parentId);
       }
     }
+    const parentComment = parentId ? post.comments.id(parentId) : null;
 
     post.comments.push({
       authorId: req.user.id,
@@ -520,6 +701,15 @@ router.post('/:id/comments', authMiddleware, ...feedGuard('comment'), async (req
       createdAt: new Date(),
     });
     await post.save();
+
+    const createdComment = post.comments[post.comments.length - 1];
+    await notifyFeedAuthor(req, post, parentComment ? 'reply' : 'comment', {
+      content: content.slice(0, 240),
+      commentId: String(createdComment._id),
+      parentCommentId: parentComment ? String(parentComment._id) : '',
+      commentAuthorId: parentComment?.authorId,
+      commentAuthorRole: parentComment?.authorRole,
+    });
 
     const data = serializePost(post, req.user.id);
     emitFeed(req.app.get('io'), 'feed:comment', {

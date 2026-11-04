@@ -46,22 +46,22 @@ import {
   resolveYouTubeDisplayDuration,
   syncYouTubePlaybackState,
 } from '../utils/youtubeDuration';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 const MOCK_COURSES = [
   { _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0, 
     videos: [{ title: 'Giới thiệu về Thắng Tin Học', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 635 }, { title: 'Tổng quan công việc', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 920 }],
-    files: [{ title: 'Quy trình giảng dạy.pdf', type: 'PDF', size: '2 MB' }, { title: 'Sổ tay Giảng viên.docx', type: 'DOCX', size: '1 MB' }],
+    files: [{ title: 'Quy trình giảng dạy.PDF', type: 'PDF', size: '2 MB' }, { title: 'Sổ tay Giảng viên.DOCX', type: 'DOCX', size: '1 MB' }],
     notices: ['Chào mừng các bạn đến với TT', 'Hãy xem hết các video trước khi nhận lớp']
   },
   { _id: '2', title: 'Kỹ năng Đứng lớp Chuyên sâu', progress: 45, 
     videos: [{ title: 'Xử lý tình huống học viên yếu', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 2412 }],
-    files: [{ title: 'Quy trình xử lý.docx', type: 'DOCX', size: '500 KB' }],
+    files: [{ title: 'Quy trình xử lý.DOCX', type: 'DOCX', size: '500 KB' }],
     notices: ['Nhớ nộp bài thu hoạch trước 15/4 ngay sau khi xem video']
   },
   { _id: '3', title: 'Khóa học Excel Nâng cao', progress: 100, 
     videos: [{ title: 'Hàm logic phức tạp', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 2100 }],
-    files: [{ title: 'Bài tập thực hành.xlsx', type: 'EXCEL', size: '3.5 MB' }],
+    files: [{ title: 'Bài tập thực hành.XLSX', type: 'EXCEL', size: '3.5 MB' }],
     notices: []
   },
   { _id: '4', title: 'Bảo mật và An toàn thông tin', progress: 80, 
@@ -164,7 +164,6 @@ const YouTubePlayerSecure = ({
   const [isReady, setIsReady] = useState(false);
   const [hasEnded, setHasEnded] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -174,7 +173,6 @@ const YouTubePlayerSecure = ({
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ytPlaybackQuality, setYtPlaybackQuality] = useState('default');
-  const pauseTimeoutRef = useRef(null);
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
@@ -258,12 +256,6 @@ const YouTubePlayerSecure = ({
     }
   }, [lessonDuration, totalDuration]);
 
-  const formatTime = (secs) => {
-    const s = Math.floor(secs);
-    const m = Math.floor(s / 60);
-    return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  };
-
   const requiredSeconds = effectiveDuration > 0 ? requiredWatchSeconds(effectiveDuration) : 0;
 
   // ── Complete khi đủ threshold 2/3 (COMPLETION ≠ SEEK) — chờ player ready ──
@@ -286,7 +278,7 @@ const YouTubePlayerSecure = ({
       if (document.hidden) {
         setIsTabActive(false);
         if (playerRef.current?.pauseVideo) {
-          try { playerRef.current.pauseVideo(); } catch (e) { void 0; }
+          try { playerRef.current.pauseVideo(); } catch { void 0; }
         }
       } else {
         setIsTabActive(true);
@@ -512,7 +504,6 @@ const YouTubePlayerSecure = ({
     const state = event.data;
     if (state === window.YT.PlayerState.PLAYING) {
       setOverlayVisible(false);
-      setIsPaused(false);
       setIsPlaying(true);
       setHasEnded(false);
       setPlayerError('');
@@ -526,9 +517,6 @@ const YouTubePlayerSecure = ({
     if (state === window.YT.PlayerState.PAUSED) {
       stopCounting();
       setIsPlaying(false);
-      setIsPaused(true);
-      clearTimeout(pauseTimeoutRef.current);
-      pauseTimeoutRef.current = setTimeout(() => setIsPaused(false), 1200);
     }
     if (state === window.YT.PlayerState.ENDED) {
       stopCounting();
@@ -715,7 +703,7 @@ const YouTubePlayerSecure = ({
           <div className="absolute inset-0 z-20 bg-slate-900 flex items-center justify-center rounded-none lg:rounded-2xl">
             <div className="flex flex-col items-center gap-4">
               <div className="w-12 h-12 border-[3px] border-red-500/30 border-t-red-500 rounded-full animate-spin" />
-              <p className="text-slate-400 font-semibold text-xs animate-pulse tracking-widest uppercase">Đang tải video...</p>
+              <p className="text-slate-400 font-semibold text-xs animate-pulse tracking-widest ">Đang tải video...</p>
             </div>
           </div>
         )}
@@ -820,7 +808,7 @@ const AdminProgressPanel = ({ courseId }) => {
     try {
       const res = await lmsApiFetch(`/admin/progress/${courseId}`);
       if (res.success) setData(res.data);
-    } catch (e) { void 0 }
+    } catch { void 0 }
     setLoading(false);
   };
 
@@ -831,7 +819,7 @@ const AdminProgressPanel = ({ courseId }) => {
       <div className="px-8 py-6 bg-gradient-to-r from-red-900 to-slate-900 flex items-center justify-between">
         <div className="flex items-center gap-3 text-white">
           <Users size={20} />
-          <h3 className="font-black text-base uppercase tracking-wide">Tiến độ Giảng viên</h3>
+          <h3 className="font-black text-base  tracking-wide">Tiến độ Giảng viên</h3>
         </div>
         <button onClick={load} className="text-slate-400 hover:text-white transition-colors">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -887,7 +875,7 @@ const AdminProgressPanel = ({ courseId }) => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
+const TeacherTrainingLMS = ({ isAdmin = false }) => {
   const { trainingData, setTrainingData, examSubjectsCatalog } = useData() || { trainingData: { videos: [], guides: [], files: [] } };
   const [teacherProfile, setTeacherProfile] = useState(null);
 
@@ -1069,7 +1057,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         res.data.forEach(l => { chapters[l.chapterTitle || 'Chương 1'] = true; });
         setExpandedChapters(chapters);
       }
-    } catch (e) { void 0 }
+    } catch { void 0 }
     setLoading(false);
   };
 
@@ -1132,7 +1120,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       if (lessonsRes.success) {
         setLessons(lessonsRes.data);
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }, [currentLesson, selectedCourse, toast, completeLessonOnServer]);
 
   // Video kết thúc
@@ -1176,7 +1164,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           setTimeout(() => setCurrentLesson(next), 800);
         }
       }
-    } catch (e) { void 0 }
+    } catch { void 0 }
     setCompleting(false);
   }, [currentLesson, selectedCourse, completing, toast, completeLessonOnServer]);
 
@@ -1227,7 +1215,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         watchedSeconds: watchedSeconds,
         videoDuration,
       }),
-    }).catch(e => void 0);
+    }).catch(() => undefined);
   }, [selectedCourse, patchLessonWatchLocal]);
 
   const overallProgress = lessons.length > 0
@@ -1287,7 +1275,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         )}
 
         {/* TOP TABS FOR TEACHER */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 border-b border-slate-200 pb-3 mb-6 mt-1">
+        <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-3 mb-6 mt-1 sm:gap-3">
           {[
             { key: 'courses', icon: Video, label: 'Khóa học', count: courses.length, tone: 'from-red-500 via-rose-500 to-red-700' },
             { key: 'guides', icon: FileText, label: 'Quy trình', count: visibleTraining?.guides?.length || 0, tone: 'from-sky-400 via-blue-500 to-indigo-700' },
@@ -1295,22 +1283,22 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
             { key: 'software', icon: Link2, label: 'Phần mềm', count: visibleTraining?.softwareLinks?.length || 0, tone: 'from-emerald-400 via-teal-500 to-cyan-700' },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`group relative flex min-h-[5.5rem] w-full min-w-0 items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 ${
+              className={`group relative flex min-h-[4.75rem] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-1 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 sm:min-h-[5.5rem] sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${
                 mainTab === t.key
                   ? 'border-red-500 bg-red-50 text-slate-800 shadow-md shadow-red-100'
                   : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-red-200'
               }`}>
-              <span className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${t.tone} text-white shadow-lg ring-2 ring-white transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2`}>
+              <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br ${t.tone} text-white shadow-lg ring-2 ring-white transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2 sm:h-12 sm:w-12 sm:rounded-2xl`}>
                 <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/45 blur-md" aria-hidden="true" />
-                <t.icon size={24} strokeWidth={2.3} className="relative drop-shadow-md" />
+                <t.icon size={16} strokeWidth={2.3} className="relative drop-shadow-md sm:h-6 sm:w-6" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-black leading-tight">{t.label}</span>
-                <span className={`mt-1 block text-[11px] font-semibold ${mainTab === t.key ? 'text-red-600' : 'text-slate-400'}`}>
+                <span className="block text-[10px] font-black leading-tight sm:text-sm">{t.label}</span>
+                <span className={`mt-1 hidden text-[11px] font-semibold sm:block ${mainTab === t.key ? 'text-red-600' : 'text-slate-400'}`}>
                   {t.count} mục đang có
                 </span>
               </span>
-              <span className={`absolute right-3 top-3 min-w-[24px] rounded-full px-1.5 py-1 text-center text-[10px] font-black leading-none ${mainTab === t.key ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`absolute right-1 top-1 min-w-[18px] rounded-full px-1 py-0.5 text-center text-[9px] font-black leading-none sm:right-3 sm:top-3 sm:min-w-[24px] sm:px-1.5 sm:py-1 sm:text-[10px] ${mainTab === t.key ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                 {t.count}
               </span>
             </button>
@@ -1383,11 +1371,11 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
                           <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
                              <Video size={14} className="text-slate-400" />
-                             <span>{lessonCount} BÀI HỌC</span>
+                             <span>{lessonCount}  Bài học</span>
                           </div>
                           
                           <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
-                             <span>VÀO HỌC</span>
+                             <span>Vào học</span>
                              <ChevronRight size={14} />
                           </div>
                        </div>
@@ -1470,7 +1458,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                    <div className="flex items-center gap-4 min-w-0">
                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 ${
                        isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-red-500' : 'bg-red-600')
-                     }`}>{isLink ? 'LINK' : (file.fileType || 'FILE')}</div>
+                     }`}>{isLink ? 'Link' : (file.fileType || 'FILE')}</div>
                      <div className="min-w-0">
                        <h3 className="font-bold text-slate-800 truncate">{file.title}</h3>
                        <p className="text-xs text-slate-400">{isLink ? 'Liên kết ngoài' : (file.fileSize || 'N/A')}</p>
@@ -1554,7 +1542,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {completing && (
-              <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold animate-pulse uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold animate-pulse  tracking-widest">
                 <RefreshCw size={11} className="animate-spin" /> Đang lưu...
               </div>
             )}
@@ -1649,7 +1637,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           {/* Sidebar Header */}
           <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-300">Nội dung khóa học</h3>
+              <h3 className="text-[11px] font-black  tracking-widest text-slate-300">Nội dung khóa học</h3>
               <span
                 className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
                   overallProgress === 100
@@ -1657,7 +1645,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
                     : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
                 }`}
               >
-                {lessons.filter(l => l.isCompleted).length}/{lessons.length} BÀI
+                {lessons.filter(l => l.isCompleted).length}/{lessons.length}  Bài
               </span>
             </div>
             {/* Mini progress bar */}

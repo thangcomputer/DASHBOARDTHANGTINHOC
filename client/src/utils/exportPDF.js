@@ -204,7 +204,7 @@ const exportPDF = async (data = {}) => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 
     return true;
-  } catch (error) {
+  } catch {
     toast.error('Có lỗi khi xuất PDF. Vui lòng thử lại.');
     return false;
   } finally {
@@ -380,7 +380,7 @@ export async function captureAndSendZalo({ phone, zalo, studentName, courseName 
     window.open(url, '_blank', 'noopener,noreferrer');
 
     if (copied) {
-      toast.success('Đã copy phiếu thu. Dán (Ctrl+V) trong Zalo rồi gửi.');
+      toast.success('Đã copy phiếu thu. Dán (Ctrl+VN?) trong Zalo rồi gửi.');
     } else {
       toast.error('Đã mở Zalo nhưng chưa copy được ảnh. Hãy Tải PDF rồi gửi tay.');
     }

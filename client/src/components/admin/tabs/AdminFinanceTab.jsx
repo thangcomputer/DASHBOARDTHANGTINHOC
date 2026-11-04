@@ -138,7 +138,7 @@ export default function AdminFinanceTab() {
               key={m.label}
               className={`cms-m-card p-3 sm:p-4 min-w-0 ${idx === arr.length - 1 ? 'col-span-2 md:col-span-1' : ''}`}
             >
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{m.label}</p>
+              <p className="text-[10px] font-black text-slate-400  tracking-wider mb-1">{m.label}</p>
               <p className={`text-base sm:text-lg font-extrabold break-words tabular-nums ${m.tone}`}>
                 {m.neg && m.value > 0 ? '−' : ''}{(Number(m.value) || 0).toLocaleString('vi-VN')}đ
               </p>

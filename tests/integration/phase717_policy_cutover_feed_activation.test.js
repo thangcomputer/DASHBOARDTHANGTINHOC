@@ -2,8 +2,9 @@
  * Phase 7.17 — Controlled cutover + production activation for /api/feed
  *
  * LIVE: authMiddleware → policyShadowFeed → feedCutoverGate → handler.
- * Auth-only for list/create/upload/like/react/comment.
+ * Auth-only for list/create/upload/like/react/comment/report/pin/report moderation.
  * delete_post / delete_comment: adminLike OR ownership (handler still owns Legacy path).
+ * Pin/report moderation additionally enforces role checks inside the route handlers.
  * Socket feed_room emits remain in handlers only.
  */
 const test = require('node:test');
@@ -11,6 +12,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { readDeployEnv, DEPLOY_ENV_SKIP } = require('../helpers/deployEnv');
 const {
   AUTHORITY,
   getAuthorizationAuthority,
@@ -45,7 +47,8 @@ const WILDCARD = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: '*' };
 const MALFORMED = { POLICY_CUTOVER_ENABLED: 'banana', POLICY_CUTOVER_ROUTES: 'feed' };
 
 function parseDotEnvFile() {
-  const envFile = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const envFile = readDeployEnv();
+  if (!envFile) return null;
   const parsed = {};
   for (const line of envFile.split(/\r?\n/)) {
     const m = line.match(/^([^#=]+)=(.*)$/);
@@ -154,7 +157,7 @@ test('Phase7.17 malformed / wildcard / unknown → Legacy', () => {
   assert.equal(withEnv(PROD, () => getAuthorizationAuthority('not-a-family')), AUTHORITY.LEGACY);
 });
 
-test('Phase7.17 activation .env includes feed + prior Policy families', () => {
+test('Phase7.17 activation .env includes feed + prior Policy families', { skip: DEPLOY_ENV_SKIP }, () => {
   const parsed = parseDotEnvFile();
   assert.equal(parsed.POLICY_CUTOVER_ENABLED, 'true');
   const routes = String(parsed.POLICY_CUTOVER_ROUTES || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -235,6 +238,23 @@ test('Phase7.17 delete_comment: commenter / post author / admin; missing → ALL
   assert.equal(parity('delete_comment', staff, { post, comment }).policy.decision, 'DENY');
   assert.equal(parity('delete_comment', commenter, { post: null, comment: null }).policy.decision, 'ALLOW');
   assert.equal(parity('delete_comment', commenter, { post, comment: null }).policy.decision, 'ALLOW');
+});
+
+test('Phase7.17 feed report and pin routes are authenticated policy actions', () => {
+  const student = sub({ id: AUTHOR, role: 'student' });
+  for (const action of ['report', 'pin', 'report_list', 'resolve_report']) {
+    assert.ok(ACTIONS.has(action), action);
+    assert.equal(parity(action, student).policy.decision, 'ALLOW', action);
+  }
+  assert.equal(parity('unknown_feed_action', student).policy.decision, 'DENY');
+
+  const routes = fs.readFileSync(path.join(ROOT, 'routes/feedRoutes.js'), 'utf8');
+  const model = fs.readFileSync(path.join(ROOT, 'models/FeedPostReport.js'), 'utf8');
+  assert.ok(routes.includes("feedGuard('report')"));
+  assert.ok(routes.includes("feedGuard('pin')"));
+  assert.ok(routes.includes("feedGuard('report_list')"));
+  assert.ok(routes.includes("feedGuard('resolve_report')"));
+  assert.ok(model.includes('feedPostReportSchema.index({ postId: 1, reporterId: 1 }, { unique: true })'));
 });
 
 test('Phase7.17 spoof resistance: body role/authorId/branch/tenant do not elevate', () => {
@@ -361,7 +381,7 @@ test('Phase7.17 rollback: remove feed → LEGACY; prior stay POLICY; restore →
   assert.equal(restored.req.authzAuthority, AUTHORITY.POLICY);
 
   const parsed = parseDotEnvFile();
-  assert.ok(String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).includes('feed'));
+  if (parsed) assert.ok(String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).includes('feed'));
 });
 
 test('Phase7.17 cross-family isolation', () => {
@@ -442,14 +462,16 @@ test('Phase7.17 functional smoke: list authz; mutations NOT EXECUTED', () => {
 });
 
 test('Phase7.17 static final authority + CQRS OFF + .env.example disabled', () => {
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const env = readDeployEnv();
   const example = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');
 
-  assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env));
-  assert.ok(
-    /POLICY_CUTOVER_ROUTES\s*=\s*backups,monitoring,tenants,system-logs,ai,workflows,builder,courses,training,training-lms,branches,notifications,blog,feed(,files(,settings(,messages(,schedules(,quizzes(,assignments(,proctor(,evaluations(,bi(,analytics(,staff(,employees(,exam-results(,teachers)?)?)?)?)?)?)?)?)?)?)?)?)?)?\s*$/m.test(env),
-  );
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env));
+  if (env) {
+    assert.ok(
+      /POLICY_CUTOVER_ROUTES\s*=\s*backups,monitoring,tenants,system-logs,ai,workflows,builder,courses,training,training-lms,branches,notifications,blog,feed(,files(,settings(,messages(,schedules(,quizzes(,assignments(,proctor(,evaluations(,bi(,analytics(,staff(,employees(,exam-results(,teachers)?)?)?)?)?)?)?)?)?)?)?)?)?)?\s*$/m.test(env),
+    );
+  }
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 });

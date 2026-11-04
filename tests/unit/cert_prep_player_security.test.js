@@ -246,6 +246,36 @@ test('client remainingSeconds is ignored; server uses startedAt + limit', async 
   }
 });
 
+test('immediate autosave returns feedback keys only for answered questions', async () => {
+  const unansweredQuestion = {
+    ...secretQuestion,
+    _id: '507f1f77bcf86cd7994390a2',
+    questionText: 'Câu chưa trả lời',
+  };
+  const session = makeSession({
+    configSnapshot: {
+      name: 'MOS Excel L1',
+      timeLimitMinutes: 50,
+      questionCount: 2,
+      feedbackMode: 'immediate',
+    },
+    questionIds: [QID, unansweredQuestion._id],
+  });
+  const restore = stubFinders(session, [secretQuestion, unansweredQuestion]);
+  try {
+    const out = await saveProgress(STUDENT_A, SESSION_ID, {
+      answers: [{ questionId: QID, value: 1 }],
+    });
+
+    assert.equal(out.questions[0].correctAnswer, secretQuestion.correctAnswer);
+    assert.equal(out.questions[0].explanation, secretQuestion.explanation);
+    assert.equal(out.questions[1].correctAnswer, undefined);
+    assert.equal(out.questions[1].explanation, undefined);
+  } finally {
+    restore();
+  }
+});
+
 test('stripAnswerKeys student view keeps hint, drops explanation and keys', () => {
   const out = stripAnswerKeys(secretQuestion, { reveal: false });
   assert.equal(out.hint, 'Gợi ý được phép');

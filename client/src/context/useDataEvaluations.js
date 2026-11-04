@@ -70,7 +70,9 @@ export function useDataEvaluations({ students, teachers, triggerBackgroundSync, 
     setPrivateEvaluations(prev => prev.map(ev => ev.id === evalId ? { ...ev, read: true } : ev));
     try {
       await api.evaluations?.markRead(evalId);
-    } catch (e) {}
+    } catch (error) {
+      console.error('Unable to sync evaluation read status:', error);
+    }
   }, []);
 
   return {

@@ -20,12 +20,17 @@ describe('Group messages sync on reload and High Admin messaging verification', 
     const src = read('routes/messageRoutes.js');
     assert.ok(src.includes("router.get('/groups/user/:userId'"), 'Group list endpoint must exist');
     assert.ok(src.includes("createdBy.userId': { $in: targetIds }"), 'Must query groups where user is creator or participant');
+    assert.ok(src.includes('const unreadRows = groupConversationIds.length'), 'Must return server-calculated group unread counts');
+    assert.ok(src.includes("messageType: { $ne: 'system' }"), 'System messages must not count as unread');
+    assert.ok(src.includes('hiddenFor: { $nin: targetIds }'), 'Messages hidden by the requesting user must not count as unread');
   });
 
   it('server.js joins user groups on connect and handles group:join', () => {
     const src = read('server.js');
     assert.ok(src.includes("socket.join(`group_${g._id}`)"), 'Must auto-join socket into user group rooms on connect');
     assert.ok(src.includes("socket.on('group:join'"), 'Must handle socket group:join event');
+    assert.ok(src.includes("socket.on('group:leave'"), 'Must allow a user who left to leave the realtime group room');
+    assert.ok(src.includes("socket.leave(`group_${groupId}`)"), 'Must stop realtime group messages after leaving');
   });
 
   it('directMessageService.js notifies group members in realtime', () => {

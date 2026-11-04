@@ -11,7 +11,7 @@ class ProctorApplicationService {
   try {
     const events = data.body?.events;
     if (!Array.isArray(events)) {
-      return { _status: 400, _body: ({ success: false, message: 'events phải là mảng' });
+      return { _status: 400, _body: { success: false, message: 'events phải là mảng' } };
     }
     const result = await proctorAudit.ingestEvents({
       user: data.currentUser,
@@ -20,9 +20,9 @@ class ProctorApplicationService {
       userAgent: data.get('user-agent'),
       tenantId: data.tenantId || data.currentUser?.tenantId,
     });
-    return { _status: 200, _body: ({ success: true, data: result });
+    return { _status: 200, _body: { success: true, data: result } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message || 'Lỗi ghi audit' });
+    return { _status: 500, _body: { success: false, message: err.message || 'Lỗi ghi audit' } };
   }
 }
 
@@ -30,9 +30,9 @@ class ProctorApplicationService {
   try {
     const limit = parseInt(data.limit, 10) || 50;
     const data = await proctorAudit.listEventsForUser(data.currentUser.id, { limit });
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -40,9 +40,9 @@ class ProctorApplicationService {
   try {
     const limit = parseInt(data.limit, 10) || 100;
     const data = await proctorAudit.listEventsForUser(data.userId, { limit });
-    return { _status: 200, _body: ({ success: true, data });
+    return { _status: 200, _body: { success: true, data } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 

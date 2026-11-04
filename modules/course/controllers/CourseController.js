@@ -7,7 +7,7 @@ class CourseController {
   async get_stats_summary(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await courseApplicationService.get_stats_summary(data);
+      const result = await courseApplicationService.get_stats_summary(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -20,7 +20,7 @@ class CourseController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await courseApplicationService.get_root(data);
+      const result = await courseApplicationService.get_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -46,7 +46,7 @@ class CourseController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await courseApplicationService.post_root(data);
+      const result = await courseApplicationService.post_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -111,7 +111,7 @@ class CourseController {
   async post_seed(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await courseApplicationService.post_seed(data);
+      const result = await courseApplicationService.post_seed(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -124,3 +124,4 @@ class CourseController {
 }
 
 module.exports = new CourseController();
+

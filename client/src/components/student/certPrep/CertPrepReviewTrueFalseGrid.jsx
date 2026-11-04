@@ -14,7 +14,7 @@ export default function CertPrepReviewTrueFalseGrid({ question }) {
     <div className="overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full min-w-[360px] text-sm">
         <thead>
-          <tr className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+          <tr className="bg-slate-50 text-xs font-black  tracking-wide text-slate-500">
             <th className="px-3 py-2 text-left">Nhận định</th>
             <th className="px-3 py-2 text-center w-24">Bạn chọn</th>
             <th className="px-3 py-2 text-center w-24">Đáp án</th>

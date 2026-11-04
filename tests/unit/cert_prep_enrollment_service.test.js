@@ -434,9 +434,9 @@ test('student cert-prep routes are learning-gated', () => {
   const certBlock = app.slice(app.indexOf("path=\"/student/cert-prep\""));
   assert.ok(certBlock.includes('StudentLearningAccessGate'));
   const side = fs.readFileSync(path.join(__dirname, '../../client/src/components/AppSidebar.jsx'), 'utf8');
-  assert.ok(side.includes("path: '/student/cert-prep', requiresLearningAccess: true")
-    || side.includes('path: \'/student/cert-prep\', requiresLearningAccess: true')
-    || /cert-prep.*requiresLearningAccess:\s*true/.test(side));
+  for (const line of side.split(/\r?\n/).filter((l) => l.includes("'/student/cert-prep'"))) {
+    assert.ok(/requiresLearningAccess:\s*true/.test(line), `student cert-prep menu must be learning-gated: ${line.trim()}`);
+  }
 });
 
 test('routes: mapping endpoints are manage_cert_prep gated; no modules/cert-prep', () => {

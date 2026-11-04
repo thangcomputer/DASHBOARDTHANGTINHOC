@@ -6,6 +6,7 @@ const Student  = require('../../student/models/Student');
 const Teacher  = require('../../teacher/models/Teacher');
 const { scheduleHistoryRepository } = require('../repositories');
 const ScheduleHistory = require('../models/ScheduleHistory'); // Temp for new ScheduleHistory
+const attendanceController = require('../controllers/AttendanceController');
 const { authMiddleware, branchFilter } = require('../../../shared/middleware/authMiddleware');
 const logger = require('../../../config/logger');
 const { studentMatchesTeacher } = require('../../enrollment/services/enrollmentService');

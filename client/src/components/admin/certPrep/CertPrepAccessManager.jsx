@@ -186,7 +186,7 @@ export default function CertPrepAccessManager({ courses, rows, loading, onRefres
       ) : (
         <div className="overflow-x-auto cms-card p-0">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase text-left">
+            <thead className="bg-slate-50 text-xs font-bold text-slate-500  text-left">
               <tr>
                 <th className="px-4 py-3">Học viên</th>
                 <th className="px-4 py-3">Khóa</th>

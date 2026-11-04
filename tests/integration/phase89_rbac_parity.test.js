@@ -196,8 +196,8 @@ test('Phase8.9/8.10 training vs student_training separation; student_training MA
 });
 
 test('Phase8.9 legacy-only → UNSUPPORTED; finalDecision still LIVE', () => {
-  const a = actor({ permissions: [LIVE.MANAGE_SCHEDULE] });
-  const r = compareStaffLivePermission(a, LIVE.MANAGE_SCHEDULE);
+  const a = actor({ permissions: [LIVE.VIEW_EVALUATIONS] });
+  const r = compareStaffLivePermission(a, LIVE.VIEW_EVALUATIONS);
   assert.equal(r.comparison, COMPARISON.UNSUPPORTED);
   assert.equal(r.finalDecision, r.live.decision);
 });

@@ -9,7 +9,7 @@ import SoftwareLinksTable from './SoftwareLinksTable';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useModal } from '../utils/Modal.jsx';
 import PopupBanner from './PopupBanner';
 import TeacherScheduleModal from './teacher/TeacherScheduleModal';
@@ -27,7 +27,7 @@ import { classifyAttendancePrompt, resolveCheckInGate } from '../utils/attendanc
 import { getAttendanceAction, formatGraceRemaining } from '../utils/attendanceAction';
 import { isScheduleDateBeforeToday } from '../utils/scheduleTime';
 
-const TeacherDashboard = ({ onNavigate }) => {
+const TeacherDashboard = () => {
   const { showModal } = useModal();
   let session = {};
   try {
@@ -41,15 +41,16 @@ const TeacherDashboard = ({ onNavigate }) => {
     students: allStudents, teachers, schedules,
     getStudentsByTeacher, getTeacherStats,
     markAttendance: ctxMarkAttendance,
-    updateStudentLink,
+    updateStudentLink, updateStudent,
     getConversations,
-    getSchedulesByTeacher, getTeacherRating, RATING_CRITERIA, getTransactionsByTeacher,
+    getSchedulesByTeacher, RATING_CRITERIA, getTransactionsByTeacher,
     addSchedule, updateSchedule, cancelSchedule,
-    revokeStudentExam, updateStudent, updateTeacher, failStudentExam,
+    failStudentExam,
     trainingData, setTrainingData,
   } = useData();
 
   const { socket, onlineUsers, lastSeenUsers } = useSocket();
+  const currentTeacher = teachers.find(t => String(t.id) === String(TEACHER_ID) || String(t._id) === String(TEACHER_ID));
 
 
   // Helper: tính "X phút trước" từ ISO string
@@ -83,13 +84,6 @@ const TeacherDashboard = ({ onNavigate }) => {
       });
     }
   };
-
-  // Trạng thái hiện tại của GV
-  const currentTeacher = teachers.find(t => String(t.id) === String(TEACHER_ID) || String(t._id) === String(TEACHER_ID));
-  // Vấn đề: `teachers` ở frontend đôi lúc không chứa giáo viên hiện tại do phân quyền gọi getAll.
-  // Giải pháp: Sử dụng thêm session.status để kiểm tra fallback chuẩn xác nhất.
-  const currentStatus = String(currentTeacher?.status || session.status || '').toLowerCase();
-  const isApproved = currentStatus === 'active';
 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
@@ -417,7 +411,7 @@ const TeacherDashboard = ({ onNavigate }) => {
         const avg = count > 0 ? (Math.round((validRatings.reduce((s, r) => s + r.criteria.stars, 0) / count) * 10) / 10) : 0;
         setTeacherRating({ avg, count, ratings: res.data });
       }
-    }).catch(err => void 0);
+    }).catch(() => undefined);
   }, [TEACHER_ID]);
   const myTransactions = useMemo(() => getTransactionsByTeacher(TEACHER_ID), [getTransactionsByTeacher, TEACHER_ID]);
 
@@ -491,7 +485,7 @@ const TeacherDashboard = ({ onNavigate }) => {
 
               {/* Quy trình */}
               <div className="space-y-4">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">QUY TRÌNH CẤP QUYỀN</p>
+                <p className="text-xs font-bold text-gray-400  tracking-widest text-center">Quy trình cấp quyền</p>
                 {(() => {
                   const step1Done = currentTeacher?.testScore != null;
                   const step2Done = !!currentTeacher?.practicalFile;
@@ -766,7 +760,7 @@ const TeacherDashboard = ({ onNavigate }) => {
 
               {mode === 'late' && (
                 <div>
-                  <label className="text-xs font-black text-slate-700 uppercase tracking-widest block mb-2">
+                  <label className="text-xs font-black text-slate-700  tracking-widest block mb-2">
                     Lý do điểm danh bổ sung
                   </label>
                   <textarea
@@ -811,7 +805,7 @@ const TeacherDashboard = ({ onNavigate }) => {
 
                 {mode !== 'expired' && (
                 <div className="border border-red-100 bg-red-50/50 rounded-2xl p-4">
-                  <label className="text-xs font-black text-red-800 uppercase tracking-widest block mb-2">Học viên không học?</label>
+                  <label className="text-xs font-black text-red-800  tracking-widest block mb-2">Học viên không học?</label>
                   <textarea
                     rows={2}
                     value={noShowReason}
@@ -841,5 +835,3 @@ const TeacherDashboard = ({ onNavigate }) => {
 };
 
 export default TeacherDashboard;
-
-

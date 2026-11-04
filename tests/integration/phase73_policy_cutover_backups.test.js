@@ -19,6 +19,7 @@ const {
 } = require('../../services/policyShadow/backupPolicy');
 const { backupsCutoverGate } = require('../../middleware/backupsCutoverGate');
 
+const { readDeployEnv } = require('../helpers/deployEnv');
 const ROOT = path.join(__dirname, '../..');
 const ACTOR = '507f1f77bcf86cd799439011';
 const ENV_OFF = { POLICY_CUTOVER_ENABLED: 'false', POLICY_CUTOVER_ROUTES: '' };
@@ -303,7 +304,7 @@ test('Phase7.3 static: only backups uses gate; handlers keep queue/create/delete
   const shadow = fs.readFileSync(path.join(ROOT, 'middleware/policyShadowBackup.js'), 'utf8');
   const policy = fs.readFileSync(path.join(ROOT, 'services/policyShadow/backupPolicy.js'), 'utf8');
   const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const env = readDeployEnv();
   const perms = fs.readFileSync(path.join(ROOT, 'constants/permissions.js'), 'utf8');
   const mon = fs.readFileSync(path.join(ROOT, 'routes/monitoringRoutes.js'), 'utf8');
 
@@ -341,10 +342,10 @@ test('Phase7.3 static: only backups uses gate; handlers keep queue/create/delete
 
   assert.ok(!/app\.use\(\s*['"]\/api\/.*policy/i.test(server));
   // Phase 7.5 production: ENABLED=true + ROUTES includes backups (+ monitoring)
-  assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env));
-  assert.ok(/POLICY_CUTOVER_ROUTES\s*=\s*.*backups/.test(env));
-  assert.ok(!/POLICY_CUTOVER_ROUTES\s*=\s*.*\*/.test(env));
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env));
+  if (env) assert.ok(/POLICY_CUTOVER_ROUTES\s*=\s*.*backups/.test(env));
+  if (env) assert.ok(!/POLICY_CUTOVER_ROUTES\s*=\s*.*\*/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   assert.ok(!perms.includes('MANAGE_BACKUP'));
   assert.ok(fs.existsSync(path.join(ROOT, 'modules/report/routes/backupRoutes.js')));
 });

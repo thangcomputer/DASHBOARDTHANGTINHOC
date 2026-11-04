@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Calendar, ChevronRight, Award, Star, Zap, UserCheck, Clipboard,
-  MessageSquare, GraduationCap, Users, Video, UserPlus, Wallet, Clock, ExternalLink,
+  Calendar, CalendarDays, ChevronRight, Award, Star, Zap, UserCheck, Clipboard,
+  MessageSquare, GraduationCap, Users, Video, UserPlus, WalletCards, Clock, ExternalLink,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import api, { resolveMediaUrl } from '../../services/api';
@@ -15,6 +15,7 @@ import {
 import { getClientEnrollments } from '../../utils/enrollments';
 import { STAR_BONUS_MIN_STUDENTS, STAR_BONUS_MIN_STARS } from '../../utils/teacherCommission';
 import { starsFromRating } from '../../context/useDataRatings';
+import '../dashboard-overview.css';
 
 function scheduleStudentId(sch) {
   return String(sch?.studentId?._id || sch?.studentId?.id || sch?.studentId || '');
@@ -54,8 +55,8 @@ function getNextScheduleForStudent(schedules, student, now = new Date()) {
 }
 
 export default function TeacherOverviewTab({
-  navigate, totalMonthlyIncome, completed, totalDone, teacherName, currentTeacher,
-  teacherRating, students, totalSess, avgGrade, mySchedules = [], myNotifs, RATING_CRITERIA,
+  navigate, totalMonthlyIncome, teacherName, currentTeacher,
+  teacherRating, students, mySchedules = [], myNotifs, RATING_CRITERIA,
   teacherId,
 }) {
   const [banners, setBanners] = useState([]);
@@ -244,47 +245,53 @@ export default function TeacherOverviewTab({
     };
   }, [teacherRating]);
 
+  const activeStudents = useMemo(
+    () => (students || []).filter((student) => student.enrollmentStatus === 'active'),
+    [students],
+  );
+
   return (
-    <div className="py-3 sm:py-5 md:py-6 space-y-4 sm:space-y-5 md:space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0 max-w-full overflow-x-hidden pb-4">
+    <div className="bg-[#F5F8FC] py-3 sm:py-5 md:py-6 space-y-4 lg:space-y-5 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0 max-w-full overflow-x-hidden pb-4 th-dashboard-overview th-dashboard-overview--teacher">
       
       {/* ── HEADER (gọn) + BANNER ── */}
-      <header className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between mb-1 min-w-0">
-        <div className="min-w-0 w-full lg:max-w-[40%] lg:shrink-0">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-black text-slate-800 break-words">
+      <header className="flex flex-col gap-3 sm:gap-4 mb-1 min-w-0 th-dashboard-overview__header">
+        <div className="min-w-0 w-full th-dashboard-overview__intro">
+          <p className="th-dashboard-overview__eyebrow">Không gian giảng dạy</p>
+          <h2 className="text-base sm:text-lg font-black text-slate-800 break-words th-dashboard-overview__title">
             Chào mừng, {teacherName || 'Giảng viên'}!
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1 th-dashboard-overview__subtitle">
             Ưu tiên điểm danh, lịch dạy và học viên được phân công.
           </p>
         </div>
-        
-        {banners.length > 0 && (
-          <div 
-            className="relative w-full lg:flex-1 lg:max-w-[800px] h-24 sm:h-28 md:aspect-[5/1] md:h-auto bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group"
-            onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
-          >
-            {banners.map((b, i) => (
-              <img 
-                key={i}
-                src={resolveMediaUrl(b.imageUrl)} 
-                alt="Banner" 
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
-              />
-            ))}
-            {banners.length > 1 && (
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
-                {banners.map((_, i) => (
-                  <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIdx ? 'bg-white shadow-sm' : 'bg-white/40'}`} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </header>
+
+      {banners.length > 0 && (
+        <div
+          className="relative w-full aspect-[5/1] min-h-20 max-h-36 bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group th-dashboard-overview__banner"
+          onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
+        >
+          {banners.map((b, i) => (
+            <img
+              key={i}
+              src={resolveMediaUrl(b.imageUrl)}
+              alt="Banner"
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            />
+          ))}
+          {banners.length > 1 && (
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
+              {banners.map((_, i) => (
+                <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIdx ? 'bg-white shadow-sm' : 'bg-white/40'}`} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── LIVE ONGOING SCHEDULE BANNER (Hiển thị nổi bật khi có lớp đang diễn ra) ── */}
       {ongoingSchedule && (
-        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-indigo-700 text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xl shadow-red-500/20 flex flex-col sm:flex-row items-center justify-between gap-4 border border-red-400/30 animate-pulse">
+        <div className="th-dashboard-overview__live-card text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
               <Video size={20} className="text-white" />
@@ -292,7 +299,7 @@ export default function TeacherOverviewTab({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-xs font-black uppercase tracking-wider text-red-100">CA DẠY ĐANG DIỄN RA</span>
+                <span className="text-xs font-black  tracking-wider text-red-100">Ca dạy đang diễn ra</span>
               </div>
               <h4 className="text-sm sm:text-base font-black text-white truncate mt-0.5">
                 👤 {ongoingSchedule.studentName || 'Học viên'} &bull; <span className="text-yellow-300">{ongoingSchedule.course}</span>
@@ -310,19 +317,19 @@ export default function TeacherOverviewTab({
               rel="noreferrer"
               className="w-full sm:w-auto px-5 py-2.5 bg-white text-red-600 hover:bg-red-50 rounded-xl text-xs sm:text-sm font-black shadow-lg transition active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
-              <Video size={16} /> VÀO LỚP NGAY
+              <Video size={16} />  Vào lớp ngay
             </a>
           )}
         </div>
       )}
 
       {/* ── Quick actions (ưu tiên hành động) ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm th-dashboard-overview__actions">
         <div className="flex items-center gap-2 mb-2.5 sm:mb-3">
           <Zap size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
           <h3 className="font-bold text-sm lg:text-base text-slate-800">Công việc cần xử lý ngay</h3>
         </div>
-        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
           {[
             {
               icon: UserCheck,
@@ -366,7 +373,7 @@ export default function TeacherOverviewTab({
               action: () => navigate('/teacher/inbox'),
             },
             {
-              icon: Calendar,
+              icon: CalendarDays,
               label: 'Xếp lịch',
               sub: 'Thêm buổi dạy mới',
               tint: 'bg-sky-50 hover:bg-sky-100/80 border-sky-100 text-sky-900',
@@ -378,26 +385,25 @@ export default function TeacherOverviewTab({
               key={label}
               type="button"
               onClick={action}
-              className={`group ${tint} border rounded-xl p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] min-h-[4rem] cursor-pointer min-w-0`}
+              className={`group ${tint} border rounded-xl p-2.5 sm:p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] min-h-[70px] cursor-pointer min-w-0`}
             >
               <div className="flex items-center gap-2 mb-1 min-w-0">
-                <span className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/80 shadow-sm ring-1 ring-black/5 transition-transform duration-200 group-hover:scale-110 ${iconClass}`}>
-                  <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-white/80 blur-[3px]" aria-hidden="true" />
-                  <Icon size={17} strokeWidth={2.4} className="relative drop-shadow-sm" aria-hidden="true" />
+                <span className={`relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-current/10 bg-white transition-transform duration-200 group-hover:scale-110 ${iconClass}`}>
+                  <Icon size={18} strokeWidth={2.4} aria-hidden="true" />
                 </span>
-                <p className="font-bold text-xs sm:text-sm lg:text-base truncate">{label}</p>
+                <p className="font-bold text-[11px] sm:text-xs lg:text-sm truncate">{label}</p>
               </div>
-              <p className="text-[11px] sm:text-xs lg:text-sm text-slate-500 leading-snug break-words">{sub}</p>
+              <p className="text-[10px] sm:text-[11px] lg:text-xs text-slate-500 leading-snug break-words">{sub}</p>
             </button>
           ))}
         </div>
       </div>
 
       {/* ── Stats Summary Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-2.5 sm:gap-3 th-dashboard-overview__metrics">
         {[
           {
-            icon: Wallet,
+            icon: WalletCards,
             label: `Thu nhập tháng ${new Date().getMonth() + 1}`,
             value: `${(Number(totalMonthlyIncome) || 0).toLocaleString('vi-VN')}đ`,
             sub: (
@@ -413,7 +419,7 @@ export default function TeacherOverviewTab({
           {
             icon: Users,
             label: 'Đang dạy',
-            value: students.length,
+            value: activeStudents.length,
             sub: 'học viên',
             color: 'from-indigo-500 to-indigo-600',
             bg: 'bg-indigo-50',
@@ -453,32 +459,30 @@ export default function TeacherOverviewTab({
             tabIndex={onClick ? 0 : undefined}
             onClick={onClick}
             onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-            className={`bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0 ${onClick ? 'cursor-pointer' : ''}`}
+            className={`bg-white rounded-2xl p-3 sm:p-3.5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0 th-dashboard-overview__metric ${onClick ? 'cursor-pointer' : ''}`}
           >
             <div className={`absolute -right-3 -bottom-3 w-14 h-14 sm:w-20 sm:h-20 ${bg} rounded-full opacity-40 group-hover:scale-125 transition-transform duration-500 pointer-events-none`} aria-hidden="true" />
-            <div className={`relative w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center mb-2.5 sm:mb-3.5 shadow-lg ring-2 ring-white/80 group-hover:scale-105 transition-transform z-10`}>
-              <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-white/60 blur-[4px]" aria-hidden="true" />
-              <Icon size={17} strokeWidth={2.4} className="text-white sm:hidden relative drop-shadow-md" aria-hidden="true" />
-              <Icon size={22} strokeWidth={2.4} className="text-white hidden sm:block relative drop-shadow-md" aria-hidden="true" />
+            <div className={`relative w-9 h-9 rounded-full bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-sm ring-2 ring-white/80 group-hover:scale-105 transition-transform z-10`}>
+              <Icon size={18} strokeWidth={2.4} className="text-white" aria-hidden="true" />
             </div>
-            <p className="text-xs sm:text-sm lg:text-base font-bold text-slate-600 uppercase tracking-wide mb-0.5 relative z-10 truncate">{label}</p>
-            <p className="text-lg sm:text-2xl md:text-3xl font-black text-slate-800 relative z-10 truncate tabular-nums">{value}</p>
-            <p className={`text-xs lg:text-sm font-medium mt-1 relative z-10 ${subClass || 'text-slate-500'}`}>{sub}</p>
+            <p className="text-[11px] sm:text-xs font-bold text-slate-600 mb-0.5 relative z-10 truncate">{label}</p>
+            <p className="text-base sm:text-lg font-black text-slate-800 relative z-10 truncate tabular-nums">{value}</p>
+            <p className={`text-[11px] sm:text-xs font-medium mt-1 relative z-10 ${subClass || 'text-slate-500'}`}>{sub}</p>
           </div>
         ))}
       </div>
 
-      {/* ── 3 cột: HV / Lịch / Đánh giá ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 items-start">
+      {/* ── Học viên / Lịch dạy / Đánh giá ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5 items-start">
 
         {/* Cột 1: Học viên được phân công — hiện ~5, scroll thêm */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
+        <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
             <h3 className="text-sm sm:text-base lg:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md shadow-indigo-200 shrink-0">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-sm shrink-0">
                 <GraduationCap size={17} strokeWidth={2.4} aria-hidden="true" />
               </span>
-              <span className="truncate">Học viên được phân công ({students.length})</span>
+              <span className="truncate">Học viên được phân công ({activeStudents.length})</span>
             </h3>
             <button
               type="button"
@@ -490,8 +494,8 @@ export default function TeacherOverviewTab({
             </button>
           </div>
 
-          <div className="space-y-2.5 max-h-[25rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
-            {students.map((s) => {
+          <div className="space-y-2.5 min-h-0">
+            {activeStudents.slice(0, 3).map((s) => {
               const done = s.completedSessions != null
                 ? Math.max(0, Number(s.completedSessions) || 0)
                 : Math.max(0, (Number(s.totalSessions) || 12) - (Number(s.remainingSessions) || 0));
@@ -511,38 +515,40 @@ export default function TeacherOverviewTab({
                   type="button"
                   key={enrollmentKey}
                   onClick={openStudent}
-                  className="w-full text-left bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center gap-3 hover:bg-indigo-50/60 hover:border-indigo-200 transition group cursor-pointer"
+                  className="w-full text-left bg-[#F7F9FC] rounded-xl p-2.5 sm:p-3 border border-slate-100 flex items-center gap-2.5 sm:gap-3 hover:bg-indigo-50/60 hover:border-indigo-200 transition group cursor-pointer"
                 >
                   <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-white shadow-sm border border-slate-200">
                     <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm lg:text-base font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{s.name}</p>
-                    <p className="text-[11px] sm:text-xs lg:text-sm text-slate-400 truncate">{s.course}</p>
-                    <div className="h-1.5 bg-slate-200/60 rounded-full mt-1.5 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-indigo-500'}`}
-                        style={{ width: `${pct}%` }}
-                      />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs sm:text-sm font-bold text-slate-800 truncate uppercase group-hover:text-indigo-600 transition-colors">{s.name}</p>
+                      <p className="shrink-0 text-[11px] sm:text-xs font-black text-slate-800 tabular-nums">{pct}%</p>
                     </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs sm:text-sm lg:text-base font-black text-slate-800 tabular-nums">{pct}%</p>
-                    <p className="text-[11px] lg:text-sm text-slate-400 tabular-nums">{done}/{total} buổi</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400 truncate uppercase">{s.course}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="h-1.5 min-w-0 flex-1 bg-slate-200/60 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="shrink-0 text-[10px] text-slate-400 tabular-nums">{done}/{total} buổi</p>
+                    </div>
                   </div>
                   <ChevronRight size={15} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition shrink-0" />
                 </button>
               );
             })}
 
-            {students.length === 0 && (
+            {activeStudents.length === 0 && (
               <div className="py-6 text-center text-slate-400 text-xs font-medium">Chưa được phân công học viên nào.</div>
             )}
           </div>
         </div>
 
         {/* Cột 2: Ca tiếp theo — giờ, thứ/ngày, link hướng dẫn, nhấp nháy khi đến ca */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
+        <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
             <h3 className="text-sm sm:text-base lg:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200 shrink-0">
@@ -560,8 +566,8 @@ export default function TeacherOverviewTab({
             </button>
           </div>
 
-          <div className="space-y-2.5 max-h-[25rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
-            {nextSessions.map(({ student, sch, live, weekday, dateLabel, joinUrl }) => {
+          <div className="space-y-2.5 min-h-0">
+            {nextSessions.slice(0, 3).map(({ student, sch, live, weekday, dateLabel, joinUrl }) => {
               const enrollmentKey = student._enrollmentKey || student._id || student.id;
               const timeRange = sch.endTime ? `${sch.startTime} - ${sch.endTime}` : (sch.startTime || '—');
               return (
@@ -576,7 +582,7 @@ export default function TeacherOverviewTab({
                   <div className="flex items-start gap-2 min-w-0">
                     <div className="min-w-0 flex-1">
                       {live && (
-                        <p className="text-[11px] font-black uppercase tracking-wider text-red-100 flex items-center gap-1.5 mb-1">
+                        <p className="text-[11px] font-black  tracking-wider text-red-100 flex items-center gap-1.5 mb-1">
                           <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
@@ -603,7 +609,7 @@ export default function TeacherOverviewTab({
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide ${
+                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black  tracking-wide ${
                           live
                             ? 'bg-white text-red-600 hover:bg-red-50 shadow'
                             : 'bg-red-600 text-white hover:bg-red-700'
@@ -648,18 +654,18 @@ export default function TeacherOverviewTab({
               <ChevronRight size={12} aria-hidden="true" />
             </button>
           </div>
-          <div className="divide-y divide-slate-50 max-h-[25.5rem] overflow-y-auto overscroll-contain pr-1 min-h-0">
+          <div className="divide-y divide-slate-50 min-h-0">
             {upcomingThisMonth.length === 0 && (
               <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy sắp tới trong tháng.</p>
             )}
-            {upcomingThisMonth.map((s) => {
+            {upcomingThisMonth.slice(0, 3).map((s) => {
               const day = normalizeScheduleDate(s.date);
               const [, monthStr, dayStr] = day.split('-');
               return (
               <div key={s._id || s.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-indigo-50/30 transition">
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 flex flex-col items-center justify-center text-indigo-600 flex-shrink-0">
                   <span className="text-xs font-black tabular-nums">{Number(dayStr) || new Date(s.date).getDate()}</span>
-                  <span className="text-[7px] font-bold opacity-60">T{Number(monthStr) || (new Date(s.date).getMonth() + 1)}</span>
+                  <span className="text-[7px] font-bold opacity-60">S?T{Number(monthStr) || (new Date(s.date).getMonth() + 1)}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-800 truncate">{s.studentName || s.course}</p>
@@ -675,7 +681,7 @@ export default function TeacherOverviewTab({
         </div>
 
         {/* Cột 3: Đánh giá từ học viên — list hiện ~3, scroll thêm */}
-        <div className="min-w-0 w-full md:col-span-2 xl:col-span-1">
+        <div className="min-w-0 w-full">
           <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} reviewsScrollLimit={3} />
         </div>
       </div>

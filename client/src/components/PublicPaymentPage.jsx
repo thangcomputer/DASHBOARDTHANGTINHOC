@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react';
-import { generateVietQRUrl } from './BankSelect';
+import { generateVietQRUrl } from './bankSelectUtils';
 import TransferPaymentDetails from './shared/TransferPaymentDetails';
 import TransferPaymentHeader from './shared/TransferPaymentHeader';
 

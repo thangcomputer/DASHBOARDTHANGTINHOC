@@ -20,7 +20,7 @@ export default function CertPrepReviewMatching({ question }) {
   return (
     <div className="space-y-3 text-sm">
       <div>
-        <p className="text-xs font-black uppercase tracking-wide text-slate-500 mb-2">Bạn chọn</p>
+        <p className="text-xs font-black  tracking-wide text-slate-500 mb-2">Bạn chọn</p>
         {items.map((item, i) => (
           <p key={`s-${item.id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 mb-2">
             {String.fromCharCode(65 + i)}. {item.text || ''} → {targetLabel(question, student.get(String(item.id)))}
@@ -28,7 +28,7 @@ export default function CertPrepReviewMatching({ question }) {
         ))}
       </div>
       <div>
-        <p className="text-xs font-black uppercase tracking-wide text-emerald-700 mb-2">Đáp án đúng</p>
+        <p className="text-xs font-black  tracking-wide text-emerald-700 mb-2">Đáp án đúng</p>
         {items.map((item, i) => (
           <p key={`c-${item.id}`} className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 mb-2">
             {String.fromCharCode(65 + i)}. {item.text || ''} → {targetLabel(question, correct.get(String(item.id)))}

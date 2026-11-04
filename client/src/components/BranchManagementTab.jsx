@@ -9,7 +9,7 @@ import {
   Loader2, Phone, MapPin, Hash, ToggleLeft, ToggleRight,
   CheckCircle2, AlertTriangle
 } from 'lucide-react';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useModal } from '../utils/Modal.jsx';
 import { csrfFetch } from '../services/api';
 
@@ -20,7 +20,14 @@ function getToken() {
     const directToken = localStorage.getItem(`${role}_access_token`);
     if (directToken) return directToken;
     const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        if (u?.token) return u.token;
+      } catch {
+        // Continue checking the next available session source.
+      }
+    }
   }
   return '';
 }
@@ -31,7 +38,7 @@ const EMPTY = { name: '', code: '', address: '', phone: '', isActive: true };
 function BranchField({ label, name, placeholder, icon: Icon, type, hint, value, onChange }) {
   return (
     <div>
-      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{label}</label>
+      <label className="text-xs font-bold text-gray-500  block mb-1">{label}</label>
       <div className="flex items-center gap-2 border-2 border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-blue-400 transition">
         {Icon && <Icon size={14} className="text-gray-400 flex-shrink-0" />}
         <input

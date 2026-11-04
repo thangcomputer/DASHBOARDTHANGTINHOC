@@ -23,7 +23,6 @@ import {
   countTeacherQuestionsBySubject,
   getQuestionSubjectId,
   computeTeacherMcExamTotalMinutesBySubjects,
-  computeTeacherExamTotalMinutesBySubjects,
   resolveTeacherExamSubjectIds,
   computeTeacherPracticalTotalMinutes,
   buildTeacherExamScheduleBySubject,
@@ -118,7 +117,7 @@ const EvaluationStepper = ({ currentStep = 1, results = {}, practicalSubmitted =
 
     return (
         <div className={`w-full bg-white rounded-xl sm:rounded-2xl ${pad} shadow-sm border border-slate-100 max-w-4xl mx-auto ${mb}`}>
-            <p className={`text-xs sm:text-sm font-black text-gray-400 uppercase tracking-widest text-center ${titleMb}`}>Quy trình đánh giá giảng viên</p>
+            <p className={`text-xs sm:text-sm font-black text-gray-400  tracking-widest text-center ${titleMb}`}>Quy trình đánh giá giảng viên</p>
             <div className={`flex items-center justify-between relative ${px} cms-table-wrap pb-1`}>
                 {/* Line Background */}
                 <div className={`absolute ${lineTop} ${lineInset} h-0.5 bg-gray-100 -z-0`} />
@@ -134,7 +133,7 @@ const EvaluationStepper = ({ currentStep = 1, results = {}, practicalSubmitted =
                              (i === 2 ? <User size={iconSz} /> : <FileText size={iconSz} />)}
                         </div>
                         <div className={`${labelMt} text-center max-w-[6.5rem] sm:max-w-none`}>
-                            <p className={`${compact ? 'text-sm sm:text-base' : 'text-xs'} font-black uppercase tracking-tight ${i + 1 === currentStep ? 'text-blue-700' : 'text-slate-900'}`}>{step.label}</p>
+                            <p className={`${compact ? 'text-sm sm:text-base' : 'text-xs'} font-black  tracking-tight ${i + 1 === currentStep ? 'text-blue-700' : 'text-slate-900'}`}>{step.label}</p>
                             <p className={`${compact ? 'text-xs sm:text-sm' : 'text-xs'} font-bold mt-0.5 ${
                                 step.sub.includes('Hoàn thành') ? 'text-green-500' : 
                                 step.sub.includes('thực hiện') ? 'text-blue-500 animate-pulse' : 'text-slate-400'
@@ -171,13 +170,13 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
       <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
         <div className="bg-white rounded-[40px] p-8 sm:p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600 animate-in zoom-in duration-300">
           <div className="text-6xl sm:text-7xl mb-3 leading-none select-none" role="img" aria-label="Buồn">😢</div>
-          <h2 className="text-2xl sm:text-3xl font-black text-red-600 uppercase italic">CHƯA ĐẠT</h2>
+          <h2 className="text-2xl sm:text-3xl font-black text-red-600  italic">Chưa đạt</h2>
 
           <div className="relative mx-auto mt-6 mb-2">
             <div className="mx-auto w-32 h-32 sm:w-40 sm:h-40 rounded-full flex items-center justify-center border-[6px] border-red-600 bg-red-50 shadow-inner">
               <span className="text-5xl sm:text-6xl font-black tracking-tighter text-red-600">{total}</span>
             </div>
-            <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Điểm / 100</p>
+            <p className="text-[10px] sm:text-xs font-black text-slate-400  tracking-[0.2em] mt-2">Điểm / 100</p>
           </div>
 
           <div className="bg-red-50 p-5 sm:p-6 rounded-3xl mt-5 border border-red-100">
@@ -194,7 +193,7 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
                 </span>
               )}
               <span className="mt-2 inline-block">
-                Tài khoản đã bị <strong>KHÓA</strong> do kết quả thi <strong>KHÔNG ĐẠT</strong>.
+                Tài khoản đã bị <strong>Khóa</strong> do kết quả thi <strong>Không đạt</strong>.
                 Vui lòng liên hệ Admin để được thi lại.
               </span>
             </p>
@@ -205,7 +204,7 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
             onClick={onLogin}
             className="w-full mt-8 py-5 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all text-sm sm:text-base"
           >
-            ✓ QUAY LẠI ĐĂNG NHẬP
+            ✓ Quay lại đăng nhập
           </button>
         </div>
       </div>
@@ -216,13 +215,13 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
     <div className="flex h-full min-h-0 max-h-[100dvh] w-full flex-col overflow-hidden bg-black items-center justify-center p-4 sm:p-5">
       <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl border-t-[10px] border-green-600">
         <div className="text-5xl sm:text-6xl mb-2 leading-none select-none" role="img" aria-label="Vui">😊</div>
-        <h2 className="text-xl sm:text-2xl font-black uppercase italic text-green-600">ĐẠT TRẮC NGHIỆM</h2>
+        <h2 className="text-xl sm:text-2xl font-black  italic text-green-600">Đạt trắc nghiệm</h2>
 
         <div className="relative mx-auto mt-4 mb-1">
           <div className="mx-auto w-28 h-28 sm:w-32 sm:h-32 rounded-full flex items-center justify-center border-[5px] border-green-600 bg-green-50 shadow-inner">
             <span className="text-4xl sm:text-5xl font-black tracking-tighter text-green-600">{total}</span>
           </div>
-          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.15em] mt-1.5">Điểm / 100</p>
+          <p className="text-xs font-black text-slate-400  tracking-[0.15em] mt-1.5">Điểm / 100</p>
         </div>
 
         <div className="p-4 sm:p-5 rounded-2xl mt-4 border bg-green-50 border-green-100 text-left">
@@ -249,18 +248,16 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
           onClick={onContinue}
           className="w-full mt-5 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all text-base sm:text-lg"
         >
-          ✓ TIẾP TỤC PHẦN TỰ LUẬN
+          ✓ Tiếp tục phần tự luận
         </button>
       </div>
     </div>
   );
 };
 
-const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
+const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
   const {
     teachers,
-    teacherExamMinutes,
-    teacherEssayExamMinutes,
     updateTeacherExamMinutes,
     updateTeacherEssayExamMinutes,
     examSubjectsCatalog,
@@ -277,12 +274,9 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const [practicalTimeLeft, setPracticalTimeLeft] = useState(0);
   const [practicalExpired, setPracticalExpired] = useState(false);
   const practicalTimerRef = useRef(null);
-  const [uploadFile, setUploadFile] = useState(null);
   const [practicalSubmitting, setPracticalSubmitting] = useState(false);
   const practicalSubmittingRef = useRef(false);
-  const fileRef = useRef(null);
-  const [tabViolations, setTabViolations] = useState(0);
-  const [cameraViolations, setCameraViolations] = useState(0);
+  const tabViolationsRef = useRef(0);
   const [warningOverlay, setWarningOverlay] = useState(null);
 
   const [cameraReady, setCameraReady] = useState(false);
@@ -290,8 +284,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const previewRef = useRef(null);
   const previewStreamRef = useRef(null);
   const [currentQ, setCurrentQ] = useState(0);
-  const [webLogoUrl, setWebLogoUrl] = useState('');
-
   const monitorRef = useRef(null);
   const timerRef = useRef(null);
   const handleSubmitRef = useRef(null);
@@ -528,19 +520,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   }, [configuredMcMinutes, phase]);
 
   useEffect(() => {
-    const origin = import.meta.env.VITE_API_URL || '';
-    fetch(`${origin}/api/settings/web`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success && res.data?.logoUrl) {
-          const u = res.data.logoUrl;
-          setWebLogoUrl(u.startsWith('http') ? u : `${origin}${u}`);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     setCurrentQ((c) => Math.max(0, Math.min(c, Math.max(0, questions.length - 1))));
   }, [questions.length]);
 
@@ -714,10 +693,10 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
 
     const confirmExit = (reasonTxt) => {
       showModal({
-        title: 'CẢNH BÁO TỪ HỆ THỐNG',
+        title: 'Cảnh báo từ hệ thống',
         content: `Nếu bạn ${reasonTxt}, đồng nghĩa với việc HỦY BÀI THI và vô hiệu hóa tài khoản Giảng viên. Bạn có chắc chắn muốn thoát?`,
         type: 'warning',
-        confirmText: 'ĐỒNG Ý HỦY BÀI',
+        confirmText: 'Đồng ý hủy bài',
         cancelText: 'Làm bài tiếp',
         onConfirm: () => {
           if (failAndExitRef.current) failAndExitRef.current(reasonTxt);
@@ -776,24 +755,22 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       if (now - lastTabViolationAtRef.current < 1200) return;
       lastTabViolationAtRef.current = now;
 
-      setTabViolations((prev) => {
-        const n = prev + 1;
-        const inPractical = practicalMonitorActiveRef.current;
-        if (n >= 2) {
-          const msg = inPractical
-            ? 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình trong phần tự luận!'
-            : 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình quá nhiều lần!';
-          if (inPractical) handlePracticalViolateRef.current(msg);
-          else handleViolate(msg);
-        } else {
-          triggerAlert(
-            'tab',
-            inPractical ? '🚨 RỜI MÀN HÌNH KHI LÀM TỰ LUẬN!' : '🚨 PHÁT HIỆN THOÁT KHỎI BÀI THI!',
-            n,
-          );
-        }
-        return n;
-      });
+      const n = tabViolationsRef.current + 1;
+      tabViolationsRef.current = n;
+      const inPracticalNow = practicalMonitorActiveRef.current;
+      if (n >= 2) {
+        const msg = inPracticalNow
+          ? 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình trong phần tự luận!'
+          : 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình quá nhiều lần!';
+        if (inPracticalNow) handlePracticalViolateRef.current(msg);
+        else handleViolate(msg);
+      } else {
+        triggerAlert(
+          'tab',
+          inPracticalNow ? '🚨 RỜI MÀN HÌNH KHI LÀM TỰ LUẬN!' : '🚨 PHÁT HIỆN THOÁT KHỎI BÀI THI!',
+          n,
+        );
+      }
     };
 
     const onVisibilityChange = () => {
@@ -1017,7 +994,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     setPracticalTimeLeft(totalSeconds);
     setPracticalStarted(true);
     setPracticalExpired(false);
-    setTabViolations(0);
+    tabViolationsRef.current = 0;
     setWarningOverlay(null);
     lastTabViolationAtRef.current = 0;
     lastViolationTime.current = 0;
@@ -1087,7 +1064,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     } else {
       setPracticalStarted(true);
       setPracticalTimeLeft(remaining);
-      setTabViolations(0);
+      tabViolationsRef.current = 0;
       setWarningOverlay(null);
       lastTabViolationAtRef.current = 0;
     }
@@ -1114,11 +1091,11 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
       <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600">
         <XCircle size={80} className="text-red-600 mx-auto mb-6" />
-        <h2 className="text-3xl font-black text-red-600 uppercase italic">BÀI THI BỊ HỦY</h2>
+        <h2 className="text-3xl font-black text-red-600  italic">Bài thi bị hủy</h2>
         <div className="bg-red-50 p-6 rounded-3xl mt-6 border border-red-100">
            <p className="text-red-900 font-bold leading-relaxed">{banReason}</p>
         </div>
-        <button type="button" onClick={() => logoutToLogin()} className="w-full mt-8 py-5 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all">✓ QUAY LẠI ĐĂNG NHẬP</button>
+        <button type="button" onClick={() => logoutToLogin()} className="w-full mt-8 py-5 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all">✓ Quay lại đăng nhập</button>
       </div>
     </div>
   );
@@ -1137,7 +1114,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
          
          {/* Hướng dẫn Box (Mô phỏng Dialog Chrome) */}
          <div className="relative mb-3 sm:mb-0 sm:row-span-2 sm:col-start-2 sm:row-start-1">
-           <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs cms-min-text-xs font-black px-2 py-0.5 rounded-full z-20 shadow-sm animate-bounce">HƯỚNG DẪN</div>
+           <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs cms-min-text-xs font-black px-2 py-0.5 rounded-full z-20 shadow-sm animate-bounce">Hướng dẫn</div>
            <div className="border-[1.5px] border-slate-200 rounded-[20px] p-3 relative text-left bg-[#F4F7F6] shadow-inner select-none pointer-events-none">
             <div className="flex items-center justify-between mb-2">
                <div>
@@ -1221,7 +1198,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                  ? 'bg-[#E13B35] text-white shadow-xl shadow-red-500/30 hover:bg-black hover:scale-[1.02] active:scale-95' 
                  : 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-70'
              }`}>
-             {startingExam ? 'Đang tải thời gian thi…' : 'TÔI ĐÃ HIỂU VÀ BẮT ĐẦU THI'}
+             {startingExam ? 'Đang tải thời gian thi…' : 'Tôi đã hiểu và bắt đầu thi'}
          </button>
          </div>
          </div>
@@ -1265,7 +1242,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
           {/* Chỉ số tổng quan */}
           <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4 sm:gap-3">
             <div className="rounded-xl bg-slate-50 px-3 py-3 sm:px-4 sm:py-3.5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:text-xs">Câu hỏi</p>
+              <p className="text-[11px] font-bold  tracking-wider text-slate-400 sm:text-xs">Câu hỏi</p>
               <p className="mt-1 text-lg font-black text-slate-900 sm:text-xl">
                 {mcQuestionCount > 0 ? (
                   <>
@@ -1281,7 +1258,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               </p>
             </div>
             <div className="rounded-xl bg-amber-50 px-3 py-3 sm:px-4 sm:py-3.5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600/80 sm:text-xs">Thời gian TN</p>
+              <p className="text-[11px] font-bold  tracking-wider text-amber-600/80 sm:text-xs">Thời gian TN</p>
               <p className="mt-1 text-lg font-black text-amber-900 sm:text-xl">
                 {!examConfigReady
                   ? '…'
@@ -1293,13 +1270,13 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               </p>
             </div>
             <div className="rounded-xl bg-violet-50 px-3 py-3 sm:px-4 sm:py-3.5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-violet-600/80 sm:text-xs">Thời gian TL</p>
+              <p className="text-[11px] font-bold  tracking-wider text-violet-600/80 sm:text-xs">Thời gian TL</p>
               <p className="mt-1 text-lg font-black text-violet-900 sm:text-xl">
                 {examConfigReady && practicalMinutesConfig != null ? `${practicalMinutesConfig} phút` : '—'}
               </p>
             </div>
             <div className="rounded-xl bg-emerald-50 px-3 py-3 sm:px-4 sm:py-3.5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600/80 sm:text-xs">Điểm đạt</p>
+              <p className="text-[11px] font-bold  tracking-wider text-emerald-600/80 sm:text-xs">Điểm đạt</p>
               <p className="mt-1 text-lg font-black text-emerald-800 sm:text-xl">≥ 80/100</p>
             </div>
           </div>
@@ -1425,12 +1402,12 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
         <div className="flex-1 min-h-0 w-full h-full overflow-y-auto bg-black flex items-center justify-center p-6">
           <div className="bg-white rounded-[40px] p-10 max-w-md w-full text-center shadow-2xl border-t-[12px] border-red-600">
             <XCircle size={72} className="text-red-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-black text-red-600 uppercase italic">HẾT GIỜ NỘP BÀI</h2>
+            <h2 className="text-2xl font-black text-red-600  italic">Hết giờ nộp bài</h2>
             <p className="text-red-900 font-bold mt-4 leading-relaxed">
               Bạn không nộp bài tự luận/thực hành đúng thời hạn. Tài khoản đã bị khóa.
             </p>
             <button type="button" onClick={() => logoutToLogin()} className="w-full mt-8 py-5 bg-slate-900 text-white font-black rounded-2xl">
-              ✓ QUAY LẠI ĐĂNG NHẬP
+              ✓ Quay lại đăng nhập
             </button>
           </div>
         </div>
@@ -1479,7 +1456,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               <CheckCircle size={20} strokeWidth={2.5} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-black uppercase leading-tight text-white sm:text-base">
+              <p className="text-sm font-black  leading-tight text-white sm:text-base">
                 Phần 1: Trắc nghiệm — Đạt ✓
               </p>
               <p className="text-xs font-bold text-white/85 sm:text-sm">
@@ -1495,7 +1472,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
             {!practicalSubmitted && !currentTeacher?.practicalFile ? (
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="shrink-0 border-b border-slate-100 px-3 py-2 sm:px-4 sm:py-2.5">
-                  <h3 className="text-base font-black uppercase italic leading-tight text-slate-800 sm:text-lg">
+                  <h3 className="text-base font-black  italic leading-tight text-slate-800 sm:text-lg">
                     Phần 2: Tự luận / Thực hành
                   </h3>
                   <p className="mt-0.5 text-sm font-semibold text-slate-500 sm:text-base">
@@ -1531,7 +1508,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                         disabled={practicalSubjectsWithFiles.length === 0}
                         className="shrink-0 w-full rounded-xl bg-[#203DB5] py-3.5 text-base font-black text-white shadow-lg hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 sm:py-4 sm:text-lg"
                       >
-                        ▶ BẮT ĐẦU PHẦN TỰ LUẬN
+                        ▶ Bắt đầu phần tự luận
                       </button>
                       {practicalSubjectsWithFiles.length === 0 && (
                         <p className="shrink-0 text-center text-sm font-bold text-red-600">Chưa có đề tự luận — liên hệ Admin</p>
@@ -1555,7 +1532,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                           {String(Math.floor(practicalTimeLeft / 60)).padStart(2, '0')}:
                           {String(practicalTimeLeft % 60).padStart(2, '0')}
                         </span>
-                        <span className="text-xs font-bold uppercase text-slate-500 sm:text-sm">còn lại</span>
+                        <span className="text-xs font-bold  text-slate-500 sm:text-sm">còn lại</span>
                       </div>
 
                       <div className="min-h-0 overflow-hidden">
@@ -1606,7 +1583,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                             showModal({ title: 'File quá lớn', content: 'Kích thước file vượt quá giới hạn 50MB.', type: 'error' });
                             return;
                           }
-                          setUploadFile(file);
                           handlePracticalSubmit(file);
                         }}
                       >
@@ -1626,7 +1602,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                               showModal({ title: 'File quá lớn', content: 'Kích thước file vượt quá giới hạn 50MB.', type: 'error' });
                               return;
                             }
-                            setUploadFile(file);
                             handlePracticalSubmit(file);
                           }}
                         />
@@ -1643,7 +1618,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
             ) : (
               <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 p-4 sm:p-5">
                 <div className="rounded-xl border border-orange-100 bg-[#FFF9E6] p-4 text-center shadow-inner">
-                  <div className="flex items-center justify-center gap-2 text-sm font-black uppercase italic text-[#D97706] sm:text-base">
+                  <div className="flex items-center justify-center gap-2 text-sm font-black  italic text-[#D97706] sm:text-base">
                     <Clock size={18} className="animate-pulse shrink-0" /> Đang chờ xét duyệt hồ sơ
                   </div>
                   <p className="mt-2 text-sm font-bold leading-snug text-[#92400E] sm:text-base">
@@ -1651,7 +1626,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 sm:text-sm">Hỗ trợ gấp:</p>
+                  <p className="text-xs font-bold  tracking-wider text-gray-400 sm:text-sm">Hỗ trợ gấp:</p>
                   <p className="text-xl font-black text-slate-800 sm:text-2xl">093.5758.462</p>
                 </div>
                 <button
@@ -1659,7 +1634,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                   onClick={() => logoutToLogin()}
                   className="w-full rounded-xl bg-[#203DB5] py-3.5 text-base font-black text-white shadow-lg sm:text-lg"
                 >
-                  ✓ HOÀN TẤT & ĐĂNG XUẤT
+                  ✓ Hoàn tất & đăng xuất
                 </button>
               </div>
             )}
@@ -1675,7 +1650,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               <AlertTriangle size={48} className="text-red-600 animate-pulse" />
               <div className="absolute inset-0 border-2 border-red-200 rounded-full animate-ping scale-150 opacity-20" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 leading-tight uppercase tracking-tight">{warningOverlay.message}</h2>
+            <h2 className="text-2xl font-black text-slate-900 leading-tight  tracking-tight">{warningOverlay.message}</h2>
             <p className="text-slate-500 font-bold mt-4">
               Vui lòng quay lại làm bài. Đây là vi phạm lần{' '}
               <span className="text-red-600">{warningOverlay.count}/2</span>.
@@ -1691,7 +1666,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               onClick={() => setWarningOverlay(null)}
               className="w-full mt-10 py-5 bg-slate-900 text-white font-black rounded-3xl text-lg hover:bg-black hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
             >
-              QUAY LẠI BÀI THI
+              Quay lại bài thi
             </button>
           </div>
         </div>
@@ -1742,10 +1717,10 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
             type="button"
             onClick={() => {
               showModal({
-                title: 'CẢNH BÁO TỪ HỆ THỐNG',
+                title: 'Cảnh báo từ hệ thống',
                 content: 'Nếu bạn thoát bây giờ, bài thi sẽ BỊ HỦY và tài khoản có thể bị khóa. Bạn có chắc chắn?',
                 type: 'warning',
-                confirmText: 'ĐỒNG Ý HỦY BÀI',
+                confirmText: 'Đồng ý hủy bài',
                 cancelText: 'Làm bài tiếp',
                 onConfirm: () => {
                   if (failAndExitRef.current) failAndExitRef.current('thoát phòng thi');
@@ -1756,7 +1731,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
           >
             <ArrowLeft size={12} /> Thoát
           </button>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-200">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold  text-emerald-200">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
             Giám sát
           </span>
@@ -1781,7 +1756,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                 style={{ width: `${TOTAL > 0 ? (answeredCount / TOTAL) * 100 : 0}%` }}
               />
             </div>
-            <p className="shrink-0 text-[11px] font-black uppercase tracking-wide text-white/70">
+            <p className="shrink-0 text-[11px] font-black  tracking-wide text-white/70">
               Kiểm tra năng lực GV
             </p>
           </div>
@@ -1800,7 +1775,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                  <AlertTriangle size={48} className="text-red-600 animate-pulse" />
                  <div className="absolute inset-0 border-2 border-red-200 rounded-full animate-ping scale-150 opacity-20" />
               </div>
-              <h2 className="text-2xl font-black text-slate-900 leading-tight uppercase tracking-tight">{warningOverlay.message}</h2>
+              <h2 className="text-2xl font-black text-slate-900 leading-tight  tracking-tight">{warningOverlay.message}</h2>
               <p className="text-slate-500 font-bold mt-4">Vui lòng quay lại làm bài. Đây là vi phạm lần <span className="text-red-600">{warningOverlay.count}/2</span>.</p>
               
               <div className="h-4 bg-slate-100 rounded-full mt-8 overflow-hidden border border-slate-200 p-1">
@@ -1814,7 +1789,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                 onClick={() => setWarningOverlay(null)} 
                 className="w-full mt-10 py-5 bg-slate-900 text-white font-black rounded-3xl text-lg hover:bg-black hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
               >
-                QUAY LẠI BÀI THI
+                Quay lại bài thi
               </button>
            </div>
         </div>
@@ -1825,7 +1800,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
           <main className="order-1 flex min-h-0 flex-col lg:order-2 lg:col-span-8 xl:col-span-9">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-md">
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/90 px-3 py-1.5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <p className="text-[11px] font-bold  tracking-wide text-slate-500">
                   Câu {TOTAL > 0 ? currentQ + 1 : 0}/{TOTAL}
                   {currentSubjectLabel ? ` · ${currentSubjectLabel}` : ''}
                   {qCur?.type === 'essay' ? ' · Tự luận' : ' · Trắc nghiệm'}
@@ -1977,7 +1952,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 py-2.5 text-sm font-black text-white shadow-md hover:from-red-700 hover:to-red-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send size={16} />
-                  {submitting ? 'ĐANG NỘP BÀI…' : 'NỘP BÀI KIỂM TRA'}
+                  {submitting ? 'Đang nộp bài…' : 'Nộp bài kiểm tra'}
                 </button>
               </div>
             </div>
@@ -1986,7 +1961,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
           <aside className="order-2 flex max-h-[28vh] min-h-0 flex-col lg:order-1 lg:col-span-4 lg:max-h-none xl:col-span-3">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-2 shadow-md sm:p-2.5">
               <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600">
+                <span className="flex items-center gap-1.5 text-xs font-bold  tracking-wide text-slate-600">
                   <LayoutGrid size={14} className="text-indigo-600" />
                   Mục lục
                 </span>
@@ -1997,7 +1972,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-3">
                 {examSections.map((section) => (
                   <div key={section.subjectId}>
-                    <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                    <p className="mb-1.5 text-[10px] font-black  tracking-wider text-indigo-600">
                       {section.label}
                       {section.empty && (
                         <span className="ml-1 normal-case text-amber-600">(chưa có câu)</span>

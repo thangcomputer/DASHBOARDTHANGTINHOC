@@ -1,9 +1,5 @@
 'use strict';
 const { commandRegistry } = require('../../../shared/cqrs');
-const Post_importCommand = require('./Post_importCommand');
-const Post_importHandler = require('./Post_importHandler');
-commandRegistry.register('Post_importCommand', new Post_importHandler());
-module.exports.Post_importCommand = Post_importCommand;
 const Post_rootCommand = require('./Post_rootCommand');
 const Post_rootHandler = require('./Post_rootHandler');
 commandRegistry.register('Post_rootCommand', new Post_rootHandler());

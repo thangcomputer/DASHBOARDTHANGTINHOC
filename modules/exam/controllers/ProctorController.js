@@ -7,7 +7,7 @@ class ProctorController {
   async post_events(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await proctorApplicationService.post_events(data);
+      const result = await proctorApplicationService.post_events(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -46,3 +46,4 @@ class ProctorController {
 }
 
 module.exports = new ProctorController();
+

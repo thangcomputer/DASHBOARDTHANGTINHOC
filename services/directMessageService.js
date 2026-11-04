@@ -172,6 +172,13 @@ async function sendCanonicalMessageInner({
     conversationId = buildCanonicalConversationId(sender, rRole, rid);
   }
 
+  let recipientRejected = false;
+  if (!isGroupFinal && ['student', 'teacher'].includes(senderRole) && ['student', 'teacher'].includes(rRole)) {
+    const { getCommunicationPreferences, getMessageRejectionPreference } = require('./communicationPreferences');
+    const recipientPreferences = await getCommunicationPreferences(rid, rRole);
+    recipientRejected = getMessageRejectionPreference(recipientPreferences, senderRole);
+  }
+
   let sBranch = '';
   if (senderId === 'admin') {
     sBranch = 'HỆ THỐNG';
@@ -299,6 +306,7 @@ async function sendCanonicalMessageInner({
     fileName: fileName || '',
     isGroup: Boolean(isGroupFinal),
     groupId: isGroupFinal ? groupIdFinal : null,
+    recipientRejected,
   };
   if (aiImageRemaining != null) messagePayload.aiImageRemaining = aiImageRemaining;
   if (payload != null && typeof payload === 'object') {
@@ -323,7 +331,7 @@ async function sendCanonicalMessageInner({
   }
 
   const unhideIds = [...new Set(
-    [senderId, String(finalReceiverId)].filter(Boolean).map(String),
+    [senderId, ...(!recipientRejected ? [String(finalReceiverId)] : [])].filter(Boolean).map(String),
   )];
   if (unhideIds.length) {
     await ConversationVisibility.findOneAndUpdate(
@@ -349,7 +357,9 @@ async function sendCanonicalMessageInner({
         }
       } catch (_) { /* ignore */ }
     } else {
-      notifyUser(finalReceiverRole, finalReceiverId, 'message:receive', clientMessage);
+      if (!recipientRejected) {
+        notifyUser(finalReceiverRole, finalReceiverId, 'message:receive', clientMessage);
+      }
       notifyUser(senderRole, senderId, 'message:sent', clientMessage);
 
       // Broadcast cho admin/support nếu đây là hội thoại AI để cập nhật realtime cho Support viên

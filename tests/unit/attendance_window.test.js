@@ -10,10 +10,15 @@ const {
   ATTENDANCE_GRACE_MINUTES,
 } = require('../../services/attendanceWindow');
 
+/** 13/08/2026 at hh:mm Vietnam time, independent of the machine time zone. */
+function vn(hours, minutes) {
+  return new Date(Date.UTC(2026, 7, 13, hours - 7, minutes, 0));
+}
+
 function mkSchedule({ status = 'scheduled', date, startTime, endTime } = {}) {
   return {
     status,
-    date: date || new Date(2026, 7, 13),
+    date: date || vn(0, 0),
     startTime: startTime || '13:51',
     endTime: endTime || '15:21',
   };
@@ -24,7 +29,7 @@ test('grace default is 60 minutes', () => {
 });
 
 test('UPCOMING: before start', () => {
-  const now = new Date(2026, 7, 13, 10, 0, 0);
+  const now = vn(10, 0);
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'UPCOMING');
   assert.equal(s.canTeacherAttend, false);
@@ -35,7 +40,7 @@ test('UPCOMING: before start', () => {
 });
 
 test('UPCOMING: at class start, teacher cannot attend yet (15 phút delay)', () => {
-  const now = new Date(2026, 7, 13, 13, 51, 0);
+  const now = vn(13, 51);
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'UPCOMING');
   assert.equal(s.canTeacherAttend, false);
@@ -46,14 +51,14 @@ test('UPCOMING: at class start, teacher cannot attend yet (15 phút delay)', () 
 });
 
 test('UPCOMING: 14 phút after start still blocked', () => {
-  const now = new Date(2026, 7, 13, 14, 5, 0);
+  const now = vn(14, 5);
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'UPCOMING');
   assert.equal(s.canTeacherAttend, false);
 });
 
 test('IN_PROGRESS: 15 phút after start, teacher can attend', () => {
-  const now = new Date(2026, 7, 13, 14, 6, 0);
+  const now = vn(14, 6);
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'IN_PROGRESS');
   assert.equal(s.canTeacherAttend, true);
@@ -61,7 +66,7 @@ test('IN_PROGRESS: 15 phút after start, teacher can attend', () => {
 });
 
 test('IN_PROGRESS: teacher can attend', () => {
-  const now = new Date(2026, 7, 13, 14, 30, 0);
+  const now = vn(14, 30);
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'IN_PROGRESS');
   assert.equal(s.canTeacherAttend, true);
@@ -69,7 +74,7 @@ test('IN_PROGRESS: teacher can attend', () => {
 });
 
 test('PENDING_ATTENDANCE: within 60m after end', () => {
-  const now = new Date(2026, 7, 13, 16, 0, 0); // end 15:21 + 39m
+  const now = vn(16, 0); // end 15:21 + 39m
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'PENDING_ATTENDANCE');
   assert.equal(s.canTeacherAttend, true);
@@ -77,7 +82,7 @@ test('PENDING_ATTENDANCE: within 60m after end', () => {
 });
 
 test('OVERDUE after end+60m: teacher blocked, admin makeup allowed', () => {
-  const now = new Date(2026, 7, 13, 16, 22, 0); // end 15:21 + 61m
+  const now = vn(16, 22); // end 15:21 + 61m
   const s = resolveAttendanceState(mkSchedule(), now);
   assert.equal(s.state, 'OVERDUE_ATTENDANCE');
   assert.equal(s.canTeacherAttend, false);
@@ -89,7 +94,7 @@ test('OVERDUE after end+60m: teacher blocked, admin makeup allowed', () => {
 });
 
 test('exact endTime still IN_PROGRESS', () => {
-  const now = new Date(2026, 7, 13, 15, 21, 0);
+  const now = vn(15, 21);
   assert.equal(resolveAttendanceState(mkSchedule(), now).state, 'IN_PROGRESS');
 });
 

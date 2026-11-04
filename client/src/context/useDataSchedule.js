@@ -3,16 +3,6 @@ import api from '../services/api';
 import { normalizeScheduleDate, formatScheduleDateVi } from '../utils/scheduleTime';
 import { normalizeCourseName } from '../utils/teacherFinance';
 
-/** enrollment.status enum trên server */
-function attendanceStatusForApi(remaining) {
-  return remaining <= 0 ? 'completed' : 'active';
-}
-
-/** Nhãn hiển thị root student.status (UI tiếng Việt) */
-function attendanceStatusForDisplay(remaining) {
-  return remaining <= 0 ? 'Hoàn thành' : 'Đang học';
-}
-
 function localDateISO(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

@@ -12,7 +12,7 @@ export default function CertPrepQuestionPreview({ question, showAnswers = true }
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-black uppercase tracking-wide text-amber-700">Admin preview</p>
+        <p className="text-[11px] font-black  tracking-wide text-amber-700">Admin preview</p>
         <span className="text-xs font-bold text-slate-500">{questionTypeLabel(q.type)}</span>
       </div>
       <p className="text-sm font-semibold text-slate-900 whitespace-pre-wrap">{q.questionText}</p>
@@ -66,7 +66,7 @@ export default function CertPrepQuestionPreview({ question, showAnswers = true }
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 text-xs font-black uppercase text-slate-500">
+              <tr className="bg-slate-50 text-xs font-black  text-slate-500">
                 <th className="px-3 py-2 text-left">Nhận định</th>
                 <th className="px-3 py-2 text-center w-24">Yes</th>
                 <th className="px-3 py-2 text-center w-24">No</th>

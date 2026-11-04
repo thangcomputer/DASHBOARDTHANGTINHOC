@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { KeyRound, Clock, RefreshCw, X, CheckCircle2, Eye, EyeOff, Copy, Shuffle } from 'lucide-react';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import api from '../../../services/api';
 
 function genTempPassword(len = 8) {

@@ -65,6 +65,36 @@ test('toStudentSession never includes correctAnswer/score/passed', () => {
   assert.equal(out.status, 'submitted');
 });
 
+test('immediate feedback reveals keys only for answered questions', () => {
+  const session = {
+    _id: '507f1f77bcf86cd7994390c1',
+    testId: '507f1f77bcf86cd7994390b1',
+    locale: 'vi',
+    status: 'in_progress',
+    startedAt: new Date('2026-08-15T00:00:00.000Z'),
+    answers: [{ questionId: '507f1f77bcf86cd7994390a1', value: 1 }],
+    configSnapshot: {
+      name: 'Test 01',
+      timeLimitMinutes: 50,
+      questionCount: 2,
+      feedbackMode: 'immediate',
+    },
+  };
+  const unansweredQuestion = {
+    ...question,
+    _id: '507f1f77bcf86cd7994390a2',
+    questionText: 'Câu chưa trả lời',
+  };
+  const out = toStudentSession(session, [question, unansweredQuestion], {
+    now: new Date('2026-08-15T00:10:00.000Z'),
+  });
+
+  assert.equal(out.questions[0].correctAnswer, question.correctAnswer);
+  assert.equal(out.questions[0].explanation, question.explanation);
+  assert.equal(out.questions[1].correctAnswer, undefined);
+  assert.equal(out.questions[1].explanation, undefined);
+});
+
 test('sessionTiming remainingSeconds uses startedAt + timeLimitMinutes', () => {
   const session = {
     startedAt: new Date('2026-08-15T00:00:00.000Z'),

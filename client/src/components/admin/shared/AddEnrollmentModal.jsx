@@ -4,10 +4,10 @@ import {
   X, BookOpen, Loader2, CheckCircle2, CreditCard, DollarSign,
   Clock3,
 } from 'lucide-react';
-import { generateVietQRUrl } from '../../BankSelect';
+import { generateVietQRUrl } from '../../bankSelectUtils';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
 import TransferPaymentHeader from '../../shared/TransferPaymentHeader';
-import { useToast } from '../../../utils/toast';
+import { useToast } from '../../../utils/useToast';
 import { useSocket } from '../../../context/SocketContext';
 import { teacherMatchesCourse } from '../../../utils/examSubjects';
 import { teacherInStudentBranch } from '../../../utils/branchIds';

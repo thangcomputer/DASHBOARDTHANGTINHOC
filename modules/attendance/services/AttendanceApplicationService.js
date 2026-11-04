@@ -6,7 +6,11 @@ const Teacher  = require('./../../teacher/models/Teacher');
 const { scheduleHistoryRepository } = require('./../repositories');
 const ScheduleHistory = require('./../models/ScheduleHistory'); // Temp for new ScheduleHistory
 const logger = require('./../../../config/logger');
-const { studentMatchesTeacher } = require('./../../enrollment/services/enrollmentService');
+const {
+  legacyEnrollmentFromStudent,
+  studentMatchesTeacher,
+} = require('./../../enrollment/services/enrollmentService');
+const NotificationService = require('./../../notification/services/NotificationService');
 
 function isAdminOrStaff(user) {
   const role = String(user?.role || '').toLowerCase();
@@ -675,8 +679,6 @@ class AttendanceApplicationService {
       }
     }
 
-    return { _status: 201, _body: { success: true, data: schedule } };
-
     // 📝 GHI AUDIT LOG: CREATED
     scheduleHistoryRepository.create({
       scheduleId: schedule._id,
@@ -692,6 +694,7 @@ class AttendanceApplicationService {
       scheduledDate: schedule.date,
       course: courseFinal,
     }).catch(e => logger.error('[ScheduleHistory] CREATED log err:', e));
+    return { _status: 201, _body: { success: true, data: schedule } };
 
   } catch (err) {
     logger.error('[SCHEDULE] Create error:', err);

@@ -9,7 +9,7 @@ import api, { notificationsAPI, apiFetch } from '../services/api';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
 import { isRetractedStudentScheduleNote } from './teacher/TeacherStudentNoteModal';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { formatNotificationStudentMask } from '../utils/studentMask';
 import { useSearchParams } from 'react-router-dom';
 import TeacherRatingDetailModal, {
@@ -465,7 +465,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
 
       {broadcastOpen && isAdmin && (
         <div className="bg-white border border-red-100 rounded-2xl p-4 space-y-3 shadow-sm">
-          <p className="text-xs font-black text-red-600 uppercase tracking-wide">Thông báo hệ thống</p>
+          <p className="text-xs font-black text-red-600  tracking-wide">Thông báo hệ thống</p>
           <input
             value={bcTitle}
             onChange={(e) => setBcTitle(e.target.value)}
@@ -541,7 +541,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                 >
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600">{typeLabelVi(n.type)}</span>
+                      <span className="text-[10px] font-black  tracking-wider text-red-600">{typeLabelVi(n.type)}</span>
                       <span className="text-[10px] text-gray-400 font-bold">{formatTime(n.time || n.createdAt)}</span>
                     </div>
                     <h3 className={`text-sm truncate ${!n.read ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>
@@ -723,7 +723,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
           <div className={`bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 relative border border-slate-100 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col ${qaDetail ? 'max-w-3xl' : 'max-w-lg'}`}>
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block mb-1">
+                <span className="text-[10px] font-black  tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md inline-block mb-1">
                   {typeLabelVi(selectedNotif.type)}
                 </span>
                 <h2 className="text-base font-black text-slate-900 leading-snug">
@@ -759,7 +759,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                     lessonTitle={qaDetail.lessonTitle || ''}
                   />
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Chi tiết câu hỏi LMS</p>
+                    <p className="text-[10px] font-black  tracking-wide text-slate-500">Chi tiết câu hỏi LMS</p>
                     <p className="text-sm font-bold text-slate-900">{qaDetail.title}</p>
                     {qaDetail.body ? <p className="text-xs text-slate-600 whitespace-pre-wrap">{qaDetail.body}</p> : null}
                     <p className="text-[11px] text-slate-500">
@@ -804,7 +804,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                               : 'bg-white border-slate-200'
                           }`}
                         >
-                          <p className={`text-[10px] font-black uppercase mb-1 ${staffish ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          <p className={`text-[10px] font-black  mb-1 ${staffish ? 'text-emerald-700' : 'text-slate-500'}`}>
                             {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Học viên · ${msg.authorName || ''}`}
                           </p>
                           <p className="text-xs text-slate-800 whitespace-pre-wrap">{msg.body}</p>

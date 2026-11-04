@@ -58,7 +58,7 @@ export default function SupportAiHandoffPanel({ onOpen, onQueueChange }) {
 
   return (
     <div className="px-3 pt-3 pb-1">
-      <p className="text-[10px] font-black uppercase tracking-wide text-amber-700 px-1 mb-1.5 flex items-center gap-1.5">
+      <p className="text-[10px] font-black  tracking-wide text-amber-700 px-1 mb-1.5 flex items-center gap-1.5">
         <Headphones size={12} />
         Yêu cầu từ Trợ lý AI
       </p>
@@ -79,7 +79,7 @@ export default function SupportAiHandoffPanel({ onOpen, onQueueChange }) {
                   <span className="text-[13px] font-bold text-slate-800 truncate">
                     {item.userName || 'Học viên / Giảng viên'}
                   </span>
-                  <span className="text-[10px] font-black uppercase text-amber-800 shrink-0">
+                  <span className="text-[10px] font-black  text-amber-800 shrink-0">
                     {statusLabel(item.status)}
                   </span>
                 </span>

@@ -12,7 +12,6 @@ import CourseSubjectSelector from './CourseSubjectSelector';
 import { formatSubjectIdsAsSpecialty, resolveTeacherSubjectIds } from '../../../utils/examSubjects';
 import {
   formatHoaHong,
-  formatStarBonusRule,
   STAR_BONUS_AMOUNT,
   STAR_BONUS_MIN_STARS,
   STAR_BONUS_MIN_STUDENTS,
@@ -466,8 +465,8 @@ export default function EditTeacherModal({
                             accountName: e.target.value.toUpperCase(),
                           },
                         }))}
-                        className="cms-input uppercase"
-                        placeholder="NGUYEN VAN A"
+                        className="cms-input "
+                        placeholder="Nguyen Van A"
                       />
                     </div>
                   </div>

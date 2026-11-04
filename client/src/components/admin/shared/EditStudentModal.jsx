@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import CmsSelect from '../../ui/CmsSelect';
 import { X, Save, KeyRound, Edit3, Loader2 } from 'lucide-react';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import { useBranch } from '../../../context/BranchContext';
 import { teacherInStudentBranch, toBranchId } from '../../../utils/branchIds';
 import { getEffectiveCoursePrice } from '../../../utils/coursePricing';
@@ -50,7 +50,7 @@ function clampSessions(total, completed, remaining) {
   return { totalSessions: t || 12, completedSessions: c, remainingSessions: r };
 }
 
-export default function EditStudentModal({ student, onSave, onClose, teachers, onResetPassword , isSubmitting }) {
+export default function EditStudentModal({ student, onSave, onClose, teachers, onResetPassword }) {
   const toast = useToast();
   const API = import.meta.env.VITE_API_URL || '';
   const { isSuperAdmin, branches } = useBranch();
@@ -260,7 +260,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
 
             <div>
               <label className="cms-label">Họ tên học viên <span className="text-red-500">*</span></label>
-              <input name="name" value={form.name} onChange={handleChange} className="cms-input uppercase" placeholder="VD: Nguyễn Văn A" />
+              <input name="name" value={form.name} onChange={handleChange} className="cms-input " placeholder="VD: Nguyễn Văn A" />
             </div>
 
             <div className="cms-form-row">

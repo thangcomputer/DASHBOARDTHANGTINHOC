@@ -33,13 +33,17 @@ export function useDataNotifications({ currentUser }) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notificationId: notifId })
-      }).catch(e => void 0);
+      }).catch((error) => {
+        console.error('Unable to mark the notification as read:', error);
+      });
     } else {
       apiFetch('/notifications/mark-read', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ markAll: true })
-      }).catch(e => void 0);
+      }).catch((error) => {
+        console.error('Unable to mark notifications as read:', error);
+      });
     }
   }, [setSocketNotifications]);
 

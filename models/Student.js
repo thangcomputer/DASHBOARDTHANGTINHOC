@@ -299,6 +299,7 @@ const StudentSchema = new mongoose.Schema(
     /** Pháo hoa hoàn thành khóa (legacy 1 khóa, không enrollment). false = chờ xem. */
     courseCelebrationSeen: { type: Boolean },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login
+    lastAccessAt: { type: Date, default: null },
     refreshToken: { type: String, select: false }, // Refresh token rotation (server-side)
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
     /** Lịch sử fingerprint (HV). Logout chỉ xóa deviceFingerprint phiên hiện tại, không xóa mảng này. */

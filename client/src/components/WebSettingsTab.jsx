@@ -8,7 +8,7 @@ import {
   Check, X, Eye, Shield,
 } from 'lucide-react';
 import api, { resolveMediaUrl } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 function LoadingPreview({ style }) {
   const previewStyles = {
@@ -53,7 +53,7 @@ function FaviconRow({
   const isRose = tone === 'rose';
   return (
     <div className={`rounded-xl border p-3 ${isRose ? 'border-rose-100 bg-rose-50/40' : 'border-slate-100 bg-slate-50/60'}`}>
-      <p className={`text-[10px] font-black uppercase tracking-wider mb-2 ${isRose ? 'text-rose-700' : 'text-slate-500'}`}>
+      <p className={`text-[10px] font-black  tracking-wider mb-2 ${isRose ? 'text-rose-700' : 'text-slate-500'}`}>
         {label}
       </p>
       <div className="flex items-center gap-2.5">

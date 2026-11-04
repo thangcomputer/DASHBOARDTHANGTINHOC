@@ -1,5 +1,8 @@
 'use strict';
 const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const { assignmentRepository } = require('./../repositories');
 const Assignment = require('./../models/Assignment'); // Temp for new Assignment
 const { submissionRepository } = require('./../repositories');

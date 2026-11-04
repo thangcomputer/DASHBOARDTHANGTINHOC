@@ -5,7 +5,7 @@ import {
   Download, Eye, Check, X,
 } from 'lucide-react';
 import { builderAPI } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
@@ -234,7 +234,7 @@ export default function FormReportBuilderPage() {
               </CmsSelect>
 
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase">Fields</p>
+                <p className="text-[10px] font-black text-gray-400 ">Fields</p>
                 {fields.map((f, i) => (
                   <div key={i} className="border border-gray-100 rounded-xl p-2 space-y-1">
                     <div className="flex gap-2">

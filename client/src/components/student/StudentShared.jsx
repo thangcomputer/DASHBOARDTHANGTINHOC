@@ -76,7 +76,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
   };
   return (
     <section className="min-w-0">
-      <p className="cms-sd-caption font-semibold uppercase tracking-wide mb-3 text-slate-400">
+      <p className="cms-sd-caption font-semibold  tracking-wide mb-3 text-slate-400">
         Khóa học của bạn
       </p>
       {videoProgress.error && (
@@ -118,7 +118,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
                 {name}
               </p>
               {completed && (
-                <span className="inline-flex mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                <span className="inline-flex mt-1 text-[10px] font-bold  tracking-wide text-slate-500">
                   Đã hoàn thành
                 </span>
               )}

@@ -1,77 +1,80 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  LayoutDashboard, BookOpen, Calendar, MessageSquare,
-  Trophy, FileText, Download, Video, Bell, LogOut, ChevronLeft, ChevronRight, ChevronDown,
-  GraduationCap, Users, DollarSign, ClipboardList, X,
+  LayoutDashboard, Home, BookOpen, Calendar, MessageSquare,
+  Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
+  GraduationCap, Users, DollarSign, ClipboardList, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Award, FileBox, Link2,
+  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound,
 } from 'lucide-react';
+import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
-import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
-const formatTime = (date) => {
-  if (!date) return '';
-  const d = new Date(date);
-  const now = new Date();
-  const diffMs = now - d;
-  if (diffMs < 60000) return 'Vừa xong';
-  if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)} phút trước`;
-  if (diffMs < 86400000) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+const INBOX_FOOTER_HIDE_MS = 1500;
+
+const MOBILE_NAV_ICON_TONES = {
+  schedule: 'border-blue-100/80 from-blue-50 to-white text-blue-600',
+  inbox: 'border-violet-100/80 from-violet-50 to-white text-violet-600',
+  feed: 'border-amber-100/80 from-amber-50 to-white text-amber-600',
+  dashboard: 'border-red-100/80 from-red-50 to-white text-red-600',
+  finance: 'border-emerald-100/80 from-emerald-50 to-white text-emerald-600',
+  support: 'border-cyan-100/80 from-cyan-50 to-white text-cyan-600',
+  profile: 'border-indigo-100/80 from-indigo-50 to-white text-indigo-600',
 };
 
 // ─── Cấu hình menu theo role ──────────────────────────────────────────────────
 const MENU_CONFIG = {
   student: {
-    brand: { label: 'HỌC VIÊN', color: 'from-slate-900 to-indigo-950' },
+    brand: { label: 'Học viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
-      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/student', requiresLearningAccess: true },
+      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
-      { key: 'lesson-practice', icon: BookOpen, label: 'Video khóa học', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+      { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
       { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
-      { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/student/feed' },
+      { key: 'feed', icon: Newspaper, label: 'Bảng tin', sectionLabel: 'THÔNG TIN & HỖ TRỢ', path: '/student/feed' },
       { key: 'news', icon: FileText, label: 'Tin tức', path: '/student/news' },
       { key: 'evaluation', icon: Star, label: 'Đánh giá GV', path: '/student', hash: 'evaluation', requiresLearningAccess: true },
       { key: 'center-info', icon: Building2, label: 'Liên hệ Trung tâm', path: '/student/center-info' },
+      { key: 'support', icon: Headphones, label: 'Hỗ trợ', mobileLabel: 'Hỗ trợ', path: '/student/support' },
     ],
     bottomItems: [
       { key: 'profile', icon: User, label: 'Hồ sơ', path: '/student', hash: 'profile' },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
-    activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md',
+    activeClass: 'cms-sidebar-glass__nav-active',
   },
   teacher: {
-    brand: { label: 'GIẢNG VIÊN', color: 'from-slate-900 to-indigo-950' },
+    brand: { label: 'Giảng viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
-      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/teacher' },
-      { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/teacher/inbox' },
-      { key: 'schedule', icon: Calendar, label: 'Lịch dạy', path: '/teacher', hash: 'schedule' },
+      { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', mobileLabel: 'Tổng quan', sectionLabel: 'KHÔNG GIAN LÀM VIỆC', path: '/teacher' },
+      { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', mobileLabel: 'Tin nhắn', path: '/teacher/inbox' },
       { key: 'students', icon: Users, label: 'Quản lý học viên', path: '/teacher', hash: 'students' },
-      { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/teacher/feed' },
-      { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', path: '/teacher', hash: 'assignments' },
+      { key: 'schedule', icon: Calendar, label: 'Lịch dạy', sidebarLabel: 'Lịch dạy & điểm danh', mobileLabel: 'Lịch', path: '/teacher', hash: 'schedule' },
+      { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', sidebarLabel: 'Bài tập & kiểm tra', sectionLabel: 'QUẢN LÝ ĐÀO TẠO', path: '/teacher', hash: 'assignments' },
       { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
-      { key: 'finance', icon: DollarSign, label: 'Tài chính', path: '/teacher/finance' },
+      { key: 'finance', icon: DollarSign, label: 'Tài chính', mobileLabel: 'Tài chính', path: '/teacher/finance' },
+      { key: 'feed', icon: Newspaper, label: 'Bảng tin', mobileLabel: 'Bảng tin', sectionLabel: 'THÔNG TIN', path: '/teacher/feed' },
       { key: 'news', icon: FileText, label: 'Tin tức', path: '/teacher/news' },
       { key: 'center-info', icon: Building2, label: 'Thông tin Trung tâm', path: '/teacher/center-info' },
+      { key: 'support', icon: Headphones, label: 'Hỗ trợ', mobileLabel: 'Hỗ trợ', path: '/teacher/support' },
     ],
     bottomItems: [
-      { key: 'profile', icon: User, label: 'Hồ sơ', path: '/teacher', hash: 'profile' },
+      { key: 'profile', icon: User, label: 'Hồ sơ', mobileLabel: 'Hồ sơ', path: '/teacher', hash: 'profile' },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
-    activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md',
+    activeClass: 'cms-sidebar-glass__nav-active',
   },
   admin: {
-    brand: { label: 'QUẢN TRỊ', color: 'from-slate-900 to-indigo-950' },
+    brand: { label: 'Quản trị', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
       {
         key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard', permission: [
@@ -98,7 +101,7 @@ const MENU_CONFIG = {
               { key: 'students', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
               { key: 'student-training', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'student-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'lesson-practice', icon: BookOpen, label: 'Bài học HV', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'cert-prep', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
             ],
           },
@@ -109,7 +112,7 @@ const MENU_CONFIG = {
             isGroup: true,
             children: [
               { key: 'teachers', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-              { key: 'training-videos', icon: Video, label: 'Video khóa học', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
+              { key: 'training-videos', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
               { key: 'training-guides-evaluations', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
               { key: 'training-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
               { key: 'training-exam-room', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },
@@ -158,10 +161,11 @@ const MENU_CONFIG = {
       { key: 'center-info', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
     ],
     bottomItems: [
+      { key: 'pin-lock', icon: KeyRound, label: 'Khóa mã PIN', isPinLock: true },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
-    activeClass: 'bg-white/15 text-white shadow-sm backdrop-blur-md font-bold',
+    activeClass: 'cms-sidebar-glass__nav-active font-bold',
   },
 };
 
@@ -177,7 +181,7 @@ const SIDEBAR_GROUP_SIBLINGS = {
   'news-training-group': ['teaching-group'],
 };
 
-const NESTED_ACTIVE_CLASS = 'bg-white/10 text-red-400 font-semibold';
+const NESTED_ACTIVE_CLASS = 'cms-sidebar-glass__nav-active font-semibold';
 
 // ─── AppSidebar Component ─────────────────────────────────────────────────────
 const AppSidebar = ({
@@ -185,7 +189,6 @@ const AppSidebar = ({
   role = 'student',
   userName = '',
   userAvatar = '',
-  notifications = 0,
   onLogout,
   activeKey,
   onNavigateItem,
@@ -194,91 +197,86 @@ const AppSidebar = ({
   userPermissions = [],   // ['manage_students', ...]
   mobileOpen: mobileOpenProp,
   onMobileOpenChange,
+  mobileNavVisible = true,
+  mobileFooterVisible = true,
+  onBrandLogoChange,
 }) => {
-  const SIDEBAR_COLLAPSE_KEY = 'cms_sidebar_collapsed';
-  // Tablet / laptop hẹp (< xl 1200px): rail + overlay khi mở rộng
-  const TABLET_RAIL_MQ = '(min-width: 768px) and (max-width: 1199.98px)';
-  const DESKTOP_MQ = '(min-width: 1200px)';
-
-  const readDesktopCollapsedPreference = () => {
-    try {
-      const saved = localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
-      if (saved === '1' || saved === '0') return saved === '1';
-    } catch { /* ignore */ }
-    return false;
-  };
-
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    if (window.matchMedia(DESKTOP_MQ).matches) {
-      return readDesktopCollapsedPreference();
-    }
-    return true;
-  });
+  const PINNED_MENU_KEY = 'cms_sidebar_pinned';
+  const LAPTOP_MQ = '(min-width: 992px)';
+  const TABLET_MQ = '(min-width: 768px)';
   const [mobileOpenInternal, setMobileOpenInternal] = useState(false);
   const isMobileNavControlled = typeof onMobileOpenChange === 'function';
   const mobileOpen = isMobileNavControlled ? Boolean(mobileOpenProp) : mobileOpenInternal;
+  const [isLaptopOrLarger, setIsLaptopOrLarger] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia(LAPTOP_MQ).matches
+  ));
+  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia(TABLET_MQ).matches
+  ));
+  const [menuPinned, setMenuPinned] = useState(() => {
+    try {
+      return localStorage.getItem(PINNED_MENU_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const pinnedSidebarVisible = isLaptopOrLarger && menuPinned;
   const setMobileOpen = (next) => {
     const value = typeof next === 'function' ? next(mobileOpen) : next;
     if (isMobileNavControlled) onMobileOpenChange(value);
     else setMobileOpenInternal(value);
   };
-  const [tabletRail, setTabletRail] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia(TABLET_RAIL_MQ).matches
-  ));
 
   useEffect(() => {
-    const mq = window.matchMedia(TABLET_RAIL_MQ);
-    const sync = () => setTabletRail(mq.matches);
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
+    const mediaQuery = window.matchMedia(LAPTOP_MQ);
+    const syncViewport = () => setIsLaptopOrLarger(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
-  // Desktop ↔ tablet: desktop mặc định giãn (hoặc theo localStorage); tablet mặc định thu rail
   useEffect(() => {
-    const desktopMq = window.matchMedia(DESKTOP_MQ);
-    const syncViewport = () => {
-      if (desktopMq.matches) {
-        setCollapsed(readDesktopCollapsedPreference());
-      } else if (window.matchMedia(TABLET_RAIL_MQ).matches) {
-        setCollapsed(true);
-      }
-    };
-    desktopMq.addEventListener('change', syncViewport);
-    return () => desktopMq.removeEventListener('change', syncViewport);
+    const mediaQuery = window.matchMedia(TABLET_MQ);
+    const syncViewport = () => setIsTabletOrLarger(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
-  const setCollapsedPersist = (next) => {
-    setCollapsed(next);
-    if (typeof window !== 'undefined' && window.matchMedia(DESKTOP_MQ).matches) {
-      try { localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-    }
+  useEffect(() => {
+    document.documentElement.classList.toggle('cms-sidebar-pinned', pinnedSidebarVisible);
+    return () => document.documentElement.classList.remove('cms-sidebar-pinned');
+  }, [pinnedSidebarVisible]);
+
+  const toggleMenuPin = () => {
+    const nextPinned = !menuPinned;
+    setMenuPinned(nextPinned);
+    try {
+      localStorage.setItem(PINNED_MENU_KEY, nextPinned ? '1' : '0');
+    } catch { /* ignore unavailable storage */ }
+    if (nextPinned) setMobileOpen(false);
   };
-
-  // Chỉ tablet (rail overlay): bấm nội dung bên phải → thu sidebar.
-  // Desktop/laptop (≥ xl): giữ mở cho đến khi user bấm nút ẩn.
-  useEffect(() => {
-    const main = document.getElementById('main-content');
-    if (!main) return undefined;
-    const collapseOnContentInteract = () => {
-      if (typeof window === 'undefined') return;
-      if (!window.matchMedia(TABLET_RAIL_MQ).matches) return;
-      setCollapsed(true);
-    };
-    main.addEventListener('pointerdown', collapseOnContentInteract);
-    return () => main.removeEventListener('pointerdown', collapseOnContentInteract);
-  }, []);
-
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Đổi trang trên tablet → thu sidebar (không ghi localStorage — tránh ảnh hưởng desktop)
+  const isInboxRoute = location.pathname.includes('/inbox');
+  const [inboxFooterOpen, setInboxFooterOpen] = useState(false);
+  const inboxFooterTimerRef = useRef(null);
+  const footerShown = mobileFooterVisible && (!isInboxRoute || inboxFooterOpen);
+  const keepInboxFooter = () => {
+    window.clearTimeout(inboxFooterTimerRef.current);
+  };
+  const scheduleInboxFooterHide = () => {
+    window.clearTimeout(inboxFooterTimerRef.current);
+    inboxFooterTimerRef.current = window.setTimeout(() => setInboxFooterOpen(false), INBOX_FOOTER_HIDE_MS);
+  };
+  const revealInboxFooter = () => {
+    setInboxFooterOpen(true);
+    scheduleInboxFooterHide();
+  };
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!window.matchMedia(TABLET_RAIL_MQ).matches) return;
-    setCollapsed(true);
-  }, [location.pathname, location.hash]);
+    setInboxFooterOpen(false);
+    return () => window.clearTimeout(inboxFooterTimerRef.current);
+  }, [isInboxRoute]);
 
   const [openGroups, setOpenGroups] = useState(() => {
     const defaults = {
@@ -303,11 +301,8 @@ const AppSidebar = ({
       return defaults;
     }
   });
-  const [flyoutHubKey, setFlyoutHubKey] = useState(null);
-  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 });
   const {
-    students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations, triggerBackgroundSync,
-    notifications: allNotifications, markNotificationRead
+    students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations,
   } = useData();
 
   // Session login/me có thể thiếu gender → bổ sung từ hồ sơ self (mọi role)
@@ -418,7 +413,6 @@ const AppSidebar = ({
   }, [session?.id, session?.gender, sessionStorageKey, role]);
 
   const [muted, setMutedState] = useState(() => isSoundMuted());
-  const [dynamicLogo, setDynamicLogo] = useState('');
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 
   useEffect(() => {
@@ -447,11 +441,12 @@ const AppSidebar = ({
       .then(res => {
         if (res.success && res.data?.logoUrl) {
           const url = res.data.logoUrl;
-          setDynamicLogo(url.startsWith('http') ? url : `${API}${url}`);
+          const resolvedLogo = url.startsWith('http') ? url : `${API}${url}`;
+          onBrandLogoChange?.(resolvedLogo);
         }
       })
       .catch(() => { });
-  }, []);
+  }, [API, onBrandLogoChange]);
 
   const handleToggleMute = () => {
     const newState = !muted;
@@ -460,6 +455,11 @@ const AppSidebar = ({
   };
 
   const config = MENU_CONFIG[role] || MENU_CONFIG.student;
+  const mobilePrimaryKeys = role === 'teacher'
+    ? ['schedule', 'inbox', 'feed', 'dashboard', 'finance', 'support', 'profile']
+    : role === 'admin' || role === 'staff'
+      ? ['students', 'finance', 'dashboard', 'inbox', 'feed']
+      : ['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile'];
 
   const studentHasLearningAccess = (() => {
     if (role !== 'student') return true;
@@ -529,6 +529,26 @@ const AppSidebar = ({
     });
     return out;
   };
+  const flatVisibleItems = flattenLeaves(filterItems(config.items));
+  const mobileItems = [
+    ...flatVisibleItems,
+    ...(config.bottomItems || []).filter((item) => item.key === 'profile'),
+  ];
+  const visibleMobileNavItems = mobilePrimaryKeys
+    .map((key) => mobileItems.find((item) => item.key === key))
+    .filter(Boolean);
+  const mobileHomeItem = visibleMobileNavItems.find((item) => item.key === 'dashboard');
+  const mobileOtherItems = visibleMobileNavItems.filter((item) => item.key !== 'dashboard');
+  const mobileHomeIndex = Math.ceil(mobileOtherItems.length / 2);
+  const mobileNavItems = mobileNavVisible
+    ? mobileHomeItem
+      ? [
+        ...mobileOtherItems.slice(0, mobileHomeIndex),
+        mobileHomeItem,
+        ...mobileOtherItems.slice(mobileHomeIndex),
+      ]
+      : visibleMobileNavItems
+    : [];
 
   const persistOpenGroups = (next) => {
     try { localStorage.setItem('cms_sidebar_groups', JSON.stringify(next)); } catch { /* ignore */ }
@@ -576,9 +596,19 @@ const AppSidebar = ({
   };
 
   const handleClick = (item) => {
+    if (item.key === 'support') {
+      navigate(item.path);
+      setMobileOpen(false);
+      return;
+    }
     if (item.isLogout) { onLogout?.(); return; }
     if (item.isChangePassword) {
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
+      setMobileOpen(false);
+      return;
+    }
+    if (item.isPinLock) {
+      window.dispatchEvent(new CustomEvent(PIN_SETTINGS_EVENT));
       setMobileOpen(false);
       return;
     }
@@ -602,6 +632,12 @@ const AppSidebar = ({
       if (!currentHash && item.hash === 'dashboard' && item.path === '/admin') return true;
       return false;
     }
+    if (
+      role === 'teacher'
+      && item.key === 'dashboard'
+      && location.pathname === '/teacher'
+      && ['training', 'assignments', 'quizzes', 'test', 'students', 'software-links'].includes(currentHash)
+    ) return true;
     // Base dashboard (Tổng quan) — chỉ active đúng path gốc, không active trên /student/feed, /teacher/finance…
     const basePaths = ['/student', '/teacher', '/admin'];
     if (basePaths.includes(item.path)) {
@@ -631,6 +667,8 @@ const AppSidebar = ({
 
   // Điều hướng → mở exclusive nhóm/hub chứa trang active
   useEffect(() => {
+    // This route-driven synchronization must update the persisted menu state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenGroups((prev) => {
       const next = { ...prev };
       let changed = false;
@@ -659,104 +697,45 @@ const AppSidebar = ({
       if (!changed) return prev;
       return persistOpenGroups(next);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.hash, role]);
-
-  const initials = userName ? userName.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase() : 'HV';
-  const avatarUrl = resolveAvatarUrl({
-    avatar: effectiveAvatar,
-    role,
-    adminRole: session?.id === 'admin' ? 'SUPER_ADMIN' : adminRole,
-    gender: effectiveGender,
-  });
 
   // Trả về element (không khai báo component con) — tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
   const renderSidebarContent = () => (
-    <div className={`flex flex-col h-full bg-gradient-to-b ${config.brand.color} text-white overflow-x-hidden`}>
-
-      {/* ── Logo + Collapse / Close ── */}
-      <div
-        className={`relative flex items-center border-b border-white/10 ${(collapsed && !mobileOpen) ? 'px-3 py-4 justify-center' : 'px-3 py-3.5'
-          }`}
-      >
-        {(!collapsed || mobileOpen) ? (
-          <>
-            <span className="w-11 h-11 shrink-0" aria-hidden="true" />
-            <button
-              type="button"
-              className="flex-1 min-w-0 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity bg-transparent border-0 p-0 px-1"
-              onClick={() => {
-                navigate(config.items[0].path);
-                triggerBackgroundSync();
-                if (mobileOpen) setMobileOpen(false);
-              }}
-              title="Làm mới bảng điều khiển"
-              aria-label="Về trang tổng quan"
-            >
-              <img
-                src={dynamicLogo || '/logo-thang-tin-hoc.svg'}
-                alt="Thắng Tin Học"
-                className="h-8 max-w-[min(100%,152px)] object-contain"
-                style={dynamicLogo ? { maxHeight: '32px' } : { filter: 'brightness(0) invert(1)' }}
-              />
-            </button>
-            {mobileOpen ? (
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="w-11 h-11 shrink-0 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-white border border-white/20 lg:hidden"
-                aria-label="Đóng menu"
-              >
-                <X size={18} />
-              </button>
-            ) : (
-              <span className="w-11 h-11 shrink-0" aria-hidden="true" />
-            )}
-          </>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setCollapsedPersist(!collapsed)}
-          aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-          className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 items-center justify-center flex-shrink-0 transition-all z-10"
-        >
-          {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
-        </button>
-      </div>
+    <div className="cms-sidebar-glass__content flex flex-col h-full text-white overflow-x-hidden">
 
       {/* ── User info ── */}
-      {(!collapsed || mobileOpen) && (
-        <div className="px-5 pt-8 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <EditableAvatar
-              avatar={effectiveAvatar}
-              name={userName}
-              role={role}
-              adminRole={session?.adminRole}
-              gender={effectiveGender}
-              className="w-10 h-10 rounded-full border-2 border-white/40 bg-white shadow-sm flex-shrink-0"
-            />
-            <div className="min-w-0">
-              <p className="text-white font-bold text-sm truncate">{userName || 'Người dùng'}</p>
-              <p className="text-white/60 text-xs font-semibold tracking-wide">
-                {(() => {
-                  if (role === 'teacher') return 'GIẢNG VIÊN';
-                  if (role === 'student') return 'HỌC VIÊN';
-                  if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
-                  if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
-                  if (session?.adminRole === 'SUPPORT') return 'CHUYÊN VIÊN HỖ TRỢ';
-                  const perms = Array.isArray(session?.permissions) ? session.permissions : [];
-                  if (perms.length === 1 && perms.includes('manage_messages')) {
-                    return 'CHUYÊN VIÊN HỖ TRỢ';
-                  }
-                  return 'ADMIN-STAFF';
-                })()}
-              </p>
-            </div>
+      <div className="cms-sidebar-glass__profile mx-4 mt-2 mb-2 rounded-[20px] border border-slate-400/15 bg-[#151F30] p-3">
+        <div className="flex items-center gap-3">
+          <EditableAvatar
+            avatar={effectiveAvatar}
+            name={userName}
+            role={role}
+            adminRole={session?.adminRole}
+            gender={effectiveGender}
+            className="w-[46px] h-[46px] rounded-full border-2 border-white/15 bg-slate-700 shadow-sm flex-shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-slate-50 font-extrabold text-sm truncate">{userName || 'Người dùng'}</p>
+            <p className="mt-1 inline-flex rounded-full bg-blue-400/10 px-2 py-0.5 text-blue-300 text-[10px] font-bold tracking-wide">
+              {(() => {
+                if (role === 'teacher') return 'GIẢNG VIÊN';
+                if (role === 'student') return 'HỌC VIÊN';
+                if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
+                if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
+                if (session?.adminRole === 'SUPPORT') return 'CHUYÊN VIÊN HỖ TRỢ';
+                const perms = Array.isArray(session?.permissions) ? session.permissions : [];
+                if (perms.length === 1 && perms.includes('manage_messages')) {
+                  return 'CHUYÊN VIÊN HỖ TRỢ';
+                }
+                return 'ADMIN-STAFF';
+              })()}
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
+      <nav className="flex-1 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
         {filterItems(config.items)
           .filter(item => {
             // Ẩn mục 'Bài Test' khi GV đã được kích hoạt giảng dạy
@@ -775,29 +754,28 @@ const AppSidebar = ({
                     onClick={() => !isLocked && handleClick(navItem)}
                     disabled={isLocked}
                     aria-current={active ? 'page' : undefined}
-                    title={isLocked ? 'Bạn chưa phải là giáo viên chính thức nên chưa được mở' : (collapsed && !mobileOpen ? navItem.label : undefined)}
-                    className={`w-full flex items-center gap-3 rounded-xl transition-all min-w-0
-                    ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-3' : nested ? 'px-4 py-2.5 pl-9' : 'px-4 py-3'}
+                    title={isLocked ? 'Bạn chưa phải là giáo viên chính thức nên chưa được mở' : undefined}
+                    className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all min-h-11 min-w-0
+                    ${nested ? 'px-3 py-1.5 pl-6' : 'px-3 py-1.5'}
                     ${isLocked
                         ? 'text-white/40 cursor-not-allowed'
                         : active
                           ? (nested ? NESTED_ACTIVE_CLASS : config.activeClass)
-                          : 'text-white/70 hover:text-white hover:bg-white/10'
+                          : 'text-[#D5DCE7]'
                       }
                   `}
                   >
-                    <Icon size={nested ? 16 : 18} className="flex-shrink-0" aria-hidden="true" />
-                    {(!collapsed || mobileOpen) && <span className={`font-medium truncate ${nested ? 'text-[13px]' : 'text-sm'}`}>{navItem.label}</span>}
-                    {(!collapsed || mobileOpen) && isLocked && (
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] transition-colors ${active ? 'bg-red-600' : ''}`}>
+                      <Icon size={nested ? 16 : 18} className="flex-shrink-0" aria-hidden="true" />
+                    </span>
+                    <span className={`font-medium truncate ${nested ? 'text-[13px]' : 'text-sm'}`}>{navItem.sidebarLabel || navItem.label}</span>
+                    {isLocked && (
                       <Lock size={13} className="ml-auto text-white/40 flex-shrink-0" aria-hidden="true" />
                     )}
-                    {(!collapsed || mobileOpen) && !isLocked && getBadgeCount(navItem.key) > 0 && (
+                    {!isLocked && getBadgeCount(navItem.key) > 0 && (
                       <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none drop-shadow-md shadow-red-500/50" aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
                         {getBadgeCount(navItem.key) > 99 ? '99+' : getBadgeCount(navItem.key)}
                       </span>
-                    )}
-                    {(collapsed && !mobileOpen) && !isLocked && getBadgeCount(navItem.key) > 0 && (
-                      <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-white" aria-hidden="true" />
                     )}
                   </button>
                 </div>
@@ -809,141 +787,63 @@ const AppSidebar = ({
               const childActive = itemOrDescendantActive(item);
               const isOpen = !!openGroups[item.key];
               const groupBadge = collectGroupBadge(item.children);
-              // Mobile drawer + tablet overlay: accordion hub; desktop mở rộng: hover flyout
-              const hubsAsAccordion = mobileOpen || tabletRail;
-
               const renderMidHub = (hub) => {
                 const HubIcon = hub.icon;
                 const hubActive = itemOrDescendantActive(hub);
                 const hubBadge = collectGroupBadge(hub.children);
                 const hubOpen = !!openGroups[hub.key];
-                const showFlyout = !hubsAsAccordion && flyoutHubKey === hub.key;
-
-                if (hubsAsAccordion) {
-                  return (
-                    <div key={hub.key} className="space-y-0.5">
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(hub.key)}
-                        aria-expanded={hubOpen}
-                        className={`w-full flex items-center gap-3 rounded-xl transition-all px-4 py-2.5 pl-9
-                        ${hubActive ? 'text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}
-                      `}
-                      >
-                        <HubIcon size={16} className="flex-shrink-0" aria-hidden="true" />
-                        <span className="text-[13px] font-semibold flex-1 text-left truncate">{hub.label}</span>
-                        {hubBadge > 0 && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
-                            {hubBadge > 99 ? '99+' : hubBadge}
-                          </span>
-                        )}
-                        <ChevronDown
-                          size={14}
-                          className={`flex-shrink-0 text-white/50 transition-transform ${hubOpen ? 'rotate-180' : ''}`}
-                          aria-hidden="true"
-                        />
-                      </button>
-                      {hubOpen && (
-                        <div className="space-y-0.5">
-                          {hub.children.map((leaf) => (
-                            <div key={leaf.key} className="pl-3">
-                              {renderNavButton(leaf, { nested: true })}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
 
                 return (
-                  <div
-                    key={hub.key}
-                    className="relative"
-                    onMouseEnter={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      // Sát mép hub (không để khe hở) để hover không bị mất khi kéo sang flyout
-                      setFlyoutPos({ top: rect.top, left: rect.right - 2 });
-                      setFlyoutHubKey(hub.key);
-                    }}
-                    onMouseLeave={() => setFlyoutHubKey((k) => (k === hub.key ? null : k))}
-                  >
+                  <div key={hub.key} className="space-y-0.5">
                     <button
                       type="button"
-                      aria-expanded={showFlyout}
-                      aria-haspopup="menu"
-                      className={`w-full flex items-center gap-3 rounded-xl transition-all px-4 py-2.5 pl-9
-                      ${hubActive || showFlyout ? 'text-white bg-white/10' : 'text-white/70 hover:text-white hover:bg-white/10'}
+                      onClick={() => toggleGroup(hub.key)}
+                      aria-expanded={hubOpen}
+                      className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all px-3 py-1.5 pl-6 min-h-11
+                      ${hubActive ? 'cms-sidebar-glass__nav-active text-white' : 'text-[#D5DCE7]'}
                     `}
                     >
-                      <HubIcon size={16} className="flex-shrink-0" aria-hidden="true" />
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${hubActive ? 'bg-red-600' : ''}`}>
+                        <HubIcon size={16} className="flex-shrink-0" aria-hidden="true" />
+                      </span>
                       <span className="text-[13px] font-semibold flex-1 text-left truncate">{hub.label}</span>
                       {hubBadge > 0 && (
                         <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
                           {hubBadge > 99 ? '99+' : hubBadge}
                         </span>
                       )}
-                      <ChevronRight size={14} className="flex-shrink-0 text-white/50" aria-hidden="true" />
+                      <ChevronDown
+                        size={14}
+                        className={`flex-shrink-0 text-white/50 transition-transform ${hubOpen ? 'rotate-180' : ''}`}
+                        aria-hidden="true"
+                      />
                     </button>
-                    {showFlyout && (
-                      <div
-                        role="menu"
-                        className="fixed z-[80] min-w-[11.5rem] rounded-xl border border-white/15 bg-slate-950/95 py-1.5 shadow-2xl backdrop-blur-md"
-                        style={{ top: flyoutPos.top, left: flyoutPos.left }}
-                      >
-                        {hub.children.map((leaf) => {
-                          const LeafIcon = leaf.icon;
-                          const leafActive = isActive(leaf);
-                          const leafBadge = getBadgeCount(leaf.key);
-                          return (
-                            <button
-                              key={leaf.key}
-                              type="button"
-                              role="menuitem"
-                              onClick={() => {
-                                handleClick(leaf);
-                                setFlyoutHubKey(null);
-                              }}
-                              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors
-                              ${leafActive ? NESTED_ACTIVE_CLASS : 'text-white/75 hover:bg-white/10 hover:text-white'}
-                            `}
-                            >
-                              <LeafIcon size={15} className="flex-shrink-0" aria-hidden="true" />
-                              <span className="text-[13px] font-medium truncate flex-1">{leaf.label}</span>
-                              {leafBadge > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black leading-none">
-                                  {leafBadge > 99 ? '99+' : leafBadge}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                    {hubOpen && (
+                      <div className="space-y-0.5">
+                        {hub.children.map((leaf) => (
+                          <div key={leaf.key} className="pl-3">
+                            {renderNavButton(leaf, { nested: true })}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
                 );
               };
 
-              // Sidebar thu gọn: hiện thẳng các lá (icon)
-              if (collapsed && !mobileOpen) {
-                return (
-                  <div key={item.key} className="space-y-1 pb-1 mb-1 border-b border-white/10 last:border-b-0 last:mb-0 last:pb-0">
-                    {flattenLeaves(item.children).map((leaf) => renderNavButton(leaf, { nested: true }))}
-                  </div>
-                );
-              }
-
               return (
-                <div key={item.key} className="pb-1 mb-1 border-b border-white/10 last:border-b-0 last:mb-0 last:pb-0">
+                <div key={item.key}>
                   <button
                     type="button"
                     onClick={() => toggleGroup(item.key)}
                     aria-expanded={isOpen}
-                    className={`w-full flex items-center gap-3 rounded-xl transition-all px-4 py-3
-                    ${childActive ? 'text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}
+                    className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all px-3 py-1.5 min-h-11
+                    ${childActive ? 'cms-sidebar-glass__nav-active text-white' : 'text-[#D5DCE7]'}
                   `}
                   >
-                    <GroupIcon size={18} className="flex-shrink-0" aria-hidden="true" />
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${childActive ? 'bg-red-600' : ''}`}>
+                      <GroupIcon size={18} className="flex-shrink-0" aria-hidden="true" />
+                    </span>
                     <span className="text-sm font-semibold flex-1 text-left">{item.label}</span>
                     {groupBadge > 0 && (
                       <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none">
@@ -970,7 +870,16 @@ const AppSidebar = ({
             }
 
             return (
-              <div key={item.key} className="pb-1 mb-1 border-b border-white/10 last:border-b-0 last:mb-0 last:pb-0">
+              <div key={item.key} className="pb-0.5">
+                {(role === 'teacher' || role === 'student') && item.sectionLabel ? (
+                  <div
+                    className="px-1 pt-3 pb-1 text-[10px] font-black tracking-[0.12em] text-slate-400"
+                    role="heading"
+                    aria-level={2}
+                  >
+                    {item.sectionLabel}
+                  </div>
+                ) : null}
                 {renderNavButton(item)}
               </div>
             );
@@ -979,25 +888,26 @@ const AppSidebar = ({
       </nav>
 
       {/* ── Bottom items ── */}
-      <div className="px-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0.5 border-t border-white/10 pt-2.5">
+      <div className="cms-sidebar-glass__footer px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0 border-t border-slate-400/15 pt-2">
         {config.bottomItems.map(item => {
           const Icon = item.icon;
-          const active = !item.isLogout && !item.isChangePassword && isActive(item);
+          const active = !item.isLogout && !item.isChangePassword && !item.isPinLock && isActive(item);
           return (
             <button
               key={item.key}
               type="button"
               onClick={() => handleClick(item)}
-              className={`w-full flex items-center gap-3 rounded-xl transition-all min-h-11 box-border
-                ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}
+              className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all min-h-11 box-border
+                px-3 py-1.5
                 ${item.isLogout
-                  ? 'text-white/50 hover:text-red-300 hover:bg-red-500/10'
-                  : active ? config.activeClass : 'text-white/65 hover:text-white hover:bg-white/10'}
+                  ? 'text-red-300'
+                  : active ? config.activeClass : 'text-[#D5DCE7]'}
               `}
-              title={(collapsed && !mobileOpen) ? item.label : undefined}
             >
-              <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
-              {(!collapsed || mobileOpen) && <span className="text-sm font-medium truncate">{item.label}</span>}
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${active ? 'bg-red-600' : ''}`}>
+                <Icon size={18} className="flex-shrink-0" aria-hidden="true" />
+              </span>
+              <span className="text-sm font-medium truncate">{item.label}</span>
             </button>
           );
         })}
@@ -1006,45 +916,56 @@ const AppSidebar = ({
         <button
           type="button"
           onClick={handleToggleMute}
-          title={(collapsed && !mobileOpen) ? (muted ? "Bật âm báo" : "Tắt âm báo") : undefined}
-          className={`w-full flex items-center gap-3 rounded-xl transition-all text-white/50 hover:text-white hover:bg-white/10 min-h-11 box-border
-            ${(collapsed && !mobileOpen) ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'}
+          className={`cms-sidebar-glass__nav-item w-full flex items-center gap-3 rounded-[14px] transition-all text-[#A8B6CC] min-h-11 box-border
+            px-3 py-1.5
           `}
         >
-          {muted ? <VolumeX size={18} className="flex-shrink-0" aria-hidden="true" /> : <Volume2 size={18} className="flex-shrink-0" aria-hidden="true" />}
-          {(!collapsed || mobileOpen) && <span className="text-sm font-medium truncate">{muted ? "Bật âm thanh" : "Tắt âm thanh"}</span>}
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]">
+            {muted ? <VolumeX size={18} className="flex-shrink-0" aria-hidden="true" /> : <Volume2 size={18} className="flex-shrink-0" aria-hidden="true" />}
+          </span>
+          <span className="text-sm font-medium truncate">{muted ? "Bật âm thanh" : "Tắt âm thanh"}</span>
+        </button>
+        <button
+          type="button"
+          onClick={toggleMenuPin}
+          aria-pressed={menuPinned}
+          aria-label={menuPinned ? 'Bỏ ghim menu' : 'Ghim menu'}
+          className="cms-sidebar-glass__nav-item hidden lg:flex w-full min-h-11 items-center gap-3 rounded-[14px] px-3 py-1.5 text-[#A8B6CC] transition-all"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]">
+            {menuPinned
+              ? <PinOff size={18} className="flex-shrink-0" aria-hidden="true" />
+              : <Pin size={18} className="flex-shrink-0" aria-hidden="true" />}
+          </span>
+          <span className="text-sm font-medium truncate">{menuPinned ? 'Bỏ ghim menu' : 'Ghim menu'}</span>
         </button>
       </div>
     </div>
   );
 
-  const overlayExpand = tabletRail && !collapsed;
-
   return (
     <>
-      {/* Tablet: nền mờ khi mở rộng sidebar (overlay, không đẩy co layout) */}
-      {overlayExpand && (
-        <button
-          type="button"
-          className="hidden md:block xl:hidden fixed inset-0 z-[55] bg-black/40 border-0 cursor-default"
-          aria-label="Đóng menu"
-          onClick={() => setCollapsedPersist(true)}
-        />
-      )}
-
-      {/* ── Desktop / Tablet Sidebar ── */}
-      <div className={`hidden md:flex flex-col fixed left-0 top-0 h-[100dvh] max-h-[100dvh] transition-all duration-300
-        ${collapsed ? 'w-16' : 'w-64'}
-        ${overlayExpand ? 'z-[60] shadow-2xl' : 'z-30'}
-      `}>
-        {renderSidebarContent()}
-      </div>
-
-      {/* ── Mobile: Overlay drawer (hamburger nằm trong header) ── */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Menu điều hướng">
-          <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-[100dvh] max-h-[100dvh] w-[min(85vw,300px)] max-w-[300px] animate-in slide-in-from-left duration-300 shadow-[8px_0_32px_rgba(0,0,0,0.28)] pt-[env(safe-area-inset-top,0px)]">
+      {/* ── Responsive navigation drawer ── */}
+      {pinnedSidebarVisible ? (
+        <>
+          <aside className="cms-sidebar-glass hidden lg:flex fixed left-0 top-0 z-30 h-[100dvh] max-h-[100dvh] w-[240px] overflow-hidden">
+            {renderSidebarContent()}
+          </aside>
+          <div className="hidden lg:block w-[240px] shrink-0" aria-hidden="true" />
+        </>
+      ) : (
+        <div
+          className={`cms-mobile-drawer-shell fixed inset-0 z-[100] ${mobileOpen ? '' : 'pointer-events-none'}`}
+          role="dialog"
+          aria-modal={mobileOpen}
+          aria-hidden={!mobileOpen}
+          aria-label="Menu điều hướng"
+        >
+          <div
+            className={`cms-mobile-drawer-backdrop absolute inset-0 bg-black/50 ${mobileOpen ? 'is-open' : ''}`}
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className={`cms-mobile-drawer-panel cms-sidebar-glass absolute left-0 top-0 h-[100dvh] max-h-[100dvh] w-[min(72vw,280px)] max-w-[280px] overflow-hidden rounded-r-[26px] pt-[env(safe-area-inset-top,0px)] ${mobileOpen ? 'is-open' : ''}`}>
             <div className="h-full relative overflow-hidden">
               {renderSidebarContent()}
             </div>
@@ -1052,8 +973,108 @@ const AppSidebar = ({
         </div>
       )}
 
-      {/* Spacer: tablet luôn giữ rail icon (w-16); desktop mới đẩy theo collapsed */}
-      <div className={`hidden md:block flex-shrink-0 transition-all duration-300 ${collapsed || tabletRail ? 'w-16' : 'w-64'}`} />
+      {mobileNavItems.length > 0 && !pinnedSidebarVisible && (
+        <nav
+          className={`${isTabletOrLarger ? '' : 'md:hidden'} fixed bottom-2 left-3 right-3 z-40 rounded-[1.5rem] border border-white/80 bg-white/65 shadow-[0_-8px_32px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl pt-1.5 pointer-events-none`}
+          aria-label="Điều hướng chính"
+          aria-hidden={!footerShown}
+          style={{
+            ...(isTabletOrLarger ? {
+              left: '50%',
+              right: 'auto',
+              bottom: '1rem',
+              width: 'min(48rem, calc(100vw - 2rem))',
+              padding: '0.625rem 0.75rem 0.25rem',
+              border: '1px solid rgba(255, 255, 255, 0.88)',
+              borderRadius: '1.25rem',
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.84), rgba(241,245,249,0.66))',
+              boxShadow: '0 12px 36px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.95)',
+              backdropFilter: 'blur(24px) saturate(1.45)',
+              WebkitBackdropFilter: 'blur(24px) saturate(1.45)',
+              transform: footerShown
+                ? 'translateX(-50%)'
+                : 'translate(-50%, calc(100% + 1rem))',
+            } : {
+              bottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))',
+              padding: '0.625rem 0.25rem 0.375rem',
+              transform: footerShown ? 'translateY(0)' : 'translateY(calc(100% + 0.5rem))',
+            }),
+            opacity: footerShown ? 1 : 0,
+            visibility: footerShown ? 'visible' : 'hidden',
+            transition: `transform 450ms cubic-bezier(0.22, 1, 0.36, 1), opacity 350ms ease, visibility 0s linear ${footerShown ? '0s' : '450ms'}`,
+          }}
+        >
+          <div
+            className="pointer-events-auto mx-auto flex h-[5.25rem] w-full max-w-[48rem] items-stretch gap-2 px-1"
+            onMouseEnter={isInboxRoute ? keepInboxFooter : undefined}
+            onMouseLeave={isInboxRoute ? scheduleInboxFooterHide : undefined}
+            onFocus={isInboxRoute ? keepInboxFooter : undefined}
+            onBlur={isInboxRoute ? scheduleInboxFooterHide : undefined}
+            onTouchStart={isInboxRoute ? scheduleInboxFooterHide : undefined}
+          >
+            {mobileNavItems.map((item) => {
+              const Icon = item.key === 'dashboard' ? Home : item.mobileIcon || item.icon || LayoutDashboard;
+              const active = isActive(item);
+              const isHome = item.key === 'dashboard';
+              const badgeCount = getBadgeCount(item.key);
+              const iconTone = MOBILE_NAV_ICON_TONES[item.key] || 'border-slate-200/80 from-slate-50 to-white text-slate-600';
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleClick(item)}
+                  aria-current={active ? 'page' : undefined}
+                  aria-label={item.label}
+                  tabIndex={footerShown ? 0 : -1}
+                  className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-1 text-[10px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${isHome
+                      ? 'border-transparent bg-transparent text-red-600'
+                      : active
+                        ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
+                        : 'border-white/70 bg-white/45 text-slate-500 hover:border-white/90 hover:bg-white/60 hover:text-slate-800'
+                    }`}
+                >
+                  <span className={`relative flex items-center justify-center transition-all duration-200 ${isHome
+                      ? 'h-14 w-14 rounded-full border-[3px] border-white bg-gradient-to-b from-red-400 via-red-600 to-red-800 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32),0_0_0_3px_rgba(254,202,202,0.6),inset_0_3px_5px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(127,29,29,0.5)] group-hover:scale-105 group-active:scale-95'
+                      : `h-10 w-10 rounded-xl border ${active
+                        ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'
+                        : `${iconTone} bg-gradient-to-br shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]`
+                      }`
+                    }`}>
+                    <Icon size={isHome ? 28 : 20} strokeWidth={isHome || active ? 2.5 : 2} aria-hidden="true" />
+                    {badgeCount > 0 && (
+                      <span className="absolute -right-1 -top-1 min-w-[1.05rem] rounded-full bg-red-600 px-1 text-center text-[9px] font-bold leading-[1.05rem] text-white">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
+                  </span>
+                  {isHome ? null : (
+                    <span className="flex h-6 w-full items-center justify-center text-center leading-3">{item.mobileLabel || item.label}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
+      {mobileNavItems.length > 0 && !pinnedSidebarVisible && isInboxRoute && mobileFooterVisible && !inboxFooterOpen && (
+        <button
+          type="button"
+          onMouseEnter={revealInboxFooter}
+          onFocus={revealInboxFooter}
+          onClick={revealInboxFooter}
+          aria-label="Hiện thanh điều hướng"
+          title="Hiện thanh điều hướng"
+          className={`${isTabletOrLarger ? '' : 'md:hidden'} cms-inbox-footer-peek fixed bottom-0 left-1/2 z-40 flex h-8 w-32 -translate-x-1/2 items-center justify-center rounded-t-2xl border border-b-0 border-white/80 bg-white/85 text-slate-500 backdrop-blur-xl transition-colors hover:text-red-600`}
+          style={{
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            boxShadow: '0 -6px 18px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.95)',
+          }}
+        >
+          <ChevronUp size={20} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+      )}
+
     </>
   );
 };

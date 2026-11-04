@@ -32,6 +32,7 @@ const PublicPaymentPage = lazy(() => import('./components/PublicPaymentPage'));
 const FeedBoard = lazy(() => import('./components/FeedBoard'));
 const NewsPage = lazy(() => import('./components/NewsPage'));
 const CenterInfoPage = lazy(() => import('./components/centerInfo/CenterInfoPage'));
+const SupportEntryPage = lazy(() => import('./components/SupportEntryPage'));
 const CenterInfoManagePage = lazy(() => import('./components/centerInfo/CenterInfoManagePage'));
 const CertPrepCatalogPage = lazy(() => import('./components/student/certPrep/CertPrepCatalogPage'));
 const CertPrepLevelPage = lazy(() => import('./components/student/certPrep/CertPrepLevelPage'));
@@ -52,7 +53,6 @@ import OfflineBanner                         from './components/OfflineBanner';
 import { ModalProvider, useModal }           from './utils/Modal.jsx';
 import SecurityGuard                         from './components/SecurityGuard';
 import FaviconSwitcher                       from './components/FaviconSwitcher';
-import { useInactivityTimer }                from './utils/useInactivityTimer';
 import { unlockAudio }                       from './utils/sound';
 import { getMessagingRole }                  from './lib/messagingRoles';
 import { hasPermission, PERMISSIONS }        from './constants/permissions';
@@ -105,8 +105,6 @@ const saveSession = (user) => {
   const key = user.adminRole === 'STAFF' || user.role === 'staff' ? 'staff' : (user.role || 'admin');
   localStorage.setItem(`${key}_user`, JSON.stringify(user));
 };
-const ACTIVE_TAB_SESSION_KEY = 'cms_active_login_session_v1';
-
 // ── Protected Route ───────────────────────────────────────────────────────────
 const Guard = ({ allowedRoles, session, children }) => {
   const { showModal } = useModal();
@@ -397,6 +395,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         <Route path="/teacher/center-info" element={
           <ErrorBoundary inline><CenterInfoPage session={session} role="teacher" /></ErrorBoundary>
         } />
+        <Route path="/teacher/support" element={
+          <ErrorBoundary inline><SupportEntryPage /></ErrorBoundary>
+        } />
         <Route path="/teacher/test"    element={
           <ErrorBoundary>
             <TeacherTest teacherName={session?.name || 'Giảng Viên'} onBack={() => nav('/teacher')} />
@@ -441,6 +442,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/center-info" element={
           <ErrorBoundary inline><CenterInfoPage session={session} role="student" /></ErrorBoundary>
+        } />
+        <Route path="/student/support" element={
+          <ErrorBoundary inline><SupportEntryPage /></ErrorBoundary>
         } />
         <Route path="/student/cert-prep" element={
           <ErrorBoundary inline>
@@ -501,54 +505,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
   );
 }
 
-// ── Inactivity Warning Overlay ────────────────────────────────────────────────
-function InactivityWarning({ visible, secondsLeft, onExtend, onLogout }) {
-  if (!visible) return null;
-  const mins = Math.floor(secondsLeft / 60);
-  const secs = String(secondsLeft % 60).padStart(2, '0');
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-      backdropFilter: 'blur(8px)', zIndex: 99999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
-    }}>
-      <div style={{
-        background: '#1e293b', borderRadius: '1.5rem', maxWidth: '400px', width: '100%',
-        border: '1px solid rgba(234,179,8,0.4)', overflow: 'hidden',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
-      }}>
-        <div style={{ background: 'linear-gradient(135deg,#ca8a04,#b45309)', padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.2)', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>⏰</div>
-          <div>
-            <h3 style={{ color: '#fff', fontWeight: 900, fontSize: '1rem', margin: 0 }}>Phiên sắp hết hạn</h3>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', margin: 0 }}>Bạn không tương tác trong 55 phút qua</p>
-          </div>
-        </div>
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', borderRadius: '1rem', padding: '1rem', textAlign: 'center' }}>
-            <p style={{ color: '#fde047', fontWeight: 900, fontSize: '2.5rem', margin: 0, fontFamily: 'monospace' }}>{mins}:{secs}</p>
-            <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '0.25rem 0 0' }}>Tự động đăng xuất sau thời gian trên</p>
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button onClick={onLogout} style={{
-              flex: 1, padding: '0.75rem', background: 'transparent', border: '2px solid rgba(255,255,255,0.1)',
-              color: '#94a3b8', fontWeight: 700, borderRadius: '0.75rem', cursor: 'pointer', fontSize: '0.875rem',
-            }}>Đăng xuất ngay</button>
-            <button onClick={onExtend} style={{
-              flex: 2, padding: '0.75rem', background: 'linear-gradient(135deg,#ca8a04,#b45309)',
-              border: 'none', color: '#fff', fontWeight: 900, borderRadius: '0.75rem',
-              cursor: 'pointer', fontSize: '0.875rem',
-            }}>✅ Tiếp tục làm việc</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main App ──────────────────────────────────────────────────────────────────
 
-import { useToast } from './utils/toast.jsx';
+import { useToast } from './utils/useToast';
 function GlobalApiErrorHandler() {
   const toast = useToast();
   useEffect(() => {
@@ -570,28 +529,6 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const navigate = useNavigate();
 
-  // ── Inactivity Timer: tự động logout sau 60 phút không dùng ────────────────
-  const handleInactivityLogout = useCallback(async () => {
-    // Đang offline → không logout (tránh đá user khi mạng tụt giữa phiên)
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
-    const loginAlerts = snapshotLoginAlertStorage();
-    const role = session?.role;
-    try { await api.auth.logout(); } catch { /* ignore */ }
-    if (role) clearTokens(role);
-    localStorage.clear();
-    sessionStorage.clear();
-    if (deviceId) localStorage.setItem('cms_device_id_v1', deviceId);
-    restoreLoginAlertStorage(loginAlerts);
-    setSession(null);
-    navigate('/login?msg=inactivity');
-  }, [navigate, session]);
-
-  const { warningVisible, secondsLeft, extendSession } = useInactivityTimer({
-    onLogout: handleInactivityLogout,
-    enabled: !!session, // Chỉ kích hoạt khi đã đăng nhập
-  });
-
   // Mở khóa AudioContext sau tương tác đầu tiên (Chrome/Safari yêu cầu)
   useEffect(() => {
     const unlock = () => unlockAudio();
@@ -606,10 +543,6 @@ function App() {
   // ── Khôi phục session khi reload ──────────────────────────────────────────
   useEffect(() => {
     const restoreSession = async () => {
-      if (sessionStorage.getItem(ACTIVE_TAB_SESSION_KEY) !== '1') {
-        setIsAuthLoading(false);
-        return;
-      }
       const savedUser = loadSession();
 
       if (!savedUser) {
@@ -679,6 +612,20 @@ function App() {
     return () => window.removeEventListener('cms:session-patched', onPatched);
   }, []);
 
+  useEffect(() => {
+    if (!session) return undefined;
+    const onSessionReplaced = (event) => {
+      const currentToken = session.token || session.accessToken;
+      if (!currentToken || event.detail?.token !== currentToken) return;
+      clearTokens(session.role);
+      localStorage.removeItem(`${session.role || 'student'}_user`);
+      setSession(null);
+      navigate('/login');
+    };
+    window.addEventListener('cms:session-replaced', onSessionReplaced);
+    return () => window.removeEventListener('cms:session-replaced', onSessionReplaced);
+  }, [navigate, session]);
+
   const handleLogout = useCallback(async () => {
     if (!session) {
       navigate('/login');
@@ -709,10 +656,6 @@ function App() {
        }
     });
 
-    // Xóa thời gian không hoạt động cũ để tránh bị văng ngay lần đăng nhập đầu tiên
-    localStorage.removeItem('last_activity_at');
-
-    sessionStorage.setItem(ACTIVE_TAB_SESSION_KEY, '1');
     saveSession(account);
     setSession(account);
     const teacherHome = String(account.status || '').toLowerCase() === 'active' ? '/teacher' : '/teacher/test';
@@ -729,13 +672,6 @@ function App() {
     <ErrorBoundary>
         <LoadingScreen />
         <OfflineBanner />
-        {/* ── Cảnh báo sắp hết phiên (5 phút cuối) ── */}
-        <InactivityWarning
-          visible={warningVisible}
-          secondsLeft={secondsLeft}
-          onExtend={extendSession}
-          onLogout={handleInactivityLogout}
-        />
         <SocketProvider
           userId={session ? (session.id || session._id) : ''}
           role={getMessagingRole(session) || session?.role || ''}

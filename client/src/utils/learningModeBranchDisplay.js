@@ -39,9 +39,8 @@ export function resolveLearningModeLabel(learningMode) {
  * True when branch.name is essentially a learning-mode synonym
  * (would confuse users if shown next to the mode badge).
  * @param {string} branchName
- * @param {string} [_learningMode] unused — kept for call-site clarity
  */
-export function isModeLikeBranchName(branchName, _learningMode) {
+export function isModeLikeBranchName(branchName) {
   const n = normalizeBranchText(branchName);
   if (!n) return false;
   if (MODE_LIKE_PHRASES.includes(n)) return true;
@@ -59,13 +58,13 @@ export function isModeLikeBranchName(branchName, _learningMode) {
  * @param {string} [learningMode]
  * @returns {string}
  */
-export function resolveBranchDisplayName(branch, learningMode) {
+export function resolveBranchDisplayName(branch) {
   if (!branch) return 'Chưa phân chi nhánh';
 
   const name = String(branch.name || '').trim();
   const code = String(branch.code || '').trim();
 
-  if (name && !isModeLikeBranchName(name, learningMode)) {
+  if (name && !isModeLikeBranchName(name)) {
     return name;
   }
   if (code) return code;

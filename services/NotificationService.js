@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
 const logger = require('../config/logger');
+const mobilePushService = require('./mobilePushService');
 
 class NotificationService {
   /**
@@ -79,6 +80,13 @@ class NotificationService {
         }
       }
 
+      mobilePushService.dispatchToReceivers(receiversArr, {
+        type,
+        title,
+        content,
+        payload,
+        notificationId: String(newNotification._id),
+      });
       return newNotification;
     } catch (error) {
       logger.error('[NotificationService] Send error:', error);

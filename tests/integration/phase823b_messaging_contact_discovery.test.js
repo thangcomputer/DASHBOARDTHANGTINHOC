@@ -61,7 +61,9 @@ describe('Phase 8.23B messaging contact discovery', { concurrency: false }, () =
     assert.ok(inbox.includes("contactTab === 'staff'"));
     assert.ok(inbox.includes("contactTab === 'support'"));
     assert.ok(inbox.includes("ar === 'SUPPORT'"));
-    assert.ok(inbox.includes("{ id: 'support', label: 'Hỗ trợ' }"));
+    // Visible chips mirror mobile: Tất cả / Học viên|Giảng viên / Nhóm
+    assert.ok(inbox.includes("{ id: 'all', label: 'Tất cả' }"));
+    assert.ok(inbox.includes("{ id: 'group', label: 'Nhóm' }"));
     assert.ok(inbox.includes("ar !== 'STAFF'") || inbox.includes("ar !== 'SUPPORT'"));
   });
 

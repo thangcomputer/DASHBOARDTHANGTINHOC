@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { biAPI, systemLogsAPI } from '../services/api';
 import { useBranch } from '../context/BranchContext';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 
 const PERIODS = [
   { value: '7d', label: '7 ngày' },
@@ -38,7 +38,7 @@ function Kpi({ icon: Icon, label, value, sub, delta, color = 'text-sky-700', bg 
         </div>
         {delta != null && <Delta value={delta} />}
       </div>
-      <p className="cms-m-caption font-semibold uppercase tracking-wide">{label}</p>
+      <p className="cms-m-caption font-semibold  tracking-wide">{label}</p>
       <p className="cms-m-kpi-value mt-1">{value}</p>
       {sub && <p className="cms-m-caption mt-0.5 line-clamp-2">{sub}</p>}
     </div>

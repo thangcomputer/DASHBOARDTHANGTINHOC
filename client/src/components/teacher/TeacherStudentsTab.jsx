@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { isUserOnline } from '../../utils/presence';
-import { Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Search, MessageSquare, Users, GraduationCap } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { matchesPersonSearch } from '../../utils/personSearch';
 import TeacherStudentCard from './TeacherStudentCard';
@@ -62,6 +62,12 @@ export default function TeacherStudentsTab({
   markAttendance, updateLink, saveGrade, updateNotes, lockStudentExam,
   cancelSchedule,
 }) {
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(() => {
+    const query = window.location.hash.split('?')[1] || '';
+    const params = new URLSearchParams(query);
+    return params.has('enrollmentKey') || params.has('studentId');
+  });
+
   const resolveStudentStatus = (student) => {
     const enrollmentStatus = String(student?.enrollmentStatus || '').toLowerCase();
     if (Boolean(student?.interactionLocked)
@@ -77,22 +83,51 @@ export default function TeacherStudentsTab({
     return 'active';
   };
 
+  const visibleStudents = students
+    .filter((student) => studentStatusFilter === 'all' || resolveStudentStatus(student) === studentStatusFilter)
+    .filter((student) => matchesPersonSearch(studentSearch, {
+      name: student.name,
+      phone: student.phone,
+      zalo: student.zalo,
+      extra: student.course || '',
+    }))
+    .slice()
+    .sort((a, b) => {
+      const aId = String(a._id || a.id || '');
+      const bId = String(b._id || b.id || '');
+      const aDropped = Boolean(a.interactionLocked)
+        || ['cancelled', 'refunded'].includes(String(a.enrollmentStatus || '').toLowerCase())
+        || String(a.status || '') === 'Thôi học';
+      const bDropped = Boolean(b.interactionLocked)
+        || ['cancelled', 'refunded'].includes(String(b.enrollmentStatus || '').toLowerCase())
+        || String(b.status || '') === 'Thôi học';
+      if (aDropped !== bDropped) return aDropped ? 1 : -1;
+      const aOn = !aDropped && isUserOnline(onlineUsers, a) ? 1 : 0;
+      const bOn = !bDropped && isUserOnline(onlineUsers, b) ? 1 : 0;
+      if (aOn !== bOn) return bOn - aOn;
+      const aSeen = new Date(lastSeenUsers?.[aId] || a.lastAccessAt || 0).getTime() || 0;
+      const bSeen = new Date(lastSeenUsers?.[bId] || b.lastAccessAt || 0).getTime() || 0;
+      if (aSeen !== bSeen) return bSeen - aSeen;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+    });
+
   return (
           <div className="cms-page-gutter py-3 sm:py-4 md:py-6 min-h-0 flex-1 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:min-h-0 overflow-y-auto overscroll-y-contain lg:overflow-hidden min-w-0 w-full max-w-full">
             
             {/* CỘT 1: DANH SÁCH HỌC VIÊN (Sidebar) */}
-            <div className="w-full lg:w-80 xl:w-96 lg:h-full flex flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden shrink-0 min-w-0 min-h-0 max-lg:flex-none">
+            <div className={`${mobileDetailOpen ? 'hidden' : 'flex'} lg:flex w-full lg:w-80 xl:w-96 lg:h-full flex-col bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden shrink-0 min-w-0 min-h-0 max-lg:flex-none`}>
                <div className="p-3 sm:p-4 border-b border-slate-50 bg-slate-50/40">
                   <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}
-                      placeholder="Tìm họ, tên, SĐT..."
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
+                      placeholder="Tìm tên, SĐT, Zalo, khóa học..."
+                      aria-label="Tìm tên, số điện thoại, Zalo hoặc khóa học"
+                      className="w-full min-h-11 pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 transition-all"
                     />
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5 mt-3">
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Lọc trạng thái học viên">
                     {[
                       ['all', 'Tất cả'],
                       ['active', 'Đang học'],
@@ -103,10 +138,12 @@ export default function TeacherStudentsTab({
                         key={value}
                         type="button"
                         onClick={() => setStudentStatusFilter(value)}
-                        className={`min-h-8 rounded-lg px-1 text-[11px] font-bold transition-colors ${
+                        role="tab"
+                        aria-selected={studentStatusFilter === value}
+                        className={`min-h-9 shrink-0 rounded-lg border px-3 text-sm font-bold transition-colors ${
                           studentStatusFilter === value
-                            ? 'bg-red-600 text-white shadow-sm'
-                            : 'bg-white text-slate-500 border border-slate-200 hover:border-red-300 hover:text-red-600'
+                            ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-red-300 hover:text-red-600'
                         }`}
                       >
                         {label}
@@ -115,35 +152,11 @@ export default function TeacherStudentsTab({
                   </div>
                </div>
                
-               <div className="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-2 space-y-1">
-                  {students
-                    .filter((s) => studentStatusFilter === 'all' || resolveStudentStatus(s) === studentStatusFilter)
-                    .filter((s) => matchesPersonSearch(studentSearch, {
-                      name: s.name,
-                      phone: s.phone,
-                      zalo: s.zalo,
-                      extra: s.course || '',
-                    }))
-                    .slice()
-                    .sort((a, b) => {
-                      const aId = String(a._id || a.id || '');
-                      const bId = String(b._id || b.id || '');
-                      const aDropped = Boolean(a.interactionLocked)
-                        || ['cancelled', 'refunded'].includes(String(a.enrollmentStatus || '').toLowerCase())
-                        || String(a.status || '') === 'Thôi học';
-                      const bDropped = Boolean(b.interactionLocked)
-                        || ['cancelled', 'refunded'].includes(String(b.enrollmentStatus || '').toLowerCase())
-                        || String(b.status || '') === 'Thôi học';
-                      if (aDropped !== bDropped) return aDropped ? 1 : -1;
-                      const aOn = !aDropped && isUserOnline(onlineUsers, a) ? 1 : 0;
-                      const bOn = !bDropped && isUserOnline(onlineUsers, b) ? 1 : 0;
-                      if (aOn !== bOn) return bOn - aOn;
-                      const aSeen = new Date(lastSeenUsers?.[aId] || 0).getTime() || 0;
-                      const bSeen = new Date(lastSeenUsers?.[bId] || 0).getTime() || 0;
-                      if (aSeen !== bSeen) return bSeen - aSeen;
-                      return String(a.name || '').localeCompare(String(b.name || ''), 'vi');
-                    })
-                    .map(s => {
+               <div className="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-2 space-y-2">
+                  <p className="px-1 text-sm font-semibold text-slate-500" aria-live="polite">
+                    {visibleStudents.length} học viên
+                  </p>
+                  {visibleStudents.map(s => {
                       const sId = s._id || s.id;
                       const rowKey = s._enrollmentKey || String(sId);
                       const isOnline = isUserOnline(onlineUsers, s);
@@ -154,25 +167,27 @@ export default function TeacherStudentsTab({
                       return (
                         <div
                           key={rowKey}
-                          onClick={() => setSelectedEnrollmentKey(s)}
+                          onClick={() => {
+                            setSelectedEnrollmentKey(s);
+                            setMobileDetailOpen(true);
+                          }}
                           role="button"
                           tabIndex={0}
-                          className={`w-full flex items-center gap-3 p-2.5 sm:p-3 rounded-xl transition-all group cursor-pointer border ${
-                            isDropped ? 'opacity-55 grayscale-[0.35]' : ''
-                          } ${
-                            isSelected
-                              ? 'bg-blue-50/60 border-blue-200 border-l-4 border-l-blue-600 shadow-sm'
-                              : 'border-transparent hover:bg-slate-50 text-slate-700'
-                          }`}
+                          aria-label={`Mở hồ sơ ${s.name}`}
+                          aria-pressed={isSelected}
+                          className={`w-full flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/30 ${
+                            isDropped ? 'opacity-60 grayscale-[0.25]' : ''
+                          } ${isSelected ? 'lg:border-blue-300 lg:bg-blue-50/60' : ''}`}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault();
                               setSelectedEnrollmentKey(s);
+                              setMobileDetailOpen(true);
                             }
                           }}
                         >
                           <div className="relative shrink-0">
-                            <div className="w-10 h-10 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">
+                            <div className="w-11 h-11 rounded-full overflow-hidden shadow-sm bg-white border border-slate-100">
                               <img src={resolveAvatarUrl({ avatar: s.avatar, role: 'student', gender: s.gender })} alt="" className="w-full h-full object-cover" />
                             </div>
                             {isOnline && !isDropped && (
@@ -181,28 +196,33 @@ export default function TeacherStudentsTab({
                           </div>
                           
                           <div className="flex-1 text-left min-w-0">
-                            <p className={`text-sm font-bold truncate ${isDropped ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</p>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <p className={`min-w-0 flex-1 text-base font-bold truncate ${isDropped ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</p>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                                isDropped
+                                  ? 'bg-slate-100 text-slate-600'
+                                  : resolveStudentStatus(s) === 'completed'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-blue-50 text-blue-700'
+                              }`}>
+                                {isDropped ? 'Thôi học' : resolveStudentStatus(s) === 'completed' ? 'Học xong' : 'Đang học'}
+                              </span>
+                            </div>
                             {s.course && (
-                              <p className={`text-[10px] font-bold uppercase tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-600' : 'text-indigo-600'}`}>
+                              <p className={`text-sm font-semibold tracking-tight truncate mt-0.5 ${isSelected ? 'text-blue-600' : 'text-indigo-600'}`}>
                                 {s.course}
                               </p>
                             )}
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              {isDropped ? (
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
-                                  Thôi học
-                                </span>
-                              ) : isOnline ? (
-                                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                  Đang online
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-medium text-slate-400">
-                                  {lastSeenUsers[String(sId)]
-                                    ? `Truy cập lần cuối: ${new Date(lastSeenUsers[String(sId)]).toLocaleString('vi-VN')}`
-                                    : 'Chưa có dữ liệu truy cập'}
-                                </span>
-                              )}
+                              <span className={`text-sm font-medium ${isOnline && !isDropped ? 'text-emerald-700' : 'text-slate-500'}`}>
+                                {isDropped
+                                  ? 'Đã ngừng học'
+                                  : isOnline
+                                    ? 'Trực tuyến'
+                                    : lastSeenUsers[String(sId)] || s.lastAccessAt
+                                      ? `Truy cập ${new Date(lastSeenUsers[String(sId)] || s.lastAccessAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+                                      : 'Chưa có dữ liệu truy cập'}
+                              </span>
                             </div>
                           </div>
                           
@@ -214,7 +234,7 @@ export default function TeacherStudentsTab({
                                 if (isDropped) return;
                                 navigateTeacherStudentChat(navigate, s);
                               }} 
-                              className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all border-none outline-none shrink-0 ${
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all border-none outline-none shrink-0 ${
                                 isDropped
                                   ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                   : 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700'
@@ -222,23 +242,23 @@ export default function TeacherStudentsTab({
                               title={isDropped ? 'HV đã thôi học — không nhắn tin' : 'Nhắn tin với học viên'}
                               aria-label="Nhắn tin với học viên"
                             >
-                              <MessageSquare size={14} />
+                              <MessageSquare size={17} />
                             </button>
                         </div>
                       );
-                    })
-                  }
-                  {students.length === 0 && (
-                     <div className="text-center py-10 opacity-30">
+                    })}
+                  {visibleStudents.length === 0 && (
+                     <div className="text-center py-10 text-slate-400">
                         <Users size={40} className="mx-auto mb-2" />
-                        <p className="text-sm font-bold">Chưa có học viên</p>
+                        <p className="text-sm font-bold">{students.length ? 'Không tìm thấy học viên' : 'Chưa có học viên'}</p>
+                        {students.length > 0 && <p className="mt-1 text-sm">Thử tìm theo tên hoặc khóa học khác.</p>}
                      </div>
                   )}
                </div>
             </div>
 
             {/* CỘT 2: CHI TIẾT HỌC VIÊN (Main Content) */}
-            <div className="flex-1 min-w-0 min-h-0 lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden pr-0 pb-4 sm:pr-1 sm:pb-6">
+            <div className={`${mobileDetailOpen ? 'flex' : 'hidden'} lg:flex flex-1 min-w-0 min-h-0 flex-col lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden pr-0 pb-4 sm:pr-1 sm:pb-6`}>
               {selectedEnrollmentKey ? (
                 (() => {
                   const student = students.find(s => String(s._enrollmentKey || s._id || s.id) === String(selectedEnrollmentKey));
@@ -283,21 +303,37 @@ export default function TeacherStudentsTab({
                     );
 
                   return (
-                    <TeacherStudentCard 
-                      key={student._enrollmentKey || student._id || student.id} student={student}
-                      onAttendance={(id, note, grade) => markAttendance(id, note, grade, courseName)} onUpdateLink={updateLink}
-                      onSaveGrade={saveGrade} onUpdateNotes={updateNotes}
-                      onLockExam={lockStudentExam} 
-                      isDetailed={true}
-                      attendanceGate={attendanceGate}
-                      myStudents={students}
-                      onCancelSchedule={cancelSchedule}
-                      navigate={navigate}
-                    />
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileDetailOpen(false);
+                          navigate(
+                            { pathname: window.location.pathname, hash: 'students' },
+                            { replace: true },
+                          );
+                        }}
+                        className="mb-3 inline-flex min-h-11 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm lg:hidden"
+                      >
+                        <ArrowLeft size={17} />
+                        Danh sách học viên
+                      </button>
+                      <TeacherStudentCard
+                        key={student._enrollmentKey || student._id || student.id} student={student}
+                        onAttendance={(id, note, grade) => markAttendance(id, note, grade, courseName)} onUpdateLink={updateLink}
+                        onSaveGrade={saveGrade} onUpdateNotes={updateNotes}
+                        onLockExam={lockStudentExam}
+                        isDetailed={true}
+                        attendanceGate={attendanceGate}
+                        myStudents={students}
+                        onCancelSchedule={cancelSchedule}
+                        navigate={navigate}
+                      />
+                    </>
                   );
                 })()
               ) : (
-                <div className="h-full flex flex-col items-center justify-center bg-white rounded-[40px] border-2 border-dashed border-gray-100 text-gray-300">
+                <div className="h-full flex flex-col items-center justify-center bg-white rounded-[40px] border-2 border-dashed border-gray-100 text-gray-300 max-lg:hidden">
                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                       <GraduationCap size={40} />
                    </div>

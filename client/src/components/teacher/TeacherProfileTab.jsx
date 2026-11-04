@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   User, Phone, Mail, Building2, CreditCard, Landmark, Copy, Edit3, Shield, MapPin, Save, X, CheckCircle,
-  Calendar, Award, AlertCircle, Clock, DollarSign, ChevronDown,
+  Calendar, Award, AlertCircle, Clock, DollarSign, ChevronDown, KeyRound,
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
-import { teachersAPI, csrfFetch, resolveMediaUrl } from '../../services/api';
+import { openPinLockSettings } from '../../utils/pinLock';
 import { useData } from '../../context/DataContext';
-import { useToast } from '../../utils/toast';
-import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import EditableAvatar from '../EditableAvatar';
-import { showGlossyAlert } from './TeacherShared';
 import CmsSelect from '../ui/CmsSelect';
 import { VOICE_REGION_OPTIONS, voiceRegionLabel } from '../../constants/voiceRegions';
 
@@ -84,7 +81,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
       } else {
         setSaveMsg('❌ ' + (result?.message || 'Lỗi khi lưu'));
       }
-    } catch (err) {
+    } catch {
       setSaveMsg('❌ Lỗi kết nối server');
     } finally {
       setSaving(false);
@@ -110,7 +107,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
       } else {
         setSaveMsg('❌ ' + (result?.message || 'Lỗi khi lưu'));
       }
-    } catch (err) {
+    } catch {
       setSaveMsg('❌ Lỗi kết nối server');
     } finally {
       setSaving(false);
@@ -124,16 +121,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
     setTimeout(() => setCopiedField(''), 1500);
   };
 
-  const initials = currentTeacher?.name
-    ? currentTeacher.name.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase()
-    : 'GV';
-
   const bankFilled = bankForm.bankName && bankForm.accountNumber && bankForm.accountName;
-  const teacherAvatarUrl = resolveAvatarUrl({
-    avatar: currentTeacher?.avatar,
-    role: 'teacher',
-    gender: currentTeacher?.gender,
-  });
 
   return (
     <div className="w-full py-2 sm:py-6 lg:py-8 space-y-4 lg:space-y-5">
@@ -150,7 +138,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
             className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl border-2 border-white/30 shadow-lg bg-white shrink-0"
           />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wide text-red-200/90">Hồ sơ cá nhân</p>
+            <p className="text-[11px] sm:text-xs font-bold  tracking-wide text-red-200/90">Hồ sơ cá nhân</p>
             <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight truncate mt-0.5">
               {currentTeacher?.name || 'Giảng viên'}
             </h2>
@@ -159,7 +147,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
               {currentTeacher?.branchCode ? ` · Cơ sở ${currentTeacher.branchCode}` : ''}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex items-center rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">
+              <span className="inline-flex items-center rounded-lg bg-white/10 px-2.5 py-1 text-[11px] font-bold  tracking-wide">
                 {String(currentTeacher?.status || '').toLowerCase() === 'active' ? 'Đang hoạt động' : (currentTeacher?.status || '—')}
               </span>
               {currentTeacher?.specialty && (
@@ -184,6 +172,21 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         <span className="flex-1 min-w-0">
           <span className="block text-sm lg:text-base font-bold text-slate-800">Đổi mật khẩu</span>
           <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
+        </span>
+        <Edit3 size={16} className="text-slate-300 shrink-0" aria-hidden="true" />
+      </button>
+
+      <button
+        type="button"
+        onClick={openPinLockSettings}
+        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3.5 lg:px-5 lg:py-4 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+      >
+        <span className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+          <KeyRound size={18} aria-hidden="true" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm lg:text-base font-bold text-slate-800">Khóa mã PIN</span>
+          <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Tự khóa màn hình khi không thao tác</span>
         </span>
         <Edit3 size={16} className="text-slate-300 shrink-0" aria-hidden="true" />
       </button>
@@ -224,7 +227,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
           <div className={`${openSections.profile ? 'grid' : 'hidden lg:grid'} p-5 lg:p-6 grid-cols-1 md:grid-cols-2 gap-4`}>
             {/* Name - Read only */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Họ và tên</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Họ và tên</label>
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <User size={16} className="text-gray-400 flex-shrink-0" />
                 <span className="text-sm font-bold text-gray-800">{currentTeacher?.name || '—'}</span>
@@ -234,7 +237,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Phone - Read only */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Số điện thoại</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Số điện thoại</label>
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <Phone size={16} className="text-gray-400 flex-shrink-0" />
                 <span className="text-sm font-bold text-gray-800">{currentTeacher?.phone || '—'}</span>
@@ -245,7 +248,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Zalo - Editable */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Zalo</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Zalo</label>
               {editingProfile ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus-within:border-blue-400 transition">
                   <Phone size={16} className="text-blue-400 flex-shrink-0" />
@@ -267,7 +270,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Age - Editable */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Tuổi</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Tuổi</label>
               {editingProfile ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus-within:border-blue-400 transition">
                   <User size={16} className="text-blue-400 flex-shrink-0" />
@@ -293,7 +296,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Start Date - Read only */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Ngày vào làm</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Ngày vào làm</label>
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <Calendar size={16} className="text-gray-400 flex-shrink-0" />
                 <span className="text-sm font-bold text-gray-800">
@@ -305,7 +308,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Branch - Read only */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Chi nhánh làm việc</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Chi nhánh làm việc</label>
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <MapPin size={16} className="text-gray-400 flex-shrink-0" />
                 <span className="text-sm font-bold text-gray-800">
@@ -317,7 +320,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Email */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Email</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Email</label>
               {editingProfile ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus-within:border-blue-400 transition">
                   <Mail size={16} className="text-blue-400 flex-shrink-0" />
@@ -340,7 +343,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Address */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Địa chỉ (Thường trú/Tạm trú)</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Địa chỉ (Thường trú/Tạm trú)</label>
               {editingProfile ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-blue-200 focus-within:border-blue-400 transition">
                   <MapPin size={16} className="text-blue-400 flex-shrink-0" />
@@ -362,7 +365,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Specialty - Read only (chỉ Admin sửa) */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Chuyên môn</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Chuyên môn</label>
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                 <Award size={16} className="text-gray-400 flex-shrink-0" />
                 <span className="text-sm font-bold text-gray-800">{currentTeacher?.specialty || profileForm.specialty || '—'}</span>
@@ -373,7 +376,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Giọng vùng miền */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Giọng (vùng miền)</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Giọng (vùng miền)</label>
               {editingProfile ? (
                 <CmsSelect
                   value={profileForm.voiceRegion || ''}
@@ -397,7 +400,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Bio */}
             <div className="md:col-span-2">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Giới thiệu bản thân</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Giới thiệu bản thân</label>
               {editingProfile ? (
                 <textarea
                   value={profileForm.bio}
@@ -496,7 +499,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Bank Name - Dropdown from VietQR API */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Ngân hàng</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Ngân hàng</label>
               {editingBank ? (
                 <BankSelect
                   value={bankForm.bankCode}
@@ -516,7 +519,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Account Number */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Số tài khoản</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Số tài khoản</label>
               {editingBank ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-emerald-200 focus-within:border-emerald-400 transition">
                   <CreditCard size={16} className="text-emerald-400 flex-shrink-0" />
@@ -539,7 +542,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Account Name */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Tên chủ tài khoản</label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Tên chủ tài khoản</label>
               {editingBank ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-emerald-200 focus-within:border-emerald-400 transition">
                   <User size={16} className="text-emerald-400 flex-shrink-0" />
@@ -547,8 +550,8 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                     type="text"
                     value={bankForm.accountName}
                     onChange={e => setBankForm({...bankForm, accountName: e.target.value.toUpperCase()})}
-                    placeholder="VD: NGUYEN VAN A"
-                    className="flex-1 text-sm outline-none bg-transparent uppercase font-bold"
+                    placeholder="Vd: nguyen van a"
+                    className="flex-1 text-sm outline-none bg-transparent  font-bold"
                   />
                 </div>
                 ) : (
@@ -561,7 +564,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
 
             {/* Bank Branch */}
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Chi nhánh <span className="text-gray-300">(Tùy chọn)</span></label>
+              <label className="text-xs font-bold text-gray-400  tracking-wider block mb-1">Chi nhánh <span className="text-gray-300">(Tùy chọn)</span></label>
               {editingBank ? (
                 <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border-2 border-emerald-200 focus-within:border-emerald-400 transition">
                   <Building2 size={16} className="text-emerald-400 flex-shrink-0" />
@@ -637,7 +640,7 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
                 <div className={`w-12 h-12 rounded-2xl mx-auto mb-2 flex items-center justify-center ${color}`}>
                   <Icon size={20} />
                 </div>
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{label}</p>
+                <p className="text-xs text-gray-400 font-bold  tracking-wider">{label}</p>
                 <p className={`text-sm font-black mt-1 ${color.split(' ')[0]}`}>{value}</p>
               </div>
             ))}

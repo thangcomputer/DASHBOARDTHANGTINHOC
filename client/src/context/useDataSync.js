@@ -44,7 +44,6 @@ export function useDataSync({
 
     inFlightSyncRef.current = (async () => {
     try {
-      const isTeacher = currentUser.role === 'teacher';
       const isStudent = currentUser.role === 'student';
       const isAdmin = currentUser.role === 'admin' || currentUser.role === 'staff';  // ⭐ Staff cũng cần fetch teachers/transactions
 

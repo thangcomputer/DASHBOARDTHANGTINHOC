@@ -97,24 +97,24 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
 
   const statusBadge = () => {
     if (isLockedCountDown || subject.status === 'khong_dat' || tnFailed) {
-      return <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">RỚT</span>;
+      return <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Rớt</span>;
     }
     if (displayStatus === 'cho_nop') {
-      return <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">CHỜ NỘP</span>;
+      return <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">Chờ nộp</span>;
     }
     if (displayStatus === 'cho_cham') {
-      return <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">CHỜ CHẤM</span>;
+      return <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Chờ chấm</span>;
     }
     if (displayStatus === 'dat') {
-      return <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">ĐẬU</span>;
+      return <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Đậu</span>;
     }
     if (displayStatus === 'dang_thi') {
-      return <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">ĐANG THI</span>;
+      return <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Đang thi</span>;
     }
     if (subject.status === 'dang_khoa') {
-      return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">ĐANG KHÓA</span>;
+      return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Đang khóa</span>;
     }
-    return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">CHƯA THI</span>;
+    return <span className="text-[10px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Chưa thi</span>;
   };
 
   const tracNghiemDisplay = () => {
@@ -146,7 +146,6 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
     return <span className="text-sm text-red-500">Chưa nộp bài</span>;
   };
 
-  const isLocked = subject.status === 'dang_khoa';
   const failedLocked = isExamProgressLocked(subject);
   const awaitingGrade =
     subject.thucHanh === 'da_nop' &&
@@ -220,7 +219,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
           <button
             type="button"
             disabled
-            className="w-full py-2.5 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed uppercase tracking-wide"
+            className="w-full py-2.5 bg-gray-100 border border-gray-200 text-gray-400 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed  tracking-wide"
           >
             <Clock size={15} /> Mở khóa sau: {countdown}
           </button>
@@ -339,7 +338,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
           <button
             type="button"
             onClick={() => setActiveTab('quizzes')}
-            className={`flex-1 py-2 px-2 text-[11px] font-black uppercase tracking-wide rounded-xl transition ${
+            className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${
               activeTab === 'quizzes' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -348,7 +347,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
           <button
             type="button"
             onClick={() => setActiveTab('cert')}
-            className={`flex-1 py-2 px-2 text-[11px] font-black uppercase tracking-wide rounded-xl transition ${
+            className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${
               activeTab === 'cert' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -377,14 +376,14 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
                         {attempt > 0 && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">Lần {attempt + 1}</span>}
                       </div>
                     </div>
-                    {s.status === 'dat' && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 shrink-0">ĐẠT</span>}
-                    {s.status === 'khong_dat' && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200 shrink-0">CHƯA ĐẠT</span>}
+                    {s.status === 'dat' && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 shrink-0">Đạt</span>}
+                    {s.status === 'khong_dat' && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200 shrink-0">Chưa đạt</span>}
                     {(!s.status || s.status === 'chua_thi') && <span className="text-[10px] font-bold text-gray-400 shrink-0">Chưa thi</span>}
                   </div>
                   {(tn || hasEssay) && (
                     <div className="flex border-t border-gray-100 divide-x divide-gray-100">
                       <div className="flex-1 px-3 py-2.5 text-center">
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Trắc nghiệm</p>
+                        <p className="text-[9px] font-bold text-gray-400  tracking-wider mb-1">Trắc nghiệm</p>
                         {tn ? (
                           <>
                             <p className={`text-lg font-black ${tnPct >= 50 ? 'text-green-600' : 'text-red-500'}`}>{tn.score}/{tn.total}</p>
@@ -395,7 +394,7 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
                         )}
                       </div>
                       <div className="flex-1 px-3 py-2.5 text-center">
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Thực hành</p>
+                        <p className="text-[9px] font-bold text-gray-400  tracking-wider mb-1">Thực hành</p>
                         {essayScore !== null && essayScore !== undefined ? (
                           <>
                             <p className={`text-lg font-black ${essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>{essayScore}/10</p>
@@ -427,14 +426,14 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
                 return (
                   <div key={q._id} className="rounded-xl bg-gray-50 border border-gray-100 p-3.5 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 truncate">
+                      <span className="text-[10px] font-black  text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 truncate">
                         {q.courseName || 'Bài thi bài học'}
                       </span>
                       {sub ? (
-                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border shrink-0 ${
+                        <span className={`text-[10px] font-black  px-2 py-0.5 rounded border shrink-0 ${
                           isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
                         }`}>
-                          {isPassed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                          {isPassed ? 'Đạt' : 'Chưa đạt'}
                         </span>
                       ) : (
                         <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded shrink-0">Chưa làm</span>
@@ -473,7 +472,6 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const StudentExamRoom = ({
-  onNavigate,
   onStartExam,
 }) => {
   const [roomTab, setRoomTab] = useState('quiz'); // quiz | cert | scores | mos-ic3
@@ -662,7 +660,7 @@ const StudentExamRoom = ({
 
   return (
     <div className="bg-transparent font-sans h-full min-w-0 w-full max-w-full overflow-x-hidden">
-      <div className="w-full min-w-0 py-1 sm:py-2 text-left space-y-4">
+      <div className="w-full min-w-0 pt-4 pb-1 sm:pt-4 sm:pb-2 text-left space-y-4">
         {/* Khu vực thi và ôn tập */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
           <button
@@ -774,13 +772,13 @@ const StudentExamRoom = ({
 
         {/* Bộ lọc */}
         <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 mb-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-sm font-black text-gray-700 uppercase tracking-wide">
+          <div className="flex items-center gap-2 text-sm font-black text-gray-700  tracking-wide">
             <Filter size={16} className="text-blue-600" />
             Lọc danh sách
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">Khóa học</label>
+              <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Khóa học</label>
               <CmsSelect
                 value={filterCourse}
                 onChange={(e) => setFilterCourse(e.target.value)}
@@ -792,7 +790,7 @@ const StudentExamRoom = ({
               </CmsSelect>
             </div>
             <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">Môn thi</label>
+              <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Môn thi</label>
               <CmsSelect
                 value={filterSubject}
                 onChange={(e) => setFilterSubject(e.target.value)}
@@ -805,7 +803,7 @@ const StudentExamRoom = ({
               </CmsSelect>
             </div>
             <div>
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5">Trạng thái</label>
+              <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Trạng thái</label>
               <CmsSelect
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -823,7 +821,7 @@ const StudentExamRoom = ({
                 key={f.value}
                 type="button"
                 onClick={() => setFilterStatus(filterStatus === f.value ? 'all' : f.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide border transition-all ${
+                className={`px-3 py-1.5 rounded-full text-xs font-black  tracking-wide border transition-all ${
                   filterStatus === f.value
                     ? f.value === 'rot'
                       ? 'bg-red-600 text-white border-red-600'
@@ -864,7 +862,7 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => { setFilterCourse('all'); setFilterSubject('all'); setFilterStatus('all'); }}
-            className="mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black uppercase tracking-wide hover:bg-blue-100"
+            className="mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black  tracking-wide hover:bg-blue-100"
           >
             Xóa bộ lọc
           </button>

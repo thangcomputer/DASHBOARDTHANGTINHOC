@@ -9,6 +9,7 @@ const path = require('node:path');
 
 const { PERMISSIONS } = require('../../constants/permissions');
 const { studentMatchesTeacher } = require('../../services/enrollmentService');
+const { readDeployEnv } = require('../helpers/deployEnv');
 const {
   buildSubject,
   evaluateLegacyStudentRead,
@@ -623,7 +624,7 @@ test('Phase7.35 static: get_one/full_detail shadowed; no cutover; students LEGAC
   assert.ok(!src.includes('studentsCutoverGate'));
   assert.ok(!src.includes('CutoverGate'));
 
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const env = readDeployEnv() || '';
   const routesLine = (env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1];
   assert.ok(!/(^|,)students(,|$)/.test(routesLine), 'students must not be allowlisted');
 

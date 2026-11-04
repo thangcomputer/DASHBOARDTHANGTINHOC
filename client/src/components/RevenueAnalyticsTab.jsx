@@ -17,7 +17,14 @@ const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "")
 function getToken() {
   for (const role of ['admin','staff','teacher','student']) {
     const s = localStorage.getItem(`${role}_user`);
-    if (s) { try { const u = JSON.parse(s); if (u?.token) return u.token; } catch {} }
+    if (s) {
+      try {
+        const u = JSON.parse(s);
+        if (u?.token) return u.token;
+      } catch {
+        // Continue checking the next available session source.
+      }
+    }
   }
   for (const role of ['admin','staff']) {
     const t = localStorage.getItem(`${role}_access_token`);
@@ -150,7 +157,12 @@ export default function RevenueAnalyticsTab() {
   // ⭐ RBAC: Staff tự động khóa vào chi nhánh của mình
   const sess = (() => {
     for (const k of ['admin_user','staff_user']) {
-      try { const s = JSON.parse(localStorage.getItem(k) || '{}'); if (s?.id) return s; } catch {}
+      try {
+        const s = JSON.parse(localStorage.getItem(k) || '{}');
+        if (s?.id) return s;
+      } catch {
+        // Try the next available session source.
+      }
     }
     return {};
   })();

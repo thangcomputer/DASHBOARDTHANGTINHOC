@@ -34,6 +34,25 @@ async function teacherCanAccessStudent(teacherId, studentId) {
   return assigned.includes(String(studentId));
 }
 
+async function notifyScheduleConversation(req, schedule, action, previous = {}) {
+  try {
+    const { sendScheduleConversationMessage } = require('../services/scheduleConversationService');
+    await sendScheduleConversationMessage({
+      schedule,
+      actor: req.user,
+      action,
+      previous,
+      io: req.app.get('io'),
+      notifyUser: req.app.notifyUser,
+    });
+  } catch (error) {
+    logger.warn(
+      { err: error?.message, scheduleId: String(schedule?._id || schedule?.id || ''), action },
+      '[SCHEDULE] conversation message not sent',
+    );
+  }
+}
+
 function parseTimeToMinutes(raw) {
   if (raw == null || raw === '') return null;
   const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})/);
@@ -973,6 +992,10 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       { path: 'studentId', select: 'name course' },
     ]);
 
+    if (schedule.status === 'scheduled') {
+      await notifyScheduleConversation(req, schedule, 'created');
+    }
+
     // Thông báo real-time
     const io = req.app.get('io');
     if (io) {
@@ -996,6 +1019,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
             title: '📅 Lịch học mới',
             content: `Lịch học mới vào ngày ${notifDate} lúc ${startTime} đã được thêm.`,
             receivers: studentId.toString(),
+            payload: { scheduleId: String(schedule._id || schedule.id), type: 'schedule' },
             link: '/student#schedule',
           });
         }
@@ -1057,6 +1081,18 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     const schedule = await Schedule.findById(req.params.scheduleId);
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy lịch học' });
+    }
+
+    if (
+      role === 'teacher'
+      && String(schedule.studentConfirmStatus || '') === 'admin_approved'
+      && ['date', 'startTime', 'endTime'].some((field) => Object.prototype.hasOwnProperty.call(req.body || {}, field))
+    ) {
+      return res.status(409).json({
+        success: false,
+        code: 'ATTENDANCE_MAKEUP_ALREADY_APPROVED',
+        message: 'Buổi học đã được điểm danh bù — không thể sửa lịch.',
+      });
     }
 
     if (isRejectMakeup) {
@@ -1317,6 +1353,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     // Cập nhật các field được phép
     const updates = {};
     if (status)    updates.status    = status;
+    if (isRejectMakeup) updates.studentConfirmStatus = 'admin_rejected';
     if (linkHoc)   updates.linkHoc   = linkHoc;
     if (startTime) {
       updates.startTime = startTime;
@@ -1364,6 +1401,24 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       { path: 'studentId', select: 'name course totalSessions studentExamUnlocked' },
     ]);
 
+    if (updated && schedule.studentId) {
+      if (status === 'cancelled' && schedule.status !== 'cancelled' && !isRejectMakeup) {
+        await notifyScheduleConversation(req, updated, 'cancelled', {
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        });
+      } else if (
+        (startTime && startTime !== schedule.startTime)
+        || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
+        || (endTime !== undefined && String(endTime) !== String(schedule.endTime || ''))
+      ) {
+        await notifyScheduleConversation(req, updated, 'changed', {
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        });
+      }
+    }
+
     // Thông báo + realtime SAU khi DB commit — tránh HV refetch còn thấy lịch cũ
     if (schedule.studentId && io && updated) {
       const NotificationService = require('../services/NotificationService');
@@ -1399,20 +1454,35 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
            course: schedule.course,
          }).catch(e => logger.warn('[ScheduleHistory] PUT CANCELLED log err:', e.message));
 
+         const makeupRejectionPayload = isRejectMakeup
+           ? {
+             ...buildAttendanceConfirmPayload(updated),
+             kind: 'attendance_rejected',
+             rejected: true,
+           }
+           : null;
          NotificationService.send(io, {
            type: 'SCHEDULE',
-           title: '❌ Lịch học bị hủy',
-           content: cancelReason
-             ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
-             : `Lịch học ngày ${notifDate} đã bị hủy.`,
+           title: isRejectMakeup ? '❌ Buổi điểm danh bù không được tính' : '❌ Lịch học bị hủy',
+           content: isRejectMakeup
+             ? `Admin không tính buổi điểm danh bù ngày ${notifDate}. Buổi học không được cộng vào tiến độ hoặc lương.`
+             : cancelReason
+               ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
+               : `Lịch học ngày ${notifDate} đã bị hủy.`,
            receivers: String(scheduleScope.studentId),
-           payload: { scheduleId: String(updated._id), reason: cancelReason },
+           payload: makeupRejectionPayload || { scheduleId: String(updated._id), reason: cancelReason },
            link: '/student#schedule'
          }).catch((e) => logger.warn('[SCHEDULE] cancel notif:', e.message));
 
          if (isRejectMakeup && scheduleScope.teacherId) {
            const { notifyTeacherMakeupRejected } = require('../services/teacherAdminNotifier');
            notifyTeacherMakeupRejected(io, schedule, req.user).catch(() => {});
+         }
+         if (isRejectMakeup) {
+           await emitAttendanceConfirmEvents(io, updated, 'attendance:rejected', {
+             rejected: true,
+             kind: 'admin_makeup_rejected',
+           });
          }
 
          emitScheduleEvent(io, scheduleScope, 'schedule:cancelled', {
@@ -1447,6 +1517,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
            title: '🔄 Lịch học đã thay đổi',
            content: `Lịch học đã cập nhật thành: ${updated.startTime || schedule.startTime} ngày ${notifDate}.`,
            receivers: String(scheduleScope.studentId),
+           payload: { scheduleId: String(updated._id || schedule._id), type: 'schedule' },
            link: '/student#schedule'
          }).catch((e) => logger.warn('[SCHEDULE] reschedule notif:', e.message));
       }
@@ -1948,6 +2019,11 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       teacherName: schedule.teacherName,
       scheduledDate: schedule.date,
       course: schedule.course,
+    });
+
+    await notifyScheduleConversation(req, schedule, 'cancelled', {
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
     });
 
     const io = req.app.get('io');

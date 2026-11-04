@@ -5,19 +5,19 @@ const { authorize, authorizeAny, authorizeAll } = require('../../shared/middlewa
 const legacyMapping = require('../../shared/constants/legacyPermissionMapping');
 const NEW_PERMISSIONS = require('../../shared/constants/permissions');
 const { PERMISSIONS } = require('../../constants/permissions');
-const controllers/BranchController = require('./controllers/BranchController');
+const BranchController = require('./controllers/BranchController');
 
 // ── GET /api/branches/all & /api/branches ───────────────────────────────────
-router.get('/all', controllers/BranchController.getAllBranches);
-router.get('/', controllers/BranchController.getAllBranches);
+router.get('/all', BranchController.getAllBranches);
+router.get('/', BranchController.getAllBranches);
 
 // ── POST /api/branches ────────────────────────────────────────────────────────
-router.post('/', authMiddleware, authorize(NEW_PERMISSIONS.BRANCH_MANAGE), controllers/BranchController.createBranch);
+router.post('/', authMiddleware, authorize(NEW_PERMISSIONS.BRANCH_MANAGE), BranchController.createBranch);
 
 // ── PUT /api/branches/:id ─────────────────────────────────────────────────────
-router.put('/:id', authMiddleware, authorize(NEW_PERMISSIONS.BRANCH_MANAGE), controllers/BranchController.updateBranch);
+router.put('/:id', authMiddleware, authorize(NEW_PERMISSIONS.BRANCH_MANAGE), BranchController.updateBranch);
 
 // ── DELETE /api/branches/:id ──────────────────────────────────────────────────
-router.delete('/:id', authMiddleware, authorize(NEW_PERMISSIONS.BRANCH_MANAGE), controllers/BranchController.deleteBranch);
+router.delete('/:id', authMiddleware, authorize(NEW_PERMISSIONS.BRANCH_MANAGE), BranchController.deleteBranch);
 
 module.exports = router;

@@ -21,7 +21,7 @@ describe('HIGH_ADMIN teacher manage actions', () => {
     assert.match(tab, /canManageTeacherActions\s*=\s*!!\(isSuperAdmin\s*\|\|\s*isHighAdmin\)/);
     assert.match(tab, /canManageTeacherActions && active/);
     assert.match(tab, /Thanh toán lương/);
-    assert.match(tab, /Chỉnh sửa \/ lương/);
+    assert.match(tab, /Chỉnh sửa hồ sơ &amp; mức lương/);
     assert.match(tab, /Xóa giảng viên/);
     assert.match(tab, /Chỉ Super \/ High Admin thao tác được/);
     assert.doesNotMatch(tab, /isSuperAdmin && active &&/);

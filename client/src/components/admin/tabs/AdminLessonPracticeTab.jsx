@@ -539,7 +539,9 @@ export default function AdminLessonPracticeTab() {
       const link = document.createElement('a');
       link.href = url;
       const courseSlug = course?.name
-        ? `-${course.name.trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').replace(/\s+/g, '-')}`
+        ? `-${Array.from(course.name.trim(), (char) => (
+          char.charCodeAt(0) <= 0x1f ? '-' : char
+        )).join('').replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '-')}`
         : '';
       link.download = `sao-luu-bai-hoc${courseSlug}-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
@@ -649,7 +651,7 @@ export default function AdminLessonPracticeTab() {
             {section === 'progress' && (
               <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <thead className="bg-slate-50 text-left text-xs  tracking-wide text-slate-500">
                     <tr>
                       <th className="px-4 py-3">Học viên</th>
                       <th className="px-4 py-3">Môn</th>
@@ -927,7 +929,7 @@ export default function AdminLessonPracticeTab() {
                                       onChange={(event) => setUnits((rows) => rows.map((unit) => unit.id === unitId
                                         ? { ...unit, videos: unit.videos.map((row) => row.id === video.id ? { ...row, url: event.target.value } : row) }
                                         : unit))}
-                                      placeholder="https://www.youtube.com/watch?v=..."
+                                      placeholder="HTTPS://www.youtube.com/watch?VN?=..."
                                       aria-label={`Đường dẫn video ${index + 1}`}
                                       className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm"
                                     />

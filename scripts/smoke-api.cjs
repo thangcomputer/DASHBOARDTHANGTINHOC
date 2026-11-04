@@ -34,7 +34,10 @@ async function main() {
 
   let token = '';
   try {
-    const r = await fetch(BASE + '/auth/login', {
+    // Internal login is phone-only + CAPTCHA; non-production servers return the CAPTCHA answer.
+    const captchaRes = await fetch(BASE + '/auth/captcha');
+    const captcha = await captchaRes.json();
+    const r = await fetch(BASE + '/auth/login/internal', {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -42,14 +45,19 @@ async function main() {
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         ...(cookie ? { Cookie: cookie } : {}),
       },
-      body: JSON.stringify({ identifier: 'admin', password: process.env.SMOKE_ADMIN_PASSWORD || 'admin123' }),
+      body: JSON.stringify({
+        phone: process.env.SMOKE_ADMIN_PHONE || process.env.MASTER_ADMIN_PHONE || '',
+        password: process.env.SMOKE_ADMIN_PASSWORD || 'admin123',
+        captchaId: captcha.cid,
+        captchaAnswer: captcha.answer,
+      }),
     });
     const j = await r.json();
     token = j.data?.accessToken || '';
     const loginOk = r.status === 200 && j.success && (!!token || j.mfaRequired || j.data?.mfaRequired);
-    ok('POST /auth/login', loginOk, 'status=' + r.status + (j.mfaRequired ? ' mfa' : ''));
+    ok('POST /auth/login/internal', loginOk, 'status=' + r.status + (j.mfaRequired ? ' mfa' : ''));
   } catch (e) {
-    ok('POST /auth/login', false, e.message);
+    ok('POST /auth/login/internal', false, e.message);
   }
 
   const h = {

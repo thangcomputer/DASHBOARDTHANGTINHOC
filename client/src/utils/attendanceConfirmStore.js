@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
-import { useToast } from './toast';
+import { useToast } from './useToast';
 
 export const ATTENDANCE_CONFIRM_MS = 10_000;
 const STORAGE_KEY = 'cms_attendance_confirm_pending';

@@ -131,7 +131,6 @@ describe('Phase 9 messaging observability', { concurrency: false }, () => {
   it('notifyUser never fans private DM to ALL_STAFF (regression lock)', () => {
     const server = read('server.js');
     assert.ok(server.includes('NEVER fan-out private messages to ALL_STAFF'));
-    assert.ok(server.includes("mode: 'presence_socketId'") || server.includes('presence_socketId'));
-    assert.ok(server.includes("mode: 'userId_room'") || server.includes('userId_room'));
+    assert.ok(server.includes("mode: 'userId_room_all_sessions'"));
   });
 });

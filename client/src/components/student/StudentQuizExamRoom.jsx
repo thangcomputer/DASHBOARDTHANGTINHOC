@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, LayoutGrid, Award, RefreshCw
 } from 'lucide-react';
 import api from '../../services/api';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import { useData } from '../../context/DataContext';
 import ExamClickOutsideGuard from '../exam/ExamClickOutsideGuard';
 
@@ -359,8 +359,8 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                 <span className="text-4xl sm:text-5xl font-black text-amber-400 tabular-nums">
                   {resultData.score}%
                 </span>
-                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {isForfeit ? 'RỚT · THOÁT GIỮA GIỜ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
+                <span className={`text-xs font-bold  tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isForfeit ? 'Rớt · thoát giữa giờ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
                 </span>
               </div>
 
@@ -493,7 +493,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
             {currentQ ? (
               <div className="max-w-3xl mx-auto w-full space-y-4">
                 <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-400 border-b border-white/10 pb-3">
-                  <span className="text-sky-400 uppercase tracking-widest text-[11px]">
+                  <span className="text-sky-400  tracking-widest text-[11px]">
                     Câu hỏi {currentIndex + 1} / {questions.length}
                   </span>
                   <span>Đã chọn: {answeredCount}/{questions.length}</span>

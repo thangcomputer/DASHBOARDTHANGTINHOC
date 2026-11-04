@@ -203,13 +203,13 @@ export function isSchedulePastEnd(schedule, now = new Date()) {
 
 /** Nhãn hiển thị lịch (không ghi DB) — aligned with attendance state machine */
 export const SCHEDULE_DISPLAY = {
-  completed: { kind: 'completed', label: 'ĐÃ HỌC', shortLabel: 'Đã học' },
-  cancelled: { kind: 'cancelled', label: 'ĐÃ HỦY', shortLabel: 'Đã hủy' },
-  ongoing: { kind: 'ongoing', label: 'ĐANG DIỄN RA', shortLabel: 'Đang diễn ra' },
-  upcoming: { kind: 'upcoming', label: 'SẮP TỚI', shortLabel: 'Sắp tới' },
-  pending_attendance: { kind: 'pending_attendance', label: 'CHƯA ĐIỂM DANH', shortLabel: 'Chưa điểm danh' },
-  overdue_attendance: { kind: 'overdue_attendance', label: 'QUÁ HẠN ĐIỂM DANH', shortLabel: 'Quá hạn điểm danh' },
-  past_pending: { kind: 'past_pending', label: 'CHƯA ĐIỂM DANH', shortLabel: 'Chưa điểm danh' },
+  completed: { kind: 'completed', label: 'Đã học', shortLabel: 'Đã học' },
+  cancelled: { kind: 'cancelled', label: 'Đã hủy', shortLabel: 'Đã hủy' },
+  ongoing: { kind: 'ongoing', label: 'Đang diễn ra', shortLabel: 'Đang diễn ra' },
+  upcoming: { kind: 'upcoming', label: 'Sắp tới', shortLabel: 'Sắp tới' },
+  pending_attendance: { kind: 'pending_attendance', label: 'Chưa điểm danh', shortLabel: 'Chưa điểm danh' },
+  overdue_attendance: { kind: 'overdue_attendance', label: 'Quá hạn điểm danh', shortLabel: 'Quá hạn điểm danh' },
+  past_pending: { kind: 'past_pending', label: 'Chưa điểm danh', shortLabel: 'Chưa điểm danh' },
 };
 
 const ATTENDANCE_GRACE_MS = 60 * 60 * 1000; // sync with services/attendanceWindow.js default

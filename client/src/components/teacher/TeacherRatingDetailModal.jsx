@@ -40,7 +40,7 @@ export default function TeacherRatingDetailModal({
           >
             <X size={16} />
           </button>
-          <p className="text-[10px] font-black uppercase tracking-widest text-amber-100">Đánh giá từ học viên</p>
+          <p className="text-[10px] font-black  tracking-widest text-amber-100">Đánh giá từ học viên</p>
           <h3 className="text-lg font-black mt-1">Chi tiết đánh giá</h3>
         </div>
 

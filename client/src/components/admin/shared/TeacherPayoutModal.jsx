@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { DollarSign, X, CreditCard, CheckCircle2, AlertCircle, Loader2, Star } from 'lucide-react';
 import NavArrow from '../../ui/NavArrow';
-import { generateVietQRUrl } from '../../BankSelect';
+import { generateVietQRUrl } from '../../bankSelectUtils';
 import { formatHoaHong, formatStarBonusRule } from '../../../utils/teacherCommission';
 import {
   buildTeacherPayoutTransferNote,
@@ -146,7 +146,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Nợ lương</p>
+                        <p className="text-xs  tracking-wide text-slate-400 font-semibold">Nợ lương</p>
                         <p className="text-base font-bold text-slate-900 tabular-nums">
                           {formatHoaHong((Number(pm.pendingSessionsCount) || 0) * salaryPS)}
                         </p>
@@ -318,7 +318,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
 
                   {selectedSessions.length > 0 && (
                     <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3.5 py-3 space-y-1.5">
-                      <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                      <p className="text-xs font-bold  tracking-wide text-amber-800">
                         Buổi sẽ chi (FIFO — cũ trước)
                       </p>
                       <ul className="space-y-1 max-h-28 overflow-y-auto">

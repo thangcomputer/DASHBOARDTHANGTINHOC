@@ -353,6 +353,10 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
             title: '📝 Bài tập mới',
             content: `${newAssignment.assignedByRole === 'teacher' ? 'Giảng viên' : 'Admin'} vừa giao bài tập mới: "${newAssignment.title}"`,
             receivers: studentIds,
+            payload: {
+              assignmentId: String(newAssignment._id),
+              type: 'assignment',
+            },
             link: '/student#materials-assignments'
           });
         }
@@ -502,6 +506,14 @@ router.delete('/:id', [authMiddleware, ...assignmentsGuard('delete')], async (re
       return res.status(403).json({ success: false, message: 'Không có quyền xóa bài tập' });
     }
 
+    if (req.user.role === 'teacher') {
+      const existing = await Assignment.findById(req.params.id).select('teacherId').lean();
+      if (!existing) return res.status(404).json({ success: false, message: 'Không tìm thấy bài tập' });
+      if (existing.teacherId && String(existing.teacherId) !== String(req.user.id || req.user._id || '')) {
+        return res.status(403).json({ success: false, message: 'Chỉ xóa bài tập của chính bạn' });
+      }
+    }
+
     if (await assignmentHasGradedSubmission(req.params.id)) {
       return res.status(403).json({
         success: false,
@@ -548,17 +560,11 @@ router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], asyn
       return res.status(403).json({ success: false, message: 'Không có quyền nộp bài cho học viên khác' });
     }
 
-    let submission = await Submission.findOneAndUpdate(
-      { assignmentId: req.params.id, studentId },
-      { submittedFileUrl, status: 'submitted', teacherId, submittedAt: new Date() },
-      { returnDocument: 'after', upsert: true }
-    );
-
     const io = req.app.get('io');
     const student = await Student.findById(studentId);
 
-    let resolvedTeacherId = teacherId;
-    if (!resolvedTeacherId || resolvedTeacherId === 'current') {
+    let resolvedTeacherId = mongoose.Types.ObjectId.isValid(String(teacherId || '')) ? teacherId : null;
+    if (!resolvedTeacherId) {
       const fromEnrollment = resolveTeacherIdsForStudentCourse(student, assignmentForSubmit.courseId)[0];
       resolvedTeacherId =
         assignmentForSubmit.teacherId ||
@@ -568,13 +574,16 @@ router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], asyn
     }
     if (resolvedTeacherId) resolvedTeacherId = String(resolvedTeacherId);
 
-    if (resolvedTeacherId && String(submission.teacherId || '') !== resolvedTeacherId) {
-      submission = await Submission.findByIdAndUpdate(
-        submission._id,
-        { teacherId: resolvedTeacherId },
-        { returnDocument: 'after' },
-      );
-    }
+    const submission = await Submission.findOneAndUpdate(
+      { assignmentId: req.params.id, studentId },
+      {
+        submittedFileUrl,
+        status: 'submitted',
+        submittedAt: new Date(),
+        ...(resolvedTeacherId ? { teacherId: resolvedTeacherId } : {}),
+      },
+      { returnDocument: 'after', upsert: true }
+    );
 
     if (resolvedTeacherId) {
       const assignment = assignmentForSubmit;
@@ -719,6 +728,10 @@ router.put('/submissions/:submissionId/grade', [authMiddleware, ...assignmentsGu
             ? `Giảng viên đã sửa điểm bài tập "${assignment?.title || 'không tên'}". Điểm mới: ${grade}/10.`
             : `Giảng viên đã chấm điểm bài tập "${assignment?.title || 'không tên'}". Điểm: ${grade}/10.`,
           receivers: submission.studentId.toString(),
+          payload: {
+            assignmentId: String(assignment?._id || submission.assignmentId || ''),
+            type: 'assignment',
+          },
           link: '/student#materials-assignments'
         });
 

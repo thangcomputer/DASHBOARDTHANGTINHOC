@@ -11,6 +11,8 @@ const ACTIONS = new Set([
   'conversations',
   'search',
   'hidden',
+  'pinned_conversations',
+  'pin_conversation',
   'get_conversation',
   'sync',
   'upload',
@@ -283,8 +285,10 @@ async function evaluateLegacyMessage(subject, action, ctx = {}) {
   switch (action) {
     case 'contacts':
     case 'hidden':
+    case 'pinned_conversations':
     case 'upload':
     case 'hide':
+    case 'pin_conversation':
       return evaluateAuthOnly(subject);
     case 'conversations':
     case 'search':

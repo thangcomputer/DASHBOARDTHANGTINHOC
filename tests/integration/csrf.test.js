@@ -10,7 +10,7 @@ function makeApp() {
   app.use(cookieParser());
   app.use(express.json());
   app.get('/api/auth/csrf-token', (req, res) => {
-    const token = issueCsrfToken(res);
+    const token = issueCsrfToken(res, req.cookies?.[COOKIE_NAME]);
     res.json({ success: true, csrfToken: token });
   });
   app.use('/api', csrfProtection);
@@ -82,6 +82,33 @@ test('CSRF: POST with matching cookie + header → 200', async () => {
     });
     assert.equal(r.status, 200);
     assert.equal(r.body.ok, true);
+  } finally {
+    server.close();
+  }
+});
+
+test('CSRF token endpoint keeps a valid cookie stable across clients', async () => {
+  const server = await listen(makeApp());
+  try {
+    const first = await request(server, { method: 'GET', path: '/api/auth/csrf-token' });
+    const token = first.body.csrfToken;
+    const cookie = (first.headers['set-cookie'] || []).map((value) => value.split(';')[0]).join('; ');
+    assert.ok(token);
+
+    const second = await request(server, {
+      method: 'GET',
+      path: '/api/auth/csrf-token',
+      headers: { Cookie: cookie },
+    });
+    assert.equal(second.body.csrfToken, token);
+
+    const invalidCookie = await request(server, {
+      method: 'GET',
+      path: '/api/auth/csrf-token',
+      headers: { Cookie: `${COOKIE_NAME}=invalid` },
+    });
+    assert.match(invalidCookie.body.csrfToken, /^[a-f0-9]{64}$/i);
+    assert.notEqual(invalidCookie.body.csrfToken, 'invalid');
   } finally {
     server.close();
   }

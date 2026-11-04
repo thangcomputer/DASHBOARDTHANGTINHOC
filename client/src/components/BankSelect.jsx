@@ -4,11 +4,10 @@
  * Shared component + helper cho VietQR integration.
  * 
  * Exports:
- *  - generateVietQRUrl(bankCode, accountNumber, amount, description, accountName)
  *  - BankSelect  (controlled <select> component, fetches real bank list from VietQR API)
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import CmsSelect from './ui/CmsSelect';
 import { Landmark, Loader2 } from 'lucide-react';
 
@@ -33,26 +32,6 @@ async function fetchBankList() {
   return _fetchPromise;
 }
 
-// ── VietQR URL generator ─────────────────────────────────────────────────────
-/**
- * Tạo URL ảnh QR từ API VietQR (Quick Link / Image URL).
- * @param {string} bankCode   - shortName hoặc bin từ VietQR bank list (VD: 'mbbank', '970415')
- * @param {string} accountNumber
- * @param {number} amount
- * @param {string} description  - nội dung chuyển khoản
- * @param {string} accountName  - tên chủ tài khoản (UPPER_CASE)
- * @returns {string|null}       - URL ảnh QR hoặc null nếu thiếu bankCode/accountNumber
- */
-export function generateVietQRUrl(bankCode, accountNumber, amount, description = '', accountName = '') {
-  if (!bankCode || !accountNumber) return null;
-  const params = new URLSearchParams({
-    amount: String(Math.round(Number(amount) || 0)),
-    addInfo: description,
-    accountName: accountName,
-  });
-  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-qr_only.png?${params.toString()}`;
-}
-
 // ── BankSelect component ─────────────────────────────────────────────────────
 /**
  * Dropdown chọn ngân hàng, tự fetch danh sách từ VietQR API.
@@ -68,17 +47,18 @@ export function BankSelect({ value, onChange, className = '', placeholder = '—
   const [loading, setLoading] = useState(!_banksCache);
 
   useEffect(() => {
-    if (_banksCache) return;
-    setLoading(true);
-    fetchBankList().then(list => {
+    let active = true;
+    fetchBankList().then((list) => {
+      if (!active) return;
       setBanks(list);
       setLoading(false);
     });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Find selected bank object to display logo next to name
-  const selected = banks.find(b => b.bin === value || b.shortName?.toLowerCase() === value?.toLowerCase());
-
   return (
     <div className="relative">
       <Landmark size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none z-10" />

@@ -16,6 +16,8 @@ const { validateOwnedCertificationFile } = require('../utils/certificationFilePo
 const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
 const { effectiveCoursePrice } = require('../utils/coursePricing');
 const { isExcludedExamSubjectId } = require('../services/examSubjectCatalog');
+const { createTuitionInvoice } = require('../modules/finance/services/tuitionInvoiceService');
+const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
 function requireManageStudentsUnlessTeacher(req, res, next) {
@@ -252,54 +254,6 @@ function notifyStudentBell(io, studentId, { type, title, content, payload = {}, 
   }).catch((err) => {
     logger.error('[STUDENTS] notify student: %s', err?.message || err);
   });
-}
-
-async function nextInvoiceCode() {
-  const now = new Date();
-  const yy = now.getFullYear().toString().slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const prefix = `HD${yy}${mm}-`;
-  // Lấy mã lớn nhất cùng tháng để tăng tuần tự (tránh trùng khi race nhẹ)
-  const latest = await Invoice.findOne({ maHoaDon: { $regex: `^${prefix}` } })
-    .sort({ maHoaDon: -1 })
-    .select('maHoaDon')
-    .lean();
-  let seq = 1;
-  if (latest?.maHoaDon) {
-    const m = String(latest.maHoaDon).match(/-(\d+)$/);
-    if (m) seq = Number(m[1]) + 1;
-  }
-  return `${prefix}${String(seq).padStart(4, '0')}`;
-}
-
-async function createTuitionInvoice({ student, courseName, amount, note = '' }) {
-  const hocPhi = Number(amount) || 0;
-  if (!student?._id || hocPhi <= 0) return null;
-  try {
-    let maHD = await nextInvoiceCode();
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        return await Invoice.create({
-          maHoaDon: maHD,
-          hocVien: student._id,
-          hoTen: student.name,
-          khoaHoc: courseName || student.course || 'Học phí',
-          hocPhi,
-          ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
-        });
-      } catch (err) {
-        if (err?.code === 11000) {
-          maHD = await nextInvoiceCode();
-          continue;
-        }
-        throw err;
-      }
-    }
-    return null;
-  } catch (err) {
-    logger.warn('[INVOICE] create skipped:', err.message);
-    return null;
-  }
 }
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
@@ -1141,9 +1095,9 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         name: student.name,
         course: student.course,
       });
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', action: 'create' });
+      studentDataRefresh(io, student, { type: 'student', action: 'create' });
       if (createdInvoice) {
-        studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: price, studentName: student.name });
+        studentRealtime(io, student, 'revenue:updated', { amount: price, studentName: student.name });
       }
     }
 
@@ -1448,6 +1402,21 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
 
     if (locking) {
       const ioLock = req.app.get('io');
+      try {
+        await revokeMobileSessionsForUser({
+          userId: student._id,
+          role: 'student',
+          reason: 'account_disabled',
+          io: ioLock,
+        });
+      } catch (revokeError) {
+        logger.error('[STUDENTS] Account disabled but mobile session revocation failed:', revokeError);
+        return res.status(503).json({
+          success: false,
+          code: 'MOBILE_SESSION_REVOCATION_FAILED',
+          message: 'Tài khoản đã bị vô hiệu hóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+        });
+      }
       if (ioLock) {
         ioLock.emit('auth:forceLogout', {
           userId: String(student._id),
@@ -1567,8 +1536,8 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
 
     const io = req.app.get('io');
     if (io) {
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
 
       // ── Notification: duyệt/thu hồi quyền thi (khi admin/staff cập nhật qua PUT /students/:id)
       // AdminDashboard hiện dùng endpoint này cho approve/revoke exam, nên cần bắn noti ở đây.
@@ -2221,7 +2190,7 @@ router.patch('/:id/price', [authMiddleware, branchFilter, policyShadowStudentMut
     await student.save({ validateModifiedOnly: true });
 
     const io = req.app.get('io');
-    if (io) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
+    if (io) studentRealtime(io, student, 'student:updated', student._id);
 
     res.json({
       success: true,
@@ -2373,8 +2342,8 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
         link: '/student#profile'
       });
 
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: student.price, studentName: student.name });
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'revenue:updated', { amount: student.price, studentName: student.name });
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
 
     await syncCertPrepFromEnrollment(student, req);
@@ -2534,7 +2503,7 @@ router.put('/:id/unlock-exam', [authMiddleware, branchFilter, policyShadowStuden
           studentName: student.name,
           enrollmentId: hasEnrollmentId ? String(enrollmentId) : null,
         });
-        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+        studentDataRefresh(io, student, { type: 'student', id: student._id });
       } catch (notifErr) {
         logger.warn('[STUDENTS] unlock-exam notify: %s', notifErr.message);
       }
@@ -2709,8 +2678,8 @@ router.put('/:id/lock-exam', [authMiddleware, branchFilter, policyShadowStudentM
       };
       io.to(`student_${student._id}`).emit('exam:locked', lockPayload);
       studentRealtime(io, student, 'exam:locked', lockPayload);
-      studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'student:updated', student._id);
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+      studentRealtime(io, student, 'student:updated', student._id);
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
     }
 
     res.json({
@@ -2992,7 +2961,7 @@ router.put('/:id/enrollments/:enrollmentId/settings', [
     const doc = student.toObject();
     await applyEnrollmentStats(doc, student._id, Schedule);
     const io = req.app.get('io');
-    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+    if (io) studentDataRefresh(io, student, { type: 'student', id: student._id });
 
     if (typeof examUnlocked === 'boolean' && prevExamUnlocked !== Boolean(student.enrollments[idx].examUnlocked)) {
       const unlocked = Boolean(student.enrollments[idx].examUnlocked);
@@ -3149,7 +3118,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
     }
 
     const io = req.app.get('io');
-    if (io) studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: fresh._id });
+    if (io) studentDataRefresh(io, student, { type: 'student', id: student._id });
 
     const maHD = invoice?.maHoaDon || invoice?.maHD || '';
     await notifyStudentBell(io, fresh._id, {
@@ -3200,7 +3169,15 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
 
     // Cho phép hủy cả khóa active cuối cùng — HV vẫn giữ hồ sơ (dòng danh sách mờ)
 
-    const cancelReason = String(req.body?.cancelReason || '').trim() || 'Admin hủy khóa';
+    const actorRole = String(req.user?.role || '').toLowerCase();
+    const submittedCancelReason = String(req.body?.cancelReason || '').trim();
+    const cancelReason = actorRole === 'teacher'
+      ? (!submittedCancelReason || /^admin hủy khóa$/i.test(submittedCancelReason)
+        ? 'Giảng viên hủy khóa'
+        : (/^giảng viên hủy khóa(?:\s*:|$)/i.test(submittedCancelReason)
+          ? submittedCancelReason
+          : `Giảng viên hủy khóa: ${submittedCancelReason}`))
+      : (submittedCancelReason || 'Admin hủy khóa');
     const courseName = enr.courseName;
     const wasPaid = enr.paid === true;
     const paidAmt = Number(enr.price || 0);
@@ -3313,9 +3290,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
         {
           $set: {
             status: 'cancelled',
-            note: cancelReason
-              ? `Hủy khóa: ${cancelReason}`
-              : 'Hủy khóa / hoàn học phí — ca chưa học',
+            note: `Hủy khóa: ${cancelReason}`,
           },
         },
       );
@@ -3349,8 +3324,8 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
 
     const io = req.app.get('io');
     if (io) {
-      studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
-      if (refundAmt > 0) studentRealtime(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), 'revenue:updated', { amount: -refundAmt, studentName: student.name });
+      studentDataRefresh(io, student, { type: 'student', id: student._id });
+      if (refundAmt > 0) studentRealtime(io, student, 'revenue:updated', { amount: -refundAmt, studentName: student.name });
     }
     await notifyStudentBell(io, student._id, {
       type: 'COURSE',
@@ -3707,10 +3682,10 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
         io.to(teacherId.toString()).emit('CONTACT_LIST_UPDATED', { studentId: student._id });
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId });
         studentRealtime(io, student, 'student:assigned', { teacherId: teacherId.toString(), studentId: student._id.toString() });
-        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+        studentDataRefresh(io, student, { type: 'student', id: student._id });
       } else if (io && isUnassign) {
         io.to(student._id.toString()).emit('CONTACT_LIST_UPDATED', { teacherId: null });
-        studentDataRefresh(io, (typeof student !== 'undefined' && student ? student : (typeof claimed !== 'undefined' && claimed ? claimed : (typeof fresh !== 'undefined' && fresh ? fresh : (typeof populated !== 'undefined' && populated ? populated : {})))), { type: 'student', id: student._id });
+        studentDataRefresh(io, student, { type: 'student', id: student._id });
       }
     } catch (notifErr) {
       logger.error('[ASSIGN_TEACHER] Notification error:', notifErr);
@@ -3797,6 +3772,21 @@ router.delete('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation
     const cascade = await purgeStudentSideEffects(student._id, { studentName: student.name });
     await Student.findByIdAndDelete(student._id);
     try {
+      await revokeMobileSessionsForUser({
+        userId: student._id,
+        role: 'student',
+        reason: 'account_deleted',
+        io: req.app.get('io'),
+      });
+    } catch (revokeError) {
+      logger.error('[STUDENTS] Account deleted but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị xóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
+    try {
       emitDataRefresh(req.app.get('io'), { type: 'students', scope: 'system' });
     } catch { /* ignore */ }
     res.json({
@@ -3826,6 +3816,21 @@ router.post('/:id/reset-devices', [
     );
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
     const io = req.app.get('io');
+    try {
+      await revokeMobileSessionsForUser({
+        userId: student._id,
+        role: 'student',
+        reason: 'account_locked',
+        io,
+      });
+    } catch (revokeError) {
+      logger.error('[STUDENTS] Account locked but mobile session revocation failed:', revokeError);
+      return res.status(503).json({
+        success: false,
+        code: 'MOBILE_SESSION_REVOCATION_FAILED',
+        message: 'Tài khoản đã bị khóa nhưng chưa thể thu hồi toàn bộ phiên mobile.',
+      });
+    }
     if (io) {
       studentRealtime(io, student, 'student:updated', student._id);
       studentDataRefresh(io, student, { type: 'student', id: student._id });

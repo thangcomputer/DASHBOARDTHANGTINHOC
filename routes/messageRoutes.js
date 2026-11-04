@@ -121,19 +121,22 @@ router.get('/conversations/:userId', messagesGuard('conversations'), async (req,
         { senderId: userId },
         { receiverId: userId },
         ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
-      ]
+      ],
+      $and: [
+        { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(userId) }] },
+      ],
     };
 
     // If STAFF or TEACHER, filter by their branch
     if (!isSuperAdmin && userBranch) {
-      matchQuery.$and = [
+      matchQuery.$and.push(
         { $or: [
           { senderBranchCode: userBranch },
           { receiverBranchCode: userBranch },
           // Không leak hộp chung admin cho STAFF/TEACHER
           ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
-        ]}
-      ];
+        ]},
+      );
     }
 
     const messages = await Message.aggregate([
@@ -211,26 +214,67 @@ router.get('/search/:userId', messagesGuard('search'), async (req, res) => {
 
     const { sanitizeRegex } = require('../middleware/sanitizeRegex');
     const safeQ = sanitizeRegex(q);
+    const conversationId = String(req.query.conversationId || '');
 
     const isSuperAdmin = isAdminLevelAccount(req.user);
     const userBranch = req.user.branchCode || '';
 
     const searchQuery = {
-      $or: [
-        { senderId: userId }, 
-        { receiverId: userId },
-        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : [])
+      $and: [
+        { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }] },
+        {
+          $or: [
+            { senderId: userId },
+            { receiverId: userId },
+            ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
+          ],
+        },
+        {
+          $or: [
+            { content: { $regex: safeQ, $options: 'i' } },
+            { fileName: { $regex: safeQ, $options: 'i' } },
+          ],
+        },
       ],
-      content: { $regex: safeQ, $options: 'i' }
     };
 
-    if (!isSuperAdmin && userBranch) {
-      searchQuery.$and = [
-        { $or: [
-          { senderBranchCode: userBranch },
-          { receiverBranchCode: userBranch }
-        ]}
-      ];
+    if (conversationId) {
+      let conversationIds = [conversationId];
+      let isParticipant = false;
+      if (conversationId.startsWith('group_')) {
+        const mongoose = require('mongoose');
+        const groupId = conversationId.slice('group_'.length);
+        if (mongoose.Types.ObjectId.isValid(groupId)) {
+          const group = await Group.findOne({
+            _id: groupId,
+            'participants.userId': String(req.user.id),
+          }).select('_id').lean();
+          isParticipant = Boolean(group) || isAdminLevelAccount(req.user);
+        }
+      } else {
+        const expanded = expandConversationIdAliases(conversationId);
+        conversationIds = expanded.ids;
+        isParticipant = conversationIds.some((id) => canAccessDirectConversation(id, req.user));
+      }
+
+      if (!isParticipant) {
+        return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
+      }
+
+      searchQuery.conversationId = { $in: conversationIds };
+      searchQuery.hiddenFor = { $ne: String(req.user.id) };
+      if (conversationId.startsWith('group_')) searchQuery.$and.shift();
+    }
+
+    if (!conversationId && !isSuperAdmin && userBranch) {
+      searchQuery.$and.push(
+        {
+          $or: [
+            { senderBranchCode: userBranch },
+            { receiverBranchCode: userBranch },
+          ],
+        },
+      );
     }
 
     const messages = await Message.find(searchQuery).sort({ createdAt: -1 }).limit(50);
@@ -250,6 +294,62 @@ router.get('/hidden', messagesGuard('hidden'), async (req, res) => {
     res.json({ success: true, data: hiddenList });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/pinned-conversations', messagesGuard('pinned_conversations'), async (req, res) => {
+  try {
+    const userIds = [...new Set([req.user.id, req.user._id].filter(Boolean).map(String))];
+    const rows = await ConversationVisibility.find({ pinnedByUsers: { $in: userIds } })
+      .select('conversationId')
+      .lean();
+    res.json({ success: true, data: rows.map((row) => row.conversationId) });
+  } catch (err) {
+    logger.error('[MESSAGES] pinned-conversations:', err.message);
+    res.status(500).json({ success: false, message: 'Không thể tải danh sách hội thoại đã ghim.' });
+  }
+});
+
+router.put('/pin-conversation/:conversationId', messagesGuard('pin_conversation'), async (req, res) => {
+  try {
+    const conversationId = String(req.params.conversationId || '');
+    const { pinned } = req.body || {};
+    if (!conversationId || typeof pinned !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Trạng thái ghim cuộc trò chuyện không hợp lệ.' });
+    }
+
+    const userIds = [...new Set([req.user.id, req.user._id].filter(Boolean).map(String))];
+    let isParticipant = false;
+    if (conversationId.startsWith('group_')) {
+      const mongoose = require('mongoose');
+      const groupId = conversationId.slice('group_'.length);
+      if (mongoose.Types.ObjectId.isValid(groupId)) {
+        isParticipant = Boolean(await Group.findOne({
+          _id: groupId,
+          'participants.userId': { $in: userIds },
+        }).select('_id').lean());
+      }
+    } else {
+      isParticipant = canAccessDirectConversation(conversationId, req.user);
+    }
+
+    if (!isParticipant) {
+      return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này.' });
+    }
+
+    const userId = String(req.user.id || req.user._id);
+    const update = pinned
+      ? { $addToSet: { pinnedByUsers: userId } }
+      : { $pull: { pinnedByUsers: { $in: userIds } } };
+    await ConversationVisibility.findOneAndUpdate(
+      { conversationId },
+      update,
+      { upsert: pinned, returnDocument: 'after' },
+    );
+    res.json({ success: true, data: { conversationId, pinned } });
+  } catch (err) {
+    logger.error('[MESSAGES] pin-conversation:', err.message);
+    res.status(500).json({ success: false, message: 'Không thể cập nhật ghim cuộc trò chuyện.' });
   }
 });
 
@@ -285,18 +385,40 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
     if (!isParticipant) {
       return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
     }
-    const messages = await Message.find({
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 200));
+    const filter = {
       conversationId: { $in: queryIds },
-      hiddenFor: { $ne: req.user.id }
-    })
-      .sort({ createdAt: 1 })
-      .limit(200);
+      hiddenFor: { $ne: req.user.id },
+      $and: [{ $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }] }],
+    };
+    const before = String(req.query.before || '').trim();
+    if (before) {
+      const mongoose = require('mongoose');
+      const cursor = mongoose.Types.ObjectId.isValid(before)
+        ? await Message.findOne({ _id: before, conversationId: { $in: queryIds } }).select('createdAt').lean()
+        : null;
+      if (!cursor) {
+        return res.status(400).json({ success: false, message: 'Mốc tải tin cũ không hợp lệ' });
+      }
+      filter.$and.push({
+        $or: [
+          { createdAt: { $lt: cursor.createdAt } },
+          { createdAt: cursor.createdAt, _id: { $lt: cursor._id } },
+        ],
+      });
+    }
+    const newestFirst = await Message.find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit + 1);
+    const hasMore = newestFirst.length > limit;
+    const messages = newestFirst.slice(0, limit).reverse();
 
     const sanitized = sanitizeMessages(messages);
     const enriched = await enrichMessageIdentities(sanitized);
     res.json({
       success: true,
       data: enriched,
+      hasMore,
       conversationId: expandConversationIdAliases(conversationId).canonical,
     });
   } catch (err) {
@@ -339,16 +461,21 @@ router.get('/sync/:userId', messagesGuard('sync'), async (req, res) => {
         ? ['ALL_USERS', 'ALL_TEACHERS']
         : ['ALL_USERS'];
     const messages = await Message.find({
-      $or: [
-        { senderId: { $in: targetIds } },
-        { receiverId: { $in: targetIds } },
-        { receiverId: { $in: broadcastIds } },
-        ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
-        ...(groupIds.length > 0 ? [
-          { conversationId: { $in: groupIds.map(id => `group_${id}`) } },
-          { groupId: { $in: groupIds } },
-          { isGroup: true, groupId: { $in: groupIds } },
-        ] : []),
+      $and: [
+        { $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }] },
+        {
+          $or: [
+            { senderId: { $in: targetIds } },
+            { receiverId: { $in: targetIds } },
+            { receiverId: { $in: broadcastIds } },
+            ...(isAdminLevelAccount(req.user) ? [{ senderId: 'admin' }, { receiverId: 'admin' }] : []),
+            ...(groupIds.length > 0 ? [
+              { conversationId: { $in: groupIds.map(id => `group_${id}`) } },
+              { groupId: { $in: groupIds } },
+              { isGroup: true, groupId: { $in: groupIds } },
+            ] : []),
+          ],
+        },
       ],
       hiddenFor: { $nin: targetIds }
     }).sort({ createdAt: -1 }).limit(1000);
@@ -572,7 +699,12 @@ router.put('/read/:conversationId', messagesGuard('read'), async (req, res) => {
 
     const filter = isGroupConv
       ? { conversationId, isRead: false, senderId: { $nin: receiverTargets } }
-      : { conversationId: { $in: readIds }, receiverId: { $in: receiverTargets }, isRead: false };
+      : {
+          conversationId: { $in: readIds },
+          receiverId: { $in: receiverTargets },
+          isRead: false,
+          recipientRejected: { $ne: true },
+        };
 
     await Message.updateMany(
       filter,
@@ -841,6 +973,14 @@ router.patch('/:messageId/soft-delete', messagesGuard('soft_delete'), async (req
       await message.save();
     }
 
+    const io = req.app.get('io');
+    if (io && typeof req.app.notifyUser === 'function') {
+      req.app.notifyUser(getMessagingRole(req.user), userId, 'message:delete', {
+        messageId: String(message._id),
+        conversationId: message.conversationId,
+      });
+    }
+
     res.json({ success: true, message: 'Đã xóa tin nhắn', data: message.hiddenFor });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -942,7 +1082,30 @@ router.get('/groups/user/:userId', messagesGuard('group_list'), async (req, res)
         { 'createdBy.userId': { $in: targetIds } },
       ],
     }).sort({ updatedAt: -1 });
-    res.json({ success: true, data: groups });
+    const groupConversationIds = groups.map((group) => `group_${group._id}`);
+    const unreadRows = groupConversationIds.length
+      ? await Message.aggregate([
+          {
+            $match: {
+              conversationId: { $in: groupConversationIds },
+              isRead: false,
+              isRecalled: { $ne: true },
+              messageType: { $ne: 'system' },
+              senderId: { $nin: [...targetIds, 'ai_support'] },
+              hiddenFor: { $nin: targetIds },
+            },
+          },
+          { $group: { _id: '$conversationId', unreadCount: { $sum: 1 } } },
+        ])
+      : [];
+    const unreadByConversation = new Map(
+      unreadRows.map((row) => [String(row._id), Number(row.unreadCount) || 0]),
+    );
+    const data = groups.map((group) => ({
+      ...group.toObject(),
+      unreadCount: unreadByConversation.get(`group_${group._id}`) || 0,
+    }));
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

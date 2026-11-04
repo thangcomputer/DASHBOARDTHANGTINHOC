@@ -63,9 +63,9 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
               {isLive ? <Wifi size={20} className="animate-pulse" /> : <BellRing size={20} />}
             </div>
             <div className="min-w-0">
-              <p className="font-black text-sm sm:text-base uppercase tracking-tight truncate">
+              <p className="font-black text-sm sm:text-base  tracking-tight truncate">
                 {isLive
-                  ? '🔴 ĐANG DIỄN RA — Vào lớp ngay!'
+                  ? '🔴 Vào lớp ngay!'
                   : isUrgent
                     ? `⚡ CÒN ${minutesLeft} PHÚT — Vào lớp ngay!`
                     : `📚 Sắp đến giờ vào lớp! (Còn ${minutesLeft} phút)`
@@ -88,7 +88,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
                 rel="noreferrer"
                 className={`${isLive ? 'bg-white text-green-700' : 'bg-white text-red-600'} px-4 py-2 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 hover:opacity-90 transition-all shadow-lg`}
               >
-                <Video size={16} /> VÀO LỚP NGAY
+                <Video size={16} />  Vào lớp ngay
               </a>
             )}
             <button

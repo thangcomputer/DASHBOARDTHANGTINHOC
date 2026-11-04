@@ -14,7 +14,6 @@ const {
   revenueByBranch,
   sumStudentPaidTuition,
 } = require('../../finance/services/revenueAggregate');
-const guard = [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE), ...legacyMapping.resolve(PERMISSIONS.VIEW_BRANCH_REVENUE)), branchFilter];
 function getPeriodRange(period) {
   const now = new Date();
   const start = new Date(now);
@@ -58,8 +57,8 @@ function generateTimeSeries(docs, startDate, endDate, field = 'paidAt', valueFie
   });
   return Object.entries(buckets).map(([label, value]) => ({ label, value }));
 }
-function buildBaseFilter(req, queryBranch) {
-  const baseFilter = { ...req.branchFilter };
+function buildBaseFilter(data, queryBranch) {
+  const baseFilter = { ...data.branchFilter };
   if (queryBranch && queryBranch !== 'all' && !baseFilter.branchId) {
     baseFilter.branchId = queryBranch;
   }
@@ -72,7 +71,7 @@ class AnalyticsApplicationService {
   try {
     const { period = '1m', branchId: queryBranch } = data.query;
     const { start, end } = getPeriodRange(period);
-    const baseFilter = buildBaseFilter(req, queryBranch);
+    const baseFilter = buildBaseFilter(data, queryBranch);
     const branchId = baseFilter.branchId || null;
     const periodMs = end - start;
     const prevStart = new Date(start.getTime() - periodMs);
@@ -102,7 +101,7 @@ class AnalyticsApplicationService {
 
     const timeSeries = generateTimeSeries(paidItems, start, end, 'paidAt', 'amount');
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: {
         period,
@@ -121,10 +120,10 @@ class AnalyticsApplicationService {
         byBranch,
         timeSeries,
       },
-    });
+    } };
   } catch (err) {
     logger.error('[ANALYTICS] revenue error:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -132,7 +131,7 @@ class AnalyticsApplicationService {
   try {
     const { period = '1m', branchId: queryBranch } = data.query;
     const { start, end } = getPeriodRange(period);
-    const baseFilter = buildBaseFilter(req, queryBranch);
+    const baseFilter = buildBaseFilter(data, queryBranch);
 
     const students = await studentRepository.findMany({
       ...baseFilter,
@@ -188,7 +187,7 @@ class AnalyticsApplicationService {
     }));
     const timeSeries = generateTimeSeries(seriesDocs, start, end, 'createdAt', 'amount');
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: {
         period,
@@ -203,9 +202,9 @@ class AnalyticsApplicationService {
         byCourse: Object.values(courseMap).sort((a, b) => b.count - a.count),
         timeSeries,
       },
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -237,9 +236,9 @@ class AnalyticsApplicationService {
       b.pct = grandTotal > 0 ? Math.round((b.revenue / grandTotal) * 100) : 0;
     });
 
-    return { _status: 200, _body: ({ success: true, data: result.sort((a, b) => b.revenue - a.revenue) });
+    return { _status: 200, _body: { success: true, data: result.sort((a, b) => b.revenue - a.revenue) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 

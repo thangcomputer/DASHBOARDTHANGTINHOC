@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import CmsSelect from './ui/CmsSelect';
 import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
 import NavArrow from './ui/NavArrow';
 import { useLocation } from 'react-router-dom';
-import api, { resolveMediaUrl, buildMediaDownloadUrl } from '../services/api';
+import api, { buildMediaDownloadUrl } from '../services/api';
+import { useSocket } from '../context/SocketContext';
 import { getGradeTextClasses } from '../utils/gradeColors';
 import { useModal } from '../utils/Modal.jsx';
 
@@ -28,6 +29,7 @@ function studentIdOf(s) {
 
 const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const location = useLocation();
+  const { socket, onDataRefresh } = useSocket();
   const { showModal } = useModal();
   const [activeTab, setActiveTab] = useState('quiz'); // 'quiz' | 'file'
   // Compute unique courses from students
@@ -61,10 +63,6 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
     setSelectedCourse(uniqueCourses[0]);
   }, [uniqueCourses, selectedCourse]);
 
-  useEffect(() => {
-    fetchAssignments();
-  }, [selectedCourse]);
-
   // ⭐ Auto-scroll/Auto-select logic for Notifications
   useEffect(() => {
     const hash = window.location.hash;
@@ -87,7 +85,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
     }
   }, [assignments, selectedCourse, location.hash]);
 
-  const fetchAssignments = () => {
+  const fetchAssignments = useCallback(() => {
     if (!selectedCourse) return Promise.resolve([]);
     return api.assignments.getByCourse(selectedCourse)
       .then(res => {
@@ -107,7 +105,31 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         console.error(err);
         return [];
       });
-  };
+  }, [selectedCourse]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
+
+  useEffect(() => {
+    const refresh = () => fetchAssignments();
+    const events = [
+      'assignment:new',
+      'assignment:updated',
+      'assignment:deleted',
+      'submission:new',
+      'submission:graded',
+    ];
+    events.forEach((eventName) => socket?.on(eventName, refresh));
+    const unsubscribeRefresh = onDataRefresh((payload) => {
+      const type = String(payload?.type || '').toLowerCase();
+      if (type === 'assignment' || type === 'submission') refresh();
+    });
+    return () => {
+      events.forEach((eventName) => socket?.off(eventName, refresh));
+      unsubscribeRefresh?.();
+    };
+  }, [socket, onDataRefresh, fetchAssignments]);
 
   const openCreateModal = () => {
     setDeadlineMin(toDatetimeLocalValue(new Date()));
@@ -362,7 +384,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-slate-800 text-lg leading-tight">{a.title}</h3>
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md ${isClosed ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                    <span className={`text-[10px] font-black  px-2 py-1 rounded-md ${isClosed ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                       {isClosed ? 'Đã đóng' : 'Hoạt động'}
                     </span>
                   </div>
@@ -416,7 +438,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Link File đề bài (Google Drive...)</label>
-                <input type="url" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({...formData, attachedFileUrl: e.target.value})} placeholder="https://..."/>
+                <input type="url" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({...formData, attachedFileUrl: e.target.value})} placeholder="HTTPS://..."/>
               </div>
 
               <div>
@@ -521,7 +543,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse min-w-[600px]">
                     <thead>
-                      <tr className="bg-slate-50 text-slate-500 text-xs uppercase font-black tracking-wider border-b border-slate-100">
+                      <tr className="bg-slate-50 text-slate-500 text-xs  font-black tracking-wider border-b border-slate-100">
                         <th className="p-3">Học viên</th>
                         <th className="p-3">Thời gian nộp</th>
                         <th className="p-3">Trạng thái</th>
@@ -541,7 +563,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
                             </td>
                             <td className="p-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{new Date(sub.submittedAt || sub.createdAt).toLocaleString('vi-VN')}</td>
                             <td className="p-3 whitespace-nowrap">
-                              {isGraded ? <span className="bg-green-100 text-green-700 text-[10px] uppercase font-black px-2 py-1 rounded-md">Đã chấm</span> : <span className="bg-blue-100 text-blue-700 text-[10px] uppercase font-black px-2 py-1 rounded-md">Đã nộp</span>}
+                              {isGraded ? <span className="bg-green-100 text-green-700 text-[10px]  font-black px-2 py-1 rounded-md">Đã chấm</span> : <span className="bg-blue-100 text-blue-700 text-[10px]  font-black px-2 py-1 rounded-md">Đã nộp</span>}
                             </td>
                             <td className="p-3 whitespace-nowrap">
                               {sub.submittedFileUrl ? (

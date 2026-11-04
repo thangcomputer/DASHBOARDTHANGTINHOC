@@ -11,8 +11,6 @@ const { normalizeMulterFile } = require('./../../../utils/escapeRegex');
 const path = require('path');
 const fs = require('fs');
 
-const router  = express.Router();
-router.use(authMiddleware);
 const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT' || u.adminRole === 'SUPPORT_AGENT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
 const isHighAdminAccount = (u = {}) => u.adminRole === 'HIGH_ADMIN';
@@ -54,7 +52,7 @@ class ChatApplicationService {
 
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
-      throw { status: 404, message: 'Không tìm th?y cu?c h?i tho?i' };
+      throw { status: 404, message: 'Khï¿½ng tï¿½m th?y cu?c h?i tho?i' };
     }
 
     if (conversation.metadata?.pinnedMessageId === String(messageId)) {
@@ -65,12 +63,12 @@ class ChatApplicationService {
           pinnedMessageId: null
         });
       }
-      return { success: true, message: 'Ðã b? ghim tin nh?n' };
+      return { success: true, message: 'ï¿½ï¿½ b? ghim tin nh?n' };
     }
 
     const message = await Message.findById(messageId);
     if (!message || String(message.conversationId) !== String(conversationId)) {
-      throw { status: 404, message: 'Tin nh?n không h?p l?' };
+      throw { status: 404, message: 'Tin nh?n khï¿½ng h?p l?' };
     }
 
     await Conversation.updateOne({ _id: conversationId }, { "$set": { 'metadata.pinnedMessageId': String(messageId) } });
@@ -81,7 +79,7 @@ class ChatApplicationService {
       });
     }
 
-    return { success: true, message: 'Ðã ghim tin nh?n', pinnedMessageId: messageId };
+    return { success: true, message: 'ï¿½ï¿½ ghim tin nh?n', pinnedMessageId: messageId };
   }
 
   async get_contacts(data) {
@@ -1197,6 +1195,5 @@ class ChatApplicationService {
 }
 
 module.exports = new ChatApplicationService();
-
 
 

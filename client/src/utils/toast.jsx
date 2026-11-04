@@ -1,10 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { ToastContext } from './toastContext';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOAST CONTEXT — Thông báo nổi toàn cục (không icon, card + typography + shadow)
 // ═══════════════════════════════════════════════════════════════════════════════
-
-const ToastContext = createContext(null);
 
 /** Mỗi loại: thanh accent trái + nền + màu chữ (thiết kế SaaS, không emoji) */
 const VARIANT = {
@@ -239,11 +238,5 @@ function ToastItem({ toast: t, onDismiss }) {
     </div>
   );
 }
-
-export const useToast = () => {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be inside ToastProvider');
-  return ctx;
-};
 
 export default ToastProvider;

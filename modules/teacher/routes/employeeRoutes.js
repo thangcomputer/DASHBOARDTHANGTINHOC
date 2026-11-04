@@ -4,6 +4,7 @@
  */
 const express    = require('express');
 const router     = express.Router();
+const employeeController = require('../controllers/EmployeeController');
 const employeeRepository = require('../../auth/repositories');
 const PayrollLog = require('../../finance/models/PayrollLog');
 const { authMiddleware, branchFilter } = require('../../../shared/middleware/authMiddleware');

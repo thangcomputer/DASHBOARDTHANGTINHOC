@@ -23,7 +23,6 @@ const ROLE_RING = {
  */
 export default function Avatar({
   initials,
-  color = 'bg-red-500',
   src,
   role = 'student',
   adminRole = null,

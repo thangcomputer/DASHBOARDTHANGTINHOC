@@ -9,7 +9,7 @@ class EvaluationController {
   async get_admin(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_adminQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_adminQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -35,7 +35,7 @@ class EvaluationController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_rootCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_rootCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -61,3 +61,4 @@ class EvaluationController {
 }
 
 module.exports = new EvaluationController();
+

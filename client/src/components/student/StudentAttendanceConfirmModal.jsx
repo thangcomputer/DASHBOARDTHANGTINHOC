@@ -133,7 +133,7 @@ export default function StudentAttendanceConfirmModal({
               <X size={18} aria-hidden="true" />
             </button>
           )}
-          <p className={`text-[11px] font-bold uppercase tracking-[0.25em] ${eyebrowTone}`}>
+          <p className={`text-[11px] font-bold  tracking-[0.25em] ${eyebrowTone}`}>
             {eyebrow}
           </p>
           <p id="attendance-confirm-title" className={`mt-3 text-sm font-semibold ${titleTone}`}>
@@ -156,7 +156,7 @@ export default function StudentAttendanceConfirmModal({
 
         <div className="px-6 py-6 space-y-4 text-center">
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-left space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Giảng viên hướng dẫn</p>
+            <p className="text-xs font-bold  tracking-wide text-slate-400">Giảng viên hướng dẫn</p>
             <p className="text-base font-bold text-slate-900">{teacherName}</p>
             <p className="text-sm text-slate-600">
               {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}

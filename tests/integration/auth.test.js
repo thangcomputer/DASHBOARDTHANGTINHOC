@@ -12,7 +12,13 @@ process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET && process.env.J
   : 'b'.repeat(40);
 
 const blacklist = require('../../middleware/tokenBlacklist');
+const SystemSettings = require('../../models/SystemSettings');
 const { authMiddleware } = require('../../middleware/auth');
+
+// Hardcoded admin tokens are checked against SystemSettings.adminTokenVersion; no DB in this unit-level test.
+SystemSettings.findOne = () => ({
+  select: () => ({ lean: async () => ({ adminTokenVersion: 0 }) }),
+});
 
 function makeApp() {
   const app = express();

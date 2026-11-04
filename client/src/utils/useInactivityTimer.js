@@ -20,7 +20,7 @@ export function useInactivityTimer({ onLogout, enabled = true }) {
   const countdownRef  = useRef(null);
 
   // ── Lưu timestamp hoạt động gần nhất vào localStorage ──────────────────────
-  const resetActivity = useCallback(() => {
+  const resetActivity = useCallback(function resetActivity() {
     const now = Date.now();
     localStorage.setItem(STORAGE_KEY, String(now));
     setWarningVisible(false);

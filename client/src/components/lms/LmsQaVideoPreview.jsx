@@ -151,7 +151,7 @@ export default function LmsQaVideoPreview({
     <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
       <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Video bài học</p>
+          <p className="text-[10px] font-black  tracking-wide text-slate-500">Video bài học</p>
           {lessonTitle ? (
             <p className="text-xs font-bold text-slate-800 truncate">{lessonTitle}</p>
           ) : null}

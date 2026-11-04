@@ -1,7 +1,8 @@
 /**
  * Policy shadow for LIVE /api/feed (Wave 6.17).
- * Auth-only for list/create/upload/react/comment.
+ * Auth-only for list/create/upload/react/comment/report/pin/report queue actions.
  * Delete post/comment: adminLike OR ownership (Legacy helpers mirrored).
+ * Sensitive pin/report-moderation role checks remain in the route handlers.
  * No MANAGE_FEED permission. No branch/tenant.
  */
 const ACTIONS = new Set([
@@ -14,6 +15,10 @@ const ACTIONS = new Set([
   'react',
   'comment',
   'delete_comment',
+  'report',
+  'pin',
+  'report_list',
+  'resolve_report',
 ]);
 
 function buildSubject({ user, actorDoc, userBranchId }) {
@@ -170,6 +175,10 @@ function evaluateLegacyFeed(subject, action, ctx = {}) {
     case 'like':
     case 'react':
     case 'comment':
+    case 'report':
+    case 'pin':
+    case 'report_list':
+    case 'resolve_report':
       return evaluateAuthOnly(subject);
     case 'update_post':
       return evaluateUpdatePost(subject, ctx);

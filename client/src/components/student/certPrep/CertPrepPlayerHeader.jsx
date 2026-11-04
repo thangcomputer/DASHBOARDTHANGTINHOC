@@ -84,11 +84,11 @@ export default function CertPrepPlayerHeader({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-0.5">
             {immediate ? (
-              <span className="inline-flex rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+              <span className="inline-flex rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-black  tracking-wide text-emerald-700">
                 Hiển thị đáp án khi làm
               </span>
             ) : (
-              <span className="inline-flex rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-600">
+              <span className="inline-flex rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-black  tracking-wide text-slate-600">
                 Chỉ xem đáp án sau nộp
               </span>
             )}
@@ -109,7 +109,7 @@ export default function CertPrepPlayerHeader({
                   : 'bg-slate-50 border-slate-200'
             }`}
           >
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Thời gian</p>
+            <p className="text-[10px] font-bold  tracking-wider text-slate-400 mb-0.5">Thời gian</p>
             <CertPrepTimer remainingSeconds={remainingSeconds} />
           </div>
         ) : null}

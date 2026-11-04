@@ -178,6 +178,12 @@ describe('avatar gender sync — static UI/API wiring', () => {
     assert.ok(sidebar.includes('effectiveGender'));
   });
 
+  it('EditableAvatar prevents upload click recursion and renders crop dialog outside the avatar', () => {
+    assert.ok(editable.includes('onClick={(event) => event.stopPropagation()}'));
+    assert.ok(editable.includes('createPortal('));
+    assert.ok(editable.includes('document.body'));
+  });
+
   it('Avatar onError uses resolveAvatarUrl gender-aware fallback', () => {
     assert.ok(avatarComp.includes('resolveAvatarUrl({ role, adminRole, name, gender, avatar: \'\''));
     assert.ok(avatarComp.includes('fallbackStep'));

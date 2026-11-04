@@ -56,7 +56,7 @@ export default function StudentQuizInviteHost() {
   const { socket } = useSocket();
   const navigate = useNavigate();
   const [invite, setInvite] = useState(null);
-  const [queue, setQueue] = useState([]);
+  const [, setQueue] = useState([]);
   const [gateMessage, setGateMessage] = useState('');
   const [blocked, setBlocked] = useState(() => hasBlockingLoginOverlay(['student-quiz-invite']));
 
@@ -200,7 +200,7 @@ export default function StudentQuizInviteHost() {
           >
             <X size={18} />
           </button>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-red-100 flex items-center gap-1.5">
+          <p className="text-[11px] font-bold  tracking-wide text-red-100 flex items-center gap-1.5">
             <Award size={14} aria-hidden="true" /> Bài trắc nghiệm mới
           </p>
           <h2 id="quiz-invite-title" className="text-lg font-extrabold mt-1 leading-snug pr-8">

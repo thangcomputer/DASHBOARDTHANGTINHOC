@@ -1,9 +1,9 @@
 'use strict';
-const path = require('path');
-const fs = require('fs');
 const BlogPost = require('./../models/BlogPost');
 const NotificationService = require('./../../notification/services/NotificationService');
 const logger = require('./../../../config/logger');
+const { userHasPermission } = require('./../../../shared/middleware/authMiddleware');
+const { PERMISSIONS } = require('./../../../constants/permissions');
 
 /**
  * Blog / Tin tức trung tâm — mọi role đọc; Admin/Staff (manage_blog) đăng bài.
@@ -66,13 +66,6 @@ function serializeDetail(doc) {
     authorId: o.authorId,
   };
 }
-function escapeHtml(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 /** Cho phép subset HTML từ editor nội bộ (không SEO) */
 function sanitizeHtml(html) {
   let s = String(html || '');
@@ -82,26 +75,40 @@ function sanitizeHtml(html) {
   s = s.replace(/data:text\/html/gi, '');
   return s.slice(0, 200000);
 }
-const blogDir = path.join(__dirname, '..', 'uploads', 'blog');
-if (!fs.existsSync(blogDir)) fs.mkdirSync(blogDir, { recursive: true });
-const blogStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, blogDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '';
-    cb(null, `blog_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
-const upload = multer({
-  storage: blogStorage,
-  limits: { fileSize: 80 * 1024 * 1024, files: 8 },
-  fileFilter: (_req, file, cb) => {
-    const ok = /^(image|video|application|text)\//.test(file.mimetype)
-      || /\.(pdf|docx?|xlsx?|pptx?|zip|rar)$/i.test(file.originalname);
-    cb(ok ? null : new Error('Loại file không được hỗ trợ'), ok);
-  },
-});
-router.use(authMiddleware);
-// ─── GET /api/blog/posts — danh sách public (đã xuất bản) ───────────────────
+async function notifyPublished(io, post) {
+  if (!io || !post) return;
+  const receivers = post.targetAudience === 'teacher'
+    ? ['ALL_ADMIN', 'ALL_TEACHER']
+    : post.targetAudience === 'student'
+      ? ['ALL_ADMIN', 'ALL_STUDENT']
+      : 'GLOBAL';
+
+  try {
+    await NotificationService.send(io, {
+      type: 'SYSTEM',
+      title: `Có bài viết mới: '${post.title}'`,
+      content: post.excerpt || 'Mở Tin tức để đọc bài viết mới từ trung tâm.',
+      receivers,
+      payload: {
+        blogPostId: String(post._id),
+        slug: post.slug,
+        targetAudience: post.targetAudience || 'all',
+        action: 'blog_published',
+      },
+      link: '',
+    });
+    io.emit('blog:published', {
+      id: String(post._id),
+      slug: post.slug,
+      title: post.title,
+      excerpt: post.excerpt || '',
+      thumbnailUrl: post.thumbnailUrl || '',
+      targetAudience: post.targetAudience || 'all',
+    });
+  } catch (err) {
+    logger.warn('[BLOG] notify:', err.message);
+  }
+}
 
 class BlogApplicationService {
   async get_posts(data) {
@@ -135,14 +142,14 @@ class BlogApplicationService {
         .lean(),
       BlogPost.countDocuments(filter),
     ]);
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: rows.map(serializeCard),
       pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
-    });
+    } };
   } catch (err) {
     logger.error('[BLOG] list:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -157,21 +164,21 @@ class BlogApplicationService {
     if (!manage) filter.status = 'published';
 
     const doc = await BlogPost.findOne(filter);
-    if (!doc) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy bài viết' });
+    if (!doc) return { _status: 404, _body: { success: false, message: 'Không tìm thấy bài viết' } };
 
     const isAdminSide = data.currentUser?.role === 'admin' || data.currentUser?.role === 'staff' || data.currentUser?.adminRole === 'SUPER_ADMIN' || data.currentUser?.adminRole === 'STAFF';
 
     if (manage) {
       const ok = await userHasPermission(data.currentUser, PERMISSIONS.MANAGE_BLOG);
       if (!ok && doc.status !== 'published') {
-        return { _status: 403, _body: ({ success: false, message: 'Không có quyền xem bản nháp' });
+        return { _status: 403, _body: { success: false, message: 'Không có quyền xem bản nháp' } };
       }
     } else if (!isAdminSide) {
       if (data.currentUser?.role === 'teacher' && doc.targetAudience === 'student') {
-        return { _status: 403, _body: ({ success: false, message: 'Bài viết này dành cho Học viên' });
+        return { _status: 403, _body: { success: false, message: 'Bài viết này dành cho Học viên' } };
       }
       if (data.currentUser?.role === 'student' && doc.targetAudience === 'teacher') {
-        return { _status: 403, _body: ({ success: false, message: 'Bài viết này dành cho Giảng viên' });
+        return { _status: 403, _body: { success: false, message: 'Bài viết này dành cho Giảng viên' } };
       }
     }
 
@@ -201,14 +208,14 @@ class BlogApplicationService {
       .select('-contentHtml -attachments')
       .lean();
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: serializeDetail(doc),
       related: related.map(serializeCard),
-    });
+    } };
   } catch (err) {
     logger.error('[BLOG] detail:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -230,30 +237,30 @@ class BlogApplicationService {
       BlogPost.find(filter).sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       BlogPost.countDocuments(filter),
     ]);
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: rows.map(serializeCard),
       pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async get_manage_posts_id(data) {
   try {
     const doc = await BlogPost.findOne({ _id: data.id, deletedAt: null });
-    if (!doc) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy bài' });
-    return { _status: 200, _body: ({ success: true, data: serializeDetail(doc) });
+    if (!doc) return { _status: 404, _body: { success: false, message: 'Không tìm thấy bài' } };
+    return { _status: 200, _body: { success: true, data: serializeDetail(doc) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_manage_posts(data) {
   try {
     const title = String(data.title || '').trim();
-    if (!title) return { _status: 400, _body: ({ success: false, message: 'Thiếu tiêu đề' });
+    if (!title) return { _status: 400, _body: { success: false, message: 'Thiếu tiêu đề' } };
     const slug = await uniqueSlug(data.slug || title);
     const status = ['draft', 'published', 'hidden'].includes(data.status) ? data.status : 'draft';
     const targetAudience = ['all', 'teacher', 'student'].includes(data.targetAudience) ? data.targetAudience : 'all';
@@ -278,17 +285,17 @@ class BlogApplicationService {
       await notifyPublished(data.app.get('io'), post);
     }
 
-    return { _status: 201, _body: ({ success: true, data: serializeDetail(post) });
+    return { _status: 201, _body: { success: true, data: serializeDetail(post) } };
   } catch (err) {
     logger.error('[BLOG] create:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async put_manage_posts_id(data) {
   try {
     const post = await BlogPost.findOne({ _id: data.id, deletedAt: null });
-    if (!post) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy bài' });
+    if (!post) return { _status: 404, _body: { success: false, message: 'Không tìm thấy bài' } };
 
     if (data.title != null) post.title = String(data.title).trim().slice(0, 200);
     if (data.excerpt != null) post.excerpt = String(data.excerpt).trim().slice(0, 500);
@@ -316,25 +323,25 @@ class BlogApplicationService {
       await notifyPublished(data.app.get('io'), post);
     }
 
-    return { _status: 200, _body: ({ success: true, data: serializeDetail(post) });
+    return { _status: 200, _body: { success: true, data: serializeDetail(post) } };
   } catch (err) {
     logger.error('[BLOG] update:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
   async post_manage_posts_id_publish(data) {
   try {
     const post = await BlogPost.findOne({ _id: data.id, deletedAt: null });
-    if (!post) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy bài' });
+    if (!post) return { _status: 404, _body: { success: false, message: 'Không tìm thấy bài' } };
     const wasPublished = post.status === 'published';
     post.status = 'published';
     post.publishedAt = post.publishedAt || new Date();
     await post.save();
     if (!wasPublished) await notifyPublished(data.app.get('io'), post);
-    return { _status: 200, _body: ({ success: true, data: serializeDetail(post) });
+    return { _status: 200, _body: { success: true, data: serializeDetail(post) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -345,10 +352,10 @@ class BlogApplicationService {
       { status: 'hidden' },
       { returnDocument: 'after' },
     );
-    if (!post) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy bài' });
-    return { _status: 200, _body: ({ success: true, data: serializeDetail(post) });
+    if (!post) return { _status: 404, _body: { success: false, message: 'Không tìm thấy bài' } };
+    return { _status: 200, _body: { success: true, data: serializeDetail(post) } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -356,21 +363,23 @@ class BlogApplicationService {
   try {
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(data.id)) {
-      return { _status: 400, _body: ({ success: false, message: 'ID bài viết không hợp lệ' });
+      return { _status: 400, _body: { success: false, message: 'ID bài viết không hợp lệ' } };
     }
     const post = await BlogPost.findOneAndUpdate(
       { _id: data.id, deletedAt: null },
       { deletedAt: new Date(), status: 'hidden' },
       { returnDocument: 'after' },
     );
-    if (!post) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy bài viết hoặc bài đã bị xóa' });
-    return { _status: 200, _body: ({ success: true, message: 'Đã xóa bài viết' });
+    if (!post) return { _status: 404, _body: { success: false, message: 'Không tìm thấy bài viết hoặc bài đã bị xóa' } };
+    return { _status: 200, _body: { success: true, message: 'Đã xóa bài viết' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
-  async post_manage_upload(data) {}
+  async post_manage_upload() {
+    return { _status: 501, _body: { success: false, message: 'Upload được xử lý bởi middleware của route' } };
+  }
 
 }
 

@@ -72,10 +72,10 @@ export default function CertPrepMultipleChoice({
               </span>
               <span className={`font-semibold align-middle ${exam ? '' : 'text-slate-800'}`}>{opt.text || ''}</span>
               {showFeedback && isCorrectOpt ? (
-                <span className={`ml-2 text-[11px] font-black uppercase ${exam ? 'text-emerald-300' : 'text-emerald-700'}`}>Đúng</span>
+                <span className={`ml-2 text-[11px] font-black  ${exam ? 'text-emerald-300' : 'text-emerald-700'}`}>Đúng</span>
               ) : null}
               {showFeedback && wrongSelected ? (
-                <span className={`ml-2 text-[11px] font-black uppercase ${exam ? 'text-red-300' : 'text-red-600'}`}>Bạn chọn</span>
+                <span className={`ml-2 text-[11px] font-black  ${exam ? 'text-red-300' : 'text-red-600'}`}>Bạn chọn</span>
               ) : null}
               {opt.imageUrl ? (
                 <img src={resolveMediaUrl(opt.imageUrl)} alt="" className={`max-h-36 mt-2 rounded-xl border ${exam ? 'border-white/10' : 'border-slate-100'}`} />

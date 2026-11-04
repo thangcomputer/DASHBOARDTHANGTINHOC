@@ -33,7 +33,7 @@ function QuestionRow({ q, index, onEdit, onDelete, showImage }) {
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-1.5 mb-1">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+          <span className="text-[10px] font-bold  tracking-wide text-slate-400">
             {DIFF_LABELS[q.difficulty] || 'TB'}
           </span>
           {!isEssay && correctLetter && (
@@ -356,7 +356,7 @@ export default function StudentQuestionBankPanel({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[12rem]">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
               Khóa học
             </label>
             <CmsSelect
@@ -381,7 +381,7 @@ export default function StudentQuestionBankPanel({
             </CmsSelect>
           </div>
           <div className="flex-1 min-w-[12rem]">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
               Môn thi
             </label>
             <CmsSelect
@@ -426,7 +426,7 @@ export default function StudentQuestionBankPanel({
             </div>
           </div>
           <div className="w-28">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-amber-700 block mb-1.5">
+            <label className="text-[11px] font-bold  tracking-wide text-amber-700 block mb-1.5">
               Phút TN
             </label>
             <div className="flex items-center gap-1.5 border-2 border-amber-200 bg-amber-50/80 rounded-xl px-2.5 py-2">
@@ -442,7 +442,7 @@ export default function StudentQuestionBankPanel({
             </div>
           </div>
           <div className="w-28">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-violet-700 block mb-1.5">
+            <label className="text-[11px] font-bold  tracking-wide text-violet-700 block mb-1.5">
               Phút TL
             </label>
             <div className={`flex items-center gap-1.5 border-2 rounded-xl px-2.5 py-2 ${studentEssayRequired?.[activeSection] === false
@@ -462,7 +462,7 @@ export default function StudentQuestionBankPanel({
             </div>
           </div>
           <div className="min-w-[9.5rem]">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600 block mb-1.5">
+            <label className="text-[11px] font-bold  tracking-wide text-slate-600 block mb-1.5">
               Bắt buộc TL
             </label>
             <button
@@ -507,7 +507,7 @@ export default function StudentQuestionBankPanel({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[14rem]">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+            <label className="text-[11px] font-bold  tracking-wide text-slate-500 block mb-1.5">
               Âm thanh cảnh báo phòng thi (TN)
             </label>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -713,7 +713,7 @@ export default function StudentQuestionBankPanel({
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Môn</label>
+                  <label className="text-[11px] font-bold  text-slate-500 block mb-1">Môn</label>
                   <CmsSelect
                     value={sqForm.section || activeSection}
                     onChange={(e) => setSqForm({ ...sqForm, section: e.target.value })}
@@ -725,7 +725,7 @@ export default function StudentQuestionBankPanel({
                   </CmsSelect>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Độ khó</label>
+                  <label className="text-[11px] font-bold  text-slate-500 block mb-1">Độ khó</label>
                   <CmsSelect
                     value={sqForm.difficulty}
                     onChange={(e) => setSqForm({ ...sqForm, difficulty: e.target.value })}
@@ -739,7 +739,7 @@ export default function StudentQuestionBankPanel({
               </div>
 
               <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Nội dung câu hỏi</label>
+                <label className="text-[11px] font-bold  text-slate-500 block mb-1">Nội dung câu hỏi</label>
                 <textarea
                   value={sqForm.q}
                   onChange={(e) => setSqForm({ ...sqForm, q: e.target.value })}
@@ -752,7 +752,7 @@ export default function StudentQuestionBankPanel({
               {sqForm.type === 'multiple' && (
                 <>
                   <div>
-                    <label className="text-[11px] font-bold uppercase text-slate-500 block mb-2">
+                    <label className="text-[11px] font-bold  text-slate-500 block mb-2">
                       Hình minh họa <span className="text-slate-400 font-normal normal-case">(tùy chọn)</span>
                     </label>
                     <div className="flex flex-wrap items-start gap-3">
@@ -787,7 +787,7 @@ export default function StudentQuestionBankPanel({
                     </div>
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold uppercase text-slate-500 block mb-2">
+                    <label className="text-[11px] font-bold  text-slate-500 block mb-2">
                       Đáp án — bấm chữ cái để chọn đúng
                     </label>
                     <div className="space-y-2">
@@ -824,7 +824,7 @@ export default function StudentQuestionBankPanel({
               {sqForm.type === 'essay' && (
                 <>
                   <div>
-                    <label className="text-[11px] font-bold uppercase text-slate-500 block mb-2">
+                    <label className="text-[11px] font-bold  text-slate-500 block mb-2">
                       File đề riêng (PDF / Excel) <span className="text-slate-400 font-normal normal-case">— chỉ gắn với câu này</span>
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
@@ -863,7 +863,7 @@ export default function StudentQuestionBankPanel({
                     </div>
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Gợi ý chấm / đáp án mẫu</label>
+                    <label className="text-[11px] font-bold  text-slate-500 block mb-1">Gợi ý chấm / đáp án mẫu</label>
                     <textarea
                       value={sqForm.sampleAnswer || ''}
                       onChange={(e) => setSqForm({ ...sqForm, sampleAnswer: e.target.value })}

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Award, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
 import api from '../../services/api';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 
 export const PENDING_TEACHER_QUIZ_DETAIL_KEY = 'cms_pending_teacher_quiz_detail';
 
@@ -168,8 +168,8 @@ export default function TeacherQuizResultOverlay() {
               <span className="text-4xl sm:text-5xl font-black text-amber-400 tabular-nums">
                 {submission.score}%
               </span>
-              <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isForfeit ? 'RỚT · THOÁT GIỮA GIỜ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
+              <span className={`text-xs font-bold  tracking-wider mt-1 ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
+                {isForfeit ? 'Rớt · thoát giữa giờ' : (isPassed ? 'ĐẠT YÊU CẦU' : 'CHƯA ĐẠT')}
               </span>
             </div>
 

@@ -7,7 +7,7 @@ class TeacherController {
   async post_upload_practical(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await teacherApplicationService.post_upload_practical(data);
+      const result = await teacherApplicationService.post_upload_practical(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -37,7 +37,7 @@ class TeacherController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await teacherApplicationService.get_root(data);
+      const result = await teacherApplicationService.get_root(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -50,7 +50,7 @@ class TeacherController {
   async get_stats_summary(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await teacherApplicationService.get_stats_summary(data);
+      const result = await teacherApplicationService.get_stats_summary(req);
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -206,3 +206,4 @@ class TeacherController {
 }
 
 module.exports = new TeacherController();
+

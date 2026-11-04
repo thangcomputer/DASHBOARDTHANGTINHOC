@@ -140,4 +140,104 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
       adminRole: 'HIGH_ADMIN',
     }), 'high-c');
   });
+
+  it('12 teacher mobile inbox only shows All and Students filters without hiding other conversations from All', () => {
+    const mobileInbox = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
+    const teacherFilterDefinition = mobileInbox.match(/const categoryFilters = user\?\.role === 'teacher'[\s\S]*?\n    : \[/)?.[0] || '';
+
+    assert.ok(teacherFilterDefinition.includes("{ id: 'all' as const, label: 'Tất cả' }"));
+    assert.ok(teacherFilterDefinition.includes("{ id: 'student' as const, label: 'Học viên' }"));
+    assert.ok(teacherFilterDefinition.includes("{ id: 'group' as const, label: 'Nhóm' }"));
+    assert.equal(teacherFilterDefinition.includes("label: 'Admin'"), false);
+    assert.equal(teacherFilterDefinition.includes("label: 'Tuyển sinh'"), false);
+    assert.ok(mobileInbox.includes("(category === 'all' || item.category === category)"));
+    assert.ok(mobileInbox.includes('styles.inboxFilterRow'));
+    assert.ok(mobileInbox.includes('style={styles.filtersWrapper}'));
+    assert.ok(mobileInbox.includes('inboxFilterRow: { width: \'100%\''));
+    assert.ok(mobileInbox.includes('<Plus size={25} color={colors.brand} strokeWidth={2.8} />'));
+    assert.equal(mobileInbox.includes('>Tạo nhóm chat</Text>'), false);
+  });
+
+  it('hides recruitment and support filters from the student mobile inbox but keeps all conversations visible in All', () => {
+    const mobileInbox = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
+    const studentFilterDefinition = mobileInbox.match(/:\s*\[([\s\S]*?)\n      \];/)?.[1] || '';
+
+    assert.ok(studentFilterDefinition.includes("{ id: 'all' as const, label: 'Tất cả' }"));
+    assert.ok(studentFilterDefinition.includes("{ id: 'teacher' as const, label: 'Giảng viên' }"));
+    assert.ok(studentFilterDefinition.includes("{ id: 'group' as const, label: 'Nhóm' }"));
+    assert.equal(studentFilterDefinition.includes("'recruitment'"), false);
+    assert.equal(studentFilterDefinition.includes("'support'"), false);
+    assert.ok(mobileInbox.includes("(category === 'all' || item.category === category)"));
+  });
+
+  it('13 web inbox filters teachers and students by the current role while keeping contact filtering and title-case names', () => {
+    const inbox = read('client/src/components/Inbox.jsx');
+    const tabBlock = inbox.match(/\/\* Hàng Tabs \(Pills\) Phân loại danh bạ \*\/[\s\S]*?\]\.map\(tab => \(/)?.[0] || '';
+
+    assert.ok(tabBlock.includes("{ id: 'all', label: 'Tất cả' }"));
+    assert.ok(tabBlock.includes("{ id: 'teacher', label: 'Giảng viên' }"));
+    assert.ok(tabBlock.includes("{ id: 'student', label: 'Học viên' }"));
+    assert.ok(tabBlock.includes("currentUserRole === 'teacher'"));
+    assert.ok(tabBlock.includes("{ id: 'group', label: 'Nhóm' }"));
+    assert.equal(tabBlock.includes("label: 'Admin'"), false);
+    assert.equal(tabBlock.includes("label: 'Tuyển sinh'"), false);
+    assert.equal(tabBlock.includes("label: 'Hỗ trợ'"), false);
+    assert.ok(inbox.includes("if (contactTab === 'all') return true;"));
+    assert.ok(inbox.includes("if (contactTab === 'group') return c.isGroup;"));
+    assert.ok(inbox.includes('<h4 className="font-semibold text-[#1E293B] text-base truncate">{formatDisplayName(conv.user.name)}</h4>'));
+    assert.ok(inbox.includes('{formatDisplayName(c.user?.name) || \'Không rõ tên\'}'));
+    assert.ok(inbox.includes('{formatDisplayName(u.name)}'));
+  });
+
+  it('14 mobile bottom navigation hides on downward scroll and returns on upward scroll', () => {
+    const ui = read('thang-tin-hoc-mobile/src/components/ui.tsx');
+    const navigation = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');
+
+    assert.ok(ui.includes("export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility'"));
+    assert.ok(ui.includes('DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, visible)'));
+    assert.ok(ui.includes('if (directionTravel.current > SCROLL_TOGGLE_DISTANCE) emitChromeVisibility(false);'));
+    assert.ok(ui.includes('else if (directionTravel.current < -SCROLL_TOGGLE_DISTANCE) emitChromeVisibility(true);'));
+    assert.equal(ui.includes('reachedBottom'), false, 'reaching the bottom must not bring the footer back');
+    assert.ok(ui.includes('const MIN_OVERFLOW_TO_HIDE_CHROME = 180;'));
+    assert.ok(ui.includes('contentSize.height - layoutMeasurement.height < MIN_OVERFLOW_TO_HIDE_CHROME'));
+    assert.ok(ui.includes('if (viewportChanged) {'), 'header resize must not be read as a user scroll');
+    assert.ok(navigation.includes('MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT,'));
+    assert.ok(navigation.includes('translateY: visibility.interpolate'));
+    assert.ok(navigation.includes('translateY: navigationBarVisibility.interpolate'));
+    assert.ok(navigation.includes("AppState.addEventListener('change'"));
+    assert.ok(navigation.includes('if (visibleRef.current === visible) return;'));
+    assert.ok(navigation.includes('animateChrome(visibility, visible);'));
+    assert.ok(ui.includes('animateChrome(headerProgress, visible);'));
+    assert.ok(ui.includes('const CHROME_ANIMATION_MS = 260;'));
+    assert.equal(
+      (navigation.match(/style=\{styles\.navigationGlassBackground\}/g) || []).length,
+      2,
+      'main and persistent tab bars should share the same glass background',
+    );
+  });
+
+  it('15 mobile conversation preserves adminRole for consistent peer avatars', () => {
+    const mobileInbox = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
+    const navigationTypes = read('thang-tin-hoc-mobile/src/navigation/types.ts');
+
+    assert.ok(navigationTypes.includes('participantAdminRole?: string | null'));
+    assert.ok(mobileInbox.includes('participantAdminRole: conversation.adminRole'));
+    assert.equal(
+      (mobileInbox.match(/route\.params\.participantAdminRole/g) || []).length,
+      3,
+      'chat header, message bubbles, and contact info should all resolve the avatar with the same admin role',
+    );
+    assert.ok(mobileInbox.includes('participantAvatarUri: conversation.avatarUri'));
+  });
+
+  it('mobile header and footer return to their visible state at screen focus and scroll top', () => {
+    const ui = read('thang-tin-hoc-mobile/src/components/ui.tsx');
+
+    assert.ok(ui.includes('useFocusEffect(useCallback(() => {'));
+    assert.ok(ui.includes('DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);'));
+    assert.ok(ui.includes('DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);'));
+    assert.ok(ui.includes('onScrollEndDrag={handleScroll}'));
+    assert.ok(ui.includes('onMomentumScrollEnd={handleScroll}'));
+    assert.ok(ui.includes('if (offsetY <= 8 || '));
+  });
 });

@@ -67,14 +67,14 @@ const AdminLoginPage = ({ onLogin }) => {
     // 1. Kiểm tra trường trống
     const canonicalPhone = normalizePhone(phone);
     if (!canonicalPhone || !isValidVNPhone(canonicalPhone) || !password) {
-      setError('VUI LÒNG NHẬP SỐ ĐIỆN THOẠI HỢP LỆ VÀ MẬT KHẨU');
+      setError('Vui lòng nhập số điện thoại hợp lệ và mật khẩu');
       toast.error('Cảnh báo: Thông tin trống');
       return;
     }
 
     // 2. Kiểm tra mã CAPTCHA (server xác thực, client chỉ chặn trường trống)
     if (!userInputCaptcha.trim()) {
-      setError('VUI LÒNG NHẬP MÃ BẢO VỆ');
+      setError('Vui lòng nhập mã bảo vệ');
       toast.error('Chưa nhập mã bảo vệ');
       return;
     }
@@ -129,7 +129,7 @@ const AdminLoginPage = ({ onLogin }) => {
       if (data.success) {
         finishLogin(data);
       } else {
-        setError(data.message?.toUpperCase() || 'TÀI KHOẢN HOẶC MẬT KHẨU KHÔNG ĐÚNG');
+        setError(data.message || 'Tài khoản hoặc mật khẩu không đúng');
         toast.error('Truy cập bị từ chối!');
         setPassword('');
         generateCaptcha(); // CAPTCHA dùng 1 lần — cấp mã mới cho lần thử tiếp theo
@@ -138,8 +138,8 @@ const AdminLoginPage = ({ onLogin }) => {
       console.error('[AdminLogin]', err);
       setError(
         err?.message === 'INVALID_JSON'
-          ? 'MÁY CHỦ TRẢ VỀ DỮ LIỆU KHÔNG HỢP LỆ (KIỂM TRA API ĐANG CHẠY VÀ PROXY VITE)'
-          : 'LỖI KẾT NỐI HỆ THỐNG BẢO MẬT',
+          ? 'Máy chủ trả về dữ liệu không hợp lệ (kiểm tra API đang chạy và proxy vite)'
+          : 'Lỗi kết nối hệ thống bảo mật',
       );
       toast.error('Không kết nối được máy chủ — chạy backend (port 5000) và npm run dev client');
     } finally {
@@ -174,7 +174,7 @@ const AdminLoginPage = ({ onLogin }) => {
   const handleMfaVerify = async (e) => {
     if (e?.preventDefault) e.preventDefault();
     if (!mfaCode.trim() || !mfaToken) {
-      setError('NHẬP MÃ OTP 6 SỐ');
+      setError('Nhập mã OTP 6 số');
       return;
     }
     setLoading(true);
@@ -194,11 +194,11 @@ const AdminLoginPage = ({ onLogin }) => {
       if (data.success && data.data?.accessToken) {
         finishLogin(data);
       } else {
-        setError(data.message?.toUpperCase() || 'MÃ OTP KHÔNG ĐÚNG');
+        setError(data.message || 'Mã OTP không đúng');
         toast.error(data.message || 'Mã OTP không đúng');
       }
     } catch {
-      setError('LỖI KẾT NỐI');
+      setError('Lỗi kết nối');
     } finally {
       setLoading(false);
     }
@@ -217,13 +217,13 @@ const AdminLoginPage = ({ onLogin }) => {
           <div className="relative z-10 space-y-12 animate-in fade-in slide-in-from-left-20 duration-1000">
             <div className="inline-flex items-center gap-3 bg-red-600/10 border border-red-500/20 px-4 py-2 rounded-xl">
                <ShieldCheck size={18} className="text-red-500" aria-hidden="true" />
-               <span className="text-xs font-black text-red-400 uppercase tracking-[0.3em]">Hệ thống quản trị tối cao</span>
+               <span className="text-xs font-black text-red-400  tracking-[0.3em]">Hệ thống quản trị tối cao</span>
             </div>
 
             <div className="space-y-4">
                <h1 className="text-5xl lg:text-7xl xl:text-8xl font-black text-white leading-none tracking-tighter break-anywhere">
                 LMS <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-800">CENTRAL</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-800">Central</span>
               </h1>
               <p className="text-slate-400 text-lg lg:text-xl font-medium max-w-xl leading-relaxed">
                 Trung tâm điều hành nền tảng Đào tạo Tin học văn phòng. 
@@ -236,12 +236,12 @@ const AdminLoginPage = ({ onLogin }) => {
                <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] group hover:border-red-500/50 transition-all duration-500">
                   <Activity size={24} className="text-red-500 mb-4 group-hover:scale-110 transition-transform" />
                   <p className="text-3xl font-black text-white">99.9%</p>
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-1">Uptime System</p>
+                  <p className="text-xs font-black text-slate-500  tracking-widest mt-1">Uptime System</p>
                </div>
                <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] group hover:border-red-500/50 transition-all duration-500">
                   <Fingerprint size={24} className="text-red-500 mb-4 group-hover:scale-110 transition-transform" />
                   <p className="text-3xl font-black text-white">AES-256</p>
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-1">Data Security</p>
+                  <p className="text-xs font-black text-slate-500  tracking-widest mt-1">Data Security</p>
                </div>
             </div>
           </div>
@@ -263,7 +263,7 @@ const AdminLoginPage = ({ onLogin }) => {
               
               <div className="space-y-2">
                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Cổng Admin</h2>
-                <p className="text-slate-400 font-bold uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em]">Xác thực quyền truy cập hệ thống</p>
+                <p className="text-slate-400 font-bold  text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em]">Xác thực quyền truy cập hệ thống</p>
               </div>
             </div>
 
@@ -301,7 +301,7 @@ const AdminLoginPage = ({ onLogin }) => {
               ) : (
               <>
               <div className="space-y-3">
-                <label htmlFor="admin-phone" className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Số điện thoại</label>
+                <label htmlFor="admin-phone" className="text-xs font-black text-slate-400  tracking-[0.2em] block ml-1">Số điện thoại</label>
                 <div className="relative group">
                   <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
                     <User size={20} aria-hidden="true" />
@@ -321,7 +321,7 @@ const AdminLoginPage = ({ onLogin }) => {
               </div>
 
               <div className="space-y-3">
-                <label htmlFor="admin-password" className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Master Password</label>
+                <label htmlFor="admin-password" className="text-xs font-black text-slate-400  tracking-[0.2em] block ml-1">Master Password</label>
                 <div className="relative group">
                   <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-red-500 transition-colors">
                     <Lock size={20} aria-hidden="true" />
@@ -348,13 +348,13 @@ const AdminLoginPage = ({ onLogin }) => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">Mã bảo vệ</label>
+                <label className="text-xs font-black text-slate-500  tracking-[0.2em] block ml-1">Mã bảo vệ</label>
                 <div className="flex gap-3">
                   <div className="flex-1 bg-white/5 border-2 border-white/5 rounded-3xl p-4 flex items-center justify-center relative overflow-hidden h-16 select-none shadow-inner">
                     {captchaSvg ? (
                       <img src={captchaSvg} alt="Mã bảo vệ" className="h-12 w-auto rounded-lg" />
                     ) : (
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Đang tải mã…</span>
+                      <span className="text-xs font-bold text-slate-500  tracking-widest">Đang tải mã…</span>
                     )}
                   </div>
                   <button 
@@ -381,7 +381,7 @@ const AdminLoginPage = ({ onLogin }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="group w-full bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-3xl py-4 font-black uppercase tracking-[0.2em] shadow-2xl shadow-red-900/40 hover:from-red-700 hover:to-rose-800 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-4 border border-white/10"
+                className="group w-full bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-3xl py-4 font-black  tracking-[0.2em] shadow-2xl shadow-red-900/40 hover:from-red-700 hover:to-rose-800 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-70 flex items-center justify-center gap-4 border border-white/10"
               >
                 {loading ? (
                   <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -398,14 +398,14 @@ const AdminLoginPage = ({ onLogin }) => {
             <div className="text-center pt-6 animate-in fade-in duration-1000 delay-500">
                <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-4 inline-block">
                   <p className="text-xs font-mono text-slate-600">
-                    TERMINAL ID: <span className="text-red-500/70">ADMIN-01X8</span> <br />
-                    LOCATION: <span className="text-slate-400">VIETNAM CENTRAL HUB</span>
+                    Terminal ID: <span className="text-red-500/70">ADMIN-01X8</span> <br />
+                    Location: <span className="text-slate-400">Vietnam central hub</span>
                   </p>
                </div>
             </div>
           </div>
 
-          <div className="absolute bottom-6 text-[9px] font-black text-slate-700 uppercase tracking-[0.5em]">
+          <div className="absolute bottom-6 text-[9px] font-black text-slate-700  tracking-[0.5em]">
             Authorized Personnel Only © 2026
           </div>
         </div>

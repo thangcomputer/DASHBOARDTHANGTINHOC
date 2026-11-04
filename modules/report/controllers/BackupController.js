@@ -9,7 +9,7 @@ class BackupController {
   async get_stats(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_statsQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_statsQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -35,7 +35,7 @@ class BackupController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_rootCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_rootCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -50,6 +50,7 @@ class BackupController {
       // Replaced by Zod Validator
       const result = await queryBus.dispatch(new queries.Get_id_downloadQuery(BackupValidator.validateGet_id_download(req)));
       if (!result) return;
+      if (result._isDownload) return res.download(result._filePath, result._filename);
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {

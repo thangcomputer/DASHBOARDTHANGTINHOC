@@ -6,12 +6,12 @@ import { useNavigate, useParams, useSearchParams, useLocation } from 'react-rout
 import DOMPurify from 'dompurify';
 import {
   Newspaper, Search, Plus, Loader2, Eye, Calendar, User, ChevronLeft,
-  ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, RefreshCw, X, FileText,
+  ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, X, FileText,
   LayoutGrid, List,
 } from 'lucide-react';
 import { resolveMediaUrl, blogAPI } from '../services/api';
 import { applyAnchorNewTabPolicy } from '../utils/htmlContent';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { useSocket } from '../context/SocketContext';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
 import NewsRichEditor from './NewsRichEditor';
@@ -57,13 +57,11 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
     <button
       type="button"
       onClick={() => onOpen(post)}
-      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 w-full ${
-        isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
-      }`}
+      className={`group text-left bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md hover:border-red-100 transition-all duration-200 w-full ${isList ? 'flex flex-row items-stretch min-h-[7.5rem]' : 'flex flex-col h-full'
+        }`}
     >
-      <div className={`relative bg-slate-100 overflow-hidden shrink-0 ${
-        isList ? 'w-[7.5rem] sm:w-40 self-stretch min-h-[7.5rem]' : 'aspect-video w-full'
-      }`}
+      <div className={`relative bg-slate-100 overflow-hidden shrink-0 ${isList ? 'w-[7.5rem] sm:w-40 self-stretch min-h-[7.5rem]' : 'aspect-video w-full'
+        }`}
       >
         {thumb ? (
           <img
@@ -78,7 +76,7 @@ function NewsCard({ post, onOpen, variant = 'grid' }) {
         )}
         {post.isNew && (
           <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black tracking-wide shadow-sm">
-            NEW
+            New
           </span>
         )}
         {!isList && (
@@ -343,7 +341,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
 
           {/* ── BỘ CHỌN ĐỐI TƯỢNG NHẬN TIN ── */}
           <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+            <label className="text-[11px] font-black  tracking-wider text-slate-500 block">
               Đối tượng nhận tin (Bài viết này đăng cho ai?)
             </label>
             <div className="flex items-center gap-2 flex-wrap">
@@ -356,11 +354,10 @@ function EditorForm({ initial, onSaved, onCancel }) {
                   key={opt.key}
                   type="button"
                   onClick={() => setTargetAudience(opt.key)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                    targetAudience === opt.key
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${targetAudience === opt.key
                       ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   {opt.label}
                 </button>
@@ -369,16 +366,15 @@ function EditorForm({ initial, onSaved, onCancel }) {
           </div>
 
           <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+            <label className="text-[11px] font-black  tracking-wider text-slate-500 block">
               Chủ đề bài viết
             </label>
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => setTopicId('')}
-                className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
-                  !topicId ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
+                className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${!topicId ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
               >
                 Không chọn
               </button>
@@ -387,9 +383,8 @@ function EditorForm({ initial, onSaved, onCancel }) {
                   key={t.id}
                   type="button"
                   onClick={() => setTopicId(t.id)}
-                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${
-                    topicId === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition ${topicId === t.id ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
                 >
                   {t.name}
                 </button>
@@ -438,7 +433,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           />
 
           <div className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Ảnh bìa (card / đầu bài)</p>
+            <p className="text-[11px] font-black  tracking-wide text-slate-400">Ảnh bìa (card / đầu bài)</p>
             {thumbnailUrl ? (
               <div className="relative w-full max-w-md aspect-video rounded-xl overflow-hidden bg-slate-100">
                 <img src={resolveMediaUrl(thumbnailUrl)} alt="" className="w-full h-full object-cover" />
@@ -474,7 +469,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
           </div>
 
           <div className="space-y-2">
-            <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Nội dung</p>
+            <p className="text-[11px] font-black  tracking-wide text-slate-400">Nội dung</p>
             <NewsRichEditor
               ref={editorRef}
               value={contentHtml}
@@ -486,7 +481,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Tệp đính kèm (PDF, Word…)</p>
+              <p className="text-[11px] font-black  tracking-wide text-slate-400">Tệp đính kèm (PDF, Word…)</p>
               <button
                 type="button"
                 disabled={busy}
@@ -791,7 +786,7 @@ export default function NewsPage({ session, role = 'admin' }) {
       );
     }
     return (
-      <div className="w-full space-y-6 pb-20 text-left">
+      <div className="w-full space-y-6 pt-4 pb-20 text-left">
         <div className="w-full bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm space-y-6">
 
           <button
@@ -803,7 +798,7 @@ export default function NewsPage({ session, role = 'admin' }) {
           </button>
           <div>
             {detail.isNew && (
-              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">NEW</span>
+              <span className="inline-block mb-2 px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black">New</span>
             )}
             {detail.topicName ? (
               <span className="inline-block mb-2 ml-2 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-black">
@@ -839,14 +834,13 @@ export default function NewsPage({ session, role = 'admin' }) {
             if (!attachList.length) return null;
             return (
               <div className="space-y-2">
-                <p className="text-xs font-black uppercase tracking-wide text-slate-400">Tệp đính kèm</p>
+                <p className="text-xs font-black  tracking-wide text-slate-400">Tệp đính kèm</p>
                 <ul className="space-y-1.5">
                   {attachList.map((a, i) => (
                     <li key={`${a.url}-${i}`}>
                       {a.kind === 'image' ? (
                         <img src={resolveMediaUrl(a.url)} alt={a.name || ''} className="rounded-xl max-h-80 object-contain" />
                       ) : a.kind === 'video' ? (
-                        // eslint-disable-next-line jsx-a11y/media-has-caption
                         <video src={resolveMediaUrl(a.url)} controls className="rounded-xl w-full max-h-96 bg-black" />
                       ) : (
                         <a
@@ -929,7 +923,7 @@ export default function NewsPage({ session, role = 'admin' }) {
           )}
           {related.length > 0 && (
             <div className="pt-6 border-t border-slate-100">
-              <h2 className="text-sm font-black uppercase tracking-wide text-slate-400 mb-3">Bài liên quan</h2>
+              <h2 className="text-sm font-black  tracking-wide text-slate-400 mb-3">Bài liên quan</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {related.map((p) => (
                   <NewsCard key={p.id} post={p} basePath={base} onOpen={openPost} />
@@ -943,24 +937,10 @@ export default function NewsPage({ session, role = 'admin' }) {
   }
 
   return (
-    <div className="w-full space-y-4 pb-8">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2 truncate">
-            <Newspaper className="text-red-600 shrink-0" size={22} /> Tin tức
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">Tin tức &amp; thông báo từ trung tâm</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => loadList(page)}
-            className="p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-            title="Làm mới"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-          {canManage && (
+    <div className="w-full space-y-4 pt-4 pb-8">
+      {canManage && (
+        <div className="flex items-center justify-end gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <>
               <button
                 type="button"
@@ -977,56 +957,11 @@ export default function NewsPage({ session, role = 'admin' }) {
                 <Plus size={14} /> Viết bài
               </button>
             </>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 w-full">
-        <div className="relative w-52 sm:w-56 shrink-0">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') setQ(qInput.trim());
-            }}
-            placeholder="Tìm bài viết…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 bg-white transition-all"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setQ(qInput.trim())}
-          className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors"
-        >
-          Tìm
-        </button>
-        {mode !== 'manage' && (
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 shrink-0">
-            <button
-              type="button"
-              title="Xem lưới"
-              onClick={() => {
-                setNewsView('grid');
-                try { localStorage.setItem(NEWS_VIEW_KEY, 'grid'); } catch { /* ignore */ }
-              }}
-              className={`p-2 rounded-lg ${newsView === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <LayoutGrid size={15} />
-            </button>
-            <button
-              type="button"
-              title="Xem dọc"
-              onClick={() => {
-                setNewsView('list');
-                try { localStorage.setItem(NEWS_VIEW_KEY, 'list'); } catch { /* ignore */ }
-              }}
-              className={`p-2 rounded-lg ${newsView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <List size={15} />
-            </button>
-          </div>
-        )}
         <CmsSelect
           value={topicFilter}
           onChange={(e) => setTopicFilter(e.target.value)}
@@ -1063,6 +998,53 @@ export default function NewsPage({ session, role = 'admin' }) {
           <option value="last_month">Tháng trước</option>
           <option value="oldest_month">Tháng cũ nhất</option>
         </CmsSelect>
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative w-52 sm:w-56 shrink-0">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setQ(qInput.trim());
+              }}
+              placeholder="Tìm bài viết…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 bg-white transition-all"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setQ(qInput.trim())}
+            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 transition-colors"
+          >
+            Tìm
+          </button>
+          {mode !== 'manage' && (
+            <div className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
+              <button
+                type="button"
+                title="Xem lưới"
+                onClick={() => {
+                  setNewsView('grid');
+                  try { localStorage.setItem(NEWS_VIEW_KEY, 'grid'); } catch { /* ignore */ }
+                }}
+                className={`p-2 rounded-lg ${newsView === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <LayoutGrid size={15} />
+              </button>
+              <button
+                type="button"
+                title="Xem dọc"
+                onClick={() => {
+                  setNewsView('list');
+                  try { localStorage.setItem(NEWS_VIEW_KEY, 'list'); } catch { /* ignore */ }
+                }}
+                className={`p-2 rounded-lg ${newsView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <List size={15} />
+              </button>
+            </div>
+          )}
+        </div>
         {canManage && topicFilter !== 'all' && (
           <button
             type="button"
@@ -1179,7 +1161,7 @@ export default function NewsPage({ session, role = 'admin' }) {
                       } else {
                         toast.error(res?.message || 'Không thể xóa bài viết');
                       }
-                    } catch (err) {
+                    } catch {
                       toast.error('Lỗi kết nối khi xóa bài viết');
                     }
                   }}

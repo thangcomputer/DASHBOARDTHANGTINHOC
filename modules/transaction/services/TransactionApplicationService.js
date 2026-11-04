@@ -7,12 +7,12 @@ const logger = require('./../../../config/logger');
 const { postSalary, voidLedgerEntry } = require('./../../finance/services/ledgerService');
 const LedgerEntry = require('./../../finance/models/LedgerEntry');
 const { allowHardDeleteFinance } = require('./../../../utils/financeFlags');
+const { sanitizeRegex } = require('./../../../middleware/sanitizeRegex');
 
 /**
  * transactionRoutes.js — Quản lý phiếu chi lương giảng viên
  * Có branchFilter: STAFF chỉ thấy giao dịch của chi nhánh mình
  */
-const router      = express.Router();
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
 
@@ -43,16 +43,16 @@ class TransactionApplicationService {
       transactionRepository.count(filter),
     ]);
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       count: transactions.length,
       total,
       page: pageNum,
       limit: limitNum,
       data: transactions,
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -92,12 +92,12 @@ class TransactionApplicationService {
       data.userBranchId ? { teacherId: matchFilter.teacherId } : {}
     );
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: { totalPaid, totalPending, countPending, countTotal },
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -105,13 +105,13 @@ class TransactionApplicationService {
   try {
     // Chỉ Admin hoặc chính Teacher đó mới được xem
     if (data.currentUser.role !== 'admin' && data.currentUser.role !== 'staff' && data.currentUser.id !== data.teacherId) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền xem thông tin này' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không có quyền xem thông tin này' } };
     }
     const transactions = await transactionRepository.findMany({ teacherId: data.teacherId })
       .sort({ createdAt: -1 });
-    return { _status: 200, _body: ({ success: true, data: transactions });
+    return { _status: 200, _body: { success: true, data: transactions } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -121,16 +121,16 @@ class TransactionApplicationService {
     
     // Nếu không phải Admin, chỉ được tự tính lương của chính mình
     if (data.currentUser.role !== 'admin' && data.currentUser.role !== 'staff' && data.currentUser.id !== teacherId) {
-      return { _status: 403, _body: ({ success: false, message: 'Bạn không có quyền thực hiện thao tác này' });
+      return { _status: 403, _body: { success: false, message: 'Bạn không có quyền thực hiện thao tác này' } };
     }
     // month: "YYYY-MM"
     if (!teacherId || !month) {
-      return { _status: 400, _body: ({ success: false, message: 'Cần teacherId và month (YYYY-MM)' });
+      return { _status: 400, _body: { success: false, message: 'Cần teacherId và month (YYYY-MM)' } };
     }
 
     const teacher = await Teacher.findById(teacherId);
     if (!teacher) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy giảng viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy giảng viên' } };
     }
 
     const [year, m] = month.split('-').map(Number);
@@ -148,7 +148,7 @@ class TransactionApplicationService {
     const totalAmount      = completedSessions * salaryPerSession;
     const monthLabel       = `Tháng ${m}/${year}`;
 
-    return { _status: 200, _body: ({
+    return { _status: 200, _body: {
       success: true,
       data: {
         teacherId,
@@ -159,9 +159,9 @@ class TransactionApplicationService {
         totalAmount,
         bankAccount:       teacher.bankAccount,
       },
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -170,12 +170,12 @@ class TransactionApplicationService {
     const { teacherId, amount, description, month, note } = data.body;
 
     if (!teacherId || !amount) {
-      return { _status: 400, _body: ({ success: false, message: 'Thiếu teacherId hoặc amount' });
+      return { _status: 400, _body: { success: false, message: 'Thiếu teacherId hoặc amount' } };
     }
 
     const teacher = await Teacher.findById(teacherId);
     if (!teacher) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy giảng viên' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy giảng viên' } };
     }
 
     const transaction = await transactionRepository.create({
@@ -210,10 +210,10 @@ class TransactionApplicationService {
       io.emit('data:refresh', { type: 'transaction', id: transaction._id });
     }
 
-    return { _status: 201, _body: ({ success: true, data: transaction });
+    return { _status: 201, _body: { success: true, data: transaction } };
   } catch (err) {
     logger.error('[TRANSACTIONS] Create error:', err);
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -228,7 +228,7 @@ class TransactionApplicationService {
     ).populate('teacherId', 'name phone');
 
     if (!transaction) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy giao dịch' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy giao dịch' } };
     }
 
     try {
@@ -256,10 +256,10 @@ class TransactionApplicationService {
       } catch (rbErr) {
         logger.error('[TRANSACTIONS] confirm rollback failed: %s', rbErr.message);
       }
-      return { _status: 500, _body: ({
+      return { _status: 500, _body: {
         success: false,
         message: 'Ghi sổ lương thất bại — phiếu vẫn pending. Thử lại.',
-      });
+      } };
     }
 
     // Thông báo real-time cho giảng viên
@@ -278,9 +278,9 @@ class TransactionApplicationService {
       io.emit('data:refresh', { type: 'transaction', id: transaction._id });
     }
 
-    return { _status: 200, _body: ({ success: true, data: transaction });
+    return { _status: 200, _body: { success: true, data: transaction } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -288,10 +288,10 @@ class TransactionApplicationService {
   try {
     const prev = await transactionRepository.findById(data.id);
     if (!prev) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy giao dịch' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy giao dịch' } };
     }
     if (prev.status === 'cancelled') {
-      return { _status: 200, _body: ({ success: true, data: prev });
+      return { _status: 200, _body: { success: true, data: prev } };
     }
 
     const transaction = await transactionRepository.updateById(
@@ -326,9 +326,9 @@ class TransactionApplicationService {
       }
     }
 
-    return { _status: 200, _body: ({ success: true, data: transaction });
+    return { _status: 200, _body: { success: true, data: transaction } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 
@@ -336,24 +336,24 @@ class TransactionApplicationService {
   try {
     const transaction = await transactionRepository.findById(data.id);
     if (!transaction) {
-      return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy giao dịch' });
+      return { _status: 404, _body: { success: false, message: 'Không tìm thấy giao dịch' } };
     }
     if (transaction.status === 'confirmed' && !allowHardDeleteFinance()) {
-      return { _status: 405, _body: ({
+      return { _status: 405, _body: {
         success: false,
         message: 'Không được xóa phiếu lương đã xác nhận. Hãy hủy (cancel) hoặc void ledger.',
-      });
+      } };
     }
     if (!allowHardDeleteFinance() && transaction.status !== 'pending' && transaction.status !== 'cancelled') {
-      return { _status: 405, _body: ({
+      return { _status: 405, _body: {
         success: false,
         message: 'Hard-delete bị tắt. Dùng PUT /cancel.',
-      });
+      } };
     }
     await transactionRepository.deleteById(data.id);
-    return { _status: 200, _body: ({ success: true, message: 'Đã xóa giao dịch' });
+    return { _status: 200, _body: { success: true, message: 'Đã xóa giao dịch' } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 

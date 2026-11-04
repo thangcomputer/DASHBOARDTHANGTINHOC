@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const Message = require('../models/Message');
+const chatController = require('../controllers/ChatController');
 const Group = require('../../student/models/Group');
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
 console.log('--- MESSAGE ROUTES LOADED ---', typeof authMiddleware);
@@ -151,6 +154,5 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
-
 
 

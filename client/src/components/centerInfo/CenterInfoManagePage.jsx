@@ -6,13 +6,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import api, { resolveMediaUrl } from '../../services/api';
 import RichTextEditor from '../admin/shared/RichTextEditor';
 import CmsSelect from '../ui/CmsSelect';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import { CENTER_SECTIONS, SECTION_ITEM_KEYS, blankItem } from './centerInfoConstants';
 
 function Field({ label, children }) {
   return (
     <div>
-      <label className="text-xs font-bold text-slate-500 uppercase block mb-1">{label}</label>
+      <label className="text-xs font-bold text-slate-500  block mb-1">{label}</label>
       {children}
     </div>
   );
@@ -486,7 +486,7 @@ export default function CenterInfoManagePage() {
                   <input className={inputClass} value={overview.foundedYear || ''} onChange={(e) => patchOverview('foundedYear', e.target.value)} />
                 </Field>
                 <Field label="Website">
-                  <input className={inputClass} value={overview.website || ''} onChange={(e) => patchOverview('website', e.target.value)} placeholder="https://" />
+                  <input className={inputClass} value={overview.website || ''} onChange={(e) => patchOverview('website', e.target.value)} placeholder="HTTPS://" />
                 </Field>
                 <Field label="Email">
                   <input className={inputClass} value={overview.contactEmail || ''} onChange={(e) => patchOverview('contactEmail', e.target.value)} />
@@ -654,7 +654,7 @@ export default function CenterInfoManagePage() {
                     ) : null}
                     {section === 'social' || section === 'service' || section === 'certificate' ? (
                       <Field label="URL / Link">
-                        <input className={inputClass} value={form.url || ''} onChange={(e) => patchForm('url', e.target.value)} placeholder="https://" />
+                        <input className={inputClass} value={form.url || ''} onChange={(e) => patchForm('url', e.target.value)} placeholder="HTTPS://" />
                       </Field>
                     ) : null}
                     {section === 'service' ? (

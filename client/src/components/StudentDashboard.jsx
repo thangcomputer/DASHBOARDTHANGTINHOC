@@ -1,6 +1,5 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { FileUp, XCircle } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import ClassReminder from './ClassReminder';
 import { useData } from '../context/DataContext';
 import { useScheduleContext } from '../context/ScheduleContext';
@@ -10,7 +9,7 @@ import StudentProfileUpdateModal from './StudentProfileUpdateModal';
 import api from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import {
-  getClientEnrollments, getActiveClientEnrollments, scopeStudentToEnrollment, filterSchedulesByCourse,
+  getActiveClientEnrollments, scopeStudentToEnrollment, filterSchedulesByCourse,
   filterStudentTrainingFiles,
   filterStudentTrainingVideos,
   enrichEnrollmentsWithTeachers,
@@ -114,7 +113,7 @@ function mergeScheduleLogs(pendingLogs, activityLogs) {
   return [...pendingLogs, ...fromActivity].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 }
 
-const StudentDashboard = ({ onNavigate }) => {
+const StudentDashboard = () => {
   const [activeCourseName, setActiveCourseName] = useState('');
   const [evaluatingCourseId, setEvaluatingCourseId] = useState(null);
   const [noteModalSched, setNoteModalSched] = useState(null);
@@ -125,10 +124,9 @@ const StudentDashboard = ({ onNavigate }) => {
     session = {};
   }
   const STUDENT_ID = session.id || session._id || null;
-  const { students, teachers, materials, schedules, getNotifications, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, studentQuestions, examSubjectsCatalog } = useData();
+  const { students, teachers, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, examSubjectsCatalog } = useData();
   const { setSchedulesLocal } = useScheduleContext();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));
-  const navigate = useNavigate();
   const location = useLocation();
   const { onDataRefresh, socket } = useSocket();
 
@@ -285,9 +283,6 @@ const StudentDashboard = ({ onNavigate }) => {
     return isNaN(pct) ? 0 : pct;
   }, [viewStudent]);
 
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadDone, setUploadDone] = useState(false);
-  const fileRef = useRef(null);
   const [showTuitionModal, setShowTuitionModal] = useState(false);
   const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
 
@@ -313,7 +308,7 @@ const StudentDashboard = ({ onNavigate }) => {
       } else {
         window.cmsAlert(res.message || "Lỗi tải file", "error");
       }
-    } catch(err) {
+    } catch {
       window.cmsAlert("Lỗi mạng khi tải file", "error");
     }
     setIsSubmitting(false);
@@ -429,11 +424,6 @@ const StudentDashboard = ({ onNavigate }) => {
       return kind === 'upcoming' || kind === 'ongoing';
     }).length;
   }, [mySchedules]);
-  const myMaterials = useMemo(() =>
-    materials.filter(m => student?.course?.includes(m.course) || m.course?.includes('THVP NÂNG CAO')),
-    [materials, student]
-  );
-  
   const [teacherRatingData, setTeacherRatingData] = useState({ avg: 0, count: 0, ratings: [] });
   useEffect(() => {
     if (!viewStudent?.teacherId) return;
@@ -444,7 +434,7 @@ const StudentDashboard = ({ onNavigate }) => {
         const avg = count > 0 ? (Math.round((validRatings.reduce((s, r) => s + r.criteria.stars, 0) / count) * 10) / 10) : 0;
         setTeacherRatingData({ avg, count, ratings: res.data });
       }
-    }).catch(err => void 0);
+    }).catch(() => undefined);
   }, [viewStudent?.teacherId]);
   // ─── Quizzes State (Trắc nghiệm Giảng viên giao) ───
   const [myQuizzes, setMyQuizzes] = useState([]);
@@ -648,7 +638,6 @@ const StudentDashboard = ({ onNavigate }) => {
     if (centerDone && !teacherDone) return 'teacher';
     return 'center';
   })();
-  const myNotifs = getNotifications(STUDENT_ID, 'student').filter(n => !n.read).length;
   const myUnreadMsgs = (() => {
     try {
       const convs = typeof getConversations === 'function' ? getConversations(STUDENT_ID) : [];
@@ -657,11 +646,6 @@ const StudentDashboard = ({ onNavigate }) => {
       return 0;
     }
   })();
-
-  const handleFileUpload = (e) => {
-    const f = e.target.files[0];
-    if (f) { setUploadFile(f); setTimeout(() => setUploadDone(true), 1500); }
-  };
 
   if (!studentData || !viewStudent) return <div className="p-20 text-center text-gray-500">Không tìm thấy học viên.</div>;
 
@@ -730,7 +714,7 @@ const StudentDashboard = ({ onNavigate }) => {
             </div>
             <div className="p-4 sm:p-6">
               <div className="mb-6">
-                <p className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1">Tên bài tập</p>
+                <p className="text-xs text-slate-500  font-black tracking-widest mb-1">Tên bài tập</p>
                 <p className="font-bold text-slate-800 text-lg">{activeAssignment.title}</p>
               </div>
               <div className="space-y-4">
@@ -739,7 +723,7 @@ const StudentDashboard = ({ onNavigate }) => {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <input 
                       type="url"
-                      placeholder="https://drive.google.com/... hoặc link file" 
+                      placeholder="HTTPS://drive.google.com/... hoặc link file"
                       className="flex-1 border-2 border-slate-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-300 font-medium"
                       value={submissionLink}
                       onChange={(e) => setSubmissionLink(e.target.value)}

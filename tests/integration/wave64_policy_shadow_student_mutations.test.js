@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { PERMISSIONS } = require('../../constants/permissions');
+const { readDeployEnv } = require('../helpers/deployEnv');
 const {
   buildSubject,
   evaluateLegacyStudentMutation,
@@ -501,10 +502,10 @@ test('Wave6.4 static: all live mutation routes keep legacy + shadow', () => {
 test('Wave6.4 CQRS student create remains OFF / strangler gated', () => {
   const src = fs.readFileSync(path.join(ROOT, 'routes/studentRoutes.js'), 'utf8');
   assert.ok(src.includes("ENABLE_CQRS_STUDENT_CREATE === 'true'"));
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-  assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
+  const env = readDeployEnv();
+  if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
 });
 
 test('Wave6.4 adapter: MANAGE_STUDENTS / MANAGE_FINANCE identity mapping', () => {

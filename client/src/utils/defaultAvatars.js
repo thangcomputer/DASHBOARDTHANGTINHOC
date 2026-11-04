@@ -105,7 +105,7 @@ function pickRoleGenderAsset(roleKey, gender) {
  * Khong bien unknown thanh male.
  */
 export function resolveAvatarUrl(userObj = {}) {
-  let avatar, role, adminRole, name, id, gender;
+  let avatar, role, adminRole, id, gender;
   if (typeof userObj === 'string') {
     avatar = userObj;
   } else if (userObj && typeof userObj === 'object') {
@@ -116,7 +116,6 @@ export function resolveAvatarUrl(userObj = {}) {
       ?? userObj.src;
     role = userObj.role;
     adminRole = userObj.adminRole;
-    name = userObj.name;
     id = userObj.id || userObj._id;
     gender = userObj.gender ?? userObj.genderCode;
   }

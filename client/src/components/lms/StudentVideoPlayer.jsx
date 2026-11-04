@@ -51,7 +51,7 @@ export const StudentVideoPlayer = ({
   };
   const yId = extractYouTubeId(videoId);
   const [isReady, setIsReady] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [, setIsPaused] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [hasEnded, setHasEnded] = useState(false);
@@ -178,7 +178,11 @@ export const StudentVideoPlayer = ({
       if (document.hidden) {
         setIsTabActive(false);
         if (playerRef.current?.pauseVideo) {
-          try { playerRef.current.pauseVideo(); } catch (e) { void 0; }
+          try {
+            playerRef.current.pauseVideo();
+          } catch {
+            // The embedded player may reject pause during teardown.
+          }
         }
       } else {
         setIsTabActive(true);
@@ -612,7 +616,7 @@ export const StudentVideoPlayer = ({
             <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mb-4">
               <Lock size={28} />
             </div>
-            <h3 className="text-red-400 font-black text-sm uppercase tracking-wider">Video Đã Tạm Dừng</h3>
+            <h3 className="text-red-400 font-black text-sm  tracking-wider">Video Đã Tạm Dừng</h3>
             <p className="text-slate-400 text-xs mt-2 max-w-[240px] leading-relaxed">
               Bạn đã chuyển tab hoặc rời khỏi trang học. Vui lòng quay lại tab này để tiếp tục học.
             </p>
@@ -624,7 +628,7 @@ export const StudentVideoPlayer = ({
           </div>
         ) : null}
         {!isReady && !playerError && overlayVisible ? (
-          <div className="absolute top-3 right-3 z-40 text-[10px] font-bold uppercase tracking-wider text-white/90 bg-black/50 px-2 py-1 rounded-md border border-white/15">
+          <div className="absolute top-3 right-3 z-40 text-[10px] font-bold  tracking-wider text-white/90 bg-black/50 px-2 py-1 rounded-md border border-white/15">
             Đang tải…
           </div>
         ) : null}

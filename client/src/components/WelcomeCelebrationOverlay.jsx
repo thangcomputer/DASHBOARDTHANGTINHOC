@@ -347,7 +347,7 @@ export default function WelcomeCelebrationOverlay({
               />
             </div>
 
-            <p className="relative text-[11px] font-bold uppercase tracking-[0.28em] text-red-100/90">
+            <p className="relative text-[11px] font-bold  tracking-[0.28em] text-red-100/90">
               Trung tâm Tin học Thắng Tin Học
             </p>
             <h2
@@ -431,7 +431,7 @@ export default function WelcomeCelebrationOverlay({
               />
             </div>
 
-            <p className="relative text-[11px] font-bold uppercase tracking-[0.28em] text-amber-900/70">
+            <p className="relative text-[11px] font-bold  tracking-[0.28em] text-amber-900/70">
               Trung tâm Tin học Thắng Tin Học
             </p>
             <h2
@@ -461,7 +461,7 @@ export default function WelcomeCelebrationOverlay({
             </p>
 
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-yellow-50 px-4 py-5">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700/80">
+              <p className="text-[11px] font-bold  tracking-wider text-amber-700/80">
                 Sẽ được cộng vào lương
               </p>
               <p className="mt-1 text-3xl sm:text-4xl font-black tabular-nums text-amber-700 tracking-tight">
@@ -544,7 +544,7 @@ export default function WelcomeCelebrationOverlay({
           <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-amber-200/40 bg-white/15 shadow-inner backdrop-blur-sm">
             <Sparkles size={30} className="text-amber-200" aria-hidden="true" />
           </div>
-          <p className="relative text-[11px] font-bold uppercase tracking-[0.28em] text-amber-100/95">
+          <p className="relative text-[11px] font-bold  tracking-[0.28em] text-amber-100/95">
             Trung tâm Tin học Thắng Tin Học
           </p>
           <h2 id="welcome-celebration-title" className="relative mt-3 text-2xl sm:text-[1.7rem] font-black tracking-tight leading-tight">
@@ -569,13 +569,13 @@ export default function WelcomeCelebrationOverlay({
                 <p key={line}>{line}</p>
               ))}
             </div>
-            <p className="mt-3 text-[11px] font-bold uppercase tracking-wider text-amber-700/80">
+            <p className="mt-3 text-[11px] font-bold  tracking-wider text-amber-700/80">
               Học đều · Luyện tập · Kiên trì
             </p>
           </blockquote>
 
           <div className="h-px w-16 mx-auto bg-gradient-to-r from-transparent via-red-200 to-transparent" aria-hidden="true" />
-          <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+          <p className="text-xs font-semibold tracking-wide text-slate-400 ">
             Lời chào từ đội ngũ Thắng Tin Học
           </p>
           <button

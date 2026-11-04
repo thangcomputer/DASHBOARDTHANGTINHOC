@@ -2,11 +2,8 @@ const express = require('express');
 const router = express.Router();
 const aiController = require('../controllers/AiController');
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
-const { authorize, authorizeAny, authorizeAll } = require('../../../shared/middleware/authorize');
-const legacyMapping = require('../../../shared/constants/legacyPermissionMapping');
+const { authorize } = require('../../../shared/middleware/authorize');
 const NEW_PERMISSIONS = require('../../../shared/constants/permissions');
-const aiService = require('../services/aiService');
-const logger = require('../../../config/logger');
 const { sensitiveFlowLimiter } = require('../../../middleware/authRateLimit');
 
 const guard = [authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE), sensitiveFlowLimiter];

@@ -247,7 +247,7 @@ export async function parseStudentQuestionsExcel(bstr, options = {}) {
   let wb;
   try {
     wb = XLSX.read(bstr, { type: 'binary' });
-  } catch (e) {
+  } catch {
     return { questions: [], errors: ['Khong doc duoc file Excel.'], skipped: 0 };
   }
 

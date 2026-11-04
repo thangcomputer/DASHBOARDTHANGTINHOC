@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
@@ -7,10 +7,10 @@ import FloatingMessenger from './FloatingMessenger';
 import { FloatingMessengerProvider } from '../context/FloatingMessengerContext';
 import { useData } from '../context/DataContext';
 import { useSocket } from '../context/SocketContext';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import api, { setTokens, csrfFetch } from '../services/api';
-import { 
-  Bell, MessageCircle, LogOut, CheckCircle2, Clock, X, Lock,
+import {
+  Bell, MessageCircle, CheckCircle2, Clock, X, Lock,
   Calendar, DollarSign, UserPlus, Zap, BookOpen, Award, Menu, Star,
 } from 'lucide-react';
 
@@ -39,6 +39,9 @@ import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
 import { setLoginOverlay } from '../utils/loginOverlayGate';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
+import PinLockGate from './pinLock/PinLockGate';
+import PinLockSettingsModal from './pinLock/PinLockSettingsModal';
+import { clearLastActive, setLockedFlag } from '../utils/pinLock';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -59,6 +62,28 @@ const PAGE_TITLES = {
   materials: 'Tài liệu',
   evaluation: 'Đánh giá',
   profile: 'Hồ sơ',
+};
+
+const ROLE_PAGE_TITLES = {
+  student: {
+    dashboard: 'Tổng quan',
+    schedule: 'Lịch học',
+    'lesson-practice': 'Luyện tập',
+    'materials-files': 'Bài tập và tài nguyên',
+    'materials-software': 'Bài tập và tài nguyên',
+    exam: 'Phòng thi',
+    evaluation: 'Đánh giá GV',
+    profile: 'Hồ sơ',
+  },
+  teacher: {
+    dashboard: 'Tổng quan',
+    schedule: 'Lịch dạy',
+    students: 'Quản lý học viên',
+    assignments: 'Giao bài tập & kiểm tra',
+    training: 'Khóa đào tạo',
+    finance: 'Tài chính',
+    profile: 'Hồ sơ',
+  },
 };
 
 function isTeacherAttendanceConfirmedNotif(n) {
@@ -153,10 +178,12 @@ async function enrichAttendancePayloadFromSchedules(base, studentId) {
 
 function resolvePageTitle(role, pathname, hash) {
   const key = (hash || '').replace('#', '');
+  if (key && ROLE_PAGE_TITLES[role]?.[key]) return ROLE_PAGE_TITLES[role][key];
   if (key && PAGE_TITLES[key]) return PAGE_TITLES[key];
   if (pathname.includes('/inbox')) return 'Hộp thư';
   if (pathname.includes('/feed')) return 'Bảng tin';
   if (pathname.includes('/news')) return 'Tin tức';
+  if (pathname.includes('/support')) return 'Hỗ trợ';
   if (pathname.includes('/notifications')) return 'Thông báo';
   if (pathname.includes('/bi')) return 'BI Dashboard';
   if (pathname.includes('/files')) return 'Quản lý file';
@@ -172,8 +199,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (pathname.includes('/test')) return 'Bài test';
   if (pathname.includes('/finance')) return 'Tài chính';
   if (role === 'admin') return 'Quản trị';
-  if (role === 'teacher') return 'Giảng dạy';
-  return 'Học tập';
+  return 'Tổng quan';
 }
 
 const getNotifStyle = (type) => {
@@ -206,7 +232,7 @@ const getNotifStyle = (type) => {
 const formatTime = (date) => {
   if (!date) return '';
   const d = new Date(date);
-  if (isNaN(d.getTime())) return String(date); 
+  if (isNaN(d.getTime())) return String(date);
   const now = new Date();
   const diffMs = now - d;
   if (diffMs < 0) return 'Vừa xong';
@@ -216,19 +242,18 @@ const formatTime = (date) => {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
 
-const getGreetingTime = () => {
-  const currentHour = new Date().getHours();
-  if (currentHour < 11) return 'buổi sáng';
-  if (currentHour < 14) return 'buổi trưa';
-  if (currentHour < 18) return 'buổi chiều';
-  return 'buổi tối';
-};
-
 const DashboardLayout = ({ role, session, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileFooterHiddenRouteKey, setMobileFooterHiddenRouteKey] = useState(null);
+  const [mobileFooterInputFocused, setMobileFooterInputFocused] = useState(false);
+  const mobileFooterRouteKey = `${location.pathname}${location.hash}`;
+  const mobileFooterVisible = mobileFooterHiddenRouteKey !== mobileFooterRouteKey;
+  const [brandLogo, setBrandLogo] = useState('');
+  const scrollPositions = useRef(new WeakMap());
+  const focusRestoreTimer = useRef(null);
   const [ratingDetail, setRatingDetail] = useState(null);
   const [ratingDetailLoading, setRatingDetailLoading] = useState(false);
   const [ratingDetailError, setRatingDetailError] = useState('');
@@ -347,10 +372,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               localStorage.setItem(key, JSON.stringify({ ...stored, token: res.accessToken, accessToken: res.accessToken, refreshToken: nextRefresh }));
               setTokens(res.accessToken, nextRefresh, role);
             }
-          }).catch(() => {});
+          }).catch((error) => {
+            console.warn('Unable to refresh the stored access token:', error);
+          });
         }
       }
-    } catch {}
+    } catch {
+      // The persisted session is optional; the in-memory session remains usable.
+    }
   }, []);
 
   const sessionTeacherId = session?.id || session?._id;
@@ -362,29 +391,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   // ⭐ Fix: Chuyển sang logic "Pessimistic" (Mặc định là Pending trừ khi có bằng chứng là Active)
   // Việc này giúp tránh bị "Flash" mở khóa menu khi login (do data chưa load kịp)
   const isTeacherPending = (role === 'teacher' && sessionTeacherId) ? (
-     String(session?.status || '').toLowerCase() !== 'active' && 
-     (!currentTeacher || String(currentTeacher.status || '').toLowerCase() !== 'active')
-  ) : false;
-
-  const isTeacherActive = (role === 'teacher' && sessionTeacherId) ? (
-     String(session?.status || '').toLowerCase() === 'active' || 
-     (currentTeacher && String(currentTeacher.status || '').toLowerCase() === 'active')
+    String(session?.status || '').toLowerCase() !== 'active' &&
+    (!currentTeacher || String(currentTeacher.status || '').toLowerCase() !== 'active')
   ) : false;
 
   useEffect(() => {
     if (role !== 'teacher' || !sessionTeacherId) return;
     if (window.location.pathname.includes('/teacher/test')) return;
-    
+
     // Nếu hệ thống đang tải hoặc currentTeacher chưa có nhưng session lại nói là active/pending thì CHỜ.
     const isLocalStatusValid = ['pending', 'active', 'locked'].includes(String(session?.status).toLowerCase());
     if (isRefetching || (!currentTeacher && isLocalStatusValid)) return;
-    
+
     const currentStatus = currentTeacher?.status || session?.status;
     if (currentStatus === undefined || currentStatus === '') return;
-    
+
     const allowed = ['pending', 'active'];
     const s = String(currentStatus).toLowerCase();
-    
+
     // Khóa / chờ chấm: chuyển sang trang test thay vì đá ra login
     if (!allowed.includes(s)) {
       navigate('/teacher/test', { replace: true });
@@ -393,7 +417,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   useEffect(() => {
     if (role !== 'teacher' || !sessionTeacherId) return;
-    
+
     const isLocalStatusValid = String(session?.status).toLowerCase();
     if (isRefetching || (!currentTeacher && isLocalStatusValid)) return;
 
@@ -764,7 +788,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       setAttendanceConfirmBusy(false);
       toast.info('Buổi học đã được Admin điểm danh bù và hoàn tất.');
       if (typeof triggerBackgroundSync === 'function') {
-        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
       }
     };
     socket.on('attendance:awaiting-confirm', onAwait);
@@ -861,7 +885,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           setAttendanceConfirm(null);
           toast.info('Buổi học đã được Admin điểm danh bù và hoàn tất.');
           if (typeof triggerBackgroundSync === 'function') {
-            Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+            Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
           }
           return;
         }
@@ -875,7 +899,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         toast.success('Đã xác nhận điểm danh — buổi học được tính.');
       }
       if (typeof triggerBackgroundSync === 'function') {
-        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
       }
     } catch (e) {
       toast.error(e?.message || 'Lỗi kết nối');
@@ -964,6 +988,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     setAttendanceConfirm(null);
   }, []);
 
+  React.useEffect(() => {
+    const onOpenAttendanceConfirm = (event) => {
+      const scheduleId = event?.detail?.scheduleId;
+      if (role !== 'student' || !scheduleId) return;
+      void openStudentAttendanceFromNotif({ scheduleId });
+    };
+    window.addEventListener('cms:open-student-attendance-confirm', onOpenAttendanceConfirm);
+    return () => window.removeEventListener('cms:open-student-attendance-confirm', onOpenAttendanceConfirm);
+  }, [openStudentAttendanceFromNotif, role]);
+
   const handleAdminDisputeDecision = React.useCallback(async (decision) => {
     const sid = attendanceDispute?.scheduleId;
     if (!sid) return;
@@ -981,7 +1015,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         toast.success('Đã chấp thuận — buổi được tính.');
       }
       if (typeof triggerBackgroundSync === 'function') {
-        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
       }
     } catch (e) {
       toast.error(e?.message || 'Lỗi kết nối');
@@ -1081,7 +1115,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         if (!prev || String(prev.scheduleId || '') !== sid) return prev;
         return { ...prev, studentNote: live, deleted: gone };
       });
-    }).catch(() => {});
+    }).catch(() => { });
   }, [schedules]);
 
   React.useEffect(() => {
@@ -1155,7 +1189,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch { /* ignore */ }
   }, [starBonusCelebration, markStarBonusSeen, myId, allNotifications, markNotificationRead]);
 
-  const handleLogout = () => onLogout?.();
+  const pinUserKey = myId ? `${role}:${myId}` : '';
+  const handleLogout = () => {
+    if (pinUserKey) {
+      clearLastActive(pinUserKey);
+      setLockedFlag(pinUserKey, false);
+    }
+    onLogout?.();
+  };
 
   const [showNotif, setShowNotif] = React.useState(false);
   const [notifLimit, setNotifLimit] = React.useState(5);
@@ -1264,7 +1305,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (!showNotif) return;
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target) &&
-          bellRef.current && !bellRef.current.contains(e.target)) {
+        bellRef.current && !bellRef.current.contains(e.target)) {
         setShowNotif(false);
       }
     };
@@ -1304,20 +1345,20 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       if (recs.includes('ALL_STUDENT') && role !== 'student') return false;
 
       const isForMe = (myIdStr && recs.includes(myIdStr)) ||
-                      (role && recs.includes(String(role))) ||
-                      (isStaffAccount && recs.includes('staff')) ||
-                      (isAdminRole && recs.includes('ALL_ADMIN')) ||
-                      isSupportReceiver ||
-                      isHighAdminBranchReceiver ||
-                      (role === 'teacher' && recs.includes('ALL_TEACHER')) ||
-                      (role === 'student' && recs.includes('ALL_STUDENT')) ||
-                      isStaffBranchReceiver ||
-                      recs.includes('GLOBAL') ||
-                      recs.includes('ALL');
+        (role && recs.includes(String(role))) ||
+        (isStaffAccount && recs.includes('staff')) ||
+        (isAdminRole && recs.includes('ALL_ADMIN')) ||
+        isSupportReceiver ||
+        isHighAdminBranchReceiver ||
+        (role === 'teacher' && recs.includes('ALL_TEACHER')) ||
+        (role === 'student' && recs.includes('ALL_STUDENT')) ||
+        isStaffBranchReceiver ||
+        recs.includes('GLOBAL') ||
+        recs.includes('ALL');
       if (!isForMe) return false;
     }
-    return ((myId && String(n.userId) === String(myId)) || !n.userId) && 
-           (n.role === role || (isStaffAccount && n.role === 'staff') || !n.role);
+    return ((myId && String(n.userId) === String(myId)) || !n.userId) &&
+      (n.role === role || (isStaffAccount && n.role === 'staff') || !n.role);
   }).sort((a, b) => new Date(b.time || Date.now()) - new Date(a.time || Date.now()));
 
 
@@ -1475,8 +1516,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   const displayName = role === 'teacher'
     ? (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name)
-        ? currentTeacher.name
-        : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên')
+      ? currentTeacher.name
+      : currentTeacher?.email || currentTeacher?.phone || session?.name || 'Giảng viên')
     : (session?.name || 'Admin');
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
   const activeHash = (location.hash || '').replace('#', '').split('?')[0];
@@ -1487,15 +1528,87 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const isStudentsTab = adminHash === 'students' || isTeacherStudentsTab;
   const isInboxPage = location.pathname.includes('/inbox');
   const isBiPage = location.pathname.includes('/bi');
+  const isLessonPracticeCoursePage = role === 'student'
+    && /^\/student\/lesson-practice\/(subjects|units)\//.test(location.pathname);
   const isImmersivePage =
     isInboxPage
     || isBiPage
     || (role === 'teacher' && location.pathname === '/teacher/test')
     || isTeacherStudentsTab;
   const showAdminBranch = role === 'admin';
-  const roleLabel = role === 'admin'
-    ? (session?.adminRole === 'SUPER_ADMIN' ? 'Super Admin' : session?.adminRole === 'HIGH_ADMIN' ? 'Admin cấp cao' : session?.adminRole === 'SUPPORT' ? 'Chuyên viên Hỗ trợ' : session?.adminRole === 'STAFF' ? 'Staff' : 'admin')
-    : role;
+  const handleContentScroll = (event) => {
+    const scrollTarget = event.target;
+    if (!(scrollTarget instanceof HTMLElement)
+      || scrollTarget.scrollHeight <= scrollTarget.clientHeight + 1) return;
+
+    const scrollTop = scrollTarget.scrollTop;
+    const previousScrollTop = scrollPositions.current.get(scrollTarget) ?? 0;
+    const delta = scrollTop - previousScrollTop;
+    scrollPositions.current.set(scrollTarget, scrollTop);
+    if (scrollTop <= 24) {
+      setMobileFooterHiddenRouteKey(null);
+    } else if (delta > 4) {
+      setMobileFooterHiddenRouteKey(mobileFooterRouteKey);
+    } else if (delta < -4) {
+      setMobileFooterHiddenRouteKey(null);
+    }
+  };
+
+  useEffect(() => {
+    const shouldHideMobileFooter = (target) => target instanceof HTMLElement && (
+      target.isContentEditable
+      || Boolean(target.closest('.cms-chat-input-bar'))
+      || target.matches(
+        'textarea, select, input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"])',
+      )
+    );
+    const handleFocusIn = (event) => {
+      if (!shouldHideMobileFooter(event.target)) return;
+      window.clearTimeout(focusRestoreTimer.current);
+      setMobileFooterInputFocused(true);
+    };
+    const handleFocusOut = (event) => {
+      window.clearTimeout(focusRestoreTimer.current);
+      focusRestoreTimer.current = window.setTimeout(() => {
+        const activeElement = document.activeElement;
+        if (
+          activeElement === document.body
+          && event.target instanceof HTMLElement
+          && event.target.closest('.cms-chat-input-bar')
+        ) return;
+        setMobileFooterInputFocused(shouldHideMobileFooter(activeElement));
+      }, 0);
+    };
+    const handlePointerDown = (event) => {
+      if (event.target instanceof HTMLElement && event.target.closest('.cms-chat-input-bar')) {
+        setMobileFooterInputFocused(true);
+        return;
+      }
+      setMobileFooterInputFocused(false);
+    };
+    const handleChatMessageSent = () => setMobileFooterInputFocused(true);
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('cms-chat-message-sent', handleChatMessageSent);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('cms-chat-message-sent', handleChatMessageSent);
+      window.clearTimeout(focusRestoreTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollPositions.current = new WeakMap();
+    setMobileFooterHiddenRouteKey(null);
+  }, [location.pathname, location.hash]);
+
+  const showMobileFooter = mobileFooterVisible
+    && !mobileFooterInputFocused
+    && !isLessonPracticeCoursePage;
 
   return (
     <FloatingMessengerProvider
@@ -1503,789 +1616,810 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       currentUserRole={getMessagingRole(session) || role}
       getConversations={getConversations}
     >
-    <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
-      {isRefetching ? (
-        <div className="sr-only" role="status" aria-live="polite">
-          Đang đồng bộ dữ liệu
-        </div>
-      ) : null}
+      <div className="flex h-[100dvh] max-h-[100dvh] bg-[#f8fafc] relative font-sans overflow-hidden">
+        {isRefetching ? (
+          <div className="sr-only" role="status" aria-live="polite">
+            Đang đồng bộ dữ liệu
+          </div>
+        ) : null}
 
-      <AppSidebar
-        session={session}
-        role={role}
-        userName={displayName}
-        userAvatar={session?.avatar || session?.avatarUrl || ''}
-        onLogout={handleLogout}
-        teacherPending={isTeacherPending}
-        adminRole={session?.adminRole || null}
-        userPermissions={session?.permissions || []}
-        mobileOpen={mobileNavOpen}
-        onMobileOpenChange={setMobileNavOpen}
-      />
+        <AppSidebar
+          session={session}
+          role={role}
+          userName={displayName}
+          userAvatar={session?.avatar || session?.avatarUrl || ''}
+          onLogout={handleLogout}
+          teacherPending={isTeacherPending}
+          adminRole={session?.adminRole || null}
+          userPermissions={session?.permissions || []}
+          mobileOpen={mobileNavOpen}
+          onMobileOpenChange={setMobileNavOpen}
+          mobileNavVisible={!isImmersivePage || isInboxPage}
+          mobileFooterVisible={showMobileFooter}
+          onBrandLogoChange={setBrandLogo}
+        />
 
-      <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
-        <header className={`cms-topbar flex flex-col ${
-          !isImmersivePage ? 'cms-shell-gutter' : ''
-        } ${
-          role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
-        }`}>
-          <div className="cms-topbar__row">
-            <button
-              type="button"
-              className="cms-topbar__menu"
-              onClick={() => setMobileNavOpen(true)}
-              aria-label="Mở menu điều hướng"
-              aria-expanded={mobileNavOpen}
-            >
-              <Menu size={20} aria-hidden="true" />
-            </button>
-            <div className="min-w-0 flex-1 flex flex-col md:flex-row md:items-center md:gap-3 overflow-hidden">
-              <h1 className="cms-topbar__title">{pageTitle}</h1>
-              <p className="hidden md:block text-[11px] sm:text-[12px] text-slate-500 truncate leading-none mt-0.5 sm:mt-0">
-                <span className="font-medium text-slate-600">{displayName}</span>
-                <span className="text-slate-300 mx-1">·</span>
-                <span>{roleLabel}</span>
-              </p>
-            </div>
-
-            <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 shrink-0">
-              {showAdminBranch && (
-                <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
-                  <BranchFilterDropdown />
-                </div>
-              )}
-
-              <div className="relative">
-                <button 
-                  ref={bellRef}
-                  type="button"
-                  onClick={() => { setShowNotif(!showNotif); setNotifLimit(5); }}
-                  aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
-                  aria-expanded={showNotif}
-                  aria-haspopup="dialog"
-                  className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'bg-red-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
-                >
-                  <Bell size={18} aria-hidden="true" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              <div className="h-8 w-px bg-slate-100 mx-0.5 hidden md:block" />
-
-              {/* Desktop / large tablet+: logout in topbar (mobile+tablet dùng sidebar) */}
+        <main id="main-content" className="flex-1 min-w-0 flex flex-col h-[100dvh] max-h-[100dvh] max-w-full overflow-hidden" tabIndex={-1}>
+          <header className={`cms-topbar flex flex-col ${!isImmersivePage ? 'cms-shell-gutter' : ''
+            } ${role === 'teacher' && location.pathname === '/teacher/test' ? 'hidden' : ''
+            }`}>
+            <div className="cms-topbar__row">
               <button
                 type="button"
-                onClick={handleLogout}
-                aria-label="Đăng xuất"
-                className="hidden lg:inline-flex h-11 px-3 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors duration-200 items-center gap-1.5"
+                className="cms-topbar__menu"
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Mở menu điều hướng"
+                aria-expanded={mobileNavOpen}
               >
-                <LogOut size={15} aria-hidden="true" />
-                <span>Đăng xuất</span>
+                <Menu size={20} aria-hidden="true" />
+                <span className="cms-topbar__menu-label">Menu</span>
               </button>
-            </div>
-          </div>
+              <div className="min-w-0 flex-1 flex items-center overflow-hidden">
+                <h1 className="cms-topbar__title cms-topbar__title--mobile-hidden">{pageTitle}</h1>
+              </div>
+              <button
+                type="button"
+                className="cms-topbar__brand"
+                onClick={() => navigate(role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : role === 'staff' ? '/staff' : '/admin')}
+                aria-label="Về trang tổng quan"
+                title="Về trang tổng quan"
+              >
+                <img src={brandLogo || '/logo-thang-tin-hoc.svg'} alt="Logo Thắng Tin Học" />
+              </button>
 
-          {/* Mobile: branch full-width row (not students — students keeps prior lg-only behavior) */}
-          {showAdminBranch && !isStudentsTab && (
-            <div className="md:hidden w-full cms-page-gutter pb-2.5">
-              <BranchFilterDropdown fullWidth />
-            </div>
-          )}
-        </header>
+              <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 shrink-0">
+                {showAdminBranch && (
+                  <div className={isStudentsTab ? 'hidden lg:block' : 'hidden md:block'}>
+                    <BranchFilterDropdown />
+                  </div>
+                )}
 
-        <div
-          className={
-            isInboxPage || isBiPage
-              ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col cms-page-gutter py-3 sm:py-3 md:py-4 pb-[env(safe-area-inset-bottom,0px)]'
-              : isImmersivePage
-                ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-                : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:pb-6'
-          }
-        >
+                <div className="relative">
+                  <button
+                    ref={bellRef}
+                    type="button"
+                    onClick={() => { setShowNotif(!showNotif); setNotifLimit(5); }}
+                    aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
+                    aria-expanded={showNotif}
+                    aria-haspopup="dialog"
+                    className={`cms-topbar__action relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-colors duration-200 ${showNotif ? 'is-open' : ''}`}
+                  >
+                    <Bell size={18} aria-hidden="true" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white" aria-hidden="true">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Mobile: branch full-width row (not students — students keeps prior lg-only behavior) */}
+            {showAdminBranch && !isStudentsTab && (
+              <div className="md:hidden w-full cms-page-gutter pb-2.5">
+                <BranchFilterDropdown fullWidth />
+              </div>
+            )}
+          </header>
+
           <div
+            onScrollCapture={handleContentScroll}
             className={
               isInboxPage || isBiPage
-                ? 'cms-page min-w-0 w-full max-w-full flex-1 min-h-0 h-full flex flex-col overflow-hidden'
+                ? `flex-1 min-h-0 w-full overflow-hidden flex flex-col cms-page-gutter py-3 sm:py-3 md:py-4 ${isInboxPage
+                  ? ''
+                  : 'pb-[env(safe-area-inset-bottom,0px)]'
+                }`
                 : isImmersivePage
-                  ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
-                  : 'cms-page min-w-0 w-full max-w-full'
+                  ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
+                  : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]'
             }
+            style={isInboxPage
+              ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }
+              : undefined}
           >
-            <Outlet context={{ session, role }} />
+            <div
+              className={
+                isInboxPage || isBiPage
+                  ? `cms-page min-w-0 w-full max-w-full flex-1 min-h-0 h-full flex flex-col overflow-hidden ${isInboxPage ? 'pt-4' : ''}`
+                  : isImmersivePage
+                    ? 'cms-page min-w-0 flex-1 min-h-0 h-full flex flex-col overflow-hidden'
+                    : 'cms-page min-w-0 w-full max-w-full'
+              }
+            >
+              <Outlet context={{ session, role }} />
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
 
-      {role === 'student' ? <StudentQuizInviteHost /> : null}
+        {role === 'student' ? <StudentQuizInviteHost /> : null}
 
-      <LoginInboxAlertPopup
-        role={role}
-        userId={myId}
-        blocked={
-          showWelcomeCelebration
-          || !!courseCelebration
-          || !!starBonusCelebration
-          || (role === 'teacher' && !!teacherPaymentCelebration)
-          || (role === 'student' && !!attendanceConfirm)
-          || (role === 'student' && assignedTeacherModal.open)
-          || (canManageAttendanceAdminPopups && !!attendanceDispute)
-          || (role === 'teacher' && !!teacherAttendanceConfirm)
-          || (role === 'teacher' && !!studentNotePopup)
-          || (session?.isFirstLogin === true && role !== 'teacher')
-        }
-      />
-      <WelcomeCelebrationOverlay
-        open={showWelcomeCelebration}
-        role={role}
-        name={displayName || session?.name || ''}
-        variant="welcome"
-        onClose={dismissWelcomeCelebration}
-      />
-      <WelcomeCelebrationOverlay
-        open={!showWelcomeCelebration && !!courseCelebration}
-        role="student"
-        name={displayName || session?.name || ''}
-        variant="course_complete"
-        courseName={courseCelebration?.courseName || ''}
-        onClose={dismissCourseCelebration}
-      />
-      <WelcomeCelebrationOverlay
-        open={!showWelcomeCelebration && !courseCelebration && !!starBonusCelebration}
-        role="teacher"
-        name={displayName || session?.name || ''}
-        variant="star_bonus"
-        starBonus={starBonusCelebration}
-        onClose={dismissStarBonusCelebration}
-      />
-      <TeacherPaymentCelebration
-        payment={teacherPaymentCelebration}
-        onClose={() => setTeacherPaymentCelebration(null)}
-        onViewDetail={() => {
-          setTeacherPaymentCelebration(null);
-          navigate('/teacher/finance');
-        }}
-      />
-      <StudentAttendanceConfirmModal
-        open={role === 'student' && !!attendanceConfirm}
-        payload={attendanceConfirm}
-        busy={attendanceConfirmBusy}
-        onAccept={() => handleStudentAttendanceDecision('accept')}
-        onDispute={() => handleStudentAttendanceDecision('dispute')}
-        onDismiss={dismissStudentAttendanceConfirm}
-      />
-      <StudentAssignedTeacherModal
-        open={role === 'student' && assignedTeacherModal.open}
-        teacher={assignedTeacherModal.teacher}
-        loading={assignedTeacherModal.loading}
-        onClose={() => setAssignedTeacherModal({ open: false, loading: false, teacher: null })}
-      />
-      <AdminAttendanceDisputeModal
-        open={canManageAttendanceAdminPopups && !!attendanceDispute}
-        payload={attendanceDispute}
-        busy={attendanceDisputeBusy}
-        onApprove={() => handleAdminDisputeDecision('approve')}
-        onReject={() => handleAdminDisputeDecision('reject')}
-        onClose={() => setAttendanceDispute(null)}
-      />
-      <TeacherAttendanceConfirmedModal
-        open={role === 'teacher' && !!teacherAttendanceConfirm}
-        payload={teacherAttendanceConfirm}
-        onClose={dismissTeacherAttendanceConfirm}
-      />
-      <TeacherStudentNoteModal
-        open={role === 'teacher' && !!studentNotePopup}
-        payload={studentNotePopupLive}
-        onClose={() => setStudentNotePopup(null)}
-      />
+        <LoginInboxAlertPopup
+          role={role}
+          userId={myId}
+          blocked={
+            showWelcomeCelebration
+            || !!courseCelebration
+            || !!starBonusCelebration
+            || (role === 'teacher' && !!teacherPaymentCelebration)
+            || (role === 'student' && !!attendanceConfirm)
+            || (role === 'student' && assignedTeacherModal.open)
+            || (canManageAttendanceAdminPopups && !!attendanceDispute)
+            || (role === 'teacher' && !!teacherAttendanceConfirm)
+            || (role === 'teacher' && !!studentNotePopup)
+            || (session?.isFirstLogin === true && role !== 'teacher')
+          }
+        />
+        <WelcomeCelebrationOverlay
+          open={showWelcomeCelebration}
+          role={role}
+          name={displayName || session?.name || ''}
+          variant="welcome"
+          onClose={dismissWelcomeCelebration}
+        />
+        <WelcomeCelebrationOverlay
+          open={!showWelcomeCelebration && !!courseCelebration}
+          role="student"
+          name={displayName || session?.name || ''}
+          variant="course_complete"
+          courseName={courseCelebration?.courseName || ''}
+          onClose={dismissCourseCelebration}
+        />
+        <WelcomeCelebrationOverlay
+          open={!showWelcomeCelebration && !courseCelebration && !!starBonusCelebration}
+          role="teacher"
+          name={displayName || session?.name || ''}
+          variant="star_bonus"
+          starBonus={starBonusCelebration}
+          onClose={dismissStarBonusCelebration}
+        />
+        <TeacherPaymentCelebration
+          payment={teacherPaymentCelebration}
+          onClose={() => setTeacherPaymentCelebration(null)}
+          onViewDetail={() => {
+            setTeacherPaymentCelebration(null);
+            navigate('/teacher/finance');
+          }}
+        />
+        <StudentAttendanceConfirmModal
+          open={role === 'student' && !!attendanceConfirm}
+          payload={attendanceConfirm}
+          busy={attendanceConfirmBusy}
+          onAccept={() => handleStudentAttendanceDecision('accept')}
+          onDispute={() => handleStudentAttendanceDecision('dispute')}
+          onDismiss={dismissStudentAttendanceConfirm}
+        />
+        <StudentAssignedTeacherModal
+          open={role === 'student' && assignedTeacherModal.open}
+          teacher={assignedTeacherModal.teacher}
+          loading={assignedTeacherModal.loading}
+          onClose={() => setAssignedTeacherModal({ open: false, loading: false, teacher: null })}
+        />
+        <AdminAttendanceDisputeModal
+          open={canManageAttendanceAdminPopups && !!attendanceDispute}
+          payload={attendanceDispute}
+          busy={attendanceDisputeBusy}
+          onApprove={() => handleAdminDisputeDecision('approve')}
+          onReject={() => handleAdminDisputeDecision('reject')}
+          onClose={() => setAttendanceDispute(null)}
+        />
+        <TeacherAttendanceConfirmedModal
+          open={role === 'teacher' && !!teacherAttendanceConfirm}
+          payload={teacherAttendanceConfirm}
+          onClose={dismissTeacherAttendanceConfirm}
+        />
+        <TeacherStudentNoteModal
+          open={role === 'teacher' && !!studentNotePopup}
+          payload={studentNotePopupLive}
+          onClose={() => setStudentNotePopup(null)}
+        />
 
-      {showNotif && typeof document !== 'undefined' && createPortal(
-        <>
-          <div
-            className="cms-notif-backdrop md:hidden"
-            aria-hidden="true"
-            onClick={() => setShowNotif(false)}
-          />
-          <div
-            ref={notifRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Danh sách thông báo"
-            className="cms-notif-sheet"
-            style={{
-              '--notif-top': `${notifPos.top}px`,
-              '--notif-right': `${notifPos.right}px`,
-            }}
-          >
-            <div className="md:hidden flex justify-center pt-2 pb-1" aria-hidden="true">
-              <span className="w-10 h-1 rounded-full bg-slate-200" />
-            </div>
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
-              <h3 className="font-semibold text-slate-900 text-base">Thông báo mới</h3>
-              <button
-                type="button"
-                onClick={() => setShowNotif(false)}
-                aria-label="Đóng thông báo"
-                className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-              {myNotifications.length === 0 ? (
-                <div className="p-10 text-center">
-                  <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                    <Bell size={28} className="text-slate-300" aria-hidden="true" />
+        {showNotif && typeof document !== 'undefined' && createPortal(
+          <>
+            <div
+              className="cms-notif-backdrop md:hidden"
+              aria-hidden="true"
+              onClick={() => setShowNotif(false)}
+            />
+            <div
+              ref={notifRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Danh sách thông báo"
+              className="cms-notif-sheet"
+              style={{
+                '--notif-top': `${notifPos.top}px`,
+                '--notif-right': `${notifPos.right}px`,
+              }}
+            >
+              <div className="md:hidden flex justify-center pt-2 pb-1" aria-hidden="true">
+                <span className="w-10 h-1 rounded-full bg-slate-200" />
+              </div>
+              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
+                <h3 className="font-semibold text-slate-900 text-base">Thông báo mới</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowNotif(false)}
+                  aria-label="Đóng thông báo"
+                  className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                {myNotifications.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <Bell size={28} className="text-slate-300" aria-hidden="true" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-400">Không có thông báo mới nào</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-400">Không có thông báo mới nào</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-50">
-                  {myNotifications.slice(0, notifLimit).map((n, idx) => {
-                    const style = getNotifStyle(n.type);
-                    const Icon = style.icon;
-                    return (
-                      <div
-                        key={`${n.id || n._id}-${idx}`}
-                        onClick={() => {
-                          markNotificationRead(n.id || n._id);
-                          if (n.payload?.action === 'RESET_PASSWORD') {
-                            window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
-                          } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
-                            const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
-                            navigate(`${base}/news/${n.payload.slug}`);
-                          } else if (n.payload?.kind === 'lms_qa' && n.payload?.qaId) {
-                            const qaId = n.payload.qaId;
-                            if (role === 'admin' || role === 'staff') {
-                              navigate(`/admin/notifications?qaId=${encodeURIComponent(qaId)}`);
-                            } else if (role === 'teacher') {
-                              navigate(`/teacher/notifications?qaId=${encodeURIComponent(qaId)}`);
-                            } else if (role === 'student') {
-                              const p = n.path || `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`;
-                              navigate(p.includes('#') ? p : `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`);
-                            }
-                          } else if (n.payload?.kind === 'attendance_dispute' && (role === 'admin' || role === 'staff') && canManageAttendanceAdminPopups) {
-                            setShowNotif(false);
-                            (async () => {
-                              const fallback = {
-                                scheduleId: n.payload.scheduleId,
-                                studentName: n.payload.studentName,
-                                teacherName: n.payload.teacherName,
-                                course: n.payload.course,
-                                sessionNumber: n.payload.sessionNumber,
-                                totalSessions: n.payload.totalSessions,
-                                weekday: n.payload.weekday,
-                                dateLabel: n.payload.dateLabel,
-                                timeRange: n.payload.timeRange,
+                ) : (
+                  <div className="divide-y divide-slate-50">
+                    {myNotifications.slice(0, notifLimit).map((n, idx) => {
+                      const style = getNotifStyle(n.type);
+                      const Icon = style.icon;
+                      return (
+                        <div
+                          key={`${n.id || n._id}-${idx}`}
+                          onClick={() => {
+                            markNotificationRead(n.id || n._id);
+                            if (n.payload?.action === 'RESET_PASSWORD') {
+                              window.dispatchEvent(new CustomEvent('open-reset-pw', { detail: n.payload }));
+                            } else if (n.payload?.action === 'blog_published' && n.payload?.slug) {
+                              const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
+                              navigate(`${base}/news/${n.payload.slug}`);
+                            } else if (n.payload?.kind === 'lms_qa' && n.payload?.qaId) {
+                              const qaId = n.payload.qaId;
+                              if (role === 'admin' || role === 'staff') {
+                                navigate(`/admin/notifications?qaId=${encodeURIComponent(qaId)}`);
+                              } else if (role === 'teacher') {
+                                navigate(`/teacher/notifications?qaId=${encodeURIComponent(qaId)}`);
+                              } else if (role === 'student') {
+                                const p = n.path || `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`;
+                                navigate(p.includes('#') ? p : `/student#materials?tab=qa&qaId=${encodeURIComponent(qaId)}`);
+                              }
+                            } else if (n.payload?.kind === 'attendance_dispute' && (role === 'admin' || role === 'staff') && canManageAttendanceAdminPopups) {
+                              setShowNotif(false);
+                              (async () => {
+                                const fallback = {
+                                  scheduleId: n.payload.scheduleId,
+                                  studentName: n.payload.studentName,
+                                  teacherName: n.payload.teacherName,
+                                  course: n.payload.course,
+                                  sessionNumber: n.payload.sessionNumber,
+                                  totalSessions: n.payload.totalSessions,
+                                  weekday: n.payload.weekday,
+                                  dateLabel: n.payload.dateLabel,
+                                  timeRange: n.payload.timeRange,
+                                };
+                                try {
+                                  const res = await api.schedules.getDisputes();
+                                  const live = (Array.isArray(res?.data) ? res.data : []).find(
+                                    (p) => String(p?.scheduleId) === String(n.payload.scheduleId),
+                                  );
+                                  if (live) {
+                                    setAttendanceDispute({ ...live, resolved: false });
+                                    return;
+                                  }
+                                  // Đã giải quyết: lấy schedule để biết chấp thuận / không chấp thuận
+                                  let sch = null;
+                                  try {
+                                    const one = await api.schedules.getById(n.payload.scheduleId);
+                                    if (one?.success) sch = one.data;
+                                  } catch { /* ignore */ }
+                                  const st = String(sch?.studentConfirmStatus || '').toLowerCase();
+                                  const status = String(sch?.status || '').toLowerCase();
+                                  const rejected = st === 'admin_rejected'
+                                    || status === 'cancelled'
+                                    || status === 'canceled'
+                                    || status === 'no_show';
+                                  const approved = st === 'admin_approved'
+                                    || st === 'accepted'
+                                    || status === 'completed';
+                                  setAttendanceDispute({
+                                    ...fallback,
+                                    ...(sch ? {
+                                      studentName: sch.studentName || sch.studentId?.name || fallback.studentName,
+                                      teacherName: sch.teacherName || sch.teacherId?.name || fallback.teacherName,
+                                      course: sch.course || fallback.course,
+                                      status: sch.status,
+                                      studentConfirmStatus: sch.studentConfirmStatus
+                                        || (rejected ? 'admin_rejected' : approved ? 'admin_approved' : 'admin_approved'),
+                                    } : {
+                                      studentConfirmStatus: 'admin_approved',
+                                    }),
+                                    resolved: true,
+                                    resolveOutcome: rejected ? 'rejected' : 'approved',
+                                  });
+                                } catch {
+                                  setAttendanceDispute({
+                                    ...fallback,
+                                    resolved: true,
+                                    studentConfirmStatus: 'admin_approved',
+                                    resolveOutcome: 'approved',
+                                  });
+                                }
+                              })();
+                            } else if (n.payload?.kind === 'attendance_confirm_pending' && role === 'student') {
+                              setShowNotif(false);
+                              openStudentAttendanceFromNotif(n.payload);
+                            } else if (
+                              role === 'student'
+                              && (n.payload?.kind === 'attendance_admin_approved'
+                                || n.payload?.kind === 'attendance_confirmed'
+                                || n.payload?.kind === 'attendance_taken')
+                            ) {
+                              setShowNotif(false);
+                              openStudentAttendanceFromNotif(n.payload, { forceResolved: true });
+                            } else if (
+                              role === 'student'
+                              && n.payload?.kind === 'attendance_rejected'
+                            ) {
+                              setShowNotif(false);
+                              openStudentAttendanceFromNotif(n.payload, { forceRejected: true });
+                            } else if (
+                              role === 'student'
+                              && n.payload?.kind === 'attendance_dispute'
+                            ) {
+                              setShowNotif(false);
+                              openStudentAttendanceFromNotif({
+                                ...n.payload,
+                                studentConfirmStatus: 'disputed',
+                                waiting: true,
+                              });
+                            } else if (
+                              role === 'student'
+                              && (
+                                String(n.title || '').includes('Đã điểm danh buổi học')
+                                || String(n.title || '').includes('Điểm danh đã được chấp thuận')
+                              )
+                            ) {
+                              setShowNotif(false);
+                              openStudentAttendanceFromNotif({
+                                ...(n.payload || {}),
+                                course: n.payload?.course,
+                                sessionNumber: n.payload?.completedSessions || n.payload?.sessionNumber,
+                                totalSessions: n.payload?.totalRequired || n.payload?.totalSessions,
+                                teacherName: n.payload?.teacherName,
+                              }, { forceResolved: true });
+                            } else if (
+                              role === 'teacher'
+                              && n.payload?.kind === 'admin_makeup_attendance'
+                            ) {
+                              setShowNotif(false);
+                              openTeacherAttendanceConfirmed(n);
+                            } else if (
+                              role === 'student'
+                              && (
+                                n.payload?.kind === 'teacher_assigned'
+                                || n.payload?.kind === 'teacher_reassigned'
+                                || String(n.title || '').includes('Phân công giảng viên')
+                                || String(n.title || '').includes('Giảng viên khóa học đã đổi')
+                              )
+                            ) {
+                              setShowNotif(false);
+                              openAssignedTeacherFromNotif(n.payload || {});
+                            } else if (n.payload?.kind === 'star_bonus_eligible' && role === 'teacher') {
+                              setShowNotif(false);
+                              setStarBonusCelebration({
+                                month: String(n.payload.month || ''),
+                                monthLabel: n.payload.monthLabel || '',
+                                amount: Number(n.payload.amount) || 0,
+                                minStudents: n.payload.minStudents,
+                                minStars: n.payload.minStars,
+                                teacherId: myId,
+                              });
+                            } else if (n.payload?.kind === 'feed_interaction') {
+                              setShowNotif(false);
+                              const feedRole = role === 'admin' || role === 'staff'
+                                ? 'admin'
+                                : role === 'teacher' ? 'teacher' : 'student';
+                              const params = new URLSearchParams();
+                              if (n.payload?.postId) params.set('postId', String(n.payload.postId));
+                              if (n.payload?.commentId) params.set('commentId', String(n.payload.commentId));
+                              if (n.payload?.parentCommentId) params.set('parentCommentId', String(n.payload.parentCommentId));
+                              const query = params.toString();
+                              navigate(`/${feedRole}/feed${query ? `?${query}` : ''}`);
+                            } else if (n.payload?.kind === 'lms_course_update') {
+                              const action = n.payload?.action || '';
+                              const isSoftware = String(action).startsWith('software_link');
+                              const fallback = role === 'teacher'
+                                ? (isSoftware ? '/teacher#software-links' : `/teacher#training?courseId=${encodeURIComponent(n.payload?.courseId || '')}`)
+                                : (isSoftware ? '/student#materials-software' : `/student#materials-videos?courseId=${encodeURIComponent(n.payload?.courseId || '')}`);
+                              const p = n.path || fallback;
+                              if (String(p).includes('#')) {
+                                const [pathPart, hashPart] = String(p).split('#');
+                                navigate(pathPart || (role === 'teacher' ? '/teacher' : '/student'));
+                                window.location.hash = hashPart || '';
+                              } else {
+                                navigate(p);
+                              }
+                            } else if (role === 'student' && n.payload?.kind === 'video_course_paid') {
+                              setShowNotif(false);
+                              const cid = String(n.payload?.courseId || '').trim();
+                              const p = n.path || (cid
+                                ? `/student#materials-videos?courseId=${encodeURIComponent(cid)}`
+                                : '/student#materials-videos');
+                              if (String(p).includes('#')) {
+                                const [pathPart, hashPart] = String(p).split('#');
+                                navigate(pathPart || '/student');
+                                window.location.hash = hashPart || '';
+                              } else {
+                                navigate(p);
+                              }
+                            } else if (n.payload?.kind === 'lms_review') {
+                              navigate(n.path || `/admin/notifications?reviewId=${encodeURIComponent(n.payload?.reviewId || '')}`);
+                            } else if (role === 'teacher' && isTeacherRatingNotif(n)) {
+                              openTeacherRatingDetail({
+                                evaluationId: getEvaluationIdFromNotif(n),
+                                studentId: n.payload?.studentId,
+                                ...n,
+                              });
+                            } else if (role === 'teacher' && isTeacherAttendanceRejectedNotif(n)) {
+                              setShowNotif(false);
+                              openTeacherAttendanceConfirmed(n, { rejected: true });
+                            } else if (role === 'teacher' && isTeacherAttendanceConfirmedNotif(n)) {
+                              setShowNotif(false);
+                              openTeacherAttendanceConfirmed(n);
+                            } else if (role === 'teacher' && n.payload?.quizId) {
+                              setShowNotif(false);
+                              const detail = {
+                                quizId: n.payload?.quizId,
+                                studentId: n.payload?.studentId,
+                                payload: n.payload,
                               };
                               try {
-                                const res = await api.schedules.getDisputes();
-                                const live = (Array.isArray(res?.data) ? res.data : []).find(
-                                  (p) => String(p?.scheduleId) === String(n.payload.scheduleId),
-                                );
-                                if (live) {
-                                  setAttendanceDispute({ ...live, resolved: false });
-                                  return;
-                                }
-                                // Đã giải quyết: lấy schedule để biết chấp thuận / không chấp thuận
-                                let sch = null;
-                                try {
-                                  const one = await api.schedules.getById(n.payload.scheduleId);
-                                  if (one?.success) sch = one.data;
-                                } catch { /* ignore */ }
-                                const st = String(sch?.studentConfirmStatus || '').toLowerCase();
-                                const status = String(sch?.status || '').toLowerCase();
-                                const rejected = st === 'admin_rejected'
-                                  || status === 'cancelled'
-                                  || status === 'canceled'
-                                  || status === 'no_show';
-                                const approved = st === 'admin_approved'
-                                  || st === 'accepted'
-                                  || status === 'completed';
-                                setAttendanceDispute({
-                                  ...fallback,
-                                  ...(sch ? {
-                                    studentName: sch.studentName || sch.studentId?.name || fallback.studentName,
-                                    teacherName: sch.teacherName || sch.teacherId?.name || fallback.teacherName,
-                                    course: sch.course || fallback.course,
-                                    status: sch.status,
-                                    studentConfirmStatus: sch.studentConfirmStatus
-                                      || (rejected ? 'admin_rejected' : approved ? 'admin_approved' : 'admin_approved'),
-                                  } : {
-                                    studentConfirmStatus: 'admin_approved',
-                                  }),
-                                  resolved: true,
-                                  resolveOutcome: rejected ? 'rejected' : 'approved',
-                                });
-                              } catch {
-                                setAttendanceDispute({
-                                  ...fallback,
-                                  resolved: true,
-                                  studentConfirmStatus: 'admin_approved',
-                                  resolveOutcome: 'approved',
-                                });
+                                sessionStorage.setItem(PENDING_TEACHER_QUIZ_DETAIL_KEY, JSON.stringify(detail));
+                              } catch { /* ignore */ }
+                              if (location.pathname === '/teacher') {
+                                window.dispatchEvent(new CustomEvent('open-teacher-quiz-detail', { detail }));
+                              } else {
+                                navigate('/teacher');
                               }
-                            })();
-                          } else if (n.payload?.kind === 'attendance_confirm_pending' && role === 'student') {
-                            setShowNotif(false);
-                            openStudentAttendanceFromNotif(n.payload);
-                          } else if (
-                            role === 'student'
-                            && (n.payload?.kind === 'attendance_admin_approved'
-                              || n.payload?.kind === 'attendance_confirmed'
-                              || n.payload?.kind === 'attendance_taken')
-                          ) {
-                            setShowNotif(false);
-                            openStudentAttendanceFromNotif(n.payload, { forceResolved: true });
-                          } else if (
-                            role === 'student'
-                            && n.payload?.kind === 'attendance_rejected'
-                          ) {
-                            setShowNotif(false);
-                            openStudentAttendanceFromNotif(n.payload, { forceRejected: true });
-                          } else if (
-                            role === 'student'
-                            && n.payload?.kind === 'attendance_dispute'
-                          ) {
-                            setShowNotif(false);
-                            openStudentAttendanceFromNotif({
-                              ...n.payload,
-                              studentConfirmStatus: 'disputed',
-                              waiting: true,
-                            });
-                          } else if (
-                            role === 'student'
-                            && (
-                              String(n.title || '').includes('Đã điểm danh buổi học')
-                              || String(n.title || '').includes('Điểm danh đã được chấp thuận')
-                            )
-                          ) {
-                            setShowNotif(false);
-                            openStudentAttendanceFromNotif({
-                              ...(n.payload || {}),
-                              course: n.payload?.course,
-                              sessionNumber: n.payload?.completedSessions || n.payload?.sessionNumber,
-                              totalSessions: n.payload?.totalRequired || n.payload?.totalSessions,
-                              teacherName: n.payload?.teacherName,
-                            }, { forceResolved: true });
-                          } else if (
-                            role === 'teacher'
-                            && n.payload?.kind === 'admin_makeup_attendance'
-                          ) {
-                            setShowNotif(false);
-                            openTeacherAttendanceConfirmed(n);
-                          } else if (
-                            role === 'student'
-                            && (
-                              n.payload?.kind === 'teacher_assigned'
-                              || n.payload?.kind === 'teacher_reassigned'
-                              || String(n.title || '').includes('Phân công giảng viên')
-                              || String(n.title || '').includes('Giảng viên khóa học đã đổi')
-                            )
-                          ) {
-                            setShowNotif(false);
-                            openAssignedTeacherFromNotif(n.payload || {});
-                          } else if (n.payload?.kind === 'star_bonus_eligible' && role === 'teacher') {
-                            setShowNotif(false);
-                            setStarBonusCelebration({
-                              month: String(n.payload.month || ''),
-                              monthLabel: n.payload.monthLabel || '',
-                              amount: Number(n.payload.amount) || 0,
-                              minStudents: n.payload.minStudents,
-                              minStars: n.payload.minStars,
-                              teacherId: myId,
-                            });
-                          } else if (n.payload?.kind === 'lms_course_update') {
-                            const action = n.payload?.action || '';
-                            const isSoftware = String(action).startsWith('software_link');
-                            const fallback = role === 'teacher'
-                              ? (isSoftware ? '/teacher#software-links' : `/teacher#training?courseId=${encodeURIComponent(n.payload?.courseId || '')}`)
-                              : (isSoftware ? '/student#materials-software' : `/student#materials-videos?courseId=${encodeURIComponent(n.payload?.courseId || '')}`);
-                            const p = n.path || fallback;
-                            if (String(p).includes('#')) {
-                              const [pathPart, hashPart] = String(p).split('#');
-                              navigate(pathPart || (role === 'teacher' ? '/teacher' : '/student'));
-                              window.location.hash = hashPart || '';
-                            } else {
-                              navigate(p);
-                            }
-                          } else if (role === 'student' && n.payload?.kind === 'video_course_paid') {
-                            setShowNotif(false);
-                            const cid = String(n.payload?.courseId || '').trim();
-                            const p = n.path || (cid
-                              ? `/student#materials-videos?courseId=${encodeURIComponent(cid)}`
-                              : '/student#materials-videos');
-                            if (String(p).includes('#')) {
-                              const [pathPart, hashPart] = String(p).split('#');
-                              navigate(pathPart || '/student');
-                              window.location.hash = hashPart || '';
-                            } else {
-                              navigate(p);
-                            }
-                          } else if (n.payload?.kind === 'lms_review') {
-                            navigate(n.path || `/admin/notifications?reviewId=${encodeURIComponent(n.payload?.reviewId || '')}`);
-                          } else if (role === 'teacher' && isTeacherRatingNotif(n)) {
-                            openTeacherRatingDetail({
-                              evaluationId: getEvaluationIdFromNotif(n),
-                              studentId: n.payload?.studentId,
-                              ...n,
-                            });
-                          } else if (role === 'teacher' && isTeacherAttendanceRejectedNotif(n)) {
-                            setShowNotif(false);
-                            openTeacherAttendanceConfirmed(n, { rejected: true });
-                          } else if (role === 'teacher' && isTeacherAttendanceConfirmedNotif(n)) {
-                            setShowNotif(false);
-                            openTeacherAttendanceConfirmed(n);
-                      } else if (role === 'teacher' && n.payload?.quizId) {
-                        setShowNotif(false);
-                        const detail = {
-                          quizId: n.payload?.quizId,
-                          studentId: n.payload?.studentId,
-                          payload: n.payload,
-                        };
-                        try {
-                          sessionStorage.setItem(PENDING_TEACHER_QUIZ_DETAIL_KEY, JSON.stringify(detail));
-                        } catch { /* ignore */ }
-                        if (location.pathname === '/teacher') {
-                          window.dispatchEvent(new CustomEvent('open-teacher-quiz-detail', { detail }));
-                        } else {
-                          navigate('/teacher');
-                        }
-                          } else if (role === 'teacher' && isStudentScheduleNoteNotif(n)) {
-                            setShowNotif(false);
-                            openStudentNoteFromNotif(n);
-                          } else if (role === 'teacher' && (n.payload?.type === 'schedule' || n.type === 'schedule')) {
-                            // Chuyển hướng đến tab lịch học của giảng viên khi nhận thông báo ghi chú từ học viên
-                            navigate('/teacher#schedule');
-                          } else if (
-                            (role === 'admin' || role === 'staff')
-                            && canViewEvaluationNotifications
-                            && (n.payload?.kind === 'admin_feedback'
-                              || String(n.type || '').toUpperCase() === 'EVALUATION')
-                          ) {
-                            navigate('/admin#evaluations');
-                          } else if (
-                            (
-                              (canManageStudentAdminPopups && n.title?.includes('Học viên mới đăng ký'))
-                              || (canManageAttendanceAdminPopups && n.title?.includes('Điểm danh buổi học'))
-                            )
-                          ) {
+                            } else if (role === 'teacher' && isStudentScheduleNoteNotif(n)) {
+                              setShowNotif(false);
+                              openStudentNoteFromNotif(n);
+                            } else if (role === 'teacher' && (n.payload?.type === 'schedule' || n.type === 'schedule')) {
+                              // Chuyển hướng đến tab lịch học của giảng viên khi nhận thông báo ghi chú từ học viên
+                              navigate('/teacher#schedule');
+                            } else if (
+                              (role === 'admin' || role === 'staff')
+                              && canViewEvaluationNotifications
+                              && (n.payload?.kind === 'admin_feedback'
+                                || String(n.type || '').toUpperCase() === 'EVALUATION')
+                            ) {
+                              navigate('/admin#evaluations');
+                            } else if (
+                              (
+                                (canManageStudentAdminPopups && n.title?.includes('Học viên mới đăng ký'))
+                                || (canManageAttendanceAdminPopups && n.title?.includes('Điểm danh buổi học'))
+                              )
+                            ) {
 
-                            const openPopup = (studentData) => {
-                              setAdminQuickPopup({
-                                type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
-                                notif: n,
-                                student: studentData,
-                              });
-                            };
+                              const openPopup = (studentData) => {
+                                setAdminQuickPopup({
+                                  type: n.title?.includes('Học viên mới đăng ký') ? 'register' : 'attendance',
+                                  notif: n,
+                                  student: studentData,
+                                });
+                              };
 
-                            if (n.payload?.studentId) {
-                              api.students.getById(n.payload.studentId)
-                                .then(res => {
-                                  if (res?.success && res?.data) {
-                                    openPopup(res.data);
-                                  } else {
-                                    // fallback to local state
+                              if (n.payload?.studentId) {
+                                api.students.getById(n.payload.studentId)
+                                  .then(res => {
+                                    if (res?.success && res?.data) {
+                                      openPopup(res.data);
+                                    } else {
+                                      // fallback to local state
+                                      const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                                      if (st) openPopup(st);
+                                      else if (n.path) navigate(n.path);
+                                    }
+                                  })
+                                  .catch(() => {
                                     const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
                                     if (st) openPopup(st);
                                     else if (n.path) navigate(n.path);
-                                  }
-                                })
-                                .catch(() => {
-                                  const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
-                                  if (st) openPopup(st);
-                                  else if (n.path) navigate(n.path);
-                                });
-                            } else {
-                              const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
-                              if (st) openPopup(st);
-                              else if (n.path) navigate(n.path);
-                            }
-                          } else if (
-                            canManageStudentAdminPopups
-                            && n.payload?.kind === 'student_device_alert'
-                            && n.payload?.studentId
-                          ) {
-                            setShowNotif(false);
-                            window.dispatchEvent(new CustomEvent('open-student-detail', {
-                              detail: { id: String(n.payload.studentId), tab: 'summary' },
-                            }));
-                          } else if (
-                            role === 'student'
-                            && n.payload?.kind === 'class_link_updated'
-                            && /^https?:\/\//i.test(String(n.payload?.linkHoc || '').trim())
-                          ) {
-                            window.location.assign(String(n.payload.linkHoc).trim());
-                          } else if (
-                            !n.path
-                            && String(n.type || '').toLowerCase() === 'message'
-                          ) {
-                            navigate(`/${role}/inbox`);
-                          } else if (n.path) {
-                            let targetPath = n.path;
-
-                            if (targetPath.startsWith('http')) {
-                              try {
-                                const urlObj = new URL(targetPath);
-                                targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                              } catch (e) {}
-                            }
-
-                            if (targetPath.startsWith('/admin/') && targetPath !== '/admin/inbox' && targetPath !== '/admin/news' && !targetPath.includes('/news/') && !targetPath.includes('#')) {
-                              targetPath = '/admin#' + targetPath.replace('/admin/', '');
-                            } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications', '/student/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
-                              targetPath = '/student#' + targetPath.replace('/student/', '');
-                            } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news'].includes(targetPath) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
-                              targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
-                            }
-
-                            // /teacher?evaluationId=… → mở popup thay vì chỉ về trang chủ
-                            if (role === 'teacher' && String(targetPath).includes('evaluationId=')) {
-                              openTeacherRatingDetail({ path: targetPath, payload: n.payload });
-                            } else {
-                              if (role === 'student' && String(n.type).toLowerCase() === 'exam' && n.payload?.quizId) {
-                                targetPath = '/student/exam';
-                              }
-                              if (
-                                role === 'student'
-                                && targetPath === '/student#materials'
-                                && (/bài tập/i.test(String(n.title || '')) || String(n.payload?.type || '') === 'assignment')
-                              ) {
-                                targetPath = '/student#materials-assignments';
-                              }
-                              if (String(targetPath).includes('#')) {
-                                const [pathPart, hashPart] = String(targetPath).split('#');
-                                navigate(pathPart || location.pathname || '/');
-                                window.location.hash = hashPart || '';
+                                  });
                               } else {
-                                navigate(targetPath);
+                                const st = students.find((s) => String(s._id || s.id) === String(n.payload?.studentId));
+                                if (st) openPopup(st);
+                                else if (n.path) navigate(n.path);
+                              }
+                            } else if (
+                              canManageStudentAdminPopups
+                              && n.payload?.kind === 'student_device_alert'
+                              && n.payload?.studentId
+                            ) {
+                              setShowNotif(false);
+                              window.dispatchEvent(new CustomEvent('open-student-detail', {
+                                detail: { id: String(n.payload.studentId), tab: 'summary' },
+                              }));
+                            } else if (
+                              role === 'student'
+                              && n.payload?.kind === 'class_link_updated'
+                              && /^https?:\/\//i.test(String(n.payload?.linkHoc || '').trim())
+                            ) {
+                              window.location.assign(String(n.payload.linkHoc).trim());
+                            } else if (
+                              !n.path
+                              && String(n.type || '').toLowerCase() === 'message'
+                            ) {
+                              navigate(`/${role}/inbox`);
+                            } else if (n.path) {
+                              let targetPath = n.path;
+
+                              if (targetPath.startsWith('http')) {
+                                try {
+                                  const urlObj = new URL(targetPath);
+                                  targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                                } catch {
+                                  // Keep the original target when it is not a valid absolute URL.
+                                }
+                              }
+
+                              const targetPathname = targetPath.split(/[?#]/, 1)[0];
+                              if (targetPath.startsWith('/admin/') && !['/admin/inbox', '/admin/news', '/admin/feed'].includes(targetPathname) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                                targetPath = '/admin#' + targetPath.replace('/admin/', '');
+                              } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications', '/student/news', '/student/feed'].includes(targetPathname) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                                targetPath = '/student#' + targetPath.replace('/student/', '');
+                              } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/news', '/teacher/feed'].includes(targetPathname) && !targetPath.includes('/news/') && !targetPath.includes('#')) {
+                                targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
+                              }
+
+                              // /teacher?evaluationId=… → mở popup thay vì chỉ về trang chủ
+                              if (role === 'teacher' && String(targetPath).includes('evaluationId=')) {
+                                openTeacherRatingDetail({ path: targetPath, payload: n.payload });
+                              } else {
+                                if (role === 'student' && String(n.type).toLowerCase() === 'exam' && n.payload?.quizId) {
+                                  targetPath = '/student/exam';
+                                }
+                                if (
+                                  role === 'student'
+                                  && targetPath === '/student#materials'
+                                  && (/bài tập/i.test(String(n.title || '')) || String(n.payload?.type || '') === 'assignment')
+                                ) {
+                                  targetPath = '/student#materials-assignments';
+                                }
+                                if (String(targetPath).includes('#')) {
+                                  const [pathPart, hashPart] = String(targetPath).split('#');
+                                  navigate(pathPart || location.pathname || '/');
+                                  window.location.hash = hashPart || '';
+                                } else {
+                                  navigate(targetPath);
+                                }
                               }
                             }
-                          }
-                          setShowNotif(false);
-                        }}
-                        className={`px-4 py-3 hover:bg-slate-50 active:bg-slate-50 transition-colors duration-200 cursor-pointer flex gap-3 border-l-[3px] min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
-                      >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
-                          <Icon size={18} aria-hidden="true" />
-                          {!n.read && (
-                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-red-500" aria-hidden="true" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <span className={`text-[11px] font-semibold ${style.color}`}>{style.label}</span>
-                            <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
+                            setShowNotif(false);
+                          }}
+                          className={`px-4 py-3 hover:bg-slate-50 active:bg-slate-50 transition-colors duration-200 cursor-pointer flex gap-3 border-l-[3px] min-w-0 ${!n.read ? `bg-white ${style.border.replace('border-', 'border-l-')}` : 'bg-white border-l-transparent opacity-80'}`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 relative ${style.bg} ${style.color}`}>
+                            <Icon size={18} aria-hidden="true" />
+                            {!n.read && (
+                              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-red-500" aria-hidden="true" />
+                            )}
                           </div>
-                          {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
-                          <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
-                            {formatNotificationStudentMask(n.text || n.message || n.content, students, role === 'admin' || role === 'staff' || role === 'teacher')}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className={`text-[11px] font-semibold ${style.color}`}>{style.label}</span>
+                              <span className="text-[11px] text-slate-400 font-medium flex-shrink-0">{formatTime(n.time || n.createdAt || n.timestamp)}</span>
+                            </div>
+                            {n.title && <h4 className={`text-sm font-semibold mb-0.5 break-anywhere ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</h4>}
+                            <p className={`text-[13px] leading-snug break-anywhere ${!n.read && !n.title ? 'text-slate-900 font-semibold' : !n.read ? 'text-slate-700' : 'text-slate-500'}`}>
+                              {formatNotificationStudentMask(n.text || n.message || n.content, students, role === 'admin' || role === 'staff' || role === 'teacher')}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
+                <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-red-600 transition-colors duration-200">Đọc tất cả</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNotif(false);
+                    const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
+                    navigate(`${base}/notifications`);
+                  }}
+                  className="text-[12px] font-semibold text-red-600 hover:underline inline-flex items-center gap-0.5"
+                >
+                  Xem tất cả
+                  <NavArrow size={14} className="text-red-600" />
+                </button>
+              </div>
             </div>
-            <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2 flex-shrink-0">
-              <button type="button" onClick={() => markNotificationRead()} className="text-[12px] font-semibold text-slate-500 hover:text-red-600 transition-colors duration-200">Đọc tất cả</button>
+          </>,
+          document.body
+        )}
+
+        <ChangePasswordModal session={session} role={role} />
+        {pinUserKey ? (
+          <>
+            <PinLockSettingsModal userKey={pinUserKey} />
+            <PinLockGate userKey={pinUserKey} userName={session?.name || ''} onLogout={handleLogout} />
+          </>
+        ) : null}
+
+        {(ratingDetailLoading || ratingDetail || ratingDetailError) && role === 'teacher' ? (
+          <TeacherRatingDetailModal
+            rating={ratingDetail}
+            loading={ratingDetailLoading}
+            error={ratingDetailError}
+            students={students}
+            criteriaConfig={RATING_CRITERIA}
+            onClose={() => {
+              setRatingDetail(null);
+              setRatingDetailError('');
+              setRatingDetailLoading(false);
+            }}
+          />
+        ) : null}
+        {adminQuickPopup && (
+          <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-base">
+                  {adminQuickPopup.type === 'register' ? '🎉 Học viên mới đăng ký' : '📋 Điểm danh buổi học'}
+                </h3>
+                <button type="button" onClick={() => setAdminQuickPopup(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4 text-sm font-medium">
+                {adminQuickPopup.type === 'register' ? (
+                  <>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Cơ sở:</span>
+                      <span className="font-black text-slate-800">{adminQuickPopup.student.branchId?.name || adminQuickPopup.student.branchCode || adminQuickPopup.student.createdByBranch || 'Không rõ'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Học viên:</span>
+                      <span className="font-bold text-slate-800">{adminQuickPopup.student.name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Môn học:</span>
+                      <span className="font-bold text-blue-700">{adminQuickPopup.student.course}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Thời gian:</span>
+                      <span className="font-bold text-slate-800">{formatTime(adminQuickPopup.notif.time || adminQuickPopup.notif.createdAt)}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">SĐT:</span>
+                      <span className="font-bold text-slate-800">{adminQuickPopup.student.phone || adminQuickPopup.student.zalo || 'Không có'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Thanh toán:</span>
+                      <span className="font-bold text-emerald-600">{adminQuickPopup.student.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Người lập phiếu:</span>
+                      <span className="font-bold text-slate-800">
+                        {adminQuickPopup.notif.payload?.creatorName
+                          ? `${adminQuickPopup.notif.payload.creatorName} (${adminQuickPopup.notif.payload.creatorRole})`
+                          : 'Hệ thống'}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Học viên:</span>
+                      <span className="font-bold text-slate-800">{adminQuickPopup.student.name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Môn học:</span>
+                      <span className="font-bold text-blue-700">{adminQuickPopup.notif.payload?.course || adminQuickPopup.student.course}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Giảng viên:</span>
+                      <span className="font-bold text-slate-800">{adminQuickPopup.notif.payload?.teacherName || 'Không rõ'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Tiến độ:</span>
+                      <span className="font-black text-emerald-600">Buổi {adminQuickPopup.notif.payload?.completedSessions || '?'} / {adminQuickPopup.notif.payload?.totalRequired || '?'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">Thời gian:</span>
+                      <span className="font-bold text-slate-800">{formatTime(adminQuickPopup.notif.time || adminQuickPopup.notif.createdAt)}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-50 pb-2">
+                      <span className="text-slate-500">SĐT Học viên:</span>
+                      <span className="font-bold text-slate-800">{adminQuickPopup.student.phone || adminQuickPopup.student.zalo || 'Không có'}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <button
+                  onClick={() => setAdminQuickPopup(null)}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => {
+                    setAdminQuickPopup(null);
+                    if (adminQuickPopup.type === 'register') {
+                      navigate(`/admin#students?studentId=${adminQuickPopup.student._id || adminQuickPopup.student.id}`);
+                    } else {
+                      navigate(`/admin#students?studentId=${adminQuickPopup.student._id || adminQuickPopup.student.id}&tab=attendance`);
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition"
+                >
+                  Xem chi tiết
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
+        <FloatingMessenger session={session} role={role} />
+        {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
+          <div className="cms-lms-attention" role="status" aria-live="polite">
+            <span className="cms-lms-attention__label">Trong LMS</span>
+            {newUnreadNotificationCount > 0 ? (
               <button
                 type="button"
-                onClick={() => {
-                  setShowNotif(false);
-                  const base = role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : '/admin';
-                  navigate(`${base}/notifications`);
-                }}
-                className="text-[12px] font-semibold text-red-600 hover:underline inline-flex items-center gap-0.5"
+                className="cms-lms-attention__item cms-lms-attention__item--notification"
+                onClick={() => { setShowNotif(true); setNotifLimit(5); }}
+                aria-label={`${newUnreadNotificationCount} thông báo mới chưa đọc`}
               >
-                Xem tất cả
-                <NavArrow size={14} className="text-red-600" />
+                <Bell size={15} aria-hidden="true" />
+                <span>Thông báo</span>
+                <strong>{newUnreadNotificationCount > 99 ? '99+' : newUnreadNotificationCount}</strong>
               </button>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
-
-      <ChangePasswordModal session={session} role={role} />
-
-      {(ratingDetailLoading || ratingDetail || ratingDetailError) && role === 'teacher' ? (
-        <TeacherRatingDetailModal
-          rating={ratingDetail}
-          loading={ratingDetailLoading}
-          error={ratingDetailError}
-          students={students}
-          criteriaConfig={RATING_CRITERIA}
-          onClose={() => {
-            setRatingDetail(null);
-            setRatingDetailError('');
-            setRatingDetailLoading(false);
-          }}
-        />
-      ) : null}
-      {adminQuickPopup && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 flex items-center gap-2 text-base">
-                {adminQuickPopup.type === 'register' ? '🎉 Học viên mới đăng ký' : '📋 Điểm danh buổi học'}
-              </h3>
-              <button type="button" onClick={() => setAdminQuickPopup(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 text-sm font-medium">
-              {adminQuickPopup.type === 'register' ? (
-                <>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Cơ sở:</span>
-                    <span className="font-black text-slate-800">{adminQuickPopup.student.branchId?.name || adminQuickPopup.student.branchCode || adminQuickPopup.student.createdByBranch || 'Không rõ'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Học viên:</span>
-                    <span className="font-bold text-slate-800">{adminQuickPopup.student.name}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Môn học:</span>
-                    <span className="font-bold text-blue-700">{adminQuickPopup.student.course}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Thời gian:</span>
-                    <span className="font-bold text-slate-800">{formatTime(adminQuickPopup.notif.time || adminQuickPopup.notif.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">SĐT:</span>
-                    <span className="font-bold text-slate-800">{adminQuickPopup.student.phone || adminQuickPopup.student.zalo || 'Không có'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Thanh toán:</span>
-                    <span className="font-bold text-emerald-600">{adminQuickPopup.student.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Người lập phiếu:</span>
-                    <span className="font-bold text-slate-800">
-                      {adminQuickPopup.notif.payload?.creatorName 
-                        ? `${adminQuickPopup.notif.payload.creatorName} (${adminQuickPopup.notif.payload.creatorRole})` 
-                        : 'Hệ thống'}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Học viên:</span>
-                    <span className="font-bold text-slate-800">{adminQuickPopup.student.name}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Môn học:</span>
-                    <span className="font-bold text-blue-700">{adminQuickPopup.notif.payload?.course || adminQuickPopup.student.course}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Giảng viên:</span>
-                    <span className="font-bold text-slate-800">{adminQuickPopup.notif.payload?.teacherName || 'Không rõ'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Tiến độ:</span>
-                    <span className="font-black text-emerald-600">Buổi {adminQuickPopup.notif.payload?.completedSessions || '?'} / {adminQuickPopup.notif.payload?.totalRequired || '?'}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Thời gian:</span>
-                    <span className="font-bold text-slate-800">{formatTime(adminQuickPopup.notif.time || adminQuickPopup.notif.createdAt)}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">SĐT Học viên:</span>
-                    <span className="font-bold text-slate-800">{adminQuickPopup.student.phone || adminQuickPopup.student.zalo || 'Không có'}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+            ) : null}
+            {newUnreadMessageCount > 0 ? (
               <button
-                onClick={() => setAdminQuickPopup(null)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition"
-              >
-                Đóng
-              </button>
-              <button
+                type="button"
+                className="cms-lms-attention__item cms-lms-attention__item--message"
                 onClick={() => {
-                  setAdminQuickPopup(null);
-                  if (adminQuickPopup.type === 'register') {
-                    navigate(`/admin#students?studentId=${adminQuickPopup.student._id || adminQuickPopup.student.id}`);
-                  } else {
-                    navigate(`/admin#students?studentId=${adminQuickPopup.student._id || adminQuickPopup.student.id}&tab=attendance`);
-                  }
+                  const latestUnreadDirectConversation = (getConversations(myId) || [])
+                    .filter((conversation) => (
+                      !conversation?.isGroup
+                      && conversation?.user?.id != null
+                      && Number(conversation?.unread) > 0
+                    ))
+                    .sort((a, b) => {
+                      const timeA = new Date(a.lastTime || a.updatedAt || 0).getTime();
+                      const timeB = new Date(b.lastTime || b.updatedAt || 0).getTime();
+                      return (Number.isFinite(timeB) ? timeB : 0) - (Number.isFinite(timeA) ? timeA : 0);
+                    })[0];
+                  const peerId = latestUnreadDirectConversation?.user?.id;
+                  navigate(inboxPath, {
+                    state: peerId != null ? { openPeerId: String(peerId) } : null,
+                  });
                 }}
-                className="flex-1 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition"
+                aria-label={`${newUnreadMessageCount} tin nhắn mới chưa đọc`}
               >
-                Xem chi tiết
+                <MessageCircle size={15} aria-hidden="true" />
+                <span>Tin nhắn</span>
+                <strong>{newUnreadMessageCount > 99 ? '99+' : newUnreadMessageCount}</strong>
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
-      <FloatingMessenger session={session} role={role} />
-      {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
-        <div className="cms-lms-attention" role="status" aria-live="polite">
-          <span className="cms-lms-attention__label">Trong LMS</span>
-          {newUnreadNotificationCount > 0 ? (
+            ) : null}
             <button
               type="button"
-              className="cms-lms-attention__item cms-lms-attention__item--notification"
-              onClick={() => { setShowNotif(true); setNotifLimit(5); }}
-              aria-label={`${newUnreadNotificationCount} thông báo mới chưa đọc`}
+              className="cms-lms-attention__close"
+              onClick={() => setLmsAttentionVisible(false)}
+              aria-label="Thu gọn chỉ báo LMS"
+              title="Thu gọn"
             >
-              <Bell size={15} aria-hidden="true" />
-              <span>Thông báo</span>
-              <strong>{newUnreadNotificationCount > 99 ? '99+' : newUnreadNotificationCount}</strong>
+              <X size={14} aria-hidden="true" />
             </button>
-          ) : null}
-          {newUnreadMessageCount > 0 ? (
-            <button
-              type="button"
-              className="cms-lms-attention__item cms-lms-attention__item--message"
-              onClick={() => {
-                const latestUnreadDirectConversation = (getConversations(myId) || [])
-                  .filter((conversation) => (
-                    !conversation?.isGroup
-                    && conversation?.user?.id != null
-                    && Number(conversation?.unread) > 0
-                  ))
-                  .sort((a, b) => {
-                    const timeA = new Date(a.lastTime || a.updatedAt || 0).getTime();
-                    const timeB = new Date(b.lastTime || b.updatedAt || 0).getTime();
-                    return (Number.isFinite(timeB) ? timeB : 0) - (Number.isFinite(timeA) ? timeA : 0);
-                  })[0];
-                const peerId = latestUnreadDirectConversation?.user?.id;
-                navigate(inboxPath, {
-                  state: peerId != null ? { openPeerId: String(peerId) } : null,
-                });
-              }}
-              aria-label={`${newUnreadMessageCount} tin nhắn mới chưa đọc`}
-            >
-              <MessageCircle size={15} aria-hidden="true" />
-              <span>Tin nhắn</span>
-              <strong>{newUnreadMessageCount > 99 ? '99+' : newUnreadMessageCount}</strong>
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="cms-lms-attention__close"
-            onClick={() => setLmsAttentionVisible(false)}
-            aria-label="Thu gọn chỉ báo LMS"
-            title="Thu gọn"
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
-        </div>
-      ) : null}
-    </div>
+          </div>
+        ) : null}
+      </div>
     </FloatingMessengerProvider>
   );
 };
@@ -2344,21 +2478,21 @@ const ChangePasswordModal = ({ session, role }) => {
         setSuccess(true);
         // Cập nhật lại session local storage nếu là first login
         if (session?.isFirstLogin === true) {
-           const key = `${role}_user`;
-           try {
-             const stored = JSON.parse(localStorage.getItem(key) || '{}');
-             const next = { ...stored, isFirstLogin: false };
-             localStorage.setItem(key, JSON.stringify(next));
-             window.dispatchEvent(new CustomEvent('cms:session-patched', {
-               detail: {
-                 id: stored.id || stored._id || session.id || session._id,
-                 _id: stored._id || stored.id || session._id || session.id,
-                 isFirstLogin: false,
-               },
-             }));
-           } catch { /* ignore */ }
-           setLoginOverlay('change-password-pending', false);
-           window.dispatchEvent(new CustomEvent('cms:first-login-password-done'));
+          const key = `${role}_user`;
+          try {
+            const stored = JSON.parse(localStorage.getItem(key) || '{}');
+            const next = { ...stored, isFirstLogin: false };
+            localStorage.setItem(key, JSON.stringify(next));
+            window.dispatchEvent(new CustomEvent('cms:session-patched', {
+              detail: {
+                id: stored.id || stored._id || session.id || session._id,
+                _id: stored._id || stored.id || session._id || session.id,
+                isFirstLogin: false,
+              },
+            }));
+          } catch { /* ignore */ }
+          setLoginOverlay('change-password-pending', false);
+          window.dispatchEvent(new CustomEvent('cms:first-login-password-done'));
         }
         setTimeout(() => setIsOpen(false), 2000);
       } else {
@@ -2400,18 +2534,18 @@ const ChangePasswordModal = ({ session, role }) => {
               {error && <div role="alert" className="bg-red-50 text-red-700 text-xs font-bold p-3 rounded-xl border border-red-100">{error}</div>}
               {session?.isFirstLogin !== true && (
                 <div>
-                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Mật khẩu hiện tại</label>
+                  <label htmlFor="cms-old-password" className="text-xs font-bold text-slate-600  block mb-1">Mật khẩu hiện tại</label>
                   <input id="cms-old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} autoComplete="current-password"
                     className="input-field" />
                 </div>
               )}
               <div>
-                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Mật khẩu mới</label>
+                <label htmlFor="cms-new-password" className="text-xs font-bold text-slate-600  block mb-1">Mật khẩu mới</label>
                 <input id="cms-new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password"
                   className="input-field" />
               </div>
               <div>
-                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600 uppercase block mb-1">Nhập lại mật khẩu mới</label>
+                <label htmlFor="cms-confirm-password" className="text-xs font-bold text-slate-600  block mb-1">Nhập lại mật khẩu mới</label>
                 <input id="cms-confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password"
                   className="input-field" />
               </div>

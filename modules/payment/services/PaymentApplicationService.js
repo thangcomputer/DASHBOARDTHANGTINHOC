@@ -121,7 +121,7 @@ const SepayWebhookEvent = require('../models/SepayWebhookEvent'); // Temp for ne
     });
 
     if (!content || amount <= 0) {
-      return { _status: 200, _body: ({ success: false, message: 'Thiếu thông tin giao dịch' });
+      return { _status: 200, _body: { success: false, message: 'Thiếu thông tin giao dịch' } };
     }
 
     // Idempotency theo mã giao dịch cổng
@@ -141,12 +141,12 @@ const SepayWebhookEvent = require('../models/SepayWebhookEvent'); // Temp for ne
           const existing = await sepayWebhookEventRepository.findOne({ gatewayTxnId }).select('matched matchedRef').lean();
           // Đã khớp trước đó → idempotent OK; chưa khớp (crash giữa chừng) → rematch bên dưới
           if (existing?.matched) {
-            return { _status: 200, _body: ({
+            return { _status: 200, _body: {
               success: true,
               matched: true,
               duplicate: true,
               matchedRef: existing.matchedRef || '',
-            });
+            } };
           }
           logger.warn(`[SEPAY] Duplicate gatewayTxnId chưa matched — rematch: ${gatewayTxnId}`);
         } else {
@@ -347,11 +347,11 @@ const SepayWebhookEvent = require('../models/SepayWebhookEvent'); // Temp for ne
       logger.warn('[SEPAY] Không match được — contentLen=', content.length);
     }
 
-    return { _status: 200, _body: ({ success: true, matched });
+    return { _status: 200, _body: { success: true, matched } };
 
   } catch (err) {
     logger.error('[SEPAY WEBHOOK ERROR]', err);
-    return { _status: 200, _body: ({ success: false, message: 'Lỗi server: ' + err.message });
+    return { _status: 200, _body: { success: false, message: 'Lỗi server: ' + err.message } };
   }
 }
 
@@ -361,19 +361,19 @@ const SepayWebhookEvent = require('../models/SepayWebhookEvent'); // Temp for ne
     const isSelf = data.currentUser.role === 'student' && String(data.currentUser.id) === sid;
     const isStaff = data.currentUser.role === 'admin' || data.currentUser.role === 'staff';
     if (!isSelf && !isStaff) {
-      return { _status: 403, _body: ({ success: false, message: 'Không có quyền xem trạng thái thanh toán' });
+      return { _status: 403, _body: { success: false, message: 'Không có quyền xem trạng thái thanh toán' } };
     }
 
     const student = await Student.findById(sid).select('paid paidAmount paidAt').lean();
-    if (!student) return { _status: 404, _body: ({ success: false, message: 'Không tìm thấy học viên' });
-    return { _status: 200, _body: ({
+    if (!student) return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
+    return { _status: 200, _body: {
       success: true,
       paid: student.paid === true,
       paidAmount: student.paidAmount || 0,
       paidAt: student.paidAt || null,
-    });
+    } };
   } catch (err) {
-    return { _status: 500, _body: ({ success: false, message: err.message });
+    return { _status: 500, _body: { success: false, message: err.message } };
   }
 }
 

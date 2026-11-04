@@ -641,32 +641,33 @@ describe('Phase 8.12 dual-check shadow', { concurrency: false }, () => {
   });
 
   // ── Unsupported ────────────────────────────────────────────────────────
-  it('41 schedule unsupported', async () => {
+  // RBAC-S1: schedule/messages/logs are PARTIAL-mapped → compared (MATCH), no longer UNSUPPORTED
+  it('41 schedule mapped (PARTIAL) → MATCH', async () => {
     await withFlag('true', () => {
       const out = dualCheckLiveStaffGate(
         actorReq({ permissions: [LIVE.MANAGE_SCHEDULE] }),
         { liveDecision: 'ALLOW', livePermission: LIVE.MANAGE_SCHEDULE },
       );
-      assert.equal(out.comparison, COMPARISON.UNSUPPORTED);
+      assert.equal(out.comparison, COMPARISON.MATCH);
       assert.equal(out.finalDecision, 'ALLOW');
     });
   });
 
-  it('42 messages unsupported', async () => {
+  it('42 messages mapped (PARTIAL) → MATCH', async () => {
     await withFlag('true', () => {
       assert.equal(dualCheckLiveStaffGate(
         actorReq({ permissions: [LIVE.MANAGE_MESSAGES] }),
         { liveDecision: 'ALLOW', livePermission: LIVE.MANAGE_MESSAGES },
-      ).comparison, COMPARISON.UNSUPPORTED);
+      ).comparison, COMPARISON.MATCH);
     });
   });
 
-  it('43 logs unsupported', async () => {
+  it('43 logs mapped (PARTIAL) → MATCH', async () => {
     await withFlag('true', () => {
       assert.equal(dualCheckLiveStaffGate(
         actorReq({ permissions: [LIVE.VIEW_LOGS] }),
         { liveDecision: 'ALLOW', livePermission: LIVE.VIEW_LOGS },
-      ).comparison, COMPARISON.UNSUPPORTED);
+      ).comparison, COMPARISON.MATCH);
     });
   });
 

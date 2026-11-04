@@ -16,7 +16,7 @@ export default function CertPrepTestDetail({
   return (
     <div className="cms-card space-y-4">
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        <p className="text-xs font-bold  tracking-wide text-slate-400">
           {[courseName, levelTitle].filter(Boolean).join(' — ')}
         </p>
         <h3 className="text-lg font-black text-slate-900 mt-1">{test.name}</h3>

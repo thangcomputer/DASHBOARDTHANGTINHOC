@@ -10,7 +10,7 @@ function Chip({ label, value, tone = 'sky' }) {
   const toneClass = tone === 'red' ? 'text-red-600' : tone === 'orange' ? 'text-orange-600' : 'text-sky-700';
   return (
     <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-100 rounded-xl shadow-sm min-h-11">
-      <span className="text-[12px] font-semibold text-slate-400 uppercase">{label}:</span>
+      <span className="text-[12px] font-semibold text-slate-400 ">{label}:</span>
       <span className={`text-[13px] font-bold ${toneClass}`}>{value}</span>
     </div>
   );
@@ -33,12 +33,12 @@ function CriteriaChips({ criteria = {} }) {
       <div className="flex flex-wrap gap-2">
         <Chip
           label="Hỗ trợ"
-          value={criteria.centerSupport === 'yes' ? 'TỐT' : 'CHƯA TỐT'}
+          value={criteria.centerSupport === 'yes' ? 'Tốt' : 'Chưa tốt'}
           tone={criteria.centerSupport === 'yes' ? 'sky' : 'red'}
         />
         <Chip
           label="Cơ sở"
-          value={criteria.centerFacility === 'yes' ? 'HÀI LÒNG' : 'CHƯA'}
+          value={criteria.centerFacility === 'yes' ? 'Hài lòng' : 'Chưa'}
           tone={criteria.centerFacility === 'yes' ? 'sky' : 'orange'}
         />
       </div>
@@ -48,12 +48,12 @@ function CriteriaChips({ criteria = {} }) {
     <div className="flex flex-wrap gap-2">
       <Chip
         label="Hài lòng"
-        value={criteria.satisfied === 'yes' ? 'CÓ' : 'KHÔNG'}
+        value={criteria.satisfied === 'yes' ? 'Có' : 'Không'}
         tone={criteria.satisfied === 'yes' ? 'sky' : 'red'}
       />
       <Chip
         label="Dễ hiểu"
-        value={criteria.lessonClear === 'yes' ? 'HIỂU' : 'HƠI KHÓ'}
+        value={criteria.lessonClear === 'yes' ? 'Hiểu' : 'Hơi khó'}
         tone={criteria.lessonClear === 'yes' ? 'sky' : 'orange'}
       />
     </div>
@@ -71,17 +71,20 @@ function EvaluationCard({ ev, markEvaluationRead, navigate }) {
         <div className="space-y-3 flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {!ev.read && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">MỚI</span>
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">Mới</span>
             )}
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
               ev.milestone === 'lesson_1' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
             }`}>
-              {ev.milestone === 'lesson_1' ? 'BUỔI ĐẦU TIÊN'
-                : ev.milestone === 'course_end_center' ? 'CUỐI KHÓA - TRUNG TÂM'
-                  : ev.milestone === 'course_end_teacher' ? 'CUỐI KHÓA - GIẢNG VIÊN'
-                    : ev.milestone === 'manual_feedback' ? 'PHẢN HỒI TỰ NGUYỆN'
-                      : ev.milestone === 'mid_course' ? 'MỐC 50% KHÓA'
-                        : String(ev.milestone || 'ĐÁNH GIÁ').toUpperCase()}
+              {ev.milestone === 'lesson_1' ? 'Buổi đầu tiên'
+                : ev.milestone === 'course_end_center' ? 'Cuối khóa - trung tâm'
+                  : ev.milestone === 'course_end_teacher' ? 'Cuối khóa - giảng viên'
+                    : ev.milestone === 'manual_feedback' ? 'Phản hồi tự nguyện'
+                      : ev.milestone === 'mid_course' ? 'Mốc 50% khóa'
+                        : String(ev.milestone || 'ĐÁNH GIÁ')
+                          .replace(/_/g, ' ')
+                          .toLocaleLowerCase('vi-VN')
+                          .replace(/^./u, (character) => character.toLocaleUpperCase('vi-VN'))}
             </span>
             <span className="text-[11px] font-medium text-slate-500">{ev.date}</span>
           </div>

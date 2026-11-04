@@ -32,10 +32,6 @@ export function isSuperAdminViewer(session) {
   return false;
 }
 
-export function isSuperAdminPresence(u) {
-  return String(u?.userId || '') === 'admin';
-}
-
 const ROLE_RANK = { admin: 0, staff: 0, teacher: 1, student: 2 };
 
 /** Online trước → offline sau → tên A–Z (kiểu Facebook). */
@@ -44,24 +40,6 @@ export function compareByOnlineThenName(a, b) {
   const bOn = b?.online ? 1 : 0;
   if (aOn !== bOn) return bOn - aOn;
   return String(a?.name || '').localeCompare(String(b?.name || ''), 'vi');
-}
-
-function personFromPresence(u) {
-  const rawRole = String(u.role || 'student').toLowerCase();
-  const roleKey = normalizeChatRole(rawRole);
-  const uid = String(u.userId || '');
-  let labelRole = roleKey;
-  if (rawRole === 'staff') labelRole = 'staff';
-  return {
-    id: uid,
-    name: u.name || (rawRole === 'staff' ? 'Hỗ trợ viên' : roleKey === 'admin' ? 'Quản trị viên' : roleKey === 'teacher' ? 'Giảng viên' : 'Học viên'),
-    role: rawRole === 'staff' ? 'staff' : roleKey,
-    adminRole: u.adminRole || (rawRole === 'staff' ? 'STAFF' : null),
-    displayRole: labelRole,
-    avatar: u.avatar || '',
-    online: true,
-    branchId: u.branchId || null,
-  };
 }
 
 function personFromAuthorizedContact(st, online) {

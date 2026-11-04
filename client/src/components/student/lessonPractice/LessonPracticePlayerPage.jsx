@@ -77,7 +77,7 @@ function Explanation({ item }) {
   const label = item.correct === true ? 'Chúc mừng' : item.correct === false ? 'Chưa đúng' : 'Giải thích';
   return (
     <div className={`rounded-xl border px-4 py-3 text-sm ${tone}`}>
-      <p className="font-black uppercase tracking-wide text-xs">{label}</p>
+      <p className="font-black  tracking-wide text-xs">{label}</p>
       <p className="mt-1 whitespace-pre-wrap">{item.explanation || 'Đã ghi nhận câu trả lời.'}</p>
     </div>
   );
@@ -331,7 +331,7 @@ function PracticeResult({
       <div className={`quiz-result-card__icon ${perfect ? 'quiz-result-card__icon--perfect' : ''}`} aria-hidden="true">
         <Trophy size={42} strokeWidth={2.2} />
       </div>
-      <p className="quiz-result-card__eyebrow">ĐÃ HOÀN THÀNH BÀI LUYỆN TẬP</p>
+      <p className="quiz-result-card__eyebrow">Đã hoàn thành bài luyện tập</p>
       <h2 id="practice-result-title" className="quiz-result-card__title">
         {perfect ? 'HOÀN HẢO! Bạn là nhà vô địch!' : 'Bạn đã hoàn thành rất tốt!'}
       </h2>
@@ -475,7 +475,7 @@ function QuestionCard({
     return (
       <article id={`lesson-q-${item.id}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
         <h2 className="flex items-baseline gap-2 overflow-x-auto whitespace-nowrap text-base font-bold text-slate-400">
-          <span className="shrink-0 text-xs font-black uppercase tracking-widest">Câu {index}.</span>
+          <span className="shrink-0 text-xs font-black  tracking-widest">Câu {index}.</span>
           <span>{item.prompt}</span>
         </h2>
         <p className="mt-2 text-sm text-slate-500">Chọn đúng câu trước để làm câu này.</p>
@@ -486,7 +486,7 @@ function QuestionCard({
     <article id={`lesson-q-${item.id}`} className="rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.06)] space-y-4 sm:p-5">
       {(index > 0 || item.prompt) && (
         <div className="space-y-2">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-red-600">
+          <p className="text-[11px] font-black  tracking-[0.22em] text-red-600">
             {index > 0 ? `Câu ${index}` : 'Câu'}
           </p>
           <h2 className="text-xl sm:text-2xl font-black leading-snug text-slate-900">
@@ -589,7 +589,7 @@ function QuestionCard({
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${frozen ? 'border-transparent text-transparent' : 'border-slate-200 bg-white text-slate-500 group-hover:border-red-600 group-hover:bg-red-600 group-hover:text-white'}`}>
                 <Move size={16} />
               </span>
-              <span className="shrink-0 text-xs font-black uppercase tracking-wide text-slate-500">Bước {optIndex + 1}:</span>
+              <span className="shrink-0 text-xs font-black  tracking-wide text-slate-500">Bước {optIndex + 1}:</span>
               <span className="ml-[calc(1cm-0.5rem)] font-bold text-slate-800">{opt.text}</span>
             </div>
           ))}

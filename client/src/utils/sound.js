@@ -2,7 +2,6 @@ let muted = localStorage.getItem('thvp_muted') === 'true';
 
 /** Chỉ tạo AudioContext sau gesture người dùng (tránh cảnh báo autoplay Chrome) */
 let audioCtx = null;
-let audioUnlocked = false;
 
 export const isSoundMuted = () => muted;
 
@@ -13,7 +12,6 @@ export const setSoundMuted = (val) => {
 
 /** Gọi sau click/touch đầu tiên để bật được âm thanh (Chrome/Safari autoplay policy) */
 export const unlockAudio = () => {
-  audioUnlocked = true;
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -26,47 +24,45 @@ export const unlockAudio = () => {
   }
 };
 
-const playTone = (frequency = 440, type = 'sine', duration = 0.1, volume = 0.5) => {
-  if (muted || !audioUnlocked) return;
-  try {
-    if (!audioCtx) return;
-
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-
-    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + duration);
-  } catch {
-    /* noop */
-  }
-};
-
 let lastMessageSoundAt = 0;
 let lastNotifySoundAt = 0;
 
+/** Cùng file với app mobile (thang-tin-hoc-mobile/src/assets/audio). */
+export const MESSAGE_SOUND_URL = '/audio/message.wav';
+export const NOTIFICATION_SOUND_URL = '/audio/notification.wav';
+
+const alertPlayers = new Map();
+
+const playAlertFile = (url, volume) => {
+  if (muted || typeof window === 'undefined' || typeof window.Audio !== 'function') return;
+  let player = alertPlayers.get(url);
+  if (!player) {
+    player = new window.Audio(url);
+    player.preload = 'auto';
+    alertPlayers.set(url, player);
+  }
+  player.volume = volume;
+  try {
+    player.currentTime = 0;
+  } catch { /* not loaded yet */ }
+  const playback = player.play();
+  if (playback && typeof playback.catch === 'function') {
+    playback.catch(() => { /* chưa có thao tác người dùng hoặc trình duyệt chặn */ });
+  }
+};
+
 export const playMessageSound = () => {
   const now = Date.now();
-  if (now - lastMessageSoundAt < 350) return;
+  if (now - lastMessageSoundAt < 900) return;
   lastMessageSoundAt = now;
-  playTone(1046.50, 'sine', 0.1, 0.2);
-  setTimeout(() => playTone(1318.51, 'sine', 0.15, 0.2), 100);
+  playAlertFile(MESSAGE_SOUND_URL, 0.8);
 };
 
 export const playNotifySound = () => {
   const now = Date.now();
   if (now - lastNotifySoundAt < 1200) return;
   lastNotifySoundAt = now;
-  playTone(880.00, 'triangle', 0.1, 0.2);
-  setTimeout(() => playTone(1174.66, 'triangle', 0.2, 0.2), 150);
+  playAlertFile(NOTIFICATION_SOUND_URL, 0.75);
 };
 
 /**
@@ -80,7 +76,6 @@ const playExamWarningBeep = (playbackToken) => {
     // Đảm bảo có audioCtx — tạo nếu chưa có (ưu tiên dùng lại)
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      audioUnlocked = true;
     }
     if (audioCtx.state === 'suspended') {
       void audioCtx.resume();
@@ -174,7 +169,6 @@ function lessonAudio() {
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      audioUnlocked = true;
     }
     if (audioCtx.state === 'suspended') void audioCtx.resume();
     return audioCtx;

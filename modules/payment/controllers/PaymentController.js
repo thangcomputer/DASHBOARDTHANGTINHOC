@@ -9,7 +9,7 @@ class PaymentController {
   async post_payment_session(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_payment_sessionCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_payment_sessionCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -22,7 +22,7 @@ class PaymentController {
   async post_create_session(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_create_sessionCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_create_sessionCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -35,7 +35,7 @@ class PaymentController {
   async get_payment_session_id(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_payment_session_idQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_payment_session_idQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -48,7 +48,7 @@ class PaymentController {
   async get_payment_status(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_payment_statusQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_payment_statusQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -61,7 +61,7 @@ class PaymentController {
   async post_sepay(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_sepayCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_sepayCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -87,3 +87,4 @@ class PaymentController {
 }
 
 module.exports = new PaymentController();
+

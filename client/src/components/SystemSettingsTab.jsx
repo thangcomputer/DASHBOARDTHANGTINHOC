@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { BankSelect } from './BankSelect';
 import api, { resolveMediaUrl } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import CoursePricingTab from './CoursePricingTab';
 import BranchManagementTab from './BranchManagementTab';
 import WebSettingsTab from './WebSettingsTab';
@@ -44,7 +44,7 @@ function TuitionQRPreview({ settings, compact = false }) {
   const url = `https://img.vietqr.io/image/${centerBankCode}-${centerBankAccountNumber}-compact2.png?${params}`;
   return (
     <div className={`rounded-xl border border-blue-100 bg-blue-50/70 flex flex-col items-center ${compact ? 'p-2.5 gap-1.5' : 'p-3 gap-2'}`}>
-      <p className="text-[10px] font-black text-blue-600 uppercase tracking-wide flex items-center gap-1">
+      <p className="text-[10px] font-black text-blue-600  tracking-wide flex items-center gap-1">
         <Eye size={11} /> QR mẫu · 500.000đ
       </p>
       <img
@@ -185,7 +185,7 @@ export default function SystemSettingsTab() {
       } else {
          toast.error(res.message || 'Lỗi khi đặt lại dữ liệu');
       }
-    } catch (err) {
+    } catch {
       toast.error('Có lỗi xảy ra, thử lại sau');
     }
   };
@@ -335,7 +335,9 @@ export default function SystemSettingsTab() {
             const session = JSON.parse(localStorage.getItem('admin_user') || '{}');
             session.name = res.data.name;
             localStorage.setItem('admin_user', JSON.stringify(session));
-          } catch {}
+          } catch {
+            // The profile is already saved remotely; local session data refresh is best-effort.
+          }
         }
       } else {
         toast.error(res.message || 'Cập nhật thất bại');
@@ -381,7 +383,7 @@ export default function SystemSettingsTab() {
         {/* DANGER ZONE BUTTON */}
         <button 
           onClick={() => setShowResetModal(true)}
-          className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm relative group overflow-hidden w-full sm:w-auto"
+          className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition font-bold px-4 py-2.5 rounded-xl text-xs  tracking-widest flex items-center justify-center gap-2 shadow-sm relative group overflow-hidden w-full sm:w-auto"
         >
            <span className="absolute inset-0 bg-red-600 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></span>
            <AlertOctagon size={16} className="relative z-10" /> 
@@ -436,7 +438,7 @@ export default function SystemSettingsTab() {
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 md:gap-4 items-start">
             <div className="space-y-2.5 min-w-0">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Ngân hàng</label>
+                <label className="text-[10px] font-black text-gray-400  tracking-wider block mb-1">Ngân hàng</label>
                 <BankSelect
                   value={settings.centerBankCode}
                   onChange={(bank) => setSettings((prev) => ({
@@ -447,13 +449,13 @@ export default function SystemSettingsTab() {
                 />
                 {settings.centerBankCode ? (
                   <p className="text-[10px] text-emerald-600 mt-1 font-semibold">
-                    ✓ {settings.centerBankName} · BIN {settings.centerBankCode}
+                    ✓ {settings.centerBankName}  · Bin {settings.centerBankCode}
                   </p>
                 ) : null}
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Số tài khoản</label>
+                <label className="text-[10px] font-black text-gray-400  tracking-wider block mb-1">Số tài khoản</label>
                 <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 focus-within:border-emerald-400 transition">
                   <CreditCard size={14} className="text-emerald-500 shrink-0" />
                   <input
@@ -468,15 +470,15 @@ export default function SystemSettingsTab() {
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Chủ tài khoản</label>
+                <label className="text-[10px] font-black text-gray-400  tracking-wider block mb-1">Chủ tài khoản</label>
                 <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 focus-within:border-emerald-400 transition">
                   <Users size={14} className="text-emerald-500 shrink-0" />
                   <input
                     type="text"
                     value={settings.centerBankAccountName}
                     onChange={(e) => setSettings((prev) => ({ ...prev, centerBankAccountName: e.target.value.toUpperCase() }))}
-                    className="flex-1 text-xs font-bold outline-none bg-transparent uppercase min-w-0"
-                    placeholder="TÊN CHỦ TK"
+                    className="flex-1 text-xs font-bold outline-none bg-transparent  min-w-0"
+                    placeholder="Tên chủ tk"
                   />
                 </div>
               </div>
@@ -485,7 +487,7 @@ export default function SystemSettingsTab() {
                 type="button"
                 onClick={() => handleSave(['centerBankCode', 'centerBankName', 'centerBankAccountNumber', 'centerBankAccountName'])}
                 disabled={saving || !settings.centerBankCode || !settings.centerBankAccountNumber}
-                className="w-full sm:w-auto sm:min-w-[200px] py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wide rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
+                className="w-full sm:w-auto sm:min-w-[200px] py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-black  tracking-wide rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
@@ -673,7 +675,7 @@ export default function SystemSettingsTab() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Logo hóa đơn (300x100px)</label>
+              <label className="text-[10px] font-black text-slate-500  tracking-wider block">Logo hóa đơn (300x100px)</label>
               <div className="flex items-center gap-2">
                 {settings.invoiceLogoUrl ? (
                   <img
@@ -703,7 +705,7 @@ export default function SystemSettingsTab() {
             </div>
 
             <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Chữ ký người nhận (250x150px)</label>
+              <label className="text-[10px] font-black text-slate-500  tracking-wider block">Chữ ký người nhận (250x150px)</label>
               <div className="flex items-center gap-2">
                 {settings.invoiceSignatureUrl ? (
                   <img
@@ -741,7 +743,7 @@ export default function SystemSettingsTab() {
               value={settings.invoiceStampText}
               onChange={e => setSettings(prev => ({ ...prev, invoiceStampText: e.target.value.toUpperCase() }))}
               className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[13px] font-bold text-red-600 focus:border-red-400 outline-none transition"
-              placeholder="VD: ĐÃ THANH TOÁN"
+              placeholder="Vd: đã thanh toán"
             />
           </div>
         </div>

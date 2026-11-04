@@ -20,8 +20,10 @@ function shouldSkip(req) {
   return false;
 }
 
-function issueCsrfToken(res) {
-  const token = crypto.randomBytes(32).toString('hex');
+function issueCsrfToken(res, existingToken) {
+  const token = /^[a-f0-9]{64}$/i.test(String(existingToken || ''))
+    ? String(existingToken)
+    : crypto.randomBytes(32).toString('hex');
   const isProd = process.env.NODE_ENV === 'production';
   res.cookie(COOKIE_NAME, token, {
     httpOnly: false,

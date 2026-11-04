@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Loader2 } from 'lucide-react';
-import { useToast } from '../../../utils/toast';
+import { useToast } from '../../../utils/useToast';
 import useCertPrepStudent from '../../../hooks/useCertPrepStudent';
 import CertPrepTestList from './CertPrepTestList';
 import CertPrepErrorState from './CertPrepErrorState';

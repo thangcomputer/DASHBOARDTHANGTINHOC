@@ -9,7 +9,7 @@ class StudentController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_rootQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_rootQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -22,7 +22,7 @@ class StudentController {
   async get_stats(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_statsQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_statsQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -80,19 +80,6 @@ class StudentController {
         }
       }
 
-      if (result._isSend) return res.status(result._status ?? 200).send(result._body);
-      return res.status(result._status ?? 200).json(result._body);
-    } catch (err) {
-      const status = err.status || err.statusCode || (err.code === 'VALIDATION_ERROR' ? 400 : 500);
-      return res.status(status).json({ success: false, message: err.message || 'Lỗi server', errors: err.errors });
-    }
-  }
-
-  async post_import(req, res) {
-    try {
-      // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_importCommand(data));
-      if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {

@@ -60,7 +60,7 @@ export default function ExamSubjectCheckboxGrid({
       <div className={dense ? 'space-y-2.5' : 'space-y-3'}>
         {groupEntries.map(([groupKey, items]) => (
           <div key={groupKey} className={dense ? 'space-y-1.5' : 'space-y-2'}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-semibold  tracking-wide text-slate-500">
               {getExamSubjectGroupLabel(groupKey, groupLabels)}
             </p>
             <div className={`cms-chip-grid ${colClass} ${accentClass}`}>

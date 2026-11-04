@@ -1,8 +1,10 @@
 const jwt       = require('jsonwebtoken');
 const Teacher   = require('../models/Teacher');
 const Student   = require('../models/Student');
+const SystemSettings = require('../models/SystemSettings');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
+const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 
 // ── authMiddleware: Xác thực JWT + Token Blacklist + Token Version ─────────────
 const authMiddleware = async (req, res, next) => {
@@ -30,6 +32,41 @@ const authMiddleware = async (req, res, next) => {
     req.accessToken = token; // Lưu token gốc để dùng khi logout
     req.tokenAudience = decoded.aud || 'legacy'; // 'public' | 'internal' | 'legacy'
 
+    if (decoded.sid) {
+      if (decoded.aud !== 'mobile' || !isMobileMultiSessionAuthEnabled()) {
+        return res.status(401).json({
+          success: false,
+          code: 'MOBILE_SESSION_AUTH_DISABLED',
+          message: 'Phiên mobile không được bật.',
+        });
+      }
+      const session = await require('../services/mobileAuthSessionService').validateSession({
+        sessionId: decoded.sid,
+        userId: decoded.id,
+        role: decoded.role,
+      });
+      if (!session) {
+        return res.status(401).json({
+          success: false,
+          code: 'SESSION_REVOKED',
+          message: 'Phiên đăng nhập không còn hợp lệ.',
+        });
+      }
+      req.sessionId = decoded.sid;
+      req.authSession = session;
+    }
+
+    if (decoded.id === 'admin') {
+      const settings = await SystemSettings.findOne({ _key: 'main' }).select('adminTokenVersion').lean();
+      if ((settings?.adminTokenVersion || 0) !== decoded.tokenVersion) {
+        return res.status(401).json({
+          success: false,
+          code: 'TOKEN_VERSION_MISMATCH',
+          message: 'Tài khoản đã đăng nhập ở thiết bị khác. Phiên này đã bị vô hiệu.',
+        });
+      }
+    }
+
     // ⭐ Fix 1: Kiểm tra tokenVersion + trạng thái tài khoản (khóa/vô hiệu)
     // Chỉ áp dụng cho user có ID thực (không phải hardcoded admin)
     if (decoded.id && decoded.id !== 'admin') {
@@ -56,7 +93,7 @@ const authMiddleware = async (req, res, next) => {
         });
       }
 
-      if (dbUser.tokenVersion !== undefined && decoded.tokenVersion !== undefined
+      if (!decoded.sid && dbUser.tokenVersion !== undefined && decoded.tokenVersion !== undefined
           && dbUser.tokenVersion !== decoded.tokenVersion) {
         return res.status(401).json({
           success: false,

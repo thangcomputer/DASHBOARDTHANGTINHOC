@@ -5,7 +5,7 @@ import {
   UploadCloud, Filter, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { filesAPI, SOCKET_BASE } from '../services/api';
-import { useToast } from '../utils/toast';
+import { useToast } from '../utils/useToast';
 import { displayFileName } from '../utils/validators';
 
 function formatTime(t) {
@@ -171,7 +171,7 @@ export default function FileCenterPage() {
 
       <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 cms-mobile-stack sm:flex sm:flex-row sm:flex-wrap sm:items-end gap-3 shrink-0">
         <div className="w-full sm:w-auto sm:min-w-[12rem] flex-1">
-          <label className="text-[10px] font-black text-gray-400 uppercase">Category upload</label>
+          <label className="text-[10px] font-black text-gray-400 ">Category upload</label>
           <CmsSelect
             value={uploadCat}
             onChange={(e) => setUploadCat(e.target.value)}

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
+const { policyShadowMessage } = require('../middleware/policyShadowMessage');
+const { messagesCutoverGate } = require('../middleware/messagesCutoverGate');
 const { getMessagingRole } = require('../utils/messagingRoles');
 const { canViewConversation } = require('../services/messagingPolicy');
 const {
@@ -50,6 +52,66 @@ router.get('/status', authMiddleware, (req, res) => {
       peer: { id: AI_PEER_ID, name: AI_PEER_NAME, role: 'system' },
     },
   });
+});
+
+router.post('/message', authMiddleware, policyShadowMessage('send'), messagesCutoverGate('send'), async (req, res) => {
+  try {
+    if (!isAiSupportEnabled()) {
+      return res.status(503).json({ success: false, message: 'Trợ lý AI chưa được bật' });
+    }
+    if (denyAiRoles(req, res)) return;
+
+    const role = getMessagingRole(req.user);
+    const userId = String(req.user.id);
+    const conversationId = buildConversationId(role, userId, 'system', AI_PEER_ID);
+    const access = canViewConversation(req.user, conversationId);
+    if (!access.allowed) {
+      return res.status(403).json({ success: false, message: 'Không có quyền gửi tin nhắn tới Trợ lý AI' });
+    }
+
+    const {
+      content,
+      messageType,
+      fileUrl,
+      fileName,
+      payload,
+      conversationId: requestedConversationId,
+    } = req.body || {};
+    if (requestedConversationId && requestedConversationId !== conversationId) {
+      return res.status(400).json({ success: false, message: 'Cuộc trò chuyện AI không hợp lệ' });
+    }
+    if (!String(content || '').trim() && !String(fileUrl || '').trim() && payload?.type !== 'sticker') {
+      return res.status(400).json({ success: false, message: 'Tin nhắn không được để trống' });
+    }
+
+    const { sendCanonicalMessage } = require('../services/directMessageService');
+    const result = await sendCanonicalMessage({
+      sender: req.user,
+      receiverId: AI_PEER_ID,
+      receiverName: AI_PEER_NAME,
+      receiverRole: 'system',
+      conversationId,
+      content,
+      messageType,
+      fileUrl,
+      fileName,
+      payload: payload && typeof payload === 'object' ? payload : null,
+      io: req.app.get('io'),
+      notifyUser: req.app.notifyUser,
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({
+        success: false,
+        message: result.message,
+        ...(result.code ? { code: result.code } : {}),
+        ...(result.policy ? { policy: result.policy } : {}),
+      });
+    }
+    return res.status(201).json({ success: true, data: result.clientMessage });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+  }
 });
 
 router.post('/open', authMiddleware, async (req, res) => {

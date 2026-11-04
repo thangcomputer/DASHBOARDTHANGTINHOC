@@ -4,7 +4,7 @@ import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Printer, Download, Camera } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { useSocket } from '../../../context/SocketContext';
-import { useToast } from '../../../utils/toast.jsx';
+import { useToast } from '../../../utils/useToast';
 import { useBranch } from '../../../context/BranchContext';
 import { useModal } from '../../../utils/Modal.jsx';
 import InvoicePreviewFrame from '../../InvoicePreviewFrame';
@@ -24,7 +24,6 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
   const {
     students,
     addStudent: ctxAddStudent,
-    removeStudent: ctxRemoveStudent,
     updateStudent: ctxUpdateStudent,
     assignTeacher: ctxAssignTeacher,
     approveStudentExam,
@@ -41,7 +40,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
     fetchStudentsPaginated,
   } = useData();
 
-  const { socket, onDataRefresh } = useSocket();
+  const { onDataRefresh } = useSocket();
   const toast = useToast();
   const { showModal: showGlobalModal, closeModal } = useModal();
   const { selectedBranchId } = useBranch();
@@ -227,7 +226,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
 
       if (student.paid) {
         showGlobalModal({
-          title: 'HÓA ĐƠN THU HỌC PHÍ',
+          title: 'Hóa đơn thu học phí',
           content: (
             <div className="flex flex-col items-center gap-4 w-full rounded-2xl bg-slate-100 p-3 sm:p-5">
               <InvoicePreviewFrame
@@ -245,21 +244,21 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
                   onClick={() => printInvoice()}
                   className="flex-1 min-w-[120px] py-3.5 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                 >
-                  <Printer size={18} /> IN (PRINT)
+                  <Printer size={18} />  In (print)
                 </button>
                 <button
                   type="button"
                   onClick={() => exportPDF({ studentName: student.name })}
                   className="flex-1 min-w-[120px] py-3.5 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-700 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
                 >
-                  <Download size={18} /> TẢI PDF
+                  <Download size={18} />    Tải PDF
                 </button>
                 <button
                   type="button"
                   onClick={() => closeModal()}
                   className="flex-1 min-w-[120px] py-3.5 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-all"
                 >
-                  ĐÓNG
+                  Đóng
                 </button>
                 <button
                   type="button"
@@ -429,7 +428,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
           toast.error(`${errors.length} dòng lỗi: ${errors.slice(0, 2).join(' — ')}${errors.length > 2 ? '…' : ''}`);
         }
       } catch {
-        toast.error('Không đọc được file. Dùng mẫu .xlsx và thử lại.');
+        toast.error('Không đọc được file. Dùng mẫu .XLSX và thử lại.');
       }
     };
     reader.readAsBinaryString(file);

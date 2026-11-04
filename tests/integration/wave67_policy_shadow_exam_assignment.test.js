@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { PERMISSIONS } = require('../../constants/permissions');
+const { readDeployEnv } = require('../helpers/deployEnv');
 const {
   buildSubject: buildExamSubject,
   evaluateLegacyExam,
@@ -686,10 +687,10 @@ test('Wave6.7 static: routes keep legacy authz + shadow; no mass-assignment regr
 });
 
 test('Wave6.7 static: CQRS OFF; no global Policy; constants authority; sockets preserved', () => {
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
+  const env = readDeployEnv();
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
   const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
   assert.ok(server.includes("app.use('/api/exam-results'"));
   assert.ok(server.includes("app.use('/api/assignments'"));

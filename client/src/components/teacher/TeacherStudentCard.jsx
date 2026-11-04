@@ -14,7 +14,7 @@ import { isUserOnline } from '../../utils/presence';
 import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
-import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
+import { formatLocalDateKey, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
 import { showGlossyAlert, getDisplayName } from './TeacherShared';
@@ -35,7 +35,7 @@ import {
   clearMakeupPending,
   subscribeMakeupPending,
 } from '../../utils/attendanceMakeupPendingStore';
-import { useToast } from '../../utils/toast';
+import { useToast } from '../../utils/useToast';
 import {
   ATTENDANCE_CONFIRM_MS,
   attendanceConfirmKey,
@@ -105,7 +105,7 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
       title: 'Xác nhận ĐÁNH TRƯỢT',
       content: `Hành động này sẽ KHOÁ TRUY CẬP PHÒNG THI của ${getDisplayName(student)} ngay lập tức.`,
       type: 'warning',
-      confirmText: 'ĐÁNH TRƯỢT NGAY',
+      confirmText: 'Đánh trượt ngay',
       onConfirm: () => onLockExam(student),
     });
   };
@@ -135,13 +135,13 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
       disabled={!canFail}
       title={hint}
       onClick={openConfirm}
-      className={`flex flex-1 min-[360px]:flex-initial justify-center items-center gap-2 text-xs font-black px-4 py-3 sm:px-5 rounded-2xl transition-all uppercase tracking-widest ${
+      className={`flex flex-1 min-[360px]:flex-initial justify-center items-center gap-2 text-xs font-black px-4 py-3 sm:px-5 rounded-2xl transition-all  tracking-widest ${
         canFail
           ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/40'
           : 'bg-slate-100 text-slate-400 border-2 border-slate-200 cursor-not-allowed opacity-60'
       }`}
     >
-      <XCircle size={16} /> ĐÁNH TRƯỢT
+      <XCircle size={16} />  Đánh trượt
     </button>
   );
 };
@@ -150,14 +150,13 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 
 export const StudentCard = ({
   student, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam,
-  isDetailed, attendanceGate, myStudents = [], onCancelSchedule,
+  isDetailed, attendanceGate, myStudents = [],
   navigate,
 }) => {
   const toast = useToast();
   const { showModal } = useModal();
   const { onDataRefresh, socket, onlineUsers = [], lastSeenUsers = {} } = useSocket();
   const {
-    privateEvaluations = [],
     schedules: allSchedules = [],
     triggerBackgroundSync,
     currentUser,
@@ -179,7 +178,7 @@ export const StudentCard = ({
   const confirmKey = attendanceConfirmKey(student);
   const studentPresenceId = String(student._id || student.id || '');
   const isStudentOnline = isUserOnline(onlineUsers, student);
-  const lastSeenAt = lastSeenUsers[studentPresenceId];
+  const lastSeenAt = lastSeenUsers[studentPresenceId] || student.lastAccessAt;
   const lastSeenLabel = (() => {
     if (!lastSeenAt) return 'Chưa có dữ liệu truy cập';
     const d = new Date(lastSeenAt);
@@ -200,7 +199,6 @@ export const StudentCard = ({
   const [confirmTick, setConfirmTick] = useState(0);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [studentQuizzes, setStudentQuizzes] = useState([]);
-  const [studentEvals, setStudentEvals] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const sessionTotal = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12;
   // Chuẩn Admin: enrollment.completedSessions (gồm buổi ghi nhận trước / chỉnh tay).
@@ -245,7 +243,6 @@ export const StudentCard = ({
 
   // ASSIGNMENTS STATE
   const [courseAssignments, setCourseAssignments] = useState([]);
-  const [studentSubmissions, setStudentSubmissions] = useState([]);
   const [loadingAssign, setLoadingAssign] = useState(false);
   const [showAddAssign, setShowAddAssign] = useState(false);
   const [newAssign, setNewAssign] = useState({ title: '', deadline: '', fileUrl: '', description: '' });
@@ -273,7 +270,7 @@ export const StudentCard = ({
       } else {
         showGlossyAlert(res.message || 'Lỗi chấm bài');
       }
-    } catch(e) {
+    } catch {
       showGlossyAlert('Lỗi mạng khi lưu điểm');
     }
   };
@@ -739,7 +736,9 @@ export const StudentCard = ({
             }))
         );
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể tải danh sách bài tập. Vui lòng thử lại.');
+    }
     setLoadingAssign(false);
   }, [student.id, student._id, student.course]);
 
@@ -751,26 +750,17 @@ export const StudentCard = ({
 
   const fetchActivityExtras = useCallback(async () => {
     setLoadingLogs(true);
-    const sid = String(student.id || student._id || '');
-    const teacherId = student.teacherId || student.teacherIds?.[0];
     try {
-      const [quizRes, evalRes] = await Promise.all([
-        api.quizzes.getTeacherQuizzes().catch(() => null),
-        teacherId ? api.evaluations.getByTeacher(teacherId).catch(() => null) : Promise.resolve(null),
-      ]);
+      const quizRes = await api.quizzes.getTeacherQuizzes();
       if (quizRes?.success) {
         setStudentQuizzes(quizRes.data || []);
       }
-      const fromApi = evalRes?.success
-        ? (evalRes.data || []).filter((e) => String(e.studentId?._id || e.studentId) === sid)
-        : [];
-      setStudentEvals(fromApi);
     } catch {
-      /* ignore */
+      showGlossyAlert('Không thể tải hoạt động học viên. Vui lòng thử lại.');
     } finally {
       setLoadingLogs(false);
     }
-  }, [student.id, student._id, student.teacherId, student.teacherIds]);
+  }, []);
 
   useEffect(() => {
     if (activePanel === 'logs') {
@@ -861,7 +851,9 @@ export const StudentCard = ({
         setNewAssign({ title: '', deadline: '', fileUrl: '', description: '' });
         fetchStudentAssignments();
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể tạo bài tập. Vui lòng thử lại.');
+    }
   };
 
   const isAssignmentGraded = (assign) => {
@@ -896,7 +888,9 @@ export const StudentCard = ({
         setEditingAssignmentId(null);
         fetchStudentAssignments();
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể cập nhật bài tập. Vui lòng thử lại.');
+    }
   };
 
   const handleDeleteAssign = async (id) => {
@@ -911,7 +905,9 @@ export const StudentCard = ({
       if (res.success) {
         fetchStudentAssignments();
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể xóa bài tập. Vui lòng thử lại.');
+    }
   };
 
   const handleAssignmentUpload = async (e, type = 'new') => {
@@ -930,7 +926,7 @@ export const StudentCard = ({
       } else {
         showGlossyAlert(res.message || "Lỗi khi tải file lên");
       }
-    } catch(err) {
+    } catch {
       showGlossyAlert("Lỗi mạng khi tải file");
     }
     e.target.value = '';
@@ -961,7 +957,7 @@ export const StudentCard = ({
       title: 'Hủy ca',
       content: `Xác nhận hủy ca của "${student.name || sid}"?\nLịch: ${makeupSummary.dateLabel} · ${makeupSummary.timeRange}`,
       type: 'warning',
-      confirmText: 'XÁC NHẬN HỦY CA',
+      confirmText: 'Xác nhận hủy ca',
       cancelText: 'Đóng',
       onConfirm: async () => {
         try {
@@ -1029,7 +1025,7 @@ export const StudentCard = ({
     return (
       <div className={`bg-white rounded-2xl sm:rounded-[40px] shadow-md sm:shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full ${isDroppedOut ? 'opacity-85' : ''}`}>
         {isDroppedOut && (
-          <div className="bg-slate-700 text-white text-center text-[11px] sm:text-xs font-bold uppercase tracking-wide px-3 py-2.5">
+          <div className="bg-slate-700 text-white text-center text-[11px] sm:text-xs font-bold  tracking-wide px-3 py-2.5">
             Học viên đã thôi học / hoàn phí — chỉ xem lịch sử · không thao tác
           </div>
         )}
@@ -1050,7 +1046,7 @@ export const StudentCard = ({
               />
             </div>
             {isStudentOnline ? (
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 border-2 border-white rounded-full" title="Đang online" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 border-2 border-white rounded-full" title="Trực tuyến" />
             ) : null}
             </div>
             <div className="flex-1 min-w-0">
@@ -1064,7 +1060,7 @@ export const StudentCard = ({
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`hidden min-[420px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${
+                  <span className={`hidden min-[420px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold  tracking-wide whitespace-nowrap ${
                     isDroppedOut
                       ? 'bg-slate-100 text-slate-500'
                       : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
@@ -1107,19 +1103,19 @@ export const StudentCard = ({
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className={`min-[420px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase whitespace-nowrap ${
+                <span className={`min-[420px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide  whitespace-nowrap ${
                   isDroppedOut
                     ? 'bg-slate-100 text-slate-500'
                     : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
                 }`}>
                   {isDroppedOut ? 'Thôi học' : isCompleted ? 'Hoàn thành' : 'Đang học'}
                 </span>
-                <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase whitespace-nowrap border ${
+                <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide  whitespace-nowrap border ${
                   isStudentOnline
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-slate-100 text-slate-500 border-slate-200'
                 }`}>
-                  {isStudentOnline ? 'Đang online' : 'Offline'}
+                  {isStudentOnline ? 'Trực tuyến' : 'Offline'}
                 </span>
                 {!isStudentOnline && lastSeenAt ? (
                   <span className="text-[10px] font-medium text-slate-400">{lastSeenLabel}</span>
@@ -1132,7 +1128,7 @@ export const StudentCard = ({
           </div>
           
           <div className="mt-4 pt-3 border-t border-slate-100">
-            <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wide text-slate-400">
+            <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs lg:text-sm font-bold  tracking-wide text-slate-400">
               <span>Tiến độ khóa học</span>
               <span className="text-slate-700 tabular-nums">{done}/{sessionTotal} buổi ({progressPct}%)</span>
             </div>
@@ -1155,7 +1151,7 @@ export const StudentCard = ({
 
         {String(student.teacherAlert || '').trim() ? (
           <div className="mx-3 mb-0 sm:mx-8 md:mx-10 mt-3 rounded-xl sm:rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 sm:px-4 sm:py-3">
-            <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-wide text-amber-700 flex items-center gap-1.5">
+            <p className="text-[10px] sm:text-[11px] font-black  tracking-wide text-amber-700 flex items-center gap-1.5">
               <AlertCircle size={13} className="shrink-0" aria-hidden="true" />
               Lưu ý từ Admin
             </p>
@@ -1225,23 +1221,23 @@ export const StudentCard = ({
                  {/* Stat Boxes — 3 cột trên mobile */}
                  <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2 sm:gap-4 md:gap-6 min-w-0">
                     <div className="group bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
-                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-blue-600 uppercase tracking-wide mb-1 truncate max-w-full">Đã học</p>
+                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-blue-600  tracking-wide mb-1 truncate max-w-full">Đã học</p>
                        <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-white shadow-md shadow-blue-200 transition-transform group-hover:scale-105">
                          <CheckCircle size={18} strokeWidth={2.4} />
                        </div>
                        <h4 className="text-lg sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
-                       <p className="text-[10px] sm:text-xs font-bold text-blue-400 mt-1 uppercase">buổi</p>
+                       <p className="text-[10px] sm:text-xs font-bold text-blue-400 mt-1 ">buổi</p>
                     </div>
                     <div className="group bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
-                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wide mb-1 text-amber-600 truncate max-w-full">Còn lại</p>
+                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold  tracking-wide mb-1 text-amber-600 truncate max-w-full">Còn lại</p>
                        <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-200 transition-transform group-hover:scale-105">
                          <Clock size={18} strokeWidth={2.4} />
                        </div>
                        <h4 className="text-lg sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{remainingSessions}</h4>
-                       <p className="text-[10px] sm:text-xs font-bold mt-1 uppercase text-amber-400">buổi</p>
+                       <p className="text-[10px] sm:text-xs font-bold mt-1  text-amber-400">buổi</p>
                     </div>
                     <div className="group bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
-                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-purple-600 uppercase tracking-wide mb-1 truncate max-w-full">Điểm TB</p>
+                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-purple-600  tracking-wide mb-1 truncate max-w-full">Điểm TB</p>
                        <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500 text-white shadow-md shadow-purple-200 transition-transform group-hover:scale-105">
                          <Star size={18} strokeWidth={2.4} />
                        </div>
@@ -1249,7 +1245,7 @@ export const StudentCard = ({
                           <h4 className="text-lg sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
                           <span className="text-[10px] sm:text-lg font-bold text-purple-400">/10</span>
                        </div>
-                       <p className="text-xs font-bold text-purple-400 mt-1 uppercase hidden sm:block">Đánh giá chung</p>
+                       <p className="text-xs font-bold text-purple-400 mt-1  hidden sm:block">Đánh giá chung</p>
                     </div>
                  </div>
                  {priorCredit > 0 ? (
@@ -1280,7 +1276,7 @@ export const StudentCard = ({
                          waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
                          'Bấm để điểm danh buổi học hôm nay'
                        }
-                       className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
+                       className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
                          isCompleted 
                            ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                          : makeupPending
@@ -1303,7 +1299,7 @@ export const StudentCard = ({
                          {isCompleted 
                            ? 'Hoàn thành'
                            : makeupPending
-                             ? 'Đang xét duyệt'
+                             ? 'Đã gửi Admin'
                            : isOverdueMakeup
                              ? 'Điểm danh bù'
                              : isCommittingAttendance
@@ -1326,7 +1322,7 @@ export const StudentCard = ({
                      disabled={!canCancelSession}
                      aria-disabled={!canCancelSession}
                      title={cancelButtonTitle}
-                     className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 border ${
+                     className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 border ${
                        canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
                      }`}
                    >
@@ -1340,7 +1336,7 @@ export const StudentCard = ({
 
                  {/* Notes */}
                  <div className="mt-4 sm:mt-0">
-                    <label className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                    <label className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide flex items-center gap-1.5 mb-2">
                        <FileText size={12} aria-hidden="true" /> Ghi chú học viên
                     </label>
                     <div className="border border-slate-200 rounded-xl p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
@@ -1386,11 +1382,11 @@ export const StudentCard = ({
                        <button 
                          type="button"
                          onClick={handleLinkSave}
-                         className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg whitespace-nowrap ${
+                         className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs  tracking-widest transition-all shadow-lg whitespace-nowrap ${
                             linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-100'
                          }`}
                        >
-                         {linkSaved ? 'ĐÃ LƯU ✓' : 'CẬP NHẬT'}
+                         {linkSaved ? 'Đã lưu ✓' : 'Cập nhật'}
                        </button>
                     </div>
                  </div>
@@ -1421,12 +1417,12 @@ export const StudentCard = ({
                   <div className="bg-indigo-50 border border-indigo-100 rounded-[32px] p-6 space-y-4 shadow-inner animate-in zoom-in-95">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tiêu đề bài tập</label>
+                        <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tiêu đề bài tập</label>
                         <input type="text" value={newAssign.title} onChange={e => setNewAssign({...newAssign, title: e.target.value})}
                           className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="VD: Homework Buổi 1" />
                       </div>
                       <div>
-                        <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Hạn nộp (Deadline)</label>
+                        <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Hạn nộp (Deadline)</label>
                         <input
                           type="datetime-local"
                           min={assignmentDeadlineMin()}
@@ -1437,7 +1433,7 @@ export const StudentCard = ({
                         <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
                       </div>
                       <div className="md:col-span-2">
-                        <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
+                        <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
                         <div className="flex items-center gap-2 min-w-0">
                           <input type="text" value={newAssign.fileUrl} onChange={e => setNewAssign({...newAssign, fileUrl: e.target.value})}
                             className="flex-1 min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
@@ -1448,13 +1444,13 @@ export const StudentCard = ({
                         </div>
                         <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
                       </div>
-                      <button onClick={handleCreateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">GỬI BÀI TẬP CHO HỌC VIÊN</button>
+                      <button onClick={handleCreateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Gửi bài tập cho học viên</button>
                     </div>
                   </div>
                 )}
 
                 {loadingAssign ? (
-                   <div className="py-20 text-center animate-pulse text-xs font-black text-slate-300 uppercase tracking-[4px]">Đang tải dữ liệu...</div>
+                   <div className="py-20 text-center animate-pulse text-xs font-black text-slate-300  tracking-[4px]">Đang tải dữ liệu...</div>
                 ) : (
                   <div className="space-y-4">
                     {courseAssignments.map(assign => {
@@ -1465,17 +1461,17 @@ export const StudentCard = ({
                       return editingAssignmentId === assign._id ? (
                         <div key={`edit-${assign._id}`} className="bg-indigo-50 border border-indigo-200 rounded-[32px] p-6 space-y-4 shadow-inner animate-in zoom-in-95 relative z-10 transition-all">
                           <div className="flex items-center justify-between">
-                             <h4 className="text-xs font-black text-indigo-500 uppercase tracking-widest flex items-center gap-2">Chỉnh sửa Bài tập</h4>
+                             <h4 className="text-xs font-black text-indigo-500  tracking-widest flex items-center gap-2">Chỉnh sửa Bài tập</h4>
                              <button onClick={() => setEditingAssignmentId(null)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={16}/></button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tiêu đề bài tập</label>
+                              <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tiêu đề bài tập</label>
                               <input type="text" value={editingAssign.title} onChange={e => setEditingAssign({...editingAssign, title: e.target.value})}
                                 className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"/>
                             </div>
                             <div>
-                              <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Hạn nộp (Deadline)</label>
+                              <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Hạn nộp (Deadline)</label>
                               <input
                                 type="datetime-local"
                                 min={assignmentDeadlineMin()}
@@ -1486,7 +1482,7 @@ export const StudentCard = ({
                               <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
                             </div>
                             <div className="md:col-span-2">
-                              <label className="text-xs cms-min-text-xs font-black text-indigo-400 uppercase mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
+                              <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
                               <div className="flex items-center gap-2">
                                 <input type="text" value={editingAssign.fileUrl} onChange={e => setEditingAssign({...editingAssign, fileUrl: e.target.value})}
                                   className="flex-1 bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
@@ -1497,7 +1493,7 @@ export const StudentCard = ({
                               </div>
                               <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
                             </div>
-                            <button onClick={handleUpdateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">CẬP NHẬT BÀI TẬP</button>
+                            <button onClick={handleUpdateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Cập nhật bài tập</button>
                           </div>
                         </div>
                       ) : (
@@ -1513,7 +1509,7 @@ export const StudentCard = ({
                                 const isAdmin = role === 'admin' || role === 'staff';
                                 const label = isAdmin ? 'Admin giao' : 'Giáo viên';
                                 return (
-                                  <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide border ${
+                                  <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-black  tracking-wide border ${
                                     isAdmin
                                       ? 'bg-violet-100 text-violet-700 border-violet-200'
                                       : 'bg-sky-100 text-sky-700 border-sky-200'
@@ -1524,12 +1520,12 @@ export const StudentCard = ({
                               })()}
                             </h5>
                             {isSubmitted ? (
-                              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide flex items-center gap-1 border ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
+                              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold  tracking-wide flex items-center gap-1 border ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
                                 {isGraded ? <Check size={11} /> : <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
                                 {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'Đã nộp'}
                               </span>
                             ) : (
-                              <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide bg-slate-50 text-slate-400">
+                              <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold  tracking-wide bg-slate-50 text-slate-400">
                                 Chưa nộp
                               </span>
                             )}
@@ -1614,7 +1610,7 @@ export const StudentCard = ({
                         <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-200 shadow-sm">
                            <BookOpen size={28} />
                         </div>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest px-10 leading-relaxed">Chưa có bài tập nào được giao<br/>cho lộ trình này</p>
+                        <p className="text-xs font-black text-slate-400  tracking-widest px-10 leading-relaxed">Chưa có bài tập nào được giao<br/>cho lộ trình này</p>
                       </div>
                     )}
                   </div>
@@ -1668,7 +1664,7 @@ export const StudentCard = ({
                     />
 
                     <div className="w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-full border-4 border-amber-100 flex flex-col items-center justify-center shadow-md">
-                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">Xếp loại</span>
+                      <span className="text-[10px] font-bold text-amber-400  tracking-wide">Xếp loại</span>
                       <span className="text-4xl sm:text-5xl font-bold text-amber-600 leading-none mt-0.5">{gradeLetter}</span>
                     </div>
 
@@ -1708,7 +1704,7 @@ export const StudentCard = ({
 
                 <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
                   {loadingLogs || (activePanel === 'logs' && loadingAssign && activityLogs.length === 0) ? (
-                    <div className="py-16 text-center animate-pulse text-xs font-black text-slate-300 uppercase tracking-[4px]">
+                    <div className="py-16 text-center animate-pulse text-xs font-black text-slate-300  tracking-[4px]">
                       Đang tải nhật ký...
                     </div>
                   ) : activityLogs.length > 0 ? (
@@ -1736,7 +1732,7 @@ export const StudentCard = ({
                                 <span className="text-xs font-black text-slate-900 font-mono">
                                   {log.time ? `${log.time} — ${log.date}` : log.date}
                                 </span>
-                                <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded-md border ${meta.badge}`}>
+                                <span className={`text-[11px] font-black  px-2 py-0.5 rounded-md border ${meta.badge}`}>
                                   {meta.label}
                                 </span>
                               </div>
@@ -1810,19 +1806,19 @@ export const StudentCard = ({
         {/* Makeup modal — phải có trong isDetailed (tab Học viên) */}
         {showMakeupModal && (
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-3 sm:p-4 animate-in fade-in duration-300"
             role="presentation"
             onClick={() => !sendingMakeup && setShowMakeupModal(false)}
           >
             <div
-              className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+              className="bg-white rounded-[26px] w-full max-w-[22rem] max-h-[calc(100dvh-1.5rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
               role="dialog"
               aria-modal="true"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-4 sm:px-5 text-white flex justify-between items-start gap-3">
                 <div>
-                  <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
+                  <h3 className="font-black text-lg  tracking-tight">Điểm danh bù</h3>
                   <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
                 </div>
                 <button
@@ -1834,9 +1830,9 @@ export const StudentCard = ({
                   <X size={20} />
                 </button>
               </div>
-              <div className="p-6 space-y-4 text-sm">
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Thông tin buổi học</p>
+              <div className="p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-1">
+                  <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
                   <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
                   {makeupSummary.course ? (
                     <p className="text-slate-600">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
@@ -1847,18 +1843,18 @@ export const StudentCard = ({
                   <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
                   <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-slate-700 leading-relaxed">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-slate-700 leading-relaxed">
                   <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
                   <p>Bạn chịu trách nhiệm về buổi học này.</p>
                   <p>Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa. Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.</p>
                 </div>
               </div>
-              <div className="bg-slate-50 px-6 py-5 flex gap-3">
+              <div className="bg-slate-50 px-4 py-3 sm:px-5 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowMakeupModal(false)}
                   disabled={sendingMakeup}
-                  className="flex-1 py-3.5 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                  className="flex-1 py-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
                 >
                   Hủy
                 </button>
@@ -1866,7 +1862,7 @@ export const StudentCard = ({
                   type="button"
                   onClick={sendMakeupRequestToAdmin}
                   disabled={sendingMakeup}
-                  className="flex-[1.4] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-[1.4] py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {sendingMakeup ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                   Gửi
@@ -1879,7 +1875,7 @@ export const StudentCard = ({
         {/* Attendance Modal - Added to Detailed View */}
         {showAttendanceModal && (
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-4 animate-in fade-in duration-300"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-3 sm:p-4 animate-in fade-in duration-300"
             role="presentation"
             onClick={() => setShowAttendanceModal(false)}
           >
@@ -1895,7 +1891,7 @@ export const StudentCard = ({
                     <CheckCircle size={22} />
                   </div>
                   <div>
-                    <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh & Chấm điểm</h3>
+                    <h3 className="font-black text-lg  tracking-tight">Điểm danh & Chấm điểm</h3>
                     <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest">{student.course}</p>
                   </div>
                 </div>
@@ -1905,13 +1901,13 @@ export const StudentCard = ({
               </div>
               <div className="p-10 space-y-6">
                 <div className="bg-emerald-50 rounded-3xl p-6 border border-emerald-100">
-                  <p className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-1">Học viên</p>
+                  <p className="text-xs font-black text-emerald-800  tracking-widest mb-1">Học viên</p>
                   <p className="text-lg font-black text-emerald-600">{getDisplayName(student)}</p>
                   <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{sessionTotal} buổi</p>
                 </div>
                 
                 <div>
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
+                  <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
                   <AttendanceGradeInput
                     value={attForm.grade}
                     onChange={(e) => setAttForm({ ...attForm, grade: e.target.value })}
@@ -1920,7 +1916,7 @@ export const StudentCard = ({
                 </div>
 
                 <div>
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Ghi chú nhanh</label>
+                   <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Ghi chú nhanh</label>
                    <textarea 
                      value={attForm.note}
                      onChange={(e) => setAttForm({ ...attForm, note: e.target.value })}
@@ -1934,14 +1930,14 @@ export const StudentCard = ({
                   <button 
                     type="button"
                     onClick={() => setShowAttendanceModal(false)}
-                    className="flex-1 min-h-11 py-3 sm:py-4 text-slate-400 font-black text-xs uppercase tracking-widest bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all whitespace-nowrap"
+                    className="flex-1 min-h-11 py-3 sm:py-4 text-slate-400 font-black text-xs  tracking-widest bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all whitespace-nowrap"
                   >
                     Hủy
                   </button>
                   <button 
                     type="button"
                     onClick={beginAttendanceConfirm}
-                    className="flex-[2] min-h-11 py-3 sm:py-4 px-2 text-white font-black text-xs uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95 text-center leading-tight"
+                    className="flex-[2] min-h-11 py-3 sm:py-4 px-2 text-white font-black text-xs  tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95 text-center leading-tight"
                   >
                     Xác nhận Điểm danh
                   </button>
@@ -1972,7 +1968,7 @@ export const StudentCard = ({
     <React.Fragment>
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${isDroppedOut ? 'opacity-70' : ''}`}>
       {isDroppedOut && (
-        <div className="bg-slate-600 text-white text-center text-[10px] font-bold uppercase tracking-wide px-3 py-1.5">
+        <div className="bg-slate-600 text-white text-center text-[10px] font-bold  tracking-wide px-3 py-1.5">
           Thôi học — chỉ xem
         </div>
       )}
@@ -1987,12 +1983,12 @@ export const StudentCard = ({
               <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
               <p className="text-slate-300 text-xs mt-0.5 flex flex-wrap items-center gap-2">
                 {student.course} · {student.age} tuổi
-                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider uppercase ${
+                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider  ${
                   isStudentOnline ? 'bg-emerald-500/25 text-emerald-200' : 'bg-white/10 text-slate-300'
                 }`}>
-                  {isStudentOnline ? 'Đang online' : 'Offline'}
+                  {isStudentOnline ? 'Trực tuyến' : 'Offline'}
                 </span>
-                <span className="inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-semibold tracking-wider uppercase bg-white/10 text-slate-400">
+                <span className="inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-semibold tracking-wider  bg-white/10 text-slate-400">
                   {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
                 </span>
               </p>
@@ -2068,17 +2064,17 @@ export const StudentCard = ({
           <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-blue-50 rounded-2xl p-4 text-center border border-blue-100">
-                <p className="text-xs text-blue-500 font-semibold uppercase tracking-wide mb-1">Đã học</p>
+                <p className="text-xs text-blue-500 font-semibold  tracking-wide mb-1">Đã học</p>
                 <p className="text-3xl font-black text-blue-700">{done}</p>
                 <p className="text-xs text-blue-400">buổi</p>
               </div>
               <div className={`rounded-2xl p-4 text-center border ${isCompleted ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
-                <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${isCompleted ? 'text-green-500' : 'text-orange-500'}`}>Còn lại</p>
+                <p className={`text-xs font-semibold  tracking-wide mb-1 ${isCompleted ? 'text-green-500' : 'text-orange-500'}`}>Còn lại</p>
                 <p className={`text-3xl font-black ${isCompleted ? 'text-green-700' : 'text-orange-700'}`}>{remainingSessions}</p>
                 <p className={`text-xs ${isCompleted ? 'text-green-400' : 'text-orange-400'}`}>buổi</p>
               </div>
               <div className="bg-purple-50 rounded-2xl p-4 text-center border border-purple-100">
-                <p className="text-xs text-purple-500 font-semibold uppercase tracking-wide mb-1">Điểm TB</p>
+                <p className="text-xs text-purple-500 font-semibold  tracking-wide mb-1">Điểm TB</p>
                 <p className="text-3xl font-black text-purple-700">{student.lastGrade}</p>
                 <p className="text-xs text-purple-400">/ 10</p>
               </div>
@@ -2108,7 +2104,7 @@ export const StudentCard = ({
                     waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
                     'Bấm để điểm danh'
                   }
-                  className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
+                  className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
                     isCompleted 
                       ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
                     : makeupPending
@@ -2128,22 +2124,22 @@ export const StudentCard = ({
                   <CheckCircle size={18} />
                   <span className="text-xs text-center leading-tight">
                     {isCompleted 
-                      ? 'HOÀN THÀNH'
+                      ? 'Hoàn thành'
                       : makeupPending
-                        ? <>ĐANG<br/>XÉT DUYỆT</>
+                        ? <>Đã gửi<br/>Admin</>
                       : isOverdueMakeup
-                        ? <>ĐIỂM DANH<br/>BÙ</>
+                        ? <>Điểm danh<br/>Bù</>
                         : isCommittingAttendance
-                          ? <>ĐANG<br/>GHI NHẬN</>
+                          ? <>Đang<br/>Ghi nhận</>
                         : isPendingConfirm
-                          ? <>ĐANG<br/>XÁC NHẬN</>
+                          ? <>Đang<br/>Xác nhận</>
                           : attendanceDisputed
-                            ? <>ĐANG<br/>GIẢI QUYẾT</>
+                            ? <>Đang<br/>Giải quyết</>
                           : awaitingStudentConfirm
-                            ? <>CHỜ HV<br/>XÁC NHẬN</>
+                            ? <>Chờ HV<br/>Xác nhận</>
                           : alreadyAttendedToday
                             ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
-                            : 'ĐIỂM DANH'}
+                            : 'Điểm danh'}
                   </span>
                 </button>
 
@@ -2153,25 +2149,25 @@ export const StudentCard = ({
                 disabled={!canCancelSession}
                 aria-disabled={!canCancelSession}
                 title={cancelButtonTitle}
-                className={`py-4 rounded-2xl font-black text-sm uppercase tracking-tight flex items-center justify-center gap-2 transition-all border-2 ${
+                className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all border-2 ${
                   canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
                 }`}
               >
                 <X size={18} />
                 <span className="text-xs text-center leading-tight">
                   {isCommittingAttendance
-                    ? <>ĐANG<br/>GHI NHẬN</>
+                    ? <>Đang<br/>Ghi nhận</>
                     : cancelIsUndoAttendance
-                      ? <>HỦY ĐIỂM DANH{confirmRemainSec > 0 ? <><br/>{confirmRemainSec}s</> : null}</>
+                      ? <>Hủy điểm danh{confirmRemainSec > 0 ? <><br/>{confirmRemainSec}s</> : null}</>
                       : alreadyAttendedToday
-                        ? <>ĐÃ KHÓA</>
-                        : <>HỦY CA</>}
+                        ? <>Đã khóa</>
+                        : <>Hủy ca</>}
                 </span>
               </button>
             </div>
             ) : null}
             <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2 font-black uppercase text-xs text-gray-400 tracking-widest">📝 Ghi chú học viên</label>
+              <label className="text-sm font-semibold text-gray-700 block mb-2 font-black  text-xs text-gray-400 tracking-widest">📝 Ghi chú học viên</label>
               <textarea value={notesInput} onChange={e => setNotesInput(e.target.value)}
                 onBlur={() => {
                   if (isDroppedOut) return;
@@ -2192,7 +2188,7 @@ export const StudentCard = ({
                  <Video size={18} className="text-blue-600" />
                  <h3 className="font-bold text-blue-800 text-sm">Link học trực tuyến</h3>
                </div>
-               <p className="text-xs text-blue-500 mb-4 font-bold uppercase">Cập nhật link buổi học mới tại đây</p>
+               <p className="text-xs text-blue-500 mb-4 font-bold ">Cập nhật link buổi học mới tại đây</p>
                <div className="flex gap-2">
                  <input type="text" value={linkInput} onChange={e => setLinkInput(e.target.value)}
                    className="flex-1 border-2 border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
@@ -2210,7 +2206,7 @@ export const StudentCard = ({
           <div className="space-y-5">
              <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-black text-orange-400 uppercase tracking-widest mb-1">Điểm trung bình</p>
+                  <p className="text-xs font-black text-orange-400  tracking-widest mb-1">Điểm trung bình</p>
                   <h4 className="text-3xl font-black text-orange-700">{student.lastGrade || 0}</h4>
                 </div>
                 <button onClick={() => setActivePanel('grade')} className="bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-bold">Cập nhật điểm</button>
@@ -2228,13 +2224,13 @@ export const StudentCard = ({
           onClick={() => !sendingMakeup && setShowMakeupModal(false)}
         >
           <div
-            className="bg-white rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white"
+            className="bg-white rounded-[26px] w-full max-w-[22rem] max-h-[calc(100dvh-1.5rem)] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white"
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-          >            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white flex justify-between items-start gap-3">
+          >                      <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-4 sm:px-5 text-white flex justify-between items-start gap-3">
               <div>
-                <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh bù</h3>
+                <h3 className="font-black text-lg  tracking-tight">Điểm danh bù</h3>
                 <p className="text-amber-50 text-xs font-bold mt-1">Quá hạn cửa sổ điểm danh 1 giờ</p>
               </div>
               <button
@@ -2246,9 +2242,9 @@ export const StudentCard = ({
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4 text-sm">
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-1.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Thông tin buổi học</p>
+            <div className="p-4 sm:p-5 space-y-3 text-sm overflow-y-auto">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-3 space-y-1">
+                <p className="text-[10px] font-black  tracking-widest text-amber-700">Thông tin buổi học</p>
                 <p className="font-bold text-slate-800">HV: {makeupSummary.name}</p>
                 {makeupSummary.course ? (
                   <p className="text-slate-600">Khóa: <span className="font-semibold text-blue-700">{makeupSummary.course}</span></p>
@@ -2259,18 +2255,18 @@ export const StudentCard = ({
                 <p className="text-slate-600">Lịch: <span className="font-semibold">{makeupSummary.dateLabel}</span></p>
                 <p className="text-slate-600">Giờ: <span className="font-semibold">{makeupSummary.timeRange}</span></p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-slate-700 leading-relaxed">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-slate-700 leading-relaxed">
                 <p className="font-bold text-slate-900">Giảng viên lưu ý:</p>
                 <p>Bạn chịu trách nhiệm về buổi học này.</p>
                 <p>Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa. Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.</p>
               </div>
             </div>
-            <div className="bg-slate-50 px-6 py-5 flex gap-3">
+            <div className="bg-slate-50 px-4 py-3 sm:px-5 flex gap-3">
               <button
                 type="button"
                 onClick={() => setShowMakeupModal(false)}
                 disabled={sendingMakeup}
-                className="flex-1 py-3.5 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                className="flex-1 py-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
               >
                 Hủy
               </button>
@@ -2278,7 +2274,7 @@ export const StudentCard = ({
                 type="button"
                 onClick={sendMakeupRequestToAdmin}
                 disabled={sendingMakeup}
-                className="flex-[1.4] py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-[1.4] py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl font-black shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {sendingMakeup ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 Gửi
@@ -2306,7 +2302,7 @@ export const StudentCard = ({
                   <CheckCircle size={22} />
                 </div>
                 <div>
-                  <h3 className="font-black text-lg uppercase tracking-tight">Điểm danh &amp; Chấm điểm</h3>
+                  <h3 className="font-black text-lg  tracking-tight">Điểm danh &amp; Chấm điểm</h3>
                   <p className="text-emerald-100 text-xs font-bold uppercase tracking-widest">{student.course}</p>
                 </div>
               </div>
@@ -2316,13 +2312,13 @@ export const StudentCard = ({
             </div>
             <div className="p-10 space-y-6">
               <div className="bg-emerald-50 rounded-3xl p-6 border border-emerald-100">
-                <p className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-1">Học viên</p>
+                <p className="text-xs font-black text-emerald-800  tracking-widest mb-1">Học viên</p>
                 <p className="text-lg font-black text-emerald-600">{getDisplayName(student)}</p>
                 <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{sessionTotal} buổi</p>
               </div>
               
               <div>
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
+                <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
                 <AttendanceGradeInput
                   value={attForm.grade}
                   onChange={(e) => setAttForm({ ...attForm, grade: e.target.value })}
@@ -2331,7 +2327,7 @@ export const StudentCard = ({
               </div>
 
               <div>
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Ghi chú nhanh</label>
+                 <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Ghi chú nhanh</label>
                  <textarea 
                    value={attForm.note}
                    onChange={(e) => setAttForm({ ...attForm, note: e.target.value })}

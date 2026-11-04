@@ -9,10 +9,9 @@ import {
 import AdminCourseBuilder from '../../AdminCourseBuilder';
 import TeacherQuestionBankPanel from './TeacherQuestionBankPanel';
 import RichTextEditor from '../shared/RichTextEditor';
-import { resolveTeacherExamDate, isTeacherExamDateApproximate, resolvePracticalFileUrl, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
+import { resolveTeacherExamDate, isTeacherExamDateApproximate, practicalFileDisplayName, practicalFileDownloadUrl, practicalFileViewUrl } from '../utils/teacherExam';
 import api, { apiFetch, buildMediaDownloadUrl, resolveMediaUrl } from '../../../services/api';
 import { trainingUploadDisplayName } from '../utils/trainingUpload';
-import { applyAnchorNewTabPolicy } from '../../../utils/htmlContent';
 import ExamSubjectCheckboxGrid from '../shared/ExamSubjectCheckboxGrid';
 import { BUILTIN_EXAM_SUBJECTS, getExamSubjectOptions } from '../../../utils/examSubjects';
 import { useData } from '../../../context/DataContext';
@@ -44,7 +43,6 @@ export default function AdminTrainingTab({ section }) {
     courseBuilderMode, setCourseBuilderMode, trainingData, updateTrainingItem, trainingTab: storedTrainingTab, setTrainingTab,
     trainingForm, setTrainingForm, questions, setErGvForm, BLANK_ER_GV, trainingFileUploading,
     handleTrainingDocUpload, addTrainingItem, setDeleteConfirm,
-    setTeacherExamTimeLimitMinutes, teacherExamTimeLimitMinutes,
     examSubjectsCatalog,
   } = useAdminTab();
 
@@ -297,22 +295,22 @@ export default function AdminTrainingTab({ section }) {
                     {trainingTab === 'softwareLinks' && (
                       <>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tên phần mềm</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Tên phần mềm</label>
                           <input value={trainingForm.title || ''} onChange={e => setTrainingForm({ ...trainingForm, title: e.target.value })}
                             className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="VD: Microsoft Office 365" />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Link tải / mở</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Link tải / mở</label>
                           <input value={trainingForm.linkUrl || ''} onChange={e => setTrainingForm({ ...trainingForm, linkUrl: e.target.value })}
-                            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="https://..." />
+                            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="HTTPS://..." />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Mô tả</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Mô tả</label>
                           <textarea value={trainingForm.description || ''} onChange={e => setTrainingForm({ ...trainingForm, description: e.target.value })}
                             rows={3} className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none resize-y" placeholder="Mô tả ngắn..." />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Hướng dẫn cài đặt</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Hướng dẫn cài đặt</label>
                           <RichTextEditor
                             value={trainingForm.installGuide || ''}
                             onChange={(val) => setTrainingForm((prev) => ({ ...prev, installGuide: val }))}
@@ -323,21 +321,21 @@ export default function AdminTrainingTab({ section }) {
                     )}
                     {trainingTab !== 'softwareLinks' && trainingTab !== 'files' && (
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>
+                      <label className="text-xs font-bold text-gray-500  block mb-1">Tiêu đề</label>
                       <input value={trainingForm.title || ''} onChange={e => setTrainingForm({ ...trainingForm, title: e.target.value })}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="Nhập tiêu đề..." />
                     </div>
                     )}
                     {trainingTab === 'videos' && (
                       <div className="sm:col-span-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Mô tả Khóa học (Tóm tắt)</label>
+                        <label className="text-xs font-bold text-gray-500  block mb-1">Mô tả Khóa học (Tóm tắt)</label>
                         <input value={trainingForm.desc || ''} onChange={e => setTrainingForm({ ...trainingForm, desc: e.target.value })}
                           className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="Nhập mô tả tóm tắt..." />
                       </div>
                     )}
                     {trainingTab === 'videos' && (
                       <div className="sm:col-span-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Ảnh bìa khóa học</label>
+                        <label className="text-xs font-bold text-gray-500  block mb-1">Ảnh bìa khóa học</label>
                         <p className="text-[11px] text-slate-500 mb-2">Khuyến nghị <strong>1280×720px</strong> (16:9). Tối thiểu 640×360. JPG/PNG/WEBP, tối đa ~5MB cho ảnh rõ.</p>
                         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-start">
                           <div className="w-full sm:w-48 aspect-video rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
@@ -348,7 +346,7 @@ export default function AdminTrainingTab({ section }) {
                             )}
                           </div>
                           <div className="flex flex-wrap gap-2 items-center">
-                            <label className={`inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/50 text-purple-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-purple-100 transition-colors ${coverUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                            <label className={`inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/50 text-purple-800 text-xs font-black  tracking-wide cursor-pointer hover:bg-purple-100 transition-colors ${coverUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                               {coverUploading ? <Loader2 className="animate-spin" size={16} /> : <ImagePlus size={16} />}
                               {coverUploading ? 'Đang tải...' : (trainingForm.coverImage ? 'Đổi ảnh' : 'Chọn ảnh')}
                               <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleCoverUpload} />
@@ -368,7 +366,7 @@ export default function AdminTrainingTab({ section }) {
                     )}
                     {trainingTab === 'guides' && (
                       <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Biểu tượng</label>
+                        <label className="text-xs font-bold text-gray-500  block mb-1">Biểu tượng</label>
                         <input value={trainingForm.icon || ''} onChange={e => setTrainingForm({ ...trainingForm, icon: e.target.value })}
                           className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="📋" />
                       </div>
@@ -376,7 +374,7 @@ export default function AdminTrainingTab({ section }) {
                     {trainingTab === 'files' && (
                       <>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Khóa học trong danh mục admin *</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Khóa học trong danh mục admin *</label>
                           <CmsSelect
                             value={trainingForm.courseId || ''}
                             onChange={(event) => {
@@ -408,16 +406,16 @@ export default function AdminTrainingTab({ section }) {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tiêu đề</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Tiêu đề</label>
                           <input value={trainingForm.title || ''} onChange={e => setTrainingForm({ ...trainingForm, title: e.target.value })}
                             className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none" placeholder="Nhập tiêu đề..." />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Tải tệp</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Tải tệp</label>
                           <div className="flex flex-wrap items-center gap-2 min-h-[46px]">
-                            <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-red-300 bg-red-50/50 text-red-800 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-red-100 transition-colors shrink-0 ${trainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                            <label className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-red-300 bg-red-50/50 text-red-800 text-xs font-black  tracking-wide cursor-pointer hover:bg-red-100 transition-colors shrink-0 ${trainingFileUploading ? 'opacity-60 pointer-events-none' : ''}`}>
                               {trainingFileUploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                              {trainingFileUploading ? 'Đang tải...' : 'TẢI TỆP'}
+                              {trainingFileUploading ? 'Đang tải...' : 'Tải tệp'}
                               <input type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar" onChange={(e) => handleTrainingDocUpload(e, 'teacher')} />
                             </label>
                             {trainingForm.fileUrl && String(trainingForm.fileType || '').toUpperCase() !== 'LINK' && (
@@ -435,7 +433,7 @@ export default function AdminTrainingTab({ section }) {
                           </div>
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Hoặc link (Drive / URL)</label>
+                          <label className="text-xs font-bold text-gray-500  block mb-1">Hoặc link (Drive / URL)</label>
                           <div className="flex items-center gap-2">
                             <Link2 size={16} className="text-slate-400 shrink-0" />
                             <input
@@ -458,7 +456,7 @@ export default function AdminTrainingTab({ section }) {
                                 });
                               }}
                               className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm focus:border-purple-400 outline-none"
-                              placeholder="https://drive.google.com/..."
+                              placeholder="HTTPS://drive.google.com/..."
                             />
                           </div>
                           <p className="text-[11px] text-slate-400 mt-1">Nếu điền link, học viên/GV sẽ thấy nút &quot;Mở link&quot; thay vì tải file.</p>
@@ -495,7 +493,7 @@ export default function AdminTrainingTab({ section }) {
                   {/* Mô tả - Rich Text Editor (ẩn với khóa học) */}
                   {trainingTab !== 'videos' && trainingTab !== 'softwareLinks' && (
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Nội dung mô tả (có định dạng)</label>
+                      <label className="text-xs font-bold text-gray-500  block mb-1">Nội dung mô tả (có định dạng)</label>
                       <RichTextEditor
                         value={trainingForm.desc || ''}
                         onChange={(val) => setTrainingForm(prev => ({ ...prev, desc: val }))}
@@ -636,12 +634,12 @@ export default function AdminTrainingTab({ section }) {
                                 </div>
                                 <div className="grid grid-cols-3 gap-2 text-center">
                                   <div className="rounded-xl bg-slate-50 px-1.5 py-2 min-w-0">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-0.5">TN</p>
+                                    <p className="text-[9px] font-black text-slate-400  tracking-wide mb-0.5">TN</p>
                                     <p className={`text-sm font-black ${isPassedMC ? 'text-sky-700' : 'text-red-500'}`}>{mcScore}</p>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase">{isPassedMC ? 'Đạt' : 'Trượt'}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 ">{isPassedMC ? 'Đạt' : 'Trượt'}</p>
                                   </div>
                                   <div className="rounded-xl bg-slate-50 px-1.5 py-2 min-w-0 flex flex-col items-center justify-center">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-0.5">Tự luận</p>
+                                    <p className="text-[9px] font-black text-slate-400  tracking-wide mb-0.5">Tự luận</p>
                                     {t.practicalFile ? (
                                       <button
                                         type="button"
@@ -656,7 +654,7 @@ export default function AdminTrainingTab({ section }) {
                                     )}
                                   </div>
                                   <div className="rounded-xl bg-slate-50 px-1.5 py-2 min-w-0">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-0.5">Ngày thi</p>
+                                    <p className="text-[9px] font-black text-slate-400  tracking-wide mb-0.5">Ngày thi</p>
                                     <p className="text-[10px] font-bold text-gray-600 leading-tight">
                                       {examDate
                                         ? examDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' })
@@ -667,11 +665,11 @@ export default function AdminTrainingTab({ section }) {
                                 <div className="flex flex-wrap gap-1.5 justify-end">
                                   {String(t.status || '').toLowerCase() === 'pending' && t.practicalFile ? (
                                     <>
-                                      <button type="button" onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">CHẤM ĐẠT</button>
-                                      <button type="button" onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 text-[10px] font-black border border-red-200">CHẤM TRƯỢT</button>
+                                      <button type="button" onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">Chấm đạt</button>
+                                      <button type="button" onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-2.5 py-1.5 rounded-xl bg-red-50 text-red-600 text-[10px] font-black border border-red-200">Chấm trượt</button>
                                     </>
                                   ) : String(t.status || '').toLowerCase() === 'active' ? (
-                                    <span className="text-xs text-sky-700 font-black">XONG</span>
+                                    <span className="text-xs text-sky-700 font-black">Xong</span>
                                   ) : String(t.status || '').toLowerCase() === 'locked' ? (
                                     <button
                                       type="button"
@@ -694,10 +692,10 @@ export default function AdminTrainingTab({ section }) {
                                       }}
                                       className="px-2.5 py-1.5 rounded-lg bg-white text-gray-800 text-[10px] font-black border-2 border-gray-800"
                                     >
-                                      CHO THI LẠI
+                                      Cho thi lại
                                     </button>
                                   ) : (
-                                    <span className="text-[10px] text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">ĐANG THI...</span>
+                                    <span className="text-[10px] text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">Đang thi...</span>
                                   )}
                                 </div>
                               </div>
@@ -711,12 +709,12 @@ export default function AdminTrainingTab({ section }) {
                             <table className="w-full text-left border-collapse min-w-[720px]">
                               <thead>
                                 <tr className="bg-blue-50 border-b border-blue-100">
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide">Giảng viên</th>
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Trắc nghiệm</th>
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Bài tự luận (tệp)</th>
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-center">Trạng thái</th>
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide">Ngày thi</th>
-                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700 uppercase tracking-wide text-right">Thao tác</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700  tracking-wide">Giảng viên</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700  tracking-wide text-center">Trắc nghiệm</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700  tracking-wide text-center">Bài tự luận (tệp)</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700  tracking-wide text-center">Trạng thái</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700  tracking-wide">Ngày thi</th>
+                                  <th className="px-3 py-3 text-[11px] font-black text-blue-700  tracking-wide text-right">Thao tác</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-50">
@@ -739,7 +737,7 @@ export default function AdminTrainingTab({ section }) {
                                       <td className="px-3 py-3 text-center">
                                         <div className="flex flex-col items-center">
                                           <span className={`text-lg font-black ${isPassedMC ? 'text-sky-700' : 'text-red-500'}`}>{mcScore}/100</span>
-                                          <span className="text-xs cms-min-text-xs text-gray-400 font-bold uppercase">{isPassedMC ? 'ĐẠT' : 'TRƯỢT'}</span>
+                                          <span className="text-xs cms-min-text-xs text-gray-400 font-bold ">{isPassedMC ? 'Đạt' : 'Trượt'}</span>
                                         </div>
                                       </td>
                                       <td className="px-3 py-3 text-center">
@@ -762,7 +760,7 @@ export default function AdminTrainingTab({ section }) {
                                           t.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                                           t.status === 'Locked' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
                                         }`}>
-                                          {t.status === 'active' ? 'CHÍNH THỨC' : t.status === 'Locked' ? 'BỊ KHÓA' : 'ĐANG CHỜ'}
+                                          {t.status === 'active' ? 'Chính thức' : t.status === 'Locked' ? 'Bị khóa' : 'Đang chờ'}
                                         </span>
                                       </td>
                                       <td className="px-3 py-3">
@@ -782,11 +780,11 @@ export default function AdminTrainingTab({ section }) {
                                         <div className="flex justify-end gap-1 flex-wrap">
                                           {String(t.status || '').toLowerCase() === 'pending' && t.practicalFile ? (
                                             <>
-                                              <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-black tracking-wide border border-emerald-200">CHẤM ĐẠT</button>
-                                              <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-3 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 text-xs font-black tracking-wide border border-red-200">CHẤM TRƯỢT</button>
+                                              <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'passed', status: 'active' })} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-black tracking-wide border border-emerald-200">Chấm đạt</button>
+                                              <button onClick={() => ctxUpdateTeacher(t.id || t._id, { practicalStatus: 'failed', status: 'Locked', lockReason: 'Bài thi Tự luận/Thực hành chưa đạt yêu cầu' })} className="px-3 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 text-xs font-black tracking-wide border border-red-200">Chấm trượt</button>
                                             </>
                                           ) : String(t.status || '').toLowerCase() === 'active' ? (
-                                            <span className="text-xs text-sky-700 font-black">XONG</span>
+                                            <span className="text-xs text-sky-700 font-black">Xong</span>
                                           ) : String(t.status || '').toLowerCase() === 'locked' ? (
                                             <button
                                               type="button"
@@ -809,10 +807,10 @@ export default function AdminTrainingTab({ section }) {
                                               }}
                                               className="relative z-10 px-2 py-1.5 rounded-lg bg-white text-gray-800 hover:bg-gray-50 text-xs font-black border-2 border-gray-800 shadow-sm cursor-pointer"
                                             >
-                                              CHO THI LẠI
+                                              Cho thi lại
                                             </button>
                                           ) : (
-                                            <span className="text-xs text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">ĐANG THI...</span>
+                                            <span className="text-xs text-gray-400 font-bold border px-2 py-1 border-gray-100 rounded-lg">Đang thi...</span>
                                           )}
                                         </div>
                                       </td>
@@ -852,7 +850,7 @@ export default function AdminTrainingTab({ section }) {
                         {trainingTab === 'files' && (
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white flex-shrink-0 shadow-sm ${item.fileType === 'PDF' ? 'bg-red-500' : item.fileType === 'PPTX' ? 'bg-orange-500' : 'bg-sky-500'
                             }`}>
-                            {item.fileType || 'FILE'}
+                            {item.fileType || 'File'}
                           </div>
                         )}
                         {trainingTab === 'softwareLinks' && (
@@ -940,7 +938,7 @@ export default function AdminTrainingTab({ section }) {
                 <div className="p-4 sm:p-8 space-y-5 max-h-[75vh] overflow-y-auto">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Giảng viên</label>
+                      <label className="text-xs font-bold text-gray-500  block mb-1">Giảng viên</label>
                       <CmsSelect value={erGvForm.teacherId || ''}
                         onChange={e => { const t = teachersForExamResults.find(x => String(x.id) === e.target.value || String(x._id) === e.target.value); setErGvForm({ ...erGvForm, teacherId: e.target.value, teacherName: t?.name || '' }); }}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold">
@@ -949,25 +947,25 @@ export default function AdminTrainingTab({ section }) {
                       </CmsSelect>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Bài / Môn thi</label>
+                      <label className="text-xs font-bold text-gray-500  block mb-1">Bài / Môn thi</label>
                       <CmsSelect value={erGvForm.subject || ''} onChange={e => setErGvForm({ ...erGvForm, subject: e.target.value })}
                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold">
-                        <option value="BÀI TEST GIẢNG VIÊN">BÀI TEST GIẢNG VIÊN</option>
-                        <option value="THỰC HÀNH GIẢNG DẠY">THỰC HÀNH GIẢNG DẠY</option>
+                        <option value="BÀI TEST GIẢNG VIÊN">Bài test giảng viên</option>
+                        <option value="THỰC HÀNH GIẢNG DẠY">Thực hành giảng dạy</option>
                         <option value="Khác">Khác</option>
                       </CmsSelect>
                     </div>
                   </div>
                   <div className="bg-blue-50 rounded-2xl p-4 space-y-3 border border-blue-100">
-                    <p className="text-xs font-black text-blue-700 uppercase tracking-widest">📝 Phần Trắc nghiệm</p>
+                    <p className="text-xs font-black text-blue-700  tracking-widest">📝 Phần Trắc nghiệm</p>
                     <div className="grid grid-cols-2 gap-4">
-                      <div><label className="text-xs font-bold text-gray-500 uppercase block mb-1">Điểm Trắc nghiệm (0-100)</label><input type="number" min="0" max="100" value={erGvForm.testScore || ''} onChange={e => setErGvForm({ ...erGvForm, testScore: e.target.value })} className="w-full border-2 border-blue-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold text-blue-800" placeholder="Chấm theo thang điểm 100" /></div>
-                      <div><label className="text-xs font-bold text-gray-500 uppercase block mb-1">Ngày thi</label><input type="datetime-local" value={erGvForm.testDate ? new Date(erGvForm.testDate).toISOString().slice(0,16) : ''} onChange={e => setErGvForm({ ...erGvForm, testDate: new Date(e.target.value).toISOString() })} className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm" /></div>
+                      <div><label className="text-xs font-bold text-gray-500  block mb-1">Điểm Trắc nghiệm (0-100)</label><input type="number" min="0" max="100" value={erGvForm.testScore || ''} onChange={e => setErGvForm({ ...erGvForm, testScore: e.target.value })} className="w-full border-2 border-blue-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm font-bold text-blue-800" placeholder="Chấm theo thang điểm 100" /></div>
+                      <div><label className="text-xs font-bold text-gray-500  block mb-1">Ngày thi</label><input type="datetime-local" value={erGvForm.testDate ? new Date(erGvForm.testDate).toISOString().slice(0,16) : ''} onChange={e => setErGvForm({ ...erGvForm, testDate: new Date(e.target.value).toISOString() })} className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-blue-500 outline-none text-sm" /></div>
                     </div>
                   </div>
                   <div className="bg-red-50 rounded-2xl p-4 space-y-3 border border-red-100">
-                    <p className="text-xs font-black text-red-700 uppercase tracking-widest">✍️ BÀI TỰ LUẬN & GHI CHÚ</p>
-                    <div><label className="text-xs font-bold text-gray-500 uppercase block mb-1">Đánh giá chung (Ghi chú)</label><textarea value={erGvForm.testNotes || ''} onChange={e => setErGvForm({ ...erGvForm, testNotes: e.target.value })} rows={2} className="w-full border-2 border-red-100 rounded-xl p-3 focus:border-purple-500 outline-none text-sm resize-none" placeholder="Đánh giá kết quả của giảng viên..." /></div>
+                    <p className="text-xs font-black text-red-700  tracking-widest">                    ✍️ Bài tự luận & ghi chú</p>
+                    <div><label className="text-xs font-bold text-gray-500  block mb-1">Đánh giá chung (Ghi chú)</label><textarea value={erGvForm.testNotes || ''} onChange={e => setErGvForm({ ...erGvForm, testNotes: e.target.value })} rows={2} className="w-full border-2 border-red-100 rounded-xl p-3 focus:border-purple-500 outline-none text-sm resize-none" placeholder="Đánh giá kết quả của giảng viên..." /></div>
                   </div>
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-gray-50 rounded-2xl p-4 border border-gray-100">
                     <p className="text-[15px] font-black text-gray-700 flex-1">Kết quả: Xét duyệt Giảng dạy?</p>
@@ -977,13 +975,13 @@ export default function AdminTrainingTab({ section }) {
                            erGvForm.status === 'active' 
                              ? 'bg-emerald-600 border-transparent text-white shadow-md scale-[1.02]' 
                              : 'bg-white border-gray-200 text-gray-400 hover:border-emerald-200 hover:text-emerald-500 hover:bg-emerald-50/50 hover:scale-[1.02]'
-                         }`}>ĐẠT (CẤP QUYỀN)</button>
+                         }`}>Đạt (cấp quyền)</button>
                        <button onClick={() => setErGvForm({ ...erGvForm, status: 'Locked' })} 
                          className={`flex-1 px-5 py-3 rounded-2xl text-[12px] font-black transition-all duration-300 border-2 ${
                            erGvForm.status === 'Locked' 
                              ? 'bg-red-600 border-transparent text-white shadow-md scale-[1.02]' 
                              : 'bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500 hover:bg-red-50/50 hover:scale-[1.02]'
-                         }`}>CHƯA ĐẠT (KHÓA LẠI)</button>
+                         }`}>Chưa đạt (khóa lại)</button>
                     </div>
                   </div>
                 </div>

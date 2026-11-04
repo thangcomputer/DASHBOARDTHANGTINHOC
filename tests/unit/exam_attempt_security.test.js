@@ -312,14 +312,16 @@ test('decideStudentAttemptStart: chốt điểm / chờ chấm / lượt mới',
 });
 
 test('Word NC / Excel NC reuse the office question bank', () => {
-  const attempt = createExamAttempt({
-    kind: 'student',
-    userId: 'student-nc',
-    subjectIds: ['word-nc'],
-    bank: studentBank,
-    attemptId: 'attempt-word-nc',
-    ttlSeconds: 600,
-  });
-  assert.equal(attempt.questionCount, 2);
-  assert.ok(attempt.questions.every((q) => q.section === 'word'));
+  for (const [subjectId, section] of [['word-nc', 'word'], ['excel-nc', 'excel']]) {
+    const attempt = createExamAttempt({
+      kind: 'student',
+      userId: 'student-nc',
+      subjectIds: [subjectId],
+      bank: studentBank,
+      attemptId: `attempt-${subjectId}`,
+      ttlSeconds: 600,
+    });
+    assert.equal(attempt.questionCount, section === 'word' ? 2 : 1);
+    assert.ok(attempt.questions.every((question) => question.section === section));
+  }
 });

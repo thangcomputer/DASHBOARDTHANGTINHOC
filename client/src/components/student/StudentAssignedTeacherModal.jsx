@@ -42,7 +42,7 @@ export default function StudentAssignedTeacherModal({ open, teacher, loading = f
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">Giảng viên phụ trách</p>
+            <p className="text-[10px] font-bold  tracking-wide text-sky-700">Giảng viên phụ trách</p>
             <h2 id="assigned-teacher-title" className="font-bold text-slate-900 text-base truncate">
               {loading ? 'Đang tải…' : name}
             </h2>
@@ -61,21 +61,21 @@ export default function StudentAssignedTeacherModal({ open, teacher, loading = f
           <div className="flex items-start gap-2.5">
             <User size={16} className="text-sky-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Tuổi</p>
+              <p className="text-[10px] font-bold  tracking-wide text-slate-400">Tuổi</p>
               <p className="font-semibold text-slate-900">{age != null ? `${age} tuổi` : 'Chưa cập nhật'}</p>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
             <Award size={16} className="text-sky-600 shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Chuyên môn</p>
+              <p className="text-[10px] font-bold  tracking-wide text-slate-400">Chuyên môn</p>
               <p className="font-semibold text-slate-900 break-words">{specialty || 'Chưa cập nhật'}</p>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
             <Star size={16} className="text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Đánh giá</p>
+              <p className="text-[10px] font-bold  tracking-wide text-slate-400">Đánh giá</p>
               <p className="font-semibold text-slate-900">
                 {count > 0
                   ? `${avg.toFixed(1)} / 5 · ${count} lượt`
@@ -86,7 +86,7 @@ export default function StudentAssignedTeacherModal({ open, teacher, loading = f
           <div className="flex items-start gap-2.5">
             <Mic2 size={16} className="text-violet-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Giọng</p>
+              <p className="text-[10px] font-bold  tracking-wide text-slate-400">Giọng</p>
               <p className="font-semibold text-slate-900">{region}</p>
             </div>
           </div>

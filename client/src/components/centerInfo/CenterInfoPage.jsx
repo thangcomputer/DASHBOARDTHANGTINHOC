@@ -55,7 +55,7 @@ function OverviewView({ overview }) {
           </h1>
           {overview.intro ? <p className="mt-2 text-slate-600 leading-relaxed">{overview.intro}</p> : null}
           {overview.foundedYear ? (
-            <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+            <p className="mt-2 text-xs font-bold  tracking-wide text-slate-400">
               Thành lập {overview.foundedYear}
             </p>
           ) : null}
@@ -69,14 +69,14 @@ function OverviewView({ overview }) {
           { label: 'Giá trị cốt lõi', value: overview.coreValues },
         ].filter((x) => x.value).map((x) => (
           <div key={x.label} className="rounded-2xl border border-slate-100 bg-white p-4">
-            <p className="text-[11px] font-black uppercase tracking-wide text-red-600 mb-1">{x.label}</p>
+            <p className="text-[11px] font-black  tracking-wide text-red-600 mb-1">{x.label}</p>
             <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{x.value}</p>
           </div>
         ))}
       </div>
 
       <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 space-y-2 text-sm text-slate-700">
-        <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">Liên hệ</p>
+        <p className="text-[11px] font-black  tracking-wide text-slate-400">Liên hệ</p>
         {overview.headquartersAddress ? <p>📍 {overview.headquartersAddress}</p> : null}
         {overview.contactPhone ? (
           <p className="flex items-center gap-2"><Phone size={14} /> {overview.contactPhone}</p>
@@ -122,7 +122,6 @@ function OverviewView({ overview }) {
               allowFullScreen
             />
           ) : (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
             <video src={resolveMediaUrl(overview.introVideoUrl)} controls className="w-full h-full" />
           )}
         </div>
@@ -249,26 +248,17 @@ export default function CenterInfoPage({ session, role = 'student' }) {
   const managePath = role === 'admin' ? '/admin/center-info/manage' : null;
 
   return (
-    <div className="cms-sd cms-sd-page bg-slate-50 min-h-full py-2 sm:py-4">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <Building2 className="text-red-600 shrink-0" size={22} />
-            Thông tin trung tâm
-          </h1>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1">
-            Giới thiệu, chi nhánh, dịch vụ và chứng chỉ của trung tâm
-          </p>
-        </div>
-        {canManage && managePath ? (
+    <div className="cms-sd cms-sd-page bg-slate-50 min-h-full pt-0 pb-2 sm:pt-0 sm:pb-4">
+      {canManage && managePath ? (
+        <div className="flex justify-end mb-4">
           <Link
             to={managePath}
             className="inline-flex items-center justify-center min-h-11 px-4 rounded-2xl bg-slate-900 hover:bg-black text-white text-sm font-bold"
           >
             Quản trị nội dung
           </Link>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Mobile select */}
@@ -295,11 +285,10 @@ export default function CenterInfoPage({ session, role = 'student' }) {
                   key={s.key}
                   type="button"
                   onClick={() => setSection(s.key)}
-                  className={`w-full flex items-center gap-2.5 px-3 min-h-11 rounded-xl text-sm font-bold transition-colors text-left ${
-                    active
+                  className={`w-full flex items-center gap-2.5 px-3 min-h-11 rounded-xl text-sm font-bold transition-colors text-left ${active
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <Icon size={16} className="shrink-0" />
                   {s.label}
@@ -316,9 +305,8 @@ export default function CenterInfoPage({ session, role = 'student' }) {
               key={s.key}
               type="button"
               onClick={() => setSection(s.key)}
-              className={`shrink-0 min-h-10 px-3 rounded-xl text-xs font-bold ${
-                section === s.key ? 'bg-red-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
-              }`}
+              className={`shrink-0 min-h-10 px-3 rounded-xl text-xs font-bold ${section === s.key ? 'bg-red-600 text-white' : 'bg-white border border-slate-200 text-slate-600'
+                }`}
             >
               {s.label}
             </button>

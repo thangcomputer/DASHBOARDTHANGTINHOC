@@ -44,6 +44,7 @@ function readRecentStickers() {
 export default function StickerPicker({
   disabled = false,
   inline = false,
+  buttonClassName = '',
   onPickEmoji,
   onSendSticker,
 }) {
@@ -266,7 +267,7 @@ export default function StickerPicker({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
-        className={`flex ${inline ? 'h-9 w-9' : 'h-8 w-8'} items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
+        className={`flex ${inline ? 'h-9 w-9' : 'h-8 w-8'} items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${buttonClassName} ${
           open ? 'text-blue-600' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600'
         }`}
         aria-label={open ? 'Đóng bảng emoji, sticker và GIF' : 'Mở bảng emoji, sticker và GIF'}
@@ -283,7 +284,7 @@ export default function StickerPicker({
 function StickerSection({ label, stickers, disabled, onSelect, onMissing }) {
   return (
     <section className="mb-2 last:mb-0">
-      <h3 className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</h3>
+      <h3 className="mb-1 px-1 text-[10px] font-bold  tracking-wider text-slate-400">{label}</h3>
       <div className="grid grid-cols-3 gap-2 min-[420px]:grid-cols-4">
         {stickers.map((sticker) => (
           <button

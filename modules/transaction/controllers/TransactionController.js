@@ -9,7 +9,7 @@ class TransactionController {
   async get_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await queryBus.dispatch(new queries.Get_rootQuery(data));
+      const result = await queryBus.dispatch(new queries.Get_rootQuery(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -48,7 +48,7 @@ class TransactionController {
   async post_calculate(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_calculateCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_calculateCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -61,7 +61,7 @@ class TransactionController {
   async post_root(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await commandBus.dispatch(new commands.Post_rootCommand(data));
+      const result = await commandBus.dispatch(new commands.Post_rootCommand(req));
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -113,3 +113,4 @@ class TransactionController {
 }
 
 module.exports = new TransactionController();
+

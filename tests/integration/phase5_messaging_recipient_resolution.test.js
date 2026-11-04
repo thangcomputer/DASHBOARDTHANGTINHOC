@@ -239,19 +239,6 @@ function createNotifyHarness() {
       io.to('admin').to('ALL_ADMIN').emit(eventName, data);
       return true;
     }
-    const tryRoles = new Set([role, getMessagingRole({ id: strUserId, role })]);
-    if (role === 'admin' || role === 'staff' || role === 'support') {
-      tryRoles.add('admin');
-      tryRoles.add('staff');
-    }
-    for (const r of tryRoles) {
-      if (!r) continue;
-      const user = onlineUsers.get(`${r}_${strUserId}`);
-      if (user?.socketId) {
-        io.to(user.socketId).emit(eventName, data);
-        return true;
-      }
-    }
     io.to(strUserId).emit(eventName, data);
     return true;
   }

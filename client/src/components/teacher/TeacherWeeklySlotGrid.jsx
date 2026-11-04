@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Table2 } from 'lucide-react';
-import { useToast } from '../../utils/toast';
+import { createPortal } from 'react-dom';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Search, Table2, Users, X } from 'lucide-react';
+import { useToast } from '../../utils/useToast';
 import {
   findTeacherScheduleConflict,
   formatTeacherConflictMessage,
@@ -64,6 +65,12 @@ function studentDisplayName(student) {
   return String(student?.displayName || student?.name || '');
 }
 
+function courseLabel(course) {
+  if (typeof course === 'string') return course.trim();
+  if (!course || typeof course !== 'object') return '';
+  return String(course.courseName || course.name || course.title || '').trim();
+}
+
 function compareStudentNames(a, b, dir = 'asc') {
   const cmp = studentDisplayName(a).localeCompare(studentDisplayName(b), 'vi', { sensitivity: 'base' });
   return dir === 'desc' ? -cmp : cmp;
@@ -77,8 +84,6 @@ function rowSlotMinutes(student, dateKey, schedules) {
   if (!start) return null;
   return parseTimeToMinutes(start);
 }
-
-const HEADER_CTRL = 'w-full min-w-0 max-w-full h-7 px-1.5 rounded-md border bg-white text-[10px] font-semibold text-slate-600 outline-none';
 
 function studentIdOf(student) {
   return String(student?._id || student?.id || '');
@@ -101,8 +106,12 @@ export default function TeacherWeeklySlotGrid({
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [busyKey, setBusyKey] = useState('');
   const [rosterFilter, setRosterFilter] = useState('studying');
+  const [courseFilter, setCourseFilter] = useState('');
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const [nameQuery, setNameQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sort, setSort] = useState({ kind: 'name', dir: 'asc', dayIndex: 0 });
+  const [sortMenuDayIndex, setSortMenuDayIndex] = useState(null);
   const [rosterExpanded, setRosterExpanded] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
@@ -110,6 +119,17 @@ export default function TeacherWeeklySlotGrid({
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!coursePickerOpen && sortMenuDayIndex == null) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      setCoursePickerOpen(false);
+      setSortMenuDayIndex(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [coursePickerOpen, sortMenuDayIndex]);
 
   const schedules = allSchedules || mySchedules;
   const schedulesRef = useRef(schedules);
@@ -119,21 +139,48 @@ export default function TeacherWeeklySlotGrid({
   const todayKey = formatLocalDateKey(new Date());
   const dateKeys = useMemo(() => weekDateKeys(weekStart), [weekStart]);
 
+  const eligibleRosterRows = useMemo(
+    () => (students || []).filter((student) => !isDroppedStudent(student)),
+    [students],
+  );
+  const courseOptions = useMemo(
+    () => [...new Set(eligibleRosterRows.flatMap((student) => [
+      ...(Array.isArray(student.courses) ? student.courses : []),
+      ...(Array.isArray(student.enrollments) ? student.enrollments.map((enrollment) => enrollment.courseName) : []),
+      student.course,
+    ]).map(courseLabel).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'vi')),
+    [eligibleRosterRows],
+  );
+
   const rosterRows = useMemo(() => {
-    return (students || []).filter((s) => {
-      if (isDroppedStudent(s)) return false;
+    return eligibleRosterRows.filter((s) => {
+      if (courseFilter) {
+        const courses = [
+          s.course,
+          ...(Array.isArray(s.courses) ? s.courses : []),
+          ...(Array.isArray(s.enrollments) ? s.enrollments.map((enrollment) => enrollment.courseName) : []),
+        ].map(courseLabel);
+        if (!courses.includes(courseFilter)) return false;
+      }
       const finished = isFinishedEnrollment(s);
       if (rosterFilter === 'studying') return !finished;
       if (rosterFilter === 'finished') return finished;
       return true;
     });
-  }, [students, schedules, rosterFilter]);
+  }, [eligibleRosterRows, courseFilter, rosterFilter]);
+
+  const rosterCounts = useMemo(() => ({
+    studying: eligibleRosterRows.filter((student) => !isFinishedEnrollment(student)).length,
+    finished: eligibleRosterRows.filter(isFinishedEnrollment).length,
+    all: eligibleRosterRows.length,
+  }), [eligibleRosterRows]);
 
   const rows = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     const list = rosterRows.filter((s) => {
       if (!q) return true;
-      return studentDisplayName(s).toLowerCase().includes(q);
+      return `${studentDisplayName(s)} ${s.course || ''}`.toLocaleLowerCase('vi-VN').includes(q);
     });
     const sorted = list.slice();
     if (sort.kind === 'day') {
@@ -358,84 +405,120 @@ export default function TeacherWeeklySlotGrid({
   }, [busyKey, rosterRows, teacherId, addSchedule, updateSchedule, cancelSchedule, toast]);
 
   return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-center px-4 sm:px-5 py-4 border-b border-slate-100">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
-            <Table2 size={18} />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-              Xếp lịch dạy theo tuần
-            </h3>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Chọn khung giờ trong ô. Khung trùng giáo viên cùng ngày sẽ bị khóa.
-            </p>
-          </div>
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:rounded-3xl">
+      <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-3 sm:px-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-red-50 text-red-600">
+          <Table2 size={18} />
         </div>
-        <div className="flex justify-start lg:justify-center">
-          <div className="flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
-            {[
-              { id: 'studying', label: 'Đang học' },
-              { id: 'finished', label: 'Học xong' },
-              { id: 'all', label: 'Tất cả' },
-            ].map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setRosterFilter(opt.id)}
-                className={`px-2.5 h-8 rounded-lg text-[11px] font-bold transition ${
-                  rosterFilter === opt.id
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-red-700'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center justify-start lg:justify-end gap-1.5">
-          <button
-            type="button"
-            onClick={goPrev}
-            className="w-9 h-9 rounded-xl border-2 border-red-600 text-red-600 hover:bg-red-50 flex items-center justify-center"
-            aria-label="Tuần trước"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={goThisWeek}
-            className="px-3 h-9 rounded-xl border-2 border-red-600 text-xs font-bold text-red-600 hover:bg-red-50 min-w-[9.5rem]"
-          >
-            {formatWeekRangeLabel(weekStart)}
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            className="w-9 h-9 rounded-xl border-2 border-red-600 text-red-600 hover:bg-red-50 flex items-center justify-center"
-            aria-label="Tuần sau"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
+        <h3 className="text-sm font-black tracking-tight text-slate-900 sm:text-base">
+          Xếp lịch học viên theo tuần
+        </h3>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[64rem] table-fixed border-collapse text-left">
+      <div className="m-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:m-4 sm:p-3">
+        <div className="flex items-center gap-1.5">
+          <Users size={14} className="shrink-0 text-slate-500" />
+          <span className="text-xs font-black tracking-wide text-slate-500">Lọc học viên</span>
+          <span className="ml-auto text-xs font-extrabold text-red-700">{rows.length} học viên</span>
+        </div>
+        <div className="flex w-full items-center gap-1">
+          {[
+            { id: 'studying', label: 'Đang học' },
+            { id: 'finished', label: 'Học xong' },
+            { id: 'all', label: 'Tất cả' },
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setRosterFilter(opt.id)}
+              className={`flex min-h-[34px] min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 text-xs font-extrabold transition sm:text-xs ${
+                rosterFilter === opt.id
+                  ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-500 hover:text-red-700'
+              }`}
+              aria-pressed={rosterFilter === opt.id}
+            >
+              <span className="truncate">{opt.label}</span>
+              <span className={rosterFilter === opt.id ? 'text-rose-100' : 'text-slate-400'}>
+                {rosterCounts[opt.id]}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              if (searchOpen) setNameQuery('');
+              setSearchOpen((open) => !open);
+            }}
+            className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border ${
+              searchOpen ? 'border-red-200 bg-red-50' : 'border-blue-100 bg-blue-50'
+            } text-red-600`}
+            aria-label={searchOpen ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
+            aria-expanded={searchOpen}
+          >
+            {searchOpen ? <X size={15} /> : <Search size={15} />}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCoursePickerOpen(true)}
+          aria-label={`Chọn khóa học, hiện tại ${courseFilter || 'Tất cả khóa học'}`}
+          aria-haspopup="dialog"
+          aria-expanded={coursePickerOpen}
+          className="flex min-h-[38px] w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-left"
+        >
+          <span className="shrink-0 text-xs font-bold text-slate-500">Khóa học</span>
+          <span className="min-w-0 flex-1 truncate text-center text-xs font-extrabold text-red-700">
+            {courseFilter || 'Tất cả khóa học'}
+          </span>
+          <ChevronDown size={16} className="shrink-0 text-red-600" aria-hidden="true" />
+        </button>
+        {searchOpen ? (
+          <input
+            type="search"
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
+            placeholder="Lọc tên học viên"
+            aria-label="Lọc theo tên học viên"
+            autoFocus
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none focus:border-red-300"
+          />
+        ) : null}
+      </div>
+
+      <div className="mx-3 flex min-h-9 items-center justify-between border border-b-0 border-slate-200 bg-rose-50/70 px-1 sm:mx-4">
+        <button
+          type="button"
+          onClick={goPrev}
+          className="flex h-8 w-8 items-center justify-center text-red-600"
+          aria-label="Tuần trước"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={goThisWeek}
+          className="px-2 text-xs font-extrabold text-red-700"
+          aria-label="Về tuần hiện tại"
+        >
+          {formatWeekRangeLabel(weekStart)}
+        </button>
+        <button
+          type="button"
+          onClick={goNext}
+          className="flex h-8 w-8 items-center justify-center text-red-600"
+          aria-label="Tuần sau"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      <div className="mx-3 mb-3 overflow-x-auto sm:mx-4 sm:mb-4">
+        <table className="w-full min-w-[43rem] table-fixed border-collapse text-left">
           <thead>
             <tr className="bg-slate-50/80">
-              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-slate-500 w-48 min-w-[11rem] border-b border-slate-100 align-bottom">
-                <div className="text-[11px] font-black uppercase tracking-wide">Học viên</div>
-                <input
-                  type="search"
-                  value={nameQuery}
-                  onChange={(e) => setNameQuery(e.target.value)}
-                  placeholder="Lọc tên"
-                  aria-label="Lọc theo tên học viên"
-                  className={`${HEADER_CTRL} mt-1.5 border-slate-200 font-medium normal-case tracking-normal`}
-                />
+              <th className="sticky left-0 z-10 w-[8rem] min-w-[8rem] border-b border-r border-slate-200 bg-slate-50 px-1.5 py-2 text-slate-700 align-bottom sm:px-2">
+                <div className="text-center text-xs font-black tracking-wide">Học viên</div>
                 <select
                   value={sort.kind === 'name' ? sort.dir : ''}
                   onChange={(e) => {
@@ -444,7 +527,7 @@ export default function TeacherWeeklySlotGrid({
                   }}
                   aria-label="Sắp xếp theo tên"
                   title="Sắp xếp theo tên A–Z hoặc Z–A"
-                  className={`${HEADER_CTRL} mt-1 normal-case tracking-normal ${
+                  className={`mt-1 h-7 w-full rounded-md border bg-white px-1 text-xs font-semibold text-slate-600 outline-none ${
                     sort.kind === 'name' ? 'border-red-300 text-red-700' : 'border-slate-200'
                   }`}
                 >
@@ -460,42 +543,30 @@ export default function TeacherWeeklySlotGrid({
                 return (
                   <th
                     key={key}
-                    className={`px-2 py-2 text-center border-b border-slate-100 w-[7.5rem] align-bottom ${
+                    className={`w-[5rem] min-w-[5rem] border-b border-r border-slate-200 px-0.5 py-1.5 text-center align-bottom ${
                       isToday ? 'bg-red-50/80' : ''
                     }`}
                   >
                     <div className={`${past ? 'opacity-70' : ''}`}>
-                      <div className={`text-[11px] font-black ${isToday ? 'text-red-700' : 'text-slate-600'}`}>
+                      <div className={`text-xs font-black ${isToday ? 'text-red-700' : 'text-slate-700'}`}>
                         {WEEKDAY_LABELS[i]}
                       </div>
-                      <div className={`text-[10px] font-semibold ${isToday ? 'text-red-500' : 'text-slate-400'}`}>
+                      <div className={`text-xs font-semibold ${isToday ? 'text-red-500' : 'text-slate-400'}`}>
                         {key.slice(8, 10)}/{key.slice(5, 7)}
                       </div>
                     </div>
-                    <select
-                      value={dayActive ? sort.dir : ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (!v) {
-                          setSort({ kind: 'name', dir: 'asc', dayIndex: 0 });
-                          return;
-                        }
-                        setSort({
-                          kind: 'day',
-                          dir: v === 'desc' ? 'desc' : 'asc',
-                          dayIndex: i,
-                        });
-                      }}
-                      aria-label={`Sắp xếp theo giờ ${WEEKDAY_LABELS[i]}`}
-                      title="Sắp xếp theo giờ: thấp đến cao hoặc cao đến thấp"
-                      className={`${HEADER_CTRL} mt-1.5 ${
-                        dayActive ? 'border-red-300 text-red-700' : 'border-slate-200'
+                    <button
+                      type="button"
+                      onClick={() => setSortMenuDayIndex(i)}
+                      aria-label={`Chọn sắp xếp lịch theo giờ ${WEEKDAY_LABELS[i]}`}
+                      aria-haspopup="dialog"
+                      className={`mt-0.5 flex h-6 w-full items-center justify-center gap-0.5 rounded-md border px-1 text-xs font-semibold ${
+                        dayActive ? 'border-blue-200 bg-blue-50 text-red-700' : 'border-transparent text-slate-500 hover:bg-white'
                       }`}
                     >
-                      <option value="">Giờ</option>
-                      <option value="asc">Thấp→cao</option>
-                      <option value="desc">Cao→thấp</option>
-                    </select>
+                      <span>{dayActive ? (sort.dir === 'asc' ? '↑' : '↓') : 'Giờ'}</span>
+                      {!dayActive ? <ChevronDown size={10} aria-hidden="true" /> : null}
+                    </button>
                   </th>
                 );
               })}
@@ -504,7 +575,7 @@ export default function TeacherWeeklySlotGrid({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400 font-medium">
+                <td colSpan={8} className="px-4 py-10 text-center text-sm font-medium text-slate-400">
                   {nameQuery.trim()
                     ? 'Không tìm thấy học viên khớp tên'
                     : rosterFilter === 'finished'
@@ -525,10 +596,13 @@ export default function TeacherWeeklySlotGrid({
               const name = student.displayName || student.name || 'Học viên';
               return (
                 <tr key={studentRowKey(student)} className="border-b border-slate-100 last:border-b-0">
-                  <td className="sticky left-0 z-10 bg-white px-3 py-2 align-middle">
+                  <td className="sticky left-0 z-10 h-[4.5rem] w-[8rem] min-w-[8rem] border-r border-slate-200 bg-white px-1.5 py-2 align-middle sm:px-2">
                     <p className="text-xs font-bold text-slate-900 truncate" title={name}>{name}</p>
-                    <p className="text-[10px] text-slate-400 font-medium truncate">
-                      {student.course || '—'} · {displayDone}/{totalSessions} buổi
+                    <p className="line-clamp-2 text-xs font-medium text-slate-500">
+                      {student.course || '—'}
+                    </p>
+                    <p className="text-xs font-medium text-slate-400">
+                      {displayDone}/{totalSessions} buổi
                     </p>
                   </td>
                   {dateKeys.map((dateKey) => (
@@ -557,13 +631,13 @@ export default function TeacherWeeklySlotGrid({
                   <button
                     type="button"
                     onClick={() => setRosterExpanded((v) => !v)}
-                    className="text-[11px] font-black text-red-600 hover:text-red-700 hover:underline uppercase tracking-wide"
+                    className="text-xs font-black text-red-600 hover:text-red-700 hover:underline  tracking-wide"
                   >
                     {rosterExpanded
                       ? 'Thu gọn'
                       : `Xem thêm ${hiddenCount} học viên`}
                   </button>
-                  <span className="ml-2 text-[10px] font-semibold text-slate-400">
+                  <span className="ml-2 text-xs font-semibold text-slate-400">
                     ({rosterExpanded ? rows.length : ROSTER_PAGE_SIZE}/{rows.length})
                   </span>
                 </td>
@@ -572,6 +646,125 @@ export default function TeacherWeeklySlotGrid({
           </tbody>
         </table>
       </div>
+      {coursePickerOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/45 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setCoursePickerOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="teacher-course-picker-title"
+            className="flex max-h-[min(80vh,36rem)] w-full max-w-md flex-col gap-1 rounded-2xl bg-white p-3 shadow-2xl sm:p-4"
+          >
+            <header className="mb-1 flex items-center gap-2.5 border-b border-slate-200 pb-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <BookOpen size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span id="teacher-course-picker-title" className="block text-sm font-black text-slate-900">Chọn khóa học</span>
+                <span className="block text-xs text-slate-500">Lọc học viên theo khóa</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setCoursePickerOpen(false)}
+                aria-label="Đóng chọn khóa học"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </header>
+            <div className="overflow-y-auto">
+              {['', ...courseOptions].map((course) => {
+                const selected = courseFilter === course;
+                return (
+                  <button
+                    key={course || 'all-courses'}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setCourseFilter(course);
+                      setCoursePickerOpen(false);
+                    }}
+                    className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${
+                      selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{course || 'Tất cả khóa học'}</span>
+                    {selected ? <Check size={17} className="shrink-0 text-red-600" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
+      {sortMenuDayIndex != null && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[10050] flex items-center justify-center bg-slate-950/45 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSortMenuDayIndex(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="teacher-hour-sort-title"
+            className="w-full max-w-md rounded-2xl bg-white p-3 shadow-2xl sm:p-4"
+          >
+            <header className="mb-1 flex items-center gap-2.5 border-b border-slate-200 pb-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <Table2 size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span id="teacher-hour-sort-title" className="block text-sm font-black text-slate-900">Sắp xếp theo giờ</span>
+                <span className="block text-xs text-slate-500">
+                  {WEEKDAY_LABELS[sortMenuDayIndex]} · {dateKeys[sortMenuDayIndex]?.slice(8, 10)}/{dateKeys[sortMenuDayIndex]?.slice(5, 7)}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSortMenuDayIndex(null)}
+                aria-label="Đóng sắp xếp"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <X size={20} />
+              </button>
+            </header>
+            {[
+              { value: 'none', label: 'Không sắp xếp theo giờ' },
+              { value: 'asc', label: 'Giờ tăng dần · thấp đến cao' },
+              { value: 'desc', label: 'Giờ giảm dần · cao đến thấp' },
+            ].map((option) => {
+              const selected = option.value === 'none'
+                ? sort.kind !== 'day' || sort.dayIndex !== sortMenuDayIndex
+                : sort.kind === 'day' && sort.dayIndex === sortMenuDayIndex && sort.dir === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    if (option.value === 'none') setSort({ kind: 'name', dir: 'asc', dayIndex: 0 });
+                    else setSort({ kind: 'day', dir: option.value, dayIndex: sortMenuDayIndex });
+                    setSortMenuDayIndex(null);
+                  }}
+                  className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${
+                    selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {selected ? <Check size={17} className="shrink-0 text-red-600" /> : null}
+                </button>
+              );
+            })}
+          </section>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -602,13 +795,13 @@ function SlotCell({
   const gate = getStudentScheduleGate(student, studentSchedules || schedules, dateKey, existingId || null);
 
   const options = extra ? [extra, ...WEEK_SLOT_OPTIONS] : WEEK_SLOT_OPTIONS;
-  const dayTd = `px-1.5 py-1.5 min-w-0 ${isToday ? 'bg-red-50/40' : ''}`;
+  const dayTd = `h-[4.5rem] min-w-0 border-b border-r border-slate-200 px-1 py-1 ${isToday ? 'bg-red-50/50' : ''}`;
 
   if (otherCourse) {
     return (
       <td className={dayTd}>
         <div
-          className="w-full min-h-9 px-1.5 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[10px] text-slate-400 font-semibold text-center leading-tight"
+          className="flex min-h-11 w-full items-center justify-center px-1 text-xs font-semibold leading-tight text-slate-400"
           title={`Đã có ca khóa ${dayOccupying.course || 'khác'} ${slotValueFromSchedule(dayOccupying) || ''}`}
         >
           Ca khác
@@ -628,7 +821,7 @@ function SlotCell({
         : 'bg-transparent border-transparent text-slate-300';
     return (
       <td className={dayTd}>
-        <div className={`w-full min-h-9 px-1.5 py-1.5 rounded-lg border text-[10px] font-bold text-center ${tone}`}>
+        <div className={`flex min-h-11 w-full items-center justify-center px-1 text-xs font-bold text-center ${tone}`}>
           {label}
         </div>
       </td>
@@ -645,12 +838,13 @@ function SlotCell({
       <select
         value={slotValue}
         disabled={disabledAll}
+        data-native-select
         title={!own && !gate.canSchedule ? (gate.reason || 'Không xếp thêm được') : undefined}
         onChange={(e) => onChange(student, dateKey, e.target.value)}
-        className={`w-full min-w-0 max-w-full min-h-9 px-1.5 rounded-lg border text-[11px] font-semibold outline-none ${
+        className={`min-h-11 w-full min-w-0 max-w-full appearance-none rounded-md border border-transparent bg-none bg-transparent px-0 text-center text-xs font-semibold outline-none hover:bg-white/70 focus:border-red-300 focus:bg-white ${
           own
-            ? 'bg-amber-50 border-amber-200 text-amber-800'
-            : 'bg-white border-slate-200 text-slate-600'
+            ? 'text-amber-700'
+            : 'text-slate-600'
         } ${busy ? 'opacity-60' : ''} ${disabledAll ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <option value="">—</option>

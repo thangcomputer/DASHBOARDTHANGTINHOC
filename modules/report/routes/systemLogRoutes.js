@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const systemLogController = require('../controllers/SystemLogController');
 const { systemLogRepository } = require('../../report/repositories');
-const { systemLogRepository } = require('../../report/repositories');
 const SystemLog = require('../../report/models/SystemLog'); // Temp for new SystemLog // Temp for new SystemLog
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
 const { authorize, authorizeAny, authorizeAll } = require('../../../shared/middleware/authorize');

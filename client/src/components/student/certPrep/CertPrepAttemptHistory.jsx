@@ -10,7 +10,7 @@ export default function CertPrepAttemptHistory({ attempts = [], currentSessionId
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs font-black uppercase tracking-wide text-slate-400">
+            <tr className="text-left text-xs font-black  tracking-wide text-slate-400">
               <th className="px-4 py-3">Lần</th>
               <th className="px-4 py-3">Ngày</th>
               <th className="px-4 py-3">Điểm</th>
