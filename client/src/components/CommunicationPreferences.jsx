@@ -25,7 +25,7 @@ const defaultPreferences = {
   rejectMessagesFromTeachers: false,
 };
 
-export default function CommunicationPreferences({ role }) {
+export default function CommunicationPreferences({ role, compact = false }) {
   const messagePreference = messagePreferenceByRole[role];
   const preferenceRows = messagePreference ? [callPreference, messagePreference] : [];
   const [preferences, setPreferences] = useState(defaultPreferences);
@@ -59,6 +59,45 @@ export default function CommunicationPreferences({ role }) {
       setSavingKey('');
     }
   };
+
+  if (compact) {
+    return (
+      <section>
+        <p className="text-[12px] font-bold leading-snug text-slate-800">Quyền riêng tư liên lạc</p>
+        <p className="text-[10px] text-slate-500">Chọn ai có thể gọi hoặc nhắn tin cho bạn.</p>
+        <div className="mt-1.5 divide-y divide-slate-100 rounded-lg border border-slate-100">
+          {preferenceRows.map(({ key, title, description }) => {
+            const checked = preferences[key];
+            const disabled = loading || Boolean(savingKey);
+            return (
+              <div key={key} className="flex items-center gap-2 px-2 py-1.5">
+                {key === 'rejectCalls'
+                  ? <Phone size={13} className="shrink-0 text-slate-400" aria-hidden="true" />
+                  : <MessageCircle size={13} className="shrink-0 text-slate-400" aria-hidden="true" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12px] font-bold leading-snug text-slate-800">{title}</span>
+                  <span className="block text-[10px] text-slate-500">{description}</span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={checked}
+                  aria-label={title}
+                  disabled={disabled}
+                  onClick={() => { void toggle(key, !checked); }}
+                  style={{ boxShadow: 'none' }}
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-red-600' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {error ? <p role="alert" className="mt-1 text-[10px] font-semibold text-red-600">{error}</p> : null}
+      </section>
+    );
+  }
 
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">

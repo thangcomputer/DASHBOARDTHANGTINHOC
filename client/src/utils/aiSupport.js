@@ -33,6 +33,22 @@ export function isAiEscalationMessage(m) {
     && String(m?.content || '').includes(AI_ESCALATE_MARKER);
 }
 
+export const AI_REPLY_WAIT_MS = 90 * 1000;
+
+/** Tin cuối là của người dùng, AI chưa trả lời và chưa quá thời gian chờ. */
+export function isAwaitingAiReply(messages, meId, now = Date.now()) {
+  const myId = String(meId || '');
+  const msgs = messages || [];
+  for (let i = msgs.length - 1; i >= 0; i -= 1) {
+    const m = msgs[i];
+    if (!m || m.isRecalled || m.messageType === 'system') continue;
+    if (!myId || String(m.senderId || '') !== myId) return false;
+    const at = messageTimestamp(m);
+    return Number.isFinite(at) && at > 0 && now - at < AI_REPLY_WAIT_MS;
+  }
+  return false;
+}
+
 export function isAiBusyReply(m) {
   return String(m?.senderId || '') === AI_SUPPORT_PEER.id
     && !m?.isRecalled

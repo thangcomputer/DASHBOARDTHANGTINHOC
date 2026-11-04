@@ -46,6 +46,7 @@ const corsOriginFn = (origin, cb) => {
   if (!origin) return cb(null, true);
   if (allowedOrigins.includes(origin)) return cb(null, true);
   if (!isProd && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
+  if (!isProd && /^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin)) return cb(null, true);
   cb(null, false);
 };
 

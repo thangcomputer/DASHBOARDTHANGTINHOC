@@ -931,6 +931,12 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     tay: 'Miền Tây',
   }[peerProfile?.voiceRegion] || peerProfile?.voiceRegion || '';
 
+  const teacherAverageRating = Number(peerProfile?.averageRating);
+  const teacherRatingCount = Number(peerProfile?.ratingCount ?? peerProfile?.totalRatings ?? 0);
+  const teacherRatingLabel = Number.isFinite(teacherAverageRating) && (teacherRatingCount > 0 || teacherAverageRating > 0)
+    ? `${teacherAverageRating.toFixed(1)} / 5 sao`
+    : 'Chưa có đánh giá';
+
   const peerUpcomingSchedules = useMemo(() => {
     if (!peerProfile || activeConv?.isGroup) return [];
     const peerId = String(peerProfile.id || peerProfile._id || activeConv?.user?.id || '');
@@ -2759,11 +2765,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             {conv.unread > 99 ? '99+' : conv.unread}
                           </span>
                         )}
-                        {conv.user.branchCode && (
-                          <span className="bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0">
-                            {conv.user.branchCode}
-                          </span>
-                        )}
                         {currentUserRole === 'admin' && conv.user.phone && (
                           <a
                             href={`https://zalo.me/${conv.user.phone.replace(/\s+/g, '')}`}
@@ -3107,98 +3108,117 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       <div
                         data-chat-popup
                         onMouseDown={(event) => event.stopPropagation()}
-                        className="absolute right-0 top-11 z-40 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl"
+                        className="cms-compact-popup absolute right-0 top-11 z-40 max-h-[min(70vh,30rem)] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-3 text-xs shadow-xl"
                       >
-                        <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-3">
-                          <Info size={16} className="text-blue-600" />
-                          <h3 className="text-sm font-black text-slate-800">Thông tin {peerRole === 'student' ? 'học viên' : peerRole === 'teacher' ? 'giảng viên' : 'nhân viên'}</h3>
-                        </div>
                         {peerRole === 'teacher' && canViewTeacherDetails ? (
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-slate-400">Tuổi</p>
-                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.age ? `${peerProfile.age} tuổi` : 'Chưa cập nhật'}</p>
-                            </div>
-                            <div className="rounded-xl bg-amber-50 p-2.5">
-                              <p className="text-amber-600">Kinh nghiệm</p>
-                              <p className="mt-0.5 font-bold text-amber-700">{teacherExperience || 'Chưa cập nhật'}</p>
-                            </div>
-                            <div className="col-span-2 rounded-xl bg-blue-50 p-2.5">
-                              <p className="text-blue-600">Chuyên môn</p>
-                              <p className="mt-0.5 font-bold text-blue-700">{peerProfile?.specialty || 'Chưa cập nhật'}</p>
-                            </div>
-                            <div className="rounded-xl bg-yellow-50 p-2.5">
-                              <p className="text-yellow-600">Đánh giá</p>
-                              <p className="mt-0.5 font-bold text-yellow-700">{Number.isFinite(Number(peerProfile?.averageRating)) ? `${Number(peerProfile.averageRating).toFixed(1)} / 5 sao` : 'Chưa có đánh giá'}</p>
-                            </div>
-                            <div className="rounded-xl bg-violet-50 p-2.5">
-                              <p className="text-violet-600">Giọng</p>
-                              <p className="mt-0.5 font-bold text-violet-700">{teacherVoiceLabel || 'Chưa cập nhật'}</p>
-                            </div>
-                          </div>
-                        ) : peerRole === 'admin' || peerRole === 'staff' ? (
-                          <div className="space-y-2 text-xs">
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-slate-400">Tên nhân viên</p>
-                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.name || activeConv.user.name || 'Chưa cập nhật'}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="rounded-xl bg-emerald-50 p-2.5">
-                                <p className="text-emerald-600">Chi nhánh</p>
-                                <p className="mt-0.5 font-bold text-emerald-700">{peerProfile?.branchName || peerProfile?.branchCode || 'Chưa cập nhật'}</p>
-                              </div>
-                              <div className="rounded-xl bg-blue-50 p-2.5">
-                                <p className="text-blue-600">Số điện thoại</p>
-                                <p className="mt-0.5 font-bold text-blue-700">{displayPeerPhone}</p>
-                              </div>
-                            </div>
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-slate-400">Địa chỉ</p>
-                              <p className="mt-0.5 break-words font-bold text-slate-700">{peerProfile?.address || 'Chưa cập nhật'}</p>
+                          <div className="mb-2 flex items-center gap-2.5 border-b border-slate-100 pb-2">
+                            <img
+                              src={resolveAvatarUrl(activeConv.user)}
+                              alt=""
+                              className={`h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm ${isRealAvatar(activeConv.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
+                              onError={(e) => {
+                                const el = e.currentTarget;
+                                if (el.dataset.fallback === '1') return;
+                                el.dataset.fallback = '1';
+                                el.src = resolveAvatarUrl({ ...activeConv.user, avatar: '' });
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <h3 className="truncate text-[13px] font-black text-slate-800">{formatDisplayName(peerProfile?.name || activeConv.user.name)}</h3>
+                              <p className="text-[10px] font-semibold text-red-600">Giảng viên</p>
+                              <p className="text-[10px] text-slate-500">{getUserStatusText(activeConv.user.id, isUserOnline(activeConv.user.id))}</p>
                             </div>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-slate-400">Khóa học</p>
-                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.course || 'Chưa cập nhật'}</p>
+                          <div className="mb-2 flex items-center gap-2 border-b border-slate-100 pb-2">
+                            <Info size={15} className="text-blue-600" />
+                            <h3 className="text-[13px] font-black text-slate-800">Thông tin {peerRole === 'student' ? 'học viên' : peerRole === 'teacher' ? 'giảng viên' : 'nhân viên'}</h3>
+                          </div>
+                        )}
+                        {peerRole === 'teacher' && canViewTeacherDetails ? (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                              <p className="text-[10px] text-slate-400">Tuổi</p>
+                              <p className="text-[12px] leading-snug font-bold text-slate-700">{peerProfile?.age ? `${peerProfile.age} tuổi` : 'Chưa cập nhật'}</p>
                             </div>
-                            <div className="rounded-xl bg-slate-50 p-2.5">
-                              <p className="text-slate-400">Tuổi</p>
-                              <p className="mt-0.5 font-bold text-slate-700">{peerProfile?.age ? `${peerProfile.age} tuổi` : 'Chưa cập nhật'}</p>
+                            <div className="rounded-lg bg-amber-50 px-2 py-1.5">
+                              <p className="text-[10px] text-amber-600">Kinh nghiệm</p>
+                              <p className="text-[12px] leading-snug font-bold text-amber-700">{teacherExperience || 'Chưa cập nhật'}</p>
                             </div>
-                            <div className="rounded-xl bg-emerald-50 p-2.5">
-                              <p className="text-emerald-600">Còn lại</p>
-                              <p className="mt-0.5 font-bold text-emerald-700">{peerRemainingSessions == null ? 'Chưa cập nhật' : `${peerRemainingSessions} buổi`}</p>
+                            <div className="col-span-2 rounded-lg bg-blue-50 px-2 py-1.5">
+                              <p className="text-[10px] text-blue-600">Chuyên môn</p>
+                              <p className="text-[12px] leading-snug line-clamp-2 font-bold text-blue-700" title={peerProfile?.specialty || ''}>{peerProfile?.specialty || 'Chưa cập nhật'}</p>
                             </div>
-                            <div className="rounded-xl bg-blue-50 p-2.5">
-                              <p className="text-blue-600">Vai trò</p>
-                              <p className="mt-0.5 font-bold text-blue-700">Học viên</p>
+                            <div className="rounded-lg bg-yellow-50 px-2 py-1.5">
+                              <p className="text-[10px] text-yellow-600">Đánh giá</p>
+                              <p className="text-[12px] leading-snug font-bold text-yellow-700">{teacherRatingLabel}</p>
+                            </div>
+                            <div className="rounded-lg bg-violet-50 px-2 py-1.5">
+                              <p className="text-[10px] text-violet-600">Giọng</p>
+                              <p className="text-[12px] leading-snug font-bold text-violet-700">{teacherVoiceLabel || 'Chưa cập nhật'}</p>
+                            </div>
+                          </div>
+                        ) : peerRole === 'admin' || peerRole === 'staff' ? (
+                          <div className="space-y-1.5">
+                            <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                              <p className="text-[10px] text-slate-400">Tên nhân viên</p>
+                              <p className="text-[12px] leading-snug font-bold text-slate-700">{peerProfile?.name || activeConv.user.name || 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
+                                <p className="text-[10px] text-emerald-600">Chi nhánh</p>
+                                <p className="text-[12px] leading-snug font-bold text-emerald-700">{peerProfile?.branchName || peerProfile?.branchCode || 'Chưa cập nhật'}</p>
+                              </div>
+                              <div className="rounded-lg bg-blue-50 px-2 py-1.5">
+                                <p className="text-[10px] text-blue-600">Số điện thoại</p>
+                                <p className="text-[12px] leading-snug font-bold text-blue-700">{displayPeerPhone}</p>
+                              </div>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                              <p className="text-[10px] text-slate-400">Địa chỉ</p>
+                              <p className="text-[12px] leading-snug break-words font-bold text-slate-700">{peerProfile?.address || 'Chưa cập nhật'}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                              <p className="text-[10px] text-slate-400">Khóa học</p>
+                              <p className="text-[12px] leading-snug line-clamp-2 font-bold leading-snug text-slate-700">{peerProfile?.course || 'Chưa cập nhật'}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                                <p className="text-[10px] text-slate-400">Tuổi</p>
+                                <p className="text-[12px] leading-snug font-bold text-slate-700">{peerProfile?.age ? `${peerProfile.age} tuổi` : 'Chưa cập nhật'}</p>
+                              </div>
+                              <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
+                                <p className="text-[10px] text-emerald-600">Còn lại</p>
+                                <p className="text-[12px] leading-snug font-bold text-emerald-700">{peerRemainingSessions == null ? 'Chưa cập nhật' : `${peerRemainingSessions} buổi`}</p>
+                              </div>
                             </div>
                           </div>
                         )}
                         {peerRole === 'student' && (
                           <>
-                            <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-xs">
-                              <p className="font-bold text-amber-700">Ghi chú Admin</p>
-                              <p className="mt-1 whitespace-pre-wrap break-words text-amber-900">{peerProfile?.notes || peerProfile?.adminNotes || 'Chưa có ghi chú'}</p>
+                            <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-2 py-1.5">
+                              <p className="text-[10px] font-bold text-amber-700">Ghi chú Admin</p>
+                              <p className="text-[12px] leading-snug line-clamp-3 whitespace-pre-wrap break-words text-amber-900">{peerProfile?.notes || peerProfile?.adminNotes || 'Chưa có ghi chú'}</p>
                             </div>
-                            <div className="mt-3">
-                              <p className="mb-1.5 text-xs font-bold text-slate-700">Lịch sắp tới</p>
+                            <div className="mt-2">
+                              <p className="mb-1 text-[10px] font-bold text-slate-700">Lịch sắp tới</p>
                               {peerUpcomingSchedules.length > 0 ? (
-                                <div className="space-y-1.5">
+                                <div className="space-y-1">
                                   {peerUpcomingSchedules.map((schedule) => (
-                                    <div key={schedule._id || schedule.id || `${schedule.date}-${schedule.startTime}`} className="rounded-xl bg-violet-50 px-2.5 py-2 text-xs text-violet-900">
-                                      <p className="font-bold">
+                                    <div key={schedule._id || schedule.id || `${schedule.date}-${schedule.startTime}`} className="rounded-lg bg-violet-50 px-2 py-1.5 text-violet-900">
+                                      <p className="text-[12px] leading-snug font-bold">
                                         {new Date(`${String(schedule.date).slice(0, 10)}T12:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                         {schedule.startTime ? ` · ${schedule.startTime}${schedule.endTime ? `–${schedule.endTime}` : ''}` : ''}
                                       </p>
-                                      <p className="mt-0.5 truncate">{schedule.course || peerProfile?.course || 'Lịch học'}</p>
+                                      <p className="truncate text-[10px]">{schedule.course || peerProfile?.course || 'Lịch học'}</p>
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-400">Chưa có lịch sắp tới</p>
+                                <p className="rounded-lg bg-slate-50 px-2 py-1.5 text-slate-400">Chưa có lịch sắp tới</p>
                               )}
                             </div>
                             {currentUserRole === 'teacher' && (
@@ -3208,10 +3228,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                   setShowPeerInfo(false);
                                   setShowScheduleModal(true);
                                 }}
-                                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100"
+                                className="mt-2 inline-flex min-h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100"
                                 title="Xếp lịch tuần cho học viên này"
                               >
-                                <Calendar size={16} aria-hidden="true" />
+                                <Calendar size={14} aria-hidden="true" />
                                 <span>Xếp lịch tuần</span>
                               </button>
                             )}
@@ -3221,8 +3241,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                           && ['student', 'teacher'].includes(currentUserRole)
                           && ['student', 'teacher'].includes(peerRole)
                           && currentUserRole !== peerRole ? (
-                          <div className="mt-3 border-t border-slate-100 pt-3">
-                            <CommunicationPreferences role={currentUserRole} />
+                          <div className="mt-2 border-t border-slate-100 pt-2">
+                            <CommunicationPreferences role={currentUserRole} compact />
                           </div>
                         ) : null}
                       </div>

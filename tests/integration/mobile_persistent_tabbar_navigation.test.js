@@ -50,8 +50,10 @@ test('persistent footer shows the same schedule and message badge counts as main
   assert.ok(navigator.includes('mobile:tab-badge-schedule'));
   assert.ok(persistentBar.includes("name === 'Messages'"));
   assert.ok(persistentBar.includes("name === 'Schedule'"));
-  assert.ok(persistentBar.includes('badgeCount > 99 ? \'99+\' : badgeCount'));
-  assert.ok(persistentBar.includes('styles.persistentTabBadge'));
+  assert.ok(persistentBar.includes('badgeCount={badgeCount}'));
+  const navTabContent = navigator.slice(navigator.indexOf('function NavTabContent('), persistentStart);
+  assert.ok(navTabContent.includes('badgeCount > 99 ? \'99+\' : badgeCount'));
+  assert.ok(navTabContent.includes('styles.persistentTabBadge'));
   assert.ok(mainTabs.includes("DeviceEventEmitter.emit('mobile:tab-badge-messages', unreadConversationCount)"));
   assert.ok(mainTabs.includes("DeviceEventEmitter.emit('mobile:tab-badge-schedule', todayScheduleCount)"));
 });

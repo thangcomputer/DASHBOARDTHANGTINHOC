@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   CheckCircle, User, Settings, BookOpen,
   Mail, Phone, MessageCircle, MapPin, Lock, ChevronRight, ChevronDown,
-  GraduationCap, BadgeDollarSign, Wallet, Receipt,
+  GraduationCap, BadgeDollarSign, Wallet, Receipt, KeyRound,
 } from 'lucide-react';
 import EditableAvatar from '../EditableAvatar';
+import { openPinLockSettings } from '../../utils/pinLock';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { readOwnedVideoCourseCache } from '../../utils/lmsDeepLink';
@@ -252,6 +253,20 @@ export default function StudentProfileTab({
               <span className="flex-1 min-w-0">
                 <span className="block text-sm lg:text-base font-bold text-slate-800">Đổi mật khẩu</span>
                 <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
+              </span>
+              <ChevronRight size={18} className="text-slate-300 shrink-0" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={openPinLockSettings}
+              className="w-full flex items-center gap-3 px-4 py-3.5 lg:px-5 lg:py-4 text-left border-t border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+            >
+              <span className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+                <KeyRound size={18} aria-hidden="true" />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm lg:text-base font-bold text-slate-800">Khóa mã PIN</span>
+                <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Tự khóa màn hình khi không thao tác</span>
               </span>
               <ChevronRight size={18} className="text-slate-300 shrink-0" aria-hidden="true" />
             </button>

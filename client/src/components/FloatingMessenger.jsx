@@ -42,6 +42,7 @@ import {
   isAiFaqChipLabel,
   TEACHER_WELCOME_CHIPS,
   STUDENT_WELCOME_CHIPS,
+  isAwaitingAiReply,
 } from '../utils/aiSupport';
 import { MessageRichText } from '../utils/messageRichText';
 import { copyableTextFromMessage } from '../utils/messageRichTextUtils';
@@ -479,62 +480,6 @@ function MessageBubble({
   );
 }
 
-function formatChatHeadName(name) {
-  const parts = String(name || 'Người dùng')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length <= 1) return parts[0] || 'Người dùng';
-  const lastName = parts[parts.length - 1];
-  const displayLastName = `${lastName.charAt(0).toLocaleUpperCase('vi-VN')}${lastName.slice(1).toLocaleLowerCase('vi-VN')}`;
-  return `${parts.slice(0, -1).map((part) => `${part.charAt(0).toLocaleUpperCase('vi-VN')}.`).join(' ')} ${displayLastName}`;
-}
-
-function ChatHead({ tab, unread = 0, online = false, onOpen, onClose }) {
-  const isGroup = Boolean(tab.user?.isGroup);
-  return (
-    <div className="cms-fm-head-wrap">
-      {!isGroup && (
-        <span className="cms-fm-head__name" title={tab.user.name || 'Người dùng'}>
-          {formatChatHeadName(tab.user.name)}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={() => onOpen(tab.id)}
-        className="cms-fm-head"
-        title={tab.user.name}
-        aria-label={`Mở chat với ${tab.user.name}`}
-      >
-        {isGroup ? (
-          <span className="cms-fm-head__avatar flex items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-white">
-            <Users size={22} strokeWidth={2.4} />
-          </span>
-        ) : (
-          <AvatarImage
-            user={tab.user}
-            className={`cms-fm-head__avatar ${isRealAvatar(tab.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
-          />
-        )}
-        {unread > 0 ? (
-          <span className="cms-fm-head__badge">{unread > 99 ? '99+' : unread}</span>
-        ) : (
-          <span className={`cms-fm-head__online ${online ? '!bg-emerald-500' : '!bg-slate-300'}`} />
-        )}
-      </button>
-      <button
-        type="button"
-        className="cms-fm-head__close"
-        onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
-        aria-label={`Đóng chat ${tab.user.name}`}
-        title="Đóng"
-      >
-        <X size={10} />
-      </button>
-    </div>
-  );
-}
-
 function ChatWindow({
   tab, meId, draftStorageKey, messages, onClose, onMinimize, onSend, onSendFile, onSendExistingImage, onRecall, onReact, onlineUsers = [], isSuper = false,
   peerTyping = false, isAiPeer = false, aiStatus = AI_SUPPORT_STATUS.AI_ACTIVE,
@@ -570,6 +515,16 @@ function ChatWindow({
   const typingActiveRef = useRef(false);
   const [winSize, setWinSize] = useState(readFmSize);
   const resizeRef = useRef({ active: false, x: 0, y: 0, w: 0, h: 0 });
+  const [, setAiWaitTick] = useState(0);
+  const awaitingAiReply = isAiPeer
+    && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+    && isAwaitingAiReply(messages, meId);
+
+  useEffect(() => {
+    if (!awaitingAiReply) return undefined;
+    const timer = window.setInterval(() => setAiWaitTick((tick) => tick + 1), 5000);
+    return () => window.clearInterval(timer);
+  }, [awaitingAiReply]);
 
   useEffect(() => {
     persistChatDraft(draftStorageKey, text);
@@ -689,7 +644,7 @@ function ChatWindow({
     scrollToLatest();
     const frame = requestAnimationFrame(scrollToLatest);
     return () => cancelAnimationFrame(frame);
-  }, [displayMessages.length, messages.length, tab.id, peerTyping, sending]);
+  }, [displayMessages.length, messages.length, tab.id, peerTyping, sending, awaitingAiReply]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -1241,8 +1196,12 @@ function ChatWindow({
             );
           })
         )}
-        {peerTyping || sending ? (
-          <TypingIndicator label={isAiPeer && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? 'Trợ lý AI đang trả lời' : 'Đang gửi'} />
+        {peerTyping || sending || awaitingAiReply ? (
+          <TypingIndicator
+            label={isAiPeer && aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+              ? 'Trợ lý AI đang trả lời'
+              : sending ? 'Đang gửi' : 'Đang gõ'}
+          />
         ) : null}
         <div ref={endRef} />
       </div>
@@ -1559,7 +1518,7 @@ export default function FloatingMessenger({ session, role }) {
   } = useData();
   const {
     supportOpen, setSupportOpen, tabs, activeTabId,
-    openChat, closeChat, minimizeChat, focusChat,
+    openChat, closeChat, minimizeChat,
   } = useFloatingMessenger();
 
   const [aiOpening, setAiOpening] = useState(false);
@@ -1764,9 +1723,6 @@ export default function FloatingMessenger({ session, role }) {
       user: { ...AI_SUPPORT_PEER },
     }
     : openWindowRaw;
-  // AI dùng mascot/FAB riêng; các chat cá nhân vẫn phải hiện chat-head
-  // để không làm mất tin GV↔HV, Admin↔GV khi AI đang bật.
-  const heads = uiTabs.filter((t) => t.minimized && !isAiSupportPeer(t.user));
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
@@ -2263,11 +2219,6 @@ export default function FloatingMessenger({ session, role }) {
     await handleEscalate(tab);
   }, [handleEscalate]);
 
-  const handleFocus = useCallback((convId) => {
-    setUserOpenedChat(true);
-    focusChat(convId);
-    if (meId) markMessagesRead?.(convId, meId);
-  }, [focusChat, meId, markMessagesRead]);
   const handleSupportPageClose = (convId) => {
     closeChat(convId);
     setSupportChatPage(false);
@@ -2794,26 +2745,6 @@ export default function FloatingMessenger({ session, role }) {
           </div>
         ) : null}
 
-        {/* Chat-heads: mỗi người 1 vòng tròn; AI được đại diện bởi FAB riêng */}
-        {heads.length > 0 && (
-          <div className="cms-fm-heads">
-            {heads.map((tab) => {
-              const peerKey = `${normalizeChatRole(tab.user.role)}_${tab.user.id}`;
-              return (
-                <ChatHead
-                  key={tab.id}
-                  tab={getFreshTab(tab)}
-                  unread={unreadByPeer.get(peerKey) || 0}
-                  online={!tab.user?.isGroup && Array.isArray(onlineUsers)
-                    && onlineUsers.some((user) => getPresenceUserId(user) === String(tab.user?.id || ''))}
-                  onOpen={handleFocus}
-                  onClose={closeChat}
-                />
-              );
-            })}
-          </div>
-        )}
-
         {/* FAB — HV/GV: mở Trợ lý AI trước; sau escalate mới mở danh bạ SUPPORT */}
         {!openWindow && !fabExpanded && !isInbox && !isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
           <div
@@ -2834,10 +2765,10 @@ export default function FloatingMessenger({ session, role }) {
               aria-label={fabExpanded ? 'Đóng hỗ trợ' : 'Mở hỗ trợ'}
               aria-expanded={fabExpanded}
             >
-              <span className="cms-fm-support-button__label">Hỗ trợ</span>
               <span className="cms-fm-support-button__icon" aria-hidden="true">
                 {fabExpanded ? <X size={22} strokeWidth={2.5} /> : <Headphones size={22} strokeWidth={2.5} />}
               </span>
+              <span className="cms-fm-support-button__label">Hỗ trợ</span>
             </button>
           </div>
         )}

@@ -194,20 +194,25 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
     const navigation = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');
 
     assert.ok(ui.includes("export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility'"));
-    assert.ok(ui.includes('DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, false)'));
-    assert.ok(ui.includes('DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true)'));
+    assert.ok(ui.includes('DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, visible)'));
+    assert.ok(ui.includes('if (directionTravel.current > SCROLL_TOGGLE_DISTANCE) emitChromeVisibility(false);'));
+    assert.ok(ui.includes('else if (directionTravel.current < -SCROLL_TOGGLE_DISTANCE) emitChromeVisibility(true);'));
+    assert.equal(ui.includes('reachedBottom'), false, 'reaching the bottom must not bring the footer back');
+    assert.ok(ui.includes('const MIN_OVERFLOW_TO_HIDE_CHROME = 180;'));
+    assert.ok(ui.includes('contentSize.height - layoutMeasurement.height < MIN_OVERFLOW_TO_HIDE_CHROME'));
+    assert.ok(ui.includes('if (viewportChanged) {'), 'header resize must not be read as a user scroll');
     assert.ok(navigation.includes('MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT,'));
     assert.ok(navigation.includes('translateY: visibility.interpolate'));
     assert.ok(navigation.includes('translateY: navigationBarVisibility.interpolate'));
     assert.ok(navigation.includes("AppState.addEventListener('change'"));
-    assert.ok(navigation.includes('Animated.timing(navigationBarVisibility'));
-    assert.ok(navigation.includes('fill={colors.canvas}'));
-    assert.equal(navigation.includes('stroke="#E2E8F0"'), false);
-    assert.ok(navigation.includes('borderTopColor: \'transparent\''));
+    assert.ok(navigation.includes('if (visibleRef.current === visible) return;'));
+    assert.ok(navigation.includes('animateChrome(visibility, visible);'));
+    assert.ok(ui.includes('animateChrome(headerProgress, visible);'));
+    assert.ok(ui.includes('const CHROME_ANIMATION_MS = 260;'));
     assert.equal(
-      (navigation.match(/M0 26 C18 8 45 8 62 25 C78 40 77 82 106 86 C132 90 148 79 160 42 C170 9 183 0 200 0 C217 0 230 9 240 42 C252 79 268 90 294 86 C323 82 322 40 338 25 C355 8 382 8 400 26 V100 H0 Z/g) || []).length,
+      (navigation.match(/style=\{styles\.navigationGlassBackground\}/g) || []).length,
       2,
-      'main and persistent tab bars should share the same curved background',
+      'main and persistent tab bars should share the same glass background',
     );
   });
 
@@ -233,6 +238,6 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
     assert.ok(ui.includes('DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);'));
     assert.ok(ui.includes('onScrollEndDrag={handleScroll}'));
     assert.ok(ui.includes('onMomentumScrollEnd={handleScroll}'));
-    assert.ok(ui.includes('if (offsetY <= 8)'));
+    assert.ok(ui.includes('if (offsetY <= 8 || '));
   });
 });

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   User, Phone, Mail, Building2, CreditCard, Landmark, Copy, Edit3, Shield, MapPin, Save, X, CheckCircle,
-  Calendar, Award, AlertCircle, Clock, DollarSign, ChevronDown,
+  Calendar, Award, AlertCircle, Clock, DollarSign, ChevronDown, KeyRound,
 } from 'lucide-react';
 import { BankSelect } from '../BankSelect';
+import { openPinLockSettings } from '../../utils/pinLock';
 import { useData } from '../../context/DataContext';
 import EditableAvatar from '../EditableAvatar';
 import CmsSelect from '../ui/CmsSelect';
@@ -171,6 +172,21 @@ export const TeacherProfileSection = ({ teacherId, currentTeacher }) => {
         <span className="flex-1 min-w-0">
           <span className="block text-sm lg:text-base font-bold text-slate-800">Đổi mật khẩu</span>
           <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Bảo mật tài khoản đăng nhập</span>
+        </span>
+        <Edit3 size={16} className="text-slate-300 shrink-0" aria-hidden="true" />
+      </button>
+
+      <button
+        type="button"
+        onClick={openPinLockSettings}
+        className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3.5 lg:px-5 lg:py-4 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+      >
+        <span className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+          <KeyRound size={18} aria-hidden="true" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm lg:text-base font-bold text-slate-800">Khóa mã PIN</span>
+          <span className="block text-xs lg:text-sm text-slate-500 mt-0.5">Tự khóa màn hình khi không thao tác</span>
         </span>
         <Edit3 size={16} className="text-slate-300 shrink-0" aria-hidden="true" />
       </button>

@@ -24,7 +24,7 @@ import {
   CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, LogOut, MessageCircle,
   MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, UserPlus, Video, X,
 } from 'lucide-react-native';
-import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField, useBrandingHeaderScrollHandler } from '../components/ui';
+import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
 import { messageService, scheduleService } from '../services/mockService';
 import { getMobileImageSource } from '../services/apiClient';
@@ -277,6 +277,7 @@ const CHAT_EMOJIS = [
 ];
 
 const SEARCH_TOKEN_SPLIT = /[^a-z0-9]+/;
+const AI_REPLY_WAIT_MS = 90 * 1000;
 
 function getChatAttachmentType(name: string) {
   const extension = name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || '';
@@ -683,7 +684,6 @@ export function ConversationScreen() {
   const isFocused = useIsFocused();
   const { width: windowWidth } = useWindowDimensions();
   const { user } = useAuth();
-  const handleHeaderScroll = useBrandingHeaderScrollHandler();
   const isTeacher = user?.role === 'teacher';
   const isPreview = Boolean(user?.previewMode);
   const [showInfo, setShowInfo] = useState(false);
@@ -1106,6 +1106,23 @@ export function ConversationScreen() {
     return [...older, ...latest, ...callMessages]
       .sort((left, right) => (left.timestampMs || 0) - (right.timestampMs || 0));
   }, [callHistory, messages, olderMessages, resource.data]);
+  const [aiWaitNow, setAiWaitNow] = useState(() => Date.now());
+  const aiAwaitingReply = useMemo(() => {
+    if (!isAiSupportConversation || isPreview || aiSupportStatus !== AI_SUPPORT_STATUS.AI_ACTIVE) return false;
+    for (let index = thread.length - 1; index >= 0; index -= 1) {
+      const message = thread[index];
+      if (message.messageType === 'system' || message.recalled || message.callEvent) continue;
+      if (!message.mine) return false;
+      return aiWaitNow - (message.timestampMs ?? aiWaitNow) < AI_REPLY_WAIT_MS;
+    }
+    return false;
+  }, [aiSupportStatus, aiWaitNow, isAiSupportConversation, isPreview, thread]);
+  useEffect(() => {
+    setAiWaitNow(Date.now());
+    if (!aiAwaitingReply) return undefined;
+    const timer = setInterval(() => setAiWaitNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, [aiAwaitingReply, thread.length]);
   const latestServerMessages = messages || resource.data || [];
   const canLoadOlder = !isPreview
     && !isSearching
@@ -2440,7 +2457,6 @@ export function ConversationScreen() {
             keyboardShouldPersistTaps="handled"
             onScroll={(event) => {
               threadScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-              handleHeaderScroll(event);
             }}
             scrollEventThrottle={16}
             onContentSizeChange={(_width, height) => {
@@ -2940,9 +2956,13 @@ export function ConversationScreen() {
               </View>
             );
           })}
-          {peerTyping ? (
+          {peerTyping || aiAwaitingReply ? (
             <View style={styles.typingIndicator}>
-              <Text style={styles.typingIndicatorText}>{route.params.conversationName || 'Đối phương'} đang nhập...</Text>
+              <Text style={styles.typingIndicatorText}>
+                {isAiSupportConversation && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+                  ? 'Trợ lý AI đang trả lời…'
+                  : `${route.params.conversationName || 'Đối phương'} đang nhập...`}
+              </Text>
             </View>
           ) : null}
           </ScrollView>
@@ -4020,7 +4040,7 @@ const styles = StyleSheet.create({
   dateDividerText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '700' },
   threadSurface: { flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 14, backgroundColor: '#EAEBEE' },
   threadScroll: { flex: 1, backgroundColor: 'transparent' },
-  thread: { paddingTop: spacing.sm, paddingHorizontal: spacing.sm, paddingBottom: 120, flexGrow: 1, backgroundColor: 'transparent' },
+  thread: { paddingTop: spacing.sm, paddingHorizontal: spacing.sm, paddingBottom: spacing.xxl, flexGrow: 1, backgroundColor: 'transparent' },
   messageRowMine: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14, position: 'relative', zIndex: 1 },
   messageRowGrouped: { marginBottom: 8 },
   messageMineContainer: { maxWidth: '85%', alignItems: 'flex-end', position: 'relative' },

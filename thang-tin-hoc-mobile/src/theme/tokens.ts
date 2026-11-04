@@ -37,6 +37,18 @@ export const radius = {
   pill: 999,
 } as const;
 
+/** Bóng "giọt nước" khớp client/src/index.css và thanh điều hướng dưới của web. */
+export const droplet = {
+  button: 'inset 1px 1px 2px rgba(15, 23, 42, 0.16), inset -1px -1px 2px rgba(255, 255, 255, 0.32), 0px 1px 2px rgba(15, 23, 42, 0.08)',
+  buttonPressed: 'inset 2px 2px 5px rgba(15, 23, 42, 0.2), inset -1px -1px 3px rgba(255, 255, 255, 0.2)',
+  navBar: '0px -8px 32px rgba(15, 23, 42, 0.12), inset 0px 1px 0px rgba(255, 255, 255, 0.95)',
+  navItemActive: 'inset 2px 2px 6px rgba(220, 38, 38, 0.12), inset -2px -2px 5px rgba(255, 255, 255, 0.96)',
+  navTile: 'inset 2px 2px 5px rgba(71, 85, 105, 0.14), inset -2px -2px 5px rgba(255, 255, 255, 0.96)',
+  navTileActive: 'inset 2px 2px 5px rgba(127, 29, 29, 0.32), inset -2px -2px 5px rgba(255, 255, 255, 0.18)',
+  logo: '0px 4px 12px rgba(15, 23, 42, 0.12), 0px 1px 2px rgba(15, 23, 42, 0.08), inset 0px 2px 3px rgba(255, 255, 255, 1), inset 0px -3px 6px rgba(148, 163, 184, 0.22)',
+  navHome: '0px 5px 16px rgba(185, 28, 28, 0.32), 0px 0px 0px 3px rgba(254, 202, 202, 0.6), inset 0px 3px 5px rgba(255, 255, 255, 0.5), inset 0px -5px 8px rgba(127, 29, 29, 0.5)',
+} as const;
+
 export const typography = {
   micro: 14,
   hero: 34,

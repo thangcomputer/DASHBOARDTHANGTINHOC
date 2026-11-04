@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LayoutDashboard, Home, BookOpen, Calendar, MessageSquare,
-  Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown,
+  Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
   GraduationCap, Users, DollarSign, ClipboardList, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Award, FileBox, Headphones, Link2, WalletCards,
+  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound,
 } from 'lucide-react';
+import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
@@ -13,6 +14,8 @@ import { PERMISSIONS } from '../constants/permissions';
 import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
+
+const INBOX_FOOTER_HIDE_MS = 1500;
 
 const MOBILE_NAV_ICON_TONES = {
   schedule: 'border-blue-100/80 from-blue-50 to-white text-blue-600',
@@ -57,7 +60,7 @@ const MENU_CONFIG = {
       { key: 'schedule', icon: Calendar, label: 'Lịch dạy', sidebarLabel: 'Lịch dạy & điểm danh', mobileLabel: 'Lịch', path: '/teacher', hash: 'schedule' },
       { key: 'assignments', icon: ClipboardList, label: 'Giao bài tập & kiểm tra', sidebarLabel: 'Bài tập & kiểm tra', sectionLabel: 'QUẢN LÝ ĐÀO TẠO', path: '/teacher', hash: 'assignments' },
       { key: 'training', icon: BookOpen, label: 'Khóa đào tạo', path: '/teacher', hash: 'training' },
-      { key: 'finance', icon: DollarSign, mobileIcon: WalletCards, label: 'Tài chính', mobileLabel: 'Tài chính', path: '/teacher/finance' },
+      { key: 'finance', icon: DollarSign, label: 'Tài chính', mobileLabel: 'Tài chính', path: '/teacher/finance' },
       { key: 'feed', icon: Newspaper, label: 'Bảng tin', mobileLabel: 'Bảng tin', sectionLabel: 'THÔNG TIN', path: '/teacher/feed' },
       { key: 'news', icon: FileText, label: 'Tin tức', path: '/teacher/news' },
       { key: 'center-info', icon: Building2, label: 'Thông tin Trung tâm', path: '/teacher/center-info' },
@@ -158,6 +161,7 @@ const MENU_CONFIG = {
       { key: 'center-info', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
     ],
     bottomItems: [
+      { key: 'pin-lock', icon: KeyRound, label: 'Khóa mã PIN', isPinLock: true },
       { key: 'logout', icon: LogOut, label: 'Đăng xuất', isLogout: true },
     ],
     accentColor: 'bg-red-600',
@@ -254,6 +258,25 @@ const AppSidebar = ({
   };
   const navigate = useNavigate();
   const location = useLocation();
+  const isInboxRoute = location.pathname.includes('/inbox');
+  const [inboxFooterOpen, setInboxFooterOpen] = useState(false);
+  const inboxFooterTimerRef = useRef(null);
+  const footerShown = mobileFooterVisible && (!isInboxRoute || inboxFooterOpen);
+  const keepInboxFooter = () => {
+    window.clearTimeout(inboxFooterTimerRef.current);
+  };
+  const scheduleInboxFooterHide = () => {
+    window.clearTimeout(inboxFooterTimerRef.current);
+    inboxFooterTimerRef.current = window.setTimeout(() => setInboxFooterOpen(false), INBOX_FOOTER_HIDE_MS);
+  };
+  const revealInboxFooter = () => {
+    setInboxFooterOpen(true);
+    scheduleInboxFooterHide();
+  };
+  useEffect(() => {
+    setInboxFooterOpen(false);
+    return () => window.clearTimeout(inboxFooterTimerRef.current);
+  }, [isInboxRoute]);
 
   const [openGroups, setOpenGroups] = useState(() => {
     const defaults = {
@@ -436,7 +459,7 @@ const AppSidebar = ({
     ? ['schedule', 'inbox', 'feed', 'dashboard', 'finance', 'support', 'profile']
     : role === 'admin' || role === 'staff'
       ? ['students', 'finance', 'dashboard', 'inbox', 'feed']
-      : ['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice'];
+      : ['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile'];
 
   const studentHasLearningAccess = (() => {
     if (role !== 'student') return true;
@@ -581,6 +604,11 @@ const AppSidebar = ({
     if (item.isLogout) { onLogout?.(); return; }
     if (item.isChangePassword) {
       window.dispatchEvent(new CustomEvent('open-change-password-modal'));
+      setMobileOpen(false);
+      return;
+    }
+    if (item.isPinLock) {
+      window.dispatchEvent(new CustomEvent(PIN_SETTINGS_EVENT));
       setMobileOpen(false);
       return;
     }
@@ -863,7 +891,7 @@ const AppSidebar = ({
       <div className="cms-sidebar-glass__footer px-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-0 border-t border-slate-400/15 pt-2">
         {config.bottomItems.map(item => {
           const Icon = item.icon;
-          const active = !item.isLogout && !item.isChangePassword && isActive(item);
+          const active = !item.isLogout && !item.isChangePassword && !item.isPinLock && isActive(item);
           return (
             <button
               key={item.key}
@@ -949,7 +977,7 @@ const AppSidebar = ({
         <nav
           className={`${isTabletOrLarger ? '' : 'md:hidden'} fixed bottom-2 left-3 right-3 z-40 rounded-[1.5rem] border border-white/80 bg-white/65 shadow-[0_-8px_32px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-2xl pt-1.5 pointer-events-none`}
           aria-label="Điều hướng chính"
-          aria-hidden={!mobileFooterVisible}
+          aria-hidden={!footerShown}
           style={{
             ...(isTabletOrLarger ? {
               left: '50%',
@@ -963,24 +991,31 @@ const AppSidebar = ({
               boxShadow: '0 12px 36px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.95)',
               backdropFilter: 'blur(24px) saturate(1.45)',
               WebkitBackdropFilter: 'blur(24px) saturate(1.45)',
-              transform: mobileFooterVisible
+              transform: footerShown
                 ? 'translateX(-50%)'
                 : 'translate(-50%, calc(100% + 1rem))',
             } : {
               bottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))',
               padding: '0.625rem 0.25rem 0.375rem',
-              transform: mobileFooterVisible ? 'translateY(0)' : 'translateY(calc(100% + 0.5rem))',
+              transform: footerShown ? 'translateY(0)' : 'translateY(calc(100% + 0.5rem))',
             }),
-            opacity: mobileFooterVisible ? 1 : 0,
-            visibility: mobileFooterVisible ? 'visible' : 'hidden',
-            transition: 'transform 240ms ease, opacity 180ms ease',
+            opacity: footerShown ? 1 : 0,
+            visibility: footerShown ? 'visible' : 'hidden',
+            transition: `transform 450ms cubic-bezier(0.22, 1, 0.36, 1), opacity 350ms ease, visibility 0s linear ${footerShown ? '0s' : '450ms'}`,
           }}
         >
-          <div className="pointer-events-auto mx-auto flex h-[5.25rem] w-full max-w-[48rem] items-stretch gap-2 px-1">
+          <div
+            className="pointer-events-auto mx-auto flex h-[5.25rem] w-full max-w-[48rem] items-stretch gap-2 px-1"
+            onMouseEnter={isInboxRoute ? keepInboxFooter : undefined}
+            onMouseLeave={isInboxRoute ? scheduleInboxFooterHide : undefined}
+            onFocus={isInboxRoute ? keepInboxFooter : undefined}
+            onBlur={isInboxRoute ? scheduleInboxFooterHide : undefined}
+            onTouchStart={isInboxRoute ? scheduleInboxFooterHide : undefined}
+          >
             {mobileNavItems.map((item) => {
               const Icon = item.key === 'dashboard' ? Home : item.mobileIcon || item.icon || LayoutDashboard;
               const active = isActive(item);
-              const isHome = item.key === 'dashboard' && role !== 'teacher';
+              const isHome = item.key === 'dashboard';
               const badgeCount = getBadgeCount(item.key);
               const iconTone = MOBILE_NAV_ICON_TONES[item.key] || 'border-slate-200/80 from-slate-50 to-white text-slate-600';
               return (
@@ -990,32 +1025,54 @@ const AppSidebar = ({
                   onClick={() => handleClick(item)}
                   aria-current={active ? 'page' : undefined}
                   aria-label={item.label}
-                  tabIndex={mobileFooterVisible ? 0 : -1}
-                  className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-1 text-[9px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${active
-                      ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
-                      : 'border-transparent text-slate-500 hover:border-white/90 hover:bg-white/55 hover:text-slate-800 hover:shadow-[inset_2px_2px_5px_rgba(71,85,105,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.95)]'
+                  tabIndex={footerShown ? 0 : -1}
+                  className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-1 text-[10px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${isHome
+                      ? 'border-transparent bg-transparent text-red-600'
+                      : active
+                        ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
+                        : 'border-white/70 bg-white/45 text-slate-500 hover:border-white/90 hover:bg-white/60 hover:text-slate-800'
                     }`}
                 >
                   <span className={`relative flex items-center justify-center transition-all duration-200 ${isHome
-                      ? 'h-10 w-10 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-red-700 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32)]'
+                      ? 'h-14 w-14 rounded-full border-[3px] border-white bg-gradient-to-b from-red-400 via-red-600 to-red-800 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32),0_0_0_3px_rgba(254,202,202,0.6),inset_0_3px_5px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(127,29,29,0.5)] group-hover:scale-105 group-active:scale-95'
                       : `h-10 w-10 rounded-xl border ${active
                         ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'
                         : `${iconTone} bg-gradient-to-br shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]`
                       }`
                     }`}>
-                    <Icon size={isHome ? 22 : 20} strokeWidth={active ? 2.5 : 2} aria-hidden="true" />
+                    <Icon size={isHome ? 28 : 20} strokeWidth={isHome || active ? 2.5 : 2} aria-hidden="true" />
                     {badgeCount > 0 && (
                       <span className="absolute -right-1 -top-1 min-w-[1.05rem] rounded-full bg-red-600 px-1 text-center text-[9px] font-bold leading-[1.05rem] text-white">
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </span>
                     )}
                   </span>
-                  <span className="flex h-6 w-full items-center justify-center text-center leading-3">{item.mobileLabel || item.label}</span>
+                  {isHome ? null : (
+                    <span className="flex h-6 w-full items-center justify-center text-center leading-3">{item.mobileLabel || item.label}</span>
+                  )}
                 </button>
               );
             })}
           </div>
         </nav>
+      )}
+
+      {mobileNavItems.length > 0 && !pinnedSidebarVisible && isInboxRoute && mobileFooterVisible && !inboxFooterOpen && (
+        <button
+          type="button"
+          onMouseEnter={revealInboxFooter}
+          onFocus={revealInboxFooter}
+          onClick={revealInboxFooter}
+          aria-label="Hiện thanh điều hướng"
+          title="Hiện thanh điều hướng"
+          className={`${isTabletOrLarger ? '' : 'md:hidden'} cms-inbox-footer-peek fixed bottom-0 left-1/2 z-40 flex h-8 w-32 -translate-x-1/2 items-center justify-center rounded-t-2xl border border-b-0 border-white/80 bg-white/85 text-slate-500 backdrop-blur-xl transition-colors hover:text-red-600`}
+          style={{
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            boxShadow: '0 -6px 18px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.95)',
+          }}
+        >
+          <ChevronUp size={20} strokeWidth={2.5} aria-hidden="true" />
+        </button>
       )}
 
     </>

@@ -727,40 +727,40 @@
   .cms-topbar__brand {
     position: absolute;
     z-index: 1;
-    left: 50%;
-    top: 50%;
+    inset: 0;
     display: flex;
-    width: min(10rem, calc(100% - 8rem));
-    height: 2.5rem;
+    width: min(12rem, calc(100% - 8rem));
+    height: 2.875rem;
+    margin: auto;
     align-items: center;
     justify-content: center;
-    padding: 0.25rem 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.94);
-    border-radius: 0.875rem;
-    background: linear-gradient(145deg, #eef2f7, #ffffff);
+    padding: 0.25rem 0.625rem;
+    border: 1px solid rgba(255, 255, 255, 0.98);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f3f6fb 100%);
     box-shadow:
-      inset 2px 2px 5px rgba(71, 85, 105, 0.14),
-      inset -2px -2px 5px rgba(255, 255, 255, 0.98),
-      0 1px 2px rgba(15, 23, 42, 0.05);
-    -webkit-backdrop-filter: blur(14px) saturate(1.4);
-    backdrop-filter: blur(14px) saturate(1.4);
-    transform: translate(-50%, -50%);
+      0 4px 12px rgba(15, 23, 42, 0.12),
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      inset 0 2px 3px rgba(255, 255, 255, 1),
+      inset 0 -3px 6px rgba(148, 163, 184, 0.22);
     cursor: pointer;
-    transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    transition: box-shadow 180ms ease, transform 180ms ease;
   }
 
   .cms-topbar__brand:hover {
-    background: linear-gradient(145deg, #e8edf4, #fbfdff);
+    transform: translateY(-1px);
     box-shadow:
-      inset 3px 3px 7px rgba(71, 85, 105, 0.18),
-      inset -2px -2px 5px rgba(255, 255, 255, 0.98),
-      0 1px 2px rgba(15, 23, 42, 0.04);
+      0 6px 16px rgba(15, 23, 42, 0.14),
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      inset 0 2px 3px rgba(255, 255, 255, 1),
+      inset 0 -3px 6px rgba(148, 163, 184, 0.22);
   }
 
   .cms-topbar__brand:active {
+    transform: translateY(0);
     box-shadow:
-      inset 3px 3px 8px rgba(71, 85, 105, 0.22),
-      inset -2px -2px 5px rgba(255, 255, 255, 0.88);
+      inset 2px 2px 6px rgba(71, 85, 105, 0.2),
+      inset -2px -2px 5px rgba(255, 255, 255, 0.9);
   }
 
   .cms-fm-support-button {
@@ -801,6 +801,7 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
   }
 
   @media (min-width: 768px) {
@@ -1392,7 +1393,7 @@
   .cms-fm-support-fab {
     position: fixed;
     z-index: 85;
-    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    right: env(safe-area-inset-right, 0px);
     bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
     touch-action: none;
     cursor: grab;
@@ -1403,9 +1404,10 @@
     align-items: center;
     gap: 0.5rem;
     min-height: 52px;
-    padding: 3px 4px 3px 12px;
+    padding: 3px 14px 3px 4px;
     border: 2px solid #f59e0b;
-    border-radius: 9999px;
+    border-right: 0;
+    border-radius: 9999px 0 0 9999px;
     background: #fff;
     color: #172033;
     box-shadow: 0 3px 8px rgba(15, 23, 42, 0.16);
@@ -2060,6 +2062,11 @@
     .text-\[12px\] { font-size: 0.9375rem !important; }
     .text-\[13px\] { font-size: 1rem !important; }
   }
+
+  /* Popup thông tin liên hệ trong Hộp thư giữ chữ nhỏ ở mọi kích thước màn hình. */
+  .cms-compact-popup .text-\[10px\] { font-size: 0.6875rem !important; line-height: 1.3 !important; }
+  .cms-compact-popup .text-\[12px\] { font-size: 0.8125rem !important; line-height: 1.35 !important; }
+  .cms-compact-popup .text-\[13px\] { font-size: 0.875rem !important; line-height: 1.35 !important; }
 }
 
 /* Contain accidental fixed widths / wide children inside scroll regions */
@@ -4835,3 +4842,28 @@ body [role='button']:not([aria-disabled='true']):not(.cms-sidebar-glass__nav-ite
     inset 2px 2px 5px rgba(15, 23, 42, 0.2),
     inset -1px -1px 3px rgba(255, 255, 255, 0.2);
 }
+
+/* Nút chỉ có chữ hoặc icon (không nền, không viền) không mang bóng giọt nước. */
+body button:not([class^='bg-']):not([class*=' bg-']):not([class*='border']):not([class*='btn']):not([class*='cms-']):not([style*='background']),
+body [role='button']:not([class^='bg-']):not([class*=' bg-']):not([class*='border']):not([class*='btn']):not([class*='cms-']):not([style*='background']) {
+  box-shadow: none;
+}
+body button[class*='bg-transparent'],
+body [role='button'][class*='bg-transparent'] {
+  box-shadow: none !important;
+}
+
+/* Mũi tên gọi thanh điều hướng ở trang Tin nhắn: hiện lại sau khi thanh trượt xuống. */
+@keyframes cms-inbox-footer-peek-in {
+  from { opacity: 0; transform: translate(-50%, 100%); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.cms-inbox-footer-peek { animation: cms-inbox-footer-peek-in 350ms cubic-bezier(0.22, 1, 0.36, 1) 300ms both; }
+
+/* Khóa mã PIN: rung khi nhập sai. */
+@keyframes cms-pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.cms-pin-shake { animation: cms-pin-shake 0.4s ease; }

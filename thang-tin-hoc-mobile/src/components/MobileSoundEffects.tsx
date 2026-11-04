@@ -5,10 +5,12 @@ import { SOCKET_EVENTS } from '../services/socketService';
 import { getMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 
 export function MobileSoundEffects({ incomingCall }: { incomingCall: boolean }) {
-  const notificationPlayer = useAudioPlayer(require('../assets/audio/practice-correct.wav'));
+  const messagePlayer = useAudioPlayer(require('../assets/audio/message.wav'));
+  const notificationPlayer = useAudioPlayer(require('../assets/audio/notification.wav'));
   const ringtonePlayer = useAudioPlayer(require('../assets/audio/incoming-call-ringtone.wav'));
   const [soundEnabled, setSoundEnabled] = useState<boolean | null>(null);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
+  const lastMessageSoundAt = useRef(0);
   const lastNotificationSoundAt = useRef(0);
 
   useEffect(() => {
@@ -73,11 +75,24 @@ export function MobileSoundEffects({ incomingCall }: { incomingCall: boolean }) 
 
   useEffect(() => {
     if (soundEnabled !== true) return undefined;
+    const playMessageSound = () => {
+      if (!appIsActive) return;
+      const now = Date.now();
+      if (now - lastMessageSoundAt.current < 900) return;
+      lastMessageSoundAt.current = now;
+      messagePlayer.volume = 0.8;
+      void messagePlayer.seekTo(0)
+        .then(() => messagePlayer.play())
+        .catch((error: unknown) => {
+          console.warn('Không thể phát âm thanh tin nhắn.', error);
+        });
+    };
     const playNotificationSound = () => {
       if (!appIsActive) return;
       const now = Date.now();
-      if (now - lastNotificationSoundAt.current < 900) return;
+      if (now - lastNotificationSoundAt.current < 1200) return;
       lastNotificationSoundAt.current = now;
+      notificationPlayer.volume = 0.75;
       void notificationPlayer.seekTo(0)
         .then(() => notificationPlayer.play())
         .catch((error: unknown) => {
@@ -86,10 +101,10 @@ export function MobileSoundEffects({ incomingCall }: { incomingCall: boolean }) 
     };
     const subscriptions = [
       DeviceEventEmitter.addListener(SOCKET_EVENTS.NOTIFICATION, playNotificationSound),
-      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_RECEIVED, playNotificationSound),
+      DeviceEventEmitter.addListener(SOCKET_EVENTS.MESSAGE_RECEIVED, playMessageSound),
     ];
     return () => subscriptions.forEach((subscription) => subscription.remove());
-  }, [appIsActive, notificationPlayer, soundEnabled]);
+  }, [appIsActive, messagePlayer, notificationPlayer, soundEnabled]);
 
   return null;
 }

@@ -3,6 +3,7 @@ import {
   Animated,
   ActivityIndicator,
   DeviceEventEmitter,
+  Easing,
   Image,
   Platform,
   type NativeScrollEvent,
@@ -23,7 +24,7 @@ import { BlurView } from 'expo-blur';
 import { Bell, ChevronLeft, ChevronRight, CircleAlert, Inbox, Search, type LucideIcon } from 'lucide-react-native';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, droplet, radius, spacing, typography } from '../theme/tokens';
 import type { Assignment, ScheduleItem } from '../types';
 import { getWebLogoUrl } from '../services/webSettingsApi';
 import type { AppStackParamList } from '../navigation/types';
@@ -32,26 +33,53 @@ const BRANDING_HEADER_VISIBILITY_EVENT = 'mobile:branding-header-visibility';
 export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility';
 const BRANDING_HEADER_HEIGHT = 58;
 
+const SCROLL_TOGGLE_DISTANCE = 12;
+/** Trang chỉ dài hơn màn hình chưa tới chiều cao header + thanh dưới thì giữ nguyên, tránh ẩn/hiện qua lại. */
+const MIN_OVERFLOW_TO_HIDE_CHROME = 180;
+const CHROME_ANIMATION_MS = 260;
+
+/** Header và thanh điều hướng dưới dùng chung một nhịp chuyển động để ẩn/hiện cùng lúc. */
+export function animateChrome(value: Animated.Value, visible: boolean) {
+  Animated.timing(value, {
+    toValue: visible ? 1 : 0,
+    duration: CHROME_ANIMATION_MS,
+    easing: Easing.out(Easing.cubic),
+    useNativeDriver: false,
+  }).start();
+}
+
+function emitChromeVisibility(visible: boolean) {
+  DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, visible);
+  DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, visible);
+}
+
+/** Cuộn xuống thì ẩn header và thanh dưới, cuộn lên mới hiện; đáy trang không tự hiện lại. */
 export function useBrandingHeaderScrollHandler() {
   const previousScrollOffset = useRef(0);
+  const previousViewportHeight = useRef(0);
+  const directionTravel = useRef(0);
   return useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const offsetY = Math.max(0, contentOffset.y);
     const offsetDelta = offsetY - previousScrollOffset.current;
     previousScrollOffset.current = offsetY;
-    const hasScrollableContent = contentSize.height > layoutMeasurement.height + 8;
-    const reachedBottom = hasScrollableContent
-      && offsetY + layoutMeasurement.height >= contentSize.height - 8;
-    if (offsetY <= 8 || reachedBottom) {
-      DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
-      DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
-    } else if (offsetY > 48 && offsetDelta > 3) {
-      DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, false);
-      DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, false);
-    } else if (offsetDelta < -3) {
-      DeviceEventEmitter.emit(BRANDING_HEADER_VISIBILITY_EVENT, true);
-      DeviceEventEmitter.emit(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, true);
+    const viewportChanged = Math.abs(layoutMeasurement.height - previousViewportHeight.current) > 1;
+    previousViewportHeight.current = layoutMeasurement.height;
+    if (offsetY <= 8 || contentSize.height - layoutMeasurement.height < MIN_OVERFLOW_TO_HIDE_CHROME) {
+      directionTravel.current = 0;
+      emitChromeVisibility(true);
+      return;
     }
+    // Header co giãn làm vùng cuộn đổi chiều cao và kéo vị trí cuộn theo; không coi đó là người dùng cuộn.
+    if (viewportChanged) {
+      directionTravel.current = 0;
+      return;
+    }
+    if (!offsetDelta) return;
+    if (Math.sign(offsetDelta) !== Math.sign(directionTravel.current)) directionTravel.current = 0;
+    directionTravel.current += offsetDelta;
+    if (directionTravel.current > SCROLL_TOGGLE_DISTANCE) emitChromeVisibility(false);
+    else if (directionTravel.current < -SCROLL_TOGGLE_DISTANCE) emitChromeVisibility(true);
   }, []);
 }
 
@@ -106,18 +134,14 @@ function BrandingTopBar() {
   const [logoUrl, setLogoUrl] = useState('');
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const headerHeight = useRef(new Animated.Value(BRANDING_HEADER_HEIGHT)).current;
+  const headerProgress = useRef(new Animated.Value(1)).current;
   const headerVisible = useRef(true);
 
   const setHeaderVisible = useCallback((visible: boolean) => {
     if (headerVisible.current === visible) return;
     headerVisible.current = visible;
-    Animated.timing(headerHeight, {
-      toValue: visible ? BRANDING_HEADER_HEIGHT : 0,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  }, [headerHeight]);
+    animateChrome(headerProgress, visible);
+  }, [headerProgress]);
 
   useEffect(() => {
     if (!isFocused) return undefined;
@@ -158,7 +182,16 @@ function BrandingTopBar() {
   }, []));
 
   return (
-    <Animated.View style={[styles.brandingTopBarContainer, { height: headerHeight }]}>
+    <Animated.View
+      style={[
+        styles.brandingTopBarContainer,
+        {
+          height: headerProgress.interpolate({ inputRange: [0, 1], outputRange: [0, BRANDING_HEADER_HEIGHT] }),
+          opacity: headerProgress,
+          transform: [{ translateY: headerProgress.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }],
+        },
+      ]}
+    >
       <BlurView intensity={Platform.OS === 'android' ? 65 : 48} tint="light" style={styles.brandingTopBar}>
         <Pressable
           onPress={() => DeviceEventEmitter.emit('mobile:open-search')}
@@ -549,8 +582,8 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.canvas },
   brandingTopBarContainer: { overflow: 'hidden' },
   brandingTopBar: { position: 'relative', minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: 'rgba(255,255,255,0.72)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.9)', shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3, overflow: 'hidden' },
-  brandingHomeCentered: { position: 'absolute', left: '50%', top: '50%', width: 148, height: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.94)', borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.78)', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 9, shadowOffset: { width: 0, height: 3 }, elevation: 3, transform: [{ translateX: -74 }, { translateY: -21 }] },
-  brandingLogo: { width: 108, height: 40 },
+  brandingHomeCentered: { position: 'absolute', left: '50%', top: '50%', width: 168, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.98)', borderRadius: 16, backgroundColor: '#FFFFFF', backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, #F3F6FB 100%)', boxShadow: droplet.logo, transform: [{ translateX: -84 }, { translateY: -24 }] },
+  brandingLogo: { width: 140, height: 42 },
   brandingFallback: { color: colors.brandDark, fontSize: typography.small, fontWeight: '800' },
   topBarAction: { zIndex: 1, width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.72)', shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   notificationBell: { position: 'relative' },
@@ -587,13 +620,13 @@ const styles = StyleSheet.create({
   badgeTextCompact: { fontSize: 9, lineHeight: 12, fontWeight: '700' },
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.brandDark, fontWeight: '800' },
-  button: { minHeight: 50, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, backgroundColor: colors.brand },
+  button: { minHeight: 50, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, backgroundColor: colors.brand, boxShadow: droplet.button },
   buttonSecondary: { backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: '#C6E8E6' },
   buttonQuiet: { backgroundColor: 'transparent' },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#FFFFFF', fontWeight: '700', fontSize: typography.body },
   buttonTextSecondary: { color: colors.brandDark },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  pressed: { boxShadow: droplet.buttonPressed, transform: [{ scale: 0.99 }] },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing.lg },
   searchInput: { flex: 1, color: colors.ink, fontSize: typography.body, paddingVertical: spacing.md },
   fieldGroup: { gap: spacing.sm },

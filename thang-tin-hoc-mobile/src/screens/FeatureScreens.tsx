@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Ban, Bell, BookOpen, BookText, CalendarDays, Camera, Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileSpreadsheet,
-  FileText, Film, GraduationCap, Landmark, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Table2, Trash2, UserRound, Users, WalletCards, X,
+  FileText, Film, GraduationCap, KeyRound, Landmark, Link2, LogOut, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Save, Search, Send, Settings, Table2, Trash2, UserRound, Users, WalletCards, X,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -31,6 +31,8 @@ import type { TeacherProfile, TeacherProfileUpdate } from '../services/teacherAp
 import { updateStudentProfile } from '../services/studentApi';
 import { buildDirectConversationId } from '../services/messageApi';
 import { enableMobilePushNotifications, requestWebNotificationPermission } from '../services/mobilePushNotifications';
+import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
+import { pinUserKey } from '../services/pinLock';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
 
 type Navigation = NativeStackNavigationProp<AppStackParamList>;
@@ -3973,6 +3975,7 @@ export function ProfileScreen() {
   const [showStudentProfileForm, setShowStudentProfileForm] = useState(false);
   const [showTeacherProfileForm, setShowTeacherProfileForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showPinSettings, setShowPinSettings] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState<{ title: string; message: string } | null>(null);
   const [previewStudentUpdates, setPreviewStudentUpdates] = useState<Record<string, string>>({});
@@ -4175,13 +4178,18 @@ export function ProfileScreen() {
       {isTeacher ? (
         <Card style={styles.menuCard}>
           <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
+          <MenuRow icon={<KeyRound size={18} color={colors.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} />
           <MenuRow icon={<Users size={18} color={colors.brand} />} title="Liên hệ Trung tâm" subtitle="Thông tin trung tâm" onPress={() => navigation.navigate('CenterInfo')} />
         </Card>
       ) : (
         <Card style={styles.menuCard}>
-          <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} borderless />
+          <MenuRow icon={<Settings size={18} color={colors.brand} />} title="Thay đổi mật khẩu" subtitle="Cập nhật mật khẩu đăng nhập" onPress={() => setShowPasswordForm(true)} />
+          <MenuRow icon={<KeyRound size={18} color={colors.brand} />} title="Khóa mã PIN" subtitle="Tự khóa màn hình khi không thao tác" onPress={() => setShowPinSettings(true)} borderless />
         </Card>
       )}
+      {showPinSettings && user ? (
+        <PinLockSettingsModal userKey={pinUserKey(user)} onClose={() => setShowPinSettings(false)} />
+      ) : null}
       {!user?.previewMode ? (
         <Card style={styles.menuCard}>
           <SectionHeading title="Cài đặt và hỗ trợ" />

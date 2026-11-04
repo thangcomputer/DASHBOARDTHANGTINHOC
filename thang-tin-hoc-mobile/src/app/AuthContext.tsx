@@ -5,6 +5,7 @@ import { clearMobileSession, getMobileApiTokens, saveMobileSession } from '../se
 import { connect as connectSocket, disconnect as disconnectSocket } from '../services/socketService';
 import { registerMobilePushNotifications, unregisterMobilePushNotifications } from '../services/mobilePushNotifications';
 import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
+import { clearLastActive, pinUserKey } from '../services/pinLock';
 import type { DemoUser, UserRole } from '../types';
 
 type AuthContextValue = {
@@ -125,6 +126,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         }
         await authService.signOut();
       } finally {
+        await clearLastActive(pinUserKey(user)).catch(() => {});
         setUser(null);
         setAuthError('');
       }

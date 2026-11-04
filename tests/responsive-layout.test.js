@@ -32,12 +32,17 @@ test('Mobile footer navigation hides during text entry and nested scrolling', as
   assert.ok(src.includes("document.removeEventListener('pointerdown', handlePointerDown, true)"));
   assert.ok(src.includes('onScrollCapture={handleContentScroll}'));
   assert.ok(src.includes('&& !mobileFooterInputFocused'));
-  assert.ok(src.includes("'env(safe-area-inset-bottom, 0px)'"));
+  assert.ok(src.includes("{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }"));
   const sidebar = await fs.readFile(
     path.resolve(__dirname, '../client/src/components/AppSidebar.jsx'),
     'utf8'
   );
-  assert.ok(sidebar.includes("visibility: mobileFooterVisible ? 'visible' : 'hidden'"));
+  assert.ok(sidebar.includes('const footerShown = mobileFooterVisible && (!isInboxRoute || inboxFooterOpen);'));
+  assert.ok(sidebar.includes("visibility: footerShown ? 'visible' : 'hidden'"));
+  assert.ok(sidebar.includes('const INBOX_FOOTER_HIDE_MS = 1500;'));
+  assert.ok(sidebar.includes("visibility 0s linear ${footerShown ? '0s' : '450ms'}"));
+  assert.ok(sidebar.includes('onMouseEnter={revealInboxFooter}'));
+  assert.ok(sidebar.includes('onMouseLeave={isInboxRoute ? scheduleInboxFooterHide : undefined}'));
   assert.ok(sidebar.includes("'translateY(calc(100% + 0.5rem))'"));
 });
 
@@ -84,8 +89,10 @@ test('Responsive footer navigation spaces items evenly and aligns icons and labe
   );
   assert.ok(src.includes('items-stretch gap-2 px-1'));
   assert.ok(src.includes('flex-1 basis-0 flex-col items-center justify-center gap-1'));
-  assert.ok(src.includes("'h-10 w-10 rounded-full"));
+  assert.ok(src.includes("'h-14 w-14 rounded-full border-[3px] border-white"));
   assert.ok(src.includes('`h-10 w-10 rounded-xl border'));
+  assert.ok(src.includes("const isHome = item.key === 'dashboard';"));
+  assert.ok(src.includes("['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile']"));
   assert.ok(src.includes('flex h-6 w-full items-center justify-center text-center leading-3'));
 });
 
@@ -203,4 +210,10 @@ test('TeacherDashboard StudentCard: header không ép một flex-row cứng', as
     'utf8'
   );
   assert.ok(src.includes('min-[440px]:flex-row'), 'Card HV GV: chồng layout rồi ngang >=440px');
+});
+
+test('Text-only and icon-only buttons skip the droplet inset effect', async () => {
+  const css = await fs.readFile(path.resolve(__dirname, '../client/src/index.css'), 'utf8');
+  assert.ok(css.includes("body button:not([class^='bg-']):not([class*=' bg-']):not([class*='border']):not([class*='btn']):not([class*='cms-']):not([style*='background'])"));
+  assert.ok(css.includes("body button[class*='bg-transparent'],"));
 });

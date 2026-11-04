@@ -39,6 +39,9 @@ import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
 import { setLoginOverlay } from '../utils/loginOverlayGate';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
+import PinLockGate from './pinLock/PinLockGate';
+import PinLockSettingsModal from './pinLock/PinLockSettingsModal';
+import { clearLastActive, setLockedFlag } from '../utils/pinLock';
 
 const PAGE_TITLES = {
   dashboard: 'Tổng quan',
@@ -1186,7 +1189,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch { /* ignore */ }
   }, [starBonusCelebration, markStarBonusSeen, myId, allNotifications, markNotificationRead]);
 
-  const handleLogout = () => onLogout?.();
+  const pinUserKey = myId ? `${role}:${myId}` : '';
+  const handleLogout = () => {
+    if (pinUserKey) {
+      clearLastActive(pinUserKey);
+      setLockedFlag(pinUserKey, false);
+    }
+    onLogout?.();
+  };
 
   const [showNotif, setShowNotif] = React.useState(false);
   const [notifLimit, setNotifLimit] = React.useState(5);
@@ -1707,11 +1717,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                   : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]'
             }
             style={isInboxPage
-              ? {
-                paddingBottom: showMobileFooter
-                  ? 'calc(7.5rem + env(safe-area-inset-bottom, 0px))'
-                  : 'env(safe-area-inset-bottom, 0px)',
-              }
+              ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }
               : undefined}
           >
             <div
@@ -2234,6 +2240,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         )}
 
         <ChangePasswordModal session={session} role={role} />
+        {pinUserKey ? (
+          <>
+            <PinLockSettingsModal userKey={pinUserKey} />
+            <PinLockGate userKey={pinUserKey} userName={session?.name || ''} onLogout={handleLogout} />
+          </>
+        ) : null}
 
         {(ratingDetailLoading || ratingDetail || ratingDetailError) && role === 'teacher' ? (
           <TeacherRatingDetailModal

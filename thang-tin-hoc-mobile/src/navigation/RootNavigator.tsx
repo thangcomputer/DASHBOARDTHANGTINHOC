@@ -10,14 +10,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import {
-  BookOpen, Building2, CalendarDays, CheckSquare, Clapperboard, FileBox, FileText, GraduationCap,
-  Headphones, House, LayoutDashboard, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
+  BookOpen, Building2, CalendarDays, CheckSquare, FileBox, FileText, GraduationCap,
+  DollarSign, Headphones, House, LayoutDashboard, LogOut, Menu, MessageCircle, Newspaper, Phone, PhoneOff, Radio, Search, Star, UserRound, Users, Volume2, VolumeX, WalletCards, X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../app/AuthContext';
 import { emit, SOCKET_EVENTS } from '../services/socketService';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, droplet, radius, spacing, typography } from '../theme/tokens';
 import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { messageService, notificationService, scheduleService, teacherFinanceService } from '../services/mockService';
@@ -46,7 +46,9 @@ import {
 } from '../screens/LessonPracticeScreens';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
-import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT } from '../components/ui';
+import { PinLockGate } from '../components/pinLock/PinLockGate';
+import { notePinActivity, pinUserKey } from '../services/pinLock';
+import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, animateChrome } from '../components/ui';
 import type { AppStackParamList, MainTabsParamList } from './types';
 import { navigationRef } from './navigationRef';
 
@@ -63,6 +65,44 @@ const TAB_ICON_TONES: Record<string, string> = {
   Support: '#0891B2',
   Profile: '#4F46E5',
 };
+
+const TAB_ICONS: Record<string, LucideIcon> = {
+  Home: House,
+  Schedule: CalendarDays,
+  Messages: MessageCircle,
+  Feed: Newspaper,
+  Support: Headphones,
+  CourseVideos: BookOpen,
+  Finance: DollarSign,
+  Profile: UserRound,
+  Students: Users,
+};
+
+/** Nhãn thanh dưới, khớp mobileLabel || label trong client/src/components/AppSidebar.jsx. */
+const NAV_TAB_LABELS: Record<'student' | 'teacher', Record<string, string>> = {
+  student: {
+    Schedule: 'Lịch học',
+    Messages: 'Hộp thư',
+    Feed: 'Bảng tin',
+    Home: 'Tổng quan',
+    Support: 'Hỗ trợ',
+    CourseVideos: 'Luyện tập',
+    Profile: 'Hồ sơ',
+  },
+  teacher: {
+    Schedule: 'Lịch',
+    Messages: 'Tin nhắn',
+    Feed: 'Bảng tin',
+    Home: 'Tổng quan',
+    Finance: 'Tài chính',
+    Support: 'Hỗ trợ',
+    Profile: 'Hồ sơ',
+  },
+};
+
+function navTabLabel(name: string, isTeacher: boolean) {
+  return NAV_TAB_LABELS[isTeacher ? 'teacher' : 'student'][name] || name;
+}
 
 type IncomingCallPrompt = {
   callId: string;
@@ -366,9 +406,18 @@ export function RootNavigator() {
     );
   }
   return user ? (
-    <View style={styles.root}>
+    <View style={styles.root} onTouchStart={notePinActivity}>
       <OfflineBanner />
       <MobileSoundEffects incomingCall={Boolean(incomingCall)} />
+      <PinLockGate
+        userKey={pinUserKey(user)}
+        userName={user.name}
+        onSignOut={() => {
+          void signOut().catch((error: unknown) => {
+            Alert.alert('Đăng xuất thất bại', error instanceof Error ? error.message : 'Không thể đăng xuất.');
+          });
+        }}
+      />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
@@ -526,6 +575,67 @@ function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   );
 }
 
+function NavTabContent({
+  name,
+  label,
+  Icon,
+  selected,
+  isHome,
+  badgeCount = 0,
+}: {
+  name: string;
+  label: string;
+  Icon: LucideIcon;
+  selected: boolean;
+  isHome: boolean;
+  badgeCount?: number;
+}) {
+  const tone = TAB_ICON_TONES[name] || colors.muted;
+  return (
+    <View
+      style={[
+        styles.navItem,
+        isHome ? styles.navItemHome : styles.navItemCard,
+        !isHome && selected && styles.navItemActive,
+      ]}
+      accessibilityLabel={isHome ? label : undefined}
+    >
+      <View
+        style={[
+          styles.navTile,
+          isHome
+            ? styles.navTileHome
+            : selected
+              ? styles.navTileActive
+              : {
+                borderColor: `${tone}26`,
+                backgroundImage: `linear-gradient(135deg, ${tone}14 0%, #FFFFFF 100%)`,
+              },
+        ]}
+      >
+        <Icon
+          size={isHome ? 28 : 20}
+          color={isHome || selected ? '#FFFFFF' : tone}
+          strokeWidth={isHome || selected ? 2.5 : 2}
+        />
+        {badgeCount > 0 ? (
+          <Text style={styles.persistentTabBadge}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        ) : null}
+      </View>
+      {isHome ? null : (
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[styles.navLabel, selected && styles.navLabelActive]}
+        >
+          {label}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 function PersistentTabBar({
   role,
   activeTab,
@@ -540,33 +650,32 @@ function PersistentTabBar({
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isTeacher = role === 'teacher';
-  const visibility = useNavigationBarVisibility();
+  const [visibility, setVisible] = useNavigationBarVisibility();
   const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
   const barWidth = 760;
   const barSideInset = centeredWebBar ? (windowWidth - barWidth) / 2 : 0;
   useEffect(() => {
-    const unsubscribe = navigationRef.addListener('state', () => {
-      Animated.timing(visibility, { toValue: 1, duration: 220, useNativeDriver: false }).start();
-    });
+    const unsubscribe = navigationRef.addListener('state', () => setVisible(true));
     return unsubscribe;
-  }, [visibility]);
+  }, [setVisible]);
   const items = isTeacher
     ? [
       { name: 'Schedule' as const, label: 'Lịch dạy', shortLabel: 'Lịch', icon: CalendarDays },
       { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
       { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
       { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
-      { name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: WalletCards },
+      { name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: DollarSign },
       { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
       { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
     ]
     : [
-      { name: 'Schedule' as const, label: 'Lịch học', shortLabel: 'Lịch', icon: CalendarDays },
-      { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Tin nhắn', icon: MessageCircle },
+      { name: 'Schedule' as const, label: 'Lịch học', shortLabel: 'Lịch học', icon: CalendarDays },
+      { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
       { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
-      { name: 'Home' as const, label: 'Trang chủ', shortLabel: 'Trang chủ', icon: House },
+      { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
       { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
-      { name: 'CourseVideos' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Clapperboard },
+      { name: 'CourseVideos' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: BookOpen },
+      { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
     ];
   const orderedItems = items;
   const barHeight = 96 + insets.bottom;
@@ -607,34 +716,19 @@ function PersistentTabBar({
             onPress={() => {
               navigationRef.navigate('MainTabs', { screen: name });
             }}
-            style={[styles.persistentTabItem, selected && styles.persistentTabItemActive]}
+            style={styles.persistentTabItem}
             accessibilityRole="button"
             accessibilityLabel={label}
             accessibilityState={{ selected }}
           >
-            <View style={[
-              styles.persistentTabIconTile,
-              selected
-                ? styles.persistentTabIconTileActive
-                : { backgroundColor: `${TAB_ICON_TONES[name] || colors.muted}12` },
-            ]}>
-              <View style={styles.persistentTabIconWrap}>
-                <Icon
-                  size={20}
-                  color={selected ? '#FFFFFF' : TAB_ICON_TONES[name] || colors.muted}
-                  strokeWidth={2.3}
-                />
-                {badgeCount > 0 ? (
-                  <Text style={styles.persistentTabBadge}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
-                ) : null}
-              </View>
-            </View>
-            <Text
-              numberOfLines={1}
-              style={[styles.persistentTabLabel, selected && styles.persistentTabLabelActive]}
-            >
-              {shortLabel}
-            </Text>
+            <NavTabContent
+              name={name}
+              label={shortLabel}
+              Icon={Icon}
+              selected={selected}
+              isHome={name === 'Home'}
+              badgeCount={badgeCount}
+            />
           </Pressable>
         );
       })}
@@ -687,7 +781,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         items: [
           { label: 'Bài tập & kiểm tra', destination: 'TeacherQuizzes', icon: CheckSquare },
           { label: 'Khóa đào tạo', destination: 'TeacherTraining', icon: BookOpen },
-          { label: 'Tài chính', destination: 'TeacherFinance', icon: WalletCards },
+          { label: 'Tài chính', destination: 'TeacherFinance', icon: DollarSign },
         ],
       },
       {
@@ -706,7 +800,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         items: [
           { label: 'Tổng quan', destination: 'Home', icon: House },
           { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-          { label: 'Luyện tập', destination: 'CourseVideos', icon: Clapperboard },
+          { label: 'Luyện tập', destination: 'CourseVideos', icon: BookOpen },
           { label: 'Lịch học', destination: 'Schedule', icon: CalendarDays },
           { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
           { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
@@ -982,11 +1076,11 @@ function FloatingSupportButton() {
         accessibilityRole="button"
         accessibilityLabel="Mở hỗ trợ"
       >
-        <View style={styles.floatingSupportLabel}>
-          <Text style={styles.floatingSupportLabelText}>Hỗ trợ</Text>
-        </View>
         <View style={styles.floatingSupportIcon}>
           <Headphones size={22} color="#FFFFFF" strokeWidth={2.5} />
+        </View>
+        <View style={styles.floatingSupportLabel}>
+          <Text style={styles.floatingSupportLabelText}>Hỗ trợ</Text>
         </View>
       </Pressable>
     </View>
@@ -1000,14 +1094,10 @@ function MainTabs() {
   const isTeacher = user?.role === 'teacher';
   const centeredWebBar = Platform.OS === 'web' && windowWidth >= 1024;
   const tabBarWidth = 760;
-  const navigationBarVisibility = useNavigationBarVisibility();
+  const [navigationBarVisibility, setNavigationBarVisible] = useNavigationBarVisibility();
   useFocusEffect(useCallback(() => {
-    Animated.timing(navigationBarVisibility, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  }, [navigationBarVisibility]));
+    setNavigationBarVisible(true);
+  }, [setNavigationBarVisible]));
   const [unreadConversationCount, setUnreadConversationCount] = useState(0);
   const [todayScheduleCount, setTodayScheduleCount] = useState(0);
   const [newFinanceTransactionCount, setNewFinanceTransactionCount] = useState(0);
@@ -1149,16 +1239,6 @@ function MainTabs() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.muted,
-        tabBarBadgeStyle: {
-          backgroundColor: '#DC2626',
-          color: '#FFFFFF',
-          fontSize: 10,
-          fontWeight: '700',
-          minWidth: 18,
-          height: 18,
-          lineHeight: 18,
-          borderRadius: 9,
-        },
         tabBarStyle: {
           ...(centeredWebBar ? {
             width: tabBarWidth,
@@ -1174,19 +1254,15 @@ function MainTabs() {
           borderTopWidth: 1,
           borderLeftWidth: 1,
           borderRightWidth: 1,
-          borderColor: 'rgba(255,255,255,0.96)',
-          borderRadius: 22,
+          borderColor: 'rgba(255,255,255,0.8)',
+          borderRadius: 24,
           height: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, 96 + insets.bottom] }),
           paddingTop: navigationBarVisibility.interpolate({ inputRange: [0, 1], outputRange: [0, spacing.md] }),
           paddingBottom: navigationBarVisibility.interpolate({
             inputRange: [0, 1],
             outputRange: [0, spacing.sm],
           }),
-          elevation: 14,
-          shadowColor: '#0F172A',
-          shadowOpacity: 0.16,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 7 },
+          boxShadow: droplet.navBar,
           opacity: navigationBarVisibility,
           transform: [{
             translateY: navigationBarVisibility.interpolate({
@@ -1195,7 +1271,8 @@ function MainTabs() {
             }),
           }],
         },
-        tabBarIconStyle: { height: 64 },
+        tabBarIconStyle: { width: '100%', height: 64 },
+        tabBarAccessibilityLabel: navTabLabel(route.name, isTeacher),
         tabBarBackground: () => (
           <BlurView
             intensity={Platform.OS === 'android' ? 75 : 60}
@@ -1213,49 +1290,21 @@ function MainTabs() {
             height: '100%',
           }
           : undefined,
-        tabBarIcon: ({ color, size, focused }) => {
-          const label = route.name === 'Schedule'
-            ? isTeacher ? 'Lịch dạy' : 'Lịch'
+        tabBarIcon: ({ focused }) => {
+          const badgeCount = route.name === 'Schedule'
+            ? todayScheduleCount
             : route.name === 'Messages'
-              ? 'Tin nhắn'
-              : route.name === 'Feed'
-                ? 'Bảng tin'
-                : route.name === 'Home'
-                  ? isTeacher ? 'Tổng quan' : 'Trang chủ'
-                  : route.name === 'Finance'
-                    ? 'Tài chính'
-                    : route.name === 'CourseVideos'
-                      ? 'Luyện tập'
-                      : route.name === 'Support'
-                        ? 'Hỗ trợ'
-                        : isTeacher ? 'Hồ sơ' : 'Cá nhân';
-          const iconColor = focused ? '#FFFFFF' : TAB_ICON_TONES[route.name] || color;
-          const common = { size: size - 2, color: iconColor, strokeWidth: 2.2 };
-          let icon;
-          switch (route.name) {
-            case 'Home': icon = <House {...common} />; break;
-            case 'Schedule': icon = <CalendarDays {...common} />; break;
-            case 'Messages': icon = <MessageCircle {...common} />; break;
-            case 'Feed': icon = <Newspaper {...common} />; break;
-            case 'Support': icon = <Headphones {...common} />; break;
-            case 'CourseVideos': icon = <Clapperboard {...common} />; break;
-            case 'Finance': icon = <WalletCards {...common} />; break;
-            case 'Profile': icon = <UserRound {...common} />; break;
-            case 'Students': icon = <Users {...common} />; break;
-            default: icon = <FileText {...common} />;
-          }
+              ? unreadConversationCount
+              : route.name === 'Finance' ? newFinanceTransactionCount : 0;
           return (
-            <View style={[styles.tabBarIconContent, focused && styles.tabBarIconContentActive]}>
-              <View style={[
-                styles.tabBarIconTile,
-                focused
-                  ? styles.tabBarIconTileActive
-                  : { backgroundColor: `${TAB_ICON_TONES[route.name] || colors.muted}12` },
-              ]}>
-                {icon}
-              </View>
-              <Text numberOfLines={1} style={[styles.tabBarLabel, { color: focused ? colors.brand : colors.muted }]}>{label}</Text>
-            </View>
+            <NavTabContent
+              name={route.name}
+              label={navTabLabel(route.name, isTeacher)}
+              Icon={TAB_ICONS[route.name] || FileText}
+              selected={focused}
+              isHome={route.name === 'Home'}
+              badgeCount={badgeCount}
+            />
           );
         },
       })}
@@ -1267,7 +1316,6 @@ function MainTabs() {
             component={ScheduleScreen}
             options={{
               title: 'Lịch dạy',
-              tabBarBadge: todayScheduleCount ? (todayScheduleCount > 99 ? '99+' : todayScheduleCount) : undefined,
             }}
           />
           <Tab.Screen
@@ -1281,9 +1329,6 @@ function MainTabs() {
             component={TeacherFinanceScreen}
             options={{
               title: 'Tài chính',
-              tabBarBadge: newFinanceTransactionCount
-                ? (newFinanceTransactionCount > 99 ? '99+' : newFinanceTransactionCount)
-                : undefined,
             }}
           />
           <Tab.Screen
@@ -1291,7 +1336,6 @@ function MainTabs() {
             component={MessagesScreen}
             options={{
               title: 'Tin nhắn',
-              tabBarBadge: unreadConversationCount ? (unreadConversationCount > 99 ? '99+' : unreadConversationCount) : undefined,
             }}
           />
           <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
@@ -1304,7 +1348,6 @@ function MainTabs() {
             component={ScheduleScreen}
             options={{
               title: 'Lịch học',
-              tabBarBadge: todayScheduleCount ? (todayScheduleCount > 99 ? '99+' : todayScheduleCount) : undefined,
             }}
           />
           <Tab.Screen
@@ -1312,7 +1355,6 @@ function MainTabs() {
             component={MessagesScreen}
             options={{
               title: 'Tin nhắn',
-              tabBarBadge: unreadConversationCount ? (unreadConversationCount > 99 ? '99+' : unreadConversationCount) : undefined,
             }}
           />
           <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
@@ -1322,7 +1364,7 @@ function MainTabs() {
           <Tab.Screen
             name="Profile"
             component={ProfileScreen}
-            options={{ title: 'Cá nhân', tabBarButton: () => null }}
+            options={{ title: 'Hồ sơ' }}
           />
         </>
       )}
@@ -1332,31 +1374,23 @@ function MainTabs() {
 
 function useNavigationBarVisibility() {
   const visibility = useRef(new Animated.Value(1)).current;
+  const visibleRef = useRef(true);
+  const setVisible = useCallback((visible: boolean) => {
+    if (visibleRef.current === visible) return;
+    visibleRef.current = visible;
+    animateChrome(visibility, visible);
+  }, [visibility]);
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT,
-      (visible: boolean) => {
-        Animated.timing(visibility, {
-          toValue: visible ? 1 : 0,
-          duration: 220,
-          useNativeDriver: false,
-        }).start();
-      },
-    );
+    const subscription = DeviceEventEmitter.addListener(MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, setVisible);
     const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
-      Animated.timing(visibility, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: false,
-      }).start();
+      if (state === 'active') setVisible(true);
     });
     return () => {
       subscription.remove();
       appStateSubscription.remove();
     };
-  }, [visibility]);
-  return visibility;
+  }, [setVisible]);
+  return [visibility, setVisible] as const;
 }
 
 const styles = StyleSheet.create({
@@ -1380,30 +1414,28 @@ const styles = StyleSheet.create({
   rejectCallButton: { backgroundColor: '#DC2626' },
   acceptCallButton: { backgroundColor: '#16A34A' },
   incomingCallButtonText: { color: '#FFFFFF', fontSize: typography.body, fontWeight: '700' },
-  persistentTabBar: { position: 'absolute', zIndex: 15, left: 8, right: 8, bottom: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingHorizontal: 6, paddingTop: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.96)', borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.76)', shadowColor: '#0F172A', shadowOpacity: 0.16, shadowRadius: 20, shadowOffset: { width: 0, height: 7 }, elevation: 14 },
-  navigationGlassBackground: { ...StyleSheet.absoluteFill, borderRadius: 22, overflow: 'hidden' },
-  navigationGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.76)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', borderRadius: 22 },
-  persistentTabItem: { flex: 1, minWidth: 0, height: 64, alignItems: 'center', justifyContent: 'flex-start', gap: 1, paddingHorizontal: 1, paddingTop: 1, borderWidth: 1, borderColor: 'transparent', borderRadius: 15 },
-  persistentTabItemActive: { borderColor: 'rgba(220,38,38,0.28)', backgroundColor: 'rgba(255,255,255,0.4)' },
-  persistentTabIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  persistentTabIconTile: { width: 40, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', borderRadius: 11 },
-  persistentTabIconTileActive: { backgroundColor: colors.brand, borderColor: 'rgba(220,38,38,0.22)', shadowColor: '#DC2626', shadowOpacity: 0.24, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
-  persistentTabLabel: { maxWidth: '100%', marginTop: 2, color: colors.muted, fontSize: 8, lineHeight: 10, fontWeight: '600', textAlign: 'center' },
-  persistentTabLabelActive: { color: colors.brand, fontWeight: '800' },
-  tabBarIconContent: { position: 'relative', width: '100%', maxWidth: 64, height: 64, alignItems: 'center', justifyContent: 'flex-start', gap: 2, borderWidth: 1, borderColor: 'transparent', borderRadius: 14, paddingTop: 1 },
-  tabBarIconContentActive: { borderColor: 'rgba(220,38,38,0.28)', backgroundColor: 'rgba(255,255,255,0.4)' },
-  tabBarIconTile: { width: 40, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', borderRadius: 11 },
-  tabBarIconTileActive: { backgroundColor: colors.brand, borderColor: 'rgba(220,38,38,0.22)', shadowColor: '#DC2626', shadowOpacity: 0.24, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
-  tabBarLabel: { maxWidth: '100%', fontSize: 8, lineHeight: 10, fontWeight: '700', textAlign: 'center' },
+  persistentTabBar: { position: 'absolute', zIndex: 15, left: 8, right: 8, bottom: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around', paddingHorizontal: 6, paddingTop: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.65)', boxShadow: droplet.navBar },
+  navigationGlassBackground: { ...StyleSheet.absoluteFill, borderRadius: 24, overflow: 'hidden' },
+  navigationGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.65)', backgroundImage: 'linear-gradient(145deg, rgba(255,255,255,0.84) 0%, rgba(241,245,249,0.66) 100%)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 24 },
+  persistentTabItem: { flex: 1, minWidth: 0, height: 64, alignItems: 'stretch', justifyContent: 'flex-start' },
+  navItem: { alignSelf: 'stretch', marginHorizontal: 3, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
+  navItemCard: { borderColor: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.45)', boxShadow: droplet.button },
+  navItemActive: { borderColor: 'rgba(252,165,165,0.8)', backgroundColor: 'rgba(254,242,242,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(254,242,242,0.8) 100%)', boxShadow: droplet.navItemActive },
+  navTile: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(226,232,240,0.8)', borderRadius: 12, backgroundColor: '#FFFFFF', boxShadow: droplet.navTile },
+  navTileActive: { borderColor: 'rgba(239,68,68,0.2)', backgroundColor: colors.brand, backgroundImage: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', boxShadow: droplet.navTileActive },
+  navItemHome: { gap: 0, paddingVertical: 0 },
+  navTileHome: { width: 56, height: 56, borderWidth: 3, borderColor: '#FFFFFF', borderRadius: 28, backgroundColor: colors.brand, backgroundImage: 'linear-gradient(160deg, #F87171 0%, #DC2626 55%, #991B1B 100%)', boxShadow: droplet.navHome },
+  navLabel: { maxWidth: '100%', color: colors.muted, fontSize: 10, lineHeight: 13, fontWeight: '600', textAlign: 'center' },
+  navLabelActive: { color: colors.brand, fontWeight: '700' },
   persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
   floatingMenuHandle: { position: 'absolute', left: 0, zIndex: 20 },
   floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 12, borderBottomRightRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 2, height: 2 }, elevation: 6 },
-  floatingSupportHandle: { position: 'absolute', right: 10, zIndex: 19 },
-  floatingSupportButton: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 4, paddingLeft: 10, borderWidth: 1, borderColor: '#FECACA', borderRadius: 28, backgroundColor: '#FFFFFF', shadowColor: '#0F172A', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 5 },
-  floatingSupportButtonPressed: { opacity: 0.82, transform: [{ scale: 0.97 }] },
+  floatingSupportHandle: { position: 'absolute', right: 0, zIndex: 19 },
+  floatingSupportButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3, paddingLeft: 4, paddingRight: 14, borderWidth: 2, borderRightWidth: 0, borderColor: '#F59E0B', borderTopLeftRadius: 999, borderBottomLeftRadius: 999, backgroundColor: '#FFF8EB', backgroundImage: 'linear-gradient(145deg, #FFF8EB 0%, #FFFFFF 100%)', boxShadow: 'inset 2px 2px 5px rgba(120, 53, 15, 0.16), inset -2px -2px 5px rgba(255, 255, 255, 0.98), 0px 2px 5px rgba(15, 23, 42, 0.08)' },
+  floatingSupportButtonPressed: { transform: [{ translateY: 1 }], boxShadow: 'inset 3px 3px 8px rgba(120, 53, 15, 0.24), inset -2px -2px 5px rgba(255, 255, 255, 0.88)' },
   floatingSupportLabel: { paddingHorizontal: 2 },
   floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
-  floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand },
+  floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand, boxShadow: 'inset 2px 2px 4px rgba(127, 29, 29, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' },
   drawerOverlay: { flex: 1, flexDirection: 'row' },
   drawerBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
