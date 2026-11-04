@@ -748,7 +748,7 @@ export default function LessonPracticeCatalogPage() {
   ];
 
   return (
-    <div className="w-full min-h-full bg-slate-50/60 px-1 pb-8 pt-2 md:px-2 md:pt-4">
+    <div className="w-full min-h-full bg-slate-50/60 px-1 pb-8 pt-4 md:px-2 md:pt-4">
       <div className="w-full">
         <LessonVideoTabs active="lesson" hidden />
         {loading && <div className="flex items-center gap-2 text-slate-400"><Loader2 className="animate-spin" size={18} /> Đang tải môn học...</div>}

@@ -291,6 +291,7 @@ const messageIsFromMe = (msg, currentUserId, currentUserRole) => {
 function usePlaceChatMenuBelow(open, estimatedHeight = 48) {
   const wrapRef = useRef(null);
   const [placeBelow, setPlaceBelow] = useState(false);
+  const [alignMenuRight, setAlignMenuRight] = useState(false);
 
   useLayoutEffect(() => {
     if (!open) return undefined;
@@ -298,9 +299,23 @@ function usePlaceChatMenuBelow(open, estimatedHeight = 48) {
       const el = wrapRef.current;
       if (!el) return;
       const scroller = el.closest('.cms-chat-messages');
+      const menu = el.querySelector('.cms-chat-message-options-menu');
+      if (!menu) return;
       const r = el.getBoundingClientRect();
-      const clipTop = scroller ? scroller.getBoundingClientRect().top : 0;
-      setPlaceBelow(r.top - clipTop < estimatedHeight + 8);
+      const menuRect = menu.getBoundingClientRect();
+      const clipRect = scroller?.getBoundingClientRect();
+      const clipTop = clipRect?.top ?? 0;
+      const clipBottom = clipRect?.bottom ?? window.innerHeight;
+      const clipLeft = clipRect?.left ?? 0;
+      const clipRight = clipRect?.right ?? window.innerWidth;
+      const spaceAbove = r.top - clipTop;
+      const spaceBelow = clipBottom - r.bottom;
+      const menuHeight = menuRect.height || estimatedHeight;
+      setPlaceBelow(spaceAbove < menuHeight + 8 && spaceBelow > spaceAbove);
+
+      const spaceRight = clipRight - r.left;
+      const spaceLeft = r.right - clipLeft;
+      setAlignMenuRight(spaceRight < menuRect.width && spaceLeft > spaceRight);
     };
     measure();
     const scroller = wrapRef.current?.closest('.cms-chat-messages');
@@ -312,7 +327,7 @@ function usePlaceChatMenuBelow(open, estimatedHeight = 48) {
     };
   }, [open, estimatedHeight]);
 
-  return [wrapRef, placeBelow];
+  return [wrapRef, placeBelow, alignMenuRight];
 }
 
 const MESSAGE_REACTIONS = [
@@ -389,7 +404,7 @@ function ReactionPicker({ msgId, onReact, myReactions, align = 'right' }) {
 }
 
 function ChatFlipWrap({ open, onClose, estimatedHeight = 160, className = 'relative', children }) {
-  const [wrapRef, placeBelow] = usePlaceChatMenuBelow(open, estimatedHeight);
+  const [wrapRef, placeBelow, alignMenuRight] = usePlaceChatMenuBelow(open, estimatedHeight);
 
   useEffect(() => {
     if (!open || !onClose) return undefined;
@@ -404,7 +419,7 @@ function ChatFlipWrap({ open, onClose, estimatedHeight = 160, className = 'relat
 
   return (
     <div className={className} ref={wrapRef}>
-      {typeof children === 'function' ? children(placeBelow) : children}
+      {typeof children === 'function' ? children(placeBelow, alignMenuRight) : children}
     </div>
   );
 }
@@ -1805,6 +1820,21 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [showMessageOptions, setShowMessageOptions] = useState(null);
   const [showConvOptions, setShowConvOptions] = useState(null);
 
+  useEffect(() => {
+    if (!showConvOptions) return undefined;
+    const handleOutsidePointerDown = (event) => {
+      const target = event.target;
+      const menuRoot = target instanceof Element
+        ? target.closest('[data-conv-options-root]')
+        : null;
+      if (menuRoot?.getAttribute('data-conv-options-root') !== String(showConvOptions)) {
+        setShowConvOptions(null);
+      }
+    };
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+  }, [showConvOptions]);
+
   const handleDeleteHistory = useCallback(async (msgId) => {
     setShowMessageOptions(null);
     try {
@@ -2081,6 +2111,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         if (!hasMessageOverride) clearConversationDraft(sendingDraftKey);
         setPendingImage(null);
         setReplyMessage(null);
+        window.dispatchEvent(new Event('cms-chat-message-sent'));
         return true;
       } catch (err) {
         toast.error(err.message || 'Không gửi được');
@@ -2142,6 +2173,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       }
     }
 
+    if (sendSucceeded) window.dispatchEvent(new Event('cms-chat-message-sent'));
     setTimeout(() => inputRef.current?.focus(), 50);
     return sendSucceeded;
   };
@@ -2747,11 +2779,11 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        <div className="relative">
+                        <div className="relative" data-conv-options-root={conv.id}>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowConvOptions(showConvOptions === conv.id ? null : conv.id);
+                              setShowConvOptions((current) => (current === conv.id ? null : conv.id));
                             }}
                             aria-label="Tùy chọn cuộc trò chuyện"
                             aria-expanded={showConvOptions === conv.id}
@@ -2761,7 +2793,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                             <MoreHorizontal size={14} />
                           </button>
                           {showConvOptions === conv.id && (
-                            <div className="absolute right-0 top-full mt-1 z-[100] min-w-48 animate-in fade-in zoom-in-95 duration-100 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_8px_32px_rgba(0,0,0,0.18)]">
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-full z-[100] mt-1.5 flex min-w-52 flex-col gap-1 rounded-2xl border border-slate-200/90 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.2)] ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95 duration-100"
+                            >
                               <button
                                 type="button"
                                 disabled={pinningConversationId === String(conv.id)}
@@ -2770,19 +2805,25 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                   setShowConvOptions(null);
                                   toggleConversationPin(e, conv);
                                 }}
-                                className="flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                                className="flex min-h-10 items-center gap-2.5 rounded-xl px-2.5 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
                               >
-                                {pinnedConversationIds.has(String(conv.id)) ? <PinOff size={13} /> : <Pin size={13} />}
-                                {pinnedConversationIds.has(String(conv.id)) ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                                  {pinnedConversationIds.has(String(conv.id)) ? <PinOff size={14} /> : <Pin size={14} />}
+                                </span>
+                                <span>{pinnedConversationIds.has(String(conv.id)) ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</span>
                               </button>
                               <button
+                                type="button"
                                 onClick={(e) => {
                                   setShowConvOptions(null);
                                   handleHideConversation(e, conv.id);
                                 }}
-                                className="flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"
+                                className="flex min-h-10 items-center gap-2.5 rounded-xl px-2.5 text-left text-xs font-bold text-red-600 transition-colors hover:bg-red-50"
                               >
-                                <EyeOff size={12} /> Ẩn trò chuyện
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-500">
+                                  <EyeOff size={14} />
+                                </span>
+                                <span>Ẩn trò chuyện</span>
                               </button>
                             </div>
                           )}
@@ -3734,7 +3775,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                 estimatedHeight={240}
                                 className="relative self-center"
                               >
-                                {(placeBelow) => (
+                                {(placeBelow, alignMenuRight) => (
                                   <>
                                     <div className="cms-chat-message-actions flex shrink-0 items-center gap-1">
                                       <button
@@ -3765,7 +3806,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                                     {showMessageOptions === msg.id && (
                                       <div
                                         onClick={(event) => event.stopPropagation()}
-                                        className={`cms-chat-message-options-menu absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${isMine ? 'left-0' : 'right-0'}`}
+                                        className={`cms-chat-message-options-menu absolute ${placeBelow ? 'top-full mt-1' : 'bottom-full mb-1'} z-50 min-w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] animate-in fade-in zoom-in-95 duration-100 flex flex-col ${alignMenuRight ? 'right-0' : 'left-0'}`}
                                       >
                                         {!msg.isRecalled && (
                                           <button
@@ -3928,7 +3969,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
                   <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
 
-                  <div className="cms-chat-attachment-tools flex items-center gap-0.5">
+                  <div className="cms-chat-attachment-tools flex items-center gap-1.5">
                     <button
                       onClick={() => imageInputRef.current?.click()}
                       disabled={isUploading}
@@ -3941,6 +3982,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       size={20}
                       disabled={isUploading || !activeConv}
                       buttonClassName="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="cms-chat-capture-control"
                       title="Chụp màn hình"
                       onCaptured={stageScreenshotForSend}
                       onError={(msg) => toast.error(msg)}
@@ -3955,7 +3997,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
 
-                  <div className="flex-1 relative flex flex-col justify-end">
+                  <div className="flex-1 relative flex min-w-0 flex-col justify-end">
                     {pendingImage && (
                       <div className="mb-2 p-2 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-200">
                         <div className="flex items-center gap-2 min-w-0">
@@ -3979,7 +4021,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         </button>
                       </div>
                     )}
-                    <div className="relative w-full">
+                    <div className="relative flex w-full min-w-0 items-center gap-1">
                       <input
                         ref={inputRef}
                         value={newMsg}
@@ -3991,11 +4033,13 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                         onBlur={stopInboxTyping}
                         onKeyDown={handleKeyPress}
                         onPaste={handlePaste}
-                        className="cms-input cms-chat-composer-input pl-4 pr-10 w-full"
+                        className="cms-input cms-chat-composer-input min-w-0 flex-1 pl-4 pr-4"
                         placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
                       />
                       <StickerPicker
                         key={activeConv?.id || 'no-conversation'}
+                        inline
+                        buttonClassName="border border-slate-200 bg-white"
                         disabled={isUploading || Boolean(pendingImage) || !activeConv}
                         onPickEmoji={handleEmojiInsert}
                         onSendSticker={handleStickerSend}

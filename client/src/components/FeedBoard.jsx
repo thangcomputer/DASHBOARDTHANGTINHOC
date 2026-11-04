@@ -917,7 +917,7 @@ export default function FeedBoard({ session, role }) {
   const CurrentPrivacyIcon = currentPrivacyOpt.icon;
 
   return (
-    <div className="cms-feed-column pb-8 space-y-4">
+    <div className="cms-feed-column pt-4 pb-8 space-y-4">
       {/* Header */}
 
       {canModerateFeed && reportQueueError && (

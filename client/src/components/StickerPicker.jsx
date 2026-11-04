@@ -44,6 +44,7 @@ function readRecentStickers() {
 export default function StickerPicker({
   disabled = false,
   inline = false,
+  buttonClassName = '',
   onPickEmoji,
   onSendSticker,
 }) {
@@ -266,7 +267,7 @@ export default function StickerPicker({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
-        className={`flex ${inline ? 'h-9 w-9' : 'h-8 w-8'} items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
+        className={`flex ${inline ? 'h-9 w-9' : 'h-8 w-8'} items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${buttonClassName} ${
           open ? 'text-blue-600' : 'text-slate-400 hover:bg-slate-100 hover:text-blue-600'
         }`}
         aria-label={open ? 'Đóng bảng emoji, sticker và GIF' : 'Mở bảng emoji, sticker và GIF'}

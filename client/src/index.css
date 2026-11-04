@@ -424,13 +424,13 @@
     margin-inline: auto;
     min-width: 0;
     padding-inline: 0;
-    padding-block: 4px 16px;
+    padding-block: 0 16px;
   }
 
   @media (min-width: 768px) {
     .cms-sd-page {
       padding-inline: 0;
-      padding-block: 8px 20px;
+      padding-block: 0 20px;
     }
   }
 
@@ -3132,7 +3132,7 @@ html.cms-app-shell #root {
 }
 .cms-chat-attachment-tools > button {
   display: inline-flex;
-  width: 32px;
+  width: 40px;
   height: 38px;
   align-items: center;
   justify-content: center;
@@ -3142,6 +3142,50 @@ html.cms-app-shell #root {
 .cms-chat-attachment-tools > button:hover:not(:disabled) {
   background: #f1f5f9;
   box-shadow: none;
+}
+.cms-chat-attachment-tools > .cms-chat-capture-control {
+  display: inline-flex;
+  height: 38px;
+  flex: 0 0 auto;
+  overflow: visible;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+.cms-chat-capture-control > .group\/capture > button {
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+.cms-chat-capture-control > button {
+  width: 24px;
+  min-width: 24px;
+  height: 36px;
+  flex: 0 0 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid #e2e8f0;
+  border-radius: 0;
+}
+.cms-chat-capture-control > button:hover:not(:disabled) {
+  background: #f1f5f9;
+  box-shadow: none;
+}
+@media (max-width: 640px) {
+  .cms-chat-attachment-tools > button {
+    width: 36px;
+  }
+  .cms-chat-capture-control > .group\/capture > button {
+    width: 36px;
+  }
+  .cms-chat-capture-control > button {
+    width: 22px;
+    min-width: 22px;
+    flex-basis: 22px;
+  }
 }
 .cms-chat-composer-send {
   width: 42px;

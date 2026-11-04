@@ -1180,14 +1180,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       <>
       <div className="w-full animate-in fade-in duration-500 min-h-full">
         {/* Header */}
-        <div className={`flex items-start justify-between gap-3 ${hideTabBar && mainTab === 'courses' && !isAdmin && !onBack ? 'hidden' : 'mb-5'}`}>
+        <div className={`flex items-start justify-between gap-3 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) && !isAdmin && !onBack ? 'hidden' : 'mb-5'}`}>
           <div className="flex gap-3 min-w-0">
             {onBack && (
               <button type="button" onClick={onBack} className="w-10 h-10 flex flex-shrink-0 items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm mt-0.5">
                 <ArrowLeft size={18} />
               </button>
             )}
-            <div className={`min-w-0 ${hideTabBar && mainTab === 'courses' ? 'hidden' : ''}`}>
+            <div className={`min-w-0 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) ? 'hidden' : ''}`}>
               <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-snug">
                 {hideTabBar
                   ? ({
@@ -1266,7 +1266,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         </div>
         )}
         {hideTabBar && ['files', 'software', 'assignments'].includes(mainTab) && (
-          <div className="mb-5 inline-flex max-w-full flex-wrap rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
+          <div className="mb-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
             {[
               { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
               { key: 'software', icon: LinkIcon, label: 'Phần mềm', count: trainingData?.softwareLinks?.length || 0 },

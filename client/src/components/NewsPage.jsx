@@ -6,7 +6,7 @@ import { useNavigate, useParams, useSearchParams, useLocation } from 'react-rout
 import DOMPurify from 'dompurify';
 import {
   Newspaper, Search, Plus, Loader2, Eye, Calendar, User, ChevronLeft,
-  ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, RefreshCw, X, FileText,
+  ImagePlus, Paperclip, Send, Save, EyeOff, Trash2, X, FileText,
   LayoutGrid, List,
 } from 'lucide-react';
 import { resolveMediaUrl, blogAPI } from '../services/api';
@@ -786,7 +786,7 @@ export default function NewsPage({ session, role = 'admin' }) {
       );
     }
     return (
-      <div className="w-full space-y-6 pb-20 text-left">
+      <div className="w-full space-y-6 pt-4 pb-20 text-left">
         <div className="w-full bg-white rounded-2xl border border-slate-100 p-6 sm:p-8 shadow-sm space-y-6">
 
           <button
@@ -937,24 +937,10 @@ export default function NewsPage({ session, role = 'admin' }) {
   }
 
   return (
-    <div className="w-full space-y-4 pb-8">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2 truncate">
-            <Newspaper className="text-red-600 shrink-0" size={22} /> Tin tức
-          </h1>
-
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => loadList(page)}
-            className="p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-            title="Làm mới"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-          {canManage && (
+    <div className="w-full space-y-4 pt-4 pb-8">
+      {canManage && (
+        <div className="flex items-center justify-end gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <>
               <button
                 type="button"
@@ -971,9 +957,9 @@ export default function NewsPage({ session, role = 'admin' }) {
                 <Plus size={14} /> Viết bài
               </button>
             </>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 w-full">
         <CmsSelect
@@ -1033,7 +1019,7 @@ export default function NewsPage({ session, role = 'admin' }) {
             Tìm
           </button>
           {mode !== 'manage' && (
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 shrink-0">
+            <div className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
               <button
                 type="button"
                 title="Xem lưới"

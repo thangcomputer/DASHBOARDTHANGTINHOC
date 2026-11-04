@@ -969,9 +969,10 @@ const AppSidebar = ({
             } : {
               bottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))',
               padding: '0.625rem 0.25rem 0.375rem',
-              transform: mobileFooterVisible ? 'translateY(0)' : 'translateY(100%)',
+              transform: mobileFooterVisible ? 'translateY(0)' : 'translateY(calc(100% + 0.5rem))',
             }),
             opacity: mobileFooterVisible ? 1 : 0,
+            visibility: mobileFooterVisible ? 'visible' : 'hidden',
             transition: 'transform 240ms ease, opacity 180ms ease',
           }}
         >

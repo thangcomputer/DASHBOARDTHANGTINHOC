@@ -566,7 +566,7 @@ function PersistentTabBar({
       { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
       { name: 'Home' as const, label: 'Trang chủ', shortLabel: 'Trang chủ', icon: House },
       { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
-      { name: 'CourseVideos' as const, label: 'Luyện tập kỹ năng', shortLabel: 'Luyện tập', icon: Clapperboard },
+      { name: 'CourseVideos' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Clapperboard },
     ];
   const orderedItems = items;
   const barHeight = 96 + insets.bottom;
@@ -605,7 +605,7 @@ function PersistentTabBar({
           <Pressable
             key={name}
             onPress={() => {
-                navigationRef.navigate('MainTabs', { screen: name });
+              navigationRef.navigate('MainTabs', { screen: name });
             }}
             style={[styles.persistentTabItem, selected && styles.persistentTabItemActive]}
             accessibilityRole="button"
@@ -706,7 +706,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         items: [
           { label: 'Tổng quan', destination: 'Home', icon: House },
           { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
-          { label: 'Luyện tập kỹ năng', destination: 'CourseVideos', icon: Clapperboard },
+          { label: 'Luyện tập', destination: 'CourseVideos', icon: Clapperboard },
           { label: 'Lịch học', destination: 'Schedule', icon: CalendarDays },
           { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
           { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
@@ -784,9 +784,9 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         ? 'TeacherQuizzes'
         : currentRoute === 'Conversation' || currentRoute === 'CallHistory'
           ? 'Messages'
-        : currentRoute === 'Profile'
-          ? 'Profile'
-          : null;
+          : currentRoute === 'Profile'
+            ? 'Profile'
+            : null;
       setActiveDestination(activeItem?.destination || activeAlias);
     };
     updateActiveDestination();
@@ -1318,7 +1318,7 @@ function MainTabs() {
           <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
           <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
           <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
-          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập kỹ năng' }} />
+          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Luyện tập' }} />
           <Tab.Screen
             name="Profile"
             component={ProfileScreen}

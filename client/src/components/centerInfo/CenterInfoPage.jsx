@@ -248,24 +248,17 @@ export default function CenterInfoPage({ session, role = 'student' }) {
   const managePath = role === 'admin' ? '/admin/center-info/manage' : null;
 
   return (
-    <div className="cms-sd cms-sd-page bg-slate-50 min-h-full py-2 sm:py-4">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <Building2 className="text-red-600 shrink-0" size={22} />
-            Thông tin trung tâm
-          </h1>
-
-        </div>
-        {canManage && managePath ? (
+    <div className="cms-sd cms-sd-page bg-slate-50 min-h-full pt-0 pb-2 sm:pt-0 sm:pb-4">
+      {canManage && managePath ? (
+        <div className="flex justify-end mb-4">
           <Link
             to={managePath}
             className="inline-flex items-center justify-center min-h-11 px-4 rounded-2xl bg-slate-900 hover:bg-black text-white text-sm font-bold"
           >
             Quản trị nội dung
           </Link>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Mobile select */}

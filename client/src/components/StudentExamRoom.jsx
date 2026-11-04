@@ -660,7 +660,7 @@ const StudentExamRoom = ({
 
   return (
     <div className="bg-transparent font-sans h-full min-w-0 w-full max-w-full overflow-x-hidden">
-      <div className="w-full min-w-0 py-1 sm:py-2 text-left space-y-4">
+      <div className="w-full min-w-0 pt-4 pb-1 sm:pt-4 sm:pb-2 text-left space-y-4">
         {/* Khu vực thi và ôn tập */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
           <button

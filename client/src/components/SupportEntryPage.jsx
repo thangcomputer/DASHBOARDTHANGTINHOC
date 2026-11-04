@@ -25,7 +25,7 @@ export default function SupportEntryPage() {
   };
 
   return (
-    <section className="mx-auto w-full max-w-5xl">
+    <section className="mx-auto w-full max-w-5xl pt-4">
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-center shadow-sm sm:px-8 sm:py-10">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600">
           <Headphones size={27} aria-hidden="true" />
