@@ -35,6 +35,9 @@ import TeacherStudentNoteModal, {
 } from './teacher/TeacherStudentNoteModal';
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
 import LearningGoalModal from './student/LearningGoalModal';
+import DailyPracticeReminder from './student/dailyPractice/DailyPracticeReminder';
+import dailyPracticeApi from '../services/dailyPracticeApi';
+import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT } from '../utils/learningGoal';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
@@ -54,7 +57,8 @@ const PAGE_TITLES = {
   finance: 'Tài chính',
   training: 'Đào tạo GV',
   'student-training': 'Đào tạo HV',
-  'lesson-practice': 'Bài học',
+  'lesson-practice': 'Bài giảng',
+  'daily-practice': 'Luyện tập hằng ngày',
   'cert-prep': 'Ôn thi MOS/IC3',
   staff: 'Phân quyền',
   hr: 'Nhân sự',
@@ -71,7 +75,8 @@ const ROLE_PAGE_TITLES = {
   student: {
     dashboard: 'Tổng quan',
     schedule: 'Lịch học',
-    'lesson-practice': 'Luyện tập',
+    'lesson-practice': 'Bài giảng',
+    'daily-practice': 'Luyện tập hằng ngày',
     'materials-files': 'Bài tập và tài nguyên',
     'materials-software': 'Bài tập và tài nguyên',
     exam: 'Phòng thi',
@@ -187,6 +192,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (pathname.includes('/feed')) return 'Bảng tin';
   if (pathname.includes('/news')) return 'Tin tức';
   if (pathname.includes('/support')) return 'Hỗ trợ';
+  if (pathname.includes('/center-info')) return 'Liên hệ Trung tâm';
   if (pathname.includes('/notifications')) return 'Thông báo';
   if (pathname.includes('/bi')) return 'BI Dashboard';
   if (pathname.includes('/files')) return 'Quản lý file';
@@ -199,6 +205,7 @@ function resolvePageTitle(role, pathname, hash) {
   if (pathname.includes('/exam')) return 'Phòng thi';
   if (pathname.includes('/cert-prep')) return 'Ôn thi MOS/IC3';
   if (pathname.includes('/lesson-practice')) return 'Bài học';
+  if (pathname.includes('/daily-practice')) return 'Luyện tập hằng ngày';
   if (pathname.includes('/test')) return 'Bài test';
   if (pathname.includes('/finance')) return 'Tài chính';
   if (role === 'admin') return 'Quản trị';
@@ -740,6 +747,36 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       if (learningGoalLaterKey) sessionStorage.setItem(learningGoalLaterKey, '1');
     } catch { /* ignore */ }
   }, [learningGoalLaterKey]);
+
+  // HV: nhắc luyện tập hằng ngày — một lần mỗi ngày, sau popup chào mừng / mục tiêu học, khi hôm nay chưa luyện.
+  const [dailyReminder, setDailyReminder] = useState(null);
+  const [dailyReminderOpen, setDailyReminderOpen] = useState(false);
+  const dailyReminderKey = myId ? `cms_daily_practice_reminder:${myId}` : '';
+
+  useEffect(() => {
+    if (role !== 'student' || !myId) return undefined;
+    let cancelled = false;
+    dailyPracticeApi.student.overview()
+      .then((data) => { if (!cancelled) setDailyReminder(data || null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [role, myId]);
+
+  useEffect(() => {
+    if (role !== 'student' || !dailyReminder || dailyReminderOpen || !dailyReminderKey) return;
+    if (showWelcomeCelebration || courseCelebration || learningGoalOpen || !learningGoalData) return;
+    if (dailyReminder.stats?.playedToday || !dailyReminder.topics?.length) return;
+    if (location.pathname.startsWith('/student/daily-practice')) return;
+    const goal = learningGoalData.goal;
+    try {
+      const goalPromptPending = (!goal || goal.expired) && sessionStorage.getItem(learningGoalLaterKey) !== '1';
+      if (goalPromptPending) return;
+      if (localStorage.getItem(dailyReminderKey) === vnTodayKey()) return;
+      localStorage.setItem(dailyReminderKey, vnTodayKey());
+    } catch { return; }
+    setDailyReminderOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ xét lại khi các popup khác đóng / dữ liệu về
+  }, [role, dailyReminder, learningGoalOpen, learningGoalData, showWelcomeCelebration, courseCelebration]);
 
   // GV: mỗi phiếu lương đã chi hiện popup đúng một lần — kể cả khi GV offline lúc Admin chi.
   const enqueueTeacherPaymentNotices = React.useCallback((notices) => {
@@ -1837,6 +1874,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           starBonus={starBonusCelebration}
           onClose={dismissStarBonusCelebration}
         />
+        {role === 'student' && dailyReminderOpen && (
+          <DailyPracticeReminder
+            stats={dailyReminder?.stats}
+            topicCount={dailyReminder?.topics?.length || 0}
+            onClose={() => setDailyReminderOpen(false)}
+            onStart={() => {
+              setDailyReminderOpen(false);
+              navigate('/student/daily-practice');
+            }}
+          />
+        )}
         {role === 'student' && (
           <LearningGoalModal
             open={learningGoalOpen}

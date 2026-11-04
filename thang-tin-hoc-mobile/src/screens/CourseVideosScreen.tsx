@@ -1,10 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Eye, FileText, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, Sparkles, Star, StickyNote, Trophy, Volume2, VolumeX } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, Sparkles, Star, StickyNote, Trophy, Volume2, VolumeX } from 'lucide-react-native';
 import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
 import RenderHtml from '@native-html/render';
 import type { MixedStyleDeclaration } from '@native-html/render';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
+import { dailyPracticeApi, type DpTopic } from '../services/dailyPracticeApi';
+import { isDirectVideoUrl, playableVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
 import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from './VideoPlayerFrame';
 import { VideoLessonTabs } from './VideoLessonTabs';
 import { AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton } from '../components/ui';
@@ -20,6 +25,7 @@ import {
   markCourseUnitSection,
   openCourseVideoUnit,
   resetCoursePractice,
+  saveStudyResumePoint,
   type LessonPracticeCourse,
   type LessonPracticeItem,
   type LessonPracticeSubject,
@@ -172,6 +178,8 @@ function previewCatalog(): Promise<{ subjects: LessonPracticeSubject[]; courses:
     }),
   }));
 }
+
+const RELATED_STRIP_HEIGHT = 42;
 
 function directSubject(course: LessonPracticeCourse) {
   if (!course.subjects.length || course.subjects.length >= 3) return undefined;
@@ -439,7 +447,11 @@ export function CourseVideosScreen() {
     setUnitsError('');
   };
 
-  const openSubject = async (course: LessonPracticeCourse, subject: LessonPracticeSubject) => {
+  const openSubject = async (
+    course: LessonPracticeCourse,
+    subject: LessonPracticeSubject,
+    resume?: { unitId: string; sectionId: string },
+  ) => {
     setSelectedCourse(course);
     setSelectedSubject(subject);
     setSelectedUnit(null);
@@ -454,7 +466,9 @@ export function CourseVideosScreen() {
       const subjectUnits = await getCourseSubjectUnits(subject.id, course.id);
       setUnits(subjectUnits);
       const availableUnits = subjectUnits.filter((unit) => !unit.locked && unit.status !== 'locked');
-      const currentUnit = availableUnits.find((unit) => unit.status === 'in_progress')
+      const resumeUnit = resume ? availableUnits.find((unit) => unit.id === resume.unitId) : undefined;
+      const currentUnit = resumeUnit
+        || availableUnits.find((unit) => unit.status === 'in_progress')
         || availableUnits.find((unit) => unit.status === 'open')
         || [...availableUnits].reverse().find((unit) => unit.status === 'completed');
       if (!currentUnit) {
@@ -464,6 +478,7 @@ export function CourseVideosScreen() {
       try {
         const detail = await openCourseVideoUnit(currentUnit.id);
         setActiveUnitDetails([{ ...currentUnit, ...detail }]);
+        if (resumeUnit && resume?.sectionId) setSelectedLearningSectionId(resume.sectionId);
         setUnitNavOpen(false);
       } catch (error) {
         setUnitsError(error instanceof Error ? error.message : 'Không tải được nội dung bài học.');
@@ -586,6 +601,88 @@ export function CourseVideosScreen() {
       ? firstIncompleteSectionIndex
       : displayedUnitSections.length - 1;
   const displayedUnitIndex = displayedUnit ? units.findIndex((unit) => unit.id === displayedUnit.id) : -1;
+
+  const route = useRoute<RouteProp<MainTabsParamList, 'CourseVideos'>>();
+  const tabNavigation = useNavigation();
+  const resumeParams = route.params;
+  const handledResumeKey = useRef(0);
+  useEffect(() => {
+    const key = resumeParams?.resumeKey || 0;
+    if (!key || handledResumeKey.current === key || !courses.length || !resumeParams?.resumeSubjectId) return;
+    handledResumeKey.current = key;
+    const subjectId = resumeParams.resumeSubjectId;
+    const hasSubject = (course: LessonPracticeCourse) => course.subjects.some((subject) => subject.id === subjectId);
+    const course = courses.find((item) => item.id === resumeParams.resumeCourseId && hasSubject(item))
+      || courses.find((item) => item.enrolled && hasSubject(item))
+      || courses.find(hasSubject);
+    const subject = course?.subjects.find((item) => item.id === subjectId);
+    tabNavigation.setParams({ resumeKey: undefined } as never);
+    if (!course || !subject) return;
+    void openSubject(course, subject, {
+      unitId: resumeParams.resumeUnitId || '',
+      sectionId: resumeParams.resumeSectionId || '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openSubject đổi mỗi lần render
+  }, [courses, resumeParams, tabNavigation]);
+
+  const stackNavigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const [relatedTopics, setRelatedTopics] = useState<{ key: string; rows: DpTopic[] }>({ key: '', rows: [] });
+  const relatedKey = !isPreview && selectedSubject && displayedUnit?.id ? `${selectedSubject.id}|${displayedUnit.id}` : '';
+  useEffect(() => {
+    if (!relatedKey) return undefined;
+    let alive = true;
+    const [relatedSubjectId, relatedUnitId] = relatedKey.split('|');
+    dailyPracticeApi.relatedTopics(relatedSubjectId, relatedUnitId)
+      .then((rows) => { if (alive) setRelatedTopics({ key: relatedKey, rows: Array.isArray(rows) ? rows : [] }); })
+      .catch(() => { if (alive) setRelatedTopics({ key: relatedKey, rows: [] }); });
+    return () => { alive = false; };
+  }, [relatedKey]);
+  const unitRelatedTopics = relatedTopics.key === relatedKey ? relatedTopics.rows : [];
+  // Cùng vị trí với web: dải gợi ý luôn nằm ngay trên thanh điều hướng đáy bài học.
+  const relatedStrip = unitRelatedTopics.length ? (
+    <View style={styles.relatedTopics}>
+      <Gamepad2 size={15} color="#92400E" />
+      <Text style={styles.relatedTopicsTitle}>Luyện tập chủ đề liên quan:</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedTopicsRow}>
+        {unitRelatedTopics.map((topic) => (
+          <Pressable
+            key={topic.id}
+            onPress={() => openRelatedTopic(topic.id)}
+            style={styles.relatedTopicChip}
+            accessibilityRole="button"
+            accessibilityLabel={`Luyện tập ${topic.name}`}
+          >
+            <Gamepad2 size={13} color={colors.brand} />
+            <Text numberOfLines={1} style={styles.relatedTopicText}>{topic.name}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  ) : null;
+  const openRelatedTopic = (topicId: string) => {
+    // Modal bài học nằm trên mọi màn hình — đóng trước khi chuyển sang luyện tập.
+    setSelectedCourse(null);
+    setSelectedSubject(null);
+    setSelectedUnit(null);
+    setActiveUnitDetails([]);
+    setUnitNavOpen(false);
+    stackNavigation.navigate('DailyPractice', { topicId });
+  };
+
+  const displayedSectionId = displayedSectionIndex >= 0 ? displayedUnitSections[displayedSectionIndex]?.id || '' : '';
+  const lastSyncedPosition = useRef('');
+  useEffect(() => {
+    if (isPreview || !selectedSubject || !displayedUnit?.id || !displayedSectionId) return undefined;
+    const courseId = selectedCourse?.id || '';
+    const signature = `${displayedUnit.id}|${displayedSectionId}|${courseId}`;
+    if (lastSyncedPosition.current === signature) return undefined;
+    const timer = setTimeout(() => {
+      lastSyncedPosition.current = signature;
+      saveStudyResumePoint({ unitId: displayedUnit.id, sectionId: displayedSectionId, courseId })
+        .catch(() => { lastSyncedPosition.current = ''; });
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [displayedSectionId, displayedUnit?.id, isPreview, selectedCourse?.id, selectedSubject]);
   const lessonNavigation = displayedUnit && (allDisplayedSectionsDone || !displayedUnitSections.length)
     ? (
       <UnitNavigationBar
@@ -609,7 +706,7 @@ export function CourseVideosScreen() {
     <AppScreen contentStyle={styles.screenContent}>
       <View style={styles.headerBand}>
         <View style={styles.headerGroup}>
-          <AppHeader title="Video bài giảng" icon={Clapperboard} />
+          <AppHeader title="Bài giảng" icon={Clapperboard} />
         </View>
       </View>
       <View style={styles.filters}>
@@ -731,7 +828,8 @@ export function CourseVideosScreen() {
                     contentContainerStyle={[
                       styles.lessonMainContent,
                       displayedUnit && {
-                        paddingBottom: 58 + Math.max(insets.bottom, spacing.sm) + spacing.sm + 1,
+                        paddingBottom: 58 + Math.max(insets.bottom, spacing.sm) + spacing.sm + 1
+                          + (unitRelatedTopics.length ? RELATED_STRIP_HEIGHT + spacing.xs : 0),
                       },
                     ]}
                     showsVerticalScrollIndicator={false}
@@ -947,10 +1045,12 @@ export function CourseVideosScreen() {
                     backgroundColor: '#FFFFFF',
                   }}
                 >
+                  {relatedStrip}
                   {lessonNavigation}
                 </div>
               ) : (
                 <View style={[styles.lessonNavigationFooter, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+                  {relatedStrip}
                   {lessonNavigation}
                 </View>
               )
@@ -1834,9 +1934,9 @@ const videoLessonTabs: Array<{ id: VideoLessonTab; label: string; icon: typeof L
 ];
 
 function getEmbeddedVideoUrl(url: string) {
-  const youtubeId = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/)?.[1];
+  const youtubeId = youtubeIdFromUrl(url);
   if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0`;
-  const vimeoId = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
+  const vimeoId = vimeoIdFromUrl(url);
   if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
   return '';
 }
@@ -1878,16 +1978,15 @@ function VideoLessonPane({
     playing: false,
   });
   const playerApiRef = useRef<VideoPlayerApi | null>(null);
-  const url = video?.url || '';
+  const rawUrl = video?.url || '';
+  const url = playableVideoUrl(rawUrl);
   const embeddedUrl = getEmbeddedVideoUrl(url);
-  const directVideo = /\.(mp4|webm|ogg)(?:$|[?#])/i.test(url);
+  const directVideo = isDirectVideoUrl(url);
+  const invalidLink = Boolean(rawUrl) && !url;
 
+  // Luôn phát ngay trong khung; link không phát được thì báo tại chỗ, không mở sang tab/ứng dụng khác.
   const startVideo = () => {
-    if (embeddedUrl || directVideo) {
-      setStarted(true);
-      return;
-    }
-    onOpenVideo(url);
+    if (url) setStarted(true);
   };
 
   return (
@@ -1929,7 +2028,9 @@ function VideoLessonPane({
             >
               <Play size={25} color="#FFFFFF" fill="#FFFFFF" />
             </Pressable>
-            <Text style={styles.videoStartLabel}>{url ? 'Nhấn để bắt đầu học' : 'Video chưa có liên kết'}</Text>
+            <Text style={styles.videoStartLabel}>
+              {url ? 'Nhấn để bắt đầu học' : invalidLink ? 'Liên kết video chưa đúng — trung tâm sẽ cập nhật sớm' : 'Video chưa có liên kết'}
+            </Text>
           </View>
         )}
       </View>
@@ -2308,6 +2409,17 @@ function PracticeQuestion({
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   screenContent: { gap: spacing.md },
+  relatedTopics: {
+    height: RELATED_STRIP_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
+  },
+  relatedTopicsTitle: { color: '#92400E', fontSize: 12, fontWeight: '900' },
+  relatedTopicsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  relatedTopicChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%', paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 999, borderWidth: 1, borderColor: '#FCD34D', backgroundColor: colors.surface,
+  },
+  relatedTopicText: { color: colors.ink, fontSize: 12, fontWeight: '800', flexShrink: 1 },
   headerBand: { marginHorizontal: -spacing.xl, marginTop: -spacing.md, marginBottom: -spacing.sm, paddingHorizontal: spacing.xl, paddingTop: spacing.md, backgroundColor: '#F1F5F9' },
   headerGroup: { marginBottom: spacing.sm },
   courseCardWrap: { width: '100%', position: 'relative' },

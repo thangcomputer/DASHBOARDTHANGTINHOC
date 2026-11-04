@@ -74,8 +74,16 @@ export function resolveMobilePublicUrl(value: string) {
 }
 
 export function getMobileImageSource(value: string): ImageSourcePropType {
-  const imageUrl = new URL(value);
-  const apiUrl = new URL(getMobileApiBaseUrl());
+  const raw = String(value || '').trim();
+  let imageUrl: URL;
+  let apiUrl: URL;
+  try {
+    apiUrl = new URL(getMobileApiBaseUrl());
+    imageUrl = new URL(raw, `${apiUrl.origin}/`);
+  } catch {
+    return { uri: raw };
+  }
+  if (!/^https?:$/.test(imageUrl.protocol)) return { uri: raw };
   const accessToken = tokens?.accessToken;
   const isProtectedUpload = imageUrl.origin === apiUrl.origin && imageUrl.pathname.startsWith('/uploads/');
 

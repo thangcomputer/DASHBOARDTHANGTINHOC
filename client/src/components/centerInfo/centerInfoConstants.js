@@ -1,5 +1,5 @@
 export const CENTER_SECTIONS = [
-  { key: 'overview', label: 'Tổng quan' },
+  { key: 'overview', label: 'Giới thiệu' },
   { key: 'staff', label: 'Nhân sự' },
   { key: 'branch', label: 'Chi nhánh' },
   { key: 'social', label: 'Mạng xã hội' },

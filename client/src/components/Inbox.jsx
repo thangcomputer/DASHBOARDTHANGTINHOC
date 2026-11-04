@@ -20,19 +20,9 @@ import {
   mergeDirectConversationsByPeer,
 } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
-import { getAttendanceAction } from '../utils/attendanceAction';
-import {
-  ATTENDANCE_CONFIRM_MS,
-  attendanceConfirmKey,
-  getAttendanceConfirm,
-  removeAttendanceConfirm,
-  subscribeAttendanceConfirm,
-  upsertAttendanceConfirm,
-} from '../utils/attendanceConfirmStore';
 import {
   getScheduleDisplayKind,
   isScheduleOngoingNow,
-  formatLocalDateKey,
   normalizeScheduleDate,
 } from '../utils/scheduleTime';
 import {
@@ -659,11 +649,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const [messageSearch, setMessageSearch] = useState('');
   const [touchActionsMessageId, setTouchActionsMessageId] = useState(null);
   const [pinnedMessageObj, setPinnedMessageObj] = useState(null);
-  const [teacherAttendanceModalSchedule, setTeacherAttendanceModalSchedule] = useState(null);
-  const [teacherAttendanceGrade, setTeacherAttendanceGrade] = useState('0');
-  const [teacherAttendanceNote, setTeacherAttendanceNote] = useState('');
-  const [headerAttendancePending, setHeaderAttendancePending] = useState(null);
-  const [headerAttendanceRemaining, setHeaderAttendanceRemaining] = useState(0);
 
   useEffect(() => {
     setShowPeerInfo(false);
@@ -778,131 +763,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       .sort((a, b) => normalizeScheduleDate(a.date).localeCompare(normalizeScheduleDate(b.date))
         || String(a.startTime || '').localeCompare(String(b.startTime || '')))[0] || null
     : null;
-  const teacherAttendanceSchedule = viewerRole === 'teacher' && peerRole === 'student' && !activeConv?.isGroup
-    ? (Array.isArray(schedules) ? schedules : [])
-      .filter((schedule) => {
-        const status = String(schedule?.status || '').toLowerCase();
-        const confirmStatus = String(schedule?.studentConfirmStatus || '').toLowerCase();
-        const isMarked = status === 'completed' || ['accepted', 'admin_approved'].includes(confirmStatus);
-        const isAwaiting = confirmStatus === 'pending' || confirmStatus === 'disputed';
-        const isEligible = getAttendanceAction(schedule, null, scheduleNow).canAttend;
-        return entityId(schedule.studentId) === entityId(activeConv?.user)
-          && entityId(schedule.teacherId) === String(currentUserId || '')
-          && normalizeScheduleDate(schedule.date) === formatLocalDateKey(scheduleNow)
-          && !['cancelled', 'canceled', 'no_show'].includes(status)
-          && (isMarked || isAwaiting || isEligible);
-      })
-      .sort((left, right) => {
-        const attendanceRank = (schedule) => {
-          const confirmStatus = String(schedule?.studentConfirmStatus || '').toLowerCase();
-          const isMarked = String(schedule?.status || '').toLowerCase() === 'completed'
-            || ['accepted', 'admin_approved'].includes(confirmStatus);
-          if (confirmStatus === 'pending' || confirmStatus === 'disputed') return 0;
-          if (!isMarked && getAttendanceAction(schedule, null, scheduleNow).canAttend) return 1;
-          return 2;
-        };
-        const rankDifference = attendanceRank(left) - attendanceRank(right);
-        if (rankDifference) return rankDifference;
-        return normalizeScheduleDate(left.date).localeCompare(normalizeScheduleDate(right.date))
-          || String(left.startTime || '').localeCompare(String(right.startTime || ''));
-      })[0] || null
-    : null;
-  const teacherAttendanceStudent = useMemo(() => {
-    if (!teacherAttendanceSchedule) return null;
-    const studentId = entityId(teacherAttendanceSchedule.studentId);
-    const course = String(teacherAttendanceSchedule.course || teacherAttendanceSchedule.courseName || teacherAttendanceSchedule.title || '')
-      .trim()
-      .toLocaleLowerCase('vi');
-    const teacherRows = typeof getStudentsByTeacher === 'function'
-      ? getStudentsByTeacher(currentUserId) || []
-      : [];
-    const matchingEnrollment = [...teacherRows, ...(students || [])].find((student) => (
-      entityId(student) === studentId
-      && String(student.course || '').trim().toLocaleLowerCase('vi') === course
-    ));
-    return matchingEnrollment
-      || teacherRows.find((student) => entityId(student) === studentId)
-      || (students || []).find((student) => entityId(student) === studentId)
-      || peerProfile
-      || null;
-  }, [currentUserId, getStudentsByTeacher, peerProfile, students, teacherAttendanceSchedule]);
-  const teacherAttendanceKey = attendanceConfirmKey(teacherAttendanceStudent);
-  const teacherAttendanceConfirmStatus = String(teacherAttendanceSchedule?.studentConfirmStatus || '').toLowerCase();
-  const teacherAttendanceMarked = String(teacherAttendanceSchedule?.status || '').toLowerCase() === 'completed'
-    || ['accepted', 'admin_approved'].includes(teacherAttendanceConfirmStatus);
-  const teacherAttendanceAwaiting = teacherAttendanceConfirmStatus === 'pending';
-  const teacherAttendanceUnderReview = teacherAttendanceConfirmStatus === 'disputed';
-  const teacherAttendanceCompleted = Number(teacherAttendanceStudent?.completedSessions) || 0;
-  const teacherAttendanceTotal = Number(teacherAttendanceStudent?.totalSessions) || 0;
-  useEffect(() => {
-    const syncPendingAttendance = () => setHeaderAttendancePending(getAttendanceConfirm(teacherAttendanceKey));
-    const timerId = window.setTimeout(syncPendingAttendance, 0);
-    const unsubscribe = subscribeAttendanceConfirm(syncPendingAttendance);
-    return () => {
-      window.clearTimeout(timerId);
-      unsubscribe();
-    };
-  }, [teacherAttendanceKey]);
-  useEffect(() => {
-    if (!headerAttendancePending) return undefined;
-    const intervalId = window.setInterval(() => {
-      setHeaderAttendanceRemaining(Math.max(
-        0,
-        Math.ceil((Number(headerAttendancePending.endsAt) - Date.now()) / 1000),
-      ));
-    }, 250);
-    return () => window.clearInterval(intervalId);
-  }, [headerAttendancePending]);
-  const openTeacherAttendanceModal = () => {
-    if (!teacherAttendanceSchedule || !teacherAttendanceStudent || headerAttendancePending) return;
-    const grade = Number(teacherAttendanceStudent.avgGrade ?? teacherAttendanceStudent.lastGrade);
-    setTeacherAttendanceGrade(Number.isFinite(grade) ? String(grade) : '0');
-    setTeacherAttendanceNote(
-      `Buổi ${teacherAttendanceCompleted + 1}: Đã điểm danh hoàn thành buổi học`,
-    );
-    setTeacherAttendanceModalSchedule(teacherAttendanceSchedule);
-  };
-  const confirmHeaderAttendance = () => {
-    if (!teacherAttendanceModalSchedule || !teacherAttendanceStudent || !teacherAttendanceKey) return;
-    const grade = Number(String(teacherAttendanceGrade).replace(',', '.'));
-    if (!Number.isFinite(grade) || grade < 0 || grade > 10) {
-      toast.error('Vui lòng nhập điểm từ 0 đến 10.');
-      return;
-    }
-    if (
-      normalizeScheduleDate(teacherAttendanceModalSchedule.date) !== formatLocalDateKey(new Date())
-      || !getAttendanceAction(teacherAttendanceModalSchedule, null, new Date()).canAttend
-    ) {
-      setTeacherAttendanceModalSchedule(null);
-      toast.info('Buổi học không còn trong khung giờ điểm danh.');
-      return;
-    }
-    if (getAttendanceConfirm(teacherAttendanceKey)) {
-      setTeacherAttendanceModalSchedule(null);
-      toast.info('Học viên đang có yêu cầu điểm danh chờ xử lý.');
-      return;
-    }
-    upsertAttendanceConfirm(teacherAttendanceKey, {
-      studentId: entityId(teacherAttendanceStudent),
-      courseName: String(teacherAttendanceModalSchedule.course || teacherAttendanceModalSchedule.courseName || teacherAttendanceModalSchedule.title || ''),
-      scheduleId: entityId(teacherAttendanceModalSchedule),
-      note: teacherAttendanceNote.trim(),
-      grade,
-      endsAt: Date.now() + ATTENDANCE_CONFIRM_MS,
-      teacherId: String(currentUserId || ''),
-    });
-    setTeacherAttendanceModalSchedule(null);
-    toast.info(`Đã ghi nhận — còn ${Math.round(ATTENDANCE_CONFIRM_MS / 1000)} giây để hủy điểm danh.`);
-  };
-  const cancelHeaderAttendance = () => {
-    const pending = getAttendanceConfirm(teacherAttendanceKey);
-    if (pending?.committing) {
-      toast.info('Đang ghi nhận điểm danh — không thể hủy lúc này.');
-      return;
-    }
-    removeAttendanceConfirm(teacherAttendanceKey);
-    toast.success('Đã hủy điểm danh — buổi chưa được tính.');
-  };
   const shouldMaskPeerPhone = (['student', 'teacher'].includes(viewerRole) && ['admin', 'staff'].includes(peerRole))
     || (viewerRole === 'teacher' && peerRole === 'student')
     || (viewerRole === 'student' && peerRole === 'teacher');
@@ -1961,8 +1821,10 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     if (!target) return;
 
     setPinnedMessageObj(null);
-    setMessages([]);
-    setActiveConv(target);
+    if (String(activeConv?.id || '') !== String(target.id || '')) {
+      setMessages([]);
+      setActiveConv(target);
+    }
     navigate({
       pathname: location.pathname,
       search: location.search,
@@ -1976,7 +1838,26 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     location.search,
     requestedPeerId,
     navigate,
+    activeConv?.id,
   ]);
+
+  // Deep-link có thể chọn hội thoại trước khi lịch sử tin nhắn tải xong; khi danh sách
+  // có id thật (có tin) cho cùng người nhận thì chuyển sang id đó để hiện tin cũ.
+  useEffect(() => {
+    if (!activeConv || activeConv.isGroup || activeConv.isAiHandoff) return;
+    const currentId = String(activeConv.id || '');
+    const peerId = String(activeConv.user?.id || '');
+    if (!currentId || !peerId || currentId.startsWith('group_')) return;
+    if (ctxGetMessages(currentId).length) return;
+    const twin = conversations.find((conversation) => (
+      !conversation.isGroup
+      && String(conversation.user?.id || '') === peerId
+      && String(conversation.id || '') !== currentId
+    ));
+    if (!twin || !ctxGetMessages(twin.id).length) return;
+    setActiveConv(twin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ctxGetMessages đổi theo contextMessages
+  }, [activeConv, conversations, contextMessages]);
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
@@ -2970,69 +2851,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </p>
                   </div>
                 </div>
-                {teacherAttendanceSchedule ? (
-                  <button
-                    type="button"
-                    onClick={headerAttendancePending
-                      ? cancelHeaderAttendance
-                      : teacherAttendanceMarked || teacherAttendanceAwaiting || teacherAttendanceUnderReview
-                        ? undefined
-                        : openTeacherAttendanceModal}
-                    disabled={
-                      Boolean(headerAttendancePending?.committing)
-                      || (!headerAttendancePending && (
-                        teacherAttendanceMarked || teacherAttendanceAwaiting || teacherAttendanceUnderReview
-                      ))
-                    }
-                    data-chat-popup
-                    className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold transition-colors sm:px-3 ${
-                      headerAttendancePending?.committing || (!headerAttendancePending && teacherAttendanceMarked)
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : headerAttendancePending
-                          ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                          : teacherAttendanceAwaiting || teacherAttendanceUnderReview
-                            ? 'border-blue-200 bg-blue-50 text-blue-700'
-                            : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
-                    }`}
-                    aria-label={headerAttendancePending?.committing
-                      ? 'Đang ghi nhận điểm danh'
-                      : headerAttendancePending
-                        ? `Hủy điểm danh, còn ${headerAttendanceRemaining} giây`
-                        : teacherAttendanceAwaiting
-                          ? 'Chờ học viên xác nhận điểm danh'
-                          : teacherAttendanceUnderReview
-                            ? 'Điểm danh đang được Admin xử lý'
-                            : teacherAttendanceMarked
-                              ? 'Đã điểm danh buổi học hôm nay'
-                              : 'Điểm danh học viên'}
-                    title={headerAttendancePending?.committing
-                      ? 'Đang ghi nhận điểm danh'
-                      : headerAttendancePending
-                        ? `Hủy điểm danh (${headerAttendanceRemaining}s)`
-                        : teacherAttendanceAwaiting
-                          ? 'Chờ học viên xác nhận'
-                          : teacherAttendanceUnderReview
-                            ? 'Đang chờ Admin xử lý'
-                            : teacherAttendanceMarked
-                              ? 'Đã điểm danh buổi học hôm nay'
-                              : 'Điểm danh học viên'}
-                  >
-                    <CheckCircle2 size={16} aria-hidden="true" />
-                    <span className="hidden sm:inline">
-                      {headerAttendancePending?.committing
-                        ? 'Đang ghi nhận'
-                        : headerAttendancePending
-                          ? `Hủy (${headerAttendanceRemaining}s)`
-                          : teacherAttendanceAwaiting
-                            ? 'Chờ xác nhận'
-                            : teacherAttendanceUnderReview
-                              ? 'Đang xử lý'
-                              : teacherAttendanceMarked
-                                ? 'Đã điểm danh'
-                                : 'Điểm danh'}
-                    </span>
-                  </button>
-                ) : null}
                 {canShowClassroomButton && (
                   isClassTime && joinClassUrl ? (
                     <a
@@ -4515,101 +4333,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           );
         })()
       )}
-
-      {teacherAttendanceModalSchedule && typeof document !== 'undefined' ? createPortal(
-        <div
-          className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setTeacherAttendanceModalSchedule(null);
-          }}
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="inbox-attendance-title"
-          >
-            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-emerald-700 to-green-600 px-6 py-5 text-white">
-              <div>
-                <h2 id="inbox-attendance-title" className="text-base font-black  tracking-wide">
-                  Điểm danh &amp; chấm điểm
-                </h2>
-                <p className="mt-1 text-xs font-semibold text-emerald-100">
-                  {teacherAttendanceModalSchedule.course
-                    || teacherAttendanceModalSchedule.courseName
-                    || teacherAttendanceModalSchedule.title
-                    || 'Buổi học'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTeacherAttendanceModalSchedule(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 hover:text-white"
-                aria-label="Đóng popup điểm danh"
-              >
-                <X size={19} />
-              </button>
-            </div>
-            <div className="space-y-5 p-6">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-                <p className="text-[11px] font-black  tracking-widest text-emerald-800">Học viên</p>
-                <p className="mt-1 text-base font-black text-emerald-700">
-                  {teacherAttendanceStudent?.name || activeConv?.user?.name || 'Học viên'}
-                </p>
-                <p className="mt-2 text-xs font-bold text-emerald-700">
-                  Tiến độ hiện tại: {teacherAttendanceCompleted}/{teacherAttendanceTotal || '—'} buổi
-                </p>
-                <p className="mt-1 text-xs text-emerald-700">
-                  Ca {teacherAttendanceModalSchedule.startTime || '—'}
-                  {teacherAttendanceModalSchedule.endTime ? ` - ${teacherAttendanceModalSchedule.endTime}` : ''}
-                </p>
-              </div>
-              <label className="block">
-                <span className="mb-2 block text-xs font-black  tracking-widest text-slate-500">
-                  Đánh giá buổi học (0-10)
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  value={teacherAttendanceGrade}
-                  onChange={(event) => setTeacherAttendanceGrade(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-xs font-black  tracking-widest text-slate-500">Ghi chú nhanh</span>
-                <textarea
-                  rows={3}
-                  value={teacherAttendanceNote}
-                  onChange={(event) => setTeacherAttendanceNote(event.target.value)}
-                  placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-emerald-500 focus:bg-white"
-                />
-              </label>
-              <div className="flex flex-col-reverse gap-2 min-[380px]:flex-row">
-                <button
-                  type="button"
-                  onClick={() => setTeacherAttendanceModalSchedule(null)}
-                  className="min-h-11 flex-1 rounded-xl bg-slate-100 px-4 py-3 text-xs font-black  tracking-wide text-slate-500 transition hover:bg-slate-200"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmHeaderAttendance}
-                  className="min-h-11 flex-[2] rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black  tracking-wide text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
-                >
-                  Xác nhận điểm danh
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
 
       <ScheduleMessagePreviewModal
         open={!!schedulePreview}

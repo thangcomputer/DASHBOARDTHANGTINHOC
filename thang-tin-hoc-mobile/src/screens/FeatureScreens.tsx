@@ -2085,6 +2085,7 @@ export function AssignmentsScreen({
   const isTeacher = user?.role === 'teacher';
   const [filter, setFilter] = useState('Tất cả');
   const [courseFilter, setCourseFilter] = useState('');
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const [overrides, setOverrides] = useState<Assignment[] | null>(null);
   const [selected, setSelected] = useState<Assignment | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -2183,6 +2184,19 @@ export function AssignmentsScreen({
   const filters = isTeacher
     ? ['Tất cả', 'Cần chấm', 'Đã chấm']
     : ['Tất cả', 'Chưa làm', 'Đã nộp', 'Quá hạn'];
+  const teacherFilterCounts = useMemo(() => {
+    if (!isTeacher) return undefined;
+    const inCourse = allItems.filter((item) => !courseFilter || item.subject === courseFilter || item.courseName === courseFilter);
+    return {
+      'Cần chấm': { value: inCourse.filter((item) => item.status === 'Cần chấm').length, color: '#6D28D9', background: '#EDE9FE' },
+      'Đã chấm': { value: inCourse.filter((item) => item.status === 'Đã chấm').length, color: '#047857', background: '#D1FAE5' },
+    };
+  }, [allItems, courseFilter, isTeacher]);
+  const openCreateAssignment = () => {
+    resetCreateForm();
+    setCourse(courseFilter);
+    setShowCreate(true);
+  };
   const saveGrade = async () => {
     if (!selected || grade === '' || Number(grade) < 0 || Number(grade) > 10) {
       Alert.alert('Điểm chưa hợp lệ', 'Nhập điểm từ 0 đến 10.');
@@ -2421,40 +2435,60 @@ export function AssignmentsScreen({
           </View>
         </View>
       ) : null}
-      {isTeacher && embedded ? (
-        <Pressable
-          onPress={() => {
-            resetCreateForm();
-            setCourse(courseFilter);
-            setShowCreate(true);
-          }}
-          style={styles.assignmentEmbeddedCreateAction}
-          accessibilityRole="button"
-          accessibilityLabel="Tạo bài tập"
-        >
-          <Plus size={18} color={colors.brand} />
-          <Text style={styles.assignmentEmbeddedCreateText}>Tạo bài tập mới</Text>
+      {isTeacher ? (
+        <View style={styles.assignToolbar}>
+          <Pressable
+            onPress={() => setCoursePickerOpen(true)}
+            disabled={courses.length <= 1}
+            style={styles.assignCoursePill}
+            accessibilityRole="button"
+            accessibilityLabel={`Bài tập của khóa ${courseFilter || 'chưa chọn'}${courses.length > 1 ? ', bấm để đổi khóa' : ''}`}
+          >
+            <FileText size={18} color={colors.brand} />
+            <View style={styles.flex}>
+              <Text style={styles.assignCourseCaption}>Bài tập của</Text>
+              <Text numberOfLines={1} style={styles.assignCourseName}>{courseFilter || 'Chưa có khóa học'}</Text>
+            </View>
+            {courses.length > 1 ? <ChevronDown size={18} color="#B91C1C" /> : null}
+          </Pressable>
+          <Pressable onPress={openCreateAssignment} style={styles.assignCreateButton} accessibilityRole="button" accessibilityLabel="Tạo bài tập mới">
+            <Plus size={16} color="#FFFFFF" />
+            <Text style={styles.assignCreateText}>{'Tạo bài\ntập mới'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      <Modal visible={coursePickerOpen} transparent animationType="fade" onRequestClose={() => setCoursePickerOpen(false)}>
+        <Pressable style={styles.assignSheetBackdrop} onPress={() => setCoursePickerOpen(false)} accessibilityLabel="Đóng">
+          <Pressable style={styles.assignSheet} onPress={() => {}}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>Chọn khóa học</Text>
+              <Pressable onPress={() => setCoursePickerOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng"><X size={20} color={colors.muted} /></Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.assignSheetList}>
+              {courses.map((courseOption) => {
+                const active = courseFilter === courseOption;
+                return (
+                  <Pressable
+                    key={courseOption}
+                    onPress={() => {
+                      setCourseFilter(courseOption);
+                      setSelected(null);
+                      setCoursePickerOpen(false);
+                    }}
+                    style={[styles.assignSheetOption, active && styles.assignSheetOptionActive]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text numberOfLines={2} style={[styles.assignSheetOptionText, active && styles.assignSheetOptionTextActive]}>{courseOption}</Text>
+                    {active ? <Check size={18} color={colors.brand} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      ) : null}
-      {isTeacher && courses.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.assignmentCourseFilters}>
-          {courses.map((courseOption) => (
-            <Pressable
-              key={courseOption}
-              onPress={() => {
-                setCourseFilter(courseOption);
-                setSelected(null);
-              }}
-              style={[styles.assignmentCourseFilter, courseFilter === courseOption && styles.assignmentCourseFilterActive]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: courseFilter === courseOption }}
-            >
-              <Text style={[styles.assignmentCourseFilterText, courseFilter === courseOption && styles.assignmentCourseFilterTextActive]}>{courseOption}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
-      <FilterChips items={filters} selected={filter} onSelect={setFilter} variant="tabs" />
+      </Modal>
+      <FilterChips items={filters} selected={filter} onSelect={setFilter} variant="tabs" counts={teacherFilterCounts} />
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {!resource.loading && !resource.error && !items.length ? <EmptyState title="Không có bài tập" message="Thử chọn bộ lọc khác nhé." /> : null}
@@ -2696,20 +2730,6 @@ export function AssignmentsScreen({
   return (
     <View style={styles.assignmentScreen}>
       {embedded ? <View>{content}</View> : <AppScreen scrollViewRef={screenScrollRef}>{content}</AppScreen>}
-      {isTeacher && !embedded && !showCreate ? (
-        <Pressable
-          onPress={() => {
-            resetCreateForm();
-            setCourse(courseFilter);
-            setShowCreate(true);
-          }}
-          style={styles.assignmentCreateAction}
-          accessibilityRole="button"
-          accessibilityLabel="Tạo bài tập"
-        >
-          <Plus size={23} color="#FFFFFF" />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -5015,12 +5035,20 @@ function formatCurrency(value: number) {
   return `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 }
 
-function FilterChips({ items, selected, onSelect, compact = false, variant = 'chips' }: { items: string[]; selected: string; onSelect: (item: string) => void; compact?: boolean; variant?: 'chips' | 'tabs' }) {
+function FilterChips({ items, selected, onSelect, compact = false, variant = 'chips', counts }: {
+  items: string[];
+  selected: string;
+  onSelect: (item: string) => void;
+  compact?: boolean;
+  variant?: 'chips' | 'tabs';
+  counts?: Record<string, { value: number; color: string; background: string }>;
+}) {
   if (variant === 'tabs') {
     return (
       <View style={styles.filterTabs} accessibilityRole="tablist">
         {items.map((item) => {
           const active = selected === item;
+          const count = counts?.[item];
           return (
             <Pressable
               key={item}
@@ -5029,7 +5057,12 @@ function FilterChips({ items, selected, onSelect, compact = false, variant = 'ch
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
-              <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>{item}</Text>
+              <View style={styles.filterTabInner}>
+                <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>{item}</Text>
+                {count && count.value > 0 ? (
+                  <Text style={[styles.filterTabCount, { color: count.color, backgroundColor: count.background }]}>{count.value}</Text>
+                ) : null}
+              </View>
             </Pressable>
           );
         })}
@@ -5102,13 +5135,31 @@ const styles = StyleSheet.create({
   assessmentTabText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
   assessmentTabTextActive: { color: colors.brand, fontWeight: '800' },
   assignmentScreen: { flex: 1 },
-  assignmentEmbeddedCreateAction: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginBottom: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.surface },
-  assignmentEmbeddedCreateText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
-  assignmentCourseFilters: { gap: spacing.xs, paddingBottom: spacing.sm },
-  assignmentCourseFilter: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface },
-  assignmentCourseFilterActive: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
-  assignmentCourseFilterText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700' },
-  assignmentCourseFilterTextActive: { color: colors.brandDark },
+  assignToolbar: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.sm, marginBottom: spacing.sm },
+  assignCoursePill: {
+    flex: 1, minWidth: 0, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md,
+    borderWidth: 2, borderColor: '#FECACA', borderRadius: radius.md, backgroundColor: '#FEF2F2',
+  },
+  assignCourseCaption: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
+  assignCourseName: { color: '#B91C1C', fontSize: 14, fontWeight: '900' },
+  assignCreateButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.md,
+    backgroundColor: colors.brand, boxShadow: '0px 6px 14px rgba(220, 38, 38, 0.28)',
+  } as never,
+  assignCreateText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 16 },
+  assignSheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2, 6, 23, 0.5)' },
+  assignSheet: {
+    maxHeight: '70%', gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xl,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: colors.surface,
+  },
+  assignSheetList: { gap: spacing.xs },
+  assignSheetOption: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md,
+  },
+  assignSheetOptionActive: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  assignSheetOptionText: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '800' },
+  assignSheetOptionTextActive: { color: '#B91C1C' },
   teacherAssignmentCard: { gap: spacing.sm, padding: spacing.md },
   teacherAssignmentHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   teacherAssignmentTitleWrap: { flex: 1, minWidth: 0, gap: 3 },
@@ -5124,7 +5175,6 @@ const styles = StyleSheet.create({
   teacherAssignmentMetric: { flex: 1, minWidth: 0, alignItems: 'center', gap: 3, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.canvas },
   teacherAssignmentMetricValue: { color: colors.ink, fontSize: typography.small, fontWeight: '800' },
   teacherAssignmentMetricLabel: { color: colors.muted, fontSize: typography.micro, fontWeight: '700', textAlign: 'center' },
-  assignmentCreateAction: { position: 'absolute', right: spacing.lg, bottom: 76, zIndex: 10, width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.brand, elevation: 6, shadowColor: '#0F172A', shadowOpacity: 0.22, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   assignmentTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   assignmentTab: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm },
   assignmentTabActive: { backgroundColor: colors.brand, borderColor: colors.brand },
@@ -5418,6 +5468,8 @@ const styles = StyleSheet.create({
   filterTabActive: { borderBottomColor: colors.brand },
   filterTabText: { color: colors.muted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
   filterTabTextActive: { color: colors.brand, fontWeight: '800' },
+  filterTabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  filterTabCount: { minWidth: 20, paddingHorizontal: 6, borderRadius: 999, overflow: 'hidden', fontSize: 11, fontWeight: '900', textAlign: 'center' },
   compactChips: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.line },
   compactChipsContent: { alignItems: 'stretch', gap: 14, paddingHorizontal: spacing.md },
   chip: { minHeight: 44, paddingVertical: 9, paddingHorizontal: 14, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, justifyContent: 'center' },

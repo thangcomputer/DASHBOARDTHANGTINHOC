@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { typography } from '../theme/tokens';
 import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
+import { isDirectVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
 import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
 
 type YouTubePlayer = {
@@ -63,14 +64,6 @@ function loadYouTubeApi() {
   return youtubeApiPromise;
 }
 
-function youtubeIdFromUrl(url: string) {
-  return url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/)?.[1] || '';
-}
-
-function vimeoIdFromUrl(url: string) {
-  return url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1] || '';
-}
-
 export function VideoPlayerFrame({
   videoUrl,
   embeddedUrl,
@@ -124,7 +117,7 @@ export function VideoPlayerFrame({
   }, [playerApiRef]);
 
   useEffect(() => {
-    const directVideo = /\.(mp4|webm|ogg)(?:$|[?#])/i.test(videoUrl);
+    const directVideo = isDirectVideoUrl(videoUrl);
     const youtubeId = youtubeIdFromUrl(videoUrl);
     const vimeoId = vimeoIdFromUrl(videoUrl);
     const watchStorageKey = `student_lms_pos_${lessonId}`;
@@ -361,7 +354,7 @@ export function VideoPlayerFrame({
     return undefined;
   }, [embeddedUrl, lessonId, videoUrl, playerApiRef]);
 
-  const directVideo = /\.(mp4|webm|ogg)(?:$|[?#])/i.test(videoUrl);
+  const directVideo = isDirectVideoUrl(videoUrl);
   const vimeoId = vimeoIdFromUrl(videoUrl);
   const vimeoSrc = vimeoId
     ? `${embeddedUrl}${embeddedUrl.includes('?') ? '&' : '?'}api=1&player_id=mobile-course-video`

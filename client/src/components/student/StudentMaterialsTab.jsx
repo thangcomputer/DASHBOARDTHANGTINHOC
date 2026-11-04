@@ -13,6 +13,7 @@ export default function StudentMaterialsTab({
   setActiveCourseName,
   initialMainTab = null,
   hideTabBar = true,
+  focusAssignmentId = '',
 }) {
   const preferredCourse = getActiveOneToOneEnrollment(enrollments);
   const appliedInitialPreference = useRef(false);
@@ -46,6 +47,7 @@ export default function StudentMaterialsTab({
               onBack={undefined}
               initialMainTab={initialMainTab}
               hideTabBar={hideTabBar}
+              focusAssignmentId={focusAssignmentId}
             />
           </div>
   );

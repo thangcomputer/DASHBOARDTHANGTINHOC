@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import CmsSelect from './ui/CmsSelect';
-import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search } from 'lucide-react';
+import { Plus, Clipboard, FileText, Download, CheckCircle, Clock, XCircle, Search, Inbox } from 'lucide-react';
 import NavArrow from './ui/NavArrow';
 import { useLocation } from 'react-router-dom';
 import api, { buildMediaDownloadUrl } from '../services/api';
@@ -27,6 +27,19 @@ function studentIdOf(s) {
   return String(s?._id || s?.id || '').trim();
 }
 
+/** Cùng quy tắc với mobile: còn bài nộp chưa chấm → Cần chấm; có bài nộp và đã chấm hết → Đã chấm. */
+function gradingStatus(assignment) {
+  const subs = (assignment?.submissions || []).filter((s) => s.status !== 'not_submitted');
+  if (subs.some((s) => s.status !== 'graded')) return 'pending';
+  return subs.length ? 'graded' : 'none';
+}
+
+const GRADING_FILTERS = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'pending', label: 'Cần chấm' },
+  { id: 'graded', label: 'Đã chấm' },
+];
+
 const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const location = useLocation();
   const { socket, onDataRefresh } = useSocket();
@@ -50,6 +63,20 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const courseStudents = useMemo(
     () => (myStudents || []).filter((s) => String(s.course || '') === String(selectedCourse || '')),
     [myStudents, selectedCourse],
+  );
+
+  const [gradingFilter, setGradingFilter] = useState('all');
+  const gradingCounts = useMemo(() => {
+    const counts = { all: assignments.length, pending: 0, graded: 0 };
+    assignments.forEach((a) => {
+      const status = gradingStatus(a);
+      if (status in counts) counts[status] += 1;
+    });
+    return counts;
+  }, [assignments]);
+  const visibleAssignments = useMemo(
+    () => (gradingFilter === 'all' ? assignments : assignments.filter((a) => gradingStatus(a) === gradingFilter)),
+    [assignments, gradingFilter],
   );
 
   const [gradingSubmission, setGradingSubmission] = useState(null);
@@ -367,26 +394,65 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         </button>
       </div>
 
+      <div className="grid grid-cols-3 border-b border-slate-200" role="tablist" aria-label="Lọc bài tập theo trạng thái chấm">
+        {GRADING_FILTERS.map((option) => {
+          const active = gradingFilter === option.id;
+          const count = gradingCounts[option.id];
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setGradingFilter(option.id)}
+              className={`relative flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold transition-colors !shadow-none ${active ? 'text-red-600' : 'text-slate-500 hover:text-slate-800'}`}
+            >
+              {option.label}
+              {option.id !== 'all' && count > 0 && (
+                <span className={`min-w-5 rounded-full px-1.5 text-[11px] font-black tabular-nums ${option.id === 'pending' ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {count}
+                </span>
+              )}
+              <span className={`absolute inset-x-0 -bottom-px h-0.5 rounded-full ${active ? 'bg-red-600' : 'bg-transparent'}`} aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {assignments.length === 0 ? (
-          <div className="col-span-full py-16 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
-            <FileText size={40} className="mx-auto mb-4 text-slate-200" />
-            <p className="font-bold text-slate-600">Chưa có Bài tập nào</p>
-            <p className="text-sm text-slate-400 mt-1">Giao bài đầu tiên cho lớp tải về làm thực hành</p>
+        {visibleAssignments.length === 0 ? (
+          <div className="col-span-full flex flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white px-6 py-10 text-center shadow-sm">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <Inbox size={22} aria-hidden="true" />
+            </span>
+            <p className="mt-1 text-base font-black text-slate-900">
+              {assignments.length ? 'Không có bài tập' : 'Chưa có bài tập nào'}
+            </p>
+            <p className="text-sm text-slate-500">
+              {assignments.length ? 'Thử chọn bộ lọc khác nhé.' : 'Giao bài đầu tiên cho lớp tải về làm thực hành.'}
+            </p>
           </div>
         ) : (
-          assignments.map(a => {
+          visibleAssignments.map(a => {
             const stats = calculateStats(a.submissions);
             const isClosed = new Date(a.deadline) < new Date();
+            const grading = gradingStatus(a);
             
             return (
               <div key={a._id} className="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between hover:shadow-lg transition-shadow">
                 <div>
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start gap-2 mb-2">
                     <h3 className="font-bold text-slate-800 text-lg leading-tight">{a.title}</h3>
-                    <span className={`text-[10px] font-black  px-2 py-1 rounded-md ${isClosed ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                      {isClosed ? 'Đã đóng' : 'Hoạt động'}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`text-[10px] font-black  px-2 py-1 rounded-md ${isClosed ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                        {isClosed ? 'Đã đóng' : 'Hoạt động'}
+                      </span>
+                      {grading !== 'none' && (
+                        <span className={`text-[10px] font-black px-2 py-1 rounded-md ${grading === 'pending' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                          {grading === 'pending' ? 'Cần chấm' : 'Đã chấm'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500 mb-3 line-clamp-2">{a.description || 'Không có mô tả'}</p>
                   <p className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">

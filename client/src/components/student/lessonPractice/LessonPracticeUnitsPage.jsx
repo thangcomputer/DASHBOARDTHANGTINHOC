@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, CheckCircle2, ChevronDown, Clapperboard, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clapperboard, Gamepad2, Loader2, Lock, Menu, NotebookPen, PenLine, Trophy } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
+import dailyPracticeApi from '../../../services/dailyPracticeApi';
+import { topicColor, topicIcon } from '../../../utils/dailyPractice';
 import { resolveMediaUrl } from '../../../services/api';
 import { extractYouTubeId } from '../../../utils/youtubeDuration';
 import { resolveRichHtmlMedia, sanitizeRichHtml } from '../../../utils/htmlContent';
@@ -383,11 +385,74 @@ function NotePane({ unit, content, done, onMarkRead }) {
             const saved = await onMarkRead?.(selectedContent?.id);
             if (saved) setReadCelebrating(true);
           }}
-          className="mt-auto self-start rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
         >
-          {atEnd ? 'Tôi đã đọc xong' : 'Lăn hết nội dung để tích đã đọc'}
+          <CheckCircle2 size={17} aria-hidden="true" />
+          {atEnd ? 'Đã đọc xong · Tiếp tục' : 'Lăn hết nội dung để tích đã đọc'}
         </button>
       )}
+    </div>
+  );
+}
+
+function isSectionDone(unit, item) {
+  if (!unit || !item) return false;
+  if (item.kind === 'video') return Boolean(unit.videoDoneIds?.includes(item.itemId) || unit.videoDone);
+  if (item.kind === 'note') return Boolean(unit.noteDoneIds?.includes(item.itemId) || unit.noteDone);
+  return Boolean(unit.practiceDoneGroupIds?.includes(item.itemId) || unit.practiceDone);
+}
+
+/**
+ * Thanh điều hướng đáy bài học — giống mobile: đang học thì "Mục trước / Mục sau"
+ * (mục sau mở khi xong mục hiện tại); xong cả buổi thì "Bài trước / Bài tiếp theo".
+ */
+function LessonNavigationBar({ unit, sections, activeId, previousUnit, nextUnit, onSection, onUnit }) {
+  const index = sections.findIndex((item) => item.id === activeId);
+  const allDone = sections.length > 0 && sections.every((item) => isSectionDone(unit, item));
+  const base = 'flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 !shadow-none';
+
+  if (!sections.length || allDone) {
+    const nextOpen = Boolean(nextUnit && !nextUnit.locked);
+    const previousOpen = Boolean(previousUnit && !previousUnit.locked);
+    return (
+      <div className="mt-2 flex shrink-0 gap-2">
+        <button type="button" disabled={!previousOpen} onClick={() => onUnit(previousUnit)} className={`${base} border-slate-200 bg-white hover:border-red-200`}>
+          <ArrowLeft size={16} className="shrink-0 text-red-600" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block text-[11px] font-bold text-slate-500">Bài trước</span>
+            <span className="block truncate text-sm font-black text-slate-800">{previousUnit?.title || 'Không có'}</span>
+          </span>
+        </button>
+        <button type="button" disabled={!nextOpen} onClick={() => onUnit(nextUnit)} className={`${base} justify-end text-right ${nextOpen ? 'border-red-600 bg-red-600 text-white hover:bg-red-700' : 'border-slate-200 bg-slate-50'}`}>
+          <span className="min-w-0">
+            <span className={`block text-[11px] font-bold ${nextOpen ? 'text-red-100' : 'text-slate-500'}`}>Bài tiếp theo</span>
+            <span className={`block truncate text-sm font-black ${nextOpen ? 'text-white' : 'text-slate-800'}`}>{nextUnit?.title || 'Đã đến bài cuối'}</span>
+          </span>
+          <ChevronRight size={16} className={`shrink-0 ${nextOpen ? 'text-white' : 'text-slate-400'}`} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  const previous = index > 0 ? sections[index - 1] : null;
+  const next = index >= 0 ? sections[index + 1] || null : null;
+  const currentDone = index >= 0 && isSectionDone(unit, sections[index]);
+  return (
+    <div className="mt-2 flex shrink-0 gap-2">
+      <button type="button" disabled={!previous} onClick={() => onSection(previous.id)} className={`${base} border-slate-200 bg-white hover:border-red-200`}>
+        <ArrowLeft size={15} className="shrink-0 text-red-600" aria-hidden="true" />
+        <span className="truncate text-sm font-black text-slate-800">{previous?.label || 'Mục trước'}</span>
+      </button>
+      <button
+        type="button"
+        disabled={!next || !currentDone}
+        onClick={() => onSection(next.id)}
+        title={next && !currentDone ? 'Hoàn thành mục hiện tại để tiếp tục' : undefined}
+        className={`${base} justify-end border-slate-200 bg-slate-50 hover:border-red-200`}
+      >
+        <span className="truncate text-sm font-black text-slate-800">{next?.label || 'Mục sau'}</span>
+        <ChevronRight size={15} className="shrink-0 text-slate-500" aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -591,9 +656,11 @@ function saveCourseCompletionCelebration(key) {
 
 export default function LessonPracticeUnitsPage() {
   const { subjectId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const requestedCourseId = searchParams.get('courseId') || '';
+  const requestedUnitId = searchParams.get('unitId') || '';
+  const requestedSectionId = searchParams.get('section') || '';
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -658,6 +725,7 @@ export default function LessonPracticeUnitsPage() {
   const openUnit = units.find((unit) => unit.id === openUnitId && !unit.locked) || null;
   const openUnitIndex = openUnit ? units.findIndex((unit) => unit.id === openUnit.id) : -1;
   const nextUnit = openUnitIndex >= 0 ? units[openUnitIndex + 1] : null;
+  const previousUnit = openUnitIndex > 0 ? units[openUnitIndex - 1] : null;
   const openUnitVideos = openUnit?.videos?.length
     ? openUnit.videos
     : (openUnit?.videoUrl ? [{ id: 'legacy-video', title: 'Video 1', url: openUnit.videoUrl }] : []);
@@ -700,16 +768,54 @@ export default function LessonPracticeUnitsPage() {
   useEffect(() => {
     if (!payload || payload.subject?.id !== subjectId) return undefined;
     const current = units.find((unit) => unit.id === openUnitId);
-    if (current && !current.locked) return undefined;
-    const saved = readResumePoint(resumeStorageKey);
+    if (current && !current.locked && !requestedUnitId) return undefined;
+    const linked = requestedUnitId ? { unitId: requestedUnitId, sectionId: requestedSectionId } : null;
+    const saved = linked || readResumePoint(resumeStorageKey);
     const resumeUnit = saved && units.find((unit) => unit.id === saved.unitId && !unit.locked);
     const starter = resumeUnit || pickStarter(units);
     const sections = orderedSections(starter);
     const resumeSection = resumeUnit && sections.find((item) => item.id === saved.sectionId);
     setOpenUnitId(starter?.id || '');
     if (starter) setSection(resumeSection?.id || sections[0]?.id || '');
+    if (linked) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('unitId');
+      next.delete('section');
+      setSearchParams(next, { replace: true });
+    }
     return undefined;
-  }, [payload, subjectId, openUnitId, units, resumeStorageKey]);
+  }, [payload, subjectId, openUnitId, units, resumeStorageKey, requestedUnitId, requestedSectionId, searchParams, setSearchParams]);
+
+  const [relatedTopics, setRelatedTopics] = useState({ key: '', rows: [] });
+  const relatedKey = openUnit && !openUnit.isPreview ? `${subjectId}|${openUnit.id}` : '';
+  useEffect(() => {
+    if (!relatedKey) return undefined;
+    let alive = true;
+    const [relatedSubjectId, relatedUnitId] = relatedKey.split('|');
+    dailyPracticeApi.student.relatedTopics(relatedSubjectId, relatedUnitId)
+      .then((rows) => { if (alive) setRelatedTopics({ key: relatedKey, rows: Array.isArray(rows) ? rows : [] }); })
+      .catch(() => { if (alive) setRelatedTopics({ key: relatedKey, rows: [] }); });
+    return () => { alive = false; };
+  }, [relatedKey]);
+  const unitRelatedTopics = relatedTopics.key === relatedKey ? relatedTopics.rows : [];
+
+  const activeSectionId = activeSection?.id || '';
+  const lastSyncedPosition = useRef('');
+  useEffect(() => {
+    if (!openUnit || openUnit.isPreview || !activeSectionId) return undefined;
+    const signature = `${openUnit.id}|${activeSectionId}|${requestedCourseId}`;
+    if (lastSyncedPosition.current === signature) return undefined;
+    const timer = window.setTimeout(() => {
+      lastSyncedPosition.current = signature;
+      saveResumePoint(resumeStorageKey, openUnit.id, activeSectionId);
+      lessonPracticeApi.student.saveResumePoint({
+        unitId: openUnit.id,
+        sectionId: activeSectionId,
+        courseId: requestedCourseId,
+      }).catch(() => { lastSyncedPosition.current = ''; });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [openUnit, activeSectionId, requestedCourseId, resumeStorageKey]);
 
   function chooseUnit(unit) {
     if (unit.locked) return;
@@ -905,11 +1011,7 @@ export default function LessonPracticeUnitsPage() {
                         {orderedSections(unit).map((item) => {
                           const Icon = item.icon;
                           const active = section === item.id;
-                          const done = item.kind === 'video'
-                            ? unit.videoDoneIds?.includes(item.itemId) || unit.videoDone
-                            : item.kind === 'note'
-                              ? unit.noteDoneIds?.includes(item.itemId) || unit.noteDone
-                              : unit.practiceDoneGroupIds?.includes(item.itemId) || unit.practiceDone;
+                          const done = isSectionDone(unit, item);
                           return (
                             <button
                               key={item.id}
@@ -1004,6 +1106,39 @@ export default function LessonPracticeUnitsPage() {
                     />
                   </div>
                 )}
+                {unitRelatedTopics.length > 0 && (
+                  <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-xs font-black text-amber-800">
+                      <Gamepad2 size={15} aria-hidden="true" /> Luyện tập chủ đề liên quan:
+                    </span>
+                    {unitRelatedTopics.map((topic) => {
+                      const TopicIcon = topicIcon(topic.icon);
+                      const color = topicColor(topic.color);
+                      return (
+                        <button
+                          key={topic.id}
+                          type="button"
+                          onClick={() => navigate(`/student/daily-practice?topicId=${encodeURIComponent(topic.id)}`)}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-800 ring-1 ring-amber-200 transition hover:ring-amber-400 !shadow-none"
+                        >
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full text-white" style={{ background: `linear-gradient(180deg, ${color.from}, ${color.to})` }}>
+                            <TopicIcon size={11} aria-hidden="true" />
+                          </span>
+                          {topic.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <LessonNavigationBar
+                  unit={openUnit}
+                  sections={openSections}
+                  activeId={activeSection?.id || ''}
+                  previousUnit={previousUnit}
+                  nextUnit={nextUnit}
+                  onSection={(id) => setSection(id)}
+                  onUnit={(target) => { if (target && !target.locked) chooseUnit(target); }}
+                />
               </>
             ) : (
               <p className="text-sm text-slate-500">Chọn một buổi bên trái để xem video, nội dung buổi học hoặc luyện tập.</p>

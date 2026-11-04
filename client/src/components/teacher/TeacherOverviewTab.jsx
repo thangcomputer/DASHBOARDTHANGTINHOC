@@ -1,18 +1,17 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Calendar, CalendarDays, ChevronRight, Award, Star, Zap, UserCheck, Clipboard,
-  MessageSquare, GraduationCap, Users, Video, UserPlus, WalletCards, Clock, ExternalLink,
+  CalendarDays, ChevronRight, Award, Zap, UserCheck, Clipboard, GraduationCap, WalletCards, Clock, TrendingUp,
 } from 'lucide-react';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
-import api, { resolveMediaUrl } from '../../services/api';
+import api from '../../services/api';
 import TeacherRatingDisplay from './TeacherRatingDisplay';
+import WelcomeHero from '../WelcomeHero';
 import {
   isScheduleOngoingNow,
   getScheduleDisplayKind,
   normalizeScheduleDate,
   formatLocalDateKey,
 } from '../../utils/scheduleTime';
-import { getClientEnrollments } from '../../utils/enrollments';
 import { STAR_BONUS_MIN_STUDENTS, STAR_BONUS_MIN_STARS } from '../../utils/teacherCommission';
 import { starsFromRating } from '../../context/useDataRatings';
 import '../dashboard-overview.css';
@@ -55,16 +54,12 @@ function getNextScheduleForStudent(schedules, student, now = new Date()) {
 }
 
 export default function TeacherOverviewTab({
-  navigate, totalMonthlyIncome, teacherName, currentTeacher,
-  teacherRating, students, mySchedules = [], myNotifs, RATING_CRITERIA,
-  teacherId,
+  navigate, totalMonthlyIncome, teacherName,
+  teacherRating, students, mySchedules = [], RATING_CRITERIA,
 }) {
-  const [banners, setBanners] = useState([]);
-  const [bannerSpeed, setBannerSpeed] = useState(5);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [pendingGradeCount, setPendingGradeCount] = useState(0);
 
-  const meId = String(teacherId || currentTeacher?.id || currentTeacher?._id || '');
   const todayKey = formatLocalDateKey(new Date());
 
   useEffect(() => {
@@ -109,29 +104,6 @@ export default function TeacherOverviewTab({
     };
   }, [students]);
 
-  // Fetch Banners
-  useEffect(() => {
-    let unmounted = false;
-    api.settings.getWeb()
-      .then((res) => {
-        if (res?.success && !unmounted) {
-          setBanners(res.data.teacherBanners || []);
-          setBannerSpeed(res.data.teacherBannerSpeed || 5);
-        }
-      })
-      .catch(() => {});
-    return () => { unmounted = true; };
-  }, []);
-
-  const [bannerIdx, setBannerIdx] = useState(0);
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const t = setInterval(() => {
-      setBannerIdx((prev) => (prev + 1) % banners.length);
-    }, bannerSpeed * 1000);
-    return () => clearInterval(t);
-  }, [banners, bannerSpeed]);
-
   // Check if there is a live schedule right now
   const ongoingSchedule = useMemo(() => {
     void nowTick;
@@ -145,6 +117,9 @@ export default function TeacherOverviewTab({
       String(student?._id || student?.id || '') === studentId
     )) || null;
   }, [ongoingSchedule, students]);
+
+  const todaySessionCount = (mySchedules || [])
+    .filter((s) => s.status === 'scheduled' && normalizeScheduleDate(s.date) === todayKey).length;
 
   const ongoingJoinUrl = (
     ongoingSchedule?.linkHoc
@@ -175,51 +150,32 @@ export default function TeacherOverviewTab({
       });
   }, [students, mySchedules, nowTick]);
 
-  const upcomingThisMonth = useMemo(() => {
+  /** Ca sắp tới gần nhất (dùng cho nhãn thẻ chào mừng khi chưa có ca đang dạy). */
+  const nextUpcoming = useMemo(() => {
     void nowTick;
     const now = new Date();
-    const monthKey = formatLocalDateKey(now).slice(0, 7);
     return (mySchedules || [])
-      .filter((s) => {
-        if (String(s?.status || '') !== 'scheduled') return false;
-        if (normalizeScheduleDate(s.date).slice(0, 7) !== monthKey) return false;
-        const kind = getScheduleDisplayKind(s, now);
-        return kind === 'upcoming' || kind === 'ongoing';
-      })
-      .sort((a, b) => {
-        const ka = `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`;
-        const kb = `${normalizeScheduleDate(b.date)}-${b.startTime || ''}`;
-        return ka.localeCompare(kb);
-      });
+      .filter((s) => String(s?.status || '') === 'scheduled' && getScheduleDisplayKind(s, now) === 'upcoming')
+      .sort((a, b) => `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`.localeCompare(`${normalizeScheduleDate(b.date)}-${b.startTime || ''}`))[0] || null;
   }, [mySchedules, nowTick]);
 
-  /** HV mới gắn với GV trong 30 ngày (theo registeredAt enrollment / createdAt). */
-  const newStudents30d = useMemo(() => {
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const tid = String(teacherId || meId || '');
-    const seen = new Set();
-    let count = 0;
-    for (const s of students || []) {
-      const studentKey = String(s._id || s.id || '');
-      if (!studentKey || seen.has(studentKey)) continue;
+  /** Ca hôm nay đã tới giờ nhưng chưa điểm danh (chưa gửi xác nhận cho HV). */
+  const unmarkedToday = useMemo(() => {
+    void nowTick;
+    const now = new Date();
+    return (mySchedules || [])
+      .filter((s) => String(s?.status || '') === 'scheduled'
+        && normalizeScheduleDate(s.date) === todayKey
+        && getScheduleDisplayKind(s, now) !== 'upcoming'
+        && String(s.studentConfirmStatus || 'none') !== 'pending')
+      .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
+  }, [mySchedules, nowTick, todayKey]);
 
-      const enrs = getClientEnrollments(s).filter((e) => {
-        if (!tid) return true;
-        return String(e.teacherId || '') === tid;
-      });
-      const times = enrs
-        .map((e) => new Date(e.registeredAt || 0).getTime())
-        .filter((t) => Number.isFinite(t) && t > 0);
-      const fallback = new Date(s.registeredAt || s.createdAt || 0).getTime();
-      if (Number.isFinite(fallback) && fallback > 0) times.push(fallback);
-      const newest = times.length ? Math.max(...times) : 0;
-      if (newest >= cutoff) {
-        seen.add(studentKey);
-        count += 1;
-      }
-    }
-    return count;
-  }, [students, teacherId, meId]);
+  const taughtThisMonth = useMemo(() => {
+    const monthKey = todayKey.slice(0, 7);
+    return (mySchedules || []).filter((s) => String(s?.status || '') === 'completed'
+      && normalizeScheduleDate(s.date).slice(0, 7) === monthKey).length;
+  }, [mySchedules, todayKey]);
 
   /** HV đạt ≥5★ trong tháng hiện tại; Đạt khi đủ ngưỡng thưởng sao (≥5 HV/tháng). */
   const fiveStarStats = useMemo(() => {
@@ -250,226 +206,142 @@ export default function TeacherOverviewTab({
     [students],
   );
 
+  const heroChips = ongoingSchedule
+    ? [{ tone: 'live', label: `Đang dạy: ${ongoingSchedule.studentName || 'Học viên'} · ${ongoingSchedule.course || ''} · ${ongoingSchedule.startTime}–${ongoingSchedule.endTime}` }]
+    : nextUpcoming
+      ? [{
+        icon: CalendarDays,
+        label: `Ca tới: ${nextUpcoming.startTime || ''} · ${nextUpcoming.studentName || 'Học viên'} · ${[formatSessionDayLabel(nextUpcoming.date).weekday, formatSessionDayLabel(nextUpcoming.date).dateLabel].filter(Boolean).join(' ')}`,
+      }]
+      : [{ icon: CalendarDays, label: 'Chưa có ca dạy sắp tới' }];
+
+  const openStudentAttendance = (sch) => {
+    const stId = sch?.studentId?._id || sch?.studentId?.id || sch?.studentId;
+    if (!stId) { navigate('/teacher#students'); return; }
+    navigate(`/teacher#students?studentId=${stId}&course=${encodeURIComponent(sch.course || sch.courseName || '')}`);
+  };
+
+  const todoItems = [];
+  if (unmarkedToday.length) {
+    const first = unmarkedToday[0];
+    todoItems.push({
+      key: 'attendance',
+      icon: UserCheck,
+      tone: 'bg-gradient-to-b from-emerald-400 to-emerald-600',
+      title: `Ca chưa điểm danh (${unmarkedToday.length})`,
+      sub: `${first.studentName || 'Học viên'} · ${first.startTime || ''}${first.endTime ? `–${first.endTime}` : ''}`,
+      cta: 'Điểm danh',
+      action: () => openStudentAttendance(first),
+    });
+  }
+  if (pendingGradeCount > 0) {
+    todoItems.push({
+      key: 'grading',
+      icon: Clipboard,
+      tone: 'bg-gradient-to-b from-amber-400 to-orange-500',
+      title: `Bài chờ chấm (${pendingGradeCount} HV)`,
+      sub: 'Học viên đã nộp, đang chờ bạn chấm điểm',
+      cta: 'Chấm bài',
+      action: () => navigate('/teacher#assignments'),
+    });
+  }
+
   return (
     <div className="bg-[#F5F8FC] py-3 sm:py-5 md:py-6 space-y-4 lg:space-y-5 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0 max-w-full overflow-x-hidden pb-4 th-dashboard-overview th-dashboard-overview--teacher">
       
-      {/* ── HEADER (gọn) + BANNER ── */}
-      <header className="flex flex-col gap-3 sm:gap-4 mb-1 min-w-0 th-dashboard-overview__header">
-        <div className="min-w-0 w-full th-dashboard-overview__intro">
-          <p className="th-dashboard-overview__eyebrow">Không gian giảng dạy</p>
-          <h2 className="text-base sm:text-lg font-black text-slate-800 break-words th-dashboard-overview__title">
-            Chào mừng, {teacherName || 'Giảng viên'}!
-          </h2>
-          <p className="text-xs text-slate-500 mt-1 th-dashboard-overview__subtitle">
-            Ưu tiên điểm danh, lịch dạy và học viên được phân công.
-          </p>
-        </div>
+      <header className="flex min-w-0">
+        <WelcomeHero
+          role="teacher"
+          name={teacherName}
+          chips={heroChips}
+          joinUrl={ongoingSchedule ? ongoingJoinUrl : ''}
+          joinHint={ongoingSchedule ? 'Chưa có link dạy' : todaySessionCount ? 'Chưa đến giờ dạy' : 'Chưa có lịch dạy'}
+        />
       </header>
 
-      {banners.length > 0 && (
-        <div
-          className="relative w-full aspect-[5/1] min-h-20 max-h-36 bg-gray-50 rounded-xl overflow-hidden shrink-0 shadow-sm border border-gray-200 cursor-pointer group th-dashboard-overview__banner"
-          onClick={() => banners[bannerIdx]?.linkUrl && window.open(banners[bannerIdx].linkUrl, '_blank')}
-        >
-          {banners.map((b, i) => (
-            <img
-              key={i}
-              src={resolveMediaUrl(b.imageUrl)}
-              alt="Banner"
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${i === bannerIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-            />
-          ))}
-          {banners.length > 1 && (
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10">
-              {banners.map((_, i) => (
-                <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === bannerIdx ? 'bg-white shadow-sm' : 'bg-white/40'}`} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── LIVE ONGOING SCHEDULE BANNER (Hiển thị nổi bật khi có lớp đang diễn ra) ── */}
-      {ongoingSchedule && (
-        <div className="th-dashboard-overview__live-card text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-              <Video size={20} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-xs font-black  tracking-wider text-red-100">Ca dạy đang diễn ra</span>
-              </div>
-              <h4 className="text-sm sm:text-base font-black text-white truncate mt-0.5">
-                👤 {ongoingSchedule.studentName || 'Học viên'} &bull; <span className="text-yellow-300">{ongoingSchedule.course}</span>
-              </h4>
-              <p className="text-xs text-red-100 font-medium">
-                Thời gian: {ongoingSchedule.startTime} - {ongoingSchedule.endTime}
-              </p>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-stretch">
+      {/* ── Cần xử lý: chỉ hiện việc còn tồn, bấm là tới đúng việc ── */}
+      <section className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 min-w-0">
+        <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
+          <Zap size={16} className="text-amber-500 shrink-0" aria-hidden="true" /> Cần xử lý
+        </h3>
+        {todoItems.length ? todoItems.map(({ key, icon: Icon, tone, title, sub, cta, action }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={action}
+            className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-red-200 hover:bg-red-50/40"
+          >
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
+              <Icon size={19} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black text-slate-900">{title}</span>
+              {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
+            </span>
+            <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-red-600">
+              {cta} <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </span>
+          </button>
+        )) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl bg-emerald-50 px-4 py-6 text-center">
+            <UserCheck size={28} className="text-emerald-500" aria-hidden="true" />
+            <p className="text-sm font-black text-emerald-700">Không còn việc tồn đọng</p>
+            <p className="text-xs text-emerald-600">Các ca đã điểm danh và không có bài chờ chấm.</p>
           </div>
+        )}
+      </section>
 
-          {ongoingJoinUrl && (
-            <a
-              href={ongoingJoinUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full sm:w-auto px-5 py-2.5 bg-white text-red-600 hover:bg-red-50 rounded-xl text-xs sm:text-sm font-black shadow-lg transition active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-            >
-              <Video size={16} />  Vào lớp ngay
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* ── Quick actions (ưu tiên hành động) ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm th-dashboard-overview__actions">
-        <div className="flex items-center gap-2 mb-2.5 sm:mb-3">
-          <Zap size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
-          <h3 className="font-bold text-sm lg:text-base text-slate-800">Công việc cần xử lý ngay</h3>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+      {/* ── Tháng này: 3 cột gọn (giống mobile) ── */}
+      <section className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 min-w-0">
+        <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
+          <TrendingUp size={16} className="text-sky-500 shrink-0" aria-hidden="true" /> Tháng này
+        </h3>
+        <div className="grid flex-1 grid-cols-3 gap-2 sm:gap-3">
           {[
             {
-              icon: UserCheck,
-              label: 'Điểm danh',
-              sub: `${mySchedules.filter((s) => s.status === 'scheduled' && normalizeScheduleDate(s.date) === todayKey).length} buổi hôm nay`,
-              tint: 'bg-emerald-50 hover:bg-emerald-100/80 border-emerald-100 text-emerald-900',
-              iconClass: 'text-emerald-600',
-              action: () => {
-                const todaySchedules = mySchedules.filter((s) => s.status === 'scheduled' && normalizeScheduleDate(s.date) === todayKey);
-                if (todaySchedules.length > 0) {
-                  const oldest = todaySchedules.sort((a, b) => {
-                    const timeA = a.startTime ? a.startTime.replace(':', '') : '0000';
-                    const timeB = b.startTime ? b.startTime.replace(':', '') : '0000';
-                    return Number(timeA) - Number(timeB);
-                  })[0];
-                  const stId = oldest.studentId?._id || oldest.studentId?.id || oldest.studentId;
-                  if (stId) {
-                    navigate(`/teacher#students?studentId=${stId}&course=${encodeURIComponent(oldest.course || oldest.courseName || '')}`);
-                    return;
-                  }
-                }
-                navigate('/teacher#students');
-              },
-            },
-            {
-              icon: Clipboard,
-              label: 'Chấm điểm',
-              sub: pendingGradeCount > 0
-                ? `${pendingGradeCount} HV chờ chấm điểm`
-                : 'Không có bài chờ chấm',
-              tint: 'bg-amber-50 hover:bg-amber-100/80 border-amber-100 text-amber-900',
-              iconClass: 'text-amber-600',
-              action: () => navigate('/teacher#assignments'),
-            },
-            {
-              icon: MessageSquare,
-              label: 'Tin nhắn',
-              sub: myNotifs > 0 ? `${myNotifs} chưa đọc` : 'Không có tin mới',
-              tint: 'bg-violet-50 hover:bg-violet-100/80 border-violet-100 text-violet-900',
-              iconClass: 'text-violet-600',
-              action: () => navigate('/teacher/inbox'),
+              icon: WalletCards,
+              tint: 'bg-sky-50 text-sky-600',
+              label: `Thu nhập T${new Date().getMonth() + 1}`,
+              value: `${(Number(totalMonthlyIncome) || 0).toLocaleString('vi-VN')}đ`,
+              onClick: () => navigate('/teacher/finance'),
             },
             {
               icon: CalendarDays,
-              label: 'Xếp lịch',
-              sub: 'Thêm buổi dạy mới',
-              tint: 'bg-sky-50 hover:bg-sky-100/80 border-sky-100 text-sky-900',
-              iconClass: 'text-sky-600',
-              action: () => { navigate('/teacher#schedule'); },
+              tint: 'bg-indigo-50 text-indigo-600',
+              label: 'Buổi đã dạy',
+              value: taughtThisMonth,
+              onClick: () => navigate('/teacher#schedule'),
             },
-          ].map(({ icon: Icon, label, sub, tint, iconClass, action }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={action}
-              className={`group ${tint} border rounded-xl p-2.5 sm:p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] min-h-[70px] cursor-pointer min-w-0`}
-            >
-              <div className="flex items-center gap-2 mb-1 min-w-0">
-                <span className={`relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-current/10 bg-white transition-transform duration-200 group-hover:scale-110 ${iconClass}`}>
-                  <Icon size={18} strokeWidth={2.4} aria-hidden="true" />
+            {
+              icon: Award,
+              tint: 'bg-amber-50 text-amber-600',
+              label: fiveStarStats.achieved ? 'Thưởng sao · đã đạt' : 'Thưởng sao',
+              value: `${fiveStarStats.count}/${fiveStarStats.need} HV`,
+              title: fiveStarStats.achieved ? 'Đã đạt thưởng' : `Cần thêm ${Math.max(0, fiveStarStats.need - fiveStarStats.count)} HV đánh giá 5★`,
+            },
+          ].map(({ icon: Icon, tint, label, value, title, onClick }) => {
+            const Tag = onClick ? 'button' : 'div';
+            return (
+              <Tag
+                key={label}
+                type={onClick ? 'button' : undefined}
+                onClick={onClick}
+                title={title}
+                className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:gap-3 sm:p-3 ${onClick ? 'cursor-pointer hover:border-red-200 hover:bg-red-50/40' : ''}`}
+              >
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tint}`}>
+                  <Icon size={24} strokeWidth={2.2} aria-hidden="true" />
                 </span>
-                <p className="font-bold text-[11px] sm:text-xs lg:text-sm truncate">{label}</p>
-              </div>
-              <p className="text-[10px] sm:text-[11px] lg:text-xs text-slate-500 leading-snug break-words">{sub}</p>
-            </button>
-          ))}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-base font-black tabular-nums text-slate-900 sm:text-lg">{value}</span>
+                  <span className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</span>
+                </span>
+              </Tag>
+            );
+          })}
         </div>
-      </div>
-
-      {/* ── Stats Summary Cards ── */}
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-2.5 sm:gap-3 th-dashboard-overview__metrics">
-        {[
-          {
-            icon: WalletCards,
-            label: `Thu nhập tháng ${new Date().getMonth() + 1}`,
-            value: `${(Number(totalMonthlyIncome) || 0).toLocaleString('vi-VN')}đ`,
-            sub: (
-              <span className="inline-flex items-center gap-0.5">
-                Chi tiết thu nhập
-                <ChevronRight size={12} aria-hidden="true" />
-              </span>
-            ),
-            color: 'from-sky-500 to-cyan-600',
-            bg: 'bg-sky-50',
-            onClick: () => navigate('/teacher/finance'),
-          },
-          {
-            icon: Users,
-            label: 'Đang dạy',
-            value: activeStudents.length,
-            sub: 'học viên',
-            color: 'from-indigo-500 to-indigo-600',
-            bg: 'bg-indigo-50',
-            onClick: () => navigate('/teacher#students'),
-          },
-          {
-            icon: UserPlus,
-            label: 'HV mới',
-            value: newStudents30d,
-            sub: 'trong 30 ngày',
-            color: 'from-violet-500 to-purple-600',
-            bg: 'bg-violet-50',
-            onClick: () => navigate('/teacher#students'),
-          },
-          {
-            icon: Award,
-            label: '5 sao',
-            value: `${fiveStarStats.count}/${fiveStarStats.need}`,
-            sub: fiveStarStats.achieved ? 'Đạt (tháng này)' : 'Chưa đạt (tháng này)',
-            subClass: fiveStarStats.achieved ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold',
-            color: 'from-amber-500 to-orange-500',
-            bg: 'bg-orange-50',
-            onClick: () => navigate('/teacher#students'),
-          },
-          {
-            icon: Star,
-            label: 'Uy tín',
-            value: teacherRating.avg || '—',
-            sub: `${teacherRating.count || 0} đánh giá`,
-            color: 'from-emerald-500 to-teal-500',
-            bg: 'bg-emerald-50',
-          },
-        ].map(({ icon: Icon, label, value, sub, subClass, color, bg, onClick }) => (
-          <div
-            key={label}
-            role={onClick ? 'button' : undefined}
-            tabIndex={onClick ? 0 : undefined}
-            onClick={onClick}
-            onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-            className={`bg-white rounded-2xl p-3 sm:p-3.5 shadow-sm border border-slate-100 hover:shadow-md transition-all group overflow-hidden relative min-w-0 th-dashboard-overview__metric ${onClick ? 'cursor-pointer' : ''}`}
-          >
-            <div className={`absolute -right-3 -bottom-3 w-14 h-14 sm:w-20 sm:h-20 ${bg} rounded-full opacity-40 group-hover:scale-125 transition-transform duration-500 pointer-events-none`} aria-hidden="true" />
-            <div className={`relative w-9 h-9 rounded-full bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-sm ring-2 ring-white/80 group-hover:scale-105 transition-transform z-10`}>
-              <Icon size={18} strokeWidth={2.4} className="text-white" aria-hidden="true" />
-            </div>
-            <p className="text-[11px] sm:text-xs font-bold text-slate-600 mb-0.5 relative z-10 truncate">{label}</p>
-            <p className="text-base sm:text-lg font-black text-slate-800 relative z-10 truncate tabular-nums">{value}</p>
-            <p className={`text-[11px] sm:text-xs font-medium mt-1 relative z-10 ${subClass || 'text-slate-500'}`}>{sub}</p>
-          </div>
-        ))}
+      </section>
       </div>
 
       {/* ── Học viên / Lịch dạy / Đánh giá ── */}
@@ -554,20 +426,20 @@ export default function TeacherOverviewTab({
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md shadow-red-200 shrink-0">
                 <Clock size={17} strokeWidth={2.4} aria-hidden="true" />
               </span>
-              <span className="truncate">Ca tiếp theo ({nextSessions.length})</span>
+              <span className="truncate">Lịch dạy hôm nay ({nextSessions.length})</span>
             </h3>
             <button
               type="button"
               onClick={() => navigate('/teacher#schedule')}
               className="text-[11px] font-bold text-red-600 hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
             >
-              Lịch dạy
+              Cả tháng
               <ChevronRight size={12} aria-hidden="true" />
             </button>
           </div>
 
           <div className="space-y-2.5 min-h-0">
-            {nextSessions.slice(0, 3).map(({ student, sch, live, weekday, dateLabel, joinUrl }) => {
+            {nextSessions.map(({ student, sch, live, weekday, dateLabel }) => {
               const enrollmentKey = student._enrollmentKey || student._id || student.id;
               const timeRange = sch.endTime ? `${sch.startTime} - ${sch.endTime}` : (sch.startTime || '—');
               return (
@@ -603,26 +475,6 @@ export default function TeacherOverviewTab({
                         {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
                       </p>
                     </div>
-                    {live && joinUrl ? (
-                      <a
-                        href={joinUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-black  tracking-wide ${
-                          live
-                            ? 'bg-white text-red-600 hover:bg-red-50 shadow'
-                            : 'bg-red-600 text-white hover:bg-red-700'
-                        }`}
-                      >
-                        <ExternalLink size={11} aria-hidden="true" />
-                        Vào lớp
-                      </a>
-                    ) : live ? (
-                      <span className={`shrink-0 text-[11px] font-semibold ${live ? 'text-red-100' : 'text-slate-400'}`}>
-                        Chưa có link
-                      </span>
-                    ) : null}
                   </div>
                 </div>
               );
@@ -630,53 +482,9 @@ export default function TeacherOverviewTab({
 
             {nextSessions.length === 0 && (
               <div className="py-6 text-center text-slate-400 text-xs font-medium">
-                Chưa có ca dạy sắp tới.
+                Hôm nay không còn ca dạy nào.
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Cột 3: Lịch dạy sắp tới trong tháng */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col min-w-0 w-full">
-          <div className="px-4 sm:px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0">
-            <h4 className="font-bold text-slate-700 text-xs sm:text-sm flex items-center gap-2 min-w-0">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-sm shadow-indigo-200 shrink-0">
-                <Calendar size={14} strokeWidth={2.4} aria-hidden="true" />
-              </span>
-              <span className="truncate">Lịch dạy sắp tới trong tháng</span>
-            </h4>
-            <button
-              type="button"
-              onClick={() => navigate('/teacher#schedule')}
-              className="text-[11px] sm:text-xs text-indigo-600 font-bold hover:underline shrink-0 cursor-pointer inline-flex items-center gap-0.5"
-            >
-              Xem tất cả
-              <ChevronRight size={12} aria-hidden="true" />
-            </button>
-          </div>
-          <div className="divide-y divide-slate-50 min-h-0">
-            {upcomingThisMonth.length === 0 && (
-              <p className="px-4 sm:px-5 py-4 text-xs text-slate-400 text-center">Chưa có lịch dạy sắp tới trong tháng.</p>
-            )}
-            {upcomingThisMonth.slice(0, 3).map((s) => {
-              const day = normalizeScheduleDate(s.date);
-              const [, monthStr, dayStr] = day.split('-');
-              return (
-              <div key={s._id || s.id} className="px-4 sm:px-5 py-2.5 flex items-center gap-3 hover:bg-indigo-50/30 transition">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 flex flex-col items-center justify-center text-indigo-600 flex-shrink-0">
-                  <span className="text-xs font-black tabular-nums">{Number(dayStr) || new Date(s.date).getDate()}</span>
-                  <span className="text-[7px] font-bold opacity-60">S?T{Number(monthStr) || (new Date(s.date).getMonth() + 1)}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-800 truncate">{s.studentName || s.course}</p>
-                  <p className="text-[11px] text-slate-400 truncate">{s.startTime} · {s.course}</p>
-                </div>
-                <span className="text-[11px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg flex-shrink-0">
-                  {s.startTime}
-                </span>
-              </div>
-              );
-            })}
           </div>
         </div>
 

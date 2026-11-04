@@ -41,6 +41,7 @@ const CertPrepResult = lazy(() => import('./components/student/certPrep/CertPrep
 const LessonPracticeCatalogPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeCatalogPage'));
 const LessonPracticeUnitsPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeUnitsPage'));
 const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonPractice/LessonPracticePlayerPage'));
+const DailyPracticePage = lazy(() => import('./components/student/dailyPractice/DailyPracticePage'));
 import DashboardLayout                       from './components/DashboardLayout';
 import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
 import api, { clearTokens, NetworkOfflineError } from './services/api';
@@ -475,6 +476,11 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         <Route path="/student/lesson-practice/units/:unitId" element={
           <ErrorBoundary inline>
             <LessonPracticePlayerPage />
+          </ErrorBoundary>
+        } />
+        <Route path="/student/daily-practice" element={
+          <ErrorBoundary inline>
+            <DailyPracticePage />
           </ErrorBoundary>
         } />
       </Route>

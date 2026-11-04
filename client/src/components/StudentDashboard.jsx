@@ -124,7 +124,7 @@ const StudentDashboard = () => {
     session = {};
   }
   const STUDENT_ID = session.id || session._id || null;
-  const { students, teachers, getConversations, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, examSubjectsCatalog } = useData();
+  const { students, teachers, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, examSubjectsCatalog } = useData();
   const { setSchedulesLocal } = useScheduleContext();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));
   const location = useLocation();
@@ -417,13 +417,6 @@ const StudentDashboard = () => {
     [mySchedulesAll, viewStudent?.course, activeCourseName]
   );
 
-  const upcomingScheduleCount = useMemo(() => {
-    // Tổng quan: đếm buổi còn sắp tới / đang diễn ra (không tính buổi đã qua giờ)
-    return (mySchedules || []).filter((s) => {
-      const kind = getScheduleDisplayKind(s);
-      return kind === 'upcoming' || kind === 'ongoing';
-    }).length;
-  }, [mySchedules]);
   const [teacherRatingData, setTeacherRatingData] = useState({ avg: 0, count: 0, ratings: [] });
   useEffect(() => {
     if (!viewStudent?.teacherId) return;
@@ -485,8 +478,6 @@ const StudentDashboard = () => {
     if (!viewStudent) return [];
     return mergeScheduleLogs(buildPendingScheduleLogs(mySchedules, viewStudent), displayGrades);
   }, [viewStudent, mySchedules, displayGrades]);
-
-  const isNew = viewStudent?.completedSessions === 0;
 
   const [activeMilestone, setActiveMilestone] = useState(null);
   const [serverMilestoneEvals, setServerMilestoneEvals] = useState([]);
@@ -638,15 +629,6 @@ const StudentDashboard = () => {
     if (centerDone && !teacherDone) return 'teacher';
     return 'center';
   })();
-  const myUnreadMsgs = (() => {
-    try {
-      const convs = typeof getConversations === 'function' ? getConversations(STUDENT_ID) : [];
-      return (convs || []).reduce((sum, c) => sum + (c?.unread || 0), 0);
-    } catch {
-      return 0;
-    }
-  })();
-
   if (!studentData || !viewStudent) return <div className="p-20 text-center text-gray-500">Không tìm thấy học viên.</div>;
 
   // ── RENDER ──────────────────────────────────────────────────────────────────
@@ -765,13 +747,14 @@ const StudentDashboard = () => {
       )}
 
       <div className="min-w-0">
-        {/* ClassReminder */}
-        <ClassReminder
-          nextClassTime={viewStudent.nextClassTime}
-          linkHoc={viewStudent.joinClassUrl}
-          courseName={viewStudent.course}
-          studentName={viewStudent.name}
-        />
+        {currentHash && (
+          <ClassReminder
+            nextClassTime={viewStudent.nextClassTime}
+            linkHoc={viewStudent.joinClassUrl}
+            courseName={viewStudent.course}
+            studentName={viewStudent.name}
+          />
+        )}
 
 
         {/* Topbar removed - using DashboardLayout header */}
@@ -806,6 +789,7 @@ const StudentDashboard = () => {
               'exam-scores': 'exams',
             }[currentHash]}
             hideTabBar
+            focusAssignmentId={(location.hash.match(/[?&]assignmentId=([^&]+)/) || [])[1] || ''}
           />
         ) : currentHash === 'evaluation' ? (
           <StudentLazyEvaluationTab
@@ -847,14 +831,9 @@ const StudentDashboard = () => {
             setActiveCourseName={setActiveCourseName}
             viewStudent={viewStudent}
             progressPct={progressPct}
-            teacherRatingData={teacherRatingData}
-            isNew={isNew}
             myAssignments={activeAssignments}
             mySchedules={mySchedules}
-            upcomingScheduleCount={upcomingScheduleCount}
-            myUnreadMsgs={myUnreadMsgs}
             studyLogs={scoreLogs}
-            studentTrainingForLms={studentTrainingForLms}
           />
         )}
                   </div>

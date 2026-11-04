@@ -194,10 +194,10 @@ test('bảng xếp hạng: xếp theo số ngày đạt mục tiêu, bằng nhau
   }
 });
 
-test('Tổng quan: 2 cột mục tiêu + xếp hạng, chọn khóa học gọn ở dưới (web + mobile)', () => {
+test('Tổng quan có thẻ mục tiêu + xếp hạng; chọn khóa nằm trong “Khóa học của tôi” (web + mobile)', () => {
   const overview = read('client/src/components/student/StudentOverviewTab.jsx');
-  assert.match(overview, /lg:grid-cols-2[^"]*">\s*<LearningGoalCard \/>\s*<LearningLeaderboardCard \/>/);
-  assert.ok(overview.includes('variant="compact"'));
+  assert.match(overview, /<LearningGoalCard \/>\s*<LearningLeaderboardCard \/>/);
+  assert.ok(overview.includes('aria-label="Chọn khóa học"'));
   assert.ok(read('client/src/services/lessonPracticeApi.js').includes('/lesson-practice/my/learning-leaderboard'));
   assert.ok(read('routes/lessonPracticeRoutes.js').includes("router.get('/my/learning-leaderboard', ...requireStudent"));
 
@@ -232,8 +232,22 @@ test('popup tự mở khi chưa có / hết hạn mục tiêu, không đè khóa
 
   const host = read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx');
   assert.ok(host.includes('if (data.goal && !data.goal.expired) return;'));
-  assert.ok(host.includes('if (!enabled || !open || pinLocked) return null;'));
+  assert.ok(host.includes('{open && !pinLocked ? ('), 'không hiện đè khóa PIN');
   assert.ok(read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx').includes('<LearningGoalHost user={user} />'));
   assert.ok(read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LearningGoalCard />'));
   assert.ok(read('thang-tin-hoc-mobile/src/screens/FeatureScreens.tsx').includes('DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)'));
+});
+
+test('thẻ mục tiêu: "Nhiệm vụ hôm nay" gồm Luyện tập + Xem video, bấm là tới đúng chỗ (web + mobile)', () => {
+  const web = read('client/src/components/student/LearningGoalCard.jsx');
+  assert.ok(web.includes('Nhiệm vụ hôm nay'));
+  assert.ok(!web.includes('Hôm nay đã học'));
+  assert.ok(web.includes("navigate('/student/daily-practice')"));
+  assert.ok(web.includes('lessonResumeUrl(res.data)'), 'xem video mở đúng video đang học dở');
+
+  const mobile = read('thang-tin-hoc-mobile/src/components/LearningGoalCard.tsx');
+  assert.ok(mobile.includes('Nhiệm vụ hôm nay'));
+  assert.ok(!mobile.includes('Hôm nay đã học'));
+  assert.ok(mobile.includes("navigation.navigate('DailyPractice')"));
+  assert.ok(mobile.includes('getStudyResumePoint()'));
 });

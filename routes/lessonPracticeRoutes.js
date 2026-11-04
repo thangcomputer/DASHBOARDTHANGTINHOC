@@ -317,6 +317,24 @@ router.get('/my/learning-leaderboard', ...requireStudent, async (req, res) => {
   } catch (err) { return sendError(res, err); }
 });
 
+router.get('/my/resume-point', ...requireStudent, async (req, res) => {
+  try {
+    const data = await service.getResumePoint(studentId(req));
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
+router.put('/my/resume-point', ...requireStudent, async (req, res) => {
+  try {
+    const data = await service.saveResumePoint(studentId(req), {
+      unitId: String(req.body?.unitId || ''),
+      sectionId: String(req.body?.sectionId || ''),
+      courseId: String(req.body?.courseId || ''),
+    });
+    return res.json({ success: true, data });
+  } catch (err) { return sendError(res, err); }
+});
+
 router.post('/my/study-heartbeat', ...requireStudent, async (req, res) => {
   try {
     const data = await learningGoalService.recordStudyMinute(studentId(req));

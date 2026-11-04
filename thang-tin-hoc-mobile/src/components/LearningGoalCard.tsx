@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { DeviceEventEmitter, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { CalendarDays, Flame, Info, ListChecks, PlayCircle, Target } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CalendarDays, Check, ChevronRight, Flame, Gamepad2, Info, PlayCircle, Target, type LucideIcon } from 'lucide-react-native';
+import type { AppStackParamList } from '../navigation/types';
+import { getStudyResumePoint } from '../services/courseVideoApi';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
   OPEN_LEARNING_GOAL_EVENT,
@@ -12,7 +15,6 @@ import {
   type LearningGoalData,
 } from '../services/learningGoalApi';
 import { colors, spacing } from '../theme/tokens';
-
 function percent(value?: number, target?: number) {
   if (!target) return 0;
   return Math.min(100, Math.round(((value || 0) / target) * 100));
@@ -22,9 +24,73 @@ function openGoal() {
   DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT);
 }
 
+/** Nhiệm vụ mỗi ngày: một lượt luyện tập (10 câu) và ít nhất một video. */
+const MISSION_QUESTIONS = 10;
+const MISSION_VIDEOS = 1;
+const gradient = (from: string, to: string) => ({ backgroundColor: to, backgroundImage: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` } as never);
+
+function MissionTile({ icon: Icon, title, value, target, unit, from, to, bar, onPress }: {
+  icon: LucideIcon;
+  title: string;
+  value: number;
+  target: number;
+  unit: string;
+  from: string;
+  to: string;
+  bar: string;
+  onPress: () => void;
+}) {
+  const done = value >= target;
+  const pct = percent(value, target);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.mission, done && styles.missionDone, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}: ${done ? 'đã hoàn thành' : `${value}/${target} ${unit}`}`}
+    >
+      <View>
+        <View style={[styles.missionIcon, done ? gradient('#34D399', '#059669') : gradient(from, to)]}>
+          <Icon size={22} color="#FFFFFF" />
+        </View>
+        {done ? (
+          <View style={styles.missionCheck}><Check size={11} strokeWidth={3.5} color="#059669" /></View>
+        ) : null}
+      </View>
+      <View style={styles.flex}>
+        <View style={styles.missionTitleRow}>
+          <Text numberOfLines={1} style={styles.missionTitle}>{title}</Text>
+          {!done ? <ChevronRight size={14} color="#94A3B8" /> : null}
+        </View>
+        <Text numberOfLines={1} style={[styles.missionMeta, done && styles.missionMetaDone]}>
+          {done ? `Hoàn thành · ${value} ${unit}` : `${value}/${target} ${unit}`}
+        </Text>
+        <View style={styles.missionTrack}>
+          <View style={[styles.fill, { width: `${pct}%`, backgroundColor: done ? '#10B981' : bar }]} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 /** Thẻ tiến độ mục tiêu học trên Tổng quan (giống web). */
 export function LearningGoalCard() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [data, setData] = useState<LearningGoalData | null>(null);
+  const openVideoMission = () => {
+    getStudyResumePoint()
+      .then((point) => navigation.navigate('MainTabs', {
+        screen: 'CourseVideos',
+        params: point ? {
+          resumeKey: Date.now(),
+          resumeSubjectId: point.subjectId,
+          resumeCourseId: point.courseId,
+          resumeUnitId: point.unitId,
+          resumeSectionId: point.sectionId,
+        } : undefined,
+      }))
+      .catch(() => navigation.navigate('MainTabs', { screen: 'CourseVideos' }));
+  };
 
   const load = useCallback(() => {
     getLearningGoal().then(setData).catch(() => {});
@@ -120,16 +186,35 @@ export function LearningGoalCard() {
       </View>
 
       <View style={styles.evidence}>
-        <Text style={styles.evidenceLabel}>Hôm nay đã học:</Text>
-        <View style={styles.evidenceRow}>
-          <View style={[styles.chip, { backgroundColor: '#F0F9FF' }]}>
-            <ListChecks size={13} color="#0369A1" />
-            <Text style={[styles.chipText, { color: '#0369A1' }]}>{`${progress.todayQuestions || 0} câu đã làm`}</Text>
-          </View>
-          <View style={[styles.chip, { backgroundColor: '#F5F3FF' }]}>
-            <PlayCircle size={13} color="#6D28D9" />
-            <Text style={[styles.chipText, { color: '#6D28D9' }]}>{`${progress.todayVideos || 0} video đã xem`}</Text>
-          </View>
+        <View style={styles.metricRow}>
+          <Text style={styles.evidenceLabel}>Nhiệm vụ hôm nay</Text>
+          <Text style={styles.missionCount}>
+            {`${[(progress.todayQuestions || 0) >= MISSION_QUESTIONS, (progress.todayVideos || 0) >= MISSION_VIDEOS].filter(Boolean).length}/2 hoàn thành`}
+          </Text>
+        </View>
+        <View style={styles.missionRow}>
+          <MissionTile
+            icon={Gamepad2}
+            title="Luyện tập"
+            value={progress.todayQuestions || 0}
+            target={MISSION_QUESTIONS}
+            unit="câu"
+            from="#38BDF8"
+            to="#2563EB"
+            bar="#0EA5E9"
+            onPress={() => navigation.navigate('DailyPractice')}
+          />
+          <MissionTile
+            icon={PlayCircle}
+            title="Xem video"
+            value={progress.todayVideos || 0}
+            target={MISSION_VIDEOS}
+            unit="video"
+            from="#A78BFA"
+            to="#7C3AED"
+            bar="#8B5CF6"
+            onPress={openVideoMission}
+          />
         </View>
         <Text style={styles.periodEvidence}>
           {`Cả ${periodLabel(goal.period)}: ${progress.periodQuestions || 0} câu · ${progress.periodVideos || 0} video`}
@@ -167,10 +252,31 @@ const styles = StyleSheet.create({
   fill: { height: '100%', borderRadius: 999 },
   done: { color: '#059669', fontSize: 11, fontWeight: '800' },
   evidence: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: spacing.md },
-  evidenceLabel: { color: '#64748B', fontSize: 12, fontWeight: '800' },
-  evidenceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  chipText: { fontSize: 12, fontWeight: '800' },
+  evidenceLabel: { color: '#334155', fontSize: 13, fontWeight: '900' },
+  missionCount: {
+    color: '#475569', fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden',
+  },
+  missionRow: { flexDirection: 'row', gap: spacing.sm },
+  mission: {
+    flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10,
+    borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+  },
+  missionDone: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  pressed: { opacity: 0.85 },
+  missionIcon: {
+    width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0px 5px 12px rgba(15, 23, 42, 0.15)',
+  } as never,
+  missionCheck: {
+    position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#10B981',
+  },
+  missionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 2 },
+  missionTitle: { flexShrink: 1, color: colors.ink, fontSize: 13, fontWeight: '900' },
+  missionMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  missionMetaDone: { color: '#059669' },
+  missionTrack: { height: 6, marginTop: 4, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   periodEvidence: { color: '#94A3B8', fontSize: 11 },
   hintRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   hint: { flex: 1, color: '#94A3B8', fontSize: 11, lineHeight: 15 },

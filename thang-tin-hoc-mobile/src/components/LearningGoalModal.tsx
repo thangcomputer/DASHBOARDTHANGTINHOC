@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import { CalendarCheck, CalendarDays, Check, Clock3, Flame, Sparkles, Sprout, Target, Trophy, X } from 'lucide-react-native';
+import { CalendarCheck, CalendarDays, Check, Clock3, Flame, PlayCircle, Sparkles, Sprout, Target, Trophy, X } from 'lucide-react-native';
 import { PIN_LOCK_STATE_EVENT, isPinLockedNow } from '../services/pinLock';
+import { getStudyResumePoint, type StudyResumePoint } from '../services/courseVideoApi';
 import { navigationRef } from '../navigation/navigationRef';
 import { isActivelyStudying } from '../services/studyActivity';
+import { DailyPracticeReminder } from './dailyPractice/DailyPracticeReminder';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
   LEARNING_GOAL_HOURS,
@@ -29,7 +31,7 @@ const CELEBRATE_MS = 3000;
 /** Màn hình được tính là "đang học". */
 const STUDY_ROUTES = new Set([
   'CourseVideos', 'StudentLearning', 'Materials', 'Assignments', 'StudentExam',
-  'CertPrepCatalog', 'CertPrepLevel', 'CertPrepPlayer', 'CertPrepResult',
+  'CertPrepCatalog', 'CertPrepLevel', 'CertPrepPlayer', 'CertPrepResult', 'DailyPractice',
 ]);
 const PERIOD_ICONS = { week: Sprout, month: Flame, quarter: Trophy } as const;
 const CONFETTI_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
@@ -108,21 +110,27 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
     return () => clearInterval(timer);
   }, [enabled]);
 
-  if (!enabled || !open || pinLocked) return null;
+  if (!enabled) return null;
+  const goalSettled = Boolean(data) && !open && (Boolean(data?.goal && !data.goal.expired) || dismissedRef.current);
   return (
-    <LearningGoalModal
-      currentGoal={data?.goal || null}
-      onClose={() => {
-        dismissedRef.current = true;
-        setOpen(false);
-      }}
-      onSaved={(next) => {
-        dismissedRef.current = true;
-        setData(next);
-        DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT, next);
-      }}
-      onDone={() => setOpen(false)}
-    />
+    <>
+      <DailyPracticeReminder userId={user.id} ready={goalSettled && !pinLocked} />
+      {open && !pinLocked ? (
+        <LearningGoalModal
+          currentGoal={data?.goal || null}
+          onClose={() => {
+            dismissedRef.current = true;
+            setOpen(false);
+          }}
+          onSaved={(next) => {
+            dismissedRef.current = true;
+            setData(next);
+            DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT, next);
+          }}
+          onDone={() => setOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -157,6 +165,8 @@ function LearningGoalModal({
   const [hours, setHours] = useState(editing && currentGoal ? currentGoal.hoursPerDay : 2);
   const [saving, setSaving] = useState(false);
   const [celebrate, setCelebrate] = useState<{ label: string; endDate: string } | null>(null);
+  /** undefined = đang tải; null = chưa có bài học dở. */
+  const [resume, setResume] = useState<StudyResumePoint | null | undefined>(undefined);
   const [motion, setMotion] = useState(true);
   const selected = LEARNING_GOAL_PERIODS.find((option) => option.id === period) || LEARNING_GOAL_PERIODS[1];
   const level = LEARNING_GOAL_LEVELS[hours] || LEARNING_GOAL_LEVELS[2];
@@ -182,9 +192,35 @@ function LearningGoalModal({
     burst.setValue(0);
     Animated.spring(pop, { toValue: 1, friction: 5, tension: 110, useNativeDriver: true }).start();
     Animated.timing(burst, { toValue: 1, duration: 1150, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    let alive = true;
+    getStudyResumePoint()
+      .then((point) => { if (alive) setResume(point); })
+      .catch(() => { if (alive) setResume(null); });
+    return () => { alive = false; };
+  }, [burst, celebrate, pop]);
+
+  // Có bài học dở thì giữ popup để HV bấm học tiếp; không có thì tự đóng sau vài giây.
+  useEffect(() => {
+    if (!celebrate || resume !== null) return undefined;
     const timer = setTimeout(() => onDoneRef.current(), CELEBRATE_MS);
     return () => clearTimeout(timer);
-  }, [burst, celebrate, pop]);
+  }, [celebrate, resume]);
+
+  const continueLearning = () => {
+    if (!resume) return;
+    onDone();
+    if (!navigationRef.isReady()) return;
+    navigationRef.navigate('MainTabs', {
+      screen: 'CourseVideos',
+      params: {
+        resumeKey: Date.now(),
+        resumeSubjectId: resume.subjectId,
+        resumeCourseId: resume.courseId,
+        resumeUnitId: resume.unitId,
+        resumeSectionId: resume.sectionId,
+      },
+    });
+  };
 
   const save = async () => {
     setSaving(true);
@@ -290,9 +326,36 @@ function LearningGoalModal({
                   Hoàn thành dự kiến <Text style={styles.strong}>{celebrate.endDate}</Text>
                 </Text>
               </View>
-              <Pressable onPress={onDone} style={[styles.primary, styles.successButton]} accessibilityRole="button">
-                <Text style={styles.primaryText}>Tuyệt vời!</Text>
-              </Pressable>
+              {resume ? (
+                <>
+                  <View style={styles.resumeCard}>
+                    <View style={styles.resumeIcon}><PlayCircle size={22} color="#FFFFFF" /></View>
+                    <View style={styles.resumeCopy}>
+                      <Text numberOfLines={1} style={styles.resumeEyebrow}>Đang học dở · {resume.subjectName}</Text>
+                      <Text numberOfLines={1} style={styles.resumeTitle}>{resume.unitTitle}</Text>
+                      {resume.itemTitle ? <Text numberOfLines={1} style={styles.resumeSub}>{resume.itemTitle}</Text> : null}
+                    </View>
+                  </View>
+                  <Pressable onPress={continueLearning} style={[styles.primary, styles.successButton]} accessibilityRole="button">
+                    <PlayCircle size={18} color="#FFFFFF" />
+                    <Text style={styles.primaryText}>{resume.kind === 'video' ? 'Tiếp tục xem video' : 'Tiếp tục bài học'}</Text>
+                  </Pressable>
+                  <Pressable onPress={onDone} style={styles.laterButton} accessibilityRole="button">
+                    <Text style={styles.laterText}>Để sau</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  onPress={onDone}
+                  disabled={resume === undefined}
+                  style={[styles.primary, styles.successButton]}
+                  accessibilityRole="button"
+                >
+                  {resume === undefined
+                    ? <ActivityIndicator color="#FFFFFF" />
+                    : <Text style={styles.primaryText}>Tuyệt vời!</Text>}
+                </Pressable>
+              )}
             </View>
           ) : (
             <>
@@ -492,6 +555,17 @@ const styles = StyleSheet.create({
   successPillText: { color: '#B91C1C', fontSize: 14, fontWeight: '900' },
   successText: { color: '#475569', fontSize: 14 },
   successButton: { alignSelf: 'stretch', marginTop: spacing.xs },
+  resumeCard: {
+    alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm,
+    borderRadius: 16, borderWidth: 1, borderColor: '#FEE2E2', backgroundColor: '#FEF2F2',
+  },
+  resumeIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand },
+  resumeCopy: { flex: 1, minWidth: 0 },
+  resumeEyebrow: { color: '#DC2626', fontSize: 11, fontWeight: '800' },
+  resumeTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  resumeSub: { color: colors.muted, fontSize: 12 },
+  laterButton: { alignSelf: 'stretch', alignItems: 'center', paddingVertical: 6 },
+  laterText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   secondary: {
     flex: 1, minHeight: 46, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line,

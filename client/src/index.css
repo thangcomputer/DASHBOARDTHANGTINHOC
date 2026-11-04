@@ -5028,3 +5028,41 @@ body .cms-login-icon-btn:active { transform: scale(0.96); }
   .cms-goal-in, .cms-goal-droplet, .cms-goal-pop { animation: none; }
   .cms-goal-ring, .cms-goal-confetti { display: none; }
 }
+
+/* Luyện tập hằng ngày — hiệu ứng trò chơi. */
+@keyframes dp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes dp-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-12px) scale(1.04, 0.96); }
+  55% { transform: translateY(0) scale(0.96, 1.04); }
+}
+@keyframes dp-droop { 0%, 100% { transform: rotate(0deg) translateY(2px); } 50% { transform: rotate(-4deg) translateY(4px); } }
+@keyframes dp-tear { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(12px); opacity: 0; } }
+@keyframes dp-twinkle { 0%, 100% { opacity: 0.2; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes dp-pop { 0% { transform: scale(0.92); } 55% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes dp-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-7px); }
+  40%, 80% { transform: translateX(7px); }
+}
+@keyframes dp-slide-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes dp-xp-float { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
+@keyframes dp-star-in {
+  0% { transform: scale(0) rotate(-60deg); opacity: 0; }
+  70% { transform: scale(1.25) rotate(10deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.dp-float { animation: dp-float 3.2s ease-in-out infinite; }
+.dp-bounce { animation: dp-bounce 0.9s ease-in-out infinite; transform-origin: 50% 100%; }
+.dp-droop { animation: dp-droop 2.4s ease-in-out infinite; transform-origin: 50% 100%; }
+.dp-tear { animation: dp-tear 1.4s ease-in infinite; }
+.dp-twinkle { animation: dp-twinkle 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.dp-twinkle-late { animation-delay: 0.6s; }
+.dp-pop { animation: dp-pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+.dp-shake { animation: dp-shake 0.42s ease; }
+.dp-slide-up { animation: dp-slide-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
+.dp-xp-float { animation: dp-xp-float 1.1s ease-out forwards; }
+.dp-star-in { animation: dp-star-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+@media (prefers-reduced-motion: reduce) {
+  .dp-float, .dp-bounce, .dp-droop, .dp-tear, .dp-twinkle, .dp-pop, .dp-shake, .dp-slide-up, .dp-star-in { animation: none; }
+}
