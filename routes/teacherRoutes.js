@@ -45,6 +45,7 @@ const { generateTeacherCode } = require('../services/businessCodeService');
 const { postSalary } = require('../services/ledgerService');
 const { computeStarBonusSummary, resolveBonusForPayout } = require('../services/teacherStarBonus');
 const { emitTeacherEvent, emitDataRefresh, emitFinanceEvent, emitUser } = require('../utils/realtimeEmit');
+const { notifyTeacherPaymentReceived } = require('../services/teacherPaymentNotice');
 const { getCachedSettings } = require('../services/settingsCache');
 const {
   createExamAttempt,
@@ -1918,6 +1919,8 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
         note: note || '',
         paymentSessionIds: sessionIds,
         paymentSessionDetails: paymentSessionDetails(claimedSessions, amount, starBonusAmount),
+        sessionsCount: paidCount,
+        teacherPaymentNoticePending: true,
         starBonusAmount,
         starBonusMonths: starBonusMonthKeys,
         ...(idempotencyKey ? { idempotencyKey } : {}),
@@ -2016,6 +2019,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       });
       emitFinanceEvent(io, financeScope, 'transactions:new', transaction);
       emitFinanceEvent(io, financeScope, 'revenue:updated', { amount: Number(amount), type: 'salary' });
+      notifyTeacherPaymentReceived(io, transaction);
 
       NotificationService.send(io, {
         type: 'FINANCE',
@@ -2122,6 +2126,8 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
         bankAccount: teacher.bankAccount?.accountNumber || '',
         paymentSessionIds: sessionIds,
         paymentSessionDetails: paymentSessionDetails(pendingSessions, totalAmount),
+        sessionsCount: paidCount,
+        teacherPaymentNoticePending: true,
       });
     } catch (createErr) {
       try {
@@ -2174,6 +2180,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
       });
       emitFinanceEvent(io, financeScope, 'transactions:new', transaction);
       emitFinanceEvent(io, financeScope, 'revenue:updated', { amount: totalAmount, type: 'salary' });
+      notifyTeacherPaymentReceived(io, transaction);
 
       NotificationService.send(io, {
         type: 'FINANCE',

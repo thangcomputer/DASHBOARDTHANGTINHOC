@@ -1178,6 +1178,14 @@ export const transactionsAPI = {
     });
     return res.json();
   },
+  getPaymentNotices: async () => {
+    const res = await apiFetch('/transactions/me/payment-notices');
+    return res.json();
+  },
+  markPaymentNoticeSeen: async (id) => {
+    const res = await apiFetch(`/transactions/${encodeURIComponent(id)}/payment-notice-seen`, { method: 'PUT' });
+    return res.json();
+  },
 };
 
 export const staffAPI = {

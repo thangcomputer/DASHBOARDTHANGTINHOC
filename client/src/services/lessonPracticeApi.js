@@ -51,6 +51,13 @@ const lessonPracticeApi = {
       method: 'POST',
       body: JSON.stringify({ practiceGroupId }),
     })),
+    learningGoal: async () => parse(await apiFetch('/lesson-practice/my/learning-goal')),
+    setLearningGoal: async (period, hoursPerDay) => parse(await apiFetch('/lesson-practice/my/learning-goal', {
+      method: 'PUT',
+      body: JSON.stringify({ period, hoursPerDay }),
+    })),
+    studyHeartbeat: async () => parse(await apiFetch('/lesson-practice/my/study-heartbeat', { method: 'POST', body: '{}' })),
+    learningLeaderboard: async () => parse(await apiFetch('/lesson-practice/my/learning-leaderboard')),
   },
   upload: async (file) => {
     const fd = new FormData();

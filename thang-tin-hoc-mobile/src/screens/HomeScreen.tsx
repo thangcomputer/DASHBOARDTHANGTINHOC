@@ -10,6 +10,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../app/AuthContext';
 import { Avatar, AppScreen, Card, ErrorState, LoadingSkeleton, SectionHeading, StatusBadge, ProgressBar } from '../components/ui';
+import { LearningGoalCard } from '../components/LearningGoalCard';
+import { LearningLeaderboardCard } from '../components/LearningLeaderboardCard';
+import { CompactCoursePicker, type CoursePickerItem } from '../components/CompactCoursePicker';
 import {
   assignmentService, evaluationService, materialService, messageService,
   quizService, scheduleService, studentProfileService, studentService,
@@ -150,6 +153,19 @@ export function HomeScreen() {
     || activeEnrollments[0]
     || courseOptions[0];
   const currentCourse = currentEnrollment?.courseName || user?.course || '';
+  const coursePickerItems = useMemo<CoursePickerItem[]>(() => courseOptions.map((enrollment) => {
+    const total = enrollment.totalSessions ?? 12;
+    const done = enrollment.completedSessions ?? 0;
+    return {
+      key: enrollment.id,
+      name: enrollment.courseName,
+      teacherName: enrollment.teacherName,
+      done,
+      total,
+      pct: Math.min(100, Math.max(0, enrollment.progress ?? (total > 0 ? Math.round(done / total * 100) : 0))),
+      completed: enrollment.status === 'Hoàn thành' || (total > 0 && done >= total),
+    };
+  }), [courseOptions]);
   const scheduleMatchesCourse = useCallback((item: { courseName?: string; subject?: string; title: string }) => {
     if (isTeacher || !currentCourse) return true;
     const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
@@ -527,43 +543,9 @@ export function HomeScreen() {
         </>
       ) : (
         <>
-          {courseOptions.length > 1 ? (
-            <View style={styles.courseSwitcher}>
-              <Text style={styles.courseSwitcherLabel}>Khóa học của bạn</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.courseSwitcherList}>
-                {courseOptions.map((enrollment) => {
-                  const active = enrollment.courseName === currentCourse;
-                  const completed = enrollment.status === 'Hoàn thành'
-                    || ((enrollment.totalSessions ?? 0) > 0
-                      && (enrollment.completedSessions || 0) >= (enrollment.totalSessions ?? 0));
-                  const total = enrollment.totalSessions ?? 12;
-                  const done = enrollment.completedSessions ?? 0;
-                  const progress = enrollment.progress ?? (total > 0 ? Math.round(done / total * 100) : 0);
-                  const progressWidth = `${Math.min(100, Math.max(0, progress))}%` as `${number}%`;
-                  return (
-                    <Pressable
-                      key={enrollment.id}
-                      onPress={() => setSelectedCourse(enrollment.courseName)}
-                      style={[styles.courseCard, active && styles.courseCardActive]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <Text numberOfLines={2} style={[styles.coursePillText, active && styles.coursePillTextActive]}>{enrollment.courseName}</Text>
-                      {completed ? <Text style={styles.courseCompleted}>Đã hoàn thành</Text> : null}
-                      <Text numberOfLines={1} style={styles.courseTeacher}>GV: {enrollment.teacherName || 'Chưa phân công'}</Text>
-                      <View style={styles.courseProgressTrack}>
-                        <View style={[styles.courseProgress, { width: progressWidth }, completed && styles.courseProgressCompleted, active && styles.courseProgressActive]} />
-                      </View>
-                      <View style={styles.courseProgressMeta}>
-                        <Text style={styles.courseProgressText}>{done}/{total} buổi</Text>
-                        <Text style={styles.courseProgressText}>{Math.min(100, Math.max(0, progress))}%</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          ) : null}
+          {!user?.previewMode ? <LearningGoalCard /> : null}
+          {!user?.previewMode ? <LearningLeaderboardCard /> : null}
+          <CompactCoursePicker items={coursePickerItems} activeName={currentCourse} onChange={setSelectedCourse} />
           <View style={styles.studentCourseCard}>
             <View style={styles.studentCourseTop}>
               <View style={styles.studentCourseStatus}>
@@ -907,21 +889,6 @@ const styles = StyleSheet.create({
   ratingCard: { gap: spacing.xs },
   ratingTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   ratingStars: { color: '#D97706', fontSize: typography.small, fontWeight: '900', letterSpacing: 1 },
-  courseSwitcher: { gap: spacing.xs },
-  courseSwitcherLabel: { color: colors.muted, fontSize: typography.caption, fontWeight: '800', letterSpacing: 0.5, paddingHorizontal: spacing.xs },
-  courseSwitcherList: { gap: spacing.md, paddingHorizontal: spacing.xs, paddingBottom: spacing.xs },
-  courseCard: { width: 272, minHeight: 156, justifyContent: 'flex-start', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, gap: spacing.xs },
-  courseCardActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
-  coursePillText: { color: '#1E293B', fontSize: typography.body, fontWeight: '800', lineHeight: 20 },
-  coursePillTextActive: { color: '#1E40AF' },
-  courseCompleted: { color: '#64748B', fontSize: typography.micro, fontWeight: '800', letterSpacing: 0.6 },
-  courseTeacher: { color: colors.muted, fontSize: typography.caption },
-  courseProgressTrack: { height: 6, marginTop: spacing.xs, borderRadius: radius.pill, backgroundColor: '#F1F5F9', overflow: 'hidden' },
-  courseProgress: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.red },
-  courseProgressCompleted: { backgroundColor: colors.green },
-  courseProgressActive: { backgroundColor: '#3B82F6' },
-  courseProgressMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  courseProgressText: { color: colors.muted, fontSize: typography.micro, fontWeight: '700' },
   studentCourseCard: { backgroundColor: '#123F5A', borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: '#2A7180', overflow: 'hidden' },
   studentCourseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   studentCourseStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

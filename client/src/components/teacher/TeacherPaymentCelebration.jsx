@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle2, FileText, X } from 'lucide-react';
 
-export default function TeacherPaymentCelebration({ payment, onClose, onViewDetail }) {
+export default function TeacherPaymentCelebration({ payment, remaining = 0, onClose, onViewDetail }) {
   if (!payment) return null;
 
   return (
@@ -54,8 +54,13 @@ export default function TeacherPaymentCelebration({ payment, onClose, onViewDeta
             {Number(payment.amount || 0).toLocaleString('vi-VN')}đ
           </h2>
           <p className="relative z-10 mt-2 text-sm text-slate-600">
-            Admin đã chuyển tiền hoa hồng cho bạn.
+            Admin đã chuyển tiền hoa hồng cho bạn{payment.month ? ` (${payment.month})` : ''}.
           </p>
+          {remaining > 0 && (
+            <p className="relative z-10 mt-2 text-xs font-bold text-emerald-700">
+              Còn {remaining} lần thanh toán khác — đóng để xem tiếp.
+            </p>
+          )}
 
           <div className="relative z-10 mt-5 grid grid-cols-2 gap-2 text-left text-xs">
             <div className="rounded-xl border border-emerald-100 bg-white/80 p-3">

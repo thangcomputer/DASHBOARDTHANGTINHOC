@@ -16,6 +16,7 @@ import {
   syncYouTubePlaybackState,
 } from '../../utils/youtubeDuration';
 import { describeYouTubePlayerError } from '../../utils/youtubePlayerError';
+import { setStudyMediaPlaying } from '../../utils/learningGoal';
 // ─── Helper: Extract YouTube ID ──────────────────────────────────────────────
 export const extractYouTubeId = (url = '') => {
   if (!url) return '';
@@ -65,6 +66,12 @@ export const StudentVideoPlayer = ({
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ytPlaybackQuality, setYtPlaybackQuality] = useState('default');
+
+  useEffect(() => {
+    const key = `yt:${lessonId}`;
+    setStudyMediaPlaying(key, isPlaying);
+    return () => setStudyMediaPlaying(key, false);
+  }, [isPlaying, lessonId]);
 
   // Restore watched seconds: lấy max(session, server) — không để session thấp ghi đè SoT
   const bestInitial = useMemo(() => {

@@ -10,6 +10,7 @@ const CertPrepSession = require('../models/CertPrepSession');
 const StudentCertPrepAccess = require('../models/StudentCertPrepAccess');
 const FileAsset = require('../models/FileAsset');
 const fileService = require('./fileService');
+const learningGoalService = require('./learningGoalService');
 const {
   LOCALES,
   validateQuestion,
@@ -1428,8 +1429,15 @@ async function saveProgress(studentId, sessionId, body) {
   }
   // Đang trong phòng thi mà còn paused (hiếm) → resume để đồng hồ chạy tiếp
   applyResumeTimer(session);
+  const answeredBefore = new Set((session.answers || [])
+    .filter((a) => learningGoalService.countAnswered([a.value]))
+    .map((a) => String(a.questionId)));
   session.answers = mergeAnswers(session, body?.answers);
   await session.save();
+  const newlyAnswered = session.answers
+    .filter((a) => !answeredBefore.has(String(a.questionId)) && learningGoalService.countAnswered([a.value]))
+    .length;
+  if (newlyAnswered) learningGoalService.trackStudyActivity(sid, { questions: newlyAnswered });
   const questions = session.configSnapshot?.feedbackMode === 'after_submit'
     ? []
     : await loadSessionQuestions(session);

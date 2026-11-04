@@ -43,6 +43,7 @@ export const SOCKET_EVENTS = {
   ATTENDANCE_REJECTED: 'socket:attendance:rejected',
   ATTENDANCE_ADMIN_MAKEUP_COMPLETED: 'socket:attendance:admin-makeup-completed',
   FINANCE_TRANSACTION: 'socket:finance:transaction',
+  TEACHER_PAYMENT_RECEIVED: 'socket:teacher:payment-received',
   LMS_QA_UPDATED: 'socket:lms_qa:updated',
   QUIZ_SUBMITTED: 'socket:quiz:submitted',
   QUIZ_CHANGED: 'socket:quiz:changed',
@@ -150,6 +151,10 @@ function bindSocketEvents(instance: Socket, token: string) {
   instance.on('attendance:admin-makeup-completed', (data) => emitDeviceEvent(SOCKET_EVENTS.ATTENDANCE_ADMIN_MAKEUP_COMPLETED, data));
   instance.on('transactions:new', (data) => emitDeviceEvent(SOCKET_EVENTS.FINANCE_TRANSACTION, data));
   instance.on('teacher:financeUpdated', (data) => emitDeviceEvent(SOCKET_EVENTS.FINANCE_TRANSACTION, data));
+  instance.on('teacher:payment-received', (data) => {
+    emitDeviceEvent(SOCKET_EVENTS.TEACHER_PAYMENT_RECEIVED, data);
+    emitDeviceEvent(SOCKET_EVENTS.FINANCE_TRANSACTION, data);
+  });
   const callEvents = [
     ['call:incoming', SOCKET_EVENTS.CALL_INCOMING],
     ['call:checking', SOCKET_EVENTS.CALL_CHECKING],

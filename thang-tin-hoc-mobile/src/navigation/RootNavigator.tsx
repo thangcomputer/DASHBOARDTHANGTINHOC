@@ -44,6 +44,9 @@ import {
 import { OfflineBanner } from '../components/OfflineBanner';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
 import { PinLockGate } from '../components/pinLock/PinLockGate';
+import { TeacherPaymentNoticeModal } from '../components/TeacherPaymentNoticeModal';
+import { LearningGoalHost } from '../components/LearningGoalModal';
+import { noteStudyActivity } from '../services/studyActivity';
 import { notePinActivity, pinUserKey } from '../services/pinLock';
 import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, animateChrome } from '../components/ui';
 import type { AppStackParamList, MainTabsParamList } from './types';
@@ -51,6 +54,11 @@ import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
+
+function noteUserActivity() {
+  notePinActivity();
+  noteStudyActivity();
+}
 
 const TAB_ICON_TONES: Record<string, string> = {
   Schedule: '#2563EB',
@@ -400,7 +408,7 @@ export function RootNavigator() {
     );
   }
   return user ? (
-    <View style={styles.root} onTouchStart={notePinActivity}>
+    <View style={styles.root} onTouchStart={noteUserActivity}>
       <OfflineBanner />
       <MobileSoundEffects incomingCall={Boolean(incomingCall)} />
       <PinLockGate
@@ -412,6 +420,13 @@ export function RootNavigator() {
           });
         }}
       />
+      <TeacherPaymentNoticeModal
+        user={user}
+        onViewFinance={() => {
+          if (navigationRef.isReady()) navigationRef.navigate('MainTabs', { screen: 'Finance' });
+        }}
+      />
+      <LearningGoalHost user={user} />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'slide_from_right' }}>
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />

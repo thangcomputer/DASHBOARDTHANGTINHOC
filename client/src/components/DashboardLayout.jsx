@@ -34,6 +34,9 @@ import TeacherStudentNoteModal, {
   isStudentScheduleNoteNotif,
 } from './teacher/TeacherStudentNoteModal';
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
+import LearningGoalModal from './student/LearningGoalModal';
+import lessonPracticeApi from '../services/lessonPracticeApi';
+import { LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT } from '../utils/learningGoal';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -520,7 +523,10 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const [courseCelebration, setCourseCelebration] = useState(null);
   const courseCelebrationTimerRef = React.useRef(null);
   const [starBonusCelebration, setStarBonusCelebration] = useState(null);
-  const [teacherPaymentCelebration, setTeacherPaymentCelebration] = useState(null);
+  const [learningGoalData, setLearningGoalData] = useState(null);
+  const [learningGoalOpen, setLearningGoalOpen] = useState(false);
+  const [teacherPaymentNotices, setTeacherPaymentNotices] = useState([]);
+  const teacherPaymentCelebration = teacherPaymentNotices[0] || null;
   const starBonusShownRef = React.useRef(new Set());
   const [attendanceConfirm, setAttendanceConfirm] = useState(null);
   const [attendanceConfirmBusy, setAttendanceConfirmBusy] = useState(false);
@@ -697,24 +703,80 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     return () => { socket.off('teacher:star-bonus-celebration', onStarBonus); };
   }, [socket, role, queueStarBonusCelebration]);
 
+  // HV: popup đặt mục tiêu học — hiện tới khi đặt; hết hạn thì hỏi lại; "Để sau" chỉ ẩn trong phiên này.
+  const learningGoalLaterKey = myId ? `cms_learning_goal_later:${myId}` : '';
   useEffect(() => {
-    if (!socket || role !== 'teacher' || !myId) return undefined;
-    const onTeacherPayment = (transaction) => {
-      if (!transaction) return;
-      const transactionTeacherId = transaction.teacherId?._id || transaction.teacherId?.id || transaction.teacherId;
-      if (transactionTeacherId && String(transactionTeacherId) !== String(myId)) return;
-      const details = Array.isArray(transaction.paymentSessionDetails)
-        ? transaction.paymentSessionDetails
-        : [];
-      setTeacherPaymentCelebration({
-        amount: Number(transaction.amount) || 0,
-        sessions: Number(transaction.sessions || transaction.sessionsCount || details.length) || 0,
-        starBonusAmount: Number(transaction.starBonusAmount) || 0,
-      });
+    if (role !== 'student' || !myId) return undefined;
+    let cancelled = false;
+    lessonPracticeApi.student.learningGoal()
+      .then((res) => { if (!cancelled) setLearningGoalData(res?.data || { goal: null }); })
+      .catch(() => {});
+    const onOpen = () => setLearningGoalOpen(true);
+    const onChanged = (event) => { if (event.detail) setLearningGoalData(event.detail); };
+    window.addEventListener(OPEN_LEARNING_GOAL_EVENT, onOpen);
+    window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, onChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(OPEN_LEARNING_GOAL_EVENT, onOpen);
+      window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, onChanged);
     };
-    socket.on('transactions:new', onTeacherPayment);
-    return () => socket.off('transactions:new', onTeacherPayment);
-  }, [socket, role, myId]);
+  }, [role, myId]);
+
+  useEffect(() => {
+    if (role !== 'student' || !learningGoalData || learningGoalOpen) return;
+    if (showWelcomeCelebration || courseCelebration) return;
+    const goal = learningGoalData.goal;
+    if (goal && !goal.expired) return;
+    try {
+      if (learningGoalLaterKey && sessionStorage.getItem(learningGoalLaterKey) === '1') return;
+    } catch { /* ignore */ }
+    setLearningGoalOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tự mở một lần khi đủ điều kiện
+  }, [role, learningGoalData, showWelcomeCelebration, courseCelebration]);
+
+  const closeLearningGoal = React.useCallback(() => {
+    setLearningGoalOpen(false);
+    try {
+      if (learningGoalLaterKey) sessionStorage.setItem(learningGoalLaterKey, '1');
+    } catch { /* ignore */ }
+  }, [learningGoalLaterKey]);
+
+  // GV: mỗi phiếu lương đã chi hiện popup đúng một lần — kể cả khi GV offline lúc Admin chi.
+  const enqueueTeacherPaymentNotices = React.useCallback((notices) => {
+    const incoming = (Array.isArray(notices) ? notices : [notices]).filter((notice) => notice?.id);
+    if (!incoming.length) return;
+    setTeacherPaymentNotices((queue) => {
+      const known = new Set(queue.map((notice) => notice.id));
+      const fresh = incoming.filter((notice) => !known.has(notice.id));
+      return fresh.length ? [...queue, ...fresh] : queue;
+    });
+  }, []);
+
+  const dismissTeacherPaymentNotice = React.useCallback(() => {
+    const currentId = teacherPaymentCelebration?.id;
+    if (!currentId) return;
+    api.transactions.markPaymentNoticeSeen(currentId).catch(() => {});
+    setTeacherPaymentNotices((queue) => queue.filter((notice) => notice.id !== currentId));
+  }, [teacherPaymentCelebration?.id]);
+
+  useEffect(() => {
+    if (role !== 'teacher' || !myId) return undefined;
+    let cancelled = false;
+    api.transactions.getPaymentNotices()
+      .then((res) => { if (!cancelled && Array.isArray(res?.data)) enqueueTeacherPaymentNotices(res.data); })
+      .catch(() => {});
+    if (!socket) return () => { cancelled = true; };
+    const onTeacherPayment = (notice) => {
+      if (!notice?.id) return;
+      if (notice.teacherId && String(notice.teacherId) !== String(myId)) return;
+      enqueueTeacherPaymentNotices(notice);
+    };
+    socket.on('teacher:payment-received', onTeacherPayment);
+    return () => {
+      cancelled = true;
+      socket.off('teacher:payment-received', onTeacherPayment);
+    };
+  }, [socket, role, myId, enqueueTeacherPaymentNotices]);
 
   // HV: modal xác nhận điểm danh (blocking)
   useEffect(() => {
@@ -1775,11 +1837,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           starBonus={starBonusCelebration}
           onClose={dismissStarBonusCelebration}
         />
+        {role === 'student' && (
+          <LearningGoalModal
+            open={learningGoalOpen}
+            currentGoal={learningGoalData?.goal || null}
+            onClose={closeLearningGoal}
+            onSaved={(data) => {
+              if (data) setLearningGoalData(data);
+              setLearningGoalOpen(false);
+            }}
+          />
+        )}
         <TeacherPaymentCelebration
+          key={teacherPaymentCelebration?.id || 'none'}
           payment={teacherPaymentCelebration}
-          onClose={() => setTeacherPaymentCelebration(null)}
+          remaining={Math.max(0, teacherPaymentNotices.length - 1)}
+          onClose={dismissTeacherPaymentNotice}
           onViewDetail={() => {
-            setTeacherPaymentCelebration(null);
+            dismissTeacherPaymentNotice();
             navigate('/teacher/finance');
           }}
         />

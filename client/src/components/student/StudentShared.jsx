@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BookOpen, Check, ChevronDown } from 'lucide-react';
 import { isEnrollmentCompleted } from '../../utils/enrollments';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 
@@ -19,7 +20,7 @@ export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
   </div>
 );
 
-export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
+export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 'cards' }) => {
   const [videoProgress, setVideoProgress] = useState({ loading: true, error: '', byId: new Map(), byName: new Map() });
 
   useEffect(() => {
@@ -74,6 +75,34 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
       || videoProgress.byName.get(normalizeCourseName(course.courseName || course.name))
       || null;
   };
+  if (variant === 'compact') {
+    const items = orderedCourses.map((c) => {
+      const name = c.courseName || c.name;
+      const lessonProgress = progressForCourse(c);
+      const isVideoCourse = Boolean(lessonProgress);
+      const total = isVideoCourse ? lessonProgress.total : (c.totalSessions ?? 12);
+      const done = isVideoCourse ? lessonProgress.completed : (c.completedSessions ?? 0);
+      return {
+        key: c.enrollmentId || c.id || name,
+        name,
+        teacherName: c.teacherName,
+        done,
+        total,
+        unit: isVideoCourse || c.deliveryMode === 'video' ? 'bài' : 'buổi',
+        syncing: videoProgress.loading && c.deliveryMode === 'video',
+        completed: isVideoCourse ? total > 0 && done >= total : isEnrollmentCompleted(c),
+        pct: total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0,
+      };
+    });
+    return (
+      <CompactCoursePicker
+        items={items}
+        activeCourseName={activeCourseName}
+        onChange={onChange}
+        error={videoProgress.error}
+      />
+    );
+  }
   return (
     <section className="min-w-0">
       <p className="cms-sd-caption font-semibold  tracking-wide mb-3 text-slate-400">
@@ -152,6 +181,90 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange }) => {
     </section>
   );
 };
+
+function CompactCoursePicker({ items, activeCourseName, onChange, error }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const active = items.find((item) => item.name === activeCourseName) || items[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointer = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false);
+    };
+    const onKey = (event) => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const progressText = (item) => (item.syncing ? 'Đang đồng bộ' : `${item.done}/${item.total} ${item.unit} · ${item.pct}%`);
+
+  return (
+    <section ref={rootRef} className="relative min-w-0">
+      {error && (
+        <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+          Không đồng bộ được tiến độ bài học: {error}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition hover:border-blue-300"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+          <BookOpen size={18} aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-semibold text-slate-400">Khóa học đang xem · {items.length} khóa</span>
+          <span className="block truncate text-sm font-black text-slate-800">{active?.name}</span>
+        </span>
+        <span className="hidden shrink-0 text-right sm:block">
+          <span className="block text-[11px] font-bold tabular-nums text-slate-500">{active && progressText(active)}</span>
+          <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+            <span className="block h-full rounded-full bg-blue-500" style={{ width: `${active?.pct || 0}%` }} />
+          </span>
+        </span>
+        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <ul role="listbox" className="absolute left-0 right-0 top-full z-30 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
+          {items.map((item) => {
+            const selected = item.name === active?.name;
+            return (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => { onChange(item.name); setOpen(false); }}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${selected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm font-bold ${selected ? 'text-blue-800' : 'text-slate-800'}`}>{item.name}</span>
+                    <span className="block truncate text-[11px] text-slate-400">
+                      GV: {item.teacherName || 'Chưa phân công'}{item.completed ? ' · Đã hoàn thành' : ''}
+                    </span>
+                    <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-slate-100">
+                      <span className={`block h-full rounded-full ${item.completed ? 'bg-emerald-500' : selected ? 'bg-blue-500' : 'bg-red-500'}`} style={{ width: `${item.pct}%` }} />
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[11px] font-bold tabular-nums text-slate-500">{progressText(item)}</span>
+                  {selected ? <Check size={16} className="shrink-0 text-blue-600" aria-hidden="true" /> : <span className="w-4 shrink-0" />}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 function normalizeCourseName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();

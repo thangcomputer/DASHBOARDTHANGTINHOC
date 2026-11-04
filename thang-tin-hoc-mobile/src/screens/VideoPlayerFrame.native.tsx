@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { typography } from '../theme/tokens';
 import { getMobileApiBaseUrl } from '../services/apiClient';
+import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
 import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
 
@@ -251,6 +252,7 @@ export function VideoPlayerFrame({
       playing: Boolean(message.playing),
     };
     progressRef.current = progress;
+    noteStudyMediaProgress(progress.playing);
     onProgressRef.current(progress);
     if (message.eligible && !doneRef.current) {
       void onWatchedRef.current().then((saved) => {

@@ -19,6 +19,7 @@ const {
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
 const logger = require('../config/logger');
 const rules = require('./lessonPracticeRules');
+const learningGoalService = require('./learningGoalService');
 
 function isPreviewUnit(unit) {
   return unit?.isPreviewAllowed === true;
@@ -876,11 +877,25 @@ async function markUnitSection(studentId, unitId, section, itemId = '') {
   const selectedId = String(itemId || collection[0].id || '');
   if (!collection.some((item) => String(item.id) === selectedId)) throw httpError(400, 'Nội dung không hợp lệ');
   const field = section === 'video' ? 'completedVideoIds' : 'completedNoteIds';
-  await LessonUnitProgress.updateOne(
-    { studentId, unitId: unit._id },
+  const marked = await LessonUnitProgress.updateOne(
+    { studentId, unitId: unit._id, [field]: { $ne: selectedId } },
     { $addToSet: { [field]: selectedId }, $set: { subjectId: unit.subjectId } },
-    { upsert: true },
   );
+  if (!marked.modifiedCount) {
+    try {
+      const created = await LessonUnitProgress.updateOne(
+        { studentId, unitId: unit._id },
+        { $setOnInsert: { subjectId: unit.subjectId, [field]: [selectedId] } },
+        { upsert: true },
+      );
+      if (created.upsertedCount) marked.modifiedCount = 1;
+    } catch (err) {
+      if (err?.code !== 11000) throw err;
+    }
+  }
+  if (section === 'video' && marked.modifiedCount) {
+    learningGoalService.trackStudyActivity(studentId, { videos: 1 });
+  }
   const status = await refreshUnitStatus(studentId, unit, items);
   const row = await LessonUnitProgress.findOne({ studentId, unitId: unit._id }).lean();
   return checklistPayload(status, rules.unitChecklist(unit, row, row?.practiceDone));

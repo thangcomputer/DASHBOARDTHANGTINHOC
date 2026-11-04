@@ -16,6 +16,7 @@ import {
   questionMatchesExamSubject,
 } from '../utils/htmlContent';
 import { getExamSubjectMeta } from '../utils/examSubjects';
+import { clearStorageKeepingPreferences } from '../utils/logoutStorage';
 import {
   buildGroupedTeacherExamQuestions,
   buildTeacherExamSections,
@@ -64,8 +65,7 @@ async function logoutToLogin(extra = {}) {
   const deviceId = localStorage.getItem('cms_device_id_v1');
   try { await api.auth.logout(); } catch { /* ignore */ }
   const banError = extra.banError;
-  localStorage.clear();
-  sessionStorage.clear();
+  clearStorageKeepingPreferences();
   if (deviceId) localStorage.setItem('cms_device_id_v1', deviceId);
   if (banError) localStorage.setItem('teacher_ban_error', banError);
   window.location.href = '/login';

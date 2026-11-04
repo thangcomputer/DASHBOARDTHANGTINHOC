@@ -92,7 +92,8 @@ test('PIN lock is reachable from every profile and guards every signed-in screen
   assert.ok(studentProfile.includes('onClick={openPinLockSettings}'));
   assert.ok(teacherProfile.includes('onClick={openPinLockSettings}'));
   assert.ok(navigator.includes('<PinLockGate'));
-  assert.ok(navigator.includes('onTouchStart={notePinActivity}'));
+  assert.ok(navigator.includes('onTouchStart={noteUserActivity}'));
+  assert.match(navigator, /function noteUserActivity\(\) \{\s+notePinActivity\(\);/);
   assert.equal((mobileProfile.match(/title="Khóa mã PIN"/g) || []).length, 2);
   assert.ok(auth.includes('await clearLastActive(pinUserKey(user))'));
 });

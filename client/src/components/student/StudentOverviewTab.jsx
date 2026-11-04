@@ -6,6 +6,8 @@ import {
   ClipboardList, ChevronRight, XCircle, Trophy, Award,
 } from 'lucide-react';
 import { CourseSwitcher, StatCard } from './StudentShared';
+import LearningGoalCard from './LearningGoalCard';
+import LearningLeaderboardCard from './LearningLeaderboardCard';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 import api, { downloadMediaFile, resolveMediaUrl } from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
@@ -299,14 +301,19 @@ export default function StudentOverviewTab({
       </header>
 
       <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
-        <CourseSwitcher
-          courses={enrollments}
-          activeCourseName={activeCourseName || viewStudent.course}
-          onChange={setActiveCourseName}
-        />
+        <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:gap-3">
+          <LearningGoalCard />
+          <LearningLeaderboardCard />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-w-0">
           <div className="lg:col-span-8 cms-sd-stack min-w-0 lg:!gap-3">
+            <CourseSwitcher
+              variant="compact"
+              courses={enrollments}
+              activeCourseName={activeCourseName || viewStudent.course}
+              onChange={setActiveCourseName}
+            />
             {/* Upcoming / live class — live style mirrors TeacherOverviewTab */}
             <section
               className={`th-dashboard-overview__class-card ${

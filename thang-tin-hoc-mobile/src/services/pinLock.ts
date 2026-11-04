@@ -222,6 +222,20 @@ export function getMemoryActiveAt() {
   return memoryActiveAt;
 }
 
+/** Màn khóa PIN đang hiện — popup khác (vd. thông báo nhận lương) phải chờ mở khóa. */
+export const PIN_LOCK_STATE_EVENT = 'mobile:pin-lock-state';
+let pinLockedNow = false;
+
+export function setPinLockedState(locked: boolean) {
+  if (pinLockedNow === locked) return;
+  pinLockedNow = locked;
+  DeviceEventEmitter.emit(PIN_LOCK_STATE_EVENT, locked);
+}
+
+export function isPinLockedNow() {
+  return pinLockedNow;
+}
+
 export function isIdleExpired(lastActive: number, timeoutMinutes: number, now = Date.now()) {
   if (!lastActive) return false;
   return now - lastActive >= timeoutMinutes * 60 * 1000;

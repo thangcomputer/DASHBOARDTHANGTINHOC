@@ -29,6 +29,8 @@ const ACTIONS = {
   tx_list: { family: 'manage_finance', resource: null },
   tx_stats: { family: 'manage_finance', resource: null },
   tx_teacher_history: { family: 'admin_staff_or_self', resource: null },
+  tx_payment_notices: { family: 'authenticated', resource: null },
+  tx_payment_notice_seen: { family: 'authenticated', resource: null },
   tx_calculate: { family: 'tx_calculate', resource: null },
   tx_create: { family: 'manage_finance', resource: null },
   tx_confirm: { family: 'manage_finance', resource: null },
