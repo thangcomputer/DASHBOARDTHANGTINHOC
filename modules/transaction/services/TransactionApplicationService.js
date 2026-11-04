@@ -7,12 +7,12 @@ const logger = require('./../../../config/logger');
 const { postSalary, voidLedgerEntry } = require('./../../finance/services/ledgerService');
 const LedgerEntry = require('./../../finance/models/LedgerEntry');
 const { allowHardDeleteFinance } = require('./../../../utils/financeFlags');
+const { sanitizeRegex } = require('./../../../middleware/sanitizeRegex');
 
 /**
  * transactionRoutes.js — Quản lý phiếu chi lương giảng viên
  * Có branchFilter: STAFF chỉ thấy giao dịch của chi nhánh mình
  */
-const router      = express.Router();
 // ─── GET /api/transactions ─────────────────────────────────────────────────────
 // Admin/Staff: Lấy giao dịch lương (STAFF chỉ thấy chi nhánh của mình)
 

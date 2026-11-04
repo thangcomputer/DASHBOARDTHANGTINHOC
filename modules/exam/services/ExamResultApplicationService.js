@@ -4,7 +4,6 @@ const ExamResult = require('./../models/ExamResult'); // Temp for new ExamResult
 const NotificationService = require('./../../notification/services/NotificationService');
 const logger = require('./../../../config/logger');
 
-const router     = express.Router();
 // GET /api/exam-results — lấy tất cả (hoặc lọc theo type)
 
 class ExamResultApplicationService {
