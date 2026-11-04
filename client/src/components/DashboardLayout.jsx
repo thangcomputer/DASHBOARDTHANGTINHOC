@@ -245,10 +245,12 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const toast = useToast();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileFooterHiddenRouteKey, setMobileFooterHiddenRouteKey] = useState(null);
+  const [mobileFooterInputFocused, setMobileFooterInputFocused] = useState(false);
   const mobileFooterRouteKey = `${location.pathname}${location.hash}`;
   const mobileFooterVisible = mobileFooterHiddenRouteKey !== mobileFooterRouteKey;
   const [brandLogo, setBrandLogo] = useState('');
-  const lastContentScrollTop = useRef(0);
+  const scrollPositions = useRef(new WeakMap());
+  const focusRestoreTimer = useRef(null);
   const [ratingDetail, setRatingDetail] = useState(null);
   const [ratingDetailLoading, setRatingDetailLoading] = useState(false);
   const [ratingDetailError, setRatingDetailError] = useState('');
@@ -1525,9 +1527,14 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     || isTeacherStudentsTab;
   const showAdminBranch = role === 'admin';
   const handleContentScroll = (event) => {
-    const scrollTop = event.currentTarget.scrollTop;
-    const delta = scrollTop - lastContentScrollTop.current;
-    lastContentScrollTop.current = scrollTop;
+    const scrollTarget = event.target;
+    if (!(scrollTarget instanceof HTMLElement)
+      || scrollTarget.scrollHeight <= scrollTarget.clientHeight + 1) return;
+
+    const scrollTop = scrollTarget.scrollTop;
+    const previousScrollTop = scrollPositions.current.get(scrollTarget) ?? 0;
+    const delta = scrollTop - previousScrollTop;
+    scrollPositions.current.set(scrollTarget, scrollTop);
     if (scrollTop <= 24) {
       setMobileFooterHiddenRouteKey(null);
     } else if (delta > 4) {
@@ -1538,8 +1545,41 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   };
 
   useEffect(() => {
-    lastContentScrollTop.current = 0;
+    const isTextEntry = (target) => target instanceof HTMLElement && (
+      target.isContentEditable
+      || target.matches(
+        'textarea, select, input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"])',
+      )
+    );
+    const handleFocusIn = (event) => {
+      if (!isTextEntry(event.target)) return;
+      window.clearTimeout(focusRestoreTimer.current);
+      setMobileFooterInputFocused(true);
+    };
+    const handleFocusOut = () => {
+      window.clearTimeout(focusRestoreTimer.current);
+      focusRestoreTimer.current = window.setTimeout(() => {
+        setMobileFooterInputFocused(isTextEntry(document.activeElement));
+      }, 0);
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+      window.clearTimeout(focusRestoreTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollPositions.current = new WeakMap();
+    setMobileFooterHiddenRouteKey(null);
   }, [location.pathname, location.hash]);
+
+  const showMobileFooter = mobileFooterVisible
+    && !mobileFooterInputFocused
+    && !isLessonPracticeCoursePage;
 
   return (
     <FloatingMessengerProvider
@@ -1566,7 +1606,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         mobileOpen={mobileNavOpen}
         onMobileOpenChange={setMobileNavOpen}
         mobileNavVisible={!isImmersivePage || isInboxPage}
-        mobileFooterVisible={mobileFooterVisible && !isLessonPracticeCoursePage}
+        mobileFooterVisible={showMobileFooter}
         onBrandLogoChange={setBrandLogo}
       />
 
@@ -1637,7 +1677,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         </header>
 
         <div
-          onScroll={isImmersivePage || isInboxPage || isBiPage ? undefined : handleContentScroll}
+          onScrollCapture={handleContentScroll}
           className={
             isInboxPage || isBiPage
               ? `flex-1 min-h-0 w-full overflow-hidden flex flex-col cms-page-gutter py-3 sm:py-3 md:py-4 ${
@@ -1647,9 +1687,15 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               }`
               : isImmersivePage
                 ? 'flex-1 min-h-0 w-full overflow-hidden flex flex-col p-0'
-                : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(6rem+env(safe-area-inset-bottom,0px))]'
+                : 'flex-1 min-h-0 cms-page-gutter cms-shell-gutter py-3 sm:py-4 w-full max-w-full overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]'
           }
-          style={isInboxPage ? { paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' } : undefined}
+          style={isInboxPage
+            ? {
+              paddingBottom: showMobileFooter
+                ? 'calc(7.5rem + env(safe-area-inset-bottom, 0px))'
+                : 'env(safe-area-inset-bottom, 0px)',
+            }
+            : undefined}
         >
           <div
             className={

@@ -15,6 +15,18 @@ test('DashboardLayout header dùng bố cục co giãn (wrap / cột)', async ()
   );
 });
 
+test('Mobile footer navigation hides during text entry and nested scrolling', async () => {
+  const src = await fs.readFile(
+    path.resolve(__dirname, '../client/src/components/DashboardLayout.jsx'),
+    'utf8'
+  );
+  assert.ok(src.includes("document.addEventListener('focusin', handleFocusIn)"));
+  assert.ok(src.includes("document.addEventListener('focusout', handleFocusOut)"));
+  assert.ok(src.includes('onScrollCapture={handleContentScroll}'));
+  assert.ok(src.includes('&& !mobileFooterInputFocused'));
+  assert.ok(src.includes("'env(safe-area-inset-bottom, 0px)'"));
+});
+
 test('Admin tabs: học viên / tài chính / GV có breakpoints linh hoạt', async () => {
   const students = await fs.readFile(
     path.resolve(__dirname, '../client/src/components/admin/tabs/AdminStudentsTab.jsx'),

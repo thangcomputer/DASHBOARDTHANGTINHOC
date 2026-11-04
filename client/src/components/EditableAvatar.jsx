@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Loader2, Move, RotateCcw, X } from 'lucide-react';
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { authAPI } from '../services/api';
@@ -46,7 +47,14 @@ export default function EditableAvatar({
 
   const handleClick = (e) => {
     e.stopPropagation();
+    if (e.target === fileInputRef.current) return;
     if (!editable || loading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleKeyDown = (event) => {
+    if (!editable || loading || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
     fileInputRef.current?.click();
   };
 
@@ -167,6 +175,10 @@ export default function EditableAvatar({
   return (
     <div
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role={editable ? 'button' : undefined}
+      tabIndex={editable ? 0 : undefined}
+      aria-label={editable ? 'Đổi ảnh đại diện' : name || 'Avatar'}
       className={`group relative ${editable ? 'cursor-pointer' : ''} overflow-hidden select-none ${className}`}
       title={editable ? 'Rê vào và bấm để đổi ảnh đại diện' : name || 'Avatar'}
     >
@@ -176,64 +188,74 @@ export default function EditableAvatar({
           type="file"
           accept="image/*"
           onChange={handleFileChange}
+          onClick={(event) => event.stopPropagation()}
           className="hidden"
         />
       )}
       {cropSource && cropImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4" onClick={() => !loading && setCropSource(null)}>
+        createPortal(
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/70 p-4"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!loading) setCropSource(null);
+            }}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-slate-900">Căn chỉnh ảnh đại diện</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Kéo ảnh để đưa khuôn mặt vào giữa khung tròn</p>
-              </div>
-              <button type="button" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" onClick={() => setCropSource(null)} disabled={loading} aria-label="Đóng">
-                <X size={18} />
-              </button>
-            </div>
             <div
-              className="relative mx-auto h-[240px] w-[240px] cursor-move overflow-hidden rounded-full bg-slate-100 ring-4 ring-slate-200 touch-none"
-              onPointerDown={startCropDrag}
-              onPointerMove={moveCropDrag}
-              onPointerUp={stopCropDrag}
-              onPointerCancel={stopCropDrag}
-              onPointerLeave={stopCropDrag}
+              className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
             >
-              <img src={cropSource} alt="Xem trước ảnh đại diện" className="pointer-events-none absolute max-w-none select-none" style={cropImageStyle} draggable="false" />
-              <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/80" />
-            </div>
-            <div className="mt-4">
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                <Move size={14} />
-                Phóng to / thu nhỏ
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.01"
-                value={cropZoom}
-                onChange={(event) => setCropZoom(Number(event.target.value))}
-                className="mt-2 w-full accent-red-600"
-                aria-label="Mức phóng ảnh"
-              />
-            </div>
-            <div className="mt-4 flex justify-between gap-2">
-              <button type="button" className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100" onClick={() => { setCropZoom(1); setCropOffset({ x: 0, y: 0 }); }} disabled={loading}>
-                <RotateCcw size={14} /> Đặt lại
-              </button>
-              <div className="flex gap-2">
-                <button type="button" className="rounded-xl px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100" onClick={() => setCropSource(null)} disabled={loading}>Hủy</button>
-                <button type="button" className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700 disabled:opacity-50" onClick={finishCrop} disabled={loading}>
-                  {loading ? <Loader2 size={14} className="animate-spin" /> : 'Lưu ảnh'}
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-black text-slate-900">Căn chỉnh ảnh đại diện</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Kéo ảnh để đưa khuôn mặt vào giữa khung tròn</p>
+                </div>
+                <button type="button" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" onClick={() => setCropSource(null)} disabled={loading} aria-label="Đóng">
+                  <X size={18} />
                 </button>
               </div>
+              <div
+                className="relative mx-auto h-[240px] w-[240px] cursor-move overflow-hidden rounded-full bg-slate-100 ring-4 ring-slate-200 touch-none"
+                onPointerDown={startCropDrag}
+                onPointerMove={moveCropDrag}
+                onPointerUp={stopCropDrag}
+                onPointerCancel={stopCropDrag}
+                onPointerLeave={stopCropDrag}
+              >
+                <img src={cropSource} alt="Xem trước ảnh đại diện" className="pointer-events-none absolute max-w-none select-none" style={cropImageStyle} draggable="false" />
+                <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/80" />
+              </div>
+              <div className="mt-4">
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <Move size={14} />
+                  Phóng to / thu nhỏ
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.01"
+                  value={cropZoom}
+                  onChange={(event) => setCropZoom(Number(event.target.value))}
+                  className="mt-2 w-full accent-red-600"
+                  aria-label="Mức phóng ảnh"
+                />
+              </div>
+              <div className="mt-4 flex justify-between gap-2">
+                <button type="button" className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100" onClick={() => { setCropZoom(1); setCropOffset({ x: 0, y: 0 }); }} disabled={loading}>
+                  <RotateCcw size={14} /> Đặt lại
+                </button>
+                <div className="flex gap-2">
+                  <button type="button" className="rounded-xl px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100" onClick={() => setCropSource(null)} disabled={loading}>Hủy</button>
+                  <button type="button" className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700 disabled:opacity-50" onClick={finishCrop} disabled={loading}>
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : 'Lưu ảnh'}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </div>,
+          document.body,
+        )
       )}
       <img
         key={displayAvatar}
