@@ -16,25 +16,17 @@ const {
   syncStudentFinanceCache,
   postDiscount,
 } = require('../services/ledgerService');
-const guard = [
-  authMiddleware,
-  authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE), ...legacyMapping.resolve(PERMISSIONS.VIEW_BRANCH_REVENUE)),
-  branchFilter,
-];
-const manageGuard = [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)), branchFilter];
-const voidGuard = [authMiddleware, authorize(NEW_PERMISSIONS.FINANCE_REFUND_APPROVE), branchFilter];
-const paymentGuard = [authMiddleware, authorize(NEW_PERMISSIONS.FINANCE_PAYMENT_CREATE), branchFilter];
-function resolveBranchId(req) {
-  const q = req.query.branchId;
-  if (req.branchFilter?.branchId) return String(req.branchFilter.branchId);
+function resolveBranchId(data) {
+  const q = data.query?.branchId || data.branchId;
+  if (data.branchFilter?.branchId) return String(data.branchFilter.branchId);
   if (q && q !== 'all') return String(q);
   return null;
 }
-function actorOf(req) {
+function actorOf(data) {
   return {
-    id: req.currentUser?.id || req.currentUser?._id || '',
-    name: req.currentUser?.name || '',
-    role: req.currentUser?.role || '',
+    id: data.currentUser?.id || data.currentUser?._id || '',
+    name: data.currentUser?.name || '',
+    role: data.currentUser?.role || '',
   };
 }
 // GET /api/finance/summary
@@ -42,7 +34,7 @@ function actorOf(req) {
 class FinanceApplicationService {
   async get_summary(data) {
   try {
-    const branchId = resolveBranchId(req);
+    const branchId = resolveBranchId(data);
     const from = data.from || null;
     const to = data.to || null;
     const studentId = data.studentId || null;
@@ -75,8 +67,8 @@ class FinanceApplicationService {
 
   async get_ledger(data) {
   try {
-    const branchId = resolveBranchId(req);
-    const data = await listLedgerEntries({
+    const branchId = resolveBranchId(data);
+    const entries = await listLedgerEntries({
       branchId,
       studentId: data.studentId || null,
       teacherId: data.teacherId || null,
@@ -87,7 +79,7 @@ class FinanceApplicationService {
       page: data.page || 1,
       limit: data.limit || 50,
     });
-    return { _status: 200, _body: { success: true, data } };
+    return { _status: 200, _body: { success: true, data: entries } };
   } catch (err) {
     logger.error('[FINANCE] ledger error:', err);
     return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
@@ -111,7 +103,7 @@ class FinanceApplicationService {
   } catch (err) {
     const status = err.status || 500;
     logger.error('[FINANCE] student card error:', err);
-    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: status, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
@@ -120,7 +112,7 @@ class FinanceApplicationService {
     const result = await voidLedgerEntry({
       entryId: data.id,
       reason: data.body?.reason || '',
-      actor: actorOf(req),
+      actor: actorOf(data),
       createReversal: data.body?.createReversal !== false,
     });
     return { _status: 200, _body: {
@@ -130,7 +122,7 @@ class FinanceApplicationService {
     } };
   } catch (err) {
     const status = err.status || 500;
-    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: status, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
@@ -151,19 +143,19 @@ class FinanceApplicationService {
       enrollmentId,
       courseName,
       sourceRef: sourceRef || `discount:${studentId}:${enrollmentId || 'x'}`,
-      actor: actorOf(req),
+      actor: actorOf(data),
       note: note || '',
     });
     return { _status: 200, _body: { success: true, created, data: entry } };
   } catch (err) {
     const status = err.status || 500;
-    return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
+    return { _status: status, _body: { success: false, message: err.message || 'Lỗi server' } };
   }
 }
 
   async get_reconcile(data) {
   try {
-    const branchId = resolveBranchId(req);
+    const branchId = resolveBranchId(data);
     const report = await reconciliationReport({
       branchId,
       from: data.from || null,
@@ -177,7 +169,7 @@ class FinanceApplicationService {
 
   async post_snapshots_rebuild(data) {
   try {
-    const branchId = resolveBranchId(req);
+    const branchId = resolveBranchId(data);
     const result = await rebuildDailySnapshots({
       branchId,
       from: data.body?.from || data.from || null,
@@ -192,11 +184,11 @@ class FinanceApplicationService {
 
   async post_students_id_sync_cache(data) {
   try {
-    const data = await syncStudentFinanceCache(data.id);
-    if (!data) {
+    const result = await syncStudentFinanceCache(data.id);
+    if (!result) {
       return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
-    return { _status: 200, _body: { success: true, data } };
+    return { _status: 200, _body: { success: true, data: result } };
   } catch (err) {
     return { _status: 500, _body: { success: false, message: err.message || 'Lỗi server' } };
   }

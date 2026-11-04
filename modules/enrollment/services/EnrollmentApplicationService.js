@@ -6,7 +6,31 @@ const Invoice = require('../../finance/models/Invoice');
 const logger = require('../../../config/logger');
 const { effectiveCoursePrice } = require('../../../utils/coursePricing');
 const { settlePayment, postRefund, voidLedgerEntry, postSalary } = require('../../finance/services/ledgerService');
-const { applyEnrollmentStats, resolveEnrollmentExamSubjects } = require('./enrollmentService');
+const { createTuitionInvoice } = require('../../finance/services/tuitionInvoiceService');
+const { applyEnrollmentStats, resolveEnrollmentExamSubjects, legacyEnrollmentFromStudent, syncStudentFromPrimaryEnrollment } = require('./enrollmentService');
+const { userHasPermission } = require('../../../shared/middleware/authMiddleware');
+const { PERMISSIONS } = require('../../../constants/permissions');
+const cache = require('../../../utils/cache');
+
+function financeActor(data) {
+  return {
+    id: String(data.currentUser?.id || data.currentUser?._id || ''),
+    role: String(data.currentUser?.role || ''),
+  };
+}
+
+function financeReqMeta(data, student) {
+  const headers = data.headers || {};
+  return {
+    ip: headers['x-forwarded-for']?.split(',')[0]?.trim() || data.ip || '',
+    userAgent: headers['user-agent'] || '',
+    branchId: student?.branchId || data.currentUser?.branchId || null,
+  };
+}
+
+function bustFinanceCaches() {
+  cache.delByPrefix('bi:overview');
+}
 
 class EnrollmentApplicationService {
   async post_id_enrollments(data) {
@@ -122,9 +146,9 @@ class EnrollmentApplicationService {
           idempotencyKey: lastEnr?._id
             ? `payment:enrollment_add:${student._id}:${lastEnr._id}`
             : `payment:enrollment_add:${student._id}:${invoice?.maHoaDon || 'nohd'}`,
-          actor: financeActor(req),
+          actor: financeActor(data),
           note: `Thêm khóa ${resolvedName}`,
-          reqMeta: financeReqMeta(req, student),
+          reqMeta: financeReqMeta(data, student),
           metadata: { paymentMethod: paymentMethod || 'transfer' },
         });
         bustFinanceCaches();
@@ -296,9 +320,9 @@ class EnrollmentApplicationService {
           source: 'enrollment_pay',
           sourceRef: invoice?.maHoaDon || `enr:${claimedEnr._id}`,
           idempotencyKey: `payment:enrollment_pay:${fresh._id}:${claimedEnr._id}`,
-          actor: financeActor(req),
+          actor: financeActor(data),
           note: note || '',
-          reqMeta: financeReqMeta(req, fresh),
+          reqMeta: financeReqMeta(data, fresh),
         });
         bustFinanceCaches();
       } catch (ledgerErr) {
@@ -343,7 +367,6 @@ class EnrollmentApplicationService {
       return { _status: 404, _body: { success: false, message: 'Không tìm thấy học viên' } };
     }
     if (!student.enrollments?.length && student.course) {
-      const { legacyEnrollmentFromStudent } = require('../../enrollment/services/enrollmentService');
       student.enrollments = [legacyEnrollmentFromStudent(student)];
       student.enrollments[0].isPrimary = true;
     }
@@ -375,7 +398,7 @@ class EnrollmentApplicationService {
     // Số tiền hoàn: chỉ hoàn khi client gửi rõ; mặc định 0 (hủy ≠ tự động hoàn toàn bộ)
     let refundAmt = 0;
     if (wasPaid && paidAmt > 0 && data.body?.refundAmount != null) {
-      const bodyRefund = Number(data.refundAmount);
+      const bodyRefund = Number(data.body.refundAmount);
       if (Number.isFinite(bodyRefund) && bodyRefund >= 0 && bodyRefund <= paidAmt) {
         refundAmt = bodyRefund;
       }
@@ -403,16 +426,19 @@ class EnrollmentApplicationService {
           note: `Hoàn học phí khi hủy khóa "${courseName}". Lý do: ${cancelReason}`,
           sourceRef: `cancel:${student._id}:${enr._id}`,
           idempotencyKey: `refund:cancel:${student._id}:${enr._id}`,
-          actor: financeActor(req),
-          reqMeta: financeReqMeta(req, student),
+          actor: financeActor(data),
+          reqMeta: financeReqMeta(data, student),
           metadata: { enrollmentId: String(enr._id), cancelReason },
         });
       } catch (ledgerErr) {
         logger.error('[STUDENTS] cancel enrollment refund FAILED: %s', ledgerErr.message);
-        return res.status(ledgerErr.status || 500).json({
-          success: false,
-          message: ledgerErr.message || 'Ghi sổ hoàn thất bại — khóa chưa hủy.',
-        });
+        return {
+          _status: ledgerErr.status || 500,
+          _body: {
+            success: false,
+            message: ledgerErr.message || 'Ghi sổ hoàn thất bại — khóa chưa hủy.',
+          },
+        };
       }
     }
 
@@ -456,7 +482,7 @@ class EnrollmentApplicationService {
           oldValue: { status: 'active', paid: true, price: paidAmt },
           newValue: { status: 'cancelled', refundedAmount: refundAmt, cancelReason },
           ip: data.ip,
-          userAgent: data.headers['user-agent'] || '',
+          userAgent: data.headers?.['user-agent'] || '',
         });
       } catch { /* ignore audit */ }
       refundMsg = ` Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ.`;

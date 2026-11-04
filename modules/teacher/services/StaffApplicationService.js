@@ -4,25 +4,17 @@ const { teacherRepository } = require('./../repositories');
 const Teacher = require('./../models/Teacher'); // Temp for new Teacher
 const Branch  = require('./../../branch/models/Branch');
 
-/**
- * staffRoutes.js — Quản lý tài khoản nội bộ (Admin / Staff) CRUD
- * Thêm: validate branchId tồn tại trong Branches, auto-fill branchCode
- */
-const guard  = [authMiddleware, authorize(NEW_PERMISSIONS.USER_MANAGE)];
-function actorIsRootSuperAdmin(req) {
-  return req.currentUser?.id === 'admin';
+function actorIsRootSuperAdmin(data) {
+  return data.currentUser?.id === 'admin';
 }
-function actorIsSuperAdmin(req) {
-  return req.currentUser?.id === 'admin' || req.currentUser?.adminRole === 'SUPER_ADMIN';
-}
-function actorIsHighAdminOrAbove(req) {
-  return actorIsSuperAdmin(req) || req.currentUser?.adminRole === 'HIGH_ADMIN';
+function actorIsSuperAdmin(data) {
+  return data.currentUser?.id === 'admin' || data.currentUser?.adminRole === 'SUPER_ADMIN';
 }
 /** Staff không được gán quyền vượt quá quyền của chính mình. */
-async function sanitizeAssignedPermissions(req, permissions) {
+async function sanitizeAssignedPermissions(data, permissions) {
   const list = Array.isArray(permissions) ? permissions.map(String) : [];
-  if (actorIsSuperAdmin(req)) return list;
-  const mine = new Set(req.currentUser?.permissions || []);
+  if (actorIsSuperAdmin(data)) return list;
+  const mine = new Set(data.currentUser?.permissions || []);
   return list.filter((p) => mine.has(p));
 }
 // ── GET /api/staff ─────────────────────────────────────────────────────────────
@@ -46,7 +38,7 @@ class StaffApplicationService {
       return { _status: 400, _body: { success: false, message: 'Thiếu tên, số điện thoại hoặc mật khẩu' } };
 
     // Tạo tài khoản SUPER_ADMIN chỉ dành cho Admin Super (Hệ thống)
-    if (adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
+    if (adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(data)) {
       return { _status: 403, _body: {
         success: false,
         message: 'Chỉ Admin Super (Hệ thống) mới được phép tạo thêm tài khoản Super Admin.',
@@ -54,7 +46,7 @@ class StaffApplicationService {
     }
 
     // Tạo HIGH_ADMIN chỉ dành cho SUPER_ADMIN trở lên
-    if (adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(req)) {
+    if (adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(data)) {
       return { _status: 403, _body: {
         success: false,
         message: 'Chỉ Super Admin mới được phép tạo tài khoản Admin cấp cao.',
@@ -78,7 +70,7 @@ class StaffApplicationService {
 
     const safePermissions = (adminRole === 'SUPER_ADMIN')
       ? []
-      : await sanitizeAssignedPermissions(req, permissions);
+      : await sanitizeAssignedPermissions(data, permissions);
 
     const resolvedRole = (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN') ? 'admin' : 'staff';
 
@@ -108,11 +100,11 @@ class StaffApplicationService {
 
   async put_id(data) {
   try {
-    const target = await teacherRepository.findById(data.id).select('adminRole').lean();
+    const target = await teacherRepository.findById(data.id).select('adminRole phone').lean();
     if (!target) return { _status: 404, _body: { success: false, message: 'Không tìm thấy tài khoản' } };
 
     // Nếu target là SUPER_ADMIN, chỉ Admin Super (id === admin) mới được sửa
-    if (target.adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
+    if (target.adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(data)) {
       return { _status: 403, _body: {
         success: false,
         message: 'Chỉ Admin Super mới được chỉnh sửa tài khoản Super Admin.',
@@ -120,7 +112,7 @@ class StaffApplicationService {
     }
 
     // Nếu target là HIGH_ADMIN, chỉ SUPER_ADMIN trở lên mới được sửa
-    if (target.adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(req)) {
+    if (target.adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(data)) {
       return { _status: 403, _body: {
         success: false,
         message: 'Chỉ Super Admin mới được chỉnh sửa tài khoản Admin cấp cao.',
@@ -135,7 +127,7 @@ class StaffApplicationService {
     if (gender) updates.gender = gender;
 
     if (phone && phone !== target.phone) {
-      if (!actorIsRootSuperAdmin(req)) {
+      if (!actorIsRootSuperAdmin(data)) {
         return { _status: 403, _body: { success: false, message: 'Chỉ Admin hệ thống mới được đổi số điện thoại (tài khoản đăng nhập).' } };
       }
       const exists = await teacherRepository.findOne({ phone, _id: { $ne: target._id } });
@@ -148,7 +140,7 @@ class StaffApplicationService {
     if (adminRole) {
       // Đổi vai trò sang SUPER_ADMIN hoặc từ SUPER_ADMIN xuống STAFF: chỉ dành cho Root Admin
       const isRoleChanging = target.adminRole !== adminRole;
-      if (isRoleChanging && !actorIsRootSuperAdmin(req)) {
+      if (isRoleChanging && !actorIsRootSuperAdmin(data)) {
         return { _status: 403, _body: {
           success: false,
           message: 'Chỉ Admin Super mới có quyền thăng/hạ quyền Admin Cấp Cao.',
@@ -163,17 +155,17 @@ class StaffApplicationService {
         updates.branchCode  = '';
       } else if (adminRole === 'HIGH_ADMIN') {
         updates.role        = 'admin';
-        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        updates.permissions = await sanitizeAssignedPermissions(data, permissions);
         updates.branchId    = null;
         updates.branchCode  = '';
       } else if (adminRole === 'SUPPORT') {
         updates.role        = 'staff';
-        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        updates.permissions = await sanitizeAssignedPermissions(data, permissions);
         updates.branchId    = null;
         updates.branchCode  = '';
       } else {
         updates.role        = 'staff';
-        updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+        updates.permissions = await sanitizeAssignedPermissions(data, permissions);
         if (branchId) {
           const branch = await Branch.findById(branchId);
           if (!branch)
@@ -186,7 +178,7 @@ class StaffApplicationService {
         }
       }
     } else if (target.adminRole === 'STAFF' || target.adminRole === 'HIGH_ADMIN') {
-      if (permissions) updates.permissions = await sanitizeAssignedPermissions(req, permissions);
+      if (permissions) updates.permissions = await sanitizeAssignedPermissions(data, permissions);
       if (branchId) {
         const branch = await Branch.findById(branchId);
         if (branch) {
@@ -219,13 +211,13 @@ class StaffApplicationService {
     if (!target) return { _status: 404, _body: { success: false, message: 'Không tìm thấy tài khoản' } };
 
     // Chỉ Admin Super mới được xóa SUPER_ADMIN. Chỉ SUPER_ADMIN trở lên mới xóa HIGH_ADMIN.
-    if (target.adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(req)) {
+    if (target.adminRole === 'SUPER_ADMIN' && !actorIsRootSuperAdmin(data)) {
       return { _status: 403, _body: {
         success: false,
         message: 'Chỉ Admin Super mới được xóa tài khoản Super Admin.',
       } };
     }
-    if (target.adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(req)) {
+    if (target.adminRole === 'HIGH_ADMIN' && !actorIsSuperAdmin(data)) {
       return { _status: 403, _body: {
         success: false,
         message: 'Chỉ Super Admin mới được xóa tài khoản Admin cấp cao.',

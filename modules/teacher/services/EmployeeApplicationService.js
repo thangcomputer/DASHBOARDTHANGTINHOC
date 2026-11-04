@@ -6,9 +6,8 @@ const PayrollLog = require('./../../finance/models/PayrollLog');
  * employeeRoutes.js — CRUD Nhân sự + Trả lương
  * Branch-aware: STAFF chỉ thấy nhân viên chi nhánh mình
  */
-const router     = express.Router();
-function emitEmployeesChanged(req, action = 'update') {
-  const io = req.app.get('io');
+function emitEmployeesChanged(data, action = 'update') {
+  const io = data.app?.get('io');
   if (!io) return;
   io.emit('employees:updated', { action });
   io.emit('data:refresh', { type: 'employees', action });
@@ -91,7 +90,7 @@ class EmployeeApplicationService {
       bankAccount: bankAccount || { bankCode: '', accountNumber: '', accountName: '' }
     });
 
-    emitEmployeesChanged(req, 'create');
+    emitEmployeesChanged(data, 'create');
     return { _status: 201, _body: { success: true, data: employee } };
   } catch (err) {
     return { _status: 400, _body: { success: false, message: err.message } };
@@ -113,7 +112,7 @@ class EmployeeApplicationService {
 
     const employee = await employeeRepository.update(data.id, updates);
     if (!employee) return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhân viên' } };
-    emitEmployeesChanged(req, 'update');
+    emitEmployeesChanged(data, 'update');
     return { _status: 200, _body: { success: true, data: employee } };
   } catch (err) {
     return { _status: 400, _body: { success: false, message: err.message } };
@@ -130,7 +129,7 @@ class EmployeeApplicationService {
     }
     const employee = await employeeRepository.delete(data.id);
     if (!employee) return { _status: 404, _body: { success: false, message: 'Không tìm thấy nhân viên' } };
-    emitEmployeesChanged(req, 'delete');
+    emitEmployeesChanged(data, 'delete');
     return { _status: 200, _body: { success: true, message: `Đã xóa nhân viên ${employee.name}` } };
   } catch (err) {
     return { _status: 500, _body: { success: false, message: err.message } };
@@ -162,7 +161,7 @@ class EmployeeApplicationService {
       branchCode: employee.branchCode
     });
 
-    emitEmployeesChanged(req, 'pay');
+    emitEmployeesChanged(data, 'pay');
     return { _status: 201, _body: { success: true, message: `Đã ghi nhận trả ${amount} cho ${employee.name}`, data: log } };
   } catch (err) {
     return { _status: 400, _body: { success: false, message: err.message } };

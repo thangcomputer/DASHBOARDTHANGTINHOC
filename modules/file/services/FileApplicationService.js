@@ -3,37 +3,6 @@ const logger = require('./../../../config/logger');
 const fileService = require('./fileService');
 const { normalizeMulterFile } = require('./../../../utils/escapeRegex');
 
-/** Category mọi role đã đăng nhập được upload (chat / bài tập / avatar). */
-const OPEN_UPLOAD_CATEGORIES = new Set(['messages', 'assignments', 'avatars']);
-function requireUploadCategoryPermission(req, res, next) {
-  const category = String(req.query.category || req.body?.category || 'general').toLowerCase();
-  if (OPEN_UPLOAD_CATEGORIES.has(category)) return next();
-  if (category === 'training') {
-    return authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_TRAINING), ...legacyMapping.resolve(PERMISSIONS.MANAGE_STUDENT_TRAINING), ...legacyMapping.resolve(PERMISSIONS.SYSTEM_SETTINGS), ...legacyMapping.resolve())(req, res, next);
-  }
-  return authorizeAny(...legacyMapping.resolve(PERMISSIONS.SYSTEM_SETTINGS))(req, res, next);
-}
-function uploadMiddleware(req, res, next) {
-  const category = String(req.query.category || req.body?.category || 'general').toLowerCase();
-  let uploader;
-  try {
-    uploader = fileService.createUploader(category);
-  } catch (err) {
-    return res.status(err.status || 400).json({ success: false, message: err.message });
-  }
-  uploader.single('file')(req, res, (err) => {
-    if (err) {
-      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-        const cfg = fileService.getCategoryConfig(category);
-        const mb = cfg ? Math.round(cfg.maxBytes / (1024 * 1024)) : '?';
-        return res.status(400).json({ success: false, message: 'File qua lon (toi da ' + mb + 'MB)' });
-      }
-      return res.status(400).json({ success: false, message: err.message || 'Loi upload' });
-    }
-    req.fileCategory = category;
-    next();
-  });
-}
 // POST /api/files/upload?category=general
 
 class FileApplicationService {
@@ -65,7 +34,7 @@ class FileApplicationService {
     } };
   } catch (err) {
     logger.error('[FILES] upload:', err);
-    return res.status(err.status || 500).json({ success: false, message: err.message || 'Loi server' });
+    return { _status: err.status || 500, _body: { success: false, message: err.message || 'Loi server' } };
   }
 }
 
@@ -94,7 +63,15 @@ class FileApplicationService {
   }
 }
 
-  async get_categories(data) {}
+  async get_categories() {
+    const data = Object.entries(fileService.CATEGORIES).map(([key, config]) => ({
+      key,
+      maxBytes: config.maxBytes,
+      maxLabel: fileService.formatBytes(config.maxBytes),
+      exts: config.exts,
+    }));
+    return { _status: 200, _body: { success: true, data } };
+  }
 
   async get_root(data) {
   try {
@@ -129,7 +106,8 @@ class FileApplicationService {
     const asset = await fileService.deleteById(data.id, data.currentUser);
     return { _status: 200, _body: { success: true, message: 'Da xoa file', data: { id: asset._id, status: asset.status } } };
   } catch (err) {
-    res.status(err.status || 500).json({ success: false, message: err.message || 'Loi server' });
+    logger.error('[FILES] delete:', err);
+    return { _status: err.status || 500, _body: { success: false, message: err.message || 'Loi server' } };
   }
 }
 

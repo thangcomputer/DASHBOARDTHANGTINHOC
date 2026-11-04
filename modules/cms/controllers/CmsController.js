@@ -113,7 +113,10 @@ class CmsController {
       // Replaced by Zod Validator
       const result = await cmsApplicationService.get_forms_id_submissions_export(CmsValidator.validateGet_forms_id_submissions_export(req));
       if (!result) return;
-      if (result._isSend) return res.status(result._status ?? 200).send(result._body);
+      if (result._isSend) {
+        Object.entries(result._headers || {}).forEach(([name, value]) => res.setHeader(name, value));
+        return res.status(result._status ?? 200).send(result._body);
+      }
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {
       const status = err.status || err.statusCode || (err.code === 'VALIDATION_ERROR' ? 400 : 500);
@@ -204,7 +207,10 @@ class CmsController {
       // Replaced by Zod Validator
       const result = await cmsApplicationService.get_reports_id_export(CmsValidator.validateGet_reports_id_export(req));
       if (!result) return;
-      if (result._isSend) return res.status(result._status ?? 200).send(result._body);
+      if (result._isSend) {
+        Object.entries(result._headers || {}).forEach(([name, value]) => res.setHeader(name, value));
+        return res.status(result._status ?? 200).send(result._body);
+      }
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {
       const status = err.status || err.statusCode || (err.code === 'VALIDATION_ERROR' ? 400 : 500);
@@ -293,4 +299,3 @@ class CmsController {
 }
 
 module.exports = new CmsController();
-

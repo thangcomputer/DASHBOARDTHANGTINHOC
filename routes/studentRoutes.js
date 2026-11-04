@@ -16,6 +16,7 @@ const { validateOwnedCertificationFile } = require('../utils/certificationFilePo
 const { validateAdminExamProgress } = require('../utils/adminExamProgressPolicy');
 const { effectiveCoursePrice } = require('../utils/coursePricing');
 const { isExcludedExamSubjectId } = require('../services/examSubjectCatalog');
+const { createTuitionInvoice } = require('../modules/finance/services/tuitionInvoiceService');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 
 /** Admin/Staff management list requires MANAGE_STUDENTS; teachers keep ownership-scoped access. */
@@ -253,54 +254,6 @@ function notifyStudentBell(io, studentId, { type, title, content, payload = {}, 
   }).catch((err) => {
     logger.error('[STUDENTS] notify student: %s', err?.message || err);
   });
-}
-
-async function nextInvoiceCode() {
-  const now = new Date();
-  const yy = now.getFullYear().toString().slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const prefix = `HD${yy}${mm}-`;
-  // Lấy mã lớn nhất cùng tháng để tăng tuần tự (tránh trùng khi race nhẹ)
-  const latest = await Invoice.findOne({ maHoaDon: { $regex: `^${prefix}` } })
-    .sort({ maHoaDon: -1 })
-    .select('maHoaDon')
-    .lean();
-  let seq = 1;
-  if (latest?.maHoaDon) {
-    const m = String(latest.maHoaDon).match(/-(\d+)$/);
-    if (m) seq = Number(m[1]) + 1;
-  }
-  return `${prefix}${String(seq).padStart(4, '0')}`;
-}
-
-async function createTuitionInvoice({ student, courseName, amount, note = '' }) {
-  const hocPhi = Number(amount) || 0;
-  if (!student?._id || hocPhi <= 0) return null;
-  try {
-    let maHD = await nextInvoiceCode();
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        return await Invoice.create({
-          maHoaDon: maHD,
-          hocVien: student._id,
-          hoTen: student.name,
-          khoaHoc: courseName || student.course || 'Học phí',
-          hocPhi,
-          ghiChu: note || `Thanh toán khóa ${courseName || student.course || ''}`.trim(),
-        });
-      } catch (err) {
-        if (err?.code === 11000) {
-          maHD = await nextInvoiceCode();
-          continue;
-        }
-        throw err;
-      }
-    }
-    return null;
-  } catch (err) {
-    logger.warn('[INVOICE] create skipped:', err.message);
-    return null;
-  }
 }
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────

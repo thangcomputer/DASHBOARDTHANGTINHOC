@@ -50,6 +50,7 @@ class BackupController {
       // Replaced by Zod Validator
       const result = await queryBus.dispatch(new queries.Get_id_downloadQuery(BackupValidator.validateGet_id_download(req)));
       if (!result) return;
+      if (result._isDownload) return res.download(result._filePath, result._filename);
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
     } catch (err) {
@@ -74,4 +75,3 @@ class BackupController {
 }
 
 module.exports = new BackupController();
-

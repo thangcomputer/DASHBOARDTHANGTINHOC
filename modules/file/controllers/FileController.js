@@ -7,7 +7,12 @@ class FileController {
   async post_upload(req, res) {
     try {
       // Replaced by Zod Validator
-      const result = await fileApplicationService.post_upload(FileValidator.validatePost_upload(req));
+      const result = await fileApplicationService.post_upload({
+        ...FileValidator.validatePost_upload(req),
+        body: req.body,
+        currentUser: req.currentUser,
+        fileCategory: req.fileCategory,
+      });
       if (!result) return;
       if (result._isSend) return res.status(result._status ?? 200).send(result._body);
       return res.status(result._status ?? 200).json(result._body);
@@ -85,4 +90,3 @@ class FileController {
 }
 
 module.exports = new FileController();
-
