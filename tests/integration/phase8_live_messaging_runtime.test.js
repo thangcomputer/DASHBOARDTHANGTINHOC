@@ -54,7 +54,11 @@ function apiGet(pathname, token) {
   });
 }
 
-describe('Phase 8 live messaging runtime', { concurrency: false, timeout: 180000 }, () => {
+describe('Phase 8 live messaging runtime', {
+  concurrency: false,
+  timeout: 180000,
+  skip: process.env.PHASE8_LIVE === '1' ? false : 'live harness seeds MONGODB_URI and boots server.js; set PHASE8_LIVE=1 to run',
+}, () => {
   let child = null;
   let seeded = null;
   let sockets = {};

@@ -114,8 +114,12 @@ function waitForDisconnect(socket) {
   });
 }
 
+const isolatedMobileAuthStack = String(process.env.TEST_DATABASE_URI || '').includes('/dashboardthangtinhoc_mobile_auth_test')
+  && /:6382\b/.test(String(process.env.REDIS_URL || ''));
+
 test('mobile auth works with isolated MongoDB and Redis across API and Socket.IO', {
   timeout: 60000,
+  skip: isolatedMobileAuthStack ? false : 'requires docker-compose.mobile-auth-test.yml (Mongo 27019 + Redis 6382)',
 }, async (t) => {
   const target = assertTestDatabaseEnvironment(process.env);
   const mongoUrl = new URL(target.uri);

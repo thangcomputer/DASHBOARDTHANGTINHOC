@@ -24,8 +24,11 @@ if (!files.length) {
 
 const isIntegration = files.some(f => f.includes('messaging-isolation.test.js') || f.includes('integration'));
 
+// Test files that leave Mongo/Redis/socket handles open would otherwise keep CI running forever.
+const NODE_TEST_ARGS = ['--test', '--test-force-exit', '--test-timeout=300000'];
+
 function runTestsAndExit(env = process.env) {
-  const result = spawnSync(process.execPath, ['--test'].concat(files), { stdio: 'inherit', env });
+  const result = spawnSync(process.execPath, NODE_TEST_ARGS.concat(files), { stdio: 'inherit', env });
   process.exit(result.status == null ? 0 : result.status);
 }
 
@@ -63,7 +66,7 @@ function bootServer() {
     http.get(`http://127.0.0.1:${testPort}/healthz`, (res) => {
       if (res.statusCode === 200) {
         console.log('Server is ready. Running tests...');
-        const result = spawnSync(process.execPath, ['--test'].concat(files), {
+        const result = spawnSync(process.execPath, NODE_TEST_ARGS.concat(files), {
           stdio: 'inherit',
           env: childEnv,
         });
