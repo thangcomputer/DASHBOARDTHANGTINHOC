@@ -31,7 +31,7 @@ const MENU_CONFIG = {
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
-      { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập kỹ năng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
+      { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
       { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
@@ -98,7 +98,7 @@ const MENU_CONFIG = {
               { key: 'students', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
               { key: 'student-training', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'student-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập kỹ năng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+              { key: 'lesson-practice', icon: BookOpen, label: 'Luyện tập', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
               { key: 'cert-prep', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
             ],
           },
@@ -109,7 +109,7 @@ const MENU_CONFIG = {
             isGroup: true,
             children: [
               { key: 'teachers', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-              { key: 'training-videos', icon: Video, label: 'Luyện tập kỹ năng', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
+              { key: 'training-videos', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
               { key: 'training-guides-evaluations', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
               { key: 'training-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
               { key: 'training-exam-room', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },
@@ -678,33 +678,33 @@ const AppSidebar = ({
 
       {/* ── User info ── */}
       <div className="cms-sidebar-glass__profile mx-4 mt-2 mb-2 rounded-[20px] border border-slate-400/15 bg-[#151F30] p-3">
-          <div className="flex items-center gap-3">
-            <EditableAvatar
-              avatar={effectiveAvatar}
-              name={userName}
-              role={role}
-              adminRole={session?.adminRole}
-              gender={effectiveGender}
-              className="w-[46px] h-[46px] rounded-full border-2 border-white/15 bg-slate-700 shadow-sm flex-shrink-0"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-slate-50 font-extrabold text-sm truncate">{userName || 'Người dùng'}</p>
-              <p className="mt-1 inline-flex rounded-full bg-blue-400/10 px-2 py-0.5 text-blue-300 text-[10px] font-bold tracking-wide">
-                {(() => {
-                  if (role === 'teacher') return 'GIẢNG VIÊN';
-                  if (role === 'student') return 'HỌC VIÊN';
-                  if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
-                  if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
-                  if (session?.adminRole === 'SUPPORT') return 'CHUYÊN VIÊN HỖ TRỢ';
-                  const perms = Array.isArray(session?.permissions) ? session.permissions : [];
-                  if (perms.length === 1 && perms.includes('manage_messages')) {
-                    return 'CHUYÊN VIÊN HỖ TRỢ';
-                  }
-                  return 'ADMIN-STAFF';
-                })()}
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <EditableAvatar
+            avatar={effectiveAvatar}
+            name={userName}
+            role={role}
+            adminRole={session?.adminRole}
+            gender={effectiveGender}
+            className="w-[46px] h-[46px] rounded-full border-2 border-white/15 bg-slate-700 shadow-sm flex-shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-slate-50 font-extrabold text-sm truncate">{userName || 'Người dùng'}</p>
+            <p className="mt-1 inline-flex rounded-full bg-blue-400/10 px-2 py-0.5 text-blue-300 text-[10px] font-bold tracking-wide">
+              {(() => {
+                if (role === 'teacher') return 'GIẢNG VIÊN';
+                if (role === 'student') return 'HỌC VIÊN';
+                if (session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN') return 'QUẢN TRỊ';
+                if (session?.adminRole === 'HIGH_ADMIN') return 'ADMIN CẤP CAO';
+                if (session?.adminRole === 'SUPPORT') return 'CHUYÊN VIÊN HỖ TRỢ';
+                const perms = Array.isArray(session?.permissions) ? session.permissions : [];
+                if (perms.length === 1 && perms.includes('manage_messages')) {
+                  return 'CHUYÊN VIÊN HỖ TRỢ';
+                }
+                return 'ADMIN-STAFF';
+              })()}
+            </p>
           </div>
+        </div>
       </div>
 
       <nav className="flex-1 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
@@ -975,7 +975,7 @@ const AppSidebar = ({
             transition: 'transform 240ms ease, opacity 180ms ease',
           }}
         >
-          <div className="pointer-events-auto mx-auto flex h-[5.25rem] w-full max-w-[48rem] items-stretch px-1">
+          <div className="pointer-events-auto mx-auto flex h-[5.25rem] w-full max-w-[48rem] items-stretch gap-2 px-1">
             {mobileNavItems.map((item) => {
               const Icon = item.key === 'dashboard' ? Home : item.mobileIcon || item.icon || LayoutDashboard;
               const active = isActive(item);
@@ -990,20 +990,18 @@ const AppSidebar = ({
                   aria-current={active ? 'page' : undefined}
                   aria-label={item.label}
                   tabIndex={mobileFooterVisible ? 0 : -1}
-                  className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-end gap-1 rounded-2xl border px-1 pb-1 text-[9px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${
-                    active
-                      ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[0_3px_12px_rgba(220,38,38,0.09),inset_0_1px_0_rgba(255,255,255,0.95)]'
-                      : 'border-transparent text-slate-500 hover:border-white/90 hover:bg-white/55 hover:text-slate-800 hover:shadow-[0_3px_12px_rgba(15,23,42,0.07)]'
-                  }`}
+                  className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-1 text-[9px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${active
+                      ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
+                      : 'border-transparent text-slate-500 hover:border-white/90 hover:bg-white/55 hover:text-slate-800 hover:shadow-[inset_2px_2px_5px_rgba(71,85,105,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.95)]'
+                    }`}
                 >
-                  <span className={`relative flex items-center justify-center transition-all duration-200 ${
-                    isHome
-                      ? 'h-12 w-12 rounded-full border-4 border-white bg-gradient-to-br from-red-500 to-red-700 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32)]'
-                      : `h-8 w-10 rounded-xl border ${active
-                        ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[0_4px_12px_rgba(220,38,38,0.28)]'
-                        : `${iconTone} bg-gradient-to-br shadow-[0_2px_6px_rgba(15,23,42,0.06)] group-hover:-translate-y-0.5 group-hover:shadow-[0_4px_10px_rgba(15,23,42,0.10)]`
+                  <span className={`relative flex items-center justify-center transition-all duration-200 ${isHome
+                      ? 'h-10 w-10 rounded-full border-2 border-white bg-gradient-to-br from-red-500 to-red-700 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32)]'
+                      : `h-10 w-10 rounded-xl border ${active
+                        ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'
+                        : `${iconTone} bg-gradient-to-br shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]`
                       }`
-                  }`}>
+                    }`}>
                     <Icon size={isHome ? 22 : 20} strokeWidth={active ? 2.5 : 2} aria-hidden="true" />
                     {badgeCount > 0 && (
                       <span className="absolute -right-1 -top-1 min-w-[1.05rem] rounded-full bg-red-600 px-1 text-center text-[9px] font-bold leading-[1.05rem] text-white">
@@ -1011,7 +1009,7 @@ const AppSidebar = ({
                       </span>
                     )}
                   </span>
-                  <span className="w-full truncate leading-3">{item.mobileLabel || item.label}</span>
+                  <span className="flex h-6 w-full items-center justify-center text-center leading-3">{item.mobileLabel || item.label}</span>
                 </button>
               );
             })}

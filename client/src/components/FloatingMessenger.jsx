@@ -1476,6 +1476,7 @@ function ChatWindow({
                 size={16}
                 disabled={uploading || imageBlocked || questionBlocked}
                 buttonClassName="cms-fm-attach"
+                className="cms-fm-capture-control"
                 title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay — ngày mai gửi tiếp` : 'Chụp màn hình'}
                 onCaptured={(file) => stageImage(file)}
                 onError={(msg) => toast.error(msg)}

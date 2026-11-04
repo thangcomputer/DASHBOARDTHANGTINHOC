@@ -1625,6 +1625,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               aria-expanded={mobileNavOpen}
             >
               <Menu size={20} aria-hidden="true" />
+              <span className="cms-topbar__menu-label">Menu</span>
             </button>
             <div className="min-w-0 flex-1 flex items-center overflow-hidden">
               <h1 className="cms-topbar__title cms-topbar__title--mobile-hidden">{pageTitle}</h1>
