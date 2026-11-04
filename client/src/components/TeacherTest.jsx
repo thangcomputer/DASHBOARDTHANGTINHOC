@@ -23,7 +23,6 @@ import {
   countTeacherQuestionsBySubject,
   getQuestionSubjectId,
   computeTeacherMcExamTotalMinutesBySubjects,
-  computeTeacherExamTotalMinutesBySubjects,
   resolveTeacherExamSubjectIds,
   computeTeacherPracticalTotalMinutes,
   buildTeacherExamScheduleBySubject,
@@ -256,11 +255,9 @@ const QuizResultSummary = ({ grade, examSubjectsCatalog, onContinue, onLogin }) 
   );
 };
 
-const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
+const TeacherTest = ({ teacherName = 'Giảng Viên' }) => {
   const {
     teachers,
-    teacherExamMinutes,
-    teacherEssayExamMinutes,
     updateTeacherExamMinutes,
     updateTeacherEssayExamMinutes,
     examSubjectsCatalog,
@@ -277,12 +274,9 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const [practicalTimeLeft, setPracticalTimeLeft] = useState(0);
   const [practicalExpired, setPracticalExpired] = useState(false);
   const practicalTimerRef = useRef(null);
-  const [uploadFile, setUploadFile] = useState(null);
   const [practicalSubmitting, setPracticalSubmitting] = useState(false);
   const practicalSubmittingRef = useRef(false);
-  const fileRef = useRef(null);
-  const [tabViolations, setTabViolations] = useState(0);
-  const [cameraViolations, setCameraViolations] = useState(0);
+  const tabViolationsRef = useRef(0);
   const [warningOverlay, setWarningOverlay] = useState(null);
 
   const [cameraReady, setCameraReady] = useState(false);
@@ -290,8 +284,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
   const previewRef = useRef(null);
   const previewStreamRef = useRef(null);
   const [currentQ, setCurrentQ] = useState(0);
-  const [webLogoUrl, setWebLogoUrl] = useState('');
-
   const monitorRef = useRef(null);
   const timerRef = useRef(null);
   const handleSubmitRef = useRef(null);
@@ -526,19 +518,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       setTimeLeft(configuredMcMinutes * 60);
     }
   }, [configuredMcMinutes, phase]);
-
-  useEffect(() => {
-    const origin = import.meta.env.VITE_API_URL || '';
-    fetch(`${origin}/api/settings/web`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.success && res.data?.logoUrl) {
-          const u = res.data.logoUrl;
-          setWebLogoUrl(u.startsWith('http') ? u : `${origin}${u}`);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     setCurrentQ((c) => Math.max(0, Math.min(c, Math.max(0, questions.length - 1))));
@@ -776,24 +755,22 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
       if (now - lastTabViolationAtRef.current < 1200) return;
       lastTabViolationAtRef.current = now;
 
-      setTabViolations((prev) => {
-        const n = prev + 1;
-        const inPractical = practicalMonitorActiveRef.current;
-        if (n >= 2) {
-          const msg = inPractical
-            ? 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình trong phần tự luận!'
-            : 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình quá nhiều lần!';
-          if (inPractical) handlePracticalViolateRef.current(msg);
-          else handleViolate(msg);
-        } else {
-          triggerAlert(
-            'tab',
-            inPractical ? '🚨 RỜI MÀN HÌNH KHI LÀM TỰ LUẬN!' : '🚨 PHÁT HIỆN THOÁT KHỎI BÀI THI!',
-            n,
-          );
-        }
-        return n;
-      });
+      const n = tabViolationsRef.current + 1;
+      tabViolationsRef.current = n;
+      const inPracticalNow = practicalMonitorActiveRef.current;
+      if (n >= 2) {
+        const msg = inPracticalNow
+          ? 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình trong phần tự luận!'
+          : 'HỦY BÀI: Bạn đã chuyển Tab hoặc thoát màn hình quá nhiều lần!';
+        if (inPracticalNow) handlePracticalViolateRef.current(msg);
+        else handleViolate(msg);
+      } else {
+        triggerAlert(
+          'tab',
+          inPracticalNow ? '🚨 RỜI MÀN HÌNH KHI LÀM TỰ LUẬN!' : '🚨 PHÁT HIỆN THOÁT KHỎI BÀI THI!',
+          n,
+        );
+      }
     };
 
     const onVisibilityChange = () => {
@@ -1017,7 +994,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     setPracticalTimeLeft(totalSeconds);
     setPracticalStarted(true);
     setPracticalExpired(false);
-    setTabViolations(0);
+    tabViolationsRef.current = 0;
     setWarningOverlay(null);
     lastTabViolationAtRef.current = 0;
     lastViolationTime.current = 0;
@@ -1087,7 +1064,7 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
     } else {
       setPracticalStarted(true);
       setPracticalTimeLeft(remaining);
-      setTabViolations(0);
+      tabViolationsRef.current = 0;
       setWarningOverlay(null);
       lastTabViolationAtRef.current = 0;
     }
@@ -1606,7 +1583,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                             showModal({ title: 'File quá lớn', content: 'Kích thước file vượt quá giới hạn 50MB.', type: 'error' });
                             return;
                           }
-                          setUploadFile(file);
                           handlePracticalSubmit(file);
                         }}
                       >
@@ -1626,7 +1602,6 @@ const TeacherTest = ({ teacherName = 'Giảng Viên', onBack }) => {
                               showModal({ title: 'File quá lớn', content: 'Kích thước file vượt quá giới hạn 50MB.', type: 'error' });
                               return;
                             }
-                            setUploadFile(file);
                             handlePracticalSubmit(file);
                           }}
                         />

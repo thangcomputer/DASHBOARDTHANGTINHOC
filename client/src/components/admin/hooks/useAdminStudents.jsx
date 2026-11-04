@@ -24,7 +24,6 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
   const {
     students,
     addStudent: ctxAddStudent,
-    removeStudent: ctxRemoveStudent,
     updateStudent: ctxUpdateStudent,
     assignTeacher: ctxAssignTeacher,
     approveStudentExam,
@@ -41,7 +40,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
     fetchStudentsPaginated,
   } = useData();
 
-  const { socket, onDataRefresh } = useSocket();
+  const { onDataRefresh } = useSocket();
   const toast = useToast();
   const { showModal: showGlobalModal, closeModal } = useModal();
   const { selectedBranchId } = useBranch();

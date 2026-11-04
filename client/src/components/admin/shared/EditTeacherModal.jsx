@@ -12,7 +12,6 @@ import CourseSubjectSelector from './CourseSubjectSelector';
 import { formatSubjectIdsAsSpecialty, resolveTeacherSubjectIds } from '../../../utils/examSubjects';
 import {
   formatHoaHong,
-  formatStarBonusRule,
   STAR_BONUS_AMOUNT,
   STAR_BONUS_MIN_STARS,
   STAR_BONUS_MIN_STUDENTS,

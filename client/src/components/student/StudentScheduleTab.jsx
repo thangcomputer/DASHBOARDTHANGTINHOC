@@ -12,7 +12,6 @@ export default function StudentScheduleTab({
   mySchedules,
   enrollments = [],
   activeCourseName,
-  setActiveCourseName,
   setNoteModalSched,
   displayGrades,
 }) {

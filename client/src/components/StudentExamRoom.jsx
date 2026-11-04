@@ -146,7 +146,6 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
     return <span className="text-sm text-red-500">Chưa nộp bài</span>;
   };
 
-  const isLocked = subject.status === 'dang_khoa';
   const failedLocked = isExamProgressLocked(subject);
   const awaitingGrade =
     subject.thucHanh === 'da_nop' &&
@@ -473,7 +472,6 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const StudentExamRoom = ({
-  onNavigate,
   onStartExam,
 }) => {
   const [roomTab, setRoomTab] = useState('quiz'); // quiz | cert | scores | mos-ic3

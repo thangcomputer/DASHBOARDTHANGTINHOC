@@ -2,7 +2,6 @@ import { ChevronLeft, ChevronRight, Send } from 'lucide-react';
 
 export default function CertPrepPlayerFooter({
   currentIndex,
-  total,
   onPrevious,
   onNext,
   onSubmit,

@@ -14,7 +14,7 @@ import { isUserOnline } from '../../utils/presence';
 import { useModal } from '../../utils/Modal.jsx';
 import { resolveAvatarUrl } from '../../utils/defaultAvatars';
 import { getGradeBadgeClasses, getGradeLabel } from '../../utils/gradeColors';
-import { formatLocalDateKey, isScheduleOngoingNow, normalizeScheduleDate } from '../../utils/scheduleTime';
+import { formatLocalDateKey, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { getAttendanceAction } from '../../utils/attendanceAction';
 import { countEnrollmentCompleted } from '../../utils/schedulingLimits';
 import { showGlossyAlert, getDisplayName } from './TeacherShared';
@@ -150,14 +150,13 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
 
 export const StudentCard = ({
   student, onUpdateLink, onSaveGrade, onUpdateNotes, onLockExam,
-  isDetailed, attendanceGate, myStudents = [], onCancelSchedule,
+  isDetailed, attendanceGate, myStudents = [],
   navigate,
 }) => {
   const toast = useToast();
   const { showModal } = useModal();
   const { onDataRefresh, socket, onlineUsers = [], lastSeenUsers = {} } = useSocket();
   const {
-    privateEvaluations = [],
     schedules: allSchedules = [],
     triggerBackgroundSync,
     currentUser,
@@ -200,7 +199,6 @@ export const StudentCard = ({
   const [confirmTick, setConfirmTick] = useState(0);
   const [showQuizCreate, setShowQuizCreate] = useState(false);
   const [studentQuizzes, setStudentQuizzes] = useState([]);
-  const [studentEvals, setStudentEvals] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const sessionTotal = Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12;
   // Chuẩn Admin: enrollment.completedSessions (gồm buổi ghi nhận trước / chỉnh tay).
@@ -245,7 +243,6 @@ export const StudentCard = ({
 
   // ASSIGNMENTS STATE
   const [courseAssignments, setCourseAssignments] = useState([]);
-  const [studentSubmissions, setStudentSubmissions] = useState([]);
   const [loadingAssign, setLoadingAssign] = useState(false);
   const [showAddAssign, setShowAddAssign] = useState(false);
   const [newAssign, setNewAssign] = useState({ title: '', deadline: '', fileUrl: '', description: '' });
@@ -273,7 +270,7 @@ export const StudentCard = ({
       } else {
         showGlossyAlert(res.message || 'Lỗi chấm bài');
       }
-    } catch(e) {
+    } catch {
       showGlossyAlert('Lỗi mạng khi lưu điểm');
     }
   };
@@ -739,7 +736,9 @@ export const StudentCard = ({
             }))
         );
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể tải danh sách bài tập. Vui lòng thử lại.');
+    }
     setLoadingAssign(false);
   }, [student.id, student._id, student.course]);
 
@@ -751,26 +750,17 @@ export const StudentCard = ({
 
   const fetchActivityExtras = useCallback(async () => {
     setLoadingLogs(true);
-    const sid = String(student.id || student._id || '');
-    const teacherId = student.teacherId || student.teacherIds?.[0];
     try {
-      const [quizRes, evalRes] = await Promise.all([
-        api.quizzes.getTeacherQuizzes().catch(() => null),
-        teacherId ? api.evaluations.getByTeacher(teacherId).catch(() => null) : Promise.resolve(null),
-      ]);
+      const quizRes = await api.quizzes.getTeacherQuizzes();
       if (quizRes?.success) {
         setStudentQuizzes(quizRes.data || []);
       }
-      const fromApi = evalRes?.success
-        ? (evalRes.data || []).filter((e) => String(e.studentId?._id || e.studentId) === sid)
-        : [];
-      setStudentEvals(fromApi);
     } catch {
-      /* ignore */
+      showGlossyAlert('Không thể tải hoạt động học viên. Vui lòng thử lại.');
     } finally {
       setLoadingLogs(false);
     }
-  }, [student.id, student._id, student.teacherId, student.teacherIds]);
+  }, []);
 
   useEffect(() => {
     if (activePanel === 'logs') {
@@ -861,7 +851,9 @@ export const StudentCard = ({
         setNewAssign({ title: '', deadline: '', fileUrl: '', description: '' });
         fetchStudentAssignments();
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể tạo bài tập. Vui lòng thử lại.');
+    }
   };
 
   const isAssignmentGraded = (assign) => {
@@ -896,7 +888,9 @@ export const StudentCard = ({
         setEditingAssignmentId(null);
         fetchStudentAssignments();
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể cập nhật bài tập. Vui lòng thử lại.');
+    }
   };
 
   const handleDeleteAssign = async (id) => {
@@ -911,7 +905,9 @@ export const StudentCard = ({
       if (res.success) {
         fetchStudentAssignments();
       }
-    } catch (e) { void 0 }
+    } catch {
+      showGlossyAlert('Không thể xóa bài tập. Vui lòng thử lại.');
+    }
   };
 
   const handleAssignmentUpload = async (e, type = 'new') => {
@@ -930,7 +926,7 @@ export const StudentCard = ({
       } else {
         showGlossyAlert(res.message || "Lỗi khi tải file lên");
       }
-    } catch(err) {
+    } catch {
       showGlossyAlert("Lỗi mạng khi tải file");
     }
     e.target.value = '';

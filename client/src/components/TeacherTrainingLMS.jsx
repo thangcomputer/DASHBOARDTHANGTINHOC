@@ -164,7 +164,6 @@ const YouTubePlayerSecure = ({
   const [isReady, setIsReady] = useState(false);
   const [hasEnded, setHasEnded] = useState(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isTabActive, setIsTabActive] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -174,7 +173,6 @@ const YouTubePlayerSecure = ({
   const [playerError, setPlayerError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [ytPlaybackQuality, setYtPlaybackQuality] = useState('default');
-  const pauseTimeoutRef = useRef(null);
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
@@ -258,12 +256,6 @@ const YouTubePlayerSecure = ({
     }
   }, [lessonDuration, totalDuration]);
 
-  const formatTime = (secs) => {
-    const s = Math.floor(secs);
-    const m = Math.floor(s / 60);
-    return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  };
-
   const requiredSeconds = effectiveDuration > 0 ? requiredWatchSeconds(effectiveDuration) : 0;
 
   // ── Complete khi đủ threshold 2/3 (COMPLETION ≠ SEEK) — chờ player ready ──
@@ -286,7 +278,7 @@ const YouTubePlayerSecure = ({
       if (document.hidden) {
         setIsTabActive(false);
         if (playerRef.current?.pauseVideo) {
-          try { playerRef.current.pauseVideo(); } catch (e) { void 0; }
+          try { playerRef.current.pauseVideo(); } catch { void 0; }
         }
       } else {
         setIsTabActive(true);
@@ -512,7 +504,6 @@ const YouTubePlayerSecure = ({
     const state = event.data;
     if (state === window.YT.PlayerState.PLAYING) {
       setOverlayVisible(false);
-      setIsPaused(false);
       setIsPlaying(true);
       setHasEnded(false);
       setPlayerError('');
@@ -526,9 +517,6 @@ const YouTubePlayerSecure = ({
     if (state === window.YT.PlayerState.PAUSED) {
       stopCounting();
       setIsPlaying(false);
-      setIsPaused(true);
-      clearTimeout(pauseTimeoutRef.current);
-      pauseTimeoutRef.current = setTimeout(() => setIsPaused(false), 1200);
     }
     if (state === window.YT.PlayerState.ENDED) {
       stopCounting();
@@ -820,7 +808,7 @@ const AdminProgressPanel = ({ courseId }) => {
     try {
       const res = await lmsApiFetch(`/admin/progress/${courseId}`);
       if (res.success) setData(res.data);
-    } catch (e) { void 0 }
+    } catch { void 0 }
     setLoading(false);
   };
 
@@ -887,7 +875,7 @@ const AdminProgressPanel = ({ courseId }) => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
+const TeacherTrainingLMS = ({ isAdmin = false }) => {
   const { trainingData, setTrainingData, examSubjectsCatalog } = useData() || { trainingData: { videos: [], guides: [], files: [] } };
   const [teacherProfile, setTeacherProfile] = useState(null);
 
@@ -1069,7 +1057,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         res.data.forEach(l => { chapters[l.chapterTitle || 'Chương 1'] = true; });
         setExpandedChapters(chapters);
       }
-    } catch (e) { void 0 }
+    } catch { void 0 }
     setLoading(false);
   };
 
@@ -1132,7 +1120,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
       if (lessonsRes.success) {
         setLessons(lessonsRes.data);
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }, [currentLesson, selectedCourse, toast, completeLessonOnServer]);
 
   // Video kết thúc
@@ -1176,7 +1164,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
           setTimeout(() => setCurrentLesson(next), 800);
         }
       }
-    } catch (e) { void 0 }
+    } catch { void 0 }
     setCompleting(false);
   }, [currentLesson, selectedCourse, completing, toast, completeLessonOnServer]);
 
@@ -1227,7 +1215,7 @@ const TeacherTrainingLMS = ({ onBack, isAdmin = false }) => {
         watchedSeconds: watchedSeconds,
         videoDuration,
       }),
-    }).catch(e => void 0);
+    }).catch(() => undefined);
   }, [selectedCourse, patchLessonWatchLocal]);
 
   const overallProgress = lessons.length > 0

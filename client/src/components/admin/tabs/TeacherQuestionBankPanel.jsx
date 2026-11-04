@@ -105,7 +105,6 @@ export default function TeacherQuestionBankPanel() {
     updateTeacherExamMinutes,
     teacherEssayExamMinutes,
     updateTeacherEssayExamMinutes,
-    teacherExamTimeLimitMinutes,
         addQuestion,
     updateQuestion,
     removeQuestion,

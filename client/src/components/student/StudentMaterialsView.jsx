@@ -4,7 +4,7 @@ import { htmlToPlainText } from '../../utils/htmlContent';
 import StudentQuizList from './StudentQuizList';
 import { buildMediaDownloadUrl } from '../../services/api';
 
-export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSelectAssignment }) => {
+export const MaterialsView = ({ trainingData, studentQuestions, onSelectAssignment }) => {
   const [activeTab, setActiveTab] = useState(() => {
     return sessionStorage.getItem('pending_quiz_start') ? 'quizzes' : 'videos';
   });
@@ -342,5 +342,4 @@ export const MaterialsView = ({ trainingData, courseName, studentQuestions, onSe
 
 
 export default MaterialsView;
-
 

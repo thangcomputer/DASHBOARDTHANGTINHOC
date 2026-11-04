@@ -56,7 +56,7 @@ export default function StudentQuizInviteHost() {
   const { socket } = useSocket();
   const navigate = useNavigate();
   const [invite, setInvite] = useState(null);
-  const [queue, setQueue] = useState([]);
+  const [, setQueue] = useState([]);
   const [gateMessage, setGateMessage] = useState('');
   const [blocked, setBlocked] = useState(() => hasBlockingLoginOverlay(['student-quiz-invite']));
 

@@ -204,7 +204,7 @@ const exportPDF = async (data = {}) => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 
     return true;
-  } catch (error) {
+  } catch {
     toast.error('Có lỗi khi xuất PDF. Vui lòng thử lại.');
     return false;
   } finally {

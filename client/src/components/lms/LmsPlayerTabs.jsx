@@ -97,18 +97,16 @@ export function LmsTabBar({
   const tabs = includeLessonList ? LMS_PLAYER_TABS : LMS_PLAYER_TABS.filter((tab) => tab.key !== 'list');
   const [qaItems, setQaItems] = useState([]);
   const storageKey = qaReadStorageKey({ userId, courseId, lessonId, audience });
-  const { answeredQaCount, unreadQaCount } = useMemo(() => {
+  const { unreadQaCount } = useMemo(() => {
     const readMarkers = readQaReadMarkers(storageKey);
-    let answered = 0;
     let unread = 0;
     for (const item of qaItems) {
       const marker = qaAnswerMarker(item);
       const id = String(item.id || item._id || '');
       if (!marker || !id) continue;
-      answered += 1;
       if (readMarkers[id] !== marker) unread += 1;
     }
-    return { answeredQaCount: answered, unreadQaCount: unread };
+    return { unreadQaCount: unread };
   }, [qaItems, storageKey]);
 
   const loadQaItems = useCallback(() => {
@@ -230,7 +228,6 @@ function OverviewPanel({
   currentLesson,
   selectedCourse,
   lessons,
-  overallProgress,
   teacherAntiSeekSlot = null,
   light = false,
 }) {
@@ -927,7 +924,7 @@ function QaPanel({
   );
 }
 
-function ReviewsPanel({ courseId, courseTitle, userName, audience = 'student', light = false }) {
+function ReviewsPanel({ courseId, courseTitle, audience = 'student', light = false }) {
   const [items, setItems] = useState([]);
   const [avg, setAvg] = useState(0);
   const [rating, setRating] = useState(5);

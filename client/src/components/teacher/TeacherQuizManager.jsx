@@ -205,53 +205,6 @@ export default function TeacherQuizManager({
     setQuestions(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Thêm mẫu nhanh câu hỏi Word/Excel
-  const loadTemplateQuestions = (type) => {
-    if (type === 'word') {
-      setQuestions([
-        {
-          questionText: 'Phím tắt nào dùng để sao chép văn bản trong Word?',
-          options: ['Ctrl + C', 'Ctrl + V', 'Ctrl + X', 'Ctrl + Z'],
-          correctAnswer: 0,
-          explanation: 'Ctrl + C là phím tắt sao chép (Copy).',
-        },
-        {
-          questionText: 'Để căn giữa đoạn văn bản, ta dùng tổ hợp phím nào?',
-          options: ['Ctrl + E', 'Ctrl + L', 'Ctrl + R', 'Ctrl + J'],
-          correctAnswer: 0,
-          explanation: 'Ctrl + E dùng để căn giữa (Center align).',
-        },
-        {
-          questionText: 'Định dạng đuôi file mặc định của MS Word từ bản 2007 là gì?',
-          options: ['.docx', '.xlsx', '.pptx', '.pdf'],
-          correctAnswer: 0,
-          explanation: '.docx là định dạng tài liệu mặc định của Word.',
-        },
-      ]);
-    } else if (type === 'excel') {
-      setQuestions([
-        {
-          questionText: 'Hàm nào dùng để tính tổng các ô trong Excel?',
-          options: ['SUM', 'AVERAGE', 'COUNT', 'MAX'],
-          correctAnswer: 0,
-          explanation: 'Hàm SUM dùng để cộng tổng chuỗi số.',
-        },
-        {
-          questionText: 'Cú pháp đúng của hàm VLOOKUP trong Excel là gì?',
-          options: [
-            'VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup])',
-            'VLOOKUP(table_array, lookup_value, col_index_num)',
-            'VLOOKUP(col_index_num, table_array, lookup_value)',
-            'VLOOKUP(range_lookup, table_array, col_index_num)',
-          ],
-          correctAnswer: 0,
-          explanation: 'Đối số 1 là giá trị tìm kiếm, đối số 2 là bảng tra cứu.',
-        },
-      ]);
-    }
-    toast.success(`Đã thêm mẫu câu hỏi ${type.toUpperCase()}`);
-  };
-
   const diffLabel = useMemo(() => {
     const d = String(aiDifficulty || '').toLowerCase();
     if (d === 'dễ') return 'Cơ bản';
@@ -486,7 +439,6 @@ export default function TeacherQuizManager({
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {quizzes.map((quiz) => {
                 const subCount = quiz.submissions?.length || 0;
-                const passedCount = (quiz.submissions || []).filter(s => s.status === 'passed').length;
                 const avgScore = subCount > 0
                   ? Math.round(quiz.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0) / subCount)
                   : 0;
