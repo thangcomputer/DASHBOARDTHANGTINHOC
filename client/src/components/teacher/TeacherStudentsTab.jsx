@@ -218,7 +218,7 @@ export default function TeacherStudentsTab({
                                 {isDropped
                                   ? 'Đã ngừng học'
                                   : isOnline
-                                    ? 'Đang online'
+                                    ? 'Trực tuyến'
                                     : lastSeenUsers[String(sId)] || s.lastAccessAt
                                       ? `Truy cập ${new Date(lastSeenUsers[String(sId)] || s.lastAccessAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
                                       : 'Chưa có dữ liệu truy cập'}

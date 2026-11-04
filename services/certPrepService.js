@@ -444,7 +444,10 @@ function toStudentSession(session, questions = [], extra = {}) {
   const snap = session.configSnapshot || {};
   const timing = sessionTiming(session, extra.now || new Date());
   const feedbackMode = snap.feedbackMode === 'after_submit' ? 'after_submit' : 'immediate';
-  const reveal = feedbackMode === 'immediate' && session.status === 'in_progress';
+  const revealAnswered = feedbackMode === 'immediate' && session.status === 'in_progress';
+  const answersByQuestionId = new Map(
+    (session.answers || []).map((answer) => [String(answer.questionId), answer.value]),
+  );
   return {
     id: String(session._id || session.id),
     testId: String(session.testId || ''),
@@ -466,7 +469,12 @@ function toStudentSession(session, questions = [], extra = {}) {
       questionId: String(a.questionId),
       value: a.value,
     })),
-    questions: (questions || []).map((q) => stripAnswerKeys(q, { reveal })),
+    questions: (questions || []).map((q) => {
+      const questionId = String(q._id || q.id || '');
+      const reveal = revealAnswered
+        && isStudentAnswered(q.type, answersByQuestionId.get(questionId), q);
+      return stripAnswerKeys(q, { reveal });
+    }),
     remainingSeconds: timing.remainingSeconds,
     serverNow: timing.serverNow,
     deadlineAt: timing.deadlineAt,
@@ -1422,7 +1430,10 @@ async function saveProgress(studentId, sessionId, body) {
   applyResumeTimer(session);
   session.answers = mergeAnswers(session, body?.answers);
   await session.save();
-  return toStudentSession(session, []);
+  const questions = session.configSnapshot?.feedbackMode === 'after_submit'
+    ? []
+    : await loadSessionQuestions(session);
+  return toStudentSession(session, questions);
 }
 
 async function submitSession(studentId, sessionId) {

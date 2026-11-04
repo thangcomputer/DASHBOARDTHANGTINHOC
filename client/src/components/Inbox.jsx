@@ -18,7 +18,6 @@ import { resolveMessagingActor, displayRoleLabel, DISPLAY_ROLE, isAliveMessaging
 import {
   mergeConversationsById,
   mergeDirectConversationsByPeer,
-  conversationPeerKey,
 } from '../lib/conversationList';
 import { getMessagingRole } from '../lib/messagingRoles';
 import { getAttendanceAction } from '../utils/attendanceAction';
@@ -1062,9 +1061,9 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     const seenContacts = new Set();
     const uniqueContacts = (contacts || []).filter((c) => {
       if (!c?.id) return false;
-      const contactKey = conversationPeerKey(c);
-      if (seenContacts.has(contactKey)) return false;
-      seenContacts.add(contactKey);
+      const idStr = String(c.id);
+      if (seenContacts.has(idStr)) return false;
+      seenContacts.add(idStr);
       return true;
     });
 
