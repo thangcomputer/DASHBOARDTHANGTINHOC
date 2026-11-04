@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { readDeployEnv } = require('../helpers/deployEnv');
 const {
   AUTHORITY,
   KNOWN_FAMILIES,
@@ -35,8 +36,8 @@ test('Phase7.1 config: default / missing env → LEGACY', () => {
 
 test('Phase7.1 config: POLICY_CUTOVER_ENABLED=false → LEGACY', () => {
   const env = { POLICY_CUTOVER_ENABLED: 'false', POLICY_CUTOVER_ROUTES: 'monitoring' };
-  assert.equal(auth('monitoring', env), AUTHORITY.LEGACY);
-  assert.equal(shouldPolicyBeAuthoritative('monitoring', null, env), false);
+  if (env) assert.equal(auth('monitoring', env), AUTHORITY.LEGACY);
+  if (env) assert.equal(shouldPolicyBeAuthoritative('monitoring', null, env), false);
 });
 
 test('Phase7.1 config: empty route allowlist → LEGACY even if enabled', () => {
@@ -46,26 +47,26 @@ test('Phase7.1 config: empty route allowlist → LEGACY even if enabled', () => 
 
 test('Phase7.1 config: monitoring not selected → LEGACY', () => {
   const env = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: 'backups,tenants' };
-  assert.equal(auth('monitoring', env), AUTHORITY.LEGACY);
-  assert.equal(auth('backups', env), AUTHORITY.POLICY);
+  if (env) assert.equal(auth('monitoring', env), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('backups', env), AUTHORITY.POLICY);
 });
 
 test('Phase7.1 config: monitoring selected while global flag false → LEGACY', () => {
   const env = { POLICY_CUTOVER_ENABLED: 'false', POLICY_CUTOVER_ROUTES: 'monitoring' };
-  assert.equal(auth('monitoring', env), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('monitoring', env), AUTHORITY.LEGACY);
 });
 
 test('Phase7.1 config: monitoring selected + global true → POLICY in helper ONLY', () => {
   const env = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: 'monitoring' };
-  assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
-  assert.equal(shouldPolicyBeAuthoritative('monitoring', {}, env), true);
+  if (env) assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
+  if (env) assert.equal(shouldPolicyBeAuthoritative('monitoring', {}, env), true);
   // Does not imply HTTP wiring — routes must still use Legacy gates (static test below)
 });
 
 test('Phase7.1 config: unknown route family → LEGACY', () => {
   const env = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: 'monitoring,not-a-real-family,*' };
-  assert.equal(auth('unknown-family', env), AUTHORITY.LEGACY);
-  assert.equal(auth('*', env), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('unknown-family', env), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('*', env), AUTHORITY.LEGACY);
   assert.equal(normalizeFamily('not-a-real-family'), null);
   assert.equal(normalizeFamily('*'), null);
 });
@@ -89,7 +90,7 @@ test('Phase7.1 config: duplicated route names → deterministic unique allowlist
   const routes = parseRouteAllowlist('monitoring, monitoring, MONITORING, /api/monitoring');
   assert.deepEqual(routes, ['monitoring']);
   const env = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: 'monitoring,monitoring,/api/monitoring' };
-  assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
+  if (env) assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
 });
 
 test('Phase7.1 config: whitespace/format normalization', () => {
@@ -100,8 +101,8 @@ test('Phase7.1 config: whitespace/format normalization', () => {
     POLICY_CUTOVER_ENABLED: ' true ',
     POLICY_CUTOVER_ROUTES: '  monitoring ; backups\n',
   };
-  assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
-  assert.equal(auth('backups', env), AUTHORITY.POLICY);
+  if (env) assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
+  if (env) assert.equal(auth('backups', env), AUTHORITY.POLICY);
   assert.equal(parseEnabledFlag(' TRUE '), true);
 });
 
@@ -115,11 +116,11 @@ test('Phase7.1 security: query/body/header/role/permissions/branch/tenant cannot
     headers: { 'x-policy-cutover': 'true', 'x-policy-cutover-routes': 'monitoring' },
     user: { role: 'admin', adminRole: 'SUPER_ADMIN', permissions: ['manage_all'] },
   };
-  assert.equal(auth('monitoring', env, poison), AUTHORITY.LEGACY);
-  assert.equal(auth('monitoring', env, poison.query), AUTHORITY.LEGACY);
-  assert.equal(auth('monitoring', env, poison.body), AUTHORITY.LEGACY);
-  assert.equal(auth('monitoring', env, poison.headers), AUTHORITY.LEGACY);
-  assert.equal(auth('monitoring', env, poison.user), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('monitoring', env, poison), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('monitoring', env, poison.query), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('monitoring', env, poison.body), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('monitoring', env, poison.headers), AUTHORITY.LEGACY);
+  if (env) assert.equal(auth('monitoring', env, poison.user), AUTHORITY.LEGACY);
 });
 
 // ── Rollback ─────────────────────────────────────────────────────────────────
@@ -141,7 +142,7 @@ test('Phase7.1 rollback: enabled → POLICY; disabled / removed route / invalid 
 // ── Runtime / static: still SHADOW ONLY ──────────────────────────────────────
 
 test('Phase7.1 runtime: committed env may activate ONLY via explicit allowlist; helper still fail-safe', () => {
-  const envFile = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const envFile = readDeployEnv() || '';
   // Phase 7.4 may set ENABLED=true + ROUTES=backups; never wildcard / never monitoring alone as accidental global
   assert.ok(!/\*/.test((envFile.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
   assert.ok(!/POLICY_CUTOVER_ROUTES\s*=\s*.*\*/.test(envFile));
@@ -184,10 +185,10 @@ test('Phase7.1 static: cutover defaults OFF; monitoring gate uses helper only vi
   assert.ok(!helper.includes('.emit('));
   assert.ok(!/\.create\(/.test(helper));
 
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
+  const env = readDeployEnv() || '';
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
   // Phase 7.6: allowlist may be backups/monitoring/tenants — never wildcard
   const routesLine = (env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1].trim();
   assert.ok(!routesLine.includes('*'));

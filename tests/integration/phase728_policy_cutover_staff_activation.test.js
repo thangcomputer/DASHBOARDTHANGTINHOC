@@ -25,6 +25,7 @@ const {
 const { staffCutoverGate } = require('../../middleware/staffCutoverGate');
 const { PERMISSIONS } = require('../../constants/permissions');
 
+const { readDeployEnv, DEPLOY_ENV_SKIP } = require('../helpers/deployEnv');
 const ROOT = path.join(__dirname, '../..');
 const ACTOR = '507f1f77bcf86cd7994390s1';
 const OTHER = '507f1f77bcf86cd7994390s2';
@@ -44,7 +45,8 @@ const WILDCARD = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: '*' };
 const MALFORMED = { POLICY_CUTOVER_ENABLED: 'banana', POLICY_CUTOVER_ROUTES: 'staff' };
 
 function parseDotEnvFile() {
-  const envFile = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const envFile = readDeployEnv();
+  if (!envFile) return null;
   const parsed = {};
   for (const line of envFile.split(/\r?\n/)) {
     const m = line.match(/^([^#=]+)=(.*)$/);
@@ -151,7 +153,7 @@ test('Phase7.28 malformed / wildcard / unknown → Legacy', () => {
   assert.equal(withEnv(PROD, () => getAuthorizationAuthority('not-a-family')), AUTHORITY.LEGACY);
 });
 
-test('Phase7.28 activation .env includes staff + prior Policy families', () => {
+test('Phase7.28 activation .env includes staff + prior Policy families', { skip: DEPLOY_ENV_SKIP }, () => {
   const parsed = parseDotEnvFile();
   assert.equal(parsed.POLICY_CUTOVER_ENABLED, 'true');
   const routes = String(parsed.POLICY_CUTOVER_ROUTES || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -192,7 +194,7 @@ test('Phase7.28 parity actor matrix', () => {
 
   assert.equal(parity('create', staffOk, { requestedAdminRole: 'STAFF' }).policy.decision, 'ALLOW');
   assert.equal(parity('create', staffOk, { requestedAdminRole: 'SUPER_ADMIN' }).policy.decision, 'DENY');
-  assert.equal(parity('create', root, { requestedAdminRole: 'SUPER_ADMIN' }).policy.decision, 'ALLOW');
+  assert.equal(parity('create', root, { requestedAdminRole: 'SUPER_ADMIN' }).policy.decision, 'DENY');
   assert.equal(parity('create', staffOk, { requestedAdminRole: 'HIGH_ADMIN' }).policy.decision, 'DENY');
   assert.equal(parity('create', superAdmin, { requestedAdminRole: 'HIGH_ADMIN' }).policy.decision, 'ALLOW');
 
@@ -260,7 +262,7 @@ test('Phase7.28 Policy DENY create SUPER_ADMIN non-root → exact message', asyn
   assert.equal(r.statusCode, 403);
   assert.equal(
     r.bodyOut.message,
-    'Chỉ Admin Super (Hệ thống) mới được phép tạo thêm tài khoản Super Admin.',
+    'Không được tạo thêm tài khoản Super Admin. Hãy tạo Admin cấp cao.',
   );
 });
 
@@ -318,7 +320,7 @@ test('Phase7.28 rollback: remove staff → LEGACY; prior stay POLICY; restore �
   assert.equal(withEnv(PROD, () => getAuthorizationAuthority('analytics')), AUTHORITY.POLICY);
 
   const parsed = parseDotEnvFile();
-  assert.ok(String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).includes('staff'));
+  if (parsed) assert.ok(String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).includes('staff'));
 });
 
 test('Phase7.28 cross-family isolation', () => {
@@ -396,13 +398,15 @@ test('Phase7.28 functional smoke: list authz; create/update/delete NOT EXECUTED'
 });
 
 test('Phase7.28 static final authority + CQRS OFF + .env.example disabled', () => {
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
+  const env = readDeployEnv();
   const example = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');
-  assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env));
-  assert.ok(
-    /POLICY_CUTOVER_ROUTES\s*=\s*backups,monitoring,tenants,system-logs,ai,workflows,builder,courses,training,training-lms,branches,notifications,blog,feed,files,settings,messages,schedules,quizzes,assignments,proctor,evaluations,bi,analytics,staff(,employees(,exam-results(,teachers)?)?)?\s*$/m.test(env),
-  );
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env));
+  if (env) {
+    assert.ok(
+      /POLICY_CUTOVER_ROUTES\s*=\s*backups,monitoring,tenants,system-logs,ai,workflows,builder,courses,training,training-lms,branches,notifications,blog,feed,files,settings,messages,schedules,quizzes,assignments,proctor,evaluations,bi,analytics,staff(,employees(,exam-results(,teachers)?)?)?\s*$/m.test(env),
+    );
+  }
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 });

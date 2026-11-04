@@ -8,7 +8,12 @@ const {
   hashRefreshJti,
 } = require('../../services/mobileAuthSessionService');
 
-test('MongoDB session persistence enforces indexes, ownership, expiry and refresh CAS', async () => {
+const isolatedMobileAuthStack = String(process.env.TEST_DATABASE_URI || '').includes('/dashboardthangtinhoc_mobile_auth_test')
+  && /:6382\b/.test(String(process.env.REDIS_URL || ''));
+
+test('MongoDB session persistence enforces indexes, ownership, expiry and refresh CAS', {
+  skip: isolatedMobileAuthStack ? false : 'requires docker-compose.mobile-auth-test.yml (Mongo 27019 + Redis 6382)',
+}, async () => {
   const target = assertTestDatabaseEnvironment(process.env);
   const uri = new URL(target.uri);
   assert.equal(process.env.NODE_ENV, 'test');

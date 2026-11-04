@@ -78,10 +78,11 @@ describe('Phase 8.13 RBAC soak evidence', { concurrency: false }, () => {
     assert.equal(snap.mappedGateMatch, 8);
     assert.equal(snap.mismatch, 0);
     assert.equal(snap.unknown, 0);
-    assert.equal(snap.unsupported, 4);
+    // RBAC-S1 mapped schedule/messages/logs (PARTIAL); only view_evaluations stays LEGACY_ONLY
+    assert.equal(snap.unsupported, 1);
     const channels = getSoakEvidenceSnapshot().channels;
     assert.equal(channels.STATIC.match, 8);
-    assert.equal(channels.STATIC.unsupported, 4);
+    assert.equal(channels.STATIC.unsupported, 1);
     assert.equal(channels.SYNTHETIC.requests, 0);
     assert.equal(channels.RUNTIME.requests, 0);
   });
@@ -297,12 +298,7 @@ describe('Phase 8.13 RBAC soak evidence', { concurrency: false }, () => {
 
   it('12 unsupported classification', async () => {
     await withDualFlag(true, () => {
-      for (const p of [
-        LIVE.MANAGE_SCHEDULE,
-        LIVE.MANAGE_MESSAGES,
-        LIVE.VIEW_LOGS,
-        LIVE.VIEW_EVALUATIONS,
-      ]) {
+      for (const p of [LIVE.VIEW_EVALUATIONS]) {
         const out = dualCheckLiveStaffGate(actorReq({ permissions: [p] }), {
           liveDecision: 'ALLOW',
           livePermission: p,

@@ -99,8 +99,9 @@ describe('Phase 8.22 messaging identity lock', { concurrency: false }, () => {
     assert.ok(routes.includes("router.get('/sync/:userId'"));
     const syncIdx = routes.indexOf("router.get('/sync/:userId'");
     const convIdx = routes.indexOf("router.get('/:conversationId'");
-    assert.ok(routes.slice(convIdx, convIdx + 2500).includes('enrichMessageIdentities'));
-    assert.ok(routes.slice(syncIdx, syncIdx + 2500).includes('enrichMessageIdentities'));
+    const routeBody = (start) => routes.slice(start, routes.indexOf('\nrouter.', start + 1));
+    assert.ok(routeBody(convIdx).includes('enrichMessageIdentities'));
+    assert.ok(routeBody(syncIdx).includes('enrichMessageIdentities'));
   });
 
   it('6 send path reuses enrichMessageIdentities', () => {

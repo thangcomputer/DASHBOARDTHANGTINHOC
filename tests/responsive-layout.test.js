@@ -3,16 +3,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-test('DashboardLayout header dùng bố cục co giãn (wrap / cột)', async () => {
+test('DashboardLayout header co giãn: tiêu đề tự thu gọn, ẩn trên mobile', async () => {
   const src = await fs.readFile(
     path.resolve(__dirname, '../client/src/components/DashboardLayout.jsx'),
     'utf8'
   );
-  assert.ok(src.includes('flex-wrap'), 'Header cần flex-wrap để không ép một hàng');
+  assert.ok(src.includes('cms-topbar flex flex-col'), 'Header xếp cột để hàng phụ xuống dòng');
   assert.ok(
-    src.includes('flex-col') && src.includes('sm:flex-row'),
-    'Header nhỏ: cột, lớn hơn: hàng ngang'
+    src.includes('<div className="min-w-0 flex-1 flex items-center overflow-hidden">'),
+    'Vùng tiêu đề phải co lại được, không đẩy các nút ra ngoài'
   );
+  assert.ok(src.includes('cms-topbar__title--mobile-hidden'), 'Tiêu đề ẩn trên mobile để logo giữa không bị đè');
 });
 
 test('Mobile footer navigation hides during text entry and nested scrolling', async () => {

@@ -515,7 +515,7 @@ test('Wave6.1 config: docker/CI/deploy manifests do not enable CQRS', () => {
   }
 });
 
-test('Wave6.1 config: production validateEnv rejects CQRS without ALLOW opt-in', () => {
+test('Wave6.1 config: production validateEnv forces CQRS off without ALLOW opt-in', () => {
   delete require.cache[require.resolve('../../config/validateEnv')];
   const validateEnv = require('../../config/validateEnv');
   const keys = [
@@ -532,6 +532,11 @@ test('Wave6.1 config: production validateEnv rejects CQRS without ALLOW opt-in',
     'ENABLE_CQRS_INVOICE',
     'MONGODB_URI',
     'ALLOW_CQRS_IN_PRODUCTION',
+    'MASTER_ADMIN_PHONE',
+    'ENABLE_CQRS',
+    'ENABLE_CQRS_STUDENT_CREATE',
+    'ENABLE_CQRS_TEACHER',
+    'ENABLE_CQRS_FINANCE',
   ];
   const prev = {};
   for (const k of keys) prev[k] = process.env[k];
@@ -548,8 +553,17 @@ test('Wave6.1 config: production validateEnv rejects CQRS without ALLOW opt-in',
     process.env.SMTP_PASS = 'p';
     process.env.ENABLE_CQRS_INVOICE = 'true';
     process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/db?replicaSet=rs0';
+    process.env.MASTER_ADMIN_PHONE = '0900000000';
     delete process.env.ALLOW_CQRS_IN_PRODUCTION;
-    assert.throws(() => validateEnv(), /ALLOW_CQRS_IN_PRODUCTION/);
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      validateEnv();
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(process.env.ENABLE_CQRS_INVOICE, 'false');
+    assert.equal(process.env.ENABLE_CQRS, 'false');
   } finally {
     for (const k of keys) {
       if (prev[k] === undefined) delete process.env[k];

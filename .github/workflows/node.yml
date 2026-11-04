@@ -76,6 +76,7 @@ jobs:
       JWT_REFRESH_SECRET: ci_refresh_secret_must_be_at_least_32_chars
       CLIENT_URL: http://localhost:5173
       BACKUP_SCHEDULE: '0'
+      MASTER_ADMIN_PHONE: '0900000001'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

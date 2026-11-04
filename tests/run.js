@@ -66,7 +66,8 @@ function bootServer() {
     http.get(`http://127.0.0.1:${testPort}/healthz`, (res) => {
       if (res.statusCode === 200) {
         console.log('Server is ready. Running tests...');
-        const result = spawnSync(process.execPath, NODE_TEST_ARGS.concat(files), {
+        // Integration files reset and seed the same TEST_DATABASE_URI, so they must not run in parallel.
+        const result = spawnSync(process.execPath, NODE_TEST_ARGS.concat(['--test-concurrency=1'], files), {
           stdio: 'inherit',
           env: childEnv,
         });

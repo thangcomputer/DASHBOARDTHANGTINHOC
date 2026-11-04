@@ -72,5 +72,5 @@ test('mobile API errors use safe text and enforce a bounded fetch timeout', () =
   );
   assert.ok(apiClient.includes('API_REQUEST_TIMEOUT_MS = 20_000'));
   assert.ok(apiClient.includes("'NETWORK_TIMEOUT'"));
-  assert.ok(apiClient.includes('getSafeApiErrorMessage(response.status)'));
+  assert.ok(apiClient.includes('getSafeApiErrorMessage(response.status, payload)'));
 });

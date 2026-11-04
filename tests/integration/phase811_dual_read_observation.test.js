@@ -336,19 +336,19 @@ describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
 
   it('Phase8.11 L: legacy-only → UNSUPPORTED; LIVE unchanged', async () => {
     await withFlag('true', async () => {
-      const out = observeLiveStaffGate(staffReq({ permissions: [LIVE.MANAGE_SCHEDULE] }), {
+      const out = observeLiveStaffGate(staffReq({ permissions: [LIVE.VIEW_EVALUATIONS] }), {
         liveDecision: 'ALLOW',
-        livePermission: LIVE.MANAGE_SCHEDULE,
+        livePermission: LIVE.VIEW_EVALUATIONS,
       });
       assert.equal(out.comparison, COMPARISON.UNSUPPORTED);
       assert.equal(out.liveDecision, 'ALLOW');
       assert.equal(out.enterpriseDecision, null);
 
       await withTeacher(
-        { adminRole: 'STAFF', permissions: [LIVE.MANAGE_SCHEDULE], role: 'staff' },
+        { adminRole: 'STAFF', permissions: [LIVE.VIEW_EVALUATIONS], role: 'staff' },
         async () => {
-          const mw = checkPermission(LIVE.MANAGE_SCHEDULE);
-          const req = staffReq({ permissions: [LIVE.MANAGE_SCHEDULE] });
+          const mw = checkPermission(LIVE.VIEW_EVALUATIONS);
+          const req = staffReq({ permissions: [LIVE.VIEW_EVALUATIONS] });
           const res = mockRes();
           let next = false;
           await mw(req, res, () => {

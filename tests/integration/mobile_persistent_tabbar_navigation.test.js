@@ -16,16 +16,17 @@ test('persistent footer preserves the selected tab while navigating to secondary
 
   assert.ok(rootListener, 'root navigator should retain footer selection across screen changes');
   assert.ok(rootListener[1].includes("if (currentRouteName === 'Students')"));
-  assert.ok(rootListener[1].includes("if (currentRouteName !== 'MainTabs') return;"));
-  assert.ok(rootListener[1].indexOf("if (currentRouteName !== 'MainTabs') return;") < rootListener[1].indexOf('const mainTabsRoute'));
+  assert.ok(rootListener[1].includes("if (currentRouteName !== 'MainTabs') {"));
+  assert.ok(rootListener[1].indexOf("if (currentRouteName !== 'MainTabs') {") < rootListener[1].indexOf('const mainTabsRoute'));
+  assert.ok(rootListener[1].includes("Conversation: 'Messages'"), 'stack screens keep their parent tab highlighted');
   assert.ok(rootListener[1].includes('setActiveTab(tabState.routes[tabState.index ?? 0]?.name ?? \'Home\')'));
   assert.ok(navigator.includes('<PersistentTabBar'));
   assert.ok(navigator.includes('role={user.role}'));
   assert.ok(navigator.includes('activeTab={activeTab}'));
   const teacherFooter = navigator.match(/const items = isTeacher\s*\?\s*\[([\s\S]*?)\]\s*:\s*\[/);
   assert.ok(teacherFooter, 'teacher footer items should be defined');
-  assert.ok(teacherFooter[1].includes("{ name: 'Finance' as const, label: 'Tài chính', icon: WalletCards }"));
-  assert.ok(!teacherFooter[1].includes("{ name: 'Students' as const, label: 'Học viên', icon: Users }"));
+  assert.ok(teacherFooter[1].includes("{ name: 'Finance' as const, label: 'Tài chính', shortLabel: 'Tài chính', icon: DollarSign }"));
+  assert.ok(!teacherFooter[1].includes("name: 'Students'"));
 });
 
 test('persistent footer shows the same schedule and message badge counts as main tabs', () => {

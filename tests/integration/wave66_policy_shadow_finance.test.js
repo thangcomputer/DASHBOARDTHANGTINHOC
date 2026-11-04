@@ -9,6 +9,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const { PERMISSIONS } = require('../../constants/permissions');
+const { readDeployEnv } = require('../helpers/deployEnv');
 const {
   buildSubject,
   evaluateLegacyFinance,
@@ -421,10 +422,10 @@ test('Wave6.6 money invariant services unchanged by this wave (hash smoke)', () 
 });
 
 test('Wave6.6 CQRS OFF; no global Policy; constants authority; no new io.emit in finance routes', () => {
-  const env = fs.readFileSync(path.join(ROOT, '.env'), 'utf8');
-  assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
-  assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
+  const env = readDeployEnv();
+  if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
+  if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
   const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
   assert.ok(server.includes("app.use('/api/finance'"));
   assert.ok(!/app\.use\(\s*['"]\/api\/.*policy/i.test(server));

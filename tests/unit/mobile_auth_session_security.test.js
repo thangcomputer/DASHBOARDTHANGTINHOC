@@ -21,8 +21,9 @@ test('mobile session revocation is skipped while the feature flag is disabled', 
   assert.equal(calls, 0);
 });
 
-test('revocation disconnects each revoked mobile session room', async () => {
+test('revocation notifies and disconnects each revoked mobile session room', async () => {
   const disconnectedRooms = [];
+  const notifiedRooms = [];
   const result = await revokeMobileSessionsForUser({
     userId: 'student-a',
     role: 'student',
@@ -41,6 +42,10 @@ test('revocation disconnects each revoked mobile session room', async () => {
     io: {
       in(room) {
         return {
+          emit(event) {
+            assert.equal(event, 'auth:session-replaced');
+            notifiedRooms.push(room);
+          },
           disconnectSockets(force) {
             assert.equal(force, true);
             disconnectedRooms.push(room);
@@ -52,6 +57,7 @@ test('revocation disconnects each revoked mobile session room', async () => {
 
   assert.deepEqual(result, { revokedCount: 2, disconnectedSocketRooms: 2 });
   assert.deepEqual(disconnectedRooms, ['session:session-a', 'session:session-b']);
+  assert.deepEqual(notifiedRooms, disconnectedRooms);
 });
 
 test('revocation failures remain visible to the caller', async () => {

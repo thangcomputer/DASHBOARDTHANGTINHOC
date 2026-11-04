@@ -51,6 +51,14 @@ before(async () => {
       return;
     }
     await ensureCsrf();
+    const probeId = ids.students[0]._id;
+    const probe = await api(`/unread/${encodeURIComponent(probeId)}`, {
+      token: generateTestToken({ id: probeId, role: 'student', name: 'probe' }),
+    });
+    if (probe.status === 401 && probe.json?.code === 'USER_NOT_FOUND') {
+      skipReason = 'test accounts not seeded in this database (run tests/seed_test_accounts.js)';
+      return;
+    }
     ready = true;
   } catch {
     skipReason = 'API not running';

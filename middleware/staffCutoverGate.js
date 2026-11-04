@@ -37,7 +37,12 @@ function denyStaff(res, statusHint, reason) {
       message: '403 Forbidden: Yêu cầu quyền Admin/Staff',
     });
   }
-  if (r === 'only_root_creates_super' || r === 'policy_only_root_creates_super' || r === 'super_create_disabled') {
+  if (
+    r === 'only_root_creates_super'
+    || r === 'policy_only_root_creates_super'
+    || r === 'super_create_disabled'
+    || r === 'policy_super_create_disabled'
+  ) {
     return res.status(403).json({
       success: false,
       message: 'Không được tạo thêm tài khoản Super Admin. Hãy tạo Admin cấp cao.',
