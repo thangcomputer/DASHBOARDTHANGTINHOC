@@ -535,6 +535,8 @@ test('Wave6.1 config: production validateEnv forces CQRS off without ALLOW opt-i
     'MONGODB_URI',
     'ALLOW_CQRS_IN_PRODUCTION',
     'MASTER_ADMIN_PHONE',
+    'MASTER_ADMIN_PASSWORD',
+    'SESSION_SECRET',
     'ENABLE_CQRS',
     'ENABLE_CQRS_STUDENT_CREATE',
     'ENABLE_CQRS_TEACHER',
@@ -556,6 +558,8 @@ test('Wave6.1 config: production validateEnv forces CQRS off without ALLOW opt-i
     process.env.ENABLE_CQRS_INVOICE = 'true';
     process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/db?replicaSet=rs0';
     process.env.MASTER_ADMIN_PHONE = '0900000000';
+    process.env.SESSION_SECRET = 'c'.repeat(40);
+    delete process.env.MASTER_ADMIN_PASSWORD;
     delete process.env.ALLOW_CQRS_IN_PRODUCTION;
     const originalError = console.error;
     console.error = () => {};
