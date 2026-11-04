@@ -106,6 +106,8 @@ function verifyAttemptToken(token, expected = {}, options = {}) {
 
 function expandSubjectMatchIds(subjectId) {
   const wanted = normalizeSubjectSection(subjectId);
+  if (wanted === 'wordnc') return [wanted, 'word'];
+  if (wanted === 'excelnc') return [wanted, 'excel'];
   return wanted ? [wanted] : [];
 }
 
