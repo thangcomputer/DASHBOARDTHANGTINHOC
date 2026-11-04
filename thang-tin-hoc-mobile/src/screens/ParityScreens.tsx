@@ -85,12 +85,11 @@ async function openExternalUrl(url: string | undefined, label: string) {
   }
 }
 
-type MenuScreen = 'Assignments' | 'Materials' | 'StudentLearning' | 'Evaluations' | 'Feed' | 'News' | 'CenterInfo' | 'Tuition' | 'SoftwareLinks' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'CertPrepCatalog' | 'LessonPracticeCatalog';
+type MenuScreen = 'Assignments' | 'Materials' | 'StudentLearning' | 'Evaluations' | 'Feed' | 'News' | 'CenterInfo' | 'Tuition' | 'SoftwareLinks' | 'TeacherQuizzes' | 'TeacherTraining' | 'TeacherFinance' | 'CertPrepCatalog';
 type MenuItem = { label: string; screen?: MenuScreen; description: string };
 
 const studentMenu: MenuItem[] = [
   { label: 'Bài học', screen: 'StudentLearning', description: 'Khóa học đã đăng ký và tự học qua video' },
-  { label: 'Luyện bài theo bài học', screen: 'LessonPracticeCatalog', description: 'Học và làm bài tập theo từng chương bài' },
   { label: 'Ôn thi chứng chỉ MOS / IC3', screen: 'CertPrepCatalog', description: 'Luyện đề và thi thử chứng chỉ theo cấp độ' },
   { label: 'Bài tập về nhà', screen: 'Assignments', description: 'Bài tập, hạn nộp và trạng thái bài làm' },
   { label: 'Tài liệu học tập', screen: 'Materials', description: 'Tài liệu và video theo khóa học' },

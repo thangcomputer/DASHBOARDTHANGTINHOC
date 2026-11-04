@@ -2103,6 +2103,7 @@ export function AssignmentsScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingGrade, setIsSavingGrade] = useState(false);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const loader = useCallback(() => assignmentService.list(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const resource = useMockResource(loader);
@@ -2228,6 +2229,63 @@ export function AssignmentsScreen({
     setCourse('');
     setAssignToAll(true);
     setAssignedStudentIds([]);
+    setEditingAssignmentId(null);
+  };
+  const startEditAssignment = (assignment: Assignment) => {
+    resetCreateForm();
+    setEditingAssignmentId(assignment.id);
+    setTitle(assignment.title);
+    setDescription(assignment.description || '');
+    setAttachedFileUrl(assignment.sourceFileUrl || assignment.attachedFileUrl || '');
+    setDeadline(assignment.deadlineDate || '');
+    setCourse(assignment.subject);
+    setShowCreate(true);
+  };
+  const saveEditedAssignment = async () => {
+    if (!editingAssignmentId) return;
+    if (!title.trim()) {
+      Alert.alert('Thiếu thông tin', 'Nhập tên bài tập.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline.trim())) {
+      Alert.alert('Hạn nộp chưa hợp lệ', 'Chọn ngày hạn nộp.');
+      return;
+    }
+    setIsCreatingAssignment(true);
+    try {
+      await assignmentService.update(editingAssignmentId, { title, description, fileUrl: attachedFileUrl, deadline });
+      resetCreateForm();
+      setShowCreate(false);
+      setSelected(null);
+      setOverrides(null);
+      resource.reload();
+      Alert.alert('Đã cập nhật', 'Bài tập đã được cập nhật.');
+    } catch (error) {
+      Alert.alert('Không thể cập nhật', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setIsCreatingAssignment(false);
+    }
+  };
+  const confirmDeleteAssignment = (assignment: Assignment) => {
+    Alert.alert('Xóa bài tập', `Xóa bài "${assignment.title}"? Bài nộp của học viên cũng sẽ bị xóa.`, [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await assignmentService.remove(assignment.id);
+              setSelected(null);
+              setOverrides(null);
+              resource.reload();
+            } catch (error) {
+              Alert.alert('Không thể xóa', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+            }
+          })();
+        },
+      },
+    ]);
   };
   const createAssignment = async () => {
     if (!title.trim()) {
@@ -2429,6 +2487,16 @@ export function AssignmentsScreen({
             </Pressable>
           ) : null}
           {selected.assignedStudentNames?.length ? <Text style={styles.metaText}>Học viên được giao: {selected.assignedStudentNames.join(', ')}</Text> : null}
+          {isTeacher && !user?.previewMode && !selected.submissions?.some((submission) => submission.status === 'graded') ? (
+            <View style={styles.assignmentManageRow}>
+              <Pressable onPress={() => startEditAssignment(selected)} style={styles.assignmentManageButton} accessibilityRole="button" accessibilityLabel="Sửa bài tập">
+                <Text style={styles.assignmentManageText}>Sửa bài</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmDeleteAssignment(selected)} style={styles.assignmentManageButton} accessibilityRole="button" accessibilityLabel="Xóa bài tập">
+                <Text style={[styles.assignmentManageText, styles.assignmentManageDanger]}>Xóa bài</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {isTeacher ? (
             <>
               <SectionHeading title={`Bài nộp (${selected.submissions?.length || 0})`} />
@@ -2505,12 +2573,14 @@ export function AssignmentsScreen({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.cardTitle}>Tạo bài tập</Text>
+              <Text style={styles.cardTitle}>{editingAssignmentId ? 'Sửa bài tập' : 'Tạo bài tập'}</Text>
               <TextInput value={title} onChangeText={setTitle} placeholder="Tên bài tập" style={styles.formInput} />
               <TextInput value={description} onChangeText={setDescription} placeholder="Mô tả / yêu cầu" multiline style={[styles.formInput, styles.formTextarea]} />
               <Text style={styles.fieldLabel}>Link File đề bài (Google Drive...)</Text>
               <TextInput value={attachedFileUrl} onChangeText={setAttachedFileUrl} placeholder="HTTPS://..." autoCapitalize="none" keyboardType="url" style={styles.formInput} accessibilityLabel="Link File đề bài Google Drive" />
               {attachedFileUrl.trim() ? <Pressable onPress={() => { void openAssignmentLink(attachedFileUrl.trim(), 'Tệp đề bài'); }} style={styles.fileLinkRow} accessibilityRole="button"><Link2 size={17} color={colors.brand} /><Text numberOfLines={1} style={styles.fileLinkText}>Xem trước liên kết</Text></Pressable> : null}
+              {editingAssignmentId ? <Text style={styles.metaText}>Khóa học: {course}</Text> : null}
+              {!editingAssignmentId ? (<>
               <Text style={styles.fieldLabel}>Khóa học</Text>
               {studentsResource.loading ? <Text style={styles.note}>Đang tải khóa học…</Text> : null}
               {studentsResource.error ? <Text style={styles.note}>Không tải được khóa học: {studentsResource.error}</Text> : null}
@@ -2528,6 +2598,7 @@ export function AssignmentsScreen({
                 const selectedStudent = assignedStudentIds.includes(student.id);
                 return <Pressable key={student.id} onPress={() => setAssignedStudentIds((current) => selectedStudent ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.choice, selectedStudent && styles.choiceActive]} accessibilityRole="checkbox" accessibilityState={{ checked: selectedStudent }}><Text style={[styles.choiceText, selectedStudent && styles.choiceTextActive]}>{selectedStudent ? '✓  ' : ''}{student.name} · {student.course}</Text></Pressable>;
               }) : null}
+              </>) : null}
               <Pressable
                 onPress={() => setShowDeadlineCalendar((visible) => !visible)}
                 style={styles.deadlinePickerButton}
@@ -2604,8 +2675,14 @@ export function AssignmentsScreen({
               <Text style={styles.note}>Bài tập sẽ được giao trên hệ thống. Tệp đính kèm hiện dùng liên kết tải đã có.</Text>
             </ScrollView>
             <View style={styles.assignmentModalActions}>
-              <PrimaryButton title={isCreatingAssignment ? 'Đang giao…' : 'Giao bài tập'} disabled={isCreatingAssignment} onPress={() => { void createAssignment(); }} />
-              <Pressable onPress={() => setShowCreate(false)} style={styles.assignmentModalClose} accessibilityRole="button">
+              <PrimaryButton
+                title={editingAssignmentId
+                  ? (isCreatingAssignment ? 'Đang lưu…' : 'Lưu thay đổi')
+                  : (isCreatingAssignment ? 'Đang giao…' : 'Giao bài tập')}
+                disabled={isCreatingAssignment}
+                onPress={() => { void (editingAssignmentId ? saveEditedAssignment() : createAssignment()); }}
+              />
+              <Pressable onPress={() => { setShowCreate(false); setEditingAssignmentId(null); }} style={styles.assignmentModalClose} accessibilityRole="button">
                 <Text style={styles.assignmentModalCloseText}>Đóng</Text>
               </Pressable>
             </View>
@@ -5588,6 +5665,10 @@ const styles = StyleSheet.create({
   assignmentModalContent: { gap: spacing.sm, paddingBottom: spacing.xs },
   assignmentModalActions: { gap: spacing.xs, paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   assignmentModalClose: { minHeight: 36, alignItems: 'center', justifyContent: 'center' },
+  assignmentManageRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  assignmentManageButton: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
+  assignmentManageText: { fontSize: 13, fontWeight: '800', color: colors.ink },
+  assignmentManageDanger: { color: colors.brand },
   assignmentModalCloseText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
   teacherEditBackdrop: { justifyContent: 'center', alignItems: 'center', padding: spacing.sm, backgroundColor: 'rgba(15, 23, 42, 0.6)' },
   teacherEditModal: { width: '100%', maxWidth: 480, maxHeight: '92%', overflow: 'hidden', alignSelf: 'center', borderRadius: 22, backgroundColor: colors.surface },

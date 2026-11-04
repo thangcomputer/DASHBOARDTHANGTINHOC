@@ -41,9 +41,6 @@ import { SupportEntryScreen } from '../screens/SupportEntryScreen';
 import {
   CertPrepCatalogScreen, CertPrepLevelScreen, CertPrepPlayerScreen, CertPrepResultScreen,
 } from '../screens/CertPrepScreens';
-import {
-  LessonPracticeCatalogScreen, LessonPracticeUnitsScreen, LessonPracticePlayerScreen,
-} from '../screens/LessonPracticeScreens';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { MobileSoundEffects } from '../components/MobileSoundEffects';
 import { PinLockGate } from '../components/pinLock/PinLockGate';
@@ -372,9 +369,6 @@ export function RootNavigator() {
           Feed: 'Feed',
           TeacherFinance: 'Finance',
           StudentLearning: 'CourseVideos',
-          LessonPracticeCatalog: 'CourseVideos',
-          LessonPracticeUnits: 'CourseVideos',
-          LessonPracticePlayer: 'CourseVideos',
         };
         setActiveTab(stackRouteTabs[currentRouteName ?? ''] ?? '');
         return;
@@ -445,9 +439,6 @@ export function RootNavigator() {
               <Stack.Screen name="CertPrepLevel" component={CertPrepLevelScreen} />
               <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
               <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
-              <Stack.Screen name="LessonPracticeCatalog" component={LessonPracticeCatalogScreen} />
-              <Stack.Screen name="LessonPracticeUnits" component={LessonPracticeUnitsScreen} />
-              <Stack.Screen name="LessonPracticePlayer" component={LessonPracticePlayerScreen} />
             </>
           ) : null}
           {user.role === 'teacher' ? (

@@ -53,8 +53,10 @@ import {
 } from './studentApi';
 import {
   createTeacherAssignment,
+  deleteTeacherAssignment,
   getTeacherAssignments,
   gradeAssignmentSubmission,
+  updateTeacherAssignment,
 } from './assignmentApi';
 import {
   addMessageGroupMembers, createMessageGroup, deleteMessageGroup, getMessageContacts, getMessageThread, getOlderMessages, leaveMessageGroup, markConversationRead, sendChatMessage,
@@ -820,6 +822,14 @@ export const assignmentService = {
   async create(user: DemoUser, input: Parameters<typeof createTeacherAssignment>[1]) {
     if (__DEV__ && qaState) throw new Error('Không thể giao bài thật trong chế độ UI QA.');
     return createTeacherAssignment(user, input);
+  },
+  async update(assignmentId: string, input: Parameters<typeof updateTeacherAssignment>[1]) {
+    if (__DEV__ && qaState) throw new Error('Không thể sửa bài thật trong chế độ UI QA.');
+    return updateTeacherAssignment(assignmentId, input);
+  },
+  async remove(assignmentId: string) {
+    if (__DEV__ && qaState) throw new Error('Không thể xóa bài thật trong chế độ UI QA.');
+    return deleteTeacherAssignment(assignmentId);
   },
   async grade(submissionId: string, grade: number, feedback: string) {
     if (__DEV__ && qaState) throw new Error('Không thể chấm bài thật trong chế độ UI QA.');

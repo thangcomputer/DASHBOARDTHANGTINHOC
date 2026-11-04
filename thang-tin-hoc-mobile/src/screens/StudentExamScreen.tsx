@@ -16,6 +16,7 @@ import {
   type StudentQuiz, type StudentQuizDetail, type StudentQuizResult,
 } from '../services/studentQuizApi';
 import { quizService } from '../services/mockService';
+import { getStudentCertExamScores, type CertExamScore } from '../services/studentApi';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 
@@ -68,6 +69,8 @@ export function StudentExamScreen() {
   const handledQuizId = useRef('');
   const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [notificationQuizId, setNotificationQuizId] = useState<string | null>(null);
+  const [scoreTab, setScoreTab] = useState<'quiz' | 'cert'>('quiz');
+  const [certScores, setCertScores] = useState<{ loading: boolean; error: string; data: CertExamScore[] }>({ loading: false, error: '', data: [] });
   const isPreview = Boolean(user?.previewMode)
     || (__DEV__ && Boolean(process.env.EXPO_PUBLIC_MOBILE_UI_QA_STATE));
 
@@ -96,6 +99,18 @@ export function StudentExamScreen() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'scores' || scoreTab !== 'cert' || !user || user.role !== 'student' || isPreview) return undefined;
+    let cancelled = false;
+    setCertScores((current) => ({ ...current, loading: true, error: '' }));
+    getStudentCertExamScores(user)
+      .then((data) => { if (!cancelled) setCertScores({ loading: false, error: '', data }); })
+      .catch((loadError) => {
+        if (!cancelled) setCertScores({ loading: false, error: loadError instanceof Error ? loadError.message : 'Vui lòng thử lại.', data: [] });
+      });
+    return () => { cancelled = true; };
+  }, [activeTab, isPreview, scoreTab, user]);
 
   const closeQuiz = useCallback(() => {
     setQuizDetail(null);
@@ -579,8 +594,35 @@ export function StudentExamScreen() {
       ) : activeTab === 'scores' ? (
         <View style={styles.scoreSection}>
           <Card style={styles.scoreHeader}><Trophy size={18} color={colors.surface} /><Text style={styles.scoreHeaderText}>Nhật ký điểm số</Text></Card>
-          <View style={styles.scoreTabs}><Text style={styles.scoreTabActive}>Trắc nghiệm GV</Text><Text style={styles.scoreTabDisabled}>Thi chứng nhận</Text></View>
-          {loading ? <View style={styles.centerState}><ActivityIndicator color={colors.brand} /></View> : submittedQuizzes.length ? submittedQuizzes.map((quiz) => (
+          <View style={styles.scoreTabs} accessibilityRole="tablist">
+            {(['quiz', 'cert'] as const).map((tab) => (
+              <Pressable key={tab} onPress={() => setScoreTab(tab)} style={styles.flex} accessibilityRole="tab" accessibilityState={{ selected: scoreTab === tab }}>
+                <Text style={scoreTab === tab ? styles.scoreTabActive : styles.scoreTabDisabled}>{tab === 'quiz' ? 'Trắc nghiệm GV' : 'Thi chứng nhận'}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {scoreTab === 'cert' ? (
+            certScores.loading ? <View style={styles.centerState}><ActivityIndicator color={colors.brand} /></View>
+              : certScores.error ? <EmptyState title="Không tải được điểm thi chứng nhận" message={certScores.error} />
+                : certScores.data.length ? certScores.data.map((score) => {
+                  const quizPercent = score.quizScore != null && score.quizTotal ? Math.round((score.quizScore / score.quizTotal) * 100) : null;
+                  return (
+                    <View key={score.id} style={styles.scoreRow}>
+                      <View style={styles.flex}>
+                        <Text style={styles.quizTitle}>{score.label}</Text>
+                        <Text style={styles.metaText}>
+                          {`Trắc nghiệm: ${score.quizScore != null && score.quizTotal ? `${score.quizScore}/${score.quizTotal} (${quizPercent}%)` : '--'}`}
+                          {` · Thực hành: ${score.essayScore != null ? `${score.essayScore}/10` : score.practiceSubmitted ? 'Chờ chấm' : '--'}`}
+                          {score.attemptCount > 0 ? ` · Lần ${score.attemptCount + 1}` : ''}
+                        </Text>
+                      </View>
+                      <Text style={[styles.scoreText, score.status === 'dat' ? styles.passText : score.status === 'khong_dat' ? styles.failText : styles.metaText]}>
+                        {score.status === 'dat' ? 'Đạt' : score.status === 'khong_dat' ? 'Chưa đạt' : score.status === 'dang_thi' ? 'Đang thi' : 'Chưa thi'}
+                      </Text>
+                    </View>
+                  );
+                }) : <EmptyState title="Chưa có điểm thi chứng nhận" message="Kết quả thi chứng nhận trên máy tính sẽ hiển thị tại đây." />
+          ) : loading ? <View style={styles.centerState}><ActivityIndicator color={colors.brand} /></View> : submittedQuizzes.length ? submittedQuizzes.map((quiz) => (
             <Pressable key={quiz.id} onPress={() => void openQuiz(quiz)} style={styles.scoreRow} accessibilityRole="button">
               <View style={styles.flex}><Text style={styles.quizTitle}>{quiz.title}</Text><Text style={styles.metaText}>{quiz.courseName} · {quiz.mySubmission?.submittedAt ? formatDate(quiz.mySubmission.submittedAt) : 'Đã nộp'}</Text></View>
               <Text style={[styles.scoreText, quiz.mySubmission?.passed ? styles.passText : styles.failText]}>{quiz.mySubmission?.forfeit ? 'Rớt' : `${quiz.mySubmission?.score ?? 0}%`}</Text>

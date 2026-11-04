@@ -97,8 +97,18 @@ export type CertPrepSession = {
   feedbackMode?: 'immediate' | 'end';
 };
 
+export type CertPrepAttempt = {
+  sessionId: string;
+  attempt: number;
+  score: number;
+  passed: boolean;
+  submittedAt?: string;
+  durationSeconds: number;
+};
+
 export type CertPrepResult = {
   sessionId: string;
+  testId?: string;
   score: number;
   total: number;
   correctCount: number;
@@ -201,7 +211,24 @@ const certPrepApi = {
       total: Number(result.totalQuestions) || 0,
       correctCount: Number(result.correctCount) || 0,
       passed: Boolean(result.passed),
-    } as CertPrepResult & { answers?: Record<string, unknown>; questions?: CertPrepQuestion[] };
+      testId: result.testId ? String(result.testId) : undefined,
+    } as CertPrepResult & { testId?: string; answers?: Record<string, unknown>; questions?: CertPrepQuestion[] };
+  },
+
+  /** Lịch sử các lần nộp bài của 1 đề */
+  async getAttempts(testId: string): Promise<CertPrepAttempt[]> {
+    const rows = await requestData<Array<Record<string, unknown>>>(
+      `/cert-prep/tests/${encodeURIComponent(testId)}/attempts`,
+      { method: 'GET' },
+    );
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+      sessionId: String(row.sessionId || ''),
+      attempt: Number(row.attempt) || 0,
+      score: Number(row.score) || 0,
+      passed: Boolean(row.passed),
+      submittedAt: String(row.submittedAt || row.startedAt || ''),
+      durationSeconds: Number(row.durationSeconds) || 0,
+    }));
   },
 };
 

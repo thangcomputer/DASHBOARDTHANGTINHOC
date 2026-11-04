@@ -48,9 +48,6 @@ export type AppStackParamList = {
   CertPrepLevel: { levelId: string; courseName: string };
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
-  LessonPracticeCatalog: undefined;
-  LessonPracticeUnits: { subjectId: string; subjectName: string; courseName?: string };
-  LessonPracticePlayer: { unitId: string; unitTitle: string; subjectName?: string; courseName?: string };
 };
 
 export type MainTabsParamList = {

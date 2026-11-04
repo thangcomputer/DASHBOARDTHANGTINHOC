@@ -11,7 +11,9 @@ import { AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton } f
 import { useAuth } from '../app/AuthContext';
 import { useMockResource } from '../hooks/useMockResource';
 import { getMobileApiBaseUrl, resolveMobilePublicUrl } from '../services/apiClient';
+import { CoursePaymentModal, type CoursePaymentCheckout } from '../components/CoursePaymentModal';
 import {
+  checkoutCourse,
   getCourseSubjectUnits,
   getCourseVideoCatalog,
   confirmCoursePracticeItem,
@@ -319,6 +321,8 @@ function practiceAnswerSummary(item: LessonPracticeItem) {
   return '';
 }
 
+const COURSE_CONSULTATION_ZALO_PHONE = '0984623486';
+
 export function CourseVideosScreen() {
   const { user } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
@@ -367,6 +371,57 @@ export function CourseVideosScreen() {
       instructor: visible.filter((course) => course.deliveryMode === 'instructor').length,
     };
   }, [courses]);
+  const [registeringCourseId, setRegisteringCourseId] = useState('');
+  const [checkout, setCheckout] = useState<CoursePaymentCheckout | null>(null);
+
+  const startCourseCheckout = async (course: LessonPracticeCourse) => {
+    setRegisteringCourseId(course.id);
+    try {
+      const result = await checkoutCourse(course.id);
+      if (result.owned || !result.sessionId) {
+        resource.reload();
+        Alert.alert('Đăng ký khóa học', 'Bạn đã sở hữu khóa học này.');
+        return;
+      }
+      setCheckout({
+        sessionId: result.sessionId,
+        ref: result.ref || '',
+        amount: result.amount,
+        courseTitle: result.courseTitle || course.name,
+      });
+    } catch (error) {
+      Alert.alert('Không tạo được thanh toán', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setRegisteringCourseId('');
+    }
+  };
+
+  const requestCourseRegistration = (course: LessonPracticeCourse) => {
+    if (registeringCourseId) return;
+    if (course.deliveryMode !== 'video') {
+      const message = `[THẮNG TIN HỌC] Tôi muốn được tư vấn khóa học 1 kèm 1: ${course.name}`;
+      void Linking.openURL(`https://zalo.me/${COURSE_CONSULTATION_ZALO_PHONE}?text=${encodeURIComponent(message)}`);
+      return;
+    }
+    if (isPreview) {
+      Alert.alert('Đăng ký khóa học', 'Chế độ xem thử không hỗ trợ thanh toán.');
+      return;
+    }
+    Alert.alert(
+      'Xác nhận đăng ký',
+      `Đăng ký khóa "${course.name}" với giá ${Number(course.price || 0).toLocaleString('vi-VN')}đ?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Thanh toán', onPress: () => { void startCourseCheckout(course); } },
+      ],
+    );
+  };
+
+  const handleCoursePaid = () => {
+    setCheckout(null);
+    resource.reload();
+    Alert.alert('Thanh toán thành công', 'Khóa học đã được mở.');
+  };
 
   const openCourse = (course: LessonPracticeCourse) => {
     const subject = directSubject(course);
@@ -612,7 +667,8 @@ export function CourseVideosScreen() {
             <CourseList
               courses={section.courses}
               onOpen={openCourse}
-              onRegister={() => Alert.alert('Đăng ký khóa học', 'Vui lòng đăng ký và thanh toán khóa học trên Web app.')}
+              onRegister={requestCourseRegistration}
+              registeringCourseId={registeringCourseId}
             />
           </View>
         ) : null
@@ -620,6 +676,7 @@ export function CourseVideosScreen() {
       {filter !== 'guide' && sections.every((section) => !section.courses.length) && !resource.loading && !resource.error ? (
         <EmptyState title="Không có khóa học trong bộ lọc" message="Thử chọn một bộ lọc khác." />
       ) : null}
+      <CoursePaymentModal checkout={checkout} onClose={() => setCheckout(null)} onPaid={handleCoursePaid} />
       <Modal visible={Boolean(selectedCourse)} transparent animationType="slide" onRequestClose={() => { setSelectedCourse(null); setSelectedSubject(null); }}>
         <View style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => { setSelectedCourse(null); setSelectedSubject(null); }} accessibilityRole="button" accessibilityLabel="Đóng nội dung khóa học" />
@@ -905,7 +962,7 @@ export function CourseVideosScreen() {
   );
 }
 
-function CourseCard({ course, onOpen, onRegister }: { course: LessonPracticeCourse; onOpen: () => void; onRegister: () => void }) {
+function CourseCard({ course, onOpen, onRegister, registering = false }: { course: LessonPracticeCourse; onOpen: () => void; onRegister: () => void; registering?: boolean }) {
   const [isHovered, setIsHovered] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const isVideo = course.deliveryMode === 'video';
@@ -959,7 +1016,7 @@ function CourseCard({ course, onOpen, onRegister }: { course: LessonPracticeCour
           </View>
         </Pressable>
         <View style={styles.courseActions}>
-          {!course.enrolled && isVideo ? <Pressable onPress={onRegister} style={styles.registerButton} accessibilityRole="button"><Text style={styles.registerText}>Đăng ký học</Text></Pressable> : <View />}
+          {!course.enrolled && isVideo ? <Pressable onPress={onRegister} disabled={registering} style={[styles.registerButton, registering && { opacity: 0.6 }]} accessibilityRole="button"><Text style={styles.registerText}>{registering ? 'Đang tạo thanh toán…' : 'Đăng ký học'}</Text></Pressable> : <View />}
           {!course.enrolled && !isVideo ? <Pressable onPress={onRegister} style={styles.registerButton} accessibilityRole="button"><Text style={styles.registerText}>Zalo tư vấn</Text></Pressable> : null}
           <Pressable onPress={onOpen} style={[styles.openButton, course.enrolled ? styles.openButtonActive : null]} accessibilityRole="button">
             <Text style={[styles.openButtonText, course.enrolled && styles.openButtonTextActive]}>{course.enrolled ? progress > 0 && progress < 100 ? 'Tiếp tục học' : progress >= 100 ? 'Xem lại khóa học' : 'Vào học' : directSubject(course) ? 'Học thử' : 'Xem thêm'}</Text>
@@ -987,16 +1044,23 @@ function CourseList({
   courses,
   onOpen,
   onRegister,
+  registeringCourseId = '',
 }: {
   courses: LessonPracticeCourse[];
   onOpen: (course: LessonPracticeCourse) => void;
-  onRegister: () => void;
+  onRegister: (course: LessonPracticeCourse) => void;
+  registeringCourseId?: string;
 }) {
   return (
     <View style={styles.courseList}>
       {courses.map((course) => (
         <View key={course.id} style={styles.registeredCourseCard}>
-          <CourseCard course={course} onOpen={() => onOpen(course)} onRegister={onRegister} />
+          <CourseCard
+            course={course}
+            onOpen={() => onOpen(course)}
+            onRegister={() => onRegister(course)}
+            registering={registeringCourseId === course.id}
+          />
         </View>
       ))}
     </View>

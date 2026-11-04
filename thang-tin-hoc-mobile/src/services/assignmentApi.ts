@@ -20,6 +20,13 @@ function dateLabel(value: unknown) {
     : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function dateInputValue(value: unknown) {
+  if (!value) return '';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function dateTimestamp(value: unknown) {
   const timestamp = new Date(String(value || '')).getTime();
   return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
@@ -61,9 +68,11 @@ function mapTeacherAssignment(raw: Raw, teacherName: string, roster: Awaited<Ret
     subject: text(raw.courseId, 'Khóa học'),
     teacher: text(raw.assignedByName, teacherName),
     deadline: dateLabel(raw.deadline),
+    deadlineDate: dateInputValue(raw.deadline),
     status: pendingGrades ? 'Cần chấm' : submissions.length ? 'Đã chấm' : 'Chưa làm',
     description: text(raw.description),
     attachedFileUrl: resolveFileUrl(raw.fileUrl),
+    sourceFileUrl: text(raw.fileUrl),
     assignedStudentNames: targetStudent
       ? [targetStudent.name]
       : targetStudentId
@@ -166,6 +175,35 @@ export async function createTeacherAssignment(
     }
   }
   return createdCount;
+}
+
+export async function updateTeacherAssignment(
+  assignmentId: string,
+  input: { title: string; description: string; fileUrl: string; deadline: string },
+) {
+  const title = input.title.trim();
+  const deadlineValue = input.deadline.trim();
+  const deadline = new Date(`${deadlineValue}T23:59:59`);
+  if (!assignmentId.trim() || !title || !/^\d{4}-\d{2}-\d{2}$/.test(deadlineValue) || !Number.isFinite(deadline.getTime())) {
+    throw new Error('Tên bài và hạn nộp hợp lệ là bắt buộc.');
+  }
+  const response = await mobileApiRequest<{ data?: Raw }>(`/assignments/${encodeURIComponent(assignmentId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title,
+      description: input.description.trim(),
+      fileUrl: input.fileUrl.trim(),
+      deadline: deadline.toISOString(),
+    }),
+  });
+  if (!response.data) throw new Error('Máy chủ không xác nhận đã cập nhật bài tập.');
+  return response.data;
+}
+
+export async function deleteTeacherAssignment(assignmentId: string) {
+  if (!assignmentId.trim()) throw new Error('Không thể xóa: thiếu mã bài tập.');
+  await mobileApiRequest(`/assignments/${encodeURIComponent(assignmentId)}`, { method: 'DELETE' });
 }
 
 export async function gradeAssignmentSubmission(submissionId: string, grade: number, teacherFeedback: string) {

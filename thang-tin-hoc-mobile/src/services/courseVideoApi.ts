@@ -183,6 +183,65 @@ export async function resetCoursePractice(unitId: string, practiceGroupId: strin
   );
 }
 
+export type CourseCheckout = {
+  owned: boolean;
+  sessionId?: string;
+  ref?: string;
+  amount: number;
+  courseTitle?: string;
+};
+
+export type CenterBankAccount = {
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+};
+
+export async function checkoutCourse(courseId: string): Promise<CourseCheckout> {
+  const payload = await mobileApiRequest<{ data?: CourseCheckout }>(
+    `/lesson-practice/my/courses/${encodeURIComponent(courseId)}/checkout`,
+    { method: 'POST', body: '{}' },
+  );
+  if (!payload.data) throw new Error('Máy chủ không tạo được phiên thanh toán.');
+  return payload.data;
+}
+
+export async function getCoursePurchaseSession(sessionId: string) {
+  const payload = await mobileApiRequest<{ paid?: boolean; status?: string }>(
+    `/lesson-practice/my/course-purchase-sessions/${encodeURIComponent(sessionId)}`,
+  );
+  return { paid: payload.paid === true || payload.status === 'paid', status: payload.status || '' };
+}
+
+export async function simulateCoursePurchase(sessionId: string) {
+  await mobileApiRequest(
+    `/lesson-practice/my/course-purchase-sessions/${encodeURIComponent(sessionId)}/simulate-paid`,
+    { method: 'POST', body: '{}' },
+  );
+}
+
+export async function getCenterBankAccount(): Promise<CenterBankAccount | null> {
+  const payload = await mobileApiRequest<{ data?: Partial<CenterBankAccount> }>('/settings/payment');
+  const data = payload.data;
+  if (!data?.bankCode || !data.accountNumber) return null;
+  return {
+    bankCode: data.bankCode,
+    bankName: data.bankName || data.bankCode,
+    accountNumber: data.accountNumber,
+    accountName: data.accountName || '',
+  };
+}
+
+export function buildVietQrUrl(bank: CenterBankAccount, amount: number, description: string) {
+  const params = new URLSearchParams({
+    amount: String(Math.round(Number(amount) || 0)),
+    addInfo: description,
+    accountName: bank.accountName,
+  });
+  return `https://img.vietqr.io/image/${bank.bankCode}-${bank.accountNumber}-qr_only.png?${params.toString()}`;
+}
+
 export async function getCourseLessonQuestions(courseId: string, lessonId: string) {
   const query = new URLSearchParams({ courseId, lessonId, audience: 'student' });
   const payload = await mobileApiRequest<{ data?: CourseLessonQuestion[] }>(`/training-lms/qa?${query}`);

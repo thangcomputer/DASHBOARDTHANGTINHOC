@@ -94,9 +94,11 @@ export type Assignment = {
   courseName?: string;
   teacher: string;
   deadline: string;
+  deadlineDate?: string;
   status: 'Chưa làm' | 'Đã nộp' | 'Quá hạn' | 'Cần chấm' | 'Đã chấm';
   description?: string;
   attachedFileUrl?: string;
+  sourceFileUrl?: string;
   attachedFileName?: string;
   assignedStudentNames?: string[];
   submissions?: AssignmentSubmission[];

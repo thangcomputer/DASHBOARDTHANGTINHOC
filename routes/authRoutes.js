@@ -1799,6 +1799,7 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
           remainingSessions:   user.remainingSessions,
           studentExamUnlocked: user.studentExamUnlocked,
           grade:               user.grade,
+          learningAccess:      studentHasLearningAccess(user),
           pendingCourseCelebration,
         } : {}),
       },

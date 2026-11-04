@@ -19,7 +19,7 @@ import {
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
 import certPrepApi, {
-  type CertPrepCourse, type CertPrepLevel, type CertPrepSession, type CertPrepTest,
+  type CertPrepAttempt, type CertPrepCourse, type CertPrepLevel, type CertPrepSession, type CertPrepTest,
   type CertPrepQuestion,
 } from '../services/certPrepApi';
 import { useAuth } from '../app/AuthContext';
@@ -699,6 +699,7 @@ export function CertPrepResultScreen() {
   const { sessionId, testTitle } = route.params;
   const { user } = useAuth();
   const [result, setResult] = useState<{ score: number; total: number; correctCount: number; passed?: boolean } | null>(null);
+  const [attempts, setAttempts] = useState<CertPrepAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -712,6 +713,9 @@ export function CertPrepResultScreen() {
       try {
         const r = await certPrepApi.getResult(sessionId);
         setResult(r);
+        if (r.testId) {
+          certPrepApi.getAttempts(r.testId).then(setAttempts).catch(() => setAttempts([]));
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Không thể tải kết quả.');
       } finally {
@@ -766,6 +770,25 @@ export function CertPrepResultScreen() {
             <Text style={styles.resultStatLabel}>Câu sai</Text>
           </View>
         </View>
+        {attempts.length ? (
+          <View style={styles.attemptList}>
+            <Text style={styles.attemptHeading}>Lịch sử làm bài</Text>
+            {attempts.map((row) => (
+              <Pressable
+                key={row.sessionId}
+                onPress={() => { if (row.sessionId !== sessionId) navigation.replace('CertPrepResult', { sessionId: row.sessionId, testTitle }); }}
+                style={[styles.attemptRow, row.sessionId === sessionId && styles.attemptRowActive]}
+                accessibilityRole="button"
+                accessibilityLabel={`Xem lần ${row.attempt}`}
+              >
+                <Text style={styles.attemptCell}>{`Lần ${row.attempt}`}</Text>
+                <Text style={[styles.attemptCell, styles.attemptDate]}>{row.submittedAt ? new Date(row.submittedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '--'}</Text>
+                <Text style={styles.attemptCell}>{row.score}</Text>
+                <Text style={[styles.attemptCell, { color: row.passed ? colors.green : colors.red }]}>{row.passed ? 'Đạt' : 'Chưa đạt'}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <PrimaryButton title="Về danh sách đề thi" onPress={() => navigation.navigate('CertPrepCatalog')} />
       </View>
     </AppScreen>
@@ -878,6 +901,12 @@ const styles = StyleSheet.create({
 
   // Result
   resultContainer: { alignItems: 'center', padding: spacing.xl, gap: spacing.lg },
+  attemptList: { alignSelf: 'stretch', gap: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md },
+  attemptHeading: { color: colors.ink, fontSize: typography.caption, fontWeight: '900', marginBottom: spacing.xs },
+  attemptRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, borderRadius: radius.sm },
+  attemptRowActive: { backgroundColor: colors.brandSoft },
+  attemptCell: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  attemptDate: { flex: 1, color: colors.muted, fontWeight: '500' },
   resultCircle: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
   resultCirclePassed: { backgroundColor: colors.green },
   resultCircleFailed: { backgroundColor: colors.red },

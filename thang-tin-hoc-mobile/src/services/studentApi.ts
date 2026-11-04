@@ -361,6 +361,51 @@ export async function getStudentDetail(user: DemoUser) {
   return student;
 }
 
+export type CertExamScore = {
+  id: string;
+  label: string;
+  status: 'dat' | 'khong_dat' | 'dang_thi' | 'chua_thi';
+  quizScore: number | null;
+  quizTotal: number | null;
+  practiceSubmitted: boolean;
+  essayScore: number | null;
+  attemptCount: number;
+};
+
+export async function getStudentCertExamScores(user: DemoUser): Promise<CertExamScore[]> {
+  if (user.role !== 'student' || !user.id) {
+    throw new Error('Không thể tải điểm thi chứng nhận: tài khoản học viên không hợp lệ.');
+  }
+  const [detail, catalog] = await Promise.all([
+    mobileApiRequest<{ data?: { student?: RawStudent } }>(`/students/${encodeURIComponent(user.id)}/full-detail`),
+    mobileApiRequest<{ data?: { merged?: Record<string, { label?: string }> } }>('/settings/exam-subjects')
+      .catch(() => ({ data: { merged: {} } })),
+  ]);
+  const progress = detail.data?.student?.examProgress;
+  if (!Array.isArray(progress)) return [];
+  const labels: Record<string, { label?: string }> = catalog.data?.merged || {};
+  return progress.flatMap((entry): CertExamScore[] => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+    const id = text(row.id);
+    if (!id) return [];
+    const quiz = row.tracNghiem && typeof row.tracNghiem === 'object' ? row.tracNghiem as Record<string, unknown> : null;
+    const quizTotal = finiteNumber(quiz?.total);
+    const rawStatus = text(row.status, 'chua_thi');
+    const status = (['dat', 'khong_dat', 'dang_thi'].includes(rawStatus) ? rawStatus : 'chua_thi') as CertExamScore['status'];
+    return [{
+      id,
+      label: text(labels[id]?.label, id),
+      status,
+      quizScore: quiz && quizTotal ? finiteNumber(quiz.score) : null,
+      quizTotal: quizTotal || null,
+      practiceSubmitted: row.thucHanh === 'da_nop',
+      essayScore: finiteNumber(row.essayScore),
+      attemptCount: finiteNumber(row.attemptCount) || 0,
+    }];
+  });
+}
+
 export async function getStudentExamResults(user: DemoUser): Promise<DemoGradeRecord[]> {
   if (user.role !== 'student' || !user.id) {
     throw new Error('Không thể tải kết quả kiểm tra: tài khoản học viên không hợp lệ.');
@@ -624,7 +669,6 @@ export async function submitStudentAssignment(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         studentId,
-        teacherId: 'current',
         submittedFileUrl,
       }),
     },

@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { DeviceEventEmitter, Platform } from 'react-native';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, DeviceEventEmitter, Platform } from 'react-native';
 import { authService } from '../services/mockService';
-import { clearMobileSession, getMobileApiTokens, saveMobileSession } from '../services/apiClient';
+import { clearMobileSession, getMobileApiTokens, mobileApiRequest, saveMobileSession } from '../services/apiClient';
 import { connect as connectSocket, disconnect as disconnectSocket } from '../services/socketService';
 import { registerMobilePushNotifications, unregisterMobilePushNotifications } from '../services/mobilePushNotifications';
 import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
@@ -25,6 +25,49 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState('');
+  const userRef = useRef<DemoUser | null>(null);
+  userRef.current = user;
+
+  useEffect(() => {
+    const current = userRef.current;
+    if (!current || current.previewMode) return undefined;
+    let cancelled = false;
+    let running = false;
+    const revalidate = async () => {
+      const sessionUser = userRef.current;
+      if (running || !sessionUser || sessionUser.previewMode) return;
+      running = true;
+      try {
+        const me = await mobileApiRequest<{ data?: { status?: string; learningAccess?: boolean } }>('/auth/me');
+        if (cancelled) return;
+        const status = String(me.data?.status || '').toLowerCase();
+        const reason = sessionUser.role === 'student' && me.data?.learningAccess === false
+          ? 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.'
+          : sessionUser.role === 'teacher' && ['pending', 'locked'].includes(status)
+            ? 'Tài khoản giảng viên chưa được duyệt. Vui lòng hoàn thành bài kiểm tra đầu vào trên máy tính.'
+            : '';
+        if (!reason) return;
+        await unregisterMobilePushNotifications().catch(() => {});
+        await authService.signOut().catch(() => {});
+        await clearLastActive(pinUserKey(sessionUser)).catch(() => {});
+        disconnectSocket();
+        setUser(null);
+        setAuthError(reason);
+      } catch {
+        // Lỗi mạng bỏ qua; phiên hết hạn đã được apiClient phát sự kiện mobile:session-expired.
+      } finally {
+        running = false;
+      }
+    };
+    void revalidate();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void revalidate();
+    });
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, [user?.id, user?.role, user?.previewMode]);
 
   useEffect(() => {
     const connectAuthenticatedSocket = () => {
