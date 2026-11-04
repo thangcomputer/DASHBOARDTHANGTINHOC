@@ -374,10 +374,28 @@ export async function getMessageContacts(user: DemoUser): Promise<Conversation[]
   return [...directConversations, ...groupConversations];
 }
 
+export const MESSAGE_PAGE_SIZE = 200;
+
 export async function getMessageThread(conversationId: string, user: DemoUser): Promise<ChatMessage[]> {
   const payload = await mobileApiRequest<{ data?: RawMessage[] }>(`/messages/${encodeURIComponent(conversationId)}`);
   if (!Array.isArray(payload.data)) throw new Error('Máy chủ trả về nội dung cuộc trò chuyện không hợp lệ.');
   return payload.data.map((message, index) => mapMessage(message, user, index));
+}
+
+export async function getOlderMessages(
+  conversationId: string,
+  user: DemoUser,
+  beforeId: string,
+): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+  const query = `before=${encodeURIComponent(beforeId)}&limit=${MESSAGE_PAGE_SIZE}`;
+  const payload = await mobileApiRequest<{ data?: RawMessage[]; hasMore?: boolean }>(
+    `/messages/${encodeURIComponent(conversationId)}?${query}`,
+  );
+  if (!Array.isArray(payload.data)) throw new Error('Máy chủ trả về nội dung cuộc trò chuyện không hợp lệ.');
+  return {
+    messages: payload.data.map((message, index) => mapMessage(message, user, index)),
+    hasMore: payload.hasMore === true,
+  };
 }
 
 export async function markConversationRead(conversationId: string) {

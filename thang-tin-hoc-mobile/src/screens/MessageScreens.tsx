@@ -43,6 +43,7 @@ import {
   getChatReactionType,
   mapLiveChatMessage,
   mapLiveReaction,
+  MESSAGE_PAGE_SIZE,
 } from '../services/messageApi';
 import {
   emitTypingStart,
@@ -940,6 +941,19 @@ export function ConversationScreen() {
     return () => subscriptions.forEach((subscription) => subscription.remove());
   }, [ownStudentProfile.reload, route.params.participantId, studentCard.reload, user]);
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);
+  const [olderHasMore, setOlderHasMore] = useState<boolean | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState('');
+  const threadScrollOffsetRef = useRef(0);
+  const threadContentHeightRef = useRef(0);
+  const prependPendingRef = useRef(false);
+  useEffect(() => {
+    setOlderMessages([]);
+    setOlderHasMore(null);
+    setOlderError('');
+    prependPendingRef.current = false;
+  }, [route.params.conversationId]);
   const [callHistory, setCallHistory] = useState<CallHistoryEntry[]>([]);
   const [presenceOnlineUsers, setPresenceOnlineUsers] = useState<unknown[]>(getOnlineUsersSnapshot);
   const [presenceLastSeen, setPresenceLastSeen] = useState<Record<string, string>>(getLastSeenUsersSnapshot);
@@ -1086,9 +1100,36 @@ export function ConversationScreen() {
         },
       };
     });
-    return [...(messages || resource.data || []), ...callMessages]
+    const latest = messages || resource.data || [];
+    const latestIds = new Set(latest.map((message) => message.id));
+    const older = olderMessages.filter((message) => !latestIds.has(message.id));
+    return [...older, ...latest, ...callMessages]
       .sort((left, right) => (left.timestampMs || 0) - (right.timestampMs || 0));
-  }, [callHistory, messages, resource.data]);
+  }, [callHistory, messages, olderMessages, resource.data]);
+  const latestServerMessages = messages || resource.data || [];
+  const canLoadOlder = !isPreview
+    && !isSearching
+    && (olderHasMore ?? latestServerMessages.length >= MESSAGE_PAGE_SIZE);
+  const loadOlderMessages = async () => {
+    if (loadingOlder || !user) return;
+    const oldest = [...olderMessages, ...latestServerMessages].find((message) => /^[a-f0-9]{24}$/i.test(message.id));
+    if (!oldest) {
+      setOlderHasMore(false);
+      return;
+    }
+    setLoadingOlder(true);
+    setOlderError('');
+    try {
+      const page = await messageService.olderThread(route.params.conversationId, oldest.id, user);
+      prependPendingRef.current = page.messages.length > 0;
+      setOlderMessages((current) => [...page.messages, ...current]);
+      setOlderHasMore(page.hasMore);
+    } catch (error) {
+      setOlderError(error instanceof Error ? error.message : 'Không tải được tin nhắn cũ hơn.');
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
   const lastAiWelcomeIndex = useMemo(
     () => thread.reduce((lastIndex, message, index) => (
       isAiSupportConversation
@@ -2151,9 +2192,15 @@ export function ConversationScreen() {
     setOptionsMenuMsgId((cur) => cur === message.id ? null : message.id);
   };
 
+  const olderCountRef = useRef(0);
   useEffect(() => {
+    if (olderCountRef.current !== olderMessages.length) {
+      olderCountRef.current = olderMessages.length;
+      return;
+    }
+    if (prependPendingRef.current) return;
     if (!resource.loading) threadRef.current?.scrollToEnd({ animated: true });
-  }, [resource.loading, thread.length]);
+  }, [olderMessages.length, resource.loading, thread.length]);
 
   useEffect(() => {
     if (!isFocused || isPreview || resource.loading || resource.error || !user) return undefined;
@@ -2391,12 +2438,43 @@ export function ConversationScreen() {
             contentContainerStyle={styles.thread}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            onScroll={handleHeaderScroll}
+            onScroll={(event) => {
+              threadScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+              handleHeaderScroll(event);
+            }}
             scrollEventThrottle={16}
-            onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={(_width, height) => {
+              const previousHeight = threadContentHeightRef.current;
+              threadContentHeightRef.current = height;
+              if (prependPendingRef.current) {
+                prependPendingRef.current = false;
+                threadRef.current?.scrollTo({
+                  y: Math.max(0, threadScrollOffsetRef.current + height - previousHeight),
+                  animated: false,
+                });
+                return;
+              }
+              threadRef.current?.scrollToEnd({ animated: true });
+            }}
           >
           {resource.loading ? <LoadingSkeleton rows={2} /> : null}
           {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+          {!resource.loading && !resource.error && canLoadOlder ? (
+            <View style={styles.loadOlderWrap}>
+              <Pressable
+                onPress={() => { void loadOlderMessages(); }}
+                disabled={loadingOlder}
+                style={styles.loadOlderButton}
+                accessibilityRole="button"
+                accessibilityLabel="Xem tin nhắn cũ hơn"
+              >
+                {loadingOlder
+                  ? <ActivityIndicator size="small" color={colors.brand} />
+                  : <Text style={styles.loadOlderText}>Xem tin nhắn cũ hơn</Text>}
+              </Pressable>
+              {olderError ? <Text style={styles.loadOlderError}>{olderError}</Text> : null}
+            </View>
+          ) : null}
           {!resource.loading && !resource.error && !thread.length ? <EmptyState title="Bắt đầu cuộc trò chuyện" message="Gửi lời chào đầu tiên nhé." /> : null}
           {!resource.loading && !resource.error && isSearching && !visibleMessages.length ? (
             <EmptyState title="Không tìm thấy tin nhắn" message="Thử từ khóa khác." />
@@ -3934,6 +4012,10 @@ const styles = StyleSheet.create({
   note: { color: colors.muted, fontSize: typography.caption, textAlign: 'center', lineHeight: 18, marginTop: spacing.sm },
   socketStatus: { color: colors.red, fontSize: typography.caption, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   dateDividerWrap: { alignItems: 'center', marginVertical: 10, paddingHorizontal: spacing.sm },
+  loadOlderWrap: { alignItems: 'center', gap: 4, marginTop: 4, marginBottom: 2 },
+  loadOlderButton: { minHeight: 34, minWidth: 150, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  loadOlderText: { color: colors.brand, fontSize: typography.caption, fontWeight: '700' },
+  loadOlderError: { color: '#DC2626', fontSize: 12, textAlign: 'center' },
   dateDividerPill: { backgroundColor: '#BFC1C5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   dateDividerText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '700' },
   threadSurface: { flex: 1, minHeight: 0, overflow: 'hidden', borderRadius: 14, backgroundColor: '#EAEBEE' },

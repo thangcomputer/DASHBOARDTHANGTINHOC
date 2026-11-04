@@ -57,7 +57,7 @@ import {
   gradeAssignmentSubmission,
 } from './assignmentApi';
 import {
-  addMessageGroupMembers, createMessageGroup, deleteMessageGroup, getMessageContacts, getMessageThread, leaveMessageGroup, markConversationRead, sendChatMessage,
+  addMessageGroupMembers, createMessageGroup, deleteMessageGroup, getMessageContacts, getMessageThread, getOlderMessages, leaveMessageGroup, markConversationRead, sendChatMessage,
   uploadChatAttachment, searchChatMessages, reactToChatMessage, recallChatMessage,
   deleteChatMessageForMe, setPinnedConversation, togglePinnedChatMessage, type ChatAttachmentUpload,
 } from './messageApi';
@@ -961,6 +961,10 @@ export const messageService = {
     if (qaState === 'chat-empty') return readMockList([]);
     if (user && !user.previewMode) return getMessageThread(conversationId, user);
     return readMockList(role === 'teacher' ? mockTeacherThreads[conversationId] || [] : (mockStudentThreads[conversationId] || mockMessages));
+  },
+  async olderThread(conversationId: string, beforeId: string, user?: DemoUser | null) {
+    if (!user || user.previewMode) return { messages: [] as ChatMessage[], hasMore: false };
+    return getOlderMessages(conversationId, user, beforeId);
   },
   async markRead(conversationId: string, user?: DemoUser | null) {
     if (user && !user.previewMode) {

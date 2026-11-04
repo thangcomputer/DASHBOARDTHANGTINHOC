@@ -385,19 +385,40 @@ router.get('/:conversationId', messagesGuard('get_conversation'), async (req, re
     if (!isParticipant) {
       return res.status(403).json({ success: false, message: 'Bạn không thuộc cuộc hội thoại này' });
     }
-    const messages = await Message.find({
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 200));
+    const filter = {
       conversationId: { $in: queryIds },
       hiddenFor: { $ne: req.user.id },
-      $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }],
-    })
-      .sort({ createdAt: 1 })
-      .limit(200);
+      $and: [{ $or: [{ recipientRejected: { $ne: true } }, { senderId: String(req.user.id) }] }],
+    };
+    const before = String(req.query.before || '').trim();
+    if (before) {
+      const mongoose = require('mongoose');
+      const cursor = mongoose.Types.ObjectId.isValid(before)
+        ? await Message.findOne({ _id: before, conversationId: { $in: queryIds } }).select('createdAt').lean()
+        : null;
+      if (!cursor) {
+        return res.status(400).json({ success: false, message: 'Mốc tải tin cũ không hợp lệ' });
+      }
+      filter.$and.push({
+        $or: [
+          { createdAt: { $lt: cursor.createdAt } },
+          { createdAt: cursor.createdAt, _id: { $lt: cursor._id } },
+        ],
+      });
+    }
+    const newestFirst = await Message.find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit + 1);
+    const hasMore = newestFirst.length > limit;
+    const messages = newestFirst.slice(0, limit).reverse();
 
     const sanitized = sanitizeMessages(messages);
     const enriched = await enrichMessageIdentities(sanitized);
     res.json({
       success: true,
       data: enriched,
+      hasMore,
       conversationId: expandConversationIdAliases(conversationId).canonical,
     });
   } catch (err) {
