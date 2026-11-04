@@ -572,7 +572,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
 
     const userMsgs = safeMessages.filter(m => {
       const isDirect = String(m.senderId) === sId || String(m.receiverId) === sId;
-      const isAdminMailbox = sId === 'admin' && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
+      const isAdminMailbox = isSuperAdmin && (String(m.senderId) === 'admin' || String(m.receiverId) === 'admin');
       return isDirect || isAdminMailbox;
     });
 
