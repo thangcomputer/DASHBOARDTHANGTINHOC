@@ -1838,6 +1838,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         <LoginInboxAlertPopup
           role={role}
           userId={myId}
+          adminRole={session?.adminRole || ''}
           blocked={
             showWelcomeCelebration
             || !!courseCelebration

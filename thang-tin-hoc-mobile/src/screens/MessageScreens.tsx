@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, LogOut, MessageCircle,
+  CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle,
   MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, UserPlus, Video, X,
 } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
@@ -689,6 +689,11 @@ export function ConversationScreen() {
   const [showInfo, setShowInfo] = useState(false);
   const isGroupConversation = route.params.conversationId.startsWith('group_');
   const isAiSupportConversation = route.params.conversationId.includes('system_ai_support');
+  // Hội thoại với Admin Super một chiều (server cũng chặn); HIGH_ADMIN và STAFF vẫn nhắn như cũ.
+  const { participantId: chatPeerId, participantAdminRole: chatPeerAdminRole } = route.params;
+  const superAdminReadOnly = !isGroupConversation
+    && !['SUPER_ADMIN', 'HIGH_ADMIN', 'STAFF'].includes(String(user?.adminRole || ''))
+    && (chatPeerId === 'admin' || chatPeerAdminRole === 'SUPER_ADMIN');
   const [aiSupportStatus, setAiSupportStatus] = useState<AiSupportStatus>(
     () => resolveAiSupportStatus(route.params.supportStatus),
   );
@@ -1883,6 +1888,7 @@ export function ConversationScreen() {
   }, [isPreview, resource.data, route.params.conversationId, user]);
 
   const send = async (quickPrompt?: string) => {
+    if (superAdminReadOnly) return;
     stopTyping();
     const sendingDraftKey = draftKey;
     const isQuickPrompt = typeof quickPrompt === 'string';
@@ -2981,6 +2987,12 @@ export function ConversationScreen() {
             <Pressable onPress={() => setSelectedAttachment(null)} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.cancelReply}>×</Text></Pressable>
           </View>
         ) : null}
+        {superAdminReadOnly ? (
+          <View style={[styles.composerBar, styles.composerLocked]} accessibilityRole="text">
+            <Lock size={16} color="#94A3B8" />
+            <Text style={styles.composerLockedText}>Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này.</Text>
+          </View>
+        ) : (
         <View style={styles.composerBar}>
           <View style={styles.composerTools}>
             <Pressable
@@ -3039,6 +3051,7 @@ export function ConversationScreen() {
             <Send size={18} color="#FFFFFF" />
           </Pressable>
         </View>
+        )}
         <Modal visible={picker !== null} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
           <View style={styles.pickerBackdrop}>
             <Pressable
@@ -4133,6 +4146,8 @@ const styles = StyleSheet.create({
   typingIndicatorText: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
   sticker: { fontSize: 38, lineHeight: 46 },
   composerBar: { alignSelf: 'stretch', marginHorizontal: -spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  composerLocked: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 14, backgroundColor: '#F1F5F9' },
+  composerLockedText: { flex: 1, color: '#64748B', fontSize: 13, fontWeight: '700' },
   composerTools: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   composerIcon: { width: 32, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   composerInputPill: { flex: 1, height: 42, minHeight: 42, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 21, paddingHorizontal: 12 },

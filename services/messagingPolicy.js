@@ -42,8 +42,12 @@ const POLICY_CODES = Object.freeze({
   CONVERSATION_DENIED: 'MESSAGING_CONVERSATION_DENIED',
   RECIPIENT_NOT_FOUND: 'MESSAGING_RECIPIENT_NOT_FOUND',
   TENANT_MISMATCH: 'MESSAGING_TENANT_MISMATCH',
+  SUPER_ADMIN_SEND_ONLY: 'MESSAGING_SUPER_ADMIN_SEND_ONLY',
   ALLOWED: 'MESSAGING_ALLOWED',
 });
+
+/** Hội thoại với Admin Super chỉ một chiều; HIGH_ADMIN và STAFF giữ quyền nhắn như cũ. */
+const SUPER_ADMIN_SEND_ONLY_MESSAGE = 'Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này';
 
 function decision({ allowed, reason, policy, scope = null, code = null, extra = {} }) {
   return {
@@ -859,6 +863,21 @@ async function canSendMessage(actor, recipientIdOrUser, clientReceiverRoleHint =
     });
   }
 
+  if (
+    !resolved.isBroadcast
+    && resolved.recipient?.productRole === PRODUCT_ROLES.SUPER_ADMIN
+    && ![PRODUCT_ROLES.SUPER_ADMIN, PRODUCT_ROLES.HIGH_ADMIN, PRODUCT_ROLES.STAFF].includes(actorN.productRole)
+  ) {
+    return decision({
+      allowed: false,
+      reason: SUPER_ADMIN_SEND_ONLY_MESSAGE,
+      policy: 'SUPER_ADMIN_SEND_ONLY',
+      scope: 'RECIPIENT',
+      code: POLICY_CODES.SUPER_ADMIN_SEND_ONLY,
+      extra: { actorProductRole: actorN.productRole, targetProductRole: PRODUCT_ROLES.SUPER_ADMIN },
+    });
+  }
+
   // Phase AI: Trợ lý ảo — không có tenant/branch; pairing đã kiểm tra HV/GV
   const isAiSupportRecipient = resolved.recipient?.productRole === PRODUCT_ROLES.AI_SUPPORT
     || String(resolved.recipient?.id || receiverId || '') === 'ai_support';
@@ -1119,6 +1138,7 @@ async function assertCanDirectMessage(sender, receiverId, receiverRole) {
 
 module.exports = {
   POLICY_CODES,
+  SUPER_ADMIN_SEND_ONLY_MESSAGE,
   PRODUCT_ROLES,
   normalizeIdentity,
   resolveProductRole,

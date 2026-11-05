@@ -12,6 +12,7 @@ import { useData } from '../context/DataContext';
 import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
 import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
+import { visibleInboxUnread } from '../lib/inboxUnread';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
@@ -573,7 +574,10 @@ const AppSidebar = ({
   const getBadgeCount = (itemKey) => {
     if (itemKey === 'inbox' && session?.id) {
       try {
-        return (getConversations(session.id) || []).reduce((sum, c) => sum + (c.unread || 0), 0);
+        return visibleInboxUnread(getConversations(session.id), {
+          userId: session.id,
+          adminRole: role === 'admin' ? (adminRole || session?.adminRole || '') : '',
+        });
       } catch {
         return 0;
       }

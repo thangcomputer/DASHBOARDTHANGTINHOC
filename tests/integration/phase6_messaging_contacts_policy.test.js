@@ -377,7 +377,7 @@ describe('Phase 6 messaging contacts policy', { concurrency: false }, () => {
     assert.equal(idsOf(contacts).has(IDS.staffB), false);
   });
 
-  it('DISCOVER ≠ SEND: Student → SUPER still send; Student → HIGH deny', async () => {
+  it('Student → SUPER: chỉ Admin Super được gửi; Student → HIGH deny', async () => {
     const contacts = await listDiscoverableContacts(actorFrom(IDS.studentA));
     assert.equal(idsOf(contacts).has(IDS.highA), false);
     assert.equal(idsOf(contacts).has(IDS.superA), false);
@@ -390,7 +390,18 @@ describe('Phase 6 messaging contacts policy', { concurrency: false }, () => {
     const sendHigh = await canSendMessage(actorFrom(IDS.studentA), IDS.highA, 'admin');
     const sendSuper = await canSendMessage(actorFrom(IDS.studentA), IDS.superA, 'admin');
     assert.equal(sendHigh.allowed, false);
-    assert.equal(sendSuper.allowed, true);
+    assert.equal(sendSuper.allowed, false, 'không ai nhắn được tới Admin Super');
+    assert.equal(sendSuper.code, POLICY_CODES.SUPER_ADMIN_SEND_ONLY);
+
+    const highToSuper = await canSendMessage(actorFrom(IDS.highA), IDS.superA, 'admin');
+    assert.equal(highToSuper.allowed, true, 'High Admin giữ nghiệp vụ cũ: vẫn nhắn Admin Super');
+    const staffToSuper = await canSendMessage(actorFrom(IDS.staffA), IDS.superA, 'admin');
+    assert.equal(staffToSuper.code === POLICY_CODES.SUPER_ADMIN_SEND_ONLY, false, 'STAFF không bị chặn bởi quy tắc mới');
+    const teacherToSuper = await canSendMessage(actorFrom(IDS.teacherA), IDS.superA, 'admin');
+    assert.equal(teacherToSuper.allowed, false);
+    assert.equal(teacherToSuper.code, POLICY_CODES.SUPER_ADMIN_SEND_ONLY);
+    const superToHigh = await canSendMessage(actorFrom(IDS.superA), IDS.highA, 'admin');
+    assert.equal(superToHigh.allowed, true, 'Admin Super vẫn gửi được');
   });
 
   it('policy fail-closed for unknown roles', () => {
