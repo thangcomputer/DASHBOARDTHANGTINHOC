@@ -18,7 +18,7 @@ const categories = new Set([
 ]);
 
 describe('shared chat sticker catalog', () => {
-  it('has unique IDs and complete metadata for the 54 new and legacy stickers', () => {
+  it('has unique IDs and complete metadata for the 55 new and legacy stickers', () => {
     const ids = catalog.map((sticker) => sticker.id);
     assert.equal(new Set(ids).size, ids.length);
     for (const sticker of catalog) {
@@ -37,13 +37,13 @@ describe('shared chat sticker catalog', () => {
       }
     }
     const activeStickers = catalog.filter((sticker) => sticker.visible !== false);
-    assert.equal(activeStickers.length, 54);
+    assert.equal(activeStickers.length, 55);
     assert.deepEqual(
       Object.fromEntries([...new Set(activeStickers.map((sticker) => sticker.category))]
         .map((category) => [category, activeStickers.filter((sticker) => sticker.category === category).length])),
       {
         greetings: 5,
-        thanks: 7,
+        thanks: 8,
         confirm: 6,
         emotions: 12,
         study: 6,
@@ -52,7 +52,7 @@ describe('shared chat sticker catalog', () => {
         work: 7,
       },
     );
-    assert.equal(activeStickers.filter((sticker) => sticker.src.endsWith('.webp')).length, 54);
+    assert.equal(activeStickers.filter((sticker) => sticker.src.endsWith('.webp')).length, 55);
     for (const legacyId of [
       'hello', 'thanks', 'love', 'ok', 'da-vang', 'sorry', 'sad', 'cheer',
       'cute', 'haha', 'thinking', 'congrats', 'like', 'thank-you', 'wave', 'celebrate',
@@ -61,12 +61,12 @@ describe('shared chat sticker catalog', () => {
     }
   });
 
-  it('catalogs all 54 top-level WebP sticker assets', () => {
+  it('catalogs all 55 top-level WebP sticker assets', () => {
     const stickerRoot = path.join(ROOT, 'client', 'public', 'stickers');
     const webpFiles = fs.readdirSync(stickerRoot, { withFileTypes: true })
       .filter((entry) => entry.isFile() && /\.webp$/i.test(entry.name))
       .map((entry) => `/stickers/${entry.name}`);
-    assert.equal(webpFiles.length, 54);
+    assert.equal(webpFiles.length, 55);
 
     const activeStickerSources = new Set(
       catalog.filter((sticker) => sticker.visible !== false).map((sticker) => sticker.src),

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   MessageCircle, Send, X, Search, ChevronLeft, Phone,
   User, Circle, Image, Paperclip, Download,
-  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video
+  Clock as ClockIcon, CheckCircle2, Users, Plus, Trash2, RotateCcw, MoreHorizontal, EyeOff, AlertCircle, ZoomIn, ChevronDown, Copy, LogOut, UserPlus, Calendar, Pin, PinOff, Info, Reply, ThumbsUp, Video, Lock
 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useData, buildConversationId } from '../context/DataContext';
@@ -432,6 +432,17 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const isSuperAdmin = currentUser?.id === 'admin' || currentUser?.adminRole === 'SUPER_ADMIN';
   const isSupportAgent = currentUser?.adminRole === 'SUPPORT';
   const [scheduleNow, setScheduleNow] = useState(() => new Date());
+  const [activeConv, setActiveConv] = useState(null);
+  // Hội thoại với Admin Super một chiều (server cũng chặn); HIGH_ADMIN và STAFF vẫn nhắn như cũ.
+  const superAdminReadOnly = Boolean(
+    activeConv
+    && !activeConv.isGroup
+    && !isSuperAdmin
+    && !['HIGH_ADMIN', 'STAFF'].includes(currentUser?.adminRole)
+    && (String(activeConv.user?.id || '') === 'admin'
+      || activeConv.user?.adminRole === 'SUPER_ADMIN'
+      || activeConv.user?.productRole === 'SUPER_ADMIN'),
+  );
   const [aiHandoffSession, setAiHandoffSession] = useState(null);
   const [showPriorAiThread, setShowPriorAiThread] = useState(false);
   const [handoffQueue, setHandoffQueue] = useState([]);
@@ -610,7 +621,6 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     };
   }, [socket, refreshContacts]);
 
-  const [activeConv, setActiveConv] = useState(null);
   const [messages, setMessages] = useState([]);
   const [callHistoryState, setCallHistoryState] = useState({ conversationId: '', calls: [] });
   const [conversationDrafts, setConversationDrafts] = useState({});
@@ -1976,6 +1986,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   };
 
   const handleSend = async (messageOverride, payloadOverride = null) => {
+    if (superAdminReadOnly) return;
     const hasMessageOverride = typeof messageOverride === 'string' && Boolean(messageOverride);
     const sendingDraftKey = activeDraftStorageKey;
     const contentText = hasMessageOverride ? messageOverride.trim() : newMsg.trim();
@@ -3803,6 +3814,15 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     </button>
                   </div>
                 )}
+                {superAdminReadOnly ? (
+                  <div
+                    className="mx-auto flex max-w-4xl items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-500"
+                    role="status"
+                  >
+                    <Lock size={16} className="shrink-0 text-slate-400" aria-hidden="true" />
+                    Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này.
+                  </div>
+                ) : (
                 <div className="flex items-center gap-2 relative max-w-4xl mx-auto">
                   <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
                   <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
@@ -3893,6 +3913,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
                   </button>
                 </div>
+                )}
               </div>
             </>
           )}

@@ -8,6 +8,7 @@
   { "id": "cam-on", "name": "Cảm ơn ạ!", "category": "thanks", "src": "/stickers/cam-on.webp", "keywords": ["cảm ơn", "cám ơn", "thanks", "thank you"] },
   { "id": "yeu-qua", "name": "Yêu quá!", "category": "thanks", "src": "/stickers/yeu-qua.webp", "keywords": ["yêu quá", "đáng yêu", "love"] },
   { "id": "de-thuong", "name": "Dễ thương!", "category": "thanks", "src": "/stickers/de-thuong.webp", "keywords": ["dễ thương", "cute"] },
+  { "id": "de-thuong-2", "name": "Dễ thương!", "category": "thanks", "src": "/stickers/de-thuong-2.webp", "keywords": ["dễ thương", "cute", "yêu", "trái tim"] },
   { "id": "tuyet-voi", "name": "Tuyệt vời!", "category": "thanks", "src": "/stickers/tuyet-voi.webp", "keywords": ["tuyệt vời", "hay", "great"] },
   { "id": "cam-on-nhieu", "name": "Cảm ơn nhiều!", "category": "thanks", "src": "/stickers/cam-on-nhieu.webp", "keywords": ["cảm ơn nhiều", "cám ơn nhiều", "thanks"] },
   { "id": "cam-on-nhieu-2", "name": "Cảm ơn nhiều!", "category": "thanks", "src": "/stickers/cam-on-nhieu-2.webp", "keywords": ["cảm ơn nhiều", "cám ơn nhiều", "thanks"] },

@@ -21,6 +21,7 @@ const stickerImages: Record<string, ImageSourcePropType> = {
   'cam-on': require('../../assets/stickers/cam-on.webp'),
   'yeu-qua': require('../../assets/stickers/yeu-qua.webp'),
   'de-thuong': require('../../assets/stickers/de-thuong.webp'),
+  'de-thuong-2': require('../../assets/stickers/de-thuong-2.webp'),
   'tuyet-voi': require('../../assets/stickers/tuyet-voi.webp'),
   'cam-on-nhieu': require('../../assets/stickers/cam-on-nhieu.webp'),
   'cam-on-nhieu-2': require('../../assets/stickers/cam-on-nhieu-2.webp'),

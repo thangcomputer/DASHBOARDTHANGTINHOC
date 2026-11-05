@@ -10,7 +10,7 @@ import {
   normalizeScheduleDate,
 } from '../utils/scheduleTime';
 import { LOGIN_OVERLAY_EVENT, getActiveLoginOverlayIds } from '../utils/loginOverlayGate';
-import { isAiSupportConversationId, AI_SUPPORT_PEER } from '../utils/aiSupport';
+import { visibleInboxUnread } from '../lib/inboxUnread';
 import { LMS_PLAYER_OPEN_EVENT, isLmsPlayerOpen } from '../utils/lmsPlayerOverlay';
 
 export const LOGIN_ALERT_STORAGE_PREFIX = 'cms_login_alert';
@@ -86,17 +86,6 @@ function writeAck(userId, unread, scheduleIds) {
   } catch { /* ignore */ }
 }
 
-/** Badge hộp thư: bỏ tin chào/idle của Trợ lý AI — chưa phải người nhắn. */
-function isAiSupportConv(c) {
-  return isAiSupportConversationId(c?.id) || String(c?.user?.id || '') === AI_SUPPORT_PEER.id;
-}
-
-function inboxUnreadCount(convs) {
-  return (convs || []).reduce((sum, c) => {
-    if (isAiSupportConv(c)) return sum;
-    return sum + (Number(c?.unread) || 0);
-  }, 0);
-}
 
 function pickUpcomingClasses(list) {
   const upcoming = (list || []).filter((s) => {
@@ -132,7 +121,7 @@ function formatClassLine(s) {
  * Popup lúc vào trang: tin người thật chưa đọc; lịch kèm theo.
  * Khi đang học LMS (player full-screen): cho hiện lại nếu có tin mới hoặc lịch mới chưa ack.
  */
-export default function LoginInboxAlertPopup({ role, userId, blocked = false }) {
+export default function LoginInboxAlertPopup({ role, userId, adminRole = '', blocked = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { getConversations, getSchedulesByStudent, syncMessages } = useData();
@@ -208,7 +197,7 @@ export default function LoginInboxAlertPopup({ role, userId, blocked = false }) 
 
     const readUnread = () => {
       const convs = typeof convRef.current === 'function' ? (convRef.current(userId) || []) : [];
-      return inboxUnreadCount(convs);
+      return visibleInboxUnread(convs, { userId, adminRole: role === 'admin' ? adminRole : '' });
     };
 
     const run = async () => {
