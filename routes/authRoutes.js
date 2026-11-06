@@ -29,6 +29,8 @@ const {
   isStudentAccountLocked,
 } = require('../services/studentKnownDevices');
 const { socialOAuthDisabled } = require('../utils/googleOAuthDisabled');
+const { statusOf: subscriptionStatusOf } = require('../services/subscriptionService');
+const { freePortalFlags } = require('../services/freePortal');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 const {
@@ -704,6 +706,8 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
             grade:             user.grade,
             isFirstLogin:      !!user.isFirstLogin,
             showWelcomeCelebration: user.welcomeCelebrationSeen === false,
+            subscription:      subscriptionStatusOf(user),
+            ...freePortalFlags(user),
           }),
     };
 
@@ -837,7 +841,10 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
             practicalStatus: user.practicalStatus,
             specialty: user.specialty,
             subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
-          } : {}),
+          } : {
+            subscription: subscriptionStatusOf(user),
+            ...freePortalFlags(user),
+          }),
         },
         accessToken, refreshToken,
       },
@@ -982,7 +989,10 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
             practicalStatus: user.practicalStatus,
             specialty: user.specialty,
             subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
-          } : {}),
+          } : {
+            subscription: subscriptionStatusOf(user),
+            ...freePortalFlags(user),
+          }),
         },
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -1801,6 +1811,8 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
           grade:               user.grade,
           learningAccess:      studentHasLearningAccess(user),
           pendingCourseCelebration,
+          subscription:        subscriptionStatusOf(user),
+          ...freePortalFlags(user),
         } : {}),
       },
     });

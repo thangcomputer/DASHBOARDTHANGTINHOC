@@ -79,7 +79,7 @@ export default function CertPrepTrueFalseGrid({
                     type="button"
                     disabled={disabled}
                     aria-pressed={chosen === true}
-                    aria-label={`Yes — nhận định ${idx + 1}`}
+                    aria-label={`Yes, nhận định ${idx + 1}`}
                     onClick={() => setValue(row.id, true)}
                     className={`min-h-9 min-w-[3.25rem] px-3 rounded-lg text-xs font-black border transition disabled:opacity-50 ${pillClass(chosen === true, 'yes')}`}
                   >

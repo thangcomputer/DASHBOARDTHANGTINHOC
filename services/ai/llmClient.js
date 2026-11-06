@@ -144,7 +144,10 @@ async function chatCompletionGeminiNative(cfg, opts) {
   const prompt = system ? `${system}\n\n${userParts}` : userParts;
 
   if (GoogleGenAI) {
-    const ai = new GoogleGenAI({ apiKey: cfg.apiKey });
+    const ai = new GoogleGenAI({
+      apiKey: cfg.apiKey,
+      httpOptions: { timeout: cfg.timeoutMs },
+    });
     const config = {
       temperature: opts.temperature ?? 0.4,
       maxOutputTokens: opts.maxTokens ?? 1200,
@@ -177,7 +180,16 @@ async function chatCompletionGeminiNative(cfg, opts) {
         });
       }
     }
-    const res = await ai.models.generateContent({ model, contents, config });
+    const res = await Promise.race([
+      ai.models.generateContent({ model, contents, config }),
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          const err = new Error('Không gọi được AI. Hãy gửi lại ảnh.');
+          err.status = 504;
+          reject(err);
+        }, cfg.timeoutMs);
+      }),
+    ]);
     return { content: res.text || '', model, usage: res.usageMetadata || null };
   }
 
@@ -240,6 +252,9 @@ function humanizeAiError(raw) {
   if (/prepayment credits are depleted|prepay/i.test(blob)) {
     return 'Project Gemini het credit tra truoc (AI Studio Billing). Key moi van dung chung credit project — nap tai ai.studio/projects.';
   }
+  if (/fetch failed|ECONNRESET|ETIMEDOUT|UND_ERR|network|socket hang up/i.test(blob)) {
+    return 'Không gọi được AI. Hãy gửi lại ảnh.';
+  }
   if (/high demand|currently experiencing|UNAVAILABLE|503/i.test(blob)) {
     return 'Model Gemini dang qua tai (503). Thu lai sau vai giay.';
   }
@@ -263,8 +278,9 @@ async function chatCompletionGeminiWithFailover(opts) {
 
   const tried = new Set();
   let lastErr = null;
+  const maxAttempts = Math.max(keys.length, 2);
 
-  for (let attempt = 0; attempt < keys.length; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     let apiKey = pickGeminiKey();
     if (!apiKey || tried.has(apiKey)) {
       apiKey = keys.find((k) => !tried.has(k));
@@ -280,8 +296,12 @@ async function chatCompletionGeminiWithFailover(opts) {
       return result;
     } catch (e) {
       lastErr = e;
-      if (!isRateLimitError(e)) throw wrapGeminiError(e);
-      markGeminiKeyCooldown(apiKey);
+      const retryable = isRateLimitError(e)
+        || e?.status === 503
+        || e?.status === 504
+        || /fetch failed|Không gọi được AI|503|qua tai/i.test(String(e?.message || ''));
+      if (!retryable || attempt + 1 >= maxAttempts) throw wrapGeminiError(e);
+      markGeminiKeyCooldown(apiKey, 5_000);
       logger.warn(
         { attempt: attempt + 1, keys: keys.length },
         '[AI] gemini 429 — try next key',

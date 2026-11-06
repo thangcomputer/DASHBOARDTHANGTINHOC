@@ -28,11 +28,19 @@ export function CoursePaymentModal({
   checkout,
   onClose,
   onPaid,
+  title = 'Thanh toán mua khóa học',
+  getSession = getCoursePurchaseSession,
+  simulate = simulateCoursePurchase,
 }: {
   checkout: CoursePaymentCheckout | null;
   onClose: () => void;
   onPaid: () => void;
+  title?: string;
+  getSession?: (sessionId: string) => Promise<{ paid: boolean }>;
+  simulate?: (sessionId: string) => Promise<unknown>;
 }) {
+  const getSessionRef = useRef(getSession);
+  getSessionRef.current = getSession;
   const [bank, setBank] = useState<CenterBankAccount | null>(null);
   const [loadingBank, setLoadingBank] = useState(true);
   const [seconds, setSeconds] = useState(0);
@@ -64,7 +72,7 @@ export function CoursePaymentModal({
     };
     const tick = async () => {
       try {
-        const session = await getCoursePurchaseSession(sessionId);
+        const session = await getSessionRef.current(sessionId);
         if (session.paid) markPaid();
       } catch { /* thử lại ở lượt sau */ }
     };
@@ -81,7 +89,7 @@ export function CoursePaymentModal({
     if (!sessionId) return;
     setSimulating(true);
     try {
-      await simulateCoursePurchase(sessionId);
+      await simulate(sessionId);
       if (!firedRef.current) {
         firedRef.current = true;
         onPaidRef.current();
@@ -98,7 +106,7 @@ export function CoursePaymentModal({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>Thanh toán mua khóa học</Text>
+            <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Đóng thanh toán">
               <X size={20} color={colors.muted} />
             </Pressable>

@@ -134,7 +134,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
             {celebrate
               ? 'Hệ thống sẽ theo dõi tiến độ mỗi ngày giúp bạn. Cố lên nhé!'
               : currentGoal?.expired
-                ? 'Mục tiêu trước đã kết thúc — đặt mục tiêu mới để tiếp tục nhé!'
+                ? 'Mục tiêu trước đã kết thúc. Đặt mục tiêu mới để tiếp tục nhé!'
                 : 'Chọn thời gian và số giờ học mỗi ngày, hệ thống sẽ theo dõi tiến độ giúp bạn.'}
           </p>
         </div>
@@ -229,6 +229,9 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
                     {level.label}
                   </span>
                 </div>
+                <p className="mb-2 text-[11px] font-semibold leading-relaxed text-slate-500">
+                  Người mới bắt đầu chọn 1 giờ. Biết cơ bản chọn 2 giờ.
+                </p>
                 <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="Số giờ học mỗi ngày">
                   {LEARNING_GOAL_HOURS.map((value) => {
                     const active = value === hours;
@@ -239,7 +242,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        aria-label={`${value} giờ mỗi ngày — ${tone.label}`}
+                        aria-label={`${value} giờ mỗi ngày, ${tone.label}`}
                         onClick={() => setHours(value)}
                         className={`rounded-2xl border-2 pb-2 pt-2.5 text-center transition ${active ? '' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
                         style={active ? { borderColor: tone.color, background: tone.soft, color: tone.color } : undefined}

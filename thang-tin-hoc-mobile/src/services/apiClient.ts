@@ -127,6 +127,8 @@ async function fetchWithTimeout(url: string, init: RequestInit) {
 
 function getSafeApiErrorMessage(status: number, payload: Record<string, unknown>) {
   if (status === 0) return 'Không thể kết nối máy chủ. Hãy kiểm tra Internet và thử lại.';
+  if (payload.publicMessage === true && typeof payload.message === 'string' && payload.message) return payload.message;
+  if (payload.code === 'SUBSCRIPTION_EXPIRED') return 'Tài khoản đã hết hạn. Vui lòng gia hạn để tiếp tục học.';
   if (status === 400) return 'Yêu cầu chưa hợp lệ. Vui lòng kiểm tra thông tin và thử lại.';
   if (status === 401) return 'Thông tin đăng nhập hoặc phiên làm việc không hợp lệ.';
   if (status === 403) {
@@ -281,6 +283,12 @@ async function request(
   if (response.status === 401 && withAuth && canRefresh && tokens?.refreshToken) {
     await rotateTokens();
     return request(path, init, withAuth, false, csrfRetried);
+  }
+  if (response.status === 403) {
+    try {
+      const payload = await response.clone().json() as Record<string, unknown>;
+      if (payload?.code === 'SUBSCRIPTION_EXPIRED') DeviceEventEmitter.emit('mobile:subscription-expired');
+    } catch { /* ignore */ }
   }
   return parseResponse(response);
 }

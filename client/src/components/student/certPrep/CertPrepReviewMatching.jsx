@@ -23,7 +23,7 @@ export default function CertPrepReviewMatching({ question }) {
         <p className="text-xs font-black  tracking-wide text-slate-500 mb-2">Bạn chọn</p>
         {items.map((item, i) => (
           <p key={`s-${item.id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 mb-2">
-            {String.fromCharCode(65 + i)}. {item.text || ''} → {targetLabel(question, student.get(String(item.id)))}
+            {String.fromCharCode(65 + i)}. {item.text || ''} với {targetLabel(question, student.get(String(item.id)))}
           </p>
         ))}
       </div>

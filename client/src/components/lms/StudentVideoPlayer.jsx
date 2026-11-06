@@ -43,8 +43,12 @@ export const StudentVideoPlayer = ({
   onSaveProgress,
   onVideoEnded,
   onEligibilityReached,
+  xpRatio = 0.9,
+  onXpRatioReached = null,
   onWatchProgress = null,
   playerApiRef = null,
+  /** 'window': giao diện popup video lộ trình (màn chờ xám + nút đỏ lớn, ẩn nhãn tua/mở bài). */
+  appearance = 'default',
 }) => {
   const requiredSecs = (d) => {
     const n = Number(d) || 0;
@@ -89,6 +93,7 @@ export const StudentVideoPlayer = ({
   const maxPosRef = useRef(0);
   const seekGuardRef = useRef(false);
   const eligibilitySentRef = useRef(false);
+  const xpSentRef = useRef(false);
   const uiTickRef = useRef(null);
   const seekUnlockedRef = useRef(false);
   const lessonCompletedRef = useRef(lessonCompleted);
@@ -130,6 +135,7 @@ export const StudentVideoPlayer = ({
     setIsReady(false);
     isReadyRef.current = false;
     eligibilitySentRef.current = !!lessonCompleted;
+    xpSentRef.current = false;
     watchPctSentRef.current = -1;
     const posKey = `student_lms_pos_${lessonId}`;
     const savedPos = Number(sessionStorage.getItem(posKey) || 0);
@@ -178,6 +184,18 @@ export const StudentVideoPlayer = ({
       });
     }
   }, [isReady, displayWatched, effectiveDuration, totalDuration, onEligibilityReached]);
+
+  useEffect(() => {
+    if (!isReady || !effectiveDuration || !onXpRatioReached) return;
+    if (xpSentRef.current) return;
+    const ratio = displayWatched / effectiveDuration;
+    if (ratio >= xpRatio && displayWatched > 0) {
+      xpSentRef.current = true;
+      Promise.resolve(onXpRatioReached(ratio)).catch(() => {
+        xpSentRef.current = false;
+      });
+    }
+  }, [isReady, displayWatched, effectiveDuration, xpRatio, onXpRatioReached]);
 
   // ── Giám sát tab ẩn (không dùng window.blur — iframe YouTube fire blur khi rê/click) ──
   useEffect(() => {
@@ -413,6 +431,9 @@ export const StudentVideoPlayer = ({
           return Number(totalDuration) || 0;
         }
       },
+      pause: () => { try { playerRef.current?.pauseVideo?.(); } catch { /* bỏ qua */ } },
+      play: () => { try { playerRef.current?.playVideo?.(); } catch { /* bỏ qua */ } },
+      seekTo: (sec) => { try { playerRef.current?.seekTo?.(Math.max(0, Number(sec) || 0), true); } catch { /* bỏ qua */ } },
     };
     return () => {
       playerApiRef.current = null;
@@ -543,7 +564,7 @@ export const StudentVideoPlayer = ({
     <div className="flex flex-col w-full h-full min-h-0">
       <div
         ref={containerRef}
-        className={`relative w-full h-full min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen ? 'rounded-none' : 'lg:rounded-2xl'}`}
+        className={`relative w-full h-full min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen || appearance === 'window' ? 'rounded-none' : 'lg:rounded-2xl'}`}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div
@@ -612,6 +633,7 @@ export const StudentVideoPlayer = ({
           onToggleFullscreen={toggleFullscreen}
           getPlayer={() => playerRef.current}
           actualPlaybackQuality={ytPlaybackQuality}
+          overlayVariant={appearance === 'window' ? 'window' : 'default'}
         />
 
         {/* INACTIVE TAB OVERLAY */}
@@ -639,7 +661,7 @@ export const StudentVideoPlayer = ({
             Đang tải…
           </div>
         ) : null}
-        {!overlayVisible && !hasEnded && effectiveDuration > 0 ? (
+        {appearance !== 'window' && !overlayVisible && !hasEnded && effectiveDuration > 0 ? (
           <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-1.5 justify-between pointer-events-none">
             <span className={`text-[10px] px-2 py-1 rounded-md border backdrop-blur-md font-bold ${
               antiSeekEnabled

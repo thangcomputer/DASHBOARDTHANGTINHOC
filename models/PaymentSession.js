@@ -12,8 +12,14 @@ const paymentSessionSchema = new mongoose.Schema({
   branchCode: { type: String, default: '' },
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
   paidAmount: { type: Number, default: 0 },
-  /** tuition (mặc định) | video_course | course_purchase | admin_enrollment */
-  kind: { type: String, enum: ['tuition', 'video_course', 'course_purchase', 'admin_enrollment'], default: 'tuition' },
+  /** tuition (mặc định) | video_course | course_purchase | admin_enrollment | subscription_renewal | daily_practice_xp */
+  kind: {
+    type: String,
+    enum: ['tuition', 'video_course', 'course_purchase', 'admin_enrollment', 'subscription_renewal', 'daily_practice_xp'],
+    default: 'tuition',
+  },
+  /** Gói gia hạn tài khoản (subscription_renewal) hoặc mã gói XP (daily_practice_xp). */
+  plan: { type: String, default: '' },
   purchaseId: { type: mongoose.Schema.Types.ObjectId, ref: 'VideoCoursePurchase', default: null },
   teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
   totalSessions: { type: Number, default: 12 },

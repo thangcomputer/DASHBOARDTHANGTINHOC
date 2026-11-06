@@ -195,6 +195,21 @@ export function hasLearningAccessEnrollment(student) {
   return getLearningAccessEnrollments(student).length > 0;
 }
 
+const FREE_PORTAL_COURSE = 'tài khoản miễn phí';
+
+export function isFreePortalCourseName(name) {
+  return String(name || '').trim().toLowerCase() === FREE_PORTAL_COURSE;
+}
+
+/** Có khóa 1 kèm 1 đang học. Khóa đã hoàn thành không giữ menu đầy đủ. */
+export function hasRealCourseEnrollment(student) {
+  return getLearningAccessEnrollments(student).some((enrollment) => {
+    if (isEnrollmentCompleted(enrollment)) return false;
+    const label = String(enrollment?.courseName || enrollment?.name || '').trim().toLowerCase();
+    return Boolean(label) && !isFreePortalCourseName(label);
+  });
+}
+
 function isEnrollmentPaidFlag(e) {
   return e?.paid === true || e?.paid === 'Đã đóng phí' || e?.paid === 'true' || e?.paid === 1;
 }

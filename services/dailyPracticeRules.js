@@ -3,6 +3,30 @@
 const TYPES = ['mcq', 'truefalse', 'order', 'match', 'fill', 'sort'];
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const XP_BY_DIFFICULTY = { easy: 10, medium: 15, hard: 20 };
+/** Mỗi lần nộp đáp án ở mốc video: trừ XP luyện, đúng hay sai đều trừ. */
+const VIDEO_CHECK_ANSWER_XP = 5;
+/** Mỗi lượt luyện: đặt cược 20 XP — đạt thì nhận lại, trượt/thoát thì mất trắng. */
+const SESSION_STAKE_XP = 20;
+/** Kiểm tra vượt chặng: đạt được thêm 40 XP, không đạt hoặc thoát thì mất 40 XP. */
+const TEST_OUT_XP = 40;
+/** Mỗi ngày (giờ VN) phần XP của gói đặt về mức này. XP đã mua được giữ và cộng thêm. */
+const DAILY_ALLOWANCE_XP = 200;
+/** Tài khoản miễn phí, khi không có gói Meet: mỗi ngày 60 XP. */
+const FREE_PORTAL_DAILY_XP = 60;
+/** Gói Meet còn hạn: mỗi ngày 300 XP. Hết hạn quay về mức tài khoản. */
+const MEET_PLAN_DAILY_XP = 300;
+/** @deprecated tên cũ — cùng mức đặt lại mỗi ngày. */
+const DAILY_REFILL_XP = DAILY_ALLOWANCE_XP;
+/** % đúng tối thiểu để «đạt» ở Luyện tự do. */
+const FREE_PASS_PERCENT = 60;
+/** Mức trừ khi không đạt kiểm tra vượt. */
+const CHECKPOINT_FAIL_PENALTY = TEST_OUT_XP;
+/** Gói mua XP (chuyển khoản → SePay cộng XP). */
+const XP_PACKS = [
+  { id: 'xp100', xp: 100, priceVnd: 10000, label: '100 XP' },
+  { id: 'xp300', xp: 300, priceVnd: 25000, label: '300 XP' },
+  { id: 'xp800', xp: 800, priceVnd: 59000, label: '800 XP' },
+];
 const SESSION_SIZE = 10;
 const TOPIC_ICONS = ['book', 'monitor', 'file-text', 'sheet', 'presentation', 'globe', 'keyboard', 'shield', 'cpu', 'mail', 'image', 'code'];
 const TOPIC_COLORS = ['red', 'blue', 'green', 'orange', 'purple', 'teal', 'pink', 'amber', 'sky', 'slate'];
@@ -146,6 +170,8 @@ function publicQuestion(q, rng = Math.random) {
     prompt: q.prompt,
     imageUrl: q.imageUrl || '',
     hasHint: true,
+    rewardXp: XP_BY_DIFFICULTY[q.difficulty] || XP_BY_DIFFICULTY.easy,
+    penaltyXp: xpPenalty(q.difficulty),
   };
   if (q.type === 'mcq') view.options = [...q.options];
   if (q.type === 'order') view.items = shuffleChanged(q.items, rng);
@@ -227,6 +253,25 @@ function xpFor(difficulty, { correct, hintUsed }) {
   return hintUsed ? Math.floor(base / 2) : base;
 }
 
+/** XP bị trừ nếu trả lời sai (bằng XP gốc của độ khó). */
+function xpPenalty(difficulty) {
+  return XP_BY_DIFFICULTY[difficulty] || XP_BY_DIFFICULTY.easy;
+}
+
+/** Delta XP một câu: đúng → cộng, sai → trừ. */
+function xpDelta(difficulty, { correct, hintUsed }) {
+  if (correct) return xpFor(difficulty, { correct: true, hintUsed });
+  return -xpPenalty(difficulty);
+}
+
+function clampXp(value) {
+  return Math.max(0, Math.round(Number(value) || 0));
+}
+
+function xpPack(packId) {
+  return XP_PACKS.find((pack) => pack.id === String(packId || '')) || null;
+}
+
 function starsFor(correct, total) {
   if (!total) return 0;
   const ratio = correct / total;
@@ -268,6 +313,107 @@ function dayDiff(fromKey, toKey) {
   return Math.round((Date.parse(`${toKey}T00:00:00Z`) - Date.parse(`${fromKey}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
 }
 
+function allowanceForSubscription(subscriptionStatus, student) {
+  const state = subscriptionStatus?.state;
+  const plan = subscriptionStatus?.plan;
+  if (state === 'lifetime' && student?.freePortal === true && subscriptionStatus?.meetLifetime) return MEET_PLAN_DAILY_XP;
+  if ((state === 'active' || state === 'expiring') && plan && plan !== 'lifetime') return MEET_PLAN_DAILY_XP;
+  if (student?.freePortal === true) return FREE_PORTAL_DAILY_XP;
+  return DAILY_ALLOWANCE_XP;
+}
+
+/**
+ * Sang ngày mới: phần XP của gói về đúng mức ngày, XP đã mua giữ nguyên và cộng thêm.
+ * Cùng ngày không đụng số đang có, trừ khi mức gói tăng (200 lên 300) thì cộng phần chênh.
+ */
+function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP) {
+  const day = String(today || '');
+  const sameDay = Boolean(profile) && String(profile.xpAllowanceDay || '') === day;
+  const tracked = profile?.purchasedXp != null && profile?.dailyXp != null;
+  const applied = Number(profile?.xpAllowanceAmount) > 0
+    ? Number(profile.xpAllowanceAmount)
+    : (sameDay ? DAILY_ALLOWANCE_XP : 0);
+  if (sameDay && tracked && applied === allowance) {
+    const dailyXp = clampXp(profile.dailyXp);
+    const purchasedXp = clampXp(profile.purchasedXp);
+    return {
+      changed: false,
+      sameDayUpgrade: false,
+      sameDayDowngrade: false,
+      dailyXp,
+      purchasedXp,
+      xpTotal: dailyXp + purchasedXp,
+      xpBrokeDay: String(profile.xpBrokeDay || ''),
+      xpAllowanceDay: day,
+      xpAllowanceAmount: applied,
+    };
+  }
+  if (sameDay && tracked && applied > allowance) {
+    const dailyXp = Math.min(clampXp(profile.dailyXp), allowance);
+    const purchasedXp = clampXp(profile.purchasedXp);
+    return {
+      changed: true,
+      sameDayUpgrade: false,
+      sameDayDowngrade: true,
+      dailyXp,
+      purchasedXp,
+      xpTotal: dailyXp + purchasedXp,
+      xpBrokeDay: String(profile.xpBrokeDay || ''),
+      xpAllowanceDay: day,
+      xpAllowanceAmount: allowance,
+    };
+  }
+  if (sameDay && tracked && applied < allowance) {
+    const dailyXp = clampXp(profile.dailyXp) + (allowance - applied);
+    const purchasedXp = clampXp(profile.purchasedXp);
+    return {
+      changed: true,
+      sameDayUpgrade: true,
+      sameDayDowngrade: false,
+      dailyXp,
+      purchasedXp,
+      xpTotal: dailyXp + purchasedXp,
+      xpBrokeDay: String(profile.xpBrokeDay || ''),
+      xpAllowanceDay: day,
+      xpAllowanceAmount: allowance,
+    };
+  }
+  const purchasedXp = tracked
+    ? clampXp(profile.purchasedXp)
+    : Math.max(0, clampXp(profile?.xpTotal) - allowance);
+  const dailyXp = sameDay
+    ? Math.max(0, clampXp(profile?.xpTotal) - purchasedXp)
+    : allowance;
+  return {
+    changed: true,
+    sameDayUpgrade: false,
+    sameDayDowngrade: false,
+    dailyXp,
+    purchasedXp,
+    xpTotal: dailyXp + purchasedXp,
+    xpBrokeDay: sameDay ? String(profile?.xpBrokeDay || '') : '',
+    xpAllowanceDay: day,
+    xpAllowanceAmount: allowance,
+  };
+}
+
+/** Trừ XP của gói trước, rồi mới tới XP đã mua. XP mua vào ví mua; XP thưởng về ví trong ngày. */
+function applyXpDelta(profile, delta, source = 'reward') {
+  let dailyXp = clampXp(profile?.dailyXp);
+  let purchasedXp = clampXp(profile?.purchasedXp);
+  const amount = Math.round(Number(delta) || 0);
+  if (source === 'purchase' && amount > 0) purchasedXp += amount;
+  else if (amount > 0) dailyXp += amount;
+  else if (amount < 0) {
+    let left = -amount;
+    const fromDaily = Math.min(dailyXp, left);
+    dailyXp -= fromDaily;
+    left -= fromDaily;
+    purchasedXp = Math.max(0, purchasedXp - left);
+  }
+  return { dailyXp, purchasedXp, xpTotal: dailyXp + purchasedXp };
+}
+
 /**
  * Trạng thái chuỗi để chọn lời nhắc:
  * - new: chưa từng luyện; active: hôm nay đã luyện;
@@ -288,6 +434,19 @@ module.exports = {
   TYPES,
   DIFFICULTIES,
   XP_BY_DIFFICULTY,
+  VIDEO_CHECK_ANSWER_XP,
+  SESSION_STAKE_XP,
+  TEST_OUT_XP,
+  DAILY_ALLOWANCE_XP,
+  MEET_PLAN_DAILY_XP,
+  FREE_PORTAL_DAILY_XP,
+  DAILY_REFILL_XP,
+  allowanceForSubscription,
+  applyDailyAllowance,
+  applyXpDelta,
+  FREE_PASS_PERCENT,
+  CHECKPOINT_FAIL_PENALTY,
+  XP_PACKS,
   SESSION_SIZE,
   TOPIC_ICONS,
   TOPIC_COLORS,
@@ -300,6 +459,10 @@ module.exports = {
   correctAnswerView,
   hintReveal,
   xpFor,
+  xpPenalty,
+  xpDelta,
+  clampXp,
+  xpPack,
   starsFor,
   bonusFor,
   previousDayKey,

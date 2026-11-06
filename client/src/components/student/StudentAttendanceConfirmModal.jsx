@@ -168,7 +168,7 @@ export default function StudentAttendanceConfirmModal({
 
           {waiting ? (
             <p className="text-sm text-slate-500 leading-relaxed">
-              Bạn đã gửi Không đồng ý — Admin đang xử lý. Buổi chưa được tính vào tiến độ.
+              Bạn đã gửi Không đồng ý. Admin đang xử lý. Buổi chưa được tính vào tiến độ.
             </p>
           ) : resolved ? (
             <p className="text-sm text-slate-500 leading-relaxed">

@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
@@ -22,6 +22,8 @@ import StudentAttendanceConfirmModal from './student/StudentAttendanceConfirmMod
 import StudentAssignedTeacherModal from './student/StudentAssignedTeacherModal';
 import AdminAttendanceDisputeModal from './admin/shared/AdminAttendanceDisputeModal';
 import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
+import FreeSurveyModal from './student/FreeSurveyModal';
+import FreeUnlockGuide from './student/dailyPractice/FreeUnlockGuide';
 import LoginInboxAlertPopup from './LoginInboxAlertPopup';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
@@ -59,6 +61,7 @@ const PAGE_TITLES = {
   'student-training': 'Đào tạo HV',
   'lesson-practice': 'Bài giảng',
   'daily-practice': 'Luyện tập hằng ngày',
+  'subscription-codes': 'Mã kích hoạt & gói',
   'cert-prep': 'Ôn thi MOS/IC3',
   staff: 'Phân quyền',
   hr: 'Nhân sự',
@@ -526,6 +529,11 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   }, [session?.isFirstLogin, role, firstLoginPwDone]);
 
   const [showWelcomeCelebration, setShowWelcomeCelebration] = useState(false);
+  const [freeSurveyClosed, setFreeSurveyClosed] = useState(false);
+  const [freeUnlockShow, setFreeUnlockShow] = useState(null);
+  const finishFreeFireworks = useCallback(() => {
+    setFreeUnlockShow((current) => (current === 'fireworks' ? 'guide' : current));
+  }, []);
   const welcomeMarkedRef = React.useRef(false);
   const [courseCelebration, setCourseCelebration] = useState(null);
   const courseCelebrationTimerRef = React.useRef(null);
@@ -680,6 +688,24 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch { /* ignore */ }
     setShowWelcomeCelebration(true);
   }, [role, session?.showWelcomeCelebration, session?.id, session?._id]);
+
+  useEffect(() => {
+    setFreeSurveyClosed(false);
+  }, [session?.id, session?._id]);
+
+  useEffect(() => {
+    const onUnlock = () => {
+      if (role !== 'student' || session?.freePortal !== true || session?.freeUnlocked === true) return;
+      setFreeUnlockShow('fireworks');
+    };
+    window.addEventListener('free-portal-unlocked', onUnlock);
+    return () => window.removeEventListener('free-portal-unlocked', onUnlock);
+  }, [role, session?.freePortal, session?.freeUnlocked]);
+
+  const showFreeSurvey = role === 'student'
+    && session?.freePortal === true
+    && session?.needsFreeSurvey !== false
+    && !freeSurveyClosed;
 
   useEffect(() => {
     if (role !== 'student') return;
@@ -1840,7 +1866,8 @@ const DashboardLayout = ({ role, session, onLogout }) => {
           userId={myId}
           adminRole={session?.adminRole || ''}
           blocked={
-            showWelcomeCelebration
+            showFreeSurvey
+            || showWelcomeCelebration
             || !!courseCelebration
             || !!starBonusCelebration
             || (role === 'teacher' && !!teacherPaymentCelebration)
@@ -1852,8 +1879,21 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             || (session?.isFirstLogin === true && role !== 'teacher')
           }
         />
+        <FreeSurveyModal
+          open={showFreeSurvey}
+          onDone={() => {
+            setFreeSurveyClosed(true);
+            window.dispatchEvent(new Event('free-survey-done'));
+          }}
+        />
         <WelcomeCelebrationOverlay
-          open={showWelcomeCelebration}
+          open={freeUnlockShow === 'fireworks'}
+          fireworksOnly
+          onClose={finishFreeFireworks}
+        />
+        <FreeUnlockGuide open={freeUnlockShow === 'guide'} onClose={() => setFreeUnlockShow(null)} />
+        <WelcomeCelebrationOverlay
+          open={showWelcomeCelebration && !showFreeSurvey}
           role={role}
           name={displayName || session?.name || ''}
           variant="welcome"

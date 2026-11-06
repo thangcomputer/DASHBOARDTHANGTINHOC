@@ -3,6 +3,7 @@ import { useStudentsContext } from '../../context/StudentsContext';
 import { hasLearningAccessEnrollment } from '../../utils/enrollments';
 import api, { clearTokens } from '../../services/api';
 import { getDeviceFingerprint } from '../../utils/deviceFingerprint';
+import SubscriptionGate from './subscription/SubscriptionGate';
 
 function readStudentSessionId() {
   try {
@@ -93,10 +94,10 @@ export default function StudentLearningAccessGate({
   if (mustKick) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center p-6 text-sm text-slate-500">
-        Không còn khóa học — chuyển sang trang đăng ký…
+        Không còn khóa học. Đang chuyển sang trang đăng ký…
       </div>
     );
   }
 
-  return children;
+  return <SubscriptionGate session={sessionProp}>{children}</SubscriptionGate>;
 }

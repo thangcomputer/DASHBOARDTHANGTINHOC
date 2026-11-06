@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const DailyPracticeTopic = require('../models/DailyPracticeTopic');
 const DailyPracticeQuestion = require('../models/DailyPracticeQuestion');
@@ -7,12 +8,51 @@ const DailyPracticeSession = require('../models/DailyPracticeSession');
 const DailyPracticeProfile = require('../models/DailyPracticeProfile');
 const LessonSubject = require('../models/LessonSubject');
 const LessonUnit = require('../models/LessonUnit');
+const DailyPracticeUnit = require('../models/DailyPracticeUnit');
+const DailyPracticePathProgress = require('../models/DailyPracticePathProgress');
+const Student = require('../models/Student');
+const PaymentSession = require('../models/PaymentSession');
+const DailyPracticeXpPackPrice = require('../models/DailyPracticeXpPackPrice');
 const rules = require('./dailyPracticeRules');
+const pathService = require('./dailyPracticePathService');
 const learningGoalService = require('./learningGoalService');
 const lessonPracticeService = require('./lessonPracticeService');
+const subscriptionService = require('./subscriptionService');
 const logger = require('../config/logger');
 
 const { httpError } = rules;
+
+async function listXpPacks() {
+  const doc = await DailyPracticeXpPackPrice.findOne({ key: 'default' }).lean();
+  const saved = doc?.prices && typeof doc.prices === 'object' ? doc.prices : {};
+  return rules.XP_PACKS.map((pack) => {
+    const raw = Number(saved[pack.id]);
+    const priceVnd = Number.isFinite(raw) && raw >= 1000 && raw <= 5_000_000 ? Math.round(raw) : pack.priceVnd;
+    return { id: pack.id, xp: pack.xp, label: pack.label, priceVnd };
+  });
+}
+
+async function resolveXpPack(packId) {
+  const packs = await listXpPacks();
+  return packs.find((pack) => pack.id === String(packId || '')) || null;
+}
+
+async function saveXpPackPrices(prices = {}) {
+  const next = {};
+  for (const pack of rules.XP_PACKS) {
+    const raw = Number(prices[pack.id]);
+    if (!Number.isFinite(raw) || raw < 1000 || raw > 5_000_000) {
+      throw httpError(400, `Giá gói ${pack.label} phải từ 1.000 đến 5.000.000 đồng`);
+    }
+    next[pack.id] = Math.round(raw);
+  }
+  await DailyPracticeXpPackPrice.updateOne(
+    { key: 'default' },
+    { $set: { prices: next } },
+    { upsert: true },
+  );
+  return listXpPacks();
+}
 
 function requireId(value, label) {
   if (!mongoose.Types.ObjectId.isValid(String(value || ''))) throw httpError(400, `${label} không hợp lệ`);
@@ -54,13 +94,16 @@ function questionAdminView(q) {
     text: q.text,
     distractors: q.distractors,
     groups: q.groups,
+    unitId: q.unitId ? String(q.unitId) : '',
     updatedAt: q.updatedAt,
   };
 }
 
-async function questionCounts(topicIds) {
+async function questionCounts(topicIds, { freeOnly = false } = {}) {
+  const match = { topicId: { $in: topicIds } };
+  if (freeOnly) match.unitId = null;
   const rows = await DailyPracticeQuestion.aggregate([
-    { $match: { topicId: { $in: topicIds } } },
+    { $match: match },
     { $group: { _id: { topicId: '$topicId', difficulty: '$difficulty', status: '$status' }, n: { $sum: 1 } } },
   ]);
   const byTopic = new Map();
@@ -129,15 +172,19 @@ async function deleteTopic(id) {
   const topic = await DailyPracticeTopic.findByIdAndDelete(topicId);
   if (!topic) throw httpError(404, 'Không tìm thấy chủ đề');
   const { deletedCount } = await DailyPracticeQuestion.deleteMany({ topicId });
+  await DailyPracticeUnit.deleteMany({ topicId });
+  await DailyPracticePathProgress.deleteMany({ topicId });
   return { deletedQuestions: deletedCount || 0 };
 }
 
 // ── Admin: câu hỏi ──────────────────────────────────────────────────────────
-async function listQuestions({ topicId, difficulty, type, status } = {}) {
+async function listQuestions({ topicId, difficulty, type, status, unitId } = {}) {
   const filter = { topicId: requireId(topicId, 'Chủ đề') };
   if (rules.DIFFICULTIES.includes(difficulty)) filter.difficulty = difficulty;
   if (rules.TYPES.includes(type)) filter.type = type;
   if (status === 'draft' || status === 'published') filter.status = status;
+  if (unitId === 'none') filter.unitId = null;
+  else if (mongoose.Types.ObjectId.isValid(String(unitId || ''))) filter.unitId = new mongoose.Types.ObjectId(String(unitId));
   const questions = await DailyPracticeQuestion.find(filter).sort({ status: 1, updatedAt: -1 }).limit(500).lean();
   return questions.map(questionAdminView);
 }
@@ -149,6 +196,7 @@ async function createQuestion(body, userId) {
   const question = await DailyPracticeQuestion.create({
     ...doc,
     topicId,
+    unitId: await pathService.resolveQuestionUnit(topicId, body?.unitId),
     status: body?.status === 'draft' ? 'draft' : 'published',
     source: 'manual',
     createdBy: mongoose.Types.ObjectId.isValid(String(userId || '')) ? userId : null,
@@ -167,6 +215,14 @@ async function updateQuestion(id, body) {
     const topicId = requireId(body.topicId, 'Chủ đề');
     if (!await DailyPracticeTopic.exists({ _id: topicId })) throw httpError(404, 'Không tìm thấy chủ đề');
     set.topicId = topicId;
+  }
+  if (!onlyStatus) {
+    const targetTopic = set.topicId || existing.topicId;
+    if (body && Object.prototype.hasOwnProperty.call(body, 'unitId')) {
+      set.unitId = await pathService.resolveQuestionUnit(targetTopic, body.unitId);
+    } else if (set.topicId && String(set.topicId) !== String(existing.topicId)) {
+      set.unitId = null;
+    }
   }
   const unset = {};
   for (const [key, value] of Object.entries(set)) {
@@ -199,13 +255,86 @@ async function publishDrafts(topicId) {
 
 // ── Học viên ────────────────────────────────────────────────────────────────
 async function getProfile(studentId) {
+  if (!studentId) return null;
+  await refillDailyXp(studentId);
   return DailyPracticeProfile.findOne({ studentId }).lean();
+}
+
+/** Đầu mỗi ngày (giờ VN) đặt ví về mức gói: miễn phí 60 XP, học viên thường 200 XP, gói Meet còn hạn 300 XP. */
+async function refillDailyXp(studentId) {
+  const today = learningGoalService.vnDayKey();
+  const student = await Student.findById(studentId).select('subscription freePortal').lean();
+  const allowance = rules.allowanceForSubscription(subscriptionService.statusOf(student), student);
+  if (allowance === rules.MEET_PLAN_DAILY_XP) {
+    const { unlockFreePortal } = require('./freePortal');
+    await unlockFreePortal(studentId);
+  }
+  let profile = await DailyPracticeProfile.findOne({ studentId }).lean();
+  if (!profile) {
+    try {
+      return await DailyPracticeProfile.create({
+        studentId,
+        xpTotal: allowance,
+        dailyXp: allowance,
+        purchasedXp: 0,
+        xpBrokeDay: '',
+        xpAllowanceDay: today,
+        xpAllowanceAmount: allowance,
+      });
+    } catch (err) {
+      if (err?.code !== 11000) throw err;
+      profile = await DailyPracticeProfile.findOne({ studentId }).lean();
+    }
+  }
+  const next = rules.applyDailyAllowance(profile, today, allowance);
+  if (!next.changed) return profile;
+  const filter = next.sameDayUpgrade
+    ? {
+      studentId,
+      xpAllowanceDay: today,
+      $or: [
+        { xpAllowanceAmount: { $lt: allowance } },
+        { xpAllowanceAmount: null },
+        { xpAllowanceAmount: { $exists: false } },
+      ],
+    }
+    : next.sameDayDowngrade
+      ? {
+        studentId,
+        xpAllowanceDay: today,
+        $or: [
+          { xpAllowanceAmount: { $gt: allowance } },
+          { xpAllowanceAmount: null },
+          { xpAllowanceAmount: { $exists: false } },
+        ],
+      }
+      : { studentId, xpAllowanceDay: { $ne: today } };
+  const updated = await DailyPracticeProfile.findOneAndUpdate(
+    filter,
+    { $set: {
+      xpTotal: next.xpTotal,
+      dailyXp: next.dailyXp,
+      purchasedXp: next.purchasedXp,
+      xpBrokeDay: next.xpBrokeDay,
+      xpAllowanceDay: today,
+      xpAllowanceAmount: next.xpAllowanceAmount,
+    } },
+    { new: true },
+  ).lean();
+  return updated || DailyPracticeProfile.findOne({ studentId }).lean();
 }
 
 function profileView(profile, today) {
   const status = rules.streakStatus(profile, today);
+  const xpTotal = rules.clampXp(profile?.xpTotal);
+  const allowance = Number(profile?.xpAllowanceAmount) > 0 ? Number(profile.xpAllowanceAmount) : rules.DAILY_ALLOWANCE_XP;
   return {
-    xpTotal: profile?.xpTotal || 0,
+    xpTotal,
+    xpEmpty: xpTotal < rules.SESSION_STAKE_XP,
+    dailyRefillXp: allowance,
+    dailyAllowanceXp: allowance,
+    purchasedXp: rules.clampXp(profile?.purchasedXp),
+    xpRefillsTomorrow: xpTotal < rules.SESSION_STAKE_XP && profile?.xpBrokeDay === today,
     streak: rules.liveStreak(profile, today),
     bestStreak: profile?.bestStreak || 0,
     playedToday: profile?.lastPlayedDay === today,
@@ -213,7 +342,86 @@ function profileView(profile, today) {
     streakState: status.state,
     lostStreak: status.lostStreak,
     missedDays: status.missedDays,
+    checkpointFailPenalty: rules.CHECKPOINT_FAIL_PENALTY,
+    sessionStakeXp: rules.SESSION_STAKE_XP,
+    xpPacks: rules.XP_PACKS,
   };
+}
+
+/** Cộng/trừ XP hồ sơ, không âm. */
+async function adjustProfileXp(studentId, delta, { source = 'reward' } = {}) {
+  await refillDailyXp(studentId);
+  const amount = Math.round(Number(delta) || 0);
+  let profile = await DailyPracticeProfile.findOne({ studentId }).lean();
+  if (!profile) {
+    profile = await DailyPracticeProfile.create({
+      studentId,
+      xpTotal: 0,
+      dailyXp: 0,
+      purchasedXp: 0,
+    });
+    profile = profile.toObject();
+  }
+  if (!amount) return profile;
+  const next = rules.applyXpDelta(profile, amount, source);
+  const today = learningGoalService.vnDayKey();
+  const broke = next.xpTotal < rules.SESSION_STAKE_XP;
+  return DailyPracticeProfile.findOneAndUpdate(
+    { studentId },
+    { $set: {
+      xpTotal: next.xpTotal,
+      dailyXp: next.dailyXp,
+      purchasedXp: next.purchasedXp,
+      xpBrokeDay: broke ? today : '',
+    } },
+    { new: true },
+  ).lean();
+}
+
+/**
+ * Kiểm tra XP trước khi vào lượt.
+ * - Lượt mới / bắt buộc: cần ≥ SESSION_STAKE_XP để đặt cược.
+ * - Phục hồi (làm lại nấc cũ) khi XP thấp: vẫn cho vào, không cược.
+ */
+async function assertCanSpendXp(studentId, { recovery = false, stake = rules.SESSION_STAKE_XP } = {}) {
+  const profile = await getProfile(studentId);
+  const xpTotal = rules.clampXp(profile?.xpTotal);
+  const need = Math.max(0, Number(stake) || rules.SESSION_STAKE_XP);
+  const allowance = Number(profile?.xpAllowanceAmount) > 0 ? Number(profile.xpAllowanceAmount) : rules.DAILY_ALLOWANCE_XP;
+  if (xpTotal >= need) return { profile, stakeXp: need };
+  if (profile?.xpBrokeDay === learningGoalService.vnDayKey()) {
+    const err = httpError(
+      402,
+      `Hết XP hôm nay. Mua thêm để luyện tiếp. Ngày mai bạn được lại ${allowance} XP, XP đã mua vẫn được giữ.`,
+    );
+    err.code = 'XP_EMPTY';
+    throw err;
+  }
+  if (recovery) return { profile, stakeXp: 0 };
+  const err = httpError(
+    402,
+    `Hết XP hôm nay. Mua thêm để luyện tiếp. Ngày mai bạn được lại ${allowance} XP, XP đã mua vẫn được giữ.`,
+  );
+  err.code = 'XP_EMPTY';
+  throw err;
+}
+
+/** Tạo session + trừ stake (nếu có). */
+async function createStakedSession(fields, { stakeXp = 0 } = {}) {
+  const session = await DailyPracticeSession.create({
+    ...fields,
+    stakeXp,
+    recovery: fields.recovery === true,
+  });
+  let profileXp = 0;
+  if (stakeXp > 0) {
+    const profile = await adjustProfileXp(fields.studentId, -stakeXp, { source: 'spend' });
+    profileXp = rules.clampXp(profile?.xpTotal);
+  } else {
+    const profile = await getProfile(fields.studentId);
+    profileXp = rules.clampXp(profile?.xpTotal);
+  }
+  return { session, profileXp, stakeXp };
 }
 
 /** Số học viên đã hoàn thành ít nhất một lượt hôm nay (tạo động lực thi đua). */
@@ -229,18 +437,22 @@ async function countTodayPlayers(today) {
 async function getOverview(studentId) {
   const sid = requireId(studentId, 'Học viên');
   const today = learningGoalService.vnDayKey();
-  const [topics, profile, todaySessions, todayPlayers] = await Promise.all([
-    listTopics(),
+  const topics = await DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const [freeCounts, profile, todaySessions, todayPlayers] = await Promise.all([
+    questionCounts(topics.map((topic) => topic._id), { freeOnly: true }),
     getProfile(sid),
-    DailyPracticeSession.find({ studentId: sid, status: 'finished', day: today }).select('xp bonusXp').lean(),
+    DailyPracticeSession.find({ studentId: sid, status: 'finished', mode: 'path', day: today }).select('xp bonusXp').lean(),
     countTodayPlayers(today),
   ]);
   return {
+    /** Luyện tự do: chỉ câu chưa xếp chặng (không dùng câu lộ trình). */
     topics: topics
+      .map((topic) => topicView(topic, freeCounts.get(String(topic._id))))
       .map(({ counts, ...topic }) => ({ ...topic, counts: { easy: counts.easy, medium: counts.medium, hard: counts.hard } }))
       .filter((topic) => topic.counts.easy + topic.counts.medium + topic.counts.hard > 0),
     stats: {
       ...profileView(profile, today),
+      xpPacks: await listXpPacks(),
       todaySessions: todaySessions.length,
       todayXp: todaySessions.reduce((sum, s) => sum + (s.xp || 0) + (s.bonusXp || 0), 0),
       todayPlayers,
@@ -248,8 +460,9 @@ async function getOverview(studentId) {
   };
 }
 
+/** Luyện tự do: chỉ lấy câu published chưa gắn chặng lộ trình. */
 async function pickQuestions(topicId, difficulty) {
-  const base = { topicId, status: 'published' };
+  const base = { topicId, status: 'published', unitId: null };
   const picked = await DailyPracticeQuestion.aggregate([
     { $match: { ...base, difficulty } },
     { $sample: { size: rules.SESSION_SIZE } },
@@ -264,19 +477,59 @@ async function pickQuestions(topicId, difficulty) {
   return picked;
 }
 
-async function startSession(studentId, { topicId, difficulty } = {}) {
+async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
+  const sid = requireId(studentId, 'Học viên');
+  const prepared = await pathService.preparePathSession(sid, { unitId, step, nodeKey, testOut });
+  const recovery = Boolean(prepared.pathInfo.recovery) && !testOut;
+  const stakeNeed = testOut ? rules.TEST_OUT_XP : rules.SESSION_STAKE_XP;
+  const { stakeXp } = await assertCanSpendXp(sid, { recovery, stake: stakeNeed });
+  const { session, profileXp } = await createStakedSession({
+    studentId: sid,
+    topicId: prepared.topic._id,
+    difficulty: prepared.difficulty,
+    mode: 'path',
+    unitId: prepared.unit._id,
+    step,
+    pathNodeKey: prepared.pathInfo.pathNodeKey,
+    testOut: Boolean(testOut),
+    questionIds: prepared.questions.map((q) => q._id),
+    recovery,
+  }, { stakeXp });
+  return {
+    id: String(session._id),
+    topic: topicView(prepared.topic),
+    difficulty: prepared.difficulty,
+    total: prepared.questions.length,
+    questions: prepared.questions.map((q) => rules.publicQuestion(q)),
+    path: { ...prepared.pathInfo, recovery },
+    profileXp,
+    stakeXp,
+    sessionStakeXp: testOut ? rules.TEST_OUT_XP : rules.SESSION_STAKE_XP,
+    testOutRewardXp: testOut ? rules.TEST_OUT_XP : 0,
+    mandatory: stakeXp > 0,
+    checkpointFailPenalty: testOut ? rules.TEST_OUT_XP : rules.CHECKPOINT_FAIL_PENALTY,
+  };
+}
+
+async function startSession(studentId, { topicId, difficulty, mode, unitId, step, nodeKey, testOut } = {}) {
+  if (mode === 'path') return startPathSession(studentId, { unitId, step, nodeKey, testOut: Boolean(testOut) });
   const sid = requireId(studentId, 'Học viên');
   const tid = requireId(topicId, 'Chủ đề');
   if (!rules.DIFFICULTIES.includes(difficulty)) throw httpError(400, 'Độ khó không hợp lệ');
   const topic = await DailyPracticeTopic.findOne({ _id: tid, active: true }).lean();
   if (!topic) throw httpError(404, 'Chủ đề không còn hoạt động');
   const questions = await pickQuestions(tid, difficulty);
-  if (!questions.length) throw httpError(404, 'Chủ đề này chưa có câu hỏi');
+  if (!questions.length) throw httpError(404, 'Chủ đề này chưa có câu Luyện tự do (chưa xếp chặng). Hãy soạn câu riêng cho Luyện tự do.');
+  // Luyện tự do: tuyệt đối không cược / không cộng trừ XP hồ sơ.
+  const profile = await getProfile(sid);
   const session = await DailyPracticeSession.create({
     studentId: sid,
     topicId: tid,
     difficulty,
+    mode: 'free',
     questionIds: questions.map((q) => q._id),
+    stakeXp: 0,
+    recovery: false,
   });
   return {
     id: String(session._id),
@@ -284,6 +537,12 @@ async function startSession(studentId, { topicId, difficulty } = {}) {
     difficulty,
     total: questions.length,
     questions: questions.map((q) => rules.publicQuestion(q)),
+    profileXp: rules.clampXp(profile?.xpTotal),
+    stakeXp: 0,
+    sessionStakeXp: 0,
+    mandatory: false,
+    xpDisabled: true,
+    checkpointFailPenalty: 0,
   };
 }
 
@@ -308,21 +567,25 @@ async function answerQuestion(studentId, sessionId, { questionId, answer } = {})
   const question = await loadSessionQuestion(session, questionId);
   const correct = rules.gradeAnswer(question, answer || {});
   const hintUsed = (session.hintsUsed || []).some((id) => String(id) === String(question._id));
-  const xp = rules.xpFor(question.difficulty, { correct, hintUsed });
+  // XP theo lượt (stake) — từng câu không cộng/trừ hồ sơ.
   const updated = await DailyPracticeSession.findOneAndUpdate(
     { _id: session._id, status: 'in_progress', 'answers.questionId': { $ne: question._id } },
     {
-      $push: { answers: { questionId: question._id, correct, hintUsed, xp, answeredAt: new Date() } },
-      $inc: { xp, correctCount: correct ? 1 : 0 },
+      $push: { answers: { questionId: question._id, correct, hintUsed, xp: 0, answeredAt: new Date() } },
+      $inc: { correctCount: correct ? 1 : 0 },
     },
     { new: true },
   ).lean();
   if (!updated) throw httpError(409, 'Câu này đã được trả lời');
+  const profile = await getProfile(session.studentId);
   learningGoalService.trackStudyActivity(session.studentId, { questions: 1 });
   return {
     correct,
-    xp,
-    sessionXp: updated.xp,
+    xp: 0,
+    stakeXp: session.stakeXp || 0,
+    sessionXp: updated.xp || 0,
+    profileXp: rules.clampXp(profile?.xpTotal),
+    xpEmpty: rules.clampXp(profile?.xpTotal) <= 0,
     correctCount: updated.correctCount,
     answered: updated.answers.length,
     correctAnswer: rules.correctAnswerView(question),
@@ -338,7 +601,48 @@ async function useHint(studentId, sessionId, { questionId } = {}) {
     throw httpError(409, 'Câu này đã được trả lời');
   }
   await DailyPracticeSession.updateOne({ _id: session._id }, { $addToSet: { hintsUsed: question._id } });
-  return rules.hintReveal(question);
+  const total = session.questionIds?.length || rules.SESSION_SIZE;
+  const stakeXp = session.mode === 'free' ? 0 : (session.stakeXp || rules.SESSION_STAKE_XP);
+  const hintCostXp = stakeXp > 0 && total > 0 ? Math.floor(stakeXp / (2 * total)) : 0;
+  return {
+    ...rules.hintReveal(question),
+    hintCostXp,
+    stakeXp,
+    xpDisabled: session.mode === 'free',
+  };
+}
+
+const WEEKDAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+function addDays(dayKey, delta) {
+  const date = new Date(`${dayKey}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Tuần hiện tại (T2 → CN) và những ngày đã hoàn thành ít nhất một lượt. */
+async function weekActivity(studentId, today) {
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const monday = addDays(today, weekday === 0 ? -6 : 1 - weekday);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const played = new Set(await DailyPracticeSession.distinct('day', { studentId, status: 'finished', day: { $in: days } }));
+  return days.map((day) => ({
+    day,
+    label: WEEKDAY_LABELS[new Date(`${day}T00:00:00Z`).getUTCDay()],
+    played: played.has(day),
+    today: day === today,
+  }));
+}
+
+/** Chuỗi câu đúng liên tiếp dài nhất trong lượt. */
+function maxComboOf(answers = []) {
+  let best = 0;
+  let current = 0;
+  for (const answer of [...answers].sort((a, b) => new Date(a.answeredAt) - new Date(b.answeredAt))) {
+    current = answer.correct ? current + 1 : 0;
+    best = Math.max(best, current);
+  }
+  return best;
 }
 
 async function finishSession(studentId, sessionId) {
@@ -347,22 +651,54 @@ async function finishSession(studentId, sessionId) {
   const total = session.questionIds.length;
   const correct = session.correctCount || 0;
   const stars = rules.starsFor(correct, total);
-  const bonusXp = rules.bonusFor(correct, total);
+  const scorePercent = total ? Math.round((correct / total) * 100) : 0;
   const day = learningGoalService.vnDayKey();
   const finished = await DailyPracticeSession.findOneAndUpdate(
     { _id: session._id, status: 'in_progress' },
-    { $set: { status: 'finished', stars, bonusXp, day, finishedAt: new Date() } },
+    { $set: { status: 'finished', stars, day, finishedAt: new Date() } },
     { new: true },
   ).lean();
   if (!finished) throw httpError(409, 'Lượt chơi đã kết thúc');
 
   const before = await getProfile(session.studentId);
   const streak = rules.nextStreak(before, day);
-  const gained = (finished.xp || 0) + bonusXp;
+  let path = null;
+  if (finished.mode === 'path') {
+    try {
+      path = await pathService.recordPathResult(finished);
+    } catch (err) {
+      logger.error(`[DAILY_PRACTICE] record path result failed: ${err.message}`);
+    }
+  }
+  const isFree = finished.mode === 'free';
+  const passed = isFree
+    ? scorePercent >= rules.FREE_PASS_PERCENT
+    : Boolean(path?.passed);
+  const stakeXp = isFree ? 0 : (finished.stakeXp || 0);
+  // Luyện tự do: không đụng XP. Lộ trình: đạt → hoàn cược (gợi ý = mất ½ phần câu đó); trượt → mất trắng.
+  let rewardXp = 0;
+  let hintPenaltyXp = 0;
+  if (!isFree && passed) {
+    const base = stakeXp > 0 ? stakeXp : (finished.recovery ? rules.SESSION_STAKE_XP : 0);
+    const hinted = new Set([
+      ...(finished.hintsUsed || []).map(String),
+      ...(finished.answers || []).filter((a) => a.hintUsed).map((a) => String(a.questionId)),
+    ]);
+    const perQuestion = total > 0 ? base / total : 0;
+    hintPenaltyXp = Math.round(hinted.size * (perQuestion / 2));
+    rewardXp = Math.max(0, Math.round(base - hintPenaltyXp));
+    if (finished.testOut) rewardXp += rules.TEST_OUT_XP;
+  }
+  const lostXp = (!isFree && !passed) ? stakeXp : 0;
+  if (rewardXp > 0) await adjustProfileXp(session.studentId, rewardXp, { source: 'reward' });
+  await DailyPracticeSession.updateOne(
+    { _id: finished._id },
+    { $set: { xp: rewardXp, bonusXp: 0, stakeXp } },
+  );
   const profile = await DailyPracticeProfile.findOneAndUpdate(
     { studentId: session.studentId },
     {
-      $inc: { xpTotal: gained, sessionsCount: 1 },
+      $inc: { sessionsCount: 1 },
       $set: { streak, lastPlayedDay: day },
       $max: { bestStreak: streak },
     },
@@ -373,16 +709,35 @@ async function finishSession(studentId, sessionId) {
   const missedIds = finished.questionIds.filter((id) => !answered.get(String(id))?.correct);
   const missed = await DailyPracticeQuestion.find({ _id: { $in: missedIds } }).lean();
   const relatedLesson = await relatedLessonForTopic(session.studentId, session.topicId);
+  const finishedAt = finished.finishedAt ? new Date(finished.finishedAt) : new Date();
+  const durationSeconds = Math.max(1, Math.round((finishedAt - new Date(finished.createdAt || finishedAt)) / 1000));
+  learningGoalService.trackStudyDuration(session.studentId, durationSeconds);
   return {
+    path,
+    maxCombo: maxComboOf(finished.answers),
+    durationSeconds,
+    firstToday: before?.lastPlayedDay !== day,
+    week: await weekActivity(session.studentId, day),
     relatedLesson,
     total,
     correctCount: correct,
+    scorePercent,
+    passed,
     stars,
-    xp: finished.xp || 0,
-    bonusXp,
-    gainedXp: gained,
+    stakeXp,
+    xp: rewardXp,
+    bonusXp: 0,
+    hintPenaltyXp,
+    failPenaltyXp: lostXp,
+    gainedXp: isFree ? 0 : (passed ? (finished.testOut ? rewardXp - stakeXp : rewardXp) : -lostXp),
+    xpDisabled: isFree,
     streakIncreased: streak > rules.liveStreak(before, day),
-    stats: profileView(profile, day),
+    stats: {
+      ...profileView(profile, day),
+      todayXp: (await DailyPracticeSession.find({
+        studentId: session.studentId, status: 'finished', mode: 'path', day,
+      }).select('xp bonusXp').lean()).reduce((sum, row) => sum + (row.xp || 0) + (row.bonusXp || 0), 0),
+    },
     review: missed.map((q) => ({
       id: String(q._id),
       type: q.type,
@@ -391,6 +746,25 @@ async function finishSession(studentId, sessionId) {
       correctAnswer: rules.correctAnswerView(q),
       explanation: q.explanation || '',
     })),
+  };
+}
+
+/** Thoát giữa chừng — mất trắng stake đã trừ (nếu có). */
+async function abandonSession(studentId, sessionId) {
+  const session = await loadOwnSession(studentId, sessionId);
+  if (session.status !== 'in_progress') return { abandoned: true, lostXp: session.stakeXp || 0 };
+  const day = learningGoalService.vnDayKey();
+  await DailyPracticeSession.updateOne(
+    { _id: session._id, status: 'in_progress' },
+    { $set: { status: 'abandoned', xp: 0, bonusXp: 0, day, finishedAt: new Date() } },
+  );
+  const profile = await getProfile(session.studentId);
+  return {
+    abandoned: true,
+    lostXp: session.stakeXp || 0,
+    mandatory: (session.stakeXp || 0) > 0,
+    profileXp: rules.clampXp(profile?.xpTotal),
+    stats: profileView(profile, day),
   };
 }
 
@@ -437,6 +811,145 @@ async function xpByStudent(start, end, studentIds = null) {
   return new Map(rows.map((row) => [String(row._id), row.xp]));
 }
 
+function makeXpRef(studentCode) {
+  const code = String(studentCode || 'HV').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'HV';
+  const suffix = String(crypto.randomInt(10000, 100000));
+  return `${code} XP ${suffix}`;
+}
+
+/** Tạo phiên chuyển khoản mua gói XP. */
+async function createXpPurchase(studentId, packId) {
+  const sid = requireId(studentId, 'Học viên');
+  const pack = await resolveXpPack(packId);
+  if (!pack) throw httpError(400, 'Gói XP không hợp lệ');
+  const student = await Student.findById(sid).select('name fullName studentCode branchId').lean();
+  if (!student) throw httpError(404, 'Không tìm thấy học viên');
+
+  const existing = await PaymentSession.findOne({
+    studentId: sid,
+    kind: 'daily_practice_xp',
+    status: 'pending',
+    plan: pack.id,
+  }).sort({ createdAt: -1 }).lean();
+  if (existing && Number(existing.amount) === pack.priceVnd) {
+    return {
+      sessionId: existing.sessionId,
+      ref: existing.ref,
+      amount: existing.amount,
+      xp: pack.xp,
+      pack,
+      studentName: existing.studentName || student.name || student.fullName || '',
+    };
+  }
+
+  const ref = makeXpRef(student.studentCode);
+  const sessionId = `ps_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  await PaymentSession.create({
+    sessionId,
+    ref,
+    amount: pack.priceVnd,
+    status: 'pending',
+    studentName: student.name || student.fullName || '',
+    courseName: `Luyện tập · ${pack.label}`,
+    studentId: sid,
+    branchId: student.branchId || null,
+    kind: 'daily_practice_xp',
+    plan: pack.id,
+  });
+  return {
+    sessionId,
+    ref,
+    amount: pack.priceVnd,
+    xp: pack.xp,
+    pack,
+    studentName: student.name || student.fullName || '',
+  };
+}
+
+async function getXpPurchaseStatus(studentId, sessionId) {
+  const sid = requireId(studentId, 'Học viên');
+  const session = await PaymentSession.findOne({ sessionId: String(sessionId || ''), studentId: sid, kind: 'daily_practice_xp' }).lean();
+  if (!session) throw httpError(404, 'Không tìm thấy đơn mua XP');
+  const pack = await resolveXpPack(session.plan);
+  const profile = await getProfile(sid);
+  return {
+    sessionId: session.sessionId,
+    status: session.status,
+    paid: session.status === 'paid',
+    amount: session.amount,
+    ref: session.ref,
+    xp: pack?.xp || 0,
+    pack,
+    profileXp: rules.clampXp(profile?.xpTotal),
+  };
+}
+
+/** Thanh toán ảo: đánh dấu đơn đã trả rồi cộng XP. Không dùng trên production. */
+async function simulateXpPurchase(studentId, sessionId) {
+  const sid = requireId(studentId, 'Học viên');
+  const session = await PaymentSession.findOne({
+    sessionId: String(sessionId || ''),
+    studentId: sid,
+    kind: 'daily_practice_xp',
+  });
+  if (!session) throw httpError(404, 'Không tìm thấy đơn mua XP');
+  if (session.status === 'paid') return getXpPurchaseStatus(sid, session.sessionId);
+  if (session.status !== 'pending') throw httpError(409, 'Đơn mua XP không còn hiệu lực');
+  const claimed = await PaymentSession.findOneAndUpdate(
+    { _id: session._id, status: 'pending' },
+    { $set: { status: 'paid', paidAmount: session.amount } },
+    { returnDocument: 'after' },
+  ).lean();
+  if (!claimed) throw httpError(409, 'Đơn mua XP không còn hiệu lực');
+  try {
+    await fulfillDailyPracticeXpPurchase({ session: claimed });
+  } catch (err) {
+    await PaymentSession.updateOne(
+      { _id: session._id, status: 'paid', purchaseId: null },
+      { $set: { status: 'pending' }, $unset: { paidAmount: 1 } },
+    );
+    throw err;
+  }
+  return getXpPurchaseStatus(sid, session.sessionId);
+}
+
+/** SePay đã khớp phiên → cộng XP một lần. */
+async function fulfillDailyPracticeXpPurchase({ session }) {
+  const pack = await resolveXpPack(session.plan);
+  const xp = pack?.xp || 0;
+  if (!session.studentId || xp <= 0) {
+    logger.warn(`[DAILY_PRACTICE] XP purchase missing student/pack: ${session.sessionId}`);
+    return { xp: 0 };
+  }
+  // Idempotent: chỉ cộng khi vừa chuyển pending→paid (caller đã claim). Dùng purchaseId null + plan.
+  const claimed = await PaymentSession.findOneAndUpdate(
+    { _id: session._id, kind: 'daily_practice_xp', purchaseId: null },
+    { $set: { purchaseId: session._id } }, // đánh dấu đã fulfill (tái dùng field)
+    { new: true },
+  ).lean();
+  if (!claimed) {
+    const profile = await getProfile(session.studentId);
+    return { xp: 0, already: true, profileXp: rules.clampXp(profile?.xpTotal) };
+  }
+  const profile = await adjustProfileXp(session.studentId, xp, { source: 'purchase' });
+  await DailyPracticeProfile.updateOne(
+    { studentId: session.studentId, 'xpPurchases.sessionId': { $ne: String(session.sessionId || '') } },
+    { $push: { xpPurchases: {
+      $each: [{
+        sessionId: String(session.sessionId || ''),
+        xp,
+        amount: Number(session.paidAmount || session.amount || 0),
+        packId: String(session.plan || ''),
+        at: new Date(),
+      }],
+      $position: 0,
+      $slice: 20,
+    } } },
+  );
+  logger.info(`[DAILY_PRACTICE] Credited ${xp} XP to student ${session.studentId} via ${session.sessionId}`);
+  return { xp, profileXp: rules.clampXp(profile?.xpTotal), studentId: String(session.studentId) };
+}
+
 module.exports = {
   listTopics,
   createTopic,
@@ -452,6 +965,16 @@ module.exports = {
   answerQuestion,
   useHint,
   finishSession,
+  abandonSession,
   relatedTopics,
   xpByStudent,
+  maxComboOf,
+  createXpPurchase,
+  getXpPurchaseStatus,
+  simulateXpPurchase,
+  fulfillDailyPracticeXpPurchase,
+  listXpPacks,
+  saveXpPackPrices,
+  adjustProfileXp,
+  getProfile,
 };

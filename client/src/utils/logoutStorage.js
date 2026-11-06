@@ -16,7 +16,7 @@ const PRESERVED_KEYS = new Set([
   'thvp_recent_chat_stickers_v1',
 ]);
 
-const PRESERVED_PREFIXES = ['cms_login_alert', 'cms_pin_lock:', 'cms_daily_practice_reminder:'];
+const PRESERVED_PREFIXES = ['cms_login_alert', 'cms_pin_lock:', 'cms_daily_practice_reminder:', 'cms_subscription_reminder:'];
 
 export function isPreservedPreferenceKey(key) {
   if (!key) return false;

@@ -4,7 +4,7 @@ import CertPrepResultStats from './CertPrepResultStats';
 export default function CertPrepResultSummary({ result }) {
   if (!result) return null;
   const passed = result.passed === true;
-  const title = [result.course?.name, result.level?.title].filter(Boolean).join(' — ');
+  const title = [result.course?.name, result.level?.title].filter(Boolean).join(' · ');
   return (
     <section className="cms-card p-5 sm:p-8 text-center space-y-4">
       <p className="text-[11px] font-black  tracking-wide text-slate-400">Kết quả bài thi</p>

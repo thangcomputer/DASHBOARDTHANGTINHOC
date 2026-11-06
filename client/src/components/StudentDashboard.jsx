@@ -22,6 +22,9 @@ import { setLoginOverlay } from '../utils/loginOverlayGate';
 import { buildStudentActivityLogs, isStudentScheduleLog, isStudentScoreLog } from '../utils/studentActivityLogs';
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
+import { useStudentSubscription } from './student/subscription/subscriptionContext';
+import { useFreePortalLock, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
+import FreeFeatureLock from './student/dailyPractice/FreeFeatureLock';
 import {
   StudentLazyEvaluationTab,
   StudentLazyScheduleTab,
@@ -29,6 +32,16 @@ import {
   StudentLazyProfileTab,
   StudentLazyOverviewTab,
 } from './student/StudentLazyTabShell';
+
+function ExpiredPackageBanner() {
+  const ctx = useStudentSubscription();
+  if (ctx?.subscription?.state !== 'expired') return null;
+  return (
+    <button type="button" onClick={ctx.openRenew} className="mb-3 w-full rounded-2xl bg-red-50 px-4 py-3 text-left text-sm font-semibold text-red-800 ring-1 ring-red-100">
+      Gói tự học đã hết hạn. Bấm để gia hạn rồi luyện tập và xem video. Lịch học, chat và link lớp vẫn dùng được.
+    </button>
+  );
+}
 
 function parseLogDateToMs(dStr) {
   if (!dStr) return 0;
@@ -91,8 +104,8 @@ function buildPendingScheduleLogs(schedules, student) {
       if (seenKeys.has(key)) return;
       seenKeys.add(key);
       const pendingNote = kind === 'overdue_attendance'
-        ? `Quá hạn điểm danh — chờ quản trị viên điểm danh bù (${s.teacherName || student.teacher || 'Giảng viên'})`
-        : `Chưa điểm danh — buổi đã kết thúc (${s.teacherName || student.teacher || 'Giảng viên'})`;
+        ? `Quá hạn điểm danh. Chờ quản trị viên điểm danh bù (${s.teacherName || student.teacher || 'Giảng viên'})`
+        : `Chưa điểm danh. Buổi đã kết thúc (${s.teacherName || student.teacher || 'Giảng viên'})`;
       pendingLogs.push({
         type: kind === 'overdue_attendance' ? 'overdue_attendance' : 'pending_attendance',
         displayKind: kind,
@@ -404,6 +417,12 @@ const StudentDashboard = () => {
 
   // Hash-based section
   const currentHash = (location.hash?.replace('#', '') || '').split(/[?#]/)[0];
+  const freeMenu = useFreePortalMenu();
+  const sectionHash = freeMenu && (currentHash === 'schedule' || currentHash === 'evaluation') ? '' : currentHash;
+  const freeLocked = useFreePortalLock();
+  const freeHashLocked = freeLocked && freeMenu && [
+    'materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores',
+  ].includes(sectionHash);
 
   // Rating state
   const [ratingCriteria, setRatingCriteria] = useState({ teaching: '', voice: '', guidance: '', support: '' });
@@ -637,6 +656,7 @@ const StudentDashboard = () => {
     <div className="bg-transparent font-sans h-full">
       {/* Popup thông báo — hiện 1 lần/ngày */}
       <PopupBanner role="student" />
+      <ExpiredPackageBanner />
 
       {/* Modal đóng học phí (tự động qua SePay) */}
       {noteModalSched && (
@@ -747,7 +767,7 @@ const StudentDashboard = () => {
       )}
 
       <div className="min-w-0">
-        {currentHash && (
+        {sectionHash && (
           <ClassReminder
             nextClassTime={viewStudent.nextClassTime}
             linkHoc={viewStudent.joinClassUrl}
@@ -761,7 +781,9 @@ const StudentDashboard = () => {
         <div className="pt-4"></div> {/* Temporary empty div to keep spacing if needed, or better: remove and use margin */}
         
         {/* ═══ CONTENT — Switch based on hash ═══ */}
-        {currentHash === 'schedule' ? (
+        {freeHashLocked ? (
+          <FreeFeatureLock />
+        ) : sectionHash === 'schedule' ? (
           <StudentLazyScheduleTab
             viewStudent={viewStudent}
             mySchedules={mySchedulesAll}
@@ -771,7 +793,7 @@ const StudentDashboard = () => {
             setNoteModalSched={setNoteModalSched}
             displayGrades={studyLogs}
           />
-        ) : ['materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores'].includes(currentHash) ? (
+        ) : ['materials', 'materials-videos', 'materials-files', 'materials-software', 'materials-assignments', 'exam-scores'].includes(sectionHash) ? (
           <StudentLazyMaterialsTab
             viewStudent={viewStudent}
             studentTrainingForLms={studentTrainingForLms}
@@ -787,11 +809,11 @@ const StudentDashboard = () => {
               'materials-software': 'software',
               'materials-assignments': 'assignments',
               'exam-scores': 'exams',
-            }[currentHash]}
+            }[sectionHash]}
             hideTabBar
             focusAssignmentId={(location.hash.match(/[?&]assignmentId=([^&]+)/) || [])[1] || ''}
           />
-        ) : currentHash === 'evaluation' ? (
+        ) : sectionHash === 'evaluation' ? (
           <StudentLazyEvaluationTab
             studentData={{ ...viewStudent, courses: enrollments }}
             evaluatingCourseId={evaluatingCourseId}
@@ -815,7 +837,7 @@ const StudentDashboard = () => {
             setTeacherRatingData={setTeacherRatingData}
             api={api}
           />
-        ) : currentHash === 'profile' ? (
+        ) : sectionHash === 'profile' ? (
           <StudentLazyProfileTab
             studentData={studentData}
             sessionGender={session?.gender || ''}

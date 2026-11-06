@@ -472,10 +472,10 @@ export function MessagesScreen() {
       {socketStatus ? <Text style={styles.socketStatus}>{socketStatus}</Text> : null}
       <View style={[styles.inboxFilterRow, !isTeacher && styles.inboxFilterRowStudent]}>
         {isTeacher ? (
-          <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
+        <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
             <Plus size={25} color={colors.brand} strokeWidth={2.8} />
-          </Pressable>
-        ) : null}
+        </Pressable>
+      ) : null}
         <ScrollView
           style={styles.filtersWrapper}
           horizontal
@@ -485,15 +485,15 @@ export function MessagesScreen() {
           {categoryFilters.map((filter) => {
             const active = category === filter.id;
             return (
-              <Pressable
-                key={filter.id}
-                onPress={() => setCategory(filter.id)}
+            <Pressable
+              key={filter.id}
+              onPress={() => setCategory(filter.id)}
                 style={[styles.filterChip, active && styles.filterChipActive]}
-                accessibilityRole="button"
+              accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-              >
+            >
                 <Text style={[styles.filterText, active && styles.filterTextActive]}>{filter.label}</Text>
-              </Pressable>
+            </Pressable>
             );
           })}
         </ScrollView>
@@ -520,7 +520,7 @@ export function MessagesScreen() {
               && Boolean(conversation.participantId && onlineUserIds.includes(conversation.participantId));
             return (
               <View
-                key={conversation.id}
+          key={conversation.id}
                 style={[
                   styles.contactRow,
                   index === 0 && styles.contactRowFirst,
@@ -533,27 +533,27 @@ export function MessagesScreen() {
                   onPress={() => {
                     setConversationOptionsId(null);
                     navigation.navigate('Conversation', {
-                      conversationId: conversation.id,
-                      conversationName: conversation.name,
-                      participantId: conversation.participantId,
-                      participantRole: conversation.participantRole || conversation.category,
+            conversationId: conversation.id,
+            conversationName: conversation.name,
+            participantId: conversation.participantId,
+            participantRole: conversation.participantRole || conversation.category,
                       participantAdminRole: conversation.adminRole,
                       participantOnline: isOnline,
-                      participantAvatarUri: conversation.avatarUri,
+            participantAvatarUri: conversation.avatarUri,
                     });
                   }}
                   style={({ pressed }) => [styles.contactRowMain, pressed && styles.contactRowPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
-                >
+          accessibilityRole="button"
+          accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
+        >
                   <View style={styles.avatarContainer}>
                     <View style={[styles.avatarRing, { borderColor: badge.ring }]}>
                       <Image source={avatarSource} style={styles.avatarImg} />
-                    </View>
+              </View>
                     <View style={[styles.roleBadgePill, { backgroundColor: badge.bg }]}>
                       <Text style={styles.roleBadgePillText}>
                         {conversation.roleBadge || badge.label}
-                      </Text>
+                </Text>
                     </View>
                     {isOnline ? <View style={styles.onlineDot} /> : null}
                   </View>
@@ -577,8 +577,8 @@ export function MessagesScreen() {
                       </View>
                       {conversation.time ? (
                         <Text style={styles.contactTimeText}>{conversation.time}</Text>
-                      ) : null}
-                    </View>
+              ) : null}
+              </View>
 
                     <View style={styles.contactMessageRow}>
                       <Text
@@ -595,11 +595,11 @@ export function MessagesScreen() {
                           <Text style={styles.unreadCountText}>
                             {conversation.unread > 99 ? '99+' : conversation.unread}
                           </Text>
-                        </View>
+            </View>
                       ) : null}
                     </View>
                   </View>
-                </Pressable>
+        </Pressable>
                 <View style={styles.contactOptionsWrap}>
                   <Pressable
                     onPress={() => setConversationOptionsId((current) => current === conversation.id ? null : conversation.id)}
@@ -2414,18 +2414,18 @@ export function ConversationScreen() {
         ) : null}
         {isSearching ? (
           <View>
-            <View style={styles.inlineSearch}>
-              <Search size={17} color={colors.muted} />
-              <TextInput value={searchText} onChangeText={setSearchText} placeholder="Tìm kiếm tin nhắn cũ" style={styles.inlineSearchInput} autoFocus />
-              <Pressable onPress={() => { setSearchText(''); setIsSearching(false); }} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
+          <View style={styles.inlineSearch}>
+            <Search size={17} color={colors.muted} />
+            <TextInput value={searchText} onChangeText={setSearchText} placeholder="Tìm kiếm tin nhắn cũ" style={styles.inlineSearchInput} autoFocus />
+            <Pressable onPress={() => { setSearchText(''); setIsSearching(false); }} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          </View>
             {searchText.trim() ? (
               <Text style={styles.searchStatus}>
                 {searchLoading ? 'Đang tìm trong cuộc trò chuyện…' : searchError || `${visibleMessages.length} kết quả`}
               </Text>
-            ) : null}
+        ) : null}
           </View>
         ) : null}
         {pinnedMessage ? (
@@ -2455,12 +2455,12 @@ export function ConversationScreen() {
           </View>
         ) : null}
         <View style={styles.threadSurface}>
-          <ScrollView
-            ref={threadRef}
+        <ScrollView
+          ref={threadRef}
             style={styles.threadScroll}
-            contentContainerStyle={styles.thread}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.thread}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
             onScroll={(event) => {
               threadScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
             }}
@@ -2478,7 +2478,7 @@ export function ConversationScreen() {
               }
               threadRef.current?.scrollToEnd({ animated: true });
             }}
-          >
+        >
           {resource.loading ? <LoadingSkeleton rows={2} /> : null}
           {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
           {!resource.loading && !resource.error && canLoadOlder ? (
@@ -2607,12 +2607,12 @@ export function ConversationScreen() {
                   onLongPress={() => handleMessageMenu(message)}
                   delayLongPress={350}
                   style={[
-                    styles.bubble,
+                styles.bubble,
                     isMine ? styles.bubbleMine : styles.bubbleOther,
                     message.attachmentType === 'image' && styles.imageMessageBubble,
                     message.recalled && styles.recalledMessageBubble,
-                    message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
-                    pinnedId === message.id && styles.pinnedBubble,
+                message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
+                pinnedId === message.id && styles.pinnedBubble,
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel={isMine ? 'Tin nhắn của tôi' : 'Tin nhắn'}
@@ -2628,12 +2628,12 @@ export function ConversationScreen() {
                       <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
                     </View>
                   ) : message.stickerId ? (
-                    <Image
-                      source={getChatStickerImage(message.stickerId)}
-                      style={styles.chatSticker}
-                      resizeMode="contain"
-                      accessibilityLabel={CHAT_STICKERS.find((sticker) => sticker.id === message.stickerId)?.name || 'Sticker'}
-                    />
+                  <Image
+                    source={getChatStickerImage(message.stickerId)}
+                    style={styles.chatSticker}
+                    resizeMode="contain"
+                    accessibilityLabel={CHAT_STICKERS.find((sticker) => sticker.id === message.stickerId)?.name || 'Sticker'}
+                  />
                   ) : message.sticker ? (
                     <Text style={styles.sticker}>{message.sticker}</Text>
                   ) : null}
@@ -2641,13 +2641,13 @@ export function ConversationScreen() {
                     <View style={styles.messagePinnedLabel}>
                       <Pin size={10} color="#1D4ED8" />
                       <Text style={styles.messagePinnedLabelText}>Đã ghim</Text>
-                    </View>
+              </View>
                   ) : null}
                   {message.gifLabel ? (
                     <View style={styles.chatGif}>
                       <Text style={styles.chatGifText}>GIF</Text>
                       <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.gifLabel}</Text>
-                    </View>
+            </View>
                   ) : null}
                   {message.text && !message.recalled && message.attachmentType !== 'file' ? (
                     message.attachmentType === 'image' ? (
@@ -2700,8 +2700,8 @@ export function ConversationScreen() {
                       >
                         <Text style={styles.reactionBadgeEmoji}>{emoji}</Text>
                         {count > 1 ? <Text style={styles.reactionBadgeCount}>{count}</Text> : null}
-                      </Pressable>
-                    ))}
+            </Pressable>
+          ))}
 
                     {showReactionControls ? (
                       <View
@@ -2971,7 +2971,7 @@ export function ConversationScreen() {
               </Text>
             </View>
           ) : null}
-          </ScrollView>
+        </ScrollView>
         </View>
         {replyingTo ? (
           <View style={styles.replyBar}>
@@ -3701,8 +3701,8 @@ export function ConversationScreen() {
                 && user.role !== route.params.participantRole ? (
                   <View style={{ width: '100%', marginTop: spacing.sm }}>
                     <CommunicationPreferencesCard role={user.role} />
-                  </View>
-                ) : null}
+                </View>
+              ) : null}
               <Pressable onPress={() => setShowInfo(false)} style={styles.infoClose} accessibilityRole="button">
                 <Text style={styles.infoCloseText}>Đóng</Text>
               </Pressable>
@@ -3724,7 +3724,7 @@ export function ConversationScreen() {
                   accessibilityLabel="Đóng xếp lịch tuần"
                 >
                   <X size={20} color={colors.muted} />
-                </Pressable>
+          </Pressable>
               </View>
               <View style={styles.weekScheduleNavigator}>
                 <Pressable

@@ -5,6 +5,68 @@ const SystemSettings = require('../models/SystemSettings');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
+const { hasRealCourseEnrollment } = require('../services/freePortal');
+
+/** Gói tài khoản HV đã quá hạn (thiếu trường / vĩnh viễn = không hết hạn). */
+function isSubscriptionExpired(student, now = Date.now()) {
+  const sub = student?.subscription;
+  if (!sub || sub.plan === 'lifetime' || !sub.expiresAt) return false;
+  return new Date(sub.expiresAt).getTime() <= now;
+}
+
+/** HV hết hạn vẫn vào được phần 1 kèm 1 (chat, lịch, học phí) và màn gia hạn. Tự học bị chặn riêng. */
+const EXPIRED_ALLOWED_PREFIXES = [
+  '/api/auth/',
+  '/api/subscription/my',
+  '/api/settings/',
+  '/api/notifications',
+  '/api/mobile-push-tokens',
+  '/api/center-info',
+  '/api/messages',
+  '/api/schedules',
+  '/api/calls',
+  '/api/invoices',
+  '/api/files',
+  '/api/communication-preferences',
+  '/api/students',
+  '/api/feed',
+  '/api/blog',
+];
+
+function isStudentExamPath(url) {
+  return /\/api\/students\/[^/]+\/exam-/.test(url);
+}
+
+function isFreePortalRequestBlocked(req, student) {
+  if (!student?.freePortal || hasRealCourseEnrollment(student)) return false;
+  const url = String(req.originalUrl || req.url || '').split('?')[0];
+  const hidden = [
+    '/api/schedules',
+    '/api/feed',
+    '/api/blog',
+    '/api/evaluations',
+    '/api/center-info',
+  ];
+  if (hidden.some((prefix) => url === prefix || url.startsWith(`${prefix}/`))) return true;
+  if (student.freeUnlocked === true) return false;
+  if (isStudentExamPath(url)) return true;
+  const locked = [
+    '/api/messages',
+    '/api/assignments',
+    '/api/quizzes',
+    '/api/exam-results',
+    '/api/proctor',
+    '/api/ai-support',
+    '/api/calls',
+  ];
+  return locked.some((prefix) => url === prefix || url.startsWith(`${prefix}/`));
+}
+
+function isAllowedWhenExpired(req) {
+  const url = String(req.originalUrl || req.url || '').split('?')[0];
+  if (isStudentExamPath(url)) return false;
+  return EXPIRED_ALLOWED_PREFIXES.some((prefix) => url === prefix.replace(/\/$/, '') || url.startsWith(prefix));
+}
 
 // ── authMiddleware: Xác thực JWT + Token Blacklist + Token Version ─────────────
 const authMiddleware = async (req, res, next) => {
@@ -72,7 +134,7 @@ const authMiddleware = async (req, res, next) => {
     if (decoded.id && decoded.id !== 'admin') {
       let dbUser = null;
       if (decoded.role === 'student') {
-        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked').lean();
+        dbUser = await Student.findById(decoded.id).select('tokenVersion status branchId branchCode accountLocked subscription freePortal freeUnlocked enrollments.courseName enrollments.status enrollments.learningAccess enrollments.completedSessions enrollments.totalSessions').lean();
       } else {
         dbUser = await Teacher.findById(decoded.id).select('tokenVersion status role permissions adminRole createdAt branchId branchCode').lean();
       }
@@ -108,6 +170,22 @@ const authMiddleware = async (req, res, next) => {
           code: 'ACCOUNT_LOCKED',
           isBan: true,
           message: 'Tài khoản học viên đã bị khóa đăng nhập. Vui lòng liên hệ trung tâm.',
+        });
+      }
+
+      if (decoded.role === 'student' && isSubscriptionExpired(dbUser) && !isAllowedWhenExpired(req)) {
+        return res.status(403).json({
+          success: false,
+          code: 'SUBSCRIPTION_EXPIRED',
+          message: 'Tài khoản đã hết hạn. Vui lòng gia hạn hoặc nhập mã kích hoạt để tiếp tục học.',
+        });
+      }
+
+      if (decoded.role === 'student' && isFreePortalRequestBlocked(req, dbUser)) {
+        return res.status(403).json({
+          success: false,
+          code: 'FREE_PORTAL_LOCKED',
+          message: 'Mục này đang khóa. Mua XP để mở hỗ trợ, tin nhắn, phòng thi và bài tập.',
         });
       }
 
@@ -577,4 +655,6 @@ module.exports = {
   userHasPermission,
   branchFilter,
   requireInternalToken,
+  isSubscriptionExpired,
+  isAllowedWhenExpired,
 };

@@ -13,6 +13,15 @@ const systemSettingsSchema = new mongoose.Schema({
   centerBankAccountNumber: { type: String, default: '' },
   centerBankAccountName: { type: String, default: '' }, // Tên chủ tài khoản
 
+  // ── Giá gói tài khoản HV (VND). 0 = chưa bán qua thanh toán, chỉ kích hoạt bằng mã. ──
+  subscriptionPrices: {
+    '1m': { type: Number, default: 0 },
+    '3m': { type: Number, default: 0 },
+    '6m': { type: Number, default: 0 },
+    '12m': { type: Number, default: 0 },
+    lifetime: { type: Number, default: 0 },
+  },
+
   // ── Popup thông báo/quảng cáo (HV / GV / Nhân viên) ─────────────────────
   popupIsActive: { type: Boolean, default: false },
   popupTitle: { type: String, default: '' },

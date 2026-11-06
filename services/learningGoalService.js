@@ -116,6 +116,9 @@ async function recordStudyMinute(studentId, now = new Date()) {
 }
 
 const MAX_ACTIVITY_PER_CALL = 500;
+/** Tối đa phút ghi một lần hoàn thành lượt luyện tập hằng ngày. */
+const MAX_SESSION_STUDY_MINUTES = 120;
+const MAX_DAY_STUDY_MINUTES = 24 * 60;
 
 /** Ghi bằng chứng học hôm nay: số câu vừa trả lời / số video vừa xem xong. */
 async function recordStudyActivity(studentId, { questions = 0, videos = 0 } = {}, now = new Date()) {
@@ -136,6 +139,34 @@ async function recordStudyActivity(studentId, { questions = 0, videos = 0 } = {}
 /** Gọi sau khi nghiệp vụ chính đã xong — lỗi ghi nhật ký học không được làm hỏng bài nộp. */
 function trackStudyActivity(studentId, counts) {
   recordStudyActivity(studentId, counts).catch(() => {});
+}
+
+/**
+ * Cộng phút học từ một lượt luyện tập hằng ngày (từ lúc bắt đầu đến khi hoàn thành).
+ * Dùng cho mục tiêu «X giờ/ngày» — khác heartbeat từng phút khi xem bài giảng.
+ */
+async function recordStudyDuration(studentId, seconds, now = new Date()) {
+  assertStudentId(studentId);
+  const sec = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (sec < 1) return { todayMinutes: 0, addedMinutes: 0 };
+  let minutes = Math.ceil(sec / 60);
+  minutes = Math.min(MAX_SESSION_STUDY_MINUTES, minutes);
+  const day = vnDayKey(now);
+  const existing = await StudyTimeLog.findOne({ studentId, day }).select('minutes').lean();
+  const current = existing?.minutes || 0;
+  const add = Math.min(minutes, MAX_DAY_STUDY_MINUTES - current);
+  if (add <= 0) return { todayMinutes: current, addedMinutes: 0 };
+  try {
+    await StudyTimeLog.updateOne({ studentId, day }, { $inc: { minutes: add } }, { upsert: true });
+  } catch (err) {
+    if (err?.code !== 11000) throw err;
+    await StudyTimeLog.updateOne({ studentId, day }, { $inc: { minutes: add } });
+  }
+  return { todayMinutes: current + add, addedMinutes: add };
+}
+
+function trackStudyDuration(studentId, seconds) {
+  recordStudyDuration(studentId, seconds).catch(() => {});
 }
 
 /** Đếm số câu có trả lời trong mảng hoặc object đáp án. */
@@ -160,6 +191,8 @@ module.exports = {
   setLearningGoal,
   recordStudyMinute,
   recordStudyActivity,
+  recordStudyDuration,
   trackStudyActivity,
+  trackStudyDuration,
   countAnswered,
 };

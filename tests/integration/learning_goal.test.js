@@ -95,6 +95,24 @@ test('bằng chứng học: cộng số câu / video theo ngày và trả về t
   }
 });
 
+test('luyện tập hằng ngày: thời lượng lượt chơi cộng vào phút học trong ngày', { skip: dbSkip }, async () => {
+  await mongoose.connect(TEST_DB);
+  const studentId = new mongoose.Types.ObjectId();
+  try {
+    const first = await learningGoalService.recordStudyDuration(studentId, 90);
+    assert.equal(first.addedMinutes, 2);
+    assert.equal(first.todayMinutes, 2);
+    const second = await learningGoalService.recordStudyDuration(studentId, 240);
+    assert.equal(second.addedMinutes, 4);
+    assert.equal(second.todayMinutes, 6);
+    const progress = await learningGoalService.getLearningGoal(studentId);
+    assert.equal(progress.progress.todayMinutes, 6);
+  } finally {
+    await StudyTimeLog.deleteMany({ studentId });
+    await mongoose.disconnect();
+  }
+});
+
 test('bằng chứng học được ghi ở mọi nơi HV làm bài / xem video', () => {
   assert.ok(read('routes/lessonPracticeRoutes.js').includes('if (data && !data.retry && data.alreadyConfirmed === false)'), 'chỉ câu luyện tập được chấp nhận lần đầu');
   const lessonService = read('services/lessonPracticeService.js');
@@ -116,7 +134,9 @@ test('bộ đếm phút: rảnh 3 phút thì dừng, video đang phát vẫn tí
   assert.ok(mobile.includes('return isStudyMediaPlaying(now) || now - lastTouchAt <= IDLE_MS;'));
   assert.ok(read('thang-tin-hoc-mobile/src/screens/VideoPlayerFrame.native.tsx').includes('noteStudyMediaProgress(progress.playing)'));
   assert.ok(read('thang-tin-hoc-mobile/src/screens/VideoPlayerFrame.web.tsx').includes('noteStudyMediaProgress(playing)'));
-  assert.ok(read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx').includes('if (!isActivelyStudying()) return;'));
+  assert.ok(read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx').includes("routeName === 'DailyPractice'"));
+  assert.ok(web.includes('onDailyPractice'));
+  assert.ok(read('services/dailyPracticeService.js').includes('trackStudyDuration'));
 });
 
 test('bảng xếp hạng: tuần bắt đầu thứ Hai (giờ VN) và rút gọn tên', () => {

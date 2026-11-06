@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const DailyPracticeTopic = require('../models/DailyPracticeTopic');
 const DailyPracticeQuestion = require('../models/DailyPracticeQuestion');
 const rules = require('./dailyPracticeRules');
+const { resolveQuestionUnit } = require('./dailyPracticePathService');
 const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
 const logger = require('../config/logger');
 
@@ -53,7 +54,7 @@ function buildMessages(topic, difficulty, types, count) {
 }
 
 /** AI soạn nháp câu hỏi (status draft) — admin duyệt rồi mới xuất bản cho học viên. */
-async function generateDrafts({ topicId, difficulty, types, count } = {}, userId = null) {
+async function generateDrafts({ topicId, difficulty, types, count, unitId } = {}, userId = null) {
   if (!mongoose.Types.ObjectId.isValid(String(topicId || ''))) throw httpError(400, 'Chủ đề không hợp lệ');
   if (!rules.DIFFICULTIES.includes(difficulty)) throw httpError(400, 'Độ khó không hợp lệ');
   const wanted = (Array.isArray(types) ? types : []).filter((type) => rules.TYPES.includes(type));
@@ -61,6 +62,7 @@ async function generateDrafts({ topicId, difficulty, types, count } = {}, userId
   const total = Math.min(MAX_COUNT, Math.max(1, Math.floor(Number(count) || 5)));
   const topic = await DailyPracticeTopic.findById(topicId).lean();
   if (!topic) throw httpError(404, 'Không tìm thấy chủ đề');
+  const targetUnitId = await resolveQuestionUnit(topic._id, unitId);
   if (!isAiConfigured()) throw httpError(503, 'Trợ lý AI chưa được cấu hình');
 
   const { getSupportModelFallbacks } = require('./aiSupportService');
@@ -89,6 +91,7 @@ async function generateDrafts({ topicId, difficulty, types, count } = {}, userId
           docs.push({
             ...doc,
             topicId: topic._id,
+            unitId: targetUnitId,
             status: 'draft',
             source: 'ai',
             createdBy: mongoose.Types.ObjectId.isValid(String(userId || '')) ? userId : null,

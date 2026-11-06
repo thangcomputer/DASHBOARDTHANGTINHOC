@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowDown, ArrowUp, Bot, CheckCircle2, Eye, EyeOff, Gamepad2, Loader2, Pencil, PlayCircle, Plus, Send, Sparkles, Trash2, X,
+  ArrowDown, ArrowUp, Bot, CheckCircle2, Clapperboard, Eye, EyeOff, Gamepad2, ImagePlus, Loader2, Pencil, PlayCircle, Plus, Route, Send, Sparkles, Trash2, X,
 } from 'lucide-react';
+import api, { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { useToast } from '../../../utils/useToast';
@@ -13,6 +14,137 @@ import {
 const TYPE_IDS = Object.keys(QUESTION_TYPES);
 const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
 const LABEL = 'mb-1 block text-xs font-bold text-slate-600';
+const UNIT_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
+
+function XpPackPrices() {
+  const toast = useToast();
+  const [packs, setPacks] = useState([]);
+  const [prices, setPrices] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    dailyPracticeApi.admin.xpPacks()
+      .then((rows) => {
+        const list = Array.isArray(rows) ? rows : [];
+        setPacks(list);
+        setPrices(Object.fromEntries(list.map((pack) => [pack.id, String(pack.priceVnd)])));
+      })
+      .catch((err) => toast.error(err.message || 'Không tải được giá gói XP'));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const next = await dailyPracticeApi.admin.saveXpPacks(
+        Object.fromEntries(packs.map((pack) => [pack.id, Number(String(prices[pack.id] || '').replace(/\D/g, ''))])),
+      );
+      const list = Array.isArray(next) ? next : [];
+      setPacks(list);
+      setPrices(Object.fromEntries(list.map((pack) => [pack.id, String(pack.priceVnd)])));
+      toast.success('Đã lưu giá gói XP');
+    } catch (err) {
+      toast.error(err.message || 'Chưa lưu được giá');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!packs.length) return null;
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <h3 className="text-sm font-black text-slate-900">Giá gói XP luyện</h3>
+      <p className="mt-1 text-xs text-slate-500">Chỉ đổi số tiền. Mã gói và số XP giữ nguyên để đơn chuyển khoản cũ vẫn khớp.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {packs.map((pack) => (
+          <label key={pack.id} className="text-xs font-bold text-slate-600">
+            {pack.label}
+            <input
+              inputMode="numeric"
+              className={`${INPUT} mt-1`}
+              value={prices[pack.id] || ''}
+              onChange={(event) => setPrices((prev) => ({ ...prev, [pack.id]: event.target.value.replace(/[^\d]/g, '') }))}
+            />
+          </label>
+        ))}
+      </div>
+      <button type="button" onClick={save} disabled={saving} className="cms-btn cms-btn-primary mt-3">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : null} Lưu giá
+      </button>
+    </section>
+  );
+}
+
+/** Ô ảnh chặng: dán URL hoặc tải từ máy → `/uploads/...`. */
+function UnitImageField({
+  id = 'dp-unit-image',
+  value,
+  onChange,
+  label = 'Ảnh minh họa chặng (lộ trình Duolingo)',
+  compact = false,
+}) {
+  const toast = useToast();
+  const [uploading, setUploading] = useState(false);
+  const url = String(value || '');
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Chỉ chọn file ảnh (PNG/JPG/WebP/GIF)');
+      return;
+    }
+    setUploading(true);
+    try {
+      const data = await api.settings.uploadTrainingFile(file);
+      if (!data?.success || !data.fileUrl) throw new Error(data?.message || 'Upload thất bại');
+      onChange(data.fileUrl);
+      toast.success('Đã tải ảnh lên máy chủ');
+    } catch (err) {
+      toast.error(err.message || 'Không tải được ảnh');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className={compact ? 'space-y-2' : ''}>
+      {label ? <label className={LABEL} htmlFor={id}>{label}</label> : null}
+      <div className={`flex flex-col gap-2 sm:flex-row sm:items-stretch ${compact ? '' : 'mt-0'}`}>
+        <input
+          id={id}
+          className={`${INPUT} ${compact ? '!py-1.5' : ''} min-w-0 flex-1`}
+          value={url}
+          maxLength={500}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://... hoặc /uploads/..."
+          aria-label="URL ảnh minh họa chặng"
+        />
+        <label
+          className={`inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-700 transition hover:bg-sky-100 ${uploading ? 'pointer-events-none opacity-60' : ''} ${compact ? 'py-1.5' : 'py-2'}`}
+        >
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} aria-hidden="true" />}
+          {uploading ? 'Đang tải…' : 'Tải từ máy'}
+          <input type="file" className="hidden" accept={UNIT_IMAGE_ACCEPT} disabled={uploading} onChange={handleUpload} />
+        </label>
+      </div>
+      <p className="mt-1 text-[11px] text-slate-500">PNG/JPG/WebP · gợi ý khoảng 512px. Dán link hoặc tải từ máy. Để trống nếu dùng linh vật mặc định.</p>
+      {url.trim() ? (
+        <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2">
+          <img
+            src={resolveMediaUrl(url.trim()) || url.trim()}
+            alt=""
+            className="h-16 w-16 rounded-lg object-contain bg-slate-50 ring-1 ring-slate-200"
+            onError={(e) => { e.currentTarget.style.opacity = '0.35'; }}
+          />
+          <button type="button" className="text-xs font-bold text-red-600 hover:underline" onClick={() => onChange('')}>
+            Xóa ảnh
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function Modal({ title, onClose, children, footer, wide = false }) {
   return createPortal(
@@ -163,7 +295,7 @@ function TopicModal({ topic, onClose, onSaved }) {
             disabled={lessonSubjects === null}
             onChange={(e) => set({ lessonSubjectId: e.target.value, lessonUnitIds: [] })}
           >
-            <option value="">{lessonSubjects === null ? 'Đang tải môn học…' : '— Không gắn video —'}</option>
+            <option value="">{lessonSubjects === null ? 'Đang tải môn học…' : 'Không gắn video'}</option>
             {(lessonSubjects || []).map((subject) => (
               <option key={subject.id} value={subject.id}>{subject.name}</option>
             ))}
@@ -267,17 +399,23 @@ function ListEditor({ values, onChange, min = 2, max = 8, placeholder, ordered =
 
 const splitList = (text) => String(text || '').split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
 
-function QuestionModal({ topicId, question, defaultDifficulty, onClose, onSaved }) {
+function QuestionModal({ topicId, question, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, onClose, onSaved }) {
   const toast = useToast();
-  const [form, setForm] = useState(() => (question ? fromQuestion(question) : blankQuestion('mcq', defaultDifficulty || 'easy')));
+  const [form, setForm] = useState(() => (question
+    ? fromQuestion(question)
+    : { ...blankQuestion('mcq', defaultDifficulty || 'easy'), unitId: defaultUnitId }));
   const [saving, setSaving] = useState(false);
   const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
   const blanks = useMemo(() => [...String(form.text || '').matchAll(/\{\{([^{}]+)\}\}/g)].map((m) => m[1]), [form.text]);
+  const lockedUnitId = form.unitId || defaultUnitId || '';
+  const lockedUnit = lockUnit && lockedUnitId ? units.find((u) => u.id === lockedUnitId) : null;
+  const lockedUnitIndex = lockUnit && lockedUnitId ? units.findIndex((u) => u.id === lockedUnitId) : -1;
+  const freePracticeLock = lockUnit && !lockedUnitId;
 
   const payload = () => {
     const body = {
       topicId, type: form.type, difficulty: form.difficulty, prompt: form.prompt, imageUrl: form.imageUrl,
-      hint: form.hint, explanation: form.explanation, status: form.status,
+      hint: form.hint, explanation: form.explanation, status: form.status, unitId: form.unitId || '',
     };
     if (form.type === 'mcq') Object.assign(body, { options: form.options.filter((o) => o.trim()), correctIndex: form.correctIndex });
     if (form.type === 'truefalse') body.answerBool = form.answerBool;
@@ -322,6 +460,22 @@ function QuestionModal({ topicId, question, defaultDifficulty, onClose, onSaved 
       )}
     >
       <div className="space-y-4">
+        <div>
+          <span className={LABEL}>Phạm vi câu hỏi</span>
+          {freePracticeLock ? (
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-900">
+              Luyện tự do
+              <span className="mt-0.5 block text-[11px] font-semibold text-sky-700">Chỉ dùng ở Luyện tự do. Không vào lộ trình, không gắn video.</span>
+            </p>
+          ) : lockUnit && lockedUnit ? (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900">
+              Chặng {lockedUnitIndex + 1}: {lockedUnit.title}
+              <span className="mt-0.5 block text-[11px] font-semibold text-emerald-700">Gắn theo nút trắc nghiệm bạn vừa bấm. Không đổi chặng tại đây.</span>
+            </p>
+          ) : (
+            <UnitSelect id="dp-q-unit" units={units} value={form.unitId || ''} onChange={(unitId) => set({ unitId })} />
+          )}
+        </div>
         <div>
           <span className={LABEL}>Dạng câu hỏi</span>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -415,7 +569,7 @@ function QuestionModal({ topicId, question, defaultDifficulty, onClose, onSaved 
           {form.type === 'fill' && (
             <div className="space-y-3">
               <div>
-                <label className={LABEL} htmlFor="dp-q-text">Đoạn văn — đặt từ cần điền trong {'{{ }}'}</label>
+                <label className={LABEL} htmlFor="dp-q-text">Đoạn văn. Đặt từ cần điền trong {'{{ }}'}</label>
                 <textarea id="dp-q-text" rows={3} className={INPUT} value={form.text} onChange={(e) => set({ text: e.target.value })} placeholder="Nhấn {{Ctrl}} + {{S}} để lưu tài liệu." />
                 <p className="mt-1 text-xs text-slate-500">
                   {blanks.length ? <>Chỗ trống: {blanks.map((b) => <span key={b} className="mr-1 rounded bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-700">{b}</span>)}</> : 'Chưa có chỗ trống nào.'}
@@ -463,17 +617,21 @@ function QuestionModal({ topicId, question, defaultDifficulty, onClose, onSaved 
   );
 }
 
-function AiModal({ topic, defaultDifficulty, onClose, onDone }) {
+function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', lockUnit = false, onClose, onDone }) {
   const toast = useToast();
   const [difficulty, setDifficulty] = useState(defaultDifficulty || 'easy');
+  const [unitId, setUnitId] = useState(defaultUnitId);
   const [count, setCount] = useState(6);
   const [types, setTypes] = useState(TYPE_IDS);
   const [busy, setBusy] = useState(false);
+  const lockedUnit = lockUnit && unitId ? units.find((u) => u.id === unitId) : null;
+  const lockedUnitIndex = lockUnit && unitId ? units.findIndex((u) => u.id === unitId) : -1;
+  const freePracticeLock = lockUnit && !unitId;
 
   const run = async () => {
     setBusy(true);
     try {
-      const result = await dailyPracticeApi.admin.aiGenerate({ topicId: topic.id, difficulty, count, types });
+      const result = await dailyPracticeApi.admin.aiGenerate({ topicId: topic.id, difficulty, count, types, unitId });
       toast.success(`AI đã tạo ${result.created} câu nháp${result.skipped ? ` (bỏ ${result.skipped} câu lỗi)` : ''}. Hãy duyệt rồi xuất bản.`);
       onDone();
     } catch (err) {
@@ -485,7 +643,7 @@ function AiModal({ topic, defaultDifficulty, onClose, onDone }) {
 
   return (
     <Modal
-      title={`AI tạo câu hỏi nháp — ${topic.name}`}
+      title={`AI tạo câu hỏi nháp: ${topic.name}`}
       onClose={busy ? () => {} : onClose}
       footer={(
         <>
@@ -498,8 +656,24 @@ function AiModal({ topic, defaultDifficulty, onClose, onDone }) {
     >
       <div className="space-y-4">
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-          Câu do AI tạo được lưu ở trạng thái <b>Nháp</b> — học viên chưa thấy cho tới khi bạn kiểm tra và xuất bản.
+          Câu do AI tạo được lưu ở trạng thái <b>Nháp</b>. Học viên chưa thấy cho tới khi bạn kiểm tra và xuất bản.
         </p>
+        <div>
+          <span className={LABEL}>Phạm vi câu hỏi</span>
+          {freePracticeLock ? (
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-900">
+              Luyện tự do
+              <span className="mt-0.5 block text-[11px] font-semibold text-sky-700">Chỉ dùng ở Luyện tự do. Không vào lộ trình.</span>
+            </p>
+          ) : lockUnit && lockedUnit ? (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900">
+              Chặng {lockedUnitIndex + 1}: {lockedUnit.title}
+              <span className="mt-0.5 block text-[11px] font-semibold text-emerald-700">Gắn theo nút trắc nghiệm bạn vừa bấm.</span>
+            </p>
+          ) : (
+            <UnitSelect id="dp-ai-unit" units={units} value={unitId} onChange={setUnitId} />
+          )}
+        </div>
         <div>
           <span className={LABEL}>Độ khó</span>
           <div className="flex gap-2">
@@ -530,10 +704,887 @@ function AiModal({ topic, defaultDifficulty, onClose, onDone }) {
   );
 }
 
+// ── Chặng lộ trình ───────────────────────────────────────────────────────────
+const MIN_UNIT_QUESTIONS = 4;
+
+function UnitModal({ topic, unit, onClose, onSaved }) {
+  const toast = useToast();
+  const [form, setForm] = useState(() => ({
+    title: unit?.title || '',
+    description: unit?.description || '',
+    imageUrl: unit?.imageUrl || '',
+    active: unit?.active !== false,
+    lessonUnitId: unit?.lessonUnitId || '',
+  }));
+  const [subjectId, setSubjectId] = useState(topic.lessonSubjectId || '');
+  const [subjects, setSubjects] = useState(null);
+  const [lessonUnits, setLessonUnits] = useState({ subjectId: '', rows: null });
+  const [saving, setSaving] = useState(false);
+  const set = (patch) => setForm((prev) => ({ ...prev, ...patch }));
+
+  useEffect(() => {
+    let alive = true;
+    lessonPracticeApi.admin.subjects()
+      .then((res) => { if (alive) setSubjects(res?.data || []); })
+      .catch(() => { if (alive) setSubjects([]); });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!subjectId) return undefined;
+    let alive = true;
+    lessonPracticeApi.admin.units(subjectId)
+      .then((res) => {
+        if (!alive) return;
+        const rows = res?.data || [];
+        setLessonUnits({ subjectId, rows });
+      })
+      .catch(() => { if (alive) setLessonUnits({ subjectId, rows: [] }); });
+    return () => { alive = false; };
+  }, [subjectId]);
+
+  const unitRows = lessonUnits.subjectId === subjectId ? lessonUnits.rows : null;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const saved = unit
+        ? await dailyPracticeApi.admin.updateUnit(unit.id, form)
+        : await dailyPracticeApi.admin.createUnit(topic.id, form);
+      toast.success(unit ? 'Đã cập nhật chặng' : 'Đã thêm chặng');
+      onSaved(saved);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={unit ? 'Sửa chặng' : `Thêm chặng: ${topic.name}`}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" onClick={onClose} className="cms-btn cms-btn-outline">Hủy</button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || !form.title.trim()}
+            className="cms-btn cms-btn-primary"
+          >
+            {saving && <Loader2 size={16} className="animate-spin" />} Lưu
+          </button>
+        </>
+      )}
+    >
+      <div className="space-y-3">
+        <div>
+          <label className={LABEL} htmlFor="dp-unit-title">Tên chặng</label>
+          <input id="dp-unit-title" className={INPUT} value={form.title} maxLength={80} onChange={(e) => set({ title: e.target.value })} placeholder="Ví dụ: Định dạng chữ và đoạn văn" />
+        </div>
+        <div>
+          <label className={LABEL} htmlFor="dp-unit-desc">Mô tả ngắn</label>
+          <input id="dp-unit-desc" className={INPUT} value={form.description} maxLength={240} onChange={(e) => set({ description: e.target.value })} placeholder="Học viên sẽ luyện những gì ở chặng này" />
+        </div>
+        <UnitImageField
+          id="dp-unit-image"
+          value={form.imageUrl}
+          onChange={(imageUrl) => set({ imageUrl })}
+        />
+        <div className="rounded-xl bg-slate-50 p-3">
+          <span className={LABEL}>Buổi video trong khóa bài giảng nên xem trước (không bắt buộc)</span>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <select className={INPUT} value={subjectId} onChange={(e) => { setSubjectId(e.target.value); set({ lessonUnitId: '' }); }} aria-label="Môn video">
+              <option value="">{subjects === null ? 'Đang tải môn…' : 'Không gắn video'}</option>
+              {(subjects || []).map((s) => <option key={s._id || s.id} value={s._id || s.id}>{s.name}</option>)}
+            </select>
+            <select className={INPUT} value={form.lessonUnitId} disabled={!subjectId} onChange={(e) => set({ lessonUnitId: e.target.value })} aria-label="Buổi video">
+              <option value="">{subjectId && unitRows === null ? 'Đang tải buổi…' : 'Chọn buổi'}</option>
+              {(unitRows || []).map((u) => <option key={u._id || u.id} value={u._id || u.id}>{u.title}</option>)}
+            </select>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <input type="checkbox" className="h-4 w-4 accent-red-600" checked={form.active} onChange={(e) => set({ active: e.target.checked })} />
+          Hiện chặng này trên lộ trình
+        </label>
+      </div>
+    </Modal>
+  );
+}
+
+const MAX_UNIT_VIDEOS = 20;
+const STEP_VIDEO_LEVELS = [
+  { key: 'learn', label: 'Dễ' },
+  { key: 'practice', label: 'Vừa' },
+  { key: 'challenge', label: 'Khó' },
+];
+const PATH_NODE_PRESETS = [
+  { key: 'study', label: 'Học bài', icon: 'book' },
+  { key: 'practice-1', label: 'Luyện tập', icon: 'dumbbell' },
+  { key: 'challenge', label: 'Thử thách', icon: 'flame' },
+  { key: 'practice-2', label: 'Luyện tập', icon: 'dumbbell' },
+  { key: 'complete', label: 'Hoàn thành', icon: 'crown' },
+];
+
+function emptyStepVideos() {
+  return { learn: [], practice: [], challenge: [] };
+}
+
+function emptyNodeStepVideos() {
+  return { learn: [], practice: [], challenge: [] };
+}
+
+function mapNodeStepVideos(raw) {
+  const mapItem = (v) => ({ id: v.id, title: v.title, url: v.url || '', content: v.content || '', checks: v.checks || [] });
+  return {
+    learn: (raw?.learn || []).map(mapItem),
+    practice: (raw?.practice || []).map(mapItem),
+    challenge: (raw?.challenge || []).map(mapItem),
+  };
+}
+
+/** Mặc định đủ 5 nút như lộ trình Duolingo trên HV. */
+function defaultPathNodes(unit) {
+  return PATH_NODE_PRESETS.map((preset, index) => ({
+    ...preset,
+    sortOrder: index,
+    active: true,
+    stepVideos: index === 0
+      ? mapNodeStepVideos(unit?.stepVideos)
+      : emptyNodeStepVideos(),
+  }));
+}
+
+function pathNodesFromUnit(unit) {
+  if (unit.pathNodes?.length) {
+    return unit.pathNodes.map((node, index) => ({
+      key: node.key,
+      label: node.label,
+      icon: node.icon || 'dumbbell',
+      sortOrder: node.sortOrder ?? index,
+      active: node.active !== false,
+      stepVideos: mapNodeStepVideos(node.stepVideos),
+    }));
+  }
+  return defaultPathNodes(unit);
+}
+
+function unitVideoCount(unit) {
+  const nodeTotal = (unit.pathNodes?.length ? unit.pathNodes : pathNodesFromUnit(unit)).reduce(
+    (sum, node) => sum + STEP_VIDEO_LEVELS.reduce((s, level) => s + (node.stepVideos?.[level.key]?.length || 0), 0),
+    0,
+  );
+  return (unit.videos?.length || 0) + nodeTotal;
+}
+
+/** Nút lộ trình trong chặng: Học bài = Bài 1/2…; Luyện/Thử thách/Hoàn thành = Dễ/Vừa/Khó. */
+function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
+  const toast = useToast();
+  const [nodes, setNodes] = useState(() => pathNodesFromUnit(unit));
+  const [saving, setSaving] = useState(false);
+  const original = JSON.stringify(pathNodesFromUnit(unit));
+  const dirty = JSON.stringify(nodes) !== original;
+
+  const updateNode = (index, patch) => setNodes((list) => list.map((node, i) => (i === index ? { ...node, ...patch } : node)));
+  const updateLevelVideos = (nodeIndex, levelKey, videos) => setNodes((list) => list.map((node, i) => (
+    i === nodeIndex ? { ...node, stepVideos: { ...node.stepVideos, [levelKey]: videos } } : node
+  )));
+  const moveNode = (index, delta) => setNodes((list) => {
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return list;
+    const next = [...list];
+    [next[index], next[target]] = [next[target], next[index]];
+    return next.map((node, i) => ({ ...node, sortOrder: i }));
+  });
+  const addPreset = (presetKey) => {
+    const preset = PATH_NODE_PRESETS.find((item) => item.key === presetKey);
+    if (!preset) return;
+    const suffix = nodes.filter((n) => n.key.startsWith(preset.key)).length;
+    const key = suffix ? `${preset.key}-${suffix + 1}` : preset.key;
+    setNodes((list) => [...list, { ...preset, key, sortOrder: list.length, active: true, stepVideos: emptyStepVideos() }]);
+  };
+  const removeNode = (index) => setNodes((list) => (list.length <= 1 ? list : list.filter((_, i) => i !== index)));
+  const restoreDefaults = () => {
+    if (!window.confirm('Khôi phục 5 nút mẫu (Học bài, Luyện tập, Thử thách, Luyện tập, Hoàn thành)? Video bài học nút đầu sẽ giữ nếu có.')) return;
+    setNodes(defaultPathNodes(unit));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await dailyPracticeApi.admin.updateUnit(unit.id, {
+        title: unit.title,
+        description: unit.description,
+        active: unit.active,
+        lessonUnitId: unit.lessonUnitId || '',
+        videos: unit.videos || [],
+        pathNodes: nodes.map((node, index) => ({
+          key: node.key,
+          label: node.label,
+          icon: node.icon,
+          sortOrder: index,
+          active: node.active !== false,
+          stepVideos: node.stepVideos,
+        })),
+      });
+      toast.success('Đã lưu nút lộ trình');
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/40 p-2.5">
+      <div>
+        <p className="text-xs font-black text-slate-800">Nút trên lộ trình học viên (như hình snake)</p>
+        <p className="text-[11px] font-semibold text-slate-600">
+          <span className="font-black text-violet-700">Học bài</span> = Bài 1, 2… (nội dung chữ và/hoặc video).{' '}
+          <span className="font-black text-violet-700">Luyện / Thử thách / Hoàn thành</span> = trắc nghiệm Dễ, Vừa, Khó (lấy câu đã xếp vào chặng).
+        </p>
+      </div>
+      {nodes.map((node, nodeIndex) => {
+        const isStudy = node.icon === 'book';
+        return (
+          <div key={`${node.key}-${nodeIndex}`} className="space-y-2 rounded-xl border border-slate-200 bg-white p-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-600 text-[11px] font-black text-white">{nodeIndex + 1}</span>
+              <input className={`${INPUT} !py-1.5 max-w-[140px]`} value={node.label} maxLength={40} onChange={(e) => updateNode(nodeIndex, { label: e.target.value })} aria-label="Tên nút" />
+              <select
+                className={`${INPUT} !py-1.5 max-w-[200px]`}
+                value={node.icon}
+                onChange={(e) => updateNode(nodeIndex, { icon: e.target.value })}
+                aria-label="Loại nút"
+              >
+                <option value="book">Học bài (nội dung / video)</option>
+                <option value="dumbbell">Luyện tập (trắc nghiệm)</option>
+                <option value="flame">Thử thách (trắc nghiệm)</option>
+                <option value="crown">Hoàn thành (trắc nghiệm)</option>
+              </select>
+              <span className="ml-auto flex shrink-0 flex-col">
+                <button type="button" disabled={nodeIndex === 0} onClick={() => moveNode(nodeIndex, -1)} className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
+                <button type="button" disabled={nodeIndex === nodes.length - 1} onClick={() => moveNode(nodeIndex, 1)} className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
+              </span>
+              <button type="button" disabled={nodes.length <= 1} onClick={() => removeNode(nodeIndex)} className="rounded-lg p-1.5 text-slate-400 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+            </div>
+            {isStudy ? (
+              <UnitStepVideosPanel
+                unit={unit}
+                stepKey="learn"
+                stepLabel={`${node.label} · Bài học (Bài 1, 2…)`}
+                videos={node.stepVideos.learn || []}
+                onVideosChange={(videos) => updateLevelVideos(nodeIndex, 'learn', videos)}
+                deferSave
+                lessonMode
+              />
+            ) : (
+              <QuizNodeConfig
+                unit={unit}
+                node={node}
+                nodeIndex={nodeIndex}
+                onVideosChange={updateLevelVideos}
+                onComposeQuestion={onComposeQuestion}
+                onAiDraft={onAiDraft}
+              />
+            )}
+          </div>
+        );
+      })}
+      <div className="flex flex-wrap items-center gap-2">
+        <select className={`${INPUT} !py-1.5 max-w-[220px]`} defaultValue="" onChange={(e) => { if (e.target.value) { addPreset(e.target.value); e.target.value = ''; } }} aria-label="Thêm nút">
+          <option value="">+ Thêm nút mẫu…</option>
+          {PATH_NODE_PRESETS.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
+        </select>
+        <button type="button" onClick={restoreDefaults} className="cms-btn cms-btn-outline !py-1.5 text-xs">5 nút mẫu</button>
+        <button type="button" onClick={save} disabled={!dirty || saving} className="cms-btn cms-btn-primary ml-auto !py-1.5 text-xs">
+          {saving && <Loader2 size={13} className="animate-spin" />} Lưu nút lộ trình
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Ảnh minh họa chặng — sửa ngay trong khung Lộ trình (desktop), không cần mở modal. */
+function UnitImagePanel({ unit, onSaved }) {
+  const toast = useToast();
+  const [imageUrl, setImageUrl] = useState(unit.imageUrl || '');
+  const [saving, setSaving] = useState(false);
+  const dirty = imageUrl.trim() !== String(unit.imageUrl || '').trim();
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await dailyPracticeApi.admin.updateUnit(unit.id, { imageUrl: imageUrl.trim() });
+      toast.success(imageUrl.trim() ? 'Đã lưu ảnh minh họa chặng' : 'Đã xóa ảnh minh họa chặng');
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-xl border border-sky-100 bg-sky-50/50 p-2.5">
+      <UnitImageField
+        id={`dp-unit-image-panel-${unit.id}`}
+        value={imageUrl}
+        onChange={setImageUrl}
+        compact
+      />
+      <div className="flex items-center justify-end gap-2">
+        {dirty && <span className="mr-auto text-[11px] font-bold text-amber-600">Có thay đổi chưa lưu</span>}
+        <button type="button" onClick={save} disabled={!dirty || saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">
+          {saving && <Loader2 size={13} className="animate-spin" />} Lưu ảnh chặng
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function emptyVideoCheck() {
+  return { kind: 'choice', atSec: 30, prompt: '', choices: ['', ''], answer: '0', criteria: '', shortHint: '', paidHint: '', hintCostXp: 5 };
+}
+
+/** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+function VideoChecksEditor({ checks, onChange }) {
+  const list = checks || [];
+  const patch = (index, next) => onChange(list.map((item, i) => (i === index ? { ...item, ...next } : item)));
+  return (
+    <div className="space-y-1.5 rounded-lg bg-amber-50/80 p-2 ring-1 ring-amber-100 sm:col-span-2">
+      <p className="text-[11px] font-black text-amber-900">Mốc câu hỏi trong video</p>
+      {list.map((check, index) => (
+        <div key={check.id || `check-${index}`} className="space-y-1.5 rounded-lg bg-white p-2 ring-1 ring-amber-100">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <label className="text-[11px] font-bold text-slate-600">
+              Giây
+              <input
+                type="number"
+                min={0}
+                className={`${INPUT} ml-1 !w-20 !py-1`}
+                value={check.atSec}
+                onChange={(e) => patch(index, { atSec: e.target.value })}
+              />
+            </label>
+            <select className={`${INPUT} !w-auto !py-1`} value={check.kind} onChange={(e) => patch(index, { kind: e.target.value })}>
+              <option value="choice">Chọn đáp án</option>
+              <option value="text">Nhập đáp án</option>
+              <option value="screen">Chụp màn hình, AI chấm</option>
+            </select>
+            <button type="button" onClick={() => onChange(list.filter((_, i) => i !== index))} className="ml-auto text-[11px] font-bold text-red-600 !shadow-none">Xóa mốc</button>
+          </div>
+          <input className={`${INPUT} !py-1.5`} maxLength={300} value={check.prompt} placeholder="Câu hỏi hiện lúc dừng video" onChange={(e) => patch(index, { prompt: e.target.value })} />
+          {check.kind === 'choice' && (
+            <div className="space-y-1">
+              {(check.choices || ['', '']).map((choice, choiceIndex) => (
+                <label key={choiceIndex} className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                  <input type="radio" name={`check-${check.id || index}`} checked={String(check.answer) === String(choiceIndex)} onChange={() => patch(index, { answer: String(choiceIndex) })} />
+                  <input className={`${INPUT} !py-1`} maxLength={120} value={choice} placeholder={`Đáp án ${choiceIndex + 1}`} onChange={(e) => {
+                    const choices = [...(check.choices || [])];
+                    choices[choiceIndex] = e.target.value;
+                    patch(index, { choices });
+                  }} />
+                </label>
+              ))}
+              {(check.choices || []).length < 4 && (
+                <button type="button" className="text-[11px] font-bold text-sky-700 !shadow-none" onClick={() => patch(index, { choices: [...(check.choices || []), ''] })}>Thêm đáp án</button>
+              )}
+            </div>
+          )}
+          {check.kind === 'text' && (
+            <input className={`${INPUT} !py-1.5`} maxLength={200} value={check.answer || ''} placeholder="Đáp án đúng (không phân biệt hoa thường)" onChange={(e) => patch(index, { answer: e.target.value })} />
+          )}
+          {check.kind === 'screen' && (
+            <textarea className={`${INPUT} !py-1.5`} rows={2} maxLength={500} value={check.criteria || ''} placeholder="Tiêu chí AI chấm. Học viên không thấy dòng này." onChange={(e) => patch(index, { criteria: e.target.value })} />
+          )}
+          <input className={`${INPUT} !py-1.5`} maxLength={160} value={check.shortHint || ''} placeholder="Gợi ý ngắn khi sai. Không viết đáp án." onChange={(e) => patch(index, { shortHint: e.target.value })} />
+          <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_6rem]">
+            <input className={`${INPUT} !py-1.5`} maxLength={300} value={check.paidHint || ''} placeholder="Gợi ý rõ hơn, học viên phải đổi XP" onChange={(e) => patch(index, { paidHint: e.target.value })} />
+            <input type="number" min={0} max={50} className={`${INPUT} !py-1.5`} value={check.hintCostXp ?? 5} aria-label="XP gợi ý" onChange={(e) => patch(index, { hintCostXp: e.target.value })} />
+          </div>
+        </div>
+      ))}
+      {list.length < 6 && (
+        <button type="button" onClick={() => onChange([...list, emptyVideoCheck()])} className="text-[11px] font-black text-amber-800 !shadow-none">+ Thêm mốc</button>
+      )}
+    </div>
+  );
+}
+
+/** Danh sách video riêng của một chặng — sửa ngay trong khung Lộ trình chặng. */
+function UnitVideosPanel({ unit, onSaved }) {
+  const toast = useToast();
+  const mapVideo = (video) => ({ id: video.id, title: video.title, url: video.url, checks: video.checks || [] });
+  const [videos, setVideos] = useState(() => (unit.videos || []).map(mapVideo));
+  const [draft, setDraft] = useState({ title: '', url: '' });
+  const [saving, setSaving] = useState(false);
+  const original = JSON.stringify((unit.videos || []).map(mapVideo));
+  const dirty = JSON.stringify(videos) !== original;
+  const invalid = videos.some((video) => !video.title.trim() || !video.url.trim());
+
+  const update = (index, patch) => setVideos((list) => list.map((video, i) => (i === index ? { ...video, ...patch } : video)));
+  const move = (index, delta) => setVideos((list) => {
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return list;
+    const next = [...list];
+    [next[index], next[target]] = [next[target], next[index]];
+    return next;
+  });
+  const addDraft = () => {
+    if (!draft.title.trim() || !draft.url.trim()) return;
+    setVideos((list) => [...list, { title: draft.title.trim(), url: draft.url.trim() }]);
+    setDraft({ title: '', url: '' });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await dailyPracticeApi.admin.updateUnit(unit.id, {
+        title: unit.title,
+        description: unit.description,
+        active: unit.active,
+        lessonUnitId: unit.lessonUnitId || '',
+        videos,
+        stepVideos: unit.stepVideos || { learn: [], practice: [], challenge: [] },
+      });
+      toast.success('Đã lưu danh sách video của chặng');
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-xl border border-red-100 bg-red-50/40 p-2.5">
+      <p className="text-[11px] font-semibold text-slate-500">
+        Mỗi video hiện thành nút 🎬 trên lộ trình của chặng; học viên bấm vào sẽ mở popup trình phát Thắng Tin Học ngay tại trang.
+      </p>
+      {videos.length > 0 && (
+        <ol className="space-y-1.5">
+          {videos.map((video, index) => (
+            <li key={video.id || `new-${index}`} className="flex items-start gap-2 rounded-lg bg-white p-2 ring-1 ring-slate-100">
+              <span className="mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-600 text-[11px] font-black text-white">{index + 1}</span>
+              <div className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+                <input className={`${INPUT} !py-1.5`} value={video.title} maxLength={120} onChange={(e) => update(index, { title: e.target.value })} placeholder="Tên video" aria-label={`Tên video ${index + 1}`} />
+                <input className={`${INPUT} !py-1.5`} value={video.url} maxLength={500} onChange={(e) => update(index, { url: e.target.value })} placeholder="Link YouTube / Vimeo / .mp4" aria-label={`Link video ${index + 1}`} />
+                <VideoChecksEditor checks={video.checks} onChange={(checks) => update(index, { checks })} />
+              </div>
+              <span className="flex shrink-0 flex-col pt-0.5">
+                <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
+                <button type="button" disabled={index === videos.length - 1} onClick={() => move(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
+              </span>
+              <button type="button" onClick={() => setVideos((list) => list.filter((_, i) => i !== index))} aria-label="Xóa video" className="mt-0.5 shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {videos.length < MAX_UNIT_VIDEOS && (
+        <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]">
+          <input className={`${INPUT} !py-1.5`} value={draft.title} maxLength={120} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Tên video mới" aria-label="Tên video mới" />
+          <input
+            className={`${INPUT} !py-1.5`}
+            value={draft.url}
+            maxLength={500}
+            onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === 'Enter') addDraft(); }}
+            placeholder="Dán link YouTube / Vimeo / .mp4"
+            aria-label="Link video mới"
+          />
+          <button type="button" onClick={addDraft} disabled={!draft.title.trim() || !draft.url.trim()} className="cms-btn cms-btn-outline !py-1.5 text-xs">
+            <Plus size={14} /> Thêm video
+          </button>
+        </div>
+      )}
+      <div className="flex items-center justify-end gap-2">
+        {dirty && <span className="mr-auto text-[11px] font-bold text-amber-600">Có thay đổi chưa lưu</span>}
+        <button type="button" onClick={save} disabled={!dirty || invalid || saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">
+          {saving && <Loader2 size={13} className="animate-spin" />} Lưu danh sách video
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Nút luyện: nhấn mạnh trắc nghiệm; soạn câu / AI gắn ngay dưới (không phải cấp chặng). */
+function QuizNodeConfig({ unit, node, nodeIndex, onVideosChange, onComposeQuestion, onAiDraft }) {
+  const [showVideos, setShowVideos] = useState(false);
+  const counts = unit.counts || { easy: 0, medium: 0, hard: 0, total: 0 };
+  return (
+    <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/50 p-2.5">
+      <p className="text-xs font-black text-emerald-900">Trắc nghiệm · 3 nấc Dễ, Vừa, Khó</p>
+      <p className="text-[11px] font-semibold text-slate-600">
+        Học viên bấm nút này sẽ <span className="font-black text-slate-800">làm câu hỏi</span> đã xếp vào chặng
+        (không phải xem video). Câu lấy theo độ khó từng nấc.
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { key: 'easy', label: 'Dễ', n: counts.easy },
+          { key: 'medium', label: 'Vừa', n: counts.medium },
+          { key: 'hard', label: 'Khó', n: counts.hard },
+        ].map((row) => (
+          <div key={row.key} className="rounded-xl bg-white px-2 py-2 text-center ring-1 ring-emerald-100">
+            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{row.label}</p>
+            <p className="text-sm font-black text-slate-900">{row.n} câu</p>
+          </div>
+        ))}
+      </div>
+      {counts.total < MIN_UNIT_QUESTIONS && (
+        <p className="text-[11px] font-bold text-amber-700">Chặng cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản. Thêm câu bằng nút bên dưới.</p>
+      )}
+      <div className="flex flex-wrap gap-2 pt-0.5">
+        <button
+          type="button"
+          onClick={() => onAiDraft?.(unit.id)}
+          className="cms-btn cms-btn-outline !py-1.5 text-xs"
+        >
+          <Bot size={14} /> AI tạo nháp
+        </button>
+        <button
+          type="button"
+          onClick={() => onComposeQuestion?.(unit.id)}
+          className="cms-btn cms-btn-primary !py-1.5 text-xs"
+        >
+          <Plus size={14} /> Soạn câu hỏi
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={() => setShowVideos((v) => !v)}
+        className="text-[11px] font-black text-slate-600 underline-offset-2 hover:underline !shadow-none"
+      >
+        {showVideos ? 'Ẩn video ôn (tuỳ chọn)' : '+ Video ôn trước từng nấc (tuỳ chọn)'}
+      </button>
+      {showVideos && STEP_VIDEO_LEVELS.map((level) => (
+        <UnitStepVideosPanel
+          key={`${node.key}-${level.key}`}
+          unit={unit}
+          stepKey={level.key}
+          stepLabel={`${node.label} · ${level.label}`}
+          videos={node.stepVideos[level.key] || []}
+          onVideosChange={(videos) => onVideosChange(nodeIndex, level.key, videos)}
+          deferSave
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Video ôn theo cấp — hoặc danh sách Bài 1, 2… (lessonMode: nội dung +/hoặc video). */
+function UnitStepVideosPanel({
+  unit, stepKey, stepLabel, onSaved, videos: controlledVideos, onVideosChange, deferSave = false, lessonMode = false,
+}) {
+  const toast = useToast();
+  const mapRow = (video) => ({
+    id: video.id,
+    title: video.title || '',
+    url: video.url || '',
+    content: video.content || '',
+    checks: video.checks || [],
+  });
+  const [videos, setVideos] = useState(() => (controlledVideos || unit.stepVideos?.[stepKey] || []).map(mapRow));
+  const [draft, setDraft] = useState({ title: '', url: '', content: '' });
+  const [saving, setSaving] = useState(false);
+  const original = JSON.stringify((controlledVideos || unit.stepVideos?.[stepKey] || []).map(mapRow));
+  const dirty = JSON.stringify(videos) !== original;
+  const invalid = videos.some((video) => {
+    if (!video.title.trim()) return true;
+    if (lessonMode) return !video.url.trim() && !video.content.trim();
+    return !video.url.trim();
+  });
+
+  const setList = (updater) => {
+    setVideos((list) => {
+      const next = typeof updater === 'function' ? updater(list) : updater;
+      if (deferSave && onVideosChange) onVideosChange(next);
+      return next;
+    });
+  };
+  const update = (index, patch) => setList((list) => list.map((video, i) => (i === index ? { ...video, ...patch } : video)));
+  const addDraft = () => {
+    if (!draft.title.trim()) return;
+    if (lessonMode) {
+      if (!draft.url.trim() && !draft.content.trim()) return;
+      setList((list) => [...list, { title: draft.title.trim(), url: draft.url.trim(), content: draft.content.trim() }]);
+    } else {
+      if (!draft.url.trim()) return;
+      setList((list) => [...list, { title: draft.title.trim(), url: draft.url.trim(), content: '' }]);
+    }
+    setDraft({ title: '', url: '', content: '' });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await dailyPracticeApi.admin.updateUnit(unit.id, {
+        title: unit.title,
+        description: unit.description,
+        active: unit.active,
+        lessonUnitId: unit.lessonUnitId || '',
+        videos: unit.videos || [],
+        stepVideos: {
+          learn: unit.stepVideos?.learn || [],
+          practice: unit.stepVideos?.practice || [],
+          challenge: unit.stepVideos?.challenge || [],
+          [stepKey]: videos,
+        },
+      });
+      toast.success(lessonMode ? 'Đã lưu bài học' : `Đã lưu video cấp ${stepLabel}`);
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-2.5">
+      <p className="text-xs font-black text-slate-800">
+        {lessonMode ? stepLabel : `Video ôn · ${stepLabel}`}
+      </p>
+      {lessonMode && (
+        <p className="text-[11px] font-semibold text-slate-500">
+          Mỗi bài có thể có <span className="font-black text-slate-700">nội dung chữ</span>, <span className="font-black text-slate-700">video</span>, hoặc cả hai. Học xong bài trước mới mở bài sau.
+        </p>
+      )}
+      {videos.map((video, index) => (
+        <div key={video.id || `new-${index}`} className={`rounded-xl bg-slate-50 p-2 ring-1 ring-slate-100 ${lessonMode ? 'space-y-1.5' : 'grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]'}`}>
+          {lessonMode ? (
+            <>
+              <div className="flex items-start gap-2">
+                <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-600 text-[11px] font-black text-white">{index + 1}</span>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <input
+                    className={`${INPUT} !py-1.5`}
+                    value={video.title}
+                    maxLength={120}
+                    onChange={(e) => update(index, { title: e.target.value })}
+                    placeholder={`Tên Bài ${index + 1}`}
+                  />
+                  <textarea
+                    className={`${INPUT} !min-h-[72px] !py-1.5`}
+                    value={video.content}
+                    maxLength={5000}
+                    onChange={(e) => update(index, { content: e.target.value })}
+                    placeholder="Nội dung bài học (chữ). Không bắt buộc nếu đã có video"
+                  />
+                  <input
+                    className={`${INPUT} !py-1.5`}
+                    value={video.url}
+                    maxLength={500}
+                    onChange={(e) => update(index, { url: e.target.value })}
+                    placeholder="Link video (tuỳ chọn)"
+                  />
+                  {video.url.trim() && <VideoChecksEditor checks={video.checks} onChange={(checks) => update(index, { checks })} />}
+                </div>
+                <button type="button" onClick={() => setList((list) => list.filter((_, i) => i !== index))} className="rounded-lg p-1.5 text-slate-400 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+              </div>
+            </>
+          ) : (
+            <>
+              <input className={`${INPUT} !py-1.5`} value={video.title} maxLength={120} onChange={(e) => update(index, { title: e.target.value })} placeholder="Tên video" />
+              <input className={`${INPUT} !py-1.5`} value={video.url} maxLength={500} onChange={(e) => update(index, { url: e.target.value })} placeholder="Link video" />
+              <button type="button" onClick={() => setList((list) => list.filter((_, i) => i !== index))} className="rounded-lg p-1.5 text-slate-400 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+              <VideoChecksEditor checks={video.checks} onChange={(checks) => update(index, { checks })} />
+            </>
+          )}
+        </div>
+      ))}
+      {videos.length < MAX_UNIT_VIDEOS && (
+        lessonMode ? (
+          <div className="space-y-1.5 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-2">
+            <input className={`${INPUT} !py-1.5`} value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder={`Tên Bài ${videos.length + 1}`} />
+            <textarea className={`${INPUT} !min-h-[64px] !py-1.5`} value={draft.content} onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))} placeholder="Nội dung bài học (chữ)" />
+            <input className={`${INPUT} !py-1.5`} value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} placeholder="Link video (tuỳ chọn)" />
+            <button
+              type="button"
+              onClick={addDraft}
+              disabled={!draft.title.trim() || (!draft.url.trim() && !draft.content.trim())}
+              className="cms-btn cms-btn-outline !py-1.5 text-xs"
+            >
+              <Plus size={14} /> Thêm bài
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]">
+            <input className={`${INPUT} !py-1.5`} value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder="Tên video mới" />
+            <input className={`${INPUT} !py-1.5`} value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} placeholder="Link video" />
+            <button type="button" onClick={addDraft} disabled={!draft.title.trim() || !draft.url.trim()} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm</button>
+          </div>
+        )
+      )}
+      {!deferSave && (
+        <div className="flex justify-end">
+          <button type="button" onClick={save} disabled={!dirty || invalid || saving} className="cms-btn cms-btn-primary !py-1.5 text-xs">
+            {saving && <Loader2 size={13} className="animate-spin" />} Lưu
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Danh sách chặng của chủ đề: thứ tự mở khóa, số câu theo độ khó, gắn video. */
+function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, onChanged, onComposeQuestion, onAiDraft }) {
+  const toast = useToast();
+  const [modal, setModal] = useState(null);
+  const [targetUnitId, setTargetUnitId] = useState('');
+  const [openVideosId, setOpenVideosId] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const move = async (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= units.length) return;
+    const ids = units.map((u) => u.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    try {
+      await dailyPracticeApi.admin.reorderUnits(topic.id, ids);
+      onChanged();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const remove = async (unit) => {
+    if (!window.confirm(`Xóa chặng "${unit.title}"? Câu hỏi trong chặng sẽ chuyển về "Chưa xếp chặng", tiến độ học viên ở chặng này bị xóa.`)) return;
+    try {
+      await dailyPracticeApi.admin.deleteUnit(unit.id);
+      toast.success('Đã xóa chặng');
+      if (filterUnitId === unit.id) onFilterUnit('');
+      onChanged();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const assign = async () => {
+    setBusy(true);
+    try {
+      const result = await dailyPracticeApi.admin.assignUnassigned(topic.id, targetUnitId ? { unitId: targetUnitId } : {});
+      toast.success(`Đã xếp ${result.assigned} câu vào chặng`);
+      onChanged();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="mr-auto flex items-center gap-1.5 text-sm font-black text-slate-800"><Route size={16} className="text-red-600" /> Lộ trình chặng</p>
+        <button type="button" onClick={() => setModal({})} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Plus size={14} /> Thêm chặng</button>
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Mỗi chặng có chuỗi nút kiểu Duolingo (Học bài, Luyện tập, Thử thách…). Bấm <span className="font-black text-slate-700">Cấu hình</span> để thêm Bài 1/2… vào «Học bài» và gắn câu Dễ/Vừa/Khó cho các nút luyện. Xong nút cuối mới mở chặng sau. Mỗi chặng cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản.
+      </p>
+      {!units.length ? (
+        <p className="rounded-xl bg-white p-4 text-center text-xs text-slate-500">Chưa có chặng nào. Thêm chặng rồi xếp câu hỏi vào chặng.</p>
+      ) : (
+        <ol className="space-y-1.5">
+          {units.map((unit, index) => {
+            const short = unit.counts.total < MIN_UNIT_QUESTIONS;
+            const active = filterUnitId === unit.id;
+            const videosOpen = openVideosId === unit.id;
+            return (
+              <li key={unit.id} className={`space-y-2 rounded-xl bg-white p-2.5 ring-1 ${active || videosOpen ? 'ring-red-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
+                <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-red-500 to-red-700 text-xs font-black text-white">{index + 1}</span>
+                <button type="button" onClick={() => onFilterUnit(active ? '' : unit.id)} className="min-w-0 flex-1 text-left !shadow-none" title="Lọc câu hỏi của chặng">
+                  <p className="truncate text-sm font-black text-slate-900">
+                    {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {unit.counts.total} câu · Dễ {unit.counts.easy} · Vừa {unit.counts.medium} · Khó {unit.counts.hard}
+                    {unit.counts.draft ? <span className="font-bold text-amber-600"> · {unit.counts.draft} nháp</span> : null}
+                    {unit.lessonUnitId ? <span className="font-bold text-red-600"> · gắn buổi bài giảng</span> : null}
+                  </p>
+                  {short && <p className="text-[11px] font-bold text-amber-600">Chưa hiện trên lộ trình: cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản</p>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenVideosId(videosOpen ? '' : unit.id)}
+                  aria-expanded={videosOpen}
+                  title="Nút lộ trình, ảnh và video của chặng"
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-red-600 text-white' : 'bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
+                >
+                  <Route size={14} /> Cấu hình
+                  <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-[10px]">{(unit.pathNodes?.length || 5)} nút</span>
+                  {unitVideoCount(unit) > 0 ? <Clapperboard size={13} aria-label={`${unitVideoCount(unit)} video`} /> : null}
+                  {unit.imageUrl ? <ImagePlus size={13} aria-label="Đã có ảnh chặng" /> : null}
+                </button>
+                <span className="flex shrink-0 flex-col">
+                  <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
+                  <button type="button" disabled={index === units.length - 1} onClick={() => move(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
+                </span>
+                <button type="button" onClick={() => setModal(unit)} aria-label="Sửa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><Pencil size={14} /></button>
+                <button type="button" onClick={() => remove(unit)} aria-label="Xóa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+                </div>
+                {videosOpen && (
+                  <div className="space-y-2 border-t border-slate-100 pt-2">
+                    <UnitPathNodesPanel
+                      key={`${unit.id}-nodes-${JSON.stringify(unit.pathNodes || [])}`}
+                      unit={unit}
+                      onSaved={onChanged}
+                      onComposeQuestion={onComposeQuestion}
+                      onAiDraft={onAiDraft}
+                    />
+                    <UnitImagePanel key={`${unit.id}-image-${unit.imageUrl || ''}`} unit={unit} onSaved={onChanged} />
+                    <p className="text-[11px] font-bold text-slate-600">Video chung chặng (tuỳ chọn, popup danh sách phát)</p>
+                    <UnitVideosPanel key={`${unit.id}-all-${JSON.stringify(unit.videos || [])}`} unit={unit} onSaved={onChanged} />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {unassigned > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-2.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+          <button type="button" onClick={() => onFilterUnit('none')} className="mr-auto text-left underline-offset-2 hover:underline !shadow-none">
+            {unassigned} câu Luyện tự do (chưa xếp chặng lộ trình)
+          </button>
+          <select className={`${INPUT} !w-auto !py-1.5 text-xs`} value={targetUnitId} onChange={(e) => setTargetUnitId(e.target.value)} aria-label="Chặng đích">
+            <option value="">Tạo chặng mới “Tổng hợp”</option>
+            {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.title}</option>)}
+          </select>
+          <button type="button" disabled={busy} onClick={assign} className="cms-btn cms-btn-primary !py-1.5 text-xs">
+            {busy && <Loader2 size={13} className="animate-spin" />} Xếp tất cả vào chặng
+          </button>
+        </div>
+      )}
+      {modal && (
+        <UnitModal
+          topic={topic}
+          unit={modal.id ? modal : null}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UnitSelect({ units, value, onChange, id }) {
+  return (
+    <select id={id} className={INPUT} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Chưa xếp chặng (chỉ Luyện tự do)</option>
+      {units.map((unit, index) => <option key={unit.id} value={unit.id}>Chặng {index + 1}: {unit.title}</option>)}
+    </select>
+  );
+}
+
 function answerSummary(q) {
   if (q.type === 'mcq') return `✓ ${q.options?.[q.correctIndex] || ''}`;
   if (q.type === 'truefalse') return q.answerBool ? '✓ Đúng' : '✓ Sai';
-  if (q.type === 'order') return (q.items || []).join(' → ');
+  if (q.type === 'order') return (q.items || []).join(' · ');
   if (q.type === 'match') return (q.pairs || []).map((p) => `${p.left} ↔ ${p.right}`).join(' · ');
   if (q.type === 'fill') return String(q.text || '').replace(/\{\{([^{}]+)\}\}/g, '[$1]');
   if (q.type === 'sort') return (q.groups || []).map((g) => `${g.name}: ${g.items.join(', ')}`).join(' · ');
@@ -546,12 +1597,13 @@ export default function AdminDailyPracticeTab() {
   const [topics, setTopics] = useState([]);
   const [topicId, setTopicId] = useState('');
   const [questions, setQuestions] = useState([]);
-  const [filters, setFilters] = useState({ difficulty: '', type: '', status: '' });
+  const [filters, setFilters] = useState({ difficulty: '', type: '', status: '', unitId: '' });
+  const [unitData, setUnitData] = useState({ topicId: '', units: [], unassigned: 0 });
   const [loading, setLoading] = useState(true);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [topicModal, setTopicModal] = useState(null);
   const [questionModal, setQuestionModal] = useState(null);
-  const [aiOpen, setAiOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(null);
   const [busy, setBusy] = useState(false);
   const topic = topics.find((t) => t.id === topicId) || null;
 
@@ -579,10 +1631,25 @@ export default function AdminDailyPracticeTab() {
     }
   }, [topicId, filters, toast]);
 
+  const loadUnits = useCallback(async () => {
+    if (!topicId) return;
+    try {
+      const data = await dailyPracticeApi.admin.units(topicId);
+      setUnitData({ topicId, units: data.units || [], unassigned: data.unassigned || 0 });
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }, [topicId, toast]);
+
   useEffect(() => { loadTopics(); }, [loadTopics]);
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
+  useEffect(() => { loadUnits(); }, [loadUnits]);
+  useEffect(() => { setFilters((f) => (f.unitId ? { ...f, unitId: '' } : f)); }, [topicId]);
 
-  const refreshAll = () => { loadTopics(); loadQuestions(); };
+  const units = useMemo(() => (unitData.topicId === topicId ? unitData.units : []), [unitData, topicId]);
+  const unitTitle = useMemo(() => new Map(units.map((unit, index) => [unit.id, `Chặng ${index + 1}: ${unit.title}`])), [units]);
+  const defaultUnitId = filters.unitId && filters.unitId !== 'none' ? filters.unitId : '';
+  const refreshAll = () => { loadTopics(); loadQuestions(); loadUnits(); };
 
   const installStarter = async () => {
     setBusy(true);
@@ -655,6 +1722,8 @@ export default function AdminDailyPracticeTab() {
         </div>
       </div>
 
+      <XpPackPrices />
+
       {loading ? (
         <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang tải…</p>
       ) : !topics.length ? (
@@ -708,10 +1777,61 @@ export default function AdminDailyPracticeTab() {
                 {topic.counts.draft > 0 && (
                   <button type="button" onClick={publishDrafts} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Send size={14} /> Xuất bản {topic.counts.draft} nháp</button>
                 )}
-                <button type="button" onClick={() => setAiOpen(true)} className="cms-btn cms-btn-outline !py-1.5 text-xs"><Bot size={14} /> AI tạo nháp</button>
-                <button type="button" onClick={() => setQuestionModal({})} className="cms-btn cms-btn-primary !py-1.5 text-xs"><Plus size={14} /> Soạn câu hỏi</button>
+              </div>
+              <UnitsManager
+                topic={topic}
+                units={units}
+                unassigned={unitData.topicId === topicId ? unitData.unassigned : 0}
+                filterUnitId={filters.unitId}
+                onFilterUnit={(unitId) => setFilters((f) => ({ ...f, unitId }))}
+                onChanged={refreshAll}
+                onComposeQuestion={(unitId) => {
+                  setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
+                  setQuestionModal({ defaultUnitId: unitId || '', lockUnit: Boolean(unitId) });
+                }}
+                onAiDraft={(unitId) => {
+                  setFilters((f) => ({ ...f, unitId: unitId || f.unitId }));
+                  setAiOpen({ defaultUnitId: unitId || '', lockUnit: Boolean(unitId) });
+                }}
+              />
+              <div className="space-y-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="mr-auto text-sm font-black text-slate-800">Luyện tự do · chỉ trắc nghiệm</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({ ...f, unitId: 'none' }));
+                      setAiOpen({ defaultUnitId: '', lockUnit: true });
+                    }}
+                    className="cms-btn cms-btn-outline !py-1.5 text-xs"
+                  >
+                    <Bot size={14} /> AI tạo nháp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({ ...f, unitId: 'none' }));
+                      setQuestionModal({ defaultUnitId: '', lockUnit: true });
+                    }}
+                    className="cms-btn cms-btn-primary !py-1.5 text-xs"
+                  >
+                    <Plus size={14} /> Soạn câu hỏi
+                  </button>
+                </div>
+                <p className="text-[11px] font-semibold text-slate-600">
+                  Ngân hàng riêng cho chế độ <span className="font-black text-slate-800">Luyện tự do</span> của học viên.
+                  Không dùng câu đã xếp vào lộ trình chặng · không gắn video · chỉ làm trắc nghiệm theo độ khó.
+                  {(unitData.topicId === topicId ? unitData.unassigned : 0) > 0
+                    ? ` Đang có ${unitData.unassigned} câu chưa xếp chặng (dùng cho Luyện tự do).`
+                    : ' Chưa có câu Luyện tự do. Hãy soạn hoặc dùng AI.'}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <select className={`${INPUT} !w-auto`} value={filters.unitId} onChange={(e) => setFilters((f) => ({ ...f, unitId: e.target.value }))} aria-label="Lọc chặng">
+                  <option value="">Mọi phạm vi</option>
+                  <option value="none">Chỉ Luyện tự do</option>
+                  {units.map((unit, index) => <option key={unit.id} value={unit.id}>Chặng {index + 1}: {unit.title}</option>)}
+                </select>
                 <select className={`${INPUT} !w-auto`} value={filters.difficulty} onChange={(e) => setFilters((f) => ({ ...f, difficulty: e.target.value }))} aria-label="Lọc độ khó">
                   <option value="">Mọi độ khó</option>
                   {DIFFICULTIES.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
@@ -742,6 +1862,9 @@ export default function AdminDailyPracticeTab() {
                             <div className="mb-1 flex flex-wrap gap-1.5 text-[10px] font-black">
                               <span className="rounded-full bg-slate-900 px-2 py-0.5 text-white">{QUESTION_TYPES[q.type]?.label}</span>
                               <span className="rounded-full px-2 py-0.5" style={{ background: level.soft, color: level.color }}>{level.label}</span>
+                              {q.unitId
+                                ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-700">{unitTitle.get(q.unitId) || 'Chặng'}</span>
+                                : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">Chưa xếp chặng</span>}
                               {q.status === 'draft'
                                 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">Nháp{q.source === 'ai' ? ' · AI' : ''}</span>
                                 : <span className="flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700"><CheckCircle2 size={10} /> Đã xuất bản</span>}
@@ -777,6 +1900,9 @@ export default function AdminDailyPracticeTab() {
           topicId={topic.id}
           question={questionModal.id ? questionModal : null}
           defaultDifficulty={filters.difficulty}
+          units={units}
+          defaultUnitId={questionModal.defaultUnitId ?? defaultUnitId}
+          lockUnit={Boolean(questionModal.lockUnit)}
           onClose={() => setQuestionModal(null)}
           onSaved={() => { setQuestionModal(null); refreshAll(); }}
         />
@@ -785,8 +1911,11 @@ export default function AdminDailyPracticeTab() {
         <AiModal
           topic={topic}
           defaultDifficulty={filters.difficulty}
-          onClose={() => setAiOpen(false)}
-          onDone={() => { setAiOpen(false); setFilters((f) => ({ ...f, status: 'draft' })); loadTopics(); }}
+          units={units}
+          defaultUnitId={aiOpen.defaultUnitId ?? defaultUnitId}
+          lockUnit={Boolean(aiOpen.lockUnit)}
+          onClose={() => setAiOpen(null)}
+          onDone={() => { setAiOpen(null); setFilters((f) => ({ ...f, status: 'draft' })); loadTopics(); }}
         />
       )}
     </div>

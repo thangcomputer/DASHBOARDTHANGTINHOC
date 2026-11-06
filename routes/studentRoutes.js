@@ -814,6 +814,11 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
 
     for (const row of result) {
       await syncCertPrepFromEnrollment(row, req);
+      try {
+        await require('../services/lmsProgressService').grantWelcomeXp(row._id);
+      } catch (xpErr) {
+        logger.warn({ err: xpErr }, '[LMS_XP] bỏ qua XP chào mừng khi nhập danh sách');
+      }
     }
 
     res.json({
@@ -827,6 +832,13 @@ router.post('/import', [authMiddleware, branchFilter, policyShadowStudentMutatio
       const docs = err.insertedDocs || [];
       for (const row of docs) {
         await syncCertPrepFromEnrollment(row, req);
+        if (row?._id) {
+          try {
+            await require('../services/lmsProgressService').grantWelcomeXp(row._id);
+          } catch (xpErr) {
+            logger.warn({ err: xpErr }, '[LMS_XP] bỏ qua XP chào mừng khi nhập danh sách');
+          }
+        }
       }
       return res.json({
         success: true,
@@ -1980,6 +1992,13 @@ router.post('/:id/exam-attempt/submit', studentExamGuard, async (req, res) => {
 
     const entry = (student.examProgress || []).find((item) => String(item.id) === subjectId);
     learningGoalService.trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(req.body?.answers) });
+    try {
+      const total = Number(graded.result.total) || 0;
+      const percent = total ? Math.round((Number(graded.result.correct) / total) * 100) : 0;
+      await require('../services/lmsProgressService').grantExam(student._id, subjectId, percent);
+    } catch (xpErr) {
+      logger.warn('[LMS_XP] bỏ qua XP bài kiểm tra: %s', xpErr.message);
+    }
     const io = req.app.get('io');
     if (io) {
       studentRealtime(io, student, 'student:updated', student._id);

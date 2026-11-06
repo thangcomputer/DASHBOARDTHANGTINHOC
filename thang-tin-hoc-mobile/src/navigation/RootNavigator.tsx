@@ -22,6 +22,7 @@ import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPre
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { messageService, notificationService, scheduleService, teacherFinanceService } from '../services/mockService';
 import { LoginScreen } from '../screens/LoginScreen';
+import { SubscriptionExpiredScreen, SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CallScreen } from '../screens/CallScreen';
 import { CallHistoryScreen } from '../screens/CallHistoryScreen';
@@ -119,7 +120,7 @@ type IncomingCallPrompt = {
 };
 
 export function RootNavigator() {
-  const { user, isRestoringSession, signOut } = useAuth();
+  const { user, isRestoringSession, signOut, subscription } = useAuth();
   const [notificationOverlayVisible, setNotificationOverlayVisible] = useState(false);
   const unreadNotificationCountRef = useRef(0);
   const handledReadNotificationIds = useRef(new Set<string>());
@@ -407,6 +408,9 @@ export function RootNavigator() {
         <ActivityIndicator color={colors.brand} />
       </View>
     );
+  }
+  if (user?.role === 'student' && subscription?.subscription.state === 'expired') {
+    return <SubscriptionExpiredScreen />;
   }
   return user ? (
     <View style={styles.root} onTouchStart={noteUserActivity}>
@@ -987,6 +991,7 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
                   </View>
                 </View>
               </View>
+              {!isTeacher ? <SubscriptionStatusCard compact /> : null}
             </View>
             <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
               {menuSections.map((section) => (

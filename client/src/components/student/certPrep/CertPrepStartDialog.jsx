@@ -30,7 +30,7 @@ export default function CertPrepStartDialog({
         </div>
         <div className="px-5 py-4 text-sm text-slate-600 space-y-3">
           <p className="font-bold text-slate-900">
-            {[courseName, levelTitle].filter(Boolean).join(' — ')}
+            {[courseName, levelTitle].filter(Boolean).join(' · ')}
           </p>
           <p>{test.name} · {localeLabel(test.locale)}</p>
           <p>{test.questionCount} câu · {test.timeLimitMinutes} phút · Điểm đạt: {test.passingScore}</p>

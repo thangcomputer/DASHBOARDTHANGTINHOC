@@ -26,6 +26,15 @@ export function isDirectVideoUrl(url: string) {
   return /\.(mp4|webm|ogg|m4v|mov)(?:$|[?#])/i.test(String(url || ''));
 }
 
+/** Link nhúng (YouTube/Vimeo) cho trình phát trong ứng dụng; '' với file video trực tiếp. */
+export function embeddedVideoUrl(url: string) {
+  const youtubeId = youtubeIdFromUrl(url);
+  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0`;
+  const vimeoId = vimeoIdFromUrl(url);
+  if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
+  return '';
+}
+
 /** Link chuẩn để trình phát dùng; '' nếu không phát được ngay trong ứng dụng. */
 export function playableVideoUrl(url: string) {
   const youtubeId = youtubeIdFromUrl(url);

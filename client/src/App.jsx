@@ -9,6 +9,7 @@ import { DataProvider }                      from './context/DataContext';
 import { ToastProvider }                     from './utils/toast.jsx';
 import ErrorBoundary                         from './components/ErrorBoundary';
 import LoginPage                             from './components/LoginPage';
+import FreePortalPage                        from './components/FreePortalPage';
 import AdminLoginPage                        from './components/AdminLoginPage';
 import RegistrationForm                      from './components/RegistrationForm';
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
@@ -44,6 +45,8 @@ const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonP
 const DailyPracticePage = lazy(() => import('./components/student/dailyPractice/DailyPracticePage'));
 import DashboardLayout                       from './components/DashboardLayout';
 import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
+import { SelfStudyLock }                      from './components/student/subscription/SubscriptionGate';
+import FreeFeatureLock, { FreeHiddenRoute } from './components/student/dailyPractice/FreeFeatureLock';
 import api, { clearTokens, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { useIsDesktopExamDevice } from './utils/examDevice';
@@ -275,6 +278,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
       {/* ═══ Public ═══ */}
       <Route path="/"            element={<LoginPage onLogin={onLogin} />} />
       <Route path="/login"       element={<LoginPage onLogin={onLogin} />} />
+      <Route path="/DANGNHAPMIENPHI" element={<FreePortalPage onLogin={onLogin} />} />
       <Route path="/admin/login" element={<AdminLoginPage onLogin={onLogin} />} />
       <Route path="/dangkykhoahoc" element={<RegistrationForm onNavigate={go} />} />
       <Route path="/pay/:sessionId" element={<Suspense fallback={<LoadingScreen />}><PublicPaymentPage /></Suspense>} />
@@ -422,7 +426,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/exam" element={
           <ErrorBoundary inline>
-            <StudentExamWrapper session={session} />
+            <FreeFeatureLock session={session}>
+              <SelfStudyLock><StudentExamWrapper session={session} /></SelfStudyLock>
+            </FreeFeatureLock>
           </ErrorBoundary>
         } />
         <Route path="/student/notifications" element={
@@ -430,57 +436,71 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         } />
         <Route path="/student/inbox" element={
           <ErrorBoundary inline>
-            <Inbox currentUserId={session?.id} currentUserName={session?.name} currentUserRole={getMessagingRole(session)} onNavigate={go} />
+            <FreeFeatureLock session={session}>
+              <Inbox currentUserId={session?.id} currentUserName={session?.name} currentUserRole={getMessagingRole(session)} onNavigate={go} />
+            </FreeFeatureLock>
           </ErrorBoundary>
         } />
         <Route path="/student/feed" element={
-          <ErrorBoundary inline><FeedBoard session={session} role="student" /></ErrorBoundary>
+          <ErrorBoundary inline>
+            <FreeHiddenRoute session={session}><FeedBoard session={session} role="student" /></FreeHiddenRoute>
+          </ErrorBoundary>
         } />
         <Route path="/student/news" element={
-          <ErrorBoundary inline><NewsPage session={session} role="student" /></ErrorBoundary>
+          <ErrorBoundary inline>
+            <FreeHiddenRoute session={session}><NewsPage session={session} role="student" /></FreeHiddenRoute>
+          </ErrorBoundary>
         } />
         <Route path="/student/news/:slug" element={
-          <ErrorBoundary inline><NewsPage session={session} role="student" /></ErrorBoundary>
+          <ErrorBoundary inline>
+            <FreeHiddenRoute session={session}><NewsPage session={session} role="student" /></FreeHiddenRoute>
+          </ErrorBoundary>
         } />
         <Route path="/student/center-info" element={
-          <ErrorBoundary inline><CenterInfoPage session={session} role="student" /></ErrorBoundary>
+          <ErrorBoundary inline>
+            <FreeHiddenRoute session={session}><CenterInfoPage session={session} role="student" /></FreeHiddenRoute>
+          </ErrorBoundary>
         } />
         <Route path="/student/support" element={
-          <ErrorBoundary inline><SupportEntryPage /></ErrorBoundary>
+          <ErrorBoundary inline>
+            <FreeFeatureLock session={session}>
+              <SelfStudyLock><SupportEntryPage /></SelfStudyLock>
+            </FreeFeatureLock>
+          </ErrorBoundary>
         } />
         <Route path="/student/cert-prep" element={
           <ErrorBoundary inline>
-            <CertPrepCatalogPage />
+            <SelfStudyLock><CertPrepCatalogPage /></SelfStudyLock>
           </ErrorBoundary>
         } />
         <Route path="/student/cert-prep/levels/:levelId" element={
           <ErrorBoundary inline>
-            <CertPrepLevelPage />
+            <SelfStudyLock><CertPrepLevelPage /></SelfStudyLock>
           </ErrorBoundary>
         } />
         <Route path="/student/cert-prep/result/:sessionId" element={
           <ErrorBoundary inline>
-            <CertPrepResult />
+            <SelfStudyLock><CertPrepResult /></SelfStudyLock>
           </ErrorBoundary>
         } />
         <Route path="/student/lesson-practice" element={
           <ErrorBoundary inline>
-            <LessonPracticeCatalogPage />
+            <SelfStudyLock><LessonPracticeCatalogPage /></SelfStudyLock>
           </ErrorBoundary>
         } />
         <Route path="/student/lesson-practice/subjects/:subjectId" element={
           <ErrorBoundary inline>
-            <LessonPracticeUnitsPage />
+            <SelfStudyLock><LessonPracticeUnitsPage /></SelfStudyLock>
           </ErrorBoundary>
         } />
         <Route path="/student/lesson-practice/units/:unitId" element={
           <ErrorBoundary inline>
-            <LessonPracticePlayerPage />
+            <SelfStudyLock><LessonPracticePlayerPage /></SelfStudyLock>
           </ErrorBoundary>
         } />
         <Route path="/student/daily-practice" element={
           <ErrorBoundary inline>
-            <DailyPracticePage />
+            <SelfStudyLock allowWhenExpired={session?.freePortal === true}><DailyPracticePage /></SelfStudyLock>
           </ErrorBoundary>
         } />
       </Route>
@@ -491,7 +511,9 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
       <Route path="/student/exam/:subjectId" element={
         <Guard allowedRoles={['student', 'admin']} session={session}>
           <StudentLearningAccessGate session={session} allowHashes={[]}>
-            <StudentTestWrapper session={session} />
+            <FreeFeatureLock session={session}>
+              <SelfStudyLock><StudentTestWrapper session={session} /></SelfStudyLock>
+            </FreeFeatureLock>
           </StudentLearningAccessGate>
         </Guard>
       } />
@@ -500,7 +522,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         <Guard allowedRoles={['student', 'admin']} session={session}>
           <StudentLearningAccessGate session={session} allowHashes={[]}>
             <ErrorBoundary inline>
-              <CertPrepStudentPlayer />
+              <SelfStudyLock><CertPrepStudentPlayer /></SelfStudyLock>
             </ErrorBoundary>
           </StudentLearningAccessGate>
         </Guard>
@@ -670,6 +692,31 @@ function App() {
   const handleSessionChange = useCallback((newSession) => {
     setSession(newSession);
     saveSession(newSession);
+  }, []);
+
+  useEffect(() => {
+    const unlock = () => {
+      setSession((prev) => {
+        if (!prev?.freePortal || prev.freeUnlocked) return prev;
+        const next = { ...prev, freeUnlocked: true };
+        saveSession(next);
+        return next;
+      });
+    };
+    window.addEventListener('free-portal-unlocked', unlock);
+    const surveyDone = () => {
+      setSession((prev) => {
+        if (!prev?.freePortal || prev.needsFreeSurvey === false) return prev;
+        const next = { ...prev, needsFreeSurvey: false };
+        saveSession(next);
+        return next;
+      });
+    };
+    window.addEventListener('free-survey-done', surveyDone);
+    return () => {
+      window.removeEventListener('free-portal-unlocked', unlock);
+      window.removeEventListener('free-survey-done', surveyDone);
+    };
   }, []);
 
   return (

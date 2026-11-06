@@ -10,7 +10,7 @@ import {
   CircleDollarSign, Laptop,
 } from 'lucide-react';
 import Avatar from '../shared/Avatar';
-import { getActiveClientEnrollments, getClientEnrollments } from '../../../utils/enrollments';
+import { getActiveClientEnrollments, getClientEnrollments, isFreePortalCourseName } from '../../../utils/enrollments';
 import {
   resolveLearningModeLabel,
   resolveBranchDisplayName,
@@ -733,9 +733,11 @@ export default function AdminStudentsTab() {
                 <p className="text-sm font-semibold text-slate-800">
                   {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
                 </p>
-                <p className="text-xs text-slate-500">
-                  {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
-                </p>
+                {!isFreePortalCourseName(enr.courseName || enr.name) && (
+                  <p className="text-xs text-slate-500">
+                    {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
+                  </p>
+                )}
               </div>
             );
           })}
@@ -747,7 +749,9 @@ export default function AdminStudentsTab() {
       <>
         <p className="text-sm font-semibold text-slate-800">{(s.price || 0).toLocaleString('vi-VN')}đ</p>
         <RefundHint amount={refundedTotal} />
-        <p className="text-xs text-slate-500 mt-0.5">Tiến độ: {(s.completedSessions || 0)}/{(s.totalSessions || 12)} buổi</p>
+        {!isFreePortalCourseName(s.course) && (
+          <p className="text-xs text-slate-500 mt-0.5">Tiến độ: {(s.completedSessions || 0)}/{(s.totalSessions || 12)} buổi</p>
+        )}
       </>
     );
   };
@@ -1035,9 +1039,11 @@ export default function AdminStudentsTab() {
                               <p className="text-sm font-semibold text-slate-800 leading-tight tabular-nums">
                                 {(Number(enr.price) || 0).toLocaleString('vi-VN')}đ
                               </p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
-                              </p>
+                              {!isFreePortalCourseName(enr.courseName || enr.name || courseLabel) && (
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  {(enr.completedSessions || 0)}/{(enr.totalSessions || 12)} buổi
+                                </p>
+                              )}
                             </div>
                             <div className="flex justify-start sm:justify-end pt-0.5 min-w-0">
                               <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden mr-2 self-center">Trạng thái</p>

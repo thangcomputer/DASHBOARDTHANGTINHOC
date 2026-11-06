@@ -1,7 +1,47 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import fs from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import process from 'node:process'
+
+const MASCOT_DIR = fileURLToPath(new URL('../cam-xuc-animation', import.meta.url))
+const MASCOT_URL = '/cam-xuc-animation'
+
+function mascotContentType(file) {
+  const ext = path.extname(file).toLowerCase()
+  if (ext === '.svg') return 'image/svg+xml'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.gif') return 'image/gif'
+  if (ext === '.png') return 'image/png'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  return 'application/octet-stream'
+}
+
+/** Phục vụ đúng thư mục cam-xuc-animation tại /cam-xuc-animation, kể cả bản build. */
+function camXucAnimationStatic() {
+  const root = path.resolve(MASCOT_DIR)
+  return {
+    name: 'cam-xuc-animation-static',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url || ''
+        if (!url.startsWith(`${MASCOT_URL}/`)) return next()
+        const rel = decodeURIComponent(url.slice(MASCOT_URL.length + 1).split('?')[0])
+        const file = path.resolve(root, rel)
+        if (file !== root && !file.startsWith(root + path.sep)) return next()
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return next()
+        res.setHeader('Content-Type', mascotContentType(file))
+        res.setHeader('Cache-Control', 'public, max-age=86400')
+        fs.createReadStream(file).pipe(res)
+      })
+    },
+    closeBundle() {
+      const out = path.resolve(process.cwd(), 'dist', 'cam-xuc-animation')
+      fs.cpSync(root, out, { recursive: true })
+    },
+  }
+}
 
 // Dev proxy MUST use IPv6 loopback on Windows when another process
 // (e.g. Challenge.exe) steals 127.0.0.1:5000 — Node often listens on [::]:5000 only.
@@ -10,7 +50,7 @@ const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), camXucAnimationStatic()],
   server: {
     fs: {
       allow: [PROJECT_ROOT],

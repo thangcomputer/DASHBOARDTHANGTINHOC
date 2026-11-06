@@ -21,6 +21,7 @@ const { isAiConfigured, chatCompletion } = require('./ai/llmClient');
 const logger = require('../config/logger');
 const rules = require('./lessonPracticeRules');
 const learningGoalService = require('./learningGoalService');
+const lmsProgressService = require('./lmsProgressService');
 
 function isPreviewUnit(unit) {
   return unit?.isPreviewAllowed === true;
@@ -856,7 +857,8 @@ async function refreshUnitStatus(studentId, unit, items) {
     noteDone: check.noteDone,
     practiceDone: check.practiceDone,
   };
-  if (nextStatus === 'completed' && existing?.status !== 'completed') patch.completedAt = new Date();
+  const justCompleted = nextStatus === 'completed' && existing?.status !== 'completed';
+  if (justCompleted) patch.completedAt = new Date();
   try {
     await LessonUnitProgress.updateOne(
       { studentId, unitId: unit._id },
@@ -866,10 +868,68 @@ async function refreshUnitStatus(studentId, unit, items) {
   } catch (err) {
     if (err?.code !== 11000) throw err;
   }
+  const hadNotes = rules.unitContents(unit).length > 0;
+  const hadPractice = items.some((item) => rules.isQuestionType(item.type));
+  if (hadNotes && !existing?.noteDone && check.noteDone) {
+    await awardLessonXp(studentId, 'theory', `theory:${studentId}:${unit._id}`);
+  }
+  if (hadPractice && !existing?.practiceDone && check.practiceDone) {
+    await awardLessonXp(studentId, 'practice', `practice:${studentId}:${unit._id}`);
+  }
+  if (justCompleted) await awardSubjectAndCourse(studentId, unit.subjectId);
   return nextStatus;
 }
 
-async function markUnitSection(studentId, unitId, section, itemId = '') {
+async function awardLessonXp(studentId, activity, sourceKey, watchRatio) {
+  try {
+    await lmsProgressService.grantActivity({ studentId, activity, sourceKey, watchRatio });
+  } catch (err) {
+    logger.warn({ err }, '[LMS_XP] bỏ qua cộng XP, bài học vẫn được ghi');
+  }
+}
+
+async function awardSubjectAndCourse(studentId, subjectId) {
+  try {
+    const units = await LessonUnit.find({ subjectId, isActive: true }).select('_id').lean();
+    if (!units.length) return;
+    const done = await LessonUnitProgress.countDocuments({
+      studentId,
+      subjectId,
+      status: 'completed',
+      unitId: { $in: units.map((unit) => unit._id) },
+    });
+    if (done < units.length) return;
+    await awardLessonXp(studentId, 'subject', `subject:${studentId}:${subjectId}`);
+    const subject = await LessonSubject.findById(subjectId).select('examSubjectId').lean();
+    const subjectKey = rules.normalizeSubjectKey(subject?.examSubjectId);
+    if (!subjectKey) return;
+    const courses = await Course.find({ deletedAt: null, status: 'published' }).select('examSubjects').lean();
+    for (const course of courses) {
+      const keys = (course.examSubjects || []).map((id) => rules.normalizeSubjectKey(id)).filter(Boolean);
+      if (!keys.includes(subjectKey)) continue;
+      const subjects = await LessonSubject.find({ isActive: true }).select('examSubjectId').lean();
+      const linked = subjects.filter((row) => keys.includes(rules.normalizeSubjectKey(row.examSubjectId)));
+      if (!linked.length) continue;
+      let complete = true;
+      for (const row of linked) {
+        const rowUnits = await LessonUnit.find({ subjectId: row._id, isActive: true }).select('_id').lean();
+        if (!rowUnits.length) { complete = false; break; }
+        const rowDone = await LessonUnitProgress.countDocuments({
+          studentId,
+          subjectId: row._id,
+          status: 'completed',
+          unitId: { $in: rowUnits.map((unit) => unit._id) },
+        });
+        if (rowDone < rowUnits.length) { complete = false; break; }
+      }
+      if (complete) await awardLessonXp(studentId, 'course', `course:${studentId}:${course._id}`);
+    }
+  } catch (err) {
+    logger.warn({ err }, '[LMS_XP] bỏ qua XP chương/khóa, buổi học vẫn hoàn thành');
+  }
+}
+
+async function markUnitSection(studentId, unitId, section, itemId = '', watchRatio = 0) {
   const { unit } = await loadStudentUnit(studentId, unitId);
   const items = await LessonItem.find({ unitId: unit._id }).select('type').lean();
   const collection = section === 'video' ? rules.unitVideos(unit) : section === 'note' ? rules.unitContents(unit) : null;
@@ -896,6 +956,9 @@ async function markUnitSection(studentId, unitId, section, itemId = '') {
   }
   if (section === 'video' && marked.modifiedCount) {
     learningGoalService.trackStudyActivity(studentId, { videos: 1 });
+  }
+  if (section === 'video' && Number(watchRatio) > 0) {
+    await awardLessonXp(studentId, 'video', `video:${studentId}:${unit._id}:${selectedId}`, Number(watchRatio));
   }
   const status = await refreshUnitStatus(studentId, unit, items);
   const row = await LessonUnitProgress.findOne({ studentId, unitId: unit._id }).lean();
@@ -1401,6 +1464,7 @@ module.exports = {
   previewCourseForSubject,
   isPreviewUnit,
   getUnitForStudent,
+  loadStudentUnit,
   markUnitSection,
   confirmItem,
   resetPractice,

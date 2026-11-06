@@ -1280,6 +1280,7 @@ const centerInfoRoutes = require('./routes/centerInfoRoutes');
 const certPrepRoutes = require('./routes/certPrepRoutes');
 const lessonPracticeRoutes = require('./routes/lessonPracticeRoutes');
 const dailyPracticeRoutes = require('./routes/dailyPracticeRoutes');
+const lmsProgressRoutes = require('./routes/lmsProgressRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 
 app.use('/api/auth', authRoutes);
@@ -1324,6 +1325,8 @@ app.use('/api/center-info', centerInfoRoutes);
 app.use('/api/cert-prep', certPrepRoutes);
 app.use('/api/lesson-practice', lessonPracticeRoutes);
 app.use('/api/daily-practice', dailyPracticeRoutes);
+app.use('/api/lms-progress', lmsProgressRoutes);
+app.use('/api/subscription', require('./routes/subscriptionRoutes'));
 
 // Route mặc định
 app.get('/', (req, res) => {
@@ -1410,6 +1413,31 @@ const runScheduledBackup = async () => {
 const backupCronExpr = process.env.BACKUP_CRON || '0 3 * * *';
 if (!isTest && process.env.BACKUP_SCHEDULE !== '0') {
   cron.schedule(backupCronExpr, runScheduledBackup);
+}
+
+// Nhắc gia hạn gói tài khoản HV: còn 7 ngày + ngày cuối (08:00 giờ VN, mỗi mốc 1 lần)
+const runSubscriptionReminders = async () => {
+  try {
+    const subscriptionService = require('./services/subscriptionService');
+    const NotificationService = require('./services/NotificationService');
+    const { sent } = await subscriptionService.sendExpiryReminders({
+      io,
+      notify: ({ studentId, title, content, status }) => NotificationService.send(io, {
+        type: 'FINANCE',
+        title,
+        content,
+        receivers: [studentId],
+        payload: { kind: 'subscription_reminder', state: status.state, expiresAt: status.expiresAt },
+        link: '/student#profile',
+      }),
+    });
+    if (sent) logger.info({ sent }, '[CRON] subscription reminders sent');
+  } catch (err) {
+    logger.error({ err: err.message }, '[CRON] subscription reminders');
+  }
+};
+if (!isTest) {
+  cron.schedule('0 8 * * *', runSubscriptionReminders, { timezone: 'Asia/Ho_Chi_Minh' });
 }
 
 // ==========================================

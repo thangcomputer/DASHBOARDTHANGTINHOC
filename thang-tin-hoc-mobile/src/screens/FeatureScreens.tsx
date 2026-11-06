@@ -32,6 +32,7 @@ import { updateStudentProfile } from '../services/studentApi';
 import { buildDirectConversationId } from '../services/messageApi';
 import { enableMobilePushNotifications, requestWebNotificationPermission } from '../services/mobilePushNotifications';
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
+import { SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
 import { pinUserKey } from '../services/pinLock';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
@@ -4238,6 +4239,7 @@ export function ProfileScreen() {
               <Text style={styles.studentProfileHeroSubtitle}>Chạm vào ảnh để thay đổi ảnh đại diện</Text>
             </View>
           </Card>
+          <SubscriptionStatusCard />
           <Card style={styles.studentProfileSection}>
             <View style={styles.studentProfileSectionHeader}>
               <View style={styles.studentProfileSectionTitle}>

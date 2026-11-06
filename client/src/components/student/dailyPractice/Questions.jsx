@@ -319,7 +319,7 @@ export function MatchQuestion({ question, reveal, result, onChange }) {
             >
               {right}
             </button>
-          )) : <span className="px-2 py-2 text-xs font-semibold text-slate-400">Đã ghép hết — bấm Kiểm tra nhé!</span>}
+          )) : <span className="px-2 py-2 text-xs font-semibold text-slate-400">Đã ghép hết. Bấm Kiểm tra nhé!</span>}
         </div>
       )}
       {locked && !result.correct && (

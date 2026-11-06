@@ -6,6 +6,7 @@ import { connect as connectSocket, disconnect as disconnectSocket } from '../ser
 import { registerMobilePushNotifications, unregisterMobilePushNotifications } from '../services/mobilePushNotifications';
 import { subscribeToMobileSoundPreference } from '../services/soundPreferences';
 import { clearLastActive, pinUserKey } from '../services/pinLock';
+import { subscriptionApi, type SubscriptionOverview } from '../services/subscriptionApi';
 import type { DemoUser, UserRole } from '../types';
 
 type AuthContextValue = {
@@ -13,6 +14,9 @@ type AuthContextValue = {
   isRestoringSession: boolean;
   isSigningIn: boolean;
   authError: string;
+  /** Gói tài khoản HV (null với GV / chưa tải). Hết hạn → RootNavigator chỉ hiện màn gia hạn. */
+  subscription: SubscriptionOverview | null;
+  refreshSubscription: () => Promise<void>;
   signIn: (role: UserRole, phone: string, password: string) => Promise<void>;
   updateAvatar: (avatar: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -25,8 +29,35 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [subscription, setSubscription] = useState<SubscriptionOverview | null>(null);
   const userRef = useRef<DemoUser | null>(null);
   userRef.current = user;
+
+  const refreshSubscription = useMemo(() => async () => {
+    const current = userRef.current;
+    if (!current || current.role !== 'student' || current.previewMode) {
+      setSubscription(null);
+      return;
+    }
+    try {
+      setSubscription(await subscriptionApi.overview());
+    } catch {
+      // Lỗi mạng: giữ trạng thái cũ.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshSubscription();
+    if (!user || user.role !== 'student' || user.previewMode) return undefined;
+    const expired = DeviceEventEmitter.addListener('mobile:subscription-expired', () => { void refreshSubscription(); });
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshSubscription();
+    });
+    return () => {
+      expired.remove();
+      appState.remove();
+    };
+  }, [user?.id, user?.role, user?.previewMode, refreshSubscription]);
 
   useEffect(() => {
     const current = userRef.current;
@@ -142,6 +173,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     isRestoringSession,
     isSigningIn,
     authError,
+    subscription,
+    refreshSubscription,
     async signIn(role, phone, password) {
       setIsSigningIn(true);
       setAuthError('');
@@ -171,10 +204,11 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       } finally {
         await clearLastActive(pinUserKey(user)).catch(() => {});
         setUser(null);
+        setSubscription(null);
         setAuthError('');
       }
     },
-  }), [user, isRestoringSession, isSigningIn, authError]);
+  }), [user, isRestoringSession, isSigningIn, authError, subscription, refreshSubscription]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

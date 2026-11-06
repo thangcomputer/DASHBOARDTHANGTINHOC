@@ -593,6 +593,16 @@ export const apiFetch = async (endpoint, options = {}) => {
     } catch { /* ignore */ }
   }
 
+  // Gói tài khoản HV hết hạn → báo cho SubscriptionGate hiện màn gia hạn (không đăng xuất)
+  if (res.status === 403 && typeof window !== 'undefined') {
+    try {
+      const peek = await res.clone().json();
+      if (peek?.code === 'SUBSCRIPTION_EXPIRED') {
+        window.dispatchEvent(new CustomEvent('cms:subscription-expired'));
+      }
+    } catch { /* ignore */ }
+  }
+
   // CSRF hết hạn / chưa có cookie → lấy token mới và thử lại 1 lần
   if (res.status === 403 && isMutatingMethod(method) && !options._csrfRetried) {
     let body = null;
@@ -779,6 +789,14 @@ export const authAPI = {
     const res = await apiFetch('/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ oldPassword, newPassword }),
+    });
+    return res.json();
+  },
+
+  saveFreeSurvey: async (answers) => {
+    const res = await apiFetch('/auth/free-survey', {
+      method: 'POST',
+      body: JSON.stringify(answers),
     });
     return res.json();
   },

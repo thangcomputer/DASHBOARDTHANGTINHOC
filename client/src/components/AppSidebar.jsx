@@ -4,7 +4,7 @@ import {
   Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
   GraduationCap, Users, DollarSign, ClipboardList, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2,
+  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket,
 } from 'lucide-react';
 import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,6 +13,9 @@ import { isSoundMuted, setSoundMuted } from '../utils/sound';
 import { PERMISSIONS } from '../constants/permissions';
 import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../utils/enrollments';
 import { visibleInboxUnread } from '../lib/inboxUnread';
+import { useStudentSubscription } from './student/subscription/subscriptionContext';
+import FreeFeatureLock, { useFreePortalLock, useFreePortalMenu, FREE_HIDDEN_KEYS } from './student/dailyPractice/FreeFeatureLock';
+import { subscriptionShortLabel } from '../utils/subscription';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
@@ -34,9 +37,9 @@ const MENU_CONFIG = {
     brand: { label: 'Học viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
+      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
       { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
-      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', requiresLearningAccess: true },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
       { key: 'materials-files', icon: FileBox, label: 'Bài tập và tài nguyên', path: '/student', hash: 'materials-files', altHashes: ['materials-software'], requiresLearningAccess: true },
       { key: 'exam', icon: Trophy, label: 'Phòng thi', path: '/student/exam', requiresLearningAccess: true },
@@ -79,74 +82,41 @@ const MENU_CONFIG = {
     brand: { label: 'Quản trị', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
       {
-        key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard', permission: [
+        key: 'dashboard', section: 'KHÔNG GIAN LÀM VIỆC', icon: LayoutDashboard, label: 'Tổng quan', path: '/admin', hash: 'dashboard', permission: [
           PERMISSIONS.MANAGE_STUDENTS, PERMISSIONS.VIEW_TEACHERS, PERMISSIONS.MANAGE_SCHEDULE,
           PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.MANAGE_HR,
           PERMISSIONS.SYSTEM_SETTINGS, PERMISSIONS.VIEW_BRANCH_REVENUE
         ]
       },
-      { key: 'news', icon: FileText, label: 'Tin tức', path: '/admin/news', permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
-      { key: 'feed', icon: Newspaper, label: 'Bảng tin', path: '/admin/feed', permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
-      { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/admin/inbox', permission: PERMISSIONS.MANAGE_MESSAGES },
-      {
-        key: 'manage-train-group',
-        label: 'Quản lý và đào tạo',
-        icon: Users,
-        isGroup: true,
-        children: [
-          {
-            key: 'students-hub',
-            label: 'Học viên',
-            icon: Users,
-            isGroup: true,
-            children: [
-              { key: 'students', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
-              { key: 'student-training', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'student-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
-              { key: 'cert-prep', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
-            ],
-          },
-          {
-            key: 'teachers-hub',
-            label: 'Giảng viên',
-            icon: GraduationCap,
-            isGroup: true,
-            children: [
-              { key: 'teachers', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
-              { key: 'training-videos', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
-              { key: 'training-guides-evaluations', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
-              { key: 'training-resources', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
-              { key: 'training-exam-room', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },
-            ],
-          },
-          {
-            key: 'staff-hub',
-            label: 'Nhân viên',
-            icon: ClipboardList,
-            isGroup: true,
-            children: [
-              { key: 'staff', icon: Users, label: 'Phân quyền NV', path: '/admin', hash: 'staff', permission: PERMISSIONS.MANAGE_STAFF },
-              { key: 'hr', icon: ClipboardList, label: 'Nhân sự & Lương', path: '/admin', hash: 'hr', permission: PERMISSIONS.MANAGE_HR },
-            ],
-          },
-        ],
-      },
-      {
-        key: 'finance-group',
-        label: 'Tài chính',
-        icon: DollarSign,
-        isGroup: true,
-        children: [
-          { key: 'finance', icon: DollarSign, label: 'Tài chính', path: '/admin', hash: 'finance', permission: PERMISSIONS.MANAGE_FINANCE },
-          { key: 'analytics', icon: BarChart3, label: 'Báo cáo doanh thu', path: '/admin', hash: 'analytics', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
-          { key: 'bi', icon: BarChart3, label: 'BI Dashboard', path: '/admin/bi', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
-        ],
-      },
+      { key: 'news', section: 'KHÔNG GIAN LÀM VIỆC', icon: FileText, label: 'Tin tức', path: '/admin/news', permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
+      { key: 'feed', section: 'KHÔNG GIAN LÀM VIỆC', icon: Newspaper, label: 'Bảng tin', path: '/admin/feed', permission: [PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_MESSAGES] },
+      { key: 'inbox', section: 'KHÔNG GIAN LÀM VIỆC', icon: MessageSquare, label: 'Hộp thư', path: '/admin/inbox', permission: PERMISSIONS.MANAGE_MESSAGES },
+
+      { key: 'students', section: 'HỌC VIÊN', icon: Users, label: 'Học viên', path: '/admin', hash: 'students', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'student-training', section: 'HỌC VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'student-training', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'student-resources', section: 'HỌC VIÊN', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'student-resources', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'lesson-practice', section: 'HỌC VIÊN', icon: BookOpen, label: 'Bài giảng', path: '/admin', hash: 'lesson-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'daily-practice', section: 'HỌC VIÊN', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
+      { key: 'cert-prep', section: 'HỌC VIÊN', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
+      { key: 'subscription-codes', section: 'HỌC VIÊN', icon: Ticket, label: 'Mã kích hoạt & gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
+
+      { key: 'teachers', section: 'GIẢNG VIÊN', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
+      { key: 'training-videos', section: 'GIẢNG VIÊN', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },
+      { key: 'training-guides-evaluations', section: 'GIẢNG VIÊN', icon: FileText, label: 'Quy trình & đánh giá nội bộ', path: '/admin', hash: 'training-guides-evaluations', permission: [PERMISSIONS.MANAGE_TRAINING, PERMISSIONS.VIEW_EVALUATIONS] },
+      { key: 'training-resources', section: 'GIẢNG VIÊN', icon: FileText, label: 'Tài liệu & link phần mềm', path: '/admin', hash: 'training-resources', permission: PERMISSIONS.MANAGE_TRAINING },
+      { key: 'training-exam-room', section: 'GIẢNG VIÊN', icon: Trophy, label: 'Phòng thi', path: '/admin', hash: 'training-exam-room', permission: PERMISSIONS.MANAGE_TRAINING },
+
+      { key: 'staff', section: 'NHÂN SỰ', icon: Users, label: 'Phân quyền NV', path: '/admin', hash: 'staff', permission: PERMISSIONS.MANAGE_STAFF },
+      { key: 'hr', section: 'NHÂN SỰ', icon: ClipboardList, label: 'Nhân sự & Lương', path: '/admin', hash: 'hr', permission: PERMISSIONS.MANAGE_HR },
+
+      { key: 'finance', section: 'TÀI CHÍNH', icon: DollarSign, label: 'Tài chính', path: '/admin', hash: 'finance', permission: PERMISSIONS.MANAGE_FINANCE },
+      { key: 'analytics', section: 'TÀI CHÍNH', icon: BarChart3, label: 'Báo cáo doanh thu', path: '/admin', hash: 'analytics', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
+      { key: 'bi', section: 'TÀI CHÍNH', icon: BarChart3, label: 'BI Dashboard', path: '/admin/bi', permission: [PERMISSIONS.MANAGE_FINANCE, PERMISSIONS.VIEW_BRANCH_REVENUE] },
+
       {
         key: 'system-group',
-        label: 'Hệ thống',
+        section: 'HỆ THỐNG',
+        label: 'Cài đặt & vận hành',
         icon: Settings,
         isGroup: true,
         children: [
@@ -161,7 +131,7 @@ const MENU_CONFIG = {
           { key: 'tenants', icon: Building2, label: 'Multi-tenant', path: '/admin/tenants', superAdminOnly: true },
         ],
       },
-      { key: 'center-info', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
+      { key: 'center-info', section: 'HỆ THỐNG', icon: Building2, label: 'Thông tin trung tâm', path: '/admin/center-info' },
     ],
     bottomItems: [
       { key: 'pin-lock', icon: KeyRound, label: 'Khóa mã PIN', isPinLock: true },
@@ -174,12 +144,6 @@ const MENU_CONFIG = {
 
 /** Mở 1 nhóm → đóng các sibling cùng cấp */
 const SIDEBAR_GROUP_SIBLINGS = {
-  'manage-train-group': ['finance-group', 'system-group'],
-  'finance-group': ['manage-train-group', 'system-group'],
-  'system-group': ['manage-train-group', 'finance-group'],
-  'students-hub': ['teachers-hub', 'staff-hub'],
-  'teachers-hub': ['students-hub', 'staff-hub'],
-  'staff-hub': ['students-hub', 'teachers-hub'],
   'teaching-group': ['news-training-group'],
   'news-training-group': ['teaching-group'],
 };
@@ -283,11 +247,6 @@ const AppSidebar = ({
 
   const [openGroups, setOpenGroups] = useState(() => {
     const defaults = {
-      'manage-train-group': false,
-      'students-hub': false,
-      'teachers-hub': false,
-      'staff-hub': false,
-      'finance-group': false,
       'system-group': false,
       'exam-group': false,
       'schedule-materials-group': false,
@@ -307,6 +266,7 @@ const AppSidebar = ({
   const {
     students, teachers, staffs, getPrivateEvaluationsForAdmin, getConversations,
   } = useData();
+  const studentSubscription = useStudentSubscription();
 
   // Session login/me có thể thiếu gender → bổ sung từ hồ sơ self (mọi role)
   const selfProfile = useMemo(() => {
@@ -415,6 +375,7 @@ const AppSidebar = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when identity/gender key changes
   }, [session?.id, session?.gender, sessionStorageKey, role]);
 
+  const [freeLockOpen, setFreeLockOpen] = useState(false);
   const [muted, setMutedState] = useState(() => isSoundMuted());
   const API = import.meta.env.VITE_API_URL || (import.meta.env.VITE_API_URL || "");
 
@@ -472,7 +433,13 @@ const AppSidebar = ({
     return hasLearningAccessEnrollment(me);
   })();
 
+  const freeMenu = useFreePortalMenu(session);
+  const freeLocked = useFreePortalLock(session) && freeMenu;
+  const freeLockKeys = new Set(['inbox', 'materials-files', 'exam', 'support']);
+  const itemFreeLocked = (item) => freeLocked && freeLockKeys.has(item?.key);
+
   const canSeeItem = (item) => {
+    if (role === 'student' && freeMenu && FREE_HIDDEN_KEYS.has(item.key)) return false;
     if (role === 'student' && item.requiresLearningAccess && !studentHasLearningAccess) return false;
     if (role !== 'admin' && role !== 'staff') return true;
     if (session?.id === 'admin' || adminRole === 'SUPER_ADMIN') return true;
@@ -602,6 +569,11 @@ const AppSidebar = ({
   };
 
   const handleClick = (item) => {
+    if (itemFreeLocked(item)) {
+      setFreeLockOpen(true);
+      setMobileOpen(false);
+      return;
+    }
     if (item.key === 'support') {
       navigate(item.path);
       setMobileOpen(false);
@@ -739,6 +711,27 @@ const AppSidebar = ({
             </p>
           </div>
         </div>
+        {role === 'student' && studentSubscription?.subscription && (
+          <div
+            className={`mt-2.5 flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-[11px] font-bold ${
+              studentSubscription.subscription.state === 'expiring'
+                ? 'bg-amber-400/15 text-amber-200'
+                : 'bg-white/5 text-slate-300'
+            }`}
+          >
+            <CalendarClock size={13} className="shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">{subscriptionShortLabel(studentSubscription.subscription, { freePortal: session?.freePortal === true })}</span>
+            {studentSubscription.subscription.state !== 'lifetime' && (
+              <button
+                type="button"
+                onClick={studentSubscription.openRenew}
+                className="shrink-0 rounded-lg bg-red-600 px-2 py-0.5 text-[10px] font-black text-white transition hover:bg-red-500 !shadow-none"
+              >
+                Gia hạn
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
@@ -748,11 +741,25 @@ const AppSidebar = ({
             if (role === 'teacher' && item.key === 'test' && !teacherPending) return false;
             return true;
           })
-          .map(item => {
+          .map((item, index, visibleItems) => {
+            // Tiêu đề phần: GV/HV khai báo ở mục đầu; admin theo `section`, hiện khi phần đổi giữa các mục đang hiển thị.
+            const sectionHeading = (role === 'teacher' || role === 'student')
+              ? item.sectionLabel || ''
+              : (item.section && item.section !== visibleItems[index - 1]?.section ? item.section : '');
+            const headingEl = sectionHeading ? (
+              <div
+                className="px-1 pt-3 pb-1 text-[10px] font-black tracking-[0.12em] text-slate-400"
+                role="heading"
+                aria-level={2}
+              >
+                {sectionHeading}
+              </div>
+            ) : null;
             const renderNavButton = (navItem, { nested = false } = {}) => {
               const Icon = navItem.icon;
               const active = isActive(navItem);
               const isLocked = teacherPending && navItem.key !== 'test';
+              const showFreeLock = itemFreeLocked(navItem);
               return (
                 <div key={navItem.key} className="relative group/nav">
                   <button
@@ -777,6 +784,9 @@ const AppSidebar = ({
                     <span className={`font-medium truncate ${nested ? 'text-[13px]' : 'text-sm'}`}>{navItem.sidebarLabel || navItem.label}</span>
                     {isLocked && (
                       <Lock size={13} className="ml-auto text-white/40 flex-shrink-0" aria-hidden="true" />
+                    )}
+                    {showFreeLock && (
+                      <Lock size={13} className="ml-auto text-amber-200 flex-shrink-0" aria-label="Đang khóa" />
                     )}
                     {!isLocked && getBadgeCount(navItem.key) > 0 && (
                       <span className="ml-auto px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-black leading-none drop-shadow-md shadow-red-500/50" aria-label={`${getBadgeCount(navItem.key)} thông báo`}>
@@ -839,6 +849,7 @@ const AppSidebar = ({
 
               return (
                 <div key={item.key}>
+                  {headingEl}
                   <button
                     type="button"
                     onClick={() => toggleGroup(item.key)}
@@ -877,15 +888,7 @@ const AppSidebar = ({
 
             return (
               <div key={item.key} className="pb-0.5">
-                {(role === 'teacher' || role === 'student') && item.sectionLabel ? (
-                  <div
-                    className="px-1 pt-3 pb-1 text-[10px] font-black tracking-[0.12em] text-slate-400"
-                    role="heading"
-                    aria-level={2}
-                  >
-                    {item.sectionLabel}
-                  </div>
-                ) : null}
+                {headingEl}
                 {renderNavButton(item)}
               </div>
             );
@@ -1052,6 +1055,9 @@ const AppSidebar = ({
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </span>
                     )}
+                    {itemFreeLocked(item) && (
+                      <Lock size={12} className="absolute -left-1 -top-1 rounded-full bg-slate-900 p-0.5 text-amber-200" aria-hidden="true" />
+                    )}
                   </span>
                   {isHome ? null : (
                     <span className="flex h-6 w-full items-center justify-center text-center leading-3">{item.mobileLabel || item.label}</span>
@@ -1079,6 +1085,14 @@ const AppSidebar = ({
         >
           <ChevronUp size={20} strokeWidth={2.5} aria-hidden="true" />
         </button>
+      )}
+
+      {freeLockOpen && (
+        <div className="fixed inset-0 z-[9600] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onClick={() => setFreeLockOpen(false)}>
+          <div onClick={(event) => event.stopPropagation()}>
+            <FreeFeatureLock session={session} onClose={() => setFreeLockOpen(false)} />
+          </div>
+        </div>
       )}
 
     </>

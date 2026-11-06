@@ -16,9 +16,11 @@ import { getClientEnrollments, hasLearningAccessEnrollment } from '../utils/enro
 import { getExamSubjectMeta, teacherMatchesCourse } from '../utils/examSubjects';
 import { teacherInStudentBranch, toBranchId } from '../utils/branchIds';
 import AddEnrollmentModal from './admin/shared/AddEnrollmentModal';
+import AdminStudentSubscriptionPanel from './admin/subscription/AdminStudentSubscriptionPanel';
 import { useToast } from '../utils/useToast';
 import { getAttendanceAction, attendanceToneClass } from '../utils/attendanceAction';
 import ZaloIcon from './ZaloIcon';
+import { SURVEY_FEAR_LABELS, SURVEY_LEVEL_LABELS, SURVEY_SOURCE_LABELS } from './student/FreeSurveyModal';
 import { formatStudentGradeNote } from '../utils/studentActivityLogs';
 import { getExamProgressDisplayStatus } from '../utils/examProgressStats';
 import { mapStudent } from '../lib/entityMaps';
@@ -53,6 +55,11 @@ const isRefundInvoice = (inv) => {
 };
 
 const courseKeyOf = (name) => String(name || '').trim().toLowerCase();
+const FREE_PORTAL_COURSE = 'tài khoản miễn phí';
+const isFreePortalCourse = (enrollment) => {
+  const label = String(enrollment?.courseName || enrollment?.name || enrollment?.course || '').trim().toLowerCase();
+  return label === FREE_PORTAL_COURSE;
+};
 
 /** Khóa hủy/hoàn: hiện trong filter nhưng không chọn được. */
 const isEnrollmentFilterLocked = (e) => {
@@ -170,9 +177,11 @@ const summarizeEnrollments = (list) => {
   // Khóa đã hủy/hoàn không còn tính vào học phí đang theo & số đã thu
   const activeItems = items.filter((e) => e?.status !== 'cancelled');
   const cancelledItems = items.filter((e) => e?.status === 'cancelled');
-  const totalSessions = activeItems.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
-  const completedSessions = activeItems.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
-  const remainingSessions = activeItems.reduce((s, e) => s + enrollmentRemaining(e), 0);
+  const sessionItems = activeItems.filter((e) => !isFreePortalCourse(e));
+  const noClassSessions = sessionItems.length === 0;
+  const totalSessions = sessionItems.reduce((s, e) => s + (Number(e.totalSessions) || 12), 0);
+  const completedSessions = sessionItems.reduce((s, e) => s + (Number(e.completedSessions) || 0), 0);
+  const remainingSessions = sessionItems.reduce((s, e) => s + enrollmentRemaining(e), 0);
   const price = activeItems.reduce((s, e) => s + (Number(e.price) || 0), 0);
   const paidItems = activeItems.filter(isEnrollmentPaid);
   const paidPrice = paidItems.reduce((s, e) => s + (Number(e.price) || 0), 0);
@@ -195,6 +204,7 @@ const summarizeEnrollments = (list) => {
     refundedTotal,
     progressPercent,
     avgGrade,
+    noClassSessions,
   };
 };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '—';
@@ -422,11 +432,14 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
     if (list.length) {
       list.forEach((enr, idx) => {
         const id = String(enr.enrollmentId || enr._id || enr.id || `enr-${idx}`);
-        const total = Number(enr.totalSessions) > 0 ? Number(enr.totalSessions) : 12;
-        const completed = Math.max(0, Number(enr.completedSessions) || 0);
-        const remaining = enr.remainingSessions != null && enr.remainingSessions !== ''
-          ? Math.max(0, Number(enr.remainingSessions) || 0)
-          : Math.max(0, total - completed);
+        const freeCourse = isFreePortalCourse(enr);
+        const total = freeCourse ? 0 : (Number(enr.totalSessions) > 0 ? Number(enr.totalSessions) : 12);
+        const completed = freeCourse ? 0 : Math.max(0, Number(enr.completedSessions) || 0);
+        const remaining = freeCourse
+          ? 0
+          : (enr.remainingSessions != null && enr.remainingSessions !== ''
+            ? Math.max(0, Number(enr.remainingSessions) || 0)
+            : Math.max(0, total - completed));
         next[id] = {
           totalSessions: total,
           completedSessions: completed,
@@ -541,7 +554,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
 
     const sessionEntries = Object.entries(enrollmentSessionForms || {});
     const onlyMain = sessionEntries.length === 1 && sessionEntries[0][0] === 'main';
-    if (onlyMain) {
+    if (onlyMain && !isFreePortalCourse(sessionEntries[0][1])) {
       const sess = sessionEntries[0][1];
       const total = Number(sess.totalSessions) > 0 ? Number(sess.totalSessions) : 12;
       const completed = Math.max(0, Math.min(total, Number(sess.completedSessions) || 0));
@@ -563,7 +576,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
         for (const [enrId, sess] of sessionEntries) {
           if (!enrId || enrId === 'main') continue;
           const st = String(sess.status || '').toLowerCase();
-          if (st === 'cancelled' || st === 'refunded') continue;
+          if (st === 'cancelled' || st === 'refunded' || isFreePortalCourse(sess)) continue;
           const total = Number(sess.totalSessions) > 0 ? Number(sess.totalSessions) : 12;
           const completed = Math.max(0, Math.min(total, Number(sess.completedSessions) || 0));
           const remaining = Math.max(0, total - completed);
@@ -1441,6 +1454,15 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                     )}
                   </div>
 
+                  {data.student.freeSurvey?.answeredAt && (
+                    <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-[12px] text-amber-950">
+                      <p className="font-bold">Khảo sát tài khoản miễn phí</p>
+                      <p>Biết qua: {SURVEY_SOURCE_LABELS[data.student.freeSurvey.source] || data.student.freeSurvey.source}{data.student.freeSurvey.sourceNote ? ` (${data.student.freeSurvey.sourceNote})` : ''}</p>
+                      <p>Trình độ: {SURVEY_LEVEL_LABELS[data.student.freeSurvey.level] || data.student.freeSurvey.level}</p>
+                      <p>Lo nhất: {SURVEY_FEAR_LABELS[data.student.freeSurvey.fear] || data.student.freeSurvey.fear}</p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-4 gap-y-1.5 text-[13px] text-slate-600 font-medium">
                     {String(data.student.studentCode || '').trim() ? (
                       <div className="flex items-center gap-2 min-w-0 justify-center sm:justify-start">
@@ -1579,19 +1601,26 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
               {/* --- TAB 1: SUMMARY --- */}
               {activeTab === 'summary' && (
                 <div className="space-y-8 animate-in fade-in duration-500">
+                  {canManageStudentAccount && (data?.student?._id || data?.student?.id || studentId) && (
+                    <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                      <h4 className="mb-3 text-sm font-black text-slate-900">Gói tài khoản</h4>
+                      <AdminStudentSubscriptionPanel studentId={String(data?.student?._id || data?.student?.id || studentId)} compact />
+                    </section>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <StatBox
                       label="Tiến độ học tập"
-                      value={`${summaryMetrics.progressPercent}%`}
+                      value={summaryMetrics.noClassSessions ? '—' : `${summaryMetrics.progressPercent}%`}
                       icon={TrendingUp}
                       color="bg-red-600"
-                      sub={`${summaryMetrics.completedSessions}/${summaryMetrics.totalSessions || 0} buổi`}
+                      sub={summaryMetrics.noClassSessions ? 'Chưa có buổi học' : `${summaryMetrics.completedSessions}/${summaryMetrics.totalSessions || 0} buổi`}
                     />
                     <StatBox
                       label="Số buổi còn lại"
-                      value={summaryMetrics.remainingSessions}
+                      value={summaryMetrics.noClassSessions ? '—' : summaryMetrics.remainingSessions}
                       icon={Clock}
                       color="bg-amber-500"
+                      sub={summaryMetrics.noClassSessions ? 'Tài khoản miễn phí' : undefined}
                     />
                     <StatBox
                       label="Học phí gốc"
@@ -1620,7 +1649,7 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                         <div>
                           <div className="flex justify-between items-end mb-2">
                             <p className="text-xs font-black text-slate-500  tracking-tighter">Hoàn thành khóa học</p>
-                            <p className="text-xl font-black text-indigo-600">{summaryMetrics.progressPercent}%</p>
+                            <p className="text-xl font-black text-indigo-600">{summaryMetrics.noClassSessions ? '—' : `${summaryMetrics.progressPercent}%`}</p>
                           </div>
                           <div className="h-4 bg-slate-100 rounded-full overflow-hidden p-1 shadow-inner">
                             <div
@@ -1629,10 +1658,13 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                             />
                           </div>
                           <p className="mt-2 text-[11px] font-semibold text-slate-400">
-                            {summaryMetrics.completedSessions}/{summaryMetrics.totalSessions} buổi
-                            {activeEnrollment
-                              ? ` · ${activeEnrollment.courseName || activeEnrollment.name}`
-                              : (enrollments.length > 1 ? ` · ${enrollments.length} khóa` : '')}
+                            {summaryMetrics.noClassSessions
+                              ? 'Tài khoản miễn phí không có buổi học'
+                              : `${summaryMetrics.completedSessions}/${summaryMetrics.totalSessions} buổi${
+                                activeEnrollment
+                                  ? ` · ${activeEnrollment.courseName || activeEnrollment.name}`
+                                  : (enrollments.length > 1 ? ` · ${enrollments.length} khóa` : '')
+                              }`}
                           </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4 pt-4">
@@ -2644,6 +2676,10 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   <span className="text-[9px] font-black  text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Đã hủy</span>
                                 )}
                               </div>
+                              {isFreePortalCourse(sess) ? (
+                                <p className="text-xs font-semibold text-slate-500">Tài khoản miễn phí không có buổi học.</p>
+                              ) : (
+                              <>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                   <label className="text-[11px] font-black text-slate-500  tracking-wide block mb-1">Tổng buổi</label>
@@ -2695,6 +2731,8 @@ export default function StudentDetailModal({ studentId, onClose, initialTab, hig
                                   />
                                   <p className="text-[11px] text-slate-400 mt-1">GV thấy ngay khi mở hồ sơ khóa này. Không bắt buộc.</p>
                                 </div>
+                              )}
+                              </>
                               )}
                             </div>
                           );

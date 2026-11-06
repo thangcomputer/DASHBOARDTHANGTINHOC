@@ -30,7 +30,10 @@ export default function StudyHeartbeat() {
     lastActiveRef.current = Date.now();
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
-      if (!isStudyMediaPlaying()) {
+      const onDailyPractice = /^\/student\/daily-practice(\/|$)/.test(location.pathname);
+      if (onDailyPractice) {
+        if (!isStudyMediaPlaying()) return;
+      } else if (!isStudyMediaPlaying()) {
         if (!document.hasFocus()) return;
         const idleLimit = document.activeElement?.tagName === 'IFRAME' ? EMBED_IDLE_MS : IDLE_MS;
         if (Date.now() - lastActiveRef.current > idleLimit) return;

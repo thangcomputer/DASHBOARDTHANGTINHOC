@@ -612,6 +612,15 @@ router.post('/:id/submit', [authMiddleware, ...assignmentsGuard('submit')], asyn
         });
       }
     }
+    try {
+      await require('../services/lmsProgressService').grantActivity({
+        studentId,
+        activity: 'assignment',
+        sourceKey: `assignment:${req.params.id}:${studentId}`,
+      });
+    } catch (xpErr) {
+      require('../config/logger').warn({ err: xpErr }, '[LMS_XP] bỏ qua XP bài tập, bài nộp vẫn được ghi');
+    }
     return res.json({ success: true, data: submission });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });

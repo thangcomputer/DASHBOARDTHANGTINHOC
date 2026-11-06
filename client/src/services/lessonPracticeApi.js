@@ -45,7 +45,7 @@ const lessonPracticeApi = {
       `/lesson-practice/my/subjects/${subjectId}/units${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`,
     )),
     unit: async (unitId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}`)),
-    markSection: async (unitId, section, itemId) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/sections/${section}`, { method: 'POST', body: JSON.stringify({ itemId }) })),
+    markSection: async (unitId, section, itemId, extra = {}) => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/sections/${section}`, { method: 'POST', body: JSON.stringify({ itemId, ...extra }) })),
     confirm: async (itemId, body) => parse(await apiFetch(`/lesson-practice/my/items/${itemId}/confirm`, { method: 'POST', body: JSON.stringify(body) })),
     resetPractice: async (unitId, practiceGroupId = '') => parse(await apiFetch(`/lesson-practice/my/units/${unitId}/reset-practice`, {
       method: 'POST',

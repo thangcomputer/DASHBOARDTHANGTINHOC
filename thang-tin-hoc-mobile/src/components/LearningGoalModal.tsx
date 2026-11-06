@@ -6,7 +6,7 @@ import { CalendarCheck, CalendarDays, Check, Clock3, Flame, PlayCircle, Sparkles
 import { PIN_LOCK_STATE_EVENT, isPinLockedNow } from '../services/pinLock';
 import { getStudyResumePoint, type StudyResumePoint } from '../services/courseVideoApi';
 import { navigationRef } from '../navigation/navigationRef';
-import { isActivelyStudying } from '../services/studyActivity';
+import { isActivelyStudying, isStudyMediaPlaying } from '../services/studyActivity';
 import { DailyPracticeReminder } from './dailyPractice/DailyPracticeReminder';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
@@ -100,9 +100,11 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
     if (!enabled) return undefined;
     const timer = setInterval(() => {
       if (AppState.currentState !== 'active' || isPinLockedNow()) return;
-      if (!isActivelyStudying()) return;
       const routeName = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : '';
       if (!routeName || !STUDY_ROUTES.has(routeName)) return;
+      if (routeName === 'DailyPractice') {
+        if (!isStudyMediaPlaying()) return;
+      } else if (!isActivelyStudying()) return;
       sendStudyHeartbeat()
         .then((result) => DeviceEventEmitter.emit(STUDY_MINUTE_EVENT, result))
         .catch(() => {});

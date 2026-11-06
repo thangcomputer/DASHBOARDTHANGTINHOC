@@ -166,7 +166,7 @@ export default function LearningGoalCard() {
       </div>
       <p className="mt-2 flex items-start gap-1 text-[11px] leading-snug text-slate-400">
         <Info size={12} className="mt-px shrink-0" />
-        Chỉ tính giờ khi bạn đang học ở trang bài học, ôn thi, tài liệu hoặc video — xem video đang phát, hoặc có thao tác trong 3 phút gần nhất.
+        Chỉ tính giờ khi bạn đang học ở trang bài học, ôn thi, tài liệu hoặc video, xem video đang phát, hoặc có thao tác trong 3 phút gần nhất.
       </p>
     </section>
   );

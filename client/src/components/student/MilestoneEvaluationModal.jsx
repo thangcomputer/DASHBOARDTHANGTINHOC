@@ -146,10 +146,10 @@ export function MilestoneEvaluationModal({
     : (isCourseEnd ? 'Đánh giá giảng viên' : 'Đánh giá chất lượng');
 
   const subtitle = step === 'center'
-    ? 'Gửi Admin — đánh giá trung tâm sau khi hoàn thành khóa'
+    ? 'Gửi Admin. Đánh giá trung tâm sau khi hoàn thành khóa'
     : (milestone === 'lesson_1'
-      ? 'Buổi học đầu tiên — gửi Admin (GV không thấy)'
-      : 'Bước cuối — đánh giá công khai (Thầy/Cô thấy sao)');
+      ? 'Buổi học đầu tiên. Gửi Admin (GV không thấy)'
+      : 'Bước cuối. Đánh giá công khai (Thầy/Cô thấy sao)');
 
   const canSubmitCenter = feedback.comment.trim().length > 0;
   const canSubmitLesson1 = feedback.comment.trim().length > 0;
@@ -276,7 +276,7 @@ export function MilestoneEvaluationModal({
               </p>
               {alreadyPubliclyRated ? (
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-center font-semibold leading-snug">
-                  Đã có đánh giá trước đó — chỉnh sửa lần cuối rồi gửi để khóa.
+                  Đã có đánh giá trước đó. Chỉnh sửa lần cuối rồi gửi để khóa.
                 </p>
               ) : null}
               <div className="space-y-1.5">

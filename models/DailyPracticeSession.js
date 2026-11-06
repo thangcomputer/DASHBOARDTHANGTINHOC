@@ -5,6 +5,12 @@ const dailyPracticeSessionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeTopic', required: true },
   difficulty: { type: String, enum: ['easy', 'medium', 'hard'], required: true },
+  mode: { type: String, enum: ['free', 'path'], default: 'free' },
+  unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeUnit', default: null },
+  step: { type: String, enum: ['learn', 'practice', 'challenge', 'checkpoint', null], default: null },
+  /** Nút lộ trình trong chặng (slug trong pathNodes). */
+  pathNodeKey: { type: String, default: null, trim: true, maxlength: 40 },
+  testOut: { type: Boolean, default: false },
   questionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeQuestion' }],
   hintsUsed: [{ type: mongoose.Schema.Types.ObjectId }],
   answers: [{
@@ -15,7 +21,11 @@ const dailyPracticeSessionSchema = new mongoose.Schema({
     xp: Number,
     answeredAt: Date,
   }],
-  status: { type: String, enum: ['in_progress', 'finished'], default: 'in_progress' },
+  status: { type: String, enum: ['in_progress', 'finished', 'abandoned'], default: 'in_progress' },
+  /** XP đặt cược khi bắt đầu lượt (đạt → hoàn, trượt/thoát → mất). */
+  stakeXp: { type: Number, default: 0 },
+  /** Làm lại nấc cũ để phục hồi (có thể không cược nếu XP thấp). */
+  recovery: { type: Boolean, default: false },
   xp: { type: Number, default: 0 },
   bonusXp: { type: Number, default: 0 },
   correctCount: { type: Number, default: 0 },

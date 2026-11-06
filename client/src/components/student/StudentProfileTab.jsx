@@ -10,6 +10,8 @@ import { openLearningGoal } from '../../utils/learningGoal';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import { readOwnedVideoCourseCache } from '../../utils/lmsDeepLink';
+import { isFreePortalCourseName } from '../../utils/enrollments';
+import SubscriptionProfileCard from './subscription/SubscriptionProfileCard';
 
 function openChangePassword() {
   window.dispatchEvent(new CustomEvent('open-change-password-modal'));
@@ -239,9 +241,9 @@ export default function StudentProfileTab({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-5 items-start">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-5 items-start">
         {/* Cột trái: bảo mật + thông tin + tóm tắt */}
-        <div className="lg:col-span-5 cms-sd-stack min-w-0">
+        <div className="cms-sd-stack min-w-0">
           <section className="cms-sd-card !p-0 overflow-hidden">
             <button
               type="button"
@@ -389,9 +391,9 @@ export default function StudentProfileTab({
         </div>
 
         {/* Cột phải: khóa học */}
-        <div className="lg:col-span-7 min-w-0">
+        <div className="min-w-0">
           {courses.length > 0 ? (
-            <section className="cms-sd-card !p-0 overflow-hidden h-full">
+            <section className="cms-sd-card !p-0 overflow-hidden">
               <div className="px-4 py-3 lg:px-5 lg:py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 min-w-0">
                 <button type="button" onClick={() => toggleSection('courses')} className="text-sm lg:text-base font-extrabold text-slate-800 flex items-center gap-2 min-w-0">
                   <BookOpen size={16} className="text-blue-600 shrink-0" aria-hidden="true" /> Khóa học
@@ -412,14 +414,15 @@ export default function StudentProfileTab({
                   </p>
                 )}
                 {courses.map((c) => {
+                  const title = c.courseName || c.name || 'Khóa học';
+                  const freeCourse = isFreePortalCourseName(title);
                   const videoProgress = progressForCourse(c);
                   const isVideoCourse = Boolean(videoProgress);
                   const total = isVideoCourse ? videoProgress.total : (Number(c.totalSessions) || 12);
                   const done = isVideoCourse ? videoProgress.completed : (Number(c.completedSessions) || 0);
-                  const isCompleted = c.status === 'completed'
-                    || (isVideoCourse && total > 0 && done >= total);
-                  const pct = Math.round((done / total) * 100) || 0;
-                  const title = c.courseName || c.name || 'Khóa học';
+                  const isCompleted = !freeCourse && (c.status === 'completed'
+                    || (isVideoCourse && total > 0 && done >= total));
+                  const pct = freeCourse ? 0 : (Math.round((done / total) * 100) || 0);
                   return (
                     <article
                       key={c.id || c.enrollmentId || title}
@@ -445,6 +448,7 @@ export default function StudentProfileTab({
                           {isCompleted ? 'Xong' : 'Học'}
                         </span>
                       </div>
+                      {freeCourse ? null : (
                       <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="h-2 bg-white rounded-full overflow-hidden border border-slate-100">
@@ -467,6 +471,7 @@ export default function StudentProfileTab({
                           <p className="text-[10px] font-bold  text-slate-400">TB</p>
                         </div>
                       </div>
+                      )}
                     </article>
                   );
                 })}
@@ -478,6 +483,10 @@ export default function StudentProfileTab({
               <p className="text-sm font-semibold text-slate-600">Chưa có khóa học</p>
             </section>
           )}
+
+          <div className="mt-4">
+            <SubscriptionProfileCard />
+          </div>
 
           {videoOrders.length > 0 && (
             <section className="cms-sd-card !p-0 overflow-hidden mt-4">

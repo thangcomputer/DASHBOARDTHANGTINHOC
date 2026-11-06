@@ -8,16 +8,16 @@ export const LEARNING_GOAL_HOURS = [1, 2, 3, 4, 5];
 
 /** Mức độ theo số giờ/ngày — màu chuyển dần từ xanh (nhẹ) sang đỏ (cao). */
 export const LEARNING_GOAL_LEVELS = {
-  1: { label: 'Nhẹ nhàng', color: '#10B981', soft: '#ECFDF5' },
-  2: { label: 'Vừa sức', color: '#0EA5E9', soft: '#F0F9FF' },
+  1: { label: 'Người mới bắt đầu', color: '#10B981', soft: '#ECFDF5' },
+  2: { label: 'Biết cơ bản', color: '#0EA5E9', soft: '#F0F9FF' },
   3: { label: 'Tập trung', color: '#F59E0B', soft: '#FFFBEB' },
   4: { label: 'Chuyên sâu', color: '#F97316', soft: '#FFF7ED' },
   5: { label: 'Bứt phá', color: '#DC2626', soft: '#FEF2F2' },
 };
 
 const MOTIVATION = {
-  1: 'Mỗi ngày một chút — đều đặn là chìa khóa.',
-  2: 'Nhịp học vừa sức, dễ duy trì lâu dài.',
+  1: 'Người mới bắt đầu: mỗi ngày một giờ, dễ vào nhịp.',
+  2: 'Biết cơ bản: hai giờ mỗi ngày, vừa sức để tiến đều.',
   3: 'Tập trung tốt — bạn sẽ thấy tiến bộ rõ rệt.',
   4: 'Cam kết cao — hãy chia nhỏ thành nhiều buổi.',
   5: 'Thử thách bứt phá — nhớ nghỉ ngơi hợp lý nhé!',

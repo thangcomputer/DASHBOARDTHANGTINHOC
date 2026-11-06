@@ -39,6 +39,19 @@ export function vnTodayKey(date = new Date()) {
 }
 
 export const topicColor = (key) => TOPIC_COLORS[key] || TOPIC_COLORS.red;
+
+/** Mỗi chặng lộ trình một màu (xoay vòng) — giống các "phần" của Duolingo. */
+export const UNIT_COLORS = [
+  { from: '#4ADE80', to: '#16A34A', soft: '#F0FDF4', text: '#15803D' },
+  { from: '#60A5FA', to: '#2563EB', soft: '#EFF6FF', text: '#1D4ED8' },
+  { from: '#C084FC', to: '#9333EA', soft: '#FAF5FF', text: '#7E22CE' },
+  { from: '#FB923C', to: '#EA580C', soft: '#FFF7ED', text: '#C2410C' },
+  { from: '#F472B6', to: '#DB2777', soft: '#FDF2F8', text: '#BE185D' },
+  { from: '#2DD4BF', to: '#0D9488', soft: '#F0FDFA', text: '#0F766E' },
+  { from: '#FBBF24', to: '#D97706', soft: '#FFFBEB', text: '#B45309' },
+  { from: '#818CF8', to: '#4F46E5', soft: '#EEF2FF', text: '#4338CA' },
+];
+export const unitColor = (index) => UNIT_COLORS[(Math.max(1, Number(index) || 1) - 1) % UNIT_COLORS.length];
 export const topicIcon = (key) => TOPIC_ICONS[key] || BookOpen;
 
 export const DIFFICULTIES = [
@@ -47,6 +60,13 @@ export const DIFFICULTIES = [
   { id: 'hard', label: 'Khó', stars: 3, color: '#EF4444', soft: '#FEF2F2', xp: 20 },
 ];
 export const difficultyMeta = (id) => DIFFICULTIES.find((d) => d.id === id) || DIFFICULTIES[0];
+/** XP đặt cược mỗi lượt luyện (khớp backend). */
+export const VIDEO_CHECK_ANSWER_XP = 5;
+export const SESSION_STAKE_XP = 20;
+/** Kiểm tra vượt: đạt được 40 XP, không đạt hoặc thoát mất 40 XP. */
+export const TEST_OUT_XP = 40;
+/** @deprecated dùng TEST_OUT_XP */
+export const CHECKPOINT_FAIL_PENALTY = TEST_OUT_XP;
 
 export const QUESTION_TYPES = {
   mcq: { label: 'Trắc nghiệm', instruction: 'Chọn đáp án đúng' },
@@ -56,6 +76,29 @@ export const QUESTION_TYPES = {
   fill: { label: 'Điền vào chỗ trống', instruction: 'Kéo từ vào đúng chỗ trống' },
   sort: { label: 'Phân loại', instruction: 'Kéo từng mục vào đúng nhóm' },
 };
+
+const TYPE_CHIP = { soft: '#F1F5F9', color: '#475569' };
+
+/**
+ * Nhãn ngữ cảnh trên thẻ câu — lộ trình gom Chặng + nút + nấc; loại câu riêng (không lặp «Vừa»).
+ * @returns {{ id: string, text: string, soft?: string, color?: string }[]}
+ */
+export function playQuestionHeaderChips({ path, typeLabel, levelMeta }) {
+  const level = levelMeta || DIFFICULTIES[0];
+  if (path) {
+    const pathText = path.testOut
+      ? `Chặng ${path.unitIndex} · Kiểm tra vượt`
+      : [`Chặng ${path.unitIndex}`, path.pathNodeLabel, path.stepLabel].filter(Boolean).join(' · ');
+    return [
+      { id: 'path', text: pathText, soft: '#FEF2F2', color: '#B91C1C' },
+      { id: 'type', text: typeLabel, ...TYPE_CHIP },
+    ];
+  }
+  return [
+    { id: 'level', text: level.label, soft: level.soft, color: level.color },
+    { id: 'type', text: typeLabel, ...TYPE_CHIP },
+  ];
+}
 
 const PRAISE = ['Tuyệt vời!', 'Chính xác!', 'Giỏi quá!', 'Xuất sắc!', 'Quá đỉnh!', 'Làm tốt lắm!'];
 const COMFORT = ['Chưa đúng rồi', 'Tiếc quá!', 'Gần đúng rồi đó', 'Không sao, thử câu tiếp nhé'];
@@ -71,30 +114,30 @@ export function reminderCopy(stats = {}, topicCount = 0) {
       mood: 'sad',
       badge: 'Bạn đã lỡ chuỗi',
       title: `Bạn đã lỡ chuỗi 🔥 ${stats.lostStreak} ngày!`,
-      text: `Đã ${stats.missedDays} ngày bạn chưa luyện tập. Đừng để công sức trôi đi — luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
+      text: `Đã ${stats.missedDays} ngày bạn chưa luyện tập. Đừng để công sức trôi đi. Luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
       cta: 'Lấy lại phong độ ngay',
     };
   }
   if (stats.streakState === 'lost') {
     return {
-      mood: 'sad',
+      mood: 'offline',
       badge: 'Đừng bỏ cuộc',
       title: 'Lâu rồi bạn chưa luyện tập!',
-      text: `Đã ${stats.missedDays} ngày rồi đó. Kiến thức sẽ quên dần nếu không ôn — làm ngay 10 câu để lấy lại phong độ nhé!`,
+      text: `Đã ${stats.missedDays} ngày rồi đó. Kiến thức sẽ quên dần nếu không ôn. Làm ngay 10 câu để lấy lại phong độ nhé!`,
       cta: 'Lấy lại phong độ ngay',
     };
   }
   if (streak > 0) {
     return {
-      mood: 'thinking',
+      mood: 'determined',
       badge: 'Chuỗi sắp mất',
       title: `Chuỗi 🔥 ${streak} ngày sắp mất!`,
-      text: 'Hôm nay bạn chưa luyện tập — chuỗi sẽ về 0 lúc nửa đêm. Làm ngay 10 câu để giữ lửa!',
+      text: 'Hôm nay bạn chưa luyện tập. Chuỗi sẽ về 0 lúc nửa đêm. Làm ngay 10 câu để giữ lửa!',
       cta: 'Giữ chuỗi ngay',
     };
   }
   return {
-    mood: 'happy',
+    mood: 'energy',
     badge: 'Thử thách hôm nay',
     title: 'Luyện tập 5 phút mỗi ngày',
     text: `10 câu trắc nghiệm, kéo thả vui như trò chơi${topicCount ? ` với ${topicCount} chủ đề` : ''}. Bắt đầu chuỗi ngày đầu tiên nào!`,
@@ -104,7 +147,7 @@ export function reminderCopy(stats = {}, topicCount = 0) {
 
 export function resultMessage(stars) {
   if (stars >= 3) return { title: 'Hoàn hảo!', text: 'Bạn nắm chủ đề này rất chắc. Thử độ khó cao hơn nhé!' };
-  if (stars === 2) return { title: 'Rất tốt!', text: 'Chỉ sai vài câu — xem lại phần giải thích để nhớ lâu hơn.' };
+  if (stars === 2) return { title: 'Rất tốt!', text: 'Chỉ sai vài câu. Xem lại phần giải thích để nhớ lâu hơn.' };
   if (stars === 1) return { title: 'Cố lên!', text: 'Bạn đang tiến bộ. Ôn lại các câu sai rồi chơi lại nhé.' };
   return { title: 'Đừng nản nhé!', text: 'Ai cũng bắt đầu từ đây. Thử độ khó Dễ để làm quen trước.' };
 }

@@ -9,7 +9,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
 import { dailyPracticeApi, type DpTopic } from '../services/dailyPracticeApi';
-import { isDirectVideoUrl, playableVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
+import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl, vimeoIdFromUrl, youtubeIdFromUrl } from '../utils/videoSource';
 import { VideoPlayerFrame, type VideoPlayerApi, type VideoPlayerProgress } from './VideoPlayerFrame';
 import { VideoLessonTabs } from './VideoLessonTabs';
 import { AppHeader, AppScreen, Card, EmptyState, ErrorState, LoadingSkeleton } from '../components/ui';
@@ -1933,13 +1933,7 @@ const videoLessonTabs: Array<{ id: VideoLessonTab; label: string; icon: typeof L
   { id: 'resources', label: 'Tài liệu', icon: FileText },
 ];
 
-function getEmbeddedVideoUrl(url: string) {
-  const youtubeId = youtubeIdFromUrl(url);
-  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0`;
-  const vimeoId = vimeoIdFromUrl(url);
-  if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}?autoplay=1`;
-  return '';
-}
+const getEmbeddedVideoUrl = embeddedVideoUrl;
 
 function VideoLessonPane({
   unit,

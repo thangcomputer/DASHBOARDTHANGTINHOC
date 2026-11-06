@@ -16,6 +16,7 @@ import { useToast } from '../utils/useToast';
 import { useSocket } from '../context/SocketContext';
 import SupportMascot from './SupportMascot';
 import { extractYouTubeId } from '../utils/youtubeDuration';
+import { isFreePortalLocked } from './student/dailyPractice/FreeFeatureLock';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -661,6 +662,7 @@ export default function FeedBoard({ session, role }) {
 
   const handlePost = async () => {
     const text = content.trim();
+    if (postLocked) return;
     if (!text && pendingFiles.length === 0) {
       toast.error('Nhập nội dung hoặc thêm ảnh');
       return;
@@ -875,6 +877,7 @@ export default function FeedBoard({ session, role }) {
 
   const handleComment = async (postId) => {
     const text = String(commentDrafts[postId] || '').trim();
+    if (postLocked) return;
     const files = commentFiles[postId] || [];
     if (!text && files.length === 0) return;
     setBusyId('c-' + postId);
@@ -968,6 +971,12 @@ export default function FeedBoard({ session, role }) {
       <div className="space-y-3 md:space-y-4 min-w-0">
         {/* Post Composer */}
         <div className="cms-feed-composer bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
+        {postLocked ? (
+          <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+            <Lock size={18} className="shrink-0 text-slate-700" aria-hidden="true" />
+            <p className="text-sm font-semibold text-slate-700">Tài khoản miễn phí chỉ xem bảng tin. Đăng ký gói Meet để được đăng bài.</p>
+          </div>
+        ) : (
           <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <img
@@ -1079,6 +1088,7 @@ export default function FeedBoard({ session, role }) {
           </div>
         </div>
 
+        )}
         {/* Post Feed List */}
         {!loading && (
           <div className="cms-feed-list-heading flex items-center justify-between gap-2 px-1 pt-1">
@@ -1405,7 +1415,7 @@ export default function FeedBoard({ session, role }) {
 
                             {/* Reply box to root comment */}
                             {replyTo[post.id]?.focusId === c.id && (
-                              <div className="pl-6 pt-1 space-y-1.5">
+                            {replyTo[post.id]?.focusId === c.id && !postLocked && (
                                 <div className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
                                   <Reply size={11} /> Đang trả lời <span className="font-bold text-slate-800">{replyTo[post.id].name}</span>
                                   <button type="button" onClick={() => setReplyTo((d) => ({ ...d, [post.id]: null }))} className="text-slate-400 hover:text-slate-600 ml-1">
@@ -1523,7 +1533,7 @@ export default function FeedBoard({ session, role }) {
 
                       {/* New root comment input */}
                       {!replyTo[post.id] && (
-                        <div className="pt-2">
+                      {!postLocked && !replyTo[post.id] && (
                           {(commentPreviews[post.id] || []).length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-2">
                               {(commentPreviews[post.id] || []).map((src) => (

@@ -63,7 +63,7 @@ export default function DailyPracticeReminder({ stats, topicCount, onStart, onCl
 
         {players > 0 && (
           <p className="mx-5 mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
-            <Users size={14} aria-hidden="true" /> {players} học viên đã luyện tập hôm nay — đừng để bị bỏ lại!
+            <Users size={14} aria-hidden="true" /> {players} học viên đã luyện tập hôm nay. Đừng để bị bỏ lại!
           </p>
         )}
 

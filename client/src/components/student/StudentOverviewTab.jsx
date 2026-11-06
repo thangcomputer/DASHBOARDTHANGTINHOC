@@ -5,6 +5,7 @@ import {
   PlayCircle, Trophy, XCircle,
 } from 'lucide-react';
 import LearningGoalCard from './LearningGoalCard';
+import LmsProgressCard from './LmsProgressCard';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
 import WelcomeHero from '../WelcomeHero';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
@@ -13,7 +14,7 @@ import lessonPracticeApi from '../../services/lessonPracticeApi';
 import dailyPracticeApi from '../../services/dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
-import '../dashboard-overview.css';
+import { isFreePortalCourseName } from '../../utils/enrollments';
 
 const RECENT_ACTIVITY_LIMIT = 5;
 
@@ -102,7 +103,7 @@ function StudyLogRow({ item }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className="truncate text-xs font-bold text-slate-800">
-            {item.index ? `Buổi ${item.index} — ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
+            {item.index ? `Buổi ${item.index}: ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
           </p>
           {badge && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold text-slate-600">{badge}</span>}
         </div>
@@ -256,6 +257,7 @@ export default function StudentOverviewTab({
     : (Number(progressPct) || 0);
   const nextSubject = (videoCourse?.subjects || []).find((s) => s.opened !== false
     && (Number(s.completedUnitCount) || 0) < (Number(s.totalUnitCount) || 0));
+  const freePortalCourse = isFreePortalCourseName(currentCourseName);
   const courseCta = isVideoCourse
     ? nextSubject
       ? {
@@ -350,6 +352,7 @@ export default function StudentOverviewTab({
               )}
             </div>
             <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
+            {!freePortalCourse && (
             <div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400 transition-all duration-500" style={{ width: `${pct}%` }} />
@@ -362,9 +365,12 @@ export default function StudentOverviewTab({
               </div>
               {videoCourses.error && <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>}
             </div>
+            )}
+            {!freePortalCourse && (
             <button type="button" onClick={courseCta.onClick} className="cms-btn cms-btn-primary self-start">
               <PlayCircle size={16} aria-hidden="true" /> <span className="max-w-[260px] truncate">{courseCta.label}</span>
             </button>
+            )}
           </section>
 
           {/* Việc cần làm hôm nay — ngay dưới thẻ khóa học */}
@@ -409,6 +415,7 @@ export default function StudentOverviewTab({
 
         {/* Cột phải: mục tiêu + bảng xếp hạng, nằm ngay đầu trang */}
         <div className="flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3">
+          <LmsProgressCard />
           <LearningGoalCard />
           <LearningLeaderboardCard />
         </div>

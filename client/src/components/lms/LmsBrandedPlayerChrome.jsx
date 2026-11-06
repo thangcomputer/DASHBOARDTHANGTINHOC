@@ -124,7 +124,10 @@ export default function LmsBrandedPlayerChrome({
   getPlayer = null,
   /** Chất lượng thực tế từ onPlaybackQualityChange */
   actualPlaybackQuality = null,
+  /** 'window': màn chờ nền xám đậm + nút phát đỏ lớn, không nhãn thương hiệu (popup video lộ trình). */
+  overlayVariant = 'default',
 }) {
+  const windowLook = overlayVariant === 'window';
   const [dragging, setDragging] = useState(false);
   const [dragRatio, setDragRatio] = useState(0);
   const [showVol, setShowVol] = useState(false);
@@ -226,14 +229,20 @@ export default function LmsBrandedPlayerChrome({
       {overlayVisible && (
         <div
           className="absolute inset-0 z-20 flex flex-col items-center justify-center px-4"
-          style={{ background: 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.78) 100%)' }}
+          style={{
+            background: windowLook
+              ? 'radial-gradient(circle at 50% 45%, rgba(239,68,68,0.10) 0%, #23262E 55%, #1C1F26 100%)'
+              : 'linear-gradient(135deg, rgba(10,14,24,0.88) 0%, rgba(15,25,50,0.78) 100%)',
+          }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
-            <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest  shadow-lg">
-              {brandLabel}
+          {!windowLook && (
+            <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
+              <div className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded-md tracking-widest  shadow-lg">
+                {brandLabel}
+              </div>
             </div>
-          </div>
+          )}
           {typeof onToggleFullscreen === 'function' ? (
             <button
               type="button"
@@ -251,18 +260,20 @@ export default function LmsBrandedPlayerChrome({
           <button
             type="button"
             onClick={() => onPlay?.()}
-            className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95"
+            className={`relative rounded-full flex items-center justify-center shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95 ${windowLook ? 'w-20 h-20 sm:w-28 sm:h-28' : 'w-16 h-16 sm:w-20 sm:h-20'}`}
             style={{
-              background: 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)',
+              background: windowLook ? '#EF3B36' : 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)',
               boxShadow: '0 0 32px rgba(220,38,38,0.45), 0 8px 24px rgba(0,0,0,0.35)',
             }}
             aria-label="Phát video"
           >
-            <Play size={28} className="text-white ml-1 drop-shadow-lg" fill="white" />
+            <Play size={windowLook ? 40 : 28} className="text-white ml-1.5 drop-shadow-lg" fill="white" />
           </button>
-          <p className="mt-4 text-white/75 text-sm font-semibold tracking-wide text-center">
-            {hasEnded ? 'Xem lại bài học' : 'Nhấn để bắt đầu học'}
-          </p>
+          {!windowLook || hasEnded ? (
+            <p className="mt-4 text-white/75 text-sm font-semibold tracking-wide text-center">
+              {hasEnded ? 'Xem lại bài học' : 'Nhấn để bắt đầu học'}
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -274,6 +285,20 @@ export default function LmsBrandedPlayerChrome({
           style={{ bottom: 72 }}
           onClick={() => (isPlaying ? onPause?.() : onPlay?.())}
         />
+      )}
+
+      {!overlayVisible && !isPlaying && !hasEnded && (
+        <div className="pointer-events-none absolute inset-0 z-[17] flex items-center justify-center" aria-hidden="true">
+          <span
+            className={`flex items-center justify-center rounded-full shadow-2xl ${windowLook ? 'h-16 w-16 sm:h-20 sm:w-20' : 'h-14 w-14 sm:h-16 sm:w-16'}`}
+            style={{
+              background: '#EF3B36',
+              boxShadow: '0 0 28px rgba(220,38,38,0.5), 0 6px 20px rgba(0,0,0,0.35)',
+            }}
+          >
+            <Play size={windowLook ? 32 : 26} className="ml-1.5 text-white drop-shadow-lg" fill="white" />
+          </span>
+        </div>
       )}
 
       {!overlayVisible && (

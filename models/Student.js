@@ -17,6 +17,7 @@ const StudentSchema = new mongoose.Schema(
     },
     email: { type: String, trim: true, lowercase: true },
     googleId: { type: String, sparse: true, unique: true },
+    facebookId: { type: String, sparse: true, unique: true },
     zaloId: { type: String, sparse: true, unique: true },
     avatar: { type: String, default: '' },
     gender: { type: String, enum: ['male', 'female', 'Nam', 'Nữ', ''], default: '' },
@@ -296,6 +297,18 @@ const StudentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /** Tự đăng ký ở /DANGNHAPMIENPHI. Học viên trung tâm không có field này. */
+    freePortal: { type: Boolean, default: false },
+    /** Gói Meet còn hạn thì mở hỗ trợ, tin nhắn, phòng thi và bài tập. Mua XP không mở các mục này. */
+    freeUnlocked: { type: Boolean, default: false },
+    /** Khảo sát một lần khi vào tài khoản miễn phí. */
+    freeSurvey: {
+      source: { type: String, default: '' },
+      sourceNote: { type: String, default: '' },
+      level: { type: String, default: '' },
+      fear: { type: String, default: '' },
+      answeredAt: { type: Date, default: null },
+    },
     /** Pháo hoa hoàn thành khóa (legacy 1 khóa, không enrollment). false = chờ xem. */
     courseCelebrationSeen: { type: Boolean },
     tokenVersion: { type: Number, default: 0 },   // ⭐ Anti-sharing: tăng mỗi lần login
@@ -316,6 +329,17 @@ const StudentSchema = new mongoose.Schema(
     knownDeviceCount: { type: Number, default: 0 },
     /** Khóa đăng nhập HV — tách khỏi status học vụ (Đang học / Chờ xếp lớp). */
     accountLocked: { type: Boolean, default: false },
+    /**
+     * Gói tài khoản theo thời hạn. Thiếu trường (HV cũ) = vĩnh viễn.
+     * expiresAt null = không hết hạn; quá hạn thì chỉ còn màn gia hạn.
+     */
+    subscription: {
+      plan: { type: String, enum: ['1m', '3m', '6m', '12m', 'lifetime'], default: 'lifetime' },
+      expiresAt: { type: Date, default: null },
+      activatedAt: { type: Date, default: null },
+      /** Mốc nhắc đã gửi cho kỳ hạn hiện tại, ví dụ "2026-12-01:7". */
+      remindedFor: { type: [String], default: [] },
+    },
     
     // ── Audit: Ai là người thêm học viên này ──────────────────────
     createdBy: {
@@ -348,6 +372,7 @@ StudentSchema.virtual('progressPercent').get(function () {
 
 // ── Middleware: Hash password trước khi save ───────────────────────
 StudentSchema.pre('save', async function () {
+  this.$locals.welcomeXp = this.isNew;
   if (this.isModified('age')) {
     if (this.age == null) {
       this.ageAsOf = undefined;
@@ -361,6 +386,17 @@ StudentSchema.pre('save', async function () {
   // Tự động set paidAt khi paid = true
   if (this.isModified('paid') && this.paid && !this.paidAt) {
     this.paidAt = new Date();
+  }
+});
+
+StudentSchema.post('save', async function (doc) {
+  if (!this.$locals?.welcomeXp) return;
+  try {
+    await require('../services/lmsProgressService').grantWelcomeXp(doc._id);
+  } catch (err) {
+    try {
+      require('../config/logger').warn({ err }, '[LMS_XP] bỏ qua XP chào mừng, tài khoản vẫn được tạo');
+    } catch { /* ignore */ }
   }
 });
 

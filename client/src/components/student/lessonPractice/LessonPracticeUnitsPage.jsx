@@ -84,7 +84,13 @@ function createWatchGuard() {
     tick(time, duration, playing, seekTo, unlocked) {
       const t = Number(time) || 0;
       const d = Number(duration) || 0;
-      if (unlocked) { last = t; return false; }
+      if (unlocked) {
+        const delta = t - last;
+        if (playing && delta > 0 && delta <= SEEK_TOLERANCE_SEC) watched += delta;
+        last = t;
+        this.ratio = d > 0 ? watched / d : 0;
+        return false;
+      }
       if (t > maxPos + SEEK_TOLERANCE_SEC) {
         seekTo(maxPos);
         last = maxPos;
@@ -94,13 +100,15 @@ function createWatchGuard() {
       if (playing && delta > 0 && delta <= SEEK_TOLERANCE_SEC) watched += delta;
       maxPos = Math.max(maxPos, t);
       last = t;
+      this.ratio = d > 0 ? watched / d : 0;
       return d > 0 && watched / d >= WATCH_REQUIRED_RATIO;
     },
-    reset() { maxPos = 0; watched = 0; last = 0; },
+    ratio: 0,
+    reset() { maxPos = 0; watched = 0; last = 0; this.ratio = 0; },
   };
 }
 
-function FallbackVideoPane({ unit, done, onWatched, playerApiRef }) {
+function FallbackVideoPane({ unit, done, onWatched, onXpWatched, playerApiRef }) {
   const url = unit?.videoUrl || '';
   const vimeoRef = useRef(null);
   const nativeVideoRef = useRef(null);
@@ -108,11 +116,12 @@ function FallbackVideoPane({ unit, done, onWatched, playerApiRef }) {
   const vimeoDurationRef = useRef(0);
   const [started, setStarted] = useState(false);
   const ended = useRef(false);
+  const xpSent = useRef(false);
   const onWatchedRef = useRef(onWatched);
   const doneRef = useRef(done);
   onWatchedRef.current = onWatched;
   doneRef.current = done;
-  useEffect(() => { setStarted(false); ended.current = false; }, [url]);
+  useEffect(() => { setStarted(false); ended.current = false; xpSent.current = false; }, [url]);
 
   const [guard] = useState(() => createWatchGuard());
   const guardRef = useRef(guard);
@@ -153,7 +162,9 @@ function FallbackVideoPane({ unit, done, onWatched, playerApiRef }) {
         const { seconds, duration } = data.data;
         vimeoTimeRef.current = Number(seconds) || 0;
         vimeoDurationRef.current = Number(duration) || 0;
-        if (guardRef.current.tick(seconds, duration, vimeoPlaying, (s) => frame.contentWindow?.postMessage(JSON.stringify({ method: 'setCurrentTime', value: s }), '*'), doneRef.current || unit.antiSeek === false)) finish();
+        const guard = guardRef.current;
+        if (guard.tick(seconds, duration, vimeoPlaying, (s) => frame.contentWindow?.postMessage(JSON.stringify({ method: 'setCurrentTime', value: s }), '*'), doneRef.current || unit.antiSeek === false)) finish();
+        if (!xpSent.current && guard.ratio >= 0.9) { xpSent.current = true; onXpWatched?.(); }
       }
     };
     window.addEventListener('message', onMessage);
@@ -174,14 +185,14 @@ function FallbackVideoPane({ unit, done, onWatched, playerApiRef }) {
   }
   return (
     <div className="space-y-3">
-      <video ref={nativeVideoRef} key={url} src={resolveMediaUrl(url)} controls controlsList="nodownload noplaybackrate" onTimeUpdate={(e) => { const v = e.currentTarget; if (guardRef.current.tick(v.currentTime, v.duration, !v.paused, (s) => { v.currentTime = s; }, done || unit.antiSeek === false)) finish(); }} className="w-full max-h-[70vh] rounded-2xl bg-black" />
+      <video ref={nativeVideoRef} key={url} src={resolveMediaUrl(url)} controls controlsList="nodownload noplaybackrate" onTimeUpdate={(e) => { const v = e.currentTarget; const guard = guardRef.current; if (guard.tick(v.currentTime, v.duration, !v.paused, (s) => { v.currentTime = s; }, done || unit.antiSeek === false)) finish(); if (!xpSent.current && guard.ratio >= 0.9) { xpSent.current = true; onXpWatched?.(); } }} className="w-full max-h-[70vh] rounded-2xl bg-black" />
       <p className="text-xs font-bold text-slate-500">{done ? 'Đã xem hết video.' : 'Xem tối thiểu 70% video (không tua) để hoàn thành mục này.'}</p>
     </div>
   );
 }
 
 function VideoPane({
-  unit, videos, selectedVideo, selectedVideoIndex, onSelectVideo, onWatched, subject, units, videoTab, setVideoTab, user, courseId,
+  unit, videos, selectedVideo, selectedVideoIndex, onSelectVideo, onWatched, onXpWatched, subject, units, videoTab, setVideoTab, user, courseId,
 }) {
   const url = selectedVideo?.url || '';
   const videoDone = unit?.videoDoneIds?.includes(selectedVideo?.id);
@@ -232,6 +243,7 @@ function VideoPane({
         lessonCompleted={!!videoDone}
         requiredRatio={WATCH_REQUIRED_RATIO}
         onEligibilityReached={async () => { onWatched?.(selectedVideo?.id); return true; }}
+        onXpRatioReached={async (ratio) => { await onXpWatched?.(selectedVideo?.id, ratio); }}
         playerApiRef={playerApiRef}
       />
     </div>
@@ -241,6 +253,7 @@ function VideoPane({
       unit={{ ...unit, title: selectedVideo?.title || unit.title, videoUrl: url }}
       done={videoDone}
       onWatched={() => onWatched?.(selectedVideo?.id)}
+      onXpWatched={() => onXpWatched?.(selectedVideo?.id, 0.9)}
       playerApiRef={playerApiRef}
     />
   );
@@ -828,10 +841,10 @@ export default function LessonPracticeUnitsPage() {
     setLessonListOpen(false);
   }
 
-  async function markSection(part, itemId = '') {
+  async function markSection(part, itemId = '', extra = {}) {
     if (!openUnitId) return false;
     try {
-      const res = await lessonPracticeApi.student.markSection(openUnitId, part, itemId);
+      const res = await lessonPracticeApi.student.markSection(openUnitId, part, itemId, extra);
       setPayload((prev) => prev && ({
         ...prev,
         units: (prev.units || []).map((unit) => (unit.id === openUnitId ? {
@@ -974,7 +987,7 @@ export default function LessonPracticeUnitsPage() {
                       type="button"
                       onClick={() => chooseUnit(unit)}
                       title={unit.title}
-                      aria-label={`${unit.title} — ${lessonStatus.label}`}
+                      aria-label={`${unit.title}, ${lessonStatus.label}`}
                       className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                     >
                       <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
@@ -1057,6 +1070,7 @@ export default function LessonPracticeUnitsPage() {
                         selectedVideoIndex={openUnitVideos.findIndex((video) => video.id === selectedVideo.id)}
                         onSelectVideo={setSelectedVideoId}
                         onWatched={(videoId) => markSection('video', videoId)}
+                        onXpWatched={(videoId, ratio) => markSection('video', videoId, { watchRatio: ratio })}
                         subject={payload.subject}
                         units={units}
                         videoTab={videoTab}

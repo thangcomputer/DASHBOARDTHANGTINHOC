@@ -41,7 +41,7 @@ function Avatar({ name, avatar }) {
 
 function gapMessage(me) {
   if (!me?.rank) return '';
-  if (me.rank === 1) return 'Bạn đang dẫn đầu bảng — giữ vững phong độ nhé!';
+  if (me.rank === 1) return 'Bạn đang dẫn đầu bảng. Giữ vững phong độ nhé!';
   const ahead = me.ahead;
   if (!ahead) return '';
   if (ahead.goalDays > me.goalDays) {
@@ -133,7 +133,7 @@ export default function LearningLeaderboardCard() {
           {!me?.hasGoal ? (
             <p className="text-xs text-slate-500">Đặt mục tiêu ở thẻ Mục tiêu học để có tên trên bảng xếp hạng.</p>
           ) : !me.rank ? (
-            <p className="text-xs text-slate-500">Tuần này bạn chưa học phút nào — vào bài học ngay để lên bảng!</p>
+            <p className="text-xs text-slate-500">Tuần này bạn chưa học phút nào. Vào bài học ngay để lên bảng!</p>
           ) : (
             <div className={`flex items-center gap-3 rounded-xl px-3 py-2 ${meInTop ? 'bg-emerald-50' : 'bg-red-50'}`}>
               <span className={`text-lg font-black tabular-nums ${meInTop ? 'text-emerald-700' : 'text-red-700'}`}>#{me.rank}</span>

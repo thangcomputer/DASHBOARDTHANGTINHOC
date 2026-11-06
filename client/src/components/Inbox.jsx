@@ -2870,7 +2870,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                       rel="noopener noreferrer"
                       className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
                       aria-label={isClassTime ? 'Lớp học đang diễn ra, vào lớp ngay' : 'Vào lớp học ngay'}
-                      title={isClassTime ? 'Buổi học đang diễn ra — bấm để vào lớp' : 'Vào lớp học ngay'}
+                      title={isClassTime ? 'Buổi học đang diễn ra. Bấm để vào lớp' : 'Vào lớp học ngay'}
                     >
                       {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
                       <Video size={16} aria-hidden="true" />

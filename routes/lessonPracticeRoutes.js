@@ -270,7 +270,13 @@ router.get('/my/units/:id', ...requireStudent, async (req, res) => {
 
 router.post('/my/units/:id/sections/:section', ...requireStudent, async (req, res) => {
   try {
-    const data = await service.markUnitSection(studentId(req), req.params.id, req.params.section, req.body?.itemId || '');
+    const data = await service.markUnitSection(
+      studentId(req),
+      req.params.id,
+      req.params.section,
+      req.body?.itemId || '',
+      req.body?.watchRatio,
+    );
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }
 });

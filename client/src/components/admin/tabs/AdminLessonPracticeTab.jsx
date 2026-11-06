@@ -5,6 +5,7 @@ import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import { resolveMediaUrl } from '../../../services/api';
 import RichTextEditor from '../shared/RichTextEditor';
 import AdminStudentTrainingTab from './AdminStudentTrainingTab';
+import AdminLmsXpSettings from './AdminLmsXpSettings';
 
 const TYPES = [
   { id: 'multi', label: 'Chọn nhiều đáp án' },
@@ -625,9 +626,23 @@ export default function AdminLessonPracticeTab() {
             <CircleHelp size={16} />
             Hướng dẫn học
           </button>
+          <button
+            type="button"
+            onClick={() => setModuleTab('xp')}
+            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${moduleTab === 'xp' ? 'bg-red-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            Điểm XP học bài
+          </button>
         </div>
         {moduleTab === 'guide' ? (
           <AdminStudentTrainingTab learningGuideOnly />
+        ) : moduleTab === 'xp' ? (
+          <div className="rounded-2xl border border-slate-100 bg-white p-4">
+            <h1 className="text-2xl font-black text-slate-900">Điểm XP học bài</h1>
+            <div className="mt-4">
+              <AdminLmsXpSettings />
+            </div>
+          </div>
         ) : (
           <>
             <div className="flex flex-wrap items-end justify-between gap-3">

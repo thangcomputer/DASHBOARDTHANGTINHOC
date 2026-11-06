@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, Check, ChevronDown } from 'lucide-react';
-import { isEnrollmentCompleted } from '../../utils/enrollments';
+import { isEnrollmentCompleted, isFreePortalCourseName } from '../../utils/enrollments';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 
 export const StatCard = ({ icon: Icon, label, value, sub, color }) => (
@@ -78,6 +78,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
   if (variant === 'compact') {
     const items = orderedCourses.map((c) => {
       const name = c.courseName || c.name;
+      const freeCourse = isFreePortalCourseName(name);
       const lessonProgress = progressForCourse(c);
       const isVideoCourse = Boolean(lessonProgress);
       const total = isVideoCourse ? lessonProgress.total : (c.totalSessions ?? 12);
@@ -89,6 +90,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
         done,
         total,
         unit: isVideoCourse || c.deliveryMode === 'video' ? 'bài' : 'buổi',
+        freeCourse,
         syncing: videoProgress.loading && c.deliveryMode === 'video',
         completed: isVideoCourse ? total > 0 && done >= total : isEnrollmentCompleted(c),
         pct: total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0,
@@ -116,6 +118,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
       <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1 -mx-1 px-1 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {orderedCourses.map((c) => {
           const name = c.courseName || c.name;
+          const freeCourse = isFreePortalCourseName(name);
           const lessonProgress = progressForCourse(c);
           const isVideoCourse = Boolean(lessonProgress);
           const total = isVideoCourse ? lessonProgress.total : (c.totalSessions ?? 12);
@@ -154,6 +157,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
               <p className="cms-sd-caption mt-2 truncate">
                 GV: {c.teacherName || 'Chưa phân công'}
               </p>
+              {!freeCourse && (
               <div className="mt-3">
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
@@ -174,6 +178,7 @@ export const CourseSwitcher = ({ courses, activeCourseName, onChange, variant = 
                   </span>
                 </div>
               </div>
+              )}
             </button>
           );
         })}
@@ -201,7 +206,7 @@ function CompactCoursePicker({ items, activeCourseName, onChange, error }) {
     };
   }, [open]);
 
-  const progressText = (item) => (item.syncing ? 'Đang đồng bộ' : `${item.done}/${item.total} ${item.unit} · ${item.pct}%`);
+  const progressText = (item) => (item.freeCourse ? '' : (item.syncing ? 'Đang đồng bộ' : `${item.done}/${item.total} ${item.unit} · ${item.pct}%`));
 
   return (
     <section ref={rootRef} className="relative min-w-0">

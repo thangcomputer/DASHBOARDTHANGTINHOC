@@ -99,7 +99,7 @@ const handleCreateSession = async (req, res) => {
     ) {
       return res.status(400).json({ success: false, message: 'Mã học viên, khóa học hoặc giảng viên không hợp lệ' });
     }
-    if (!['tuition', 'video_course', 'course_purchase', 'admin_enrollment'].includes(sessionKind)) {
+    if (!['tuition', 'video_course', 'course_purchase', 'admin_enrollment', 'daily_practice_xp'].includes(sessionKind)) {
       return res.status(400).json({ success: false, message: 'Loại phiên thanh toán không hợp lệ' });
     }
     if (sessionKind === 'admin_enrollment') {
@@ -378,6 +378,14 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matched = true;
             matchedRef = claimed.ref;
             logger.info(`[SEPAY] Video-course session ${claimed.sessionId} — ${amount}đ`);
+          } else if (String(claimed.kind || 'tuition') === 'daily_practice_xp') {
+            const { fulfillDailyPracticeXpPurchase } = require('../services/dailyPracticeService');
+            const credited = await fulfillDailyPracticeXpPurchase({ session: claimed, amount });
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(
+              `[SEPAY] Daily-practice XP session ${claimed.sessionId} — +${credited.xp || 0} XP student ${claimed.studentId} — ${amount}đ`,
+            );
           } else if (String(claimed.kind || 'tuition') === 'course_purchase') {
             const { fulfillCoursePurchase } = require('../services/lessonPracticePurchaseService');
             const purchase = await fulfillCoursePurchase({ session: claimed, amount });
@@ -396,6 +404,26 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matchedRef = claimed.ref;
             logger.info(
               `[SEPAY] Course-purchase session ${claimed.sessionId} — student ${purchase.studentId} course ${purchase.courseId} — ${amount}đ`,
+            );
+          } else if (String(claimed.kind || 'tuition') === 'subscription_renewal') {
+            const { fulfillSubscriptionPayment } = require('../services/subscriptionService');
+            const renewal = await fulfillSubscriptionPayment({ session: claimed, amount });
+            const io = req.app.get('io');
+            if (io) {
+              emitFinanceEvent(io, {
+                branchId: claimed.branchId || null,
+                userIds: claimed.studentId ? [claimed.studentId] : [],
+              }, 'subscription:renewed', {
+                sessionId: claimed.sessionId,
+                amount,
+                subscription: renewal.subscription || null,
+                message: `✅ Đã gia hạn tài khoản (${amount.toLocaleString('vi-VN')}đ)`,
+              });
+            }
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(
+              `[SEPAY] Subscription session ${claimed.sessionId} — student ${renewal.studentId} plan ${renewal.plan} — ${amount}đ`,
             );
           } else if (String(claimed.kind || 'tuition') === 'admin_enrollment') {
             const { fulfillAdminEnrollmentPayment } = require('../services/adminEnrollmentPaymentService');

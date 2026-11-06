@@ -15,6 +15,7 @@ export default function WelcomeCelebrationOverlay({
   /** Thưởng sao: { month, monthLabel, amount, minStudents, minStars } */
   starBonus = null,
   onClose,
+  fireworksOnly = false,
 }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
@@ -145,7 +146,7 @@ export default function WelcomeCelebrationOverlay({
       const h = window.innerHeight;
       const x = forcedX ?? w * (0.1 + Math.random() * 0.8);
       // Nổ trên cao / quanh card (15%–48%)
-      const targetY = h * (0.15 + Math.random() * 0.33);
+      const targetY = h * (fireworksOnly ? (0.08 + Math.random() * 0.72) : (0.15 + Math.random() * 0.33));
       rocketsRef.current.push({
         x,
         y: h + 12,
@@ -170,8 +171,9 @@ export default function WelcomeCelebrationOverlay({
 
     const interval = setInterval(() => {
       launchRocket();
-      if (Math.random() > 0.4) setTimeout(() => launchRocket(), 160);
-    }, 750);
+      if (fireworksOnly || Math.random() > 0.4) setTimeout(() => launchRocket(), fireworksOnly ? 90 : 160);
+      if (fireworksOnly) setTimeout(() => launchRocket(), 180);
+    }, fireworksOnly ? 240 : 750);
 
     const tick = () => {
       const w = window.innerWidth;
@@ -278,7 +280,7 @@ export default function WelcomeCelebrationOverlay({
 
     const autoClose = setTimeout(() => {
       onClose?.();
-    }, 9000);
+    }, fireworksOnly ? 3000 : 9000);
 
     return () => {
       clearInterval(interval);
@@ -289,6 +291,14 @@ export default function WelcomeCelebrationOverlay({
   }, [open, onClose, stop]);
 
   if (!open) return null;
+
+  if (fireworksOnly) {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-[10120]" aria-hidden="true">
+        <canvas ref={canvasRef} className="h-full w-full" />
+      </div>
+    );
+  }
 
   const isTeacher = role === 'teacher';
   const isCourseComplete = variant === 'course_complete';
