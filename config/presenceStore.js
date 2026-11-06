@@ -30,6 +30,15 @@ function listPresence() {
   return Array.from(local.values());
 }
 
+function dropOfflineSockets(isLive) {
+  const dead = [];
+  for (const [key, row] of local.entries()) {
+    if (!row?.socketId || !isLive(row.socketId)) dead.push(key);
+  }
+  dead.forEach((key) => local.delete(key));
+  return dead;
+}
+
 function onPresenceChange(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -157,6 +166,7 @@ async function closePresenceBus() {
 
 module.exports = {
   listPresence,
+  dropOfflineSockets,
   upsertPresence,
   removePresence,
   getPresence,

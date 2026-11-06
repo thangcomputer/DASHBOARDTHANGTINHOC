@@ -210,9 +210,23 @@ export const SCHEDULE_DISPLAY = {
   pending_attendance: { kind: 'pending_attendance', label: 'Chưa điểm danh', shortLabel: 'Chưa điểm danh' },
   overdue_attendance: { kind: 'overdue_attendance', label: 'Quá hạn điểm danh', shortLabel: 'Quá hạn điểm danh' },
   past_pending: { kind: 'past_pending', label: 'Chưa điểm danh', shortLabel: 'Chưa điểm danh' },
+  awaiting_confirm: { kind: 'awaiting_confirm', label: 'Chờ học viên xác nhận', shortLabel: 'Chờ xác nhận' },
+  makeup_attendance: { kind: 'makeup_attendance', label: 'Điểm danh bù', shortLabel: 'Điểm danh bù' },
 };
 
 const ATTENDANCE_GRACE_MS = 60 * 60 * 1000; // sync with services/attendanceWindow.js default
+const STUDENT_CONFIRM_MS = 60 * 60 * 1000;
+
+/** HV chưa xác nhận quá 1 giờ kể từ lúc GV gửi điểm danh. */
+export function isStudentConfirmExpired(schedule, now = new Date()) {
+  const confirm = String(schedule?.studentConfirmStatus || '').toLowerCase();
+  if (confirm === 'confirm_expired') return true;
+  if (confirm !== 'pending') return false;
+  const requested = schedule?.studentConfirmRequestedAt
+    ? new Date(schedule.studentConfirmRequestedAt).getTime()
+    : 0;
+  return requested > 0 && now.getTime() - requested >= STUDENT_CONFIRM_MS;
+}
 
 /**
  * Phân loại hiển thị lịch theo status + thời gian thực + grace 60'.
@@ -222,6 +236,10 @@ export function getScheduleDisplayKind(schedule, now = new Date()) {
   const status = String(schedule.status || 'scheduled');
   if (status === 'completed') return 'completed';
   if (status === 'cancelled' || status === 'no_show') return 'cancelled';
+  const confirm = String(schedule.studentConfirmStatus || '').toLowerCase();
+  if (status === 'scheduled' && (confirm === 'pending' || confirm === 'confirm_expired')) {
+    return isStudentConfirmExpired(schedule, now) ? 'makeup_attendance' : 'awaiting_confirm';
+  }
   if (isScheduleOngoingNow(schedule, now)) return 'ongoing';
   if (isSchedulePastEnd(schedule, now)) {
     // Grace window → pending; after grace → overdue

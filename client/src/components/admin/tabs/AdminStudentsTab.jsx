@@ -1158,7 +1158,9 @@ export default function AdminStudentsTab() {
                           <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
                           {isOnline
                             ? 'Đang online'
-                            : formatLastSeenLabel(lastSeenUsers[String(s.id || s._id)])}
+                            : lastSeenUsers[String(s.id || s._id)]
+                              ? formatLastSeenLabel(lastSeenUsers[String(s.id || s._id)])
+                              : 'Chưa đăng nhập'}
                         </span>
                         <DeviceAccountBadges student={s} />
                         <p className="text-xs text-slate-500 mt-0.5">{regDate}{s.phone ? ` · ${s.phone}` : ''}</p>

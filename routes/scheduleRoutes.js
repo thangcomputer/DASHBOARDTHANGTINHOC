@@ -473,6 +473,8 @@ router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async
       Schedule.countDocuments(filter),
     ]);
 
+    await scanAttendanceFollowUps(req.app.get('io'), schedules);
+
     res.json({
       success: true,
       count: schedules.length,
@@ -542,31 +544,31 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
       .populate('studentId', 'name course zalo')
       .sort({ date: 1, startTime: 1 });
 
-    // Overdue attendance → idempotent admin notify (non-blocking)
-    const io = req.app.get('io');
-    if (io) {
-      const { maybeNotifyOverdueAttendance, resolveAttendanceState } = (() => {
-        const svc = require('../services/attendanceService');
-        const win = require('../services/attendanceWindow');
-        return {
-          maybeNotifyOverdueAttendance: svc.maybeNotifyOverdueAttendance,
-          resolveAttendanceState: win.resolveAttendanceState,
-        };
-      })();
-      Promise.all(
-        schedules
-          .filter((s) => String(s.status) === 'scheduled' && !s.reminderSent)
-          .filter((s) => resolveAttendanceState(s).state === 'OVERDUE_ATTENDANCE')
-          .slice(0, 20)
-          .map((s) => maybeNotifyOverdueAttendance(io, s).catch(() => null)),
-      ).catch(() => null);
-    }
+    await scanAttendanceFollowUps(req.app.get('io'), schedules);
 
     res.json({ success: true, count: schedules.length, data: schedules });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+async function scanAttendanceFollowUps(io, schedules) {
+  if (!io || !Array.isArray(schedules) || schedules.length === 0) return;
+  const { maybeNotifyOverdueAttendance, maybeEscalateUnconfirmedAttendance } = require('../services/attendanceService');
+  const { resolveAttendanceState } = require('../services/attendanceWindow');
+  const due = schedules.filter((row) => String(row.status) === 'scheduled').filter((row) => {
+    const state = resolveAttendanceState(row).state;
+    if (state === 'STUDENT_CONFIRM_EXPIRED') return true;
+    return state === 'OVERDUE_ATTENDANCE' && !row.reminderSent;
+  }).slice(0, 20);
+  await Promise.all(due.map((row) => {
+    const state = resolveAttendanceState(row).state;
+    const job = state === 'STUDENT_CONFIRM_EXPIRED'
+      ? maybeEscalateUnconfirmedAttendance(io, row)
+      : maybeNotifyOverdueAttendance(io, row);
+    return job.catch(() => null);
+  }));
+}
 
 function pickSessionNumber(...candidates) {
   for (const c of candidates) {
@@ -687,6 +689,7 @@ router.get('/pending-confirm', [authMiddleware], async (req, res) => {
       status: 'scheduled',
       studentConfirmStatus: { $in: ['pending', 'disputed'] },
     }).sort({ studentConfirmRequestedAt: -1 }).limit(10).lean();
+    await scanAttendanceFollowUps(req.app.get('io'), list);
     const { refreshScheduleSessionPreview } = require('../services/attendanceService');
     const enriched = [];
     for (const sch of list) {

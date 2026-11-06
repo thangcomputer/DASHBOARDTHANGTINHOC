@@ -26,6 +26,7 @@ import FreeSurveyModal from './student/FreeSurveyModal';
 import FreeUnlockGuide from './student/dailyPractice/FreeUnlockGuide';
 import LoginInboxAlertPopup from './LoginInboxAlertPopup';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
+import { isStudentConfirmExpired } from '../utils/scheduleTime';
 import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
 import TeacherRatingDetailModal, {
   getEvaluationIdFromNotif,
@@ -854,6 +855,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         // Chỉ auto-mở khi còn bắt buộc xác nhận (pending). Disputed → không chặn.
         const firstPending = list.find((p) => (
           String(p?.studentConfirmStatus || '').toLowerCase() === 'pending'
+          && !isStudentConfirmExpired(p)
         ));
         if (firstPending?.scheduleId) {
           setAttendanceConfirm({ ...firstPending, resolved: false, waiting: false });

@@ -180,7 +180,7 @@ export const StudentCard = ({
   const isStudentOnline = isUserOnline(onlineUsers, student);
   const lastSeenAt = lastSeenUsers[studentPresenceId] || student.lastAccessAt;
   const lastSeenLabel = (() => {
-    if (!lastSeenAt) return 'Chưa có dữ liệu truy cập';
+    if (!lastSeenAt) return 'Chưa đăng nhập';
     const d = new Date(lastSeenAt);
     if (Number.isNaN(d.getTime())) return 'Chưa có dữ liệu truy cập';
     return `Truy cập lần cuối: ${d.toLocaleString('vi-VN')}`;

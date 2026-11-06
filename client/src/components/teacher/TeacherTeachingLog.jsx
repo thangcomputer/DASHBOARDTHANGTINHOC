@@ -6,6 +6,7 @@ import {
   formatScheduleDateVi,
   getScheduleDisplayKind,
   getScheduleDisplayMeta,
+  isStudentConfirmExpired,
   normalizeScheduleDate,
 } from '../../utils/scheduleTime';
 import { startOfWeekMonday, weekDateKeys } from '../../utils/weeklySlotGrid';
@@ -26,6 +27,7 @@ function isCancelledSchedule(sch) {
 
 function isAwaitingStudentConfirmation(sch) {
   const confirmation = String(sch?.studentConfirmStatus || sch?.attendanceConfirmStatus || '').toLowerCase();
+  if (isStudentConfirmExpired(sch)) return false;
   return !isCancelledSchedule(sch)
     && (confirmation === 'pending' || Boolean(sch?.attendanceConfirmPending));
 }

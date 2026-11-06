@@ -307,6 +307,58 @@ async function maybeNotifyOverdueAttendance(io, schedule) {
 }
 
 /**
+ * HV không xác nhận trong 1 giờ → ghi confirm_expired và báo Admin điểm danh bù một lần.
+ */
+async function maybeEscalateUnconfirmedAttendance(io, schedule) {
+  if (!schedule || String(schedule.status) !== 'scheduled') return { sent: false };
+  const state = resolveAttendanceState(schedule);
+  if (state.state !== 'STUDENT_CONFIRM_EXPIRED') return { sent: false };
+
+  const scheduleId = String(schedule._id || schedule.id || '');
+  if (!scheduleId) return { sent: false };
+
+  if (String(schedule.studentConfirmStatus) === 'pending') {
+    const updated = await Schedule.findOneAndUpdate(
+      { _id: scheduleId, status: 'scheduled', studentConfirmStatus: 'pending' },
+      { $set: { studentConfirmStatus: 'confirm_expired', studentConfirmExpiredAt: new Date() } },
+      { new: true },
+    ).lean();
+    if (updated) schedule.studentConfirmStatus = 'confirm_expired';
+  }
+
+  const dedupeKey = `attendance-confirm-expired:${scheduleId}`;
+  const existing = await Notification.findOne({ 'payload.dedupeKey': dedupeKey }).select('_id').lean();
+  if (existing) return { sent: false, deduped: true, escalated: true };
+
+  const NotificationService = require('./NotificationService');
+  const studentName = schedule.studentName || 'Học viên';
+  const teacherName = schedule.teacherName || 'Giảng viên';
+  const course = schedule.course || 'khóa học';
+  const timeRange = `${schedule.startTime || '?'} - ${schedule.endTime || '?'}`;
+  const studentId = schedule.studentId?._id || schedule.studentId;
+  const link = `/admin#students?studentId=${encodeURIComponent(String(studentId || ''))}&tab=attendance&scheduleId=${encodeURIComponent(scheduleId)}`;
+
+  await NotificationService.notifyAdmins(
+    io,
+    'Điểm danh bù',
+    `HV ${studentName} chưa xác nhận điểm danh trong 1 giờ. GV ${teacherName} · ${course} · ${timeRange}. Cần điểm danh bù.`,
+    {
+      dedupeKey,
+      type: 'attendance_makeup',
+      scheduleId,
+      studentId: String(studentId || ''),
+      teacherId: String(schedule.teacherId?._id || schedule.teacherId || ''),
+      course,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+    },
+    link,
+  );
+
+  return { sent: true, escalated: true };
+}
+
+/**
  * Complete a scheduled session (teacher window OR admin makeup OR finalize after HV/Admin confirm).
  * Atomic: only transitions scheduled → completed once.
  */
@@ -357,7 +409,10 @@ async function completeScheduleAttendance({
     if (state.state === 'UPCOMING') {
       throw attendanceError('Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học.', ATTENDANCE_CODES.WINDOW_NOT_STARTED, 409);
     }
-    if (state.state === 'OVERDUE_ATTENDANCE' || forceAdminMakeup) {
+    if (state.state === 'AWAITING_STUDENT_CONFIRM') {
+      throw attendanceError('Đang chờ học viên xác nhận trong vòng 1 giờ.', 'ATTENDANCE_AWAITING_STUDENT', 409);
+    }
+    if (state.state === 'STUDENT_CONFIRM_EXPIRED' || state.state === 'OVERDUE_ATTENDANCE' || forceAdminMakeup) {
       attendanceMethod = 'admin_makeup';
     } else if (state.state === 'IN_PROGRESS' || state.state === 'PENDING_ATTENDANCE') {
       attendanceMethod = 'admin';
@@ -801,6 +856,7 @@ async function resolveAttendanceDispute({ schedule, actor, decision }) {
 module.exports = {
   syncEnrollmentProgressAfterAttendance,
   maybeNotifyOverdueAttendance,
+  maybeEscalateUnconfirmedAttendance,
   completeScheduleAttendance,
   requestStudentAttendanceConfirm,
   respondStudentAttendanceConfirm,

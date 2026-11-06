@@ -19,6 +19,9 @@ const ATTENDANCE_GRACE_MINUTES = Math.max(
 /** GV điểm danh được sau giờ bắt đầu + N phút (không cho bấm ngay lúc vào ca). */
 const ATTENDANCE_UNLOCK_DELAY_MINUTES = 15;
 
+/** HV có 1 giờ để xác nhận sau khi GV gửi điểm danh. Quá hạn thì thành điểm danh bù. */
+const STUDENT_CONFIRM_MS = 60 * 60 * 1000;
+
 /** @deprecated alias — keep exports stable */
 const ATTENDANCE_LATE_GRACE_MINUTES = ATTENDANCE_GRACE_MINUTES;
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -110,14 +113,33 @@ function resolveAttendanceState(schedule, now = new Date()) {
     };
   }
 
-  // Chờ HV xác nhận / tranh chấp — GV không điểm danh lại; Admin có thể xử lý dispute
-  if (confirm === 'pending') {
+  // Chờ HV xác nhận. Quá 1 giờ kể từ lúc GV gửi thì chuyển điểm danh bù cho Admin.
+  if (confirm === 'pending' || confirm === 'confirm_expired') {
+    const requestedAt = schedule?.studentConfirmRequestedAt
+      ? new Date(schedule.studentConfirmRequestedAt).getTime()
+      : 0;
+    const elapsed = requestedAt > 0 ? (now instanceof Date ? now : new Date(now)).getTime() - requestedAt : 0;
+    const expired = confirm === 'confirm_expired' || (requestedAt > 0 && elapsed >= STUDENT_CONFIRM_MS);
+    if (!expired) {
+      return {
+        state: 'AWAITING_STUDENT_CONFIRM',
+        kind: 'AWAITING_STUDENT_CONFIRM',
+        code: 'ATTENDANCE_AWAITING_STUDENT',
+        canTeacherAttend: false,
+        canAdminMakeup: false,
+        canAttend: false,
+        canLateAttend: false,
+        canRequestCorrection: false,
+        remainingGraceMs: Math.max(0, STUDENT_CONFIRM_MS - elapsed),
+        studentConfirmRequestedAt: new Date(requestedAt),
+      };
+    }
     return {
-      state: 'AWAITING_STUDENT_CONFIRM',
-      kind: 'AWAITING_STUDENT_CONFIRM',
-      code: 'ATTENDANCE_AWAITING_STUDENT',
+      state: 'STUDENT_CONFIRM_EXPIRED',
+      kind: 'STUDENT_CONFIRM_EXPIRED',
+      code: 'ATTENDANCE_STUDENT_CONFIRM_EXPIRED',
       canTeacherAttend: false,
-      canAdminMakeup: false,
+      canAdminMakeup: true,
       canAttend: false,
       canLateAttend: false,
       canRequestCorrection: false,
@@ -259,6 +281,18 @@ function assertTeacherAttendanceAllowed(schedule, { lateReason, now } = {}) {
     err.code = win.code;
     throw err;
   }
+  if (win.state === 'AWAITING_STUDENT_CONFIRM') {
+    const err = new Error('Đã gửi điểm danh. Đang chờ học viên xác nhận.');
+    err.status = 409;
+    err.code = win.code;
+    throw err;
+  }
+  if (win.state === 'STUDENT_CONFIRM_EXPIRED') {
+    const err = new Error('Học viên chưa xác nhận trong 1 giờ. Buổi này chuyển điểm danh bù cho quản trị viên.');
+    err.status = 409;
+    err.code = win.code;
+    throw err;
+  }
   if (win.state === 'OVERDUE_ATTENDANCE') {
     const err = new Error('Đã quá thời gian điểm danh. Vui lòng liên hệ quản trị viên để điểm danh bù.');
     err.status = 409;
@@ -278,6 +312,7 @@ function assertAttendanceAllowed(schedule, opts) {
 module.exports = {
   ATTENDANCE_GRACE_MINUTES,
   ATTENDANCE_UNLOCK_DELAY_MINUTES,
+  STUDENT_CONFIRM_MS,
   ATTENDANCE_LATE_GRACE_MINUTES,
   ATTENDANCE_CODES,
   parseTimeToMinutes,

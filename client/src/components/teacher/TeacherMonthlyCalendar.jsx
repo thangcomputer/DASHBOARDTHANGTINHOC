@@ -56,6 +56,18 @@ const STATUS_COLORS = {
     dot: 'bg-red-500',
     label: '● Quá hạn điểm danh',
   },
+  awaiting_confirm: {
+    cell: 'bg-sky-50 border-sky-200 text-sky-700',
+    badge: 'bg-sky-100 text-sky-700 border-sky-200',
+    dot: 'bg-sky-500',
+    label: '● Chờ xác nhận',
+  },
+  makeup_attendance: {
+    cell: 'bg-rose-50 border-rose-300 text-rose-800',
+    badge: 'bg-rose-100 text-rose-800 border-rose-300',
+    dot: 'bg-rose-600',
+    label: '● Điểm danh bù',
+  },
   cancelled: {
     cell: 'bg-red-50 border-red-200 text-red-400',
     badge: 'bg-red-100 text-red-500 border-red-200',
@@ -271,7 +283,7 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                       {daySchs.filter((s) => isScheduleUpcomingDisplay(s)).slice(0, 2).map((s) => (
                         <div key={'s-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : isScheduleOngoingNow(s) ? 'bg-green-500' : selected ? 'bg-amber-200' : 'bg-amber-400'} shadow-sm`} />
                       ))}
-                      {daySchs.filter((s) => getScheduleDisplayKind(s) === 'past_pending').slice(0, 2).map((s) => (
+                      {daySchs.filter((s) => ['past_pending', 'overdue_attendance', 'makeup_attendance', 'awaiting_confirm'].includes(getScheduleDisplayKind(s))).slice(0, 2).map((s) => (
                         <div key={'p-' + s._id} className={`w-1 h-1 rounded-full ${s.hasUnreadStudentNote ? 'bg-red-500 animate-[ping_1.5s_ease-in-out_infinite]' : selected ? 'bg-slate-300' : 'bg-slate-400'} shadow-sm`} />
                       ))}
                       {daySchs.filter((s) => getScheduleDisplayKind(s) === 'completed').slice(0, 2).map((s) => (
@@ -336,13 +348,14 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                   {selectedSchedules.map(s => {
                     const past = isPast(selectedDay);
                     const displayStatus = getDisplayStatus(s);
-                    const makeupRequestSent = displayStatus === 'overdue_attendance'
+                    const makeupRequestSent = displayStatus === 'makeup_attendance'
+                      || (displayStatus === 'overdue_attendance'
                       && Boolean(getMakeupPending(makeupPendingKey({
                         scheduleId: s?._id || s?.id,
                         studentId: s?.studentId?._id || s?.studentId?.id || s?.studentId,
                         date: s?.date,
                         course: s?.course || s?.courseName,
-                      })));
+                      }))));
                     const isCancellable = !past && s.status === 'scheduled' && displayStatus !== 'ongoing';
                     const cfg = STATUS_COLORS[displayStatus] || STATUS_COLORS.scheduled;
 
@@ -353,7 +366,9 @@ export const MonthlyCalendar = ({ schedules = [], onEditSchedule, onAddSchedule,
                             👤 {s.studentName || 'Học viên'}
                           </h4>
                           <span className={`text-[10px] font-black px-1.5 py-0.2 rounded  shrink-0 border ${cfg.badge}`}>
-                            {makeupRequestSent ? '✓ Đã gửi Admin' : cfg.label}
+                            {displayStatus === 'makeup_attendance'
+                              ? 'Điểm danh bù · đã gửi Admin'
+                              : makeupRequestSent ? '✓ Đã gửi Admin' : cfg.label}
                           </span>
                         </div>
 

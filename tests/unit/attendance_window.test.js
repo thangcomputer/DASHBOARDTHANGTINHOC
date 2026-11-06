@@ -98,6 +98,22 @@ test('exact endTime still IN_PROGRESS', () => {
   assert.equal(resolveAttendanceState(mkSchedule(), now).state, 'IN_PROGRESS');
 });
 
+test('HV chưa xác nhận quá 1 giờ thì thành điểm danh bù', () => {
+  const requested = vn(14, 30);
+  const schedule = {
+    ...mkSchedule(),
+    studentConfirmStatus: 'pending',
+    studentConfirmRequestedAt: requested,
+  };
+  const waiting = resolveAttendanceState(schedule, vn(15, 0));
+  assert.equal(waiting.state, 'AWAITING_STUDENT_CONFIRM');
+  assert.equal(waiting.canAdminMakeup, false);
+  const expired = resolveAttendanceState(schedule, vn(15, 31));
+  assert.equal(expired.state, 'STUDENT_CONFIRM_EXPIRED');
+  assert.equal(expired.canTeacherAttend, false);
+  assert.equal(expired.canAdminMakeup, true);
+});
+
 test('COMPLETED / CANCELLED', () => {
   assert.equal(resolveAttendanceState(mkSchedule({ status: 'completed' })).state, 'COMPLETED');
   assert.equal(resolveAttendanceState(mkSchedule({ status: 'cancelled' })).state, 'CANCELLED');

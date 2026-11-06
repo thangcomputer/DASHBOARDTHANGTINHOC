@@ -325,6 +325,10 @@ function mapOnlineUser(u) {
  *  Teacher/Student nhận list scoped theo presence_<branchId> / presence_none.
  *  Ops roles must not join presence_* (see register) or the second emit overwrites. */
 function broadcastOnlinePresence() {
+  const sockets = io?.sockets?.sockets;
+  if (sockets) {
+    presenceStore.dropOfflineSockets((socketId) => sockets.has(socketId));
+  }
   const all = presenceStore.listPresence();
   const fullByUser = new Map();
   for (const user of all) {

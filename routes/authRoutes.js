@@ -185,14 +185,15 @@ async function clearStaleDeviceSession(Model, userId) {
   await Model.findByIdAndUpdate(userId, { $unset: { refreshToken: 1, deviceFingerprint: 1 } });
 }
 
-function isAccountSocketOnline(userId, role, onlineUsers) {
-  if (!onlineUsers || !userId) return false;
+function isAccountSocketOnline(userId, role, onlineUsers, io) {
+  if (!onlineUsers || !userId || !role) return false;
   const uid = String(userId);
-  const roles = new Set([role, 'student', 'teacher', 'admin', 'staff'].filter(Boolean));
-  for (const r of roles) {
-    if (onlineUsers.has(`${r}_${uid}`)) return true;
-  }
-  return [...onlineUsers.values()].some((u) => String(u.userId) === uid);
+  const sockets = io?.sockets?.sockets;
+  return [...onlineUsers.values()].some((user) => {
+    if (String(user?.userId || '') !== uid || String(user?.role || '') !== role) return false;
+    if (!sockets) return true;
+    return Boolean(user.socketId) && sockets.has(user.socketId);
+  });
 }
 
 async function checkDeviceConflict(Model, userId, fp, force, req) {
@@ -214,8 +215,12 @@ async function checkDeviceConflict(Model, userId, fp, force, req) {
   }
 
   const onlineUsers = req?.app?.get?.('onlineUsers');
+  const io = req?.app?.get?.('io');
   const roleHint = Model.modelName === 'Student' ? 'student' : 'teacher';
-  if (!isAccountSocketOnline(userId, roleHint, onlineUsers)) {
+  if (io?.sockets?.sockets) {
+    require('../config/presenceStore').dropOfflineSockets((socketId) => io.sockets.sockets.has(socketId));
+  }
+  if (!isAccountSocketOnline(userId, roleHint, onlineUsers, io)) {
     await clearStaleDeviceSession(Model, userId);
     return null;
   }
@@ -789,7 +794,9 @@ router.post('/login/public', loginLimiter, policyShadowAuth('login_public'), asy
     }
 
     // Lần đăng nhập mới thay thế phiên cũ trên web và mobile.
-    const { deviceFingerprint: fp2 } = req.body;
+    const { deviceFingerprint: fp2, force } = req.body;
+    const conflict = await checkDeviceConflict(userRole === 'student' ? Student : Teacher, user._id, fp2, force === true, req);
+    if (conflict) return res.status(409).json(conflict);
     await revokePreviousMobileSessions({
       userId: user._id,
       role: userRole,

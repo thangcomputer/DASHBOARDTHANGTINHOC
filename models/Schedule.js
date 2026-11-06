@@ -44,14 +44,16 @@ const scheduleSchema = new mongoose.Schema({
 
   /**
    * Xác nhận điểm danh của HV (sau cửa sổ 10s hủy của GV).
-   * none → pending (chờ HV) → accepted | disputed → admin_approved | admin_rejected
+   * none → pending (chờ HV) → accepted | disputed | confirm_expired
+   * confirm_expired: HV không xác nhận trong 1 giờ, chuyển điểm danh bù cho Admin.
    * Chỉ khi accepted/admin_approved (kèm status=completed) mới tính buổi/lương.
    */
   studentConfirmStatus: {
     type: String,
-    enum: ['none', 'pending', 'accepted', 'disputed', 'admin_approved', 'admin_rejected'],
+    enum: ['none', 'pending', 'accepted', 'disputed', 'admin_approved', 'admin_rejected', 'confirm_expired'],
     default: 'none',
   },
+  studentConfirmExpiredAt: { type: Date, default: null },
   studentConfirmRequestedAt: { type: Date, default: null },
   studentConfirmedAt: { type: Date, default: null },
   attendanceDisputeResolvedAt: { type: Date, default: null },
