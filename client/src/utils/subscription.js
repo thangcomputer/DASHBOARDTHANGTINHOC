@@ -52,3 +52,17 @@ export function reminderMilestoneKey(subscription) {
   const milestone = Number(subscription.daysLeft) <= 1 ? 1 : 7;
   return `${subscription.expiresAt}:${milestone}`;
 }
+
+/** Khớp server `hasMeetAccess`: cổng miễn phí đã mua gói Meet còn hạn. */
+export function hasMeetAccessClient(subscription) {
+  if (!subscription) return false;
+  if (subscription.state === 'expired' || subscription.freeTier) return false;
+  return Boolean(subscription.meetLifetime || subscription.state === 'active' || subscription.state === 'expiring');
+}
+
+/** HV cổng miễn phí chưa có gói Meet: chỉ xem bảng tin, không đăng / bình luận. */
+export function isFeedPostLocked({ role, session, subscription }) {
+  if (role !== 'student') return false;
+  if (session?.freePortal !== true) return false;
+  return !hasMeetAccessClient(subscription);
+}

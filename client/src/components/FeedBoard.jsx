@@ -16,7 +16,8 @@ import { useToast } from '../utils/useToast';
 import { useSocket } from '../context/SocketContext';
 import SupportMascot from './SupportMascot';
 import { extractYouTubeId } from '../utils/youtubeDuration';
-import { isFreePortalLocked } from './student/dailyPractice/FreeFeatureLock';
+import { useStudentSubscription } from './student/subscription/subscriptionContext';
+import { isFeedPostLocked } from '../utils/subscription';
 
 const ROLE_LABEL = {
   admin: 'Admin',
@@ -174,6 +175,15 @@ export default function FeedBoard({ session, role }) {
   const isSuperAdminViewerUser = meId === 'admin' || meAdminRole === 'SUPER_ADMIN';
   const isHighAdminViewerUser = meAdminRole === 'HIGH_ADMIN';
   const canModerateFeed = meRole === 'admin' || meRole === 'staff' || isSuperAdminViewerUser || isHighAdminViewerUser;
+  const studentSubscription = useStudentSubscription();
+  const postLocked = useMemo(
+    () => isFeedPostLocked({
+      role: meRole,
+      session,
+      subscription: studentSubscription?.subscription,
+    }),
+    [meRole, session, studentSubscription?.subscription],
+  );
 
   const isAuthorSuperAdmin = (authorId, authorAdminRole) => {
     const uid = String(authorId || '');
