@@ -977,6 +977,7 @@ export default function FeedBoard({ session, role }) {
             <p className="text-sm font-semibold text-slate-700">Tài khoản miễn phí chỉ xem bảng tin. Đăng ký gói Meet để được đăng bài.</p>
           </div>
         ) : (
+          <>
           <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <img
@@ -1086,9 +1087,9 @@ export default function FeedBoard({ session, role }) {
               Đăng bài
             </button>
           </div>
-        </div>
-
+          </>
         )}
+        </div>
         {/* Post Feed List */}
         {!loading && (
           <div className="cms-feed-list-heading flex items-center justify-between gap-2 px-1 pt-1">
@@ -1414,8 +1415,8 @@ export default function FeedBoard({ session, role }) {
                             </div>
 
                             {/* Reply box to root comment */}
-                            {replyTo[post.id]?.focusId === c.id && (
                             {replyTo[post.id]?.focusId === c.id && !postLocked && (
+                              <>
                                 <div className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
                                   <Reply size={11} /> Đang trả lời <span className="font-bold text-slate-800">{replyTo[post.id].name}</span>
                                   <button type="button" onClick={() => setReplyTo((d) => ({ ...d, [post.id]: null }))} className="text-slate-400 hover:text-slate-600 ml-1">
@@ -1462,7 +1463,7 @@ export default function FeedBoard({ session, role }) {
                                     {busyId === ('c-' + post.id) ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                                   </button>
                                 </div>
-                              </div>
+                              </>
                             )}
 
                             {/* Replies */}
@@ -1532,8 +1533,8 @@ export default function FeedBoard({ session, role }) {
                       })}
 
                       {/* New root comment input */}
-                      {!replyTo[post.id] && (
                       {!postLocked && !replyTo[post.id] && (
+                        <>
                           {(commentPreviews[post.id] || []).length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-2">
                               {(commentPreviews[post.id] || []).map((src) => (
@@ -1575,7 +1576,7 @@ export default function FeedBoard({ session, role }) {
                               {busyId === ('c-' + post.id) ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                             </button>
                           </div>
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
