@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Check, Flame, Gamepad2, Info, PlayCircle, Target } from 'lucide-react';
 import lessonPracticeApi from '../../../services/lessonPracticeApi';
 import {
-  LEARNING_GOAL_CHANGED_EVENT, STUDY_MINUTE_EVENT, formatStudyMinutes, lessonResumeUrl, openLearningGoal, periodLabel,
+  LEARNING_GOAL_CHANGED_EVENT, STUDY_MINUTE_EVENT, formatStudyMinutes, openLearningGoal, periodLabel,
 } from '../../../utils/learningGoal';
 
 const MISSION_QUESTIONS = 10;
@@ -57,9 +57,7 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
   }, []);
 
   const openVideo = () => {
-    lessonPracticeApi.student.resumePoint()
-      .then((res) => navigate(res?.data?.unitId ? lessonResumeUrl(res.data) : '/student/lesson-practice'))
-      .catch(() => navigate('/student/lesson-practice'));
+    navigate('/student/daily-practice?watch=stage');
   };
 
   const { goal, progress = {} } = data || {};
@@ -114,7 +112,7 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
               title="Luyện tập"
               done={(progress.todayQuestions || 0) >= MISSION_QUESTIONS}
               text={`${Math.min(progress.todayQuestions || 0, MISSION_QUESTIONS)}/${MISSION_QUESTIONS} câu`}
-              onClick={() => navigate('/student/daily-practice')}
+              onClick={() => navigate('/student/daily-practice?practice=stage')}
             />
             <MissionRow
               icon={PlayCircle}

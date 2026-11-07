@@ -125,7 +125,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
             {redeeming ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : 'Kích hoạt'}
           </button>
         </form>
-        <p className="mt-1.5 text-[11px] text-slate-500">Mã do trung tâm cấp khi đăng ký gói Meet (1, 3, 6, 12 tháng) hoặc gói vĩnh viễn.</p>
+        <p className="mt-1.5 text-[11px] text-slate-500">Mã do trung tâm cấp khi đăng ký gói Meet (1, 3, 6 tháng, 1 năm) hoặc gói vĩnh viễn.</p>
       </section>
 
       {payment && (

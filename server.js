@@ -406,6 +406,7 @@ io.use(socketAuthMiddleware);
 
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
+  require('./services/classRoomSocket').registerClassRoomSocket(io, socket);
 
   if (socket.user) {
     const uid = socketUserId(socket.user);
@@ -1289,6 +1290,7 @@ const quizRoutes = require('./routes/quizRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/calls', require('./routes/callRoutes'));
+app.use('/api/class-room', require('./routes/classRoomRoutes'));
 app.use('/api/communication-preferences', require('./routes/communicationPreferencesRoutes'));
 app.use('/api/students', studentRoutes);
 app.use('/api/invoices', invoiceRoutes);
@@ -1331,6 +1333,7 @@ app.use('/api/lesson-practice', lessonPracticeRoutes);
 app.use('/api/daily-practice', dailyPracticeRoutes);
 app.use('/api/lms-progress', lmsProgressRoutes);
 app.use('/api/subscription', require('./routes/subscriptionRoutes'));
+app.use('/api/meet-classes', require('./routes/meetClassRoutes'));
 
 // Route mặc định
 app.get('/', (req, res) => {

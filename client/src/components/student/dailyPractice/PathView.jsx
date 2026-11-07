@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, PlayCircle, Route, Video, X,
+  BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, X,
 } from 'lucide-react';
 import { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import PathLessonModal from './PathLessonModal';
+import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import PathVideoModal from './PathVideoModal';
 import { gameSounds } from '../../../utils/sound';
 import { SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon, unitColor } from '../../../utils/dailyPractice';
@@ -169,74 +170,6 @@ function ProgressRing({ size, progress, color }) {
   );
 }
 
-/** Panel video cạnh snake — bấm mở popup trình phát. */
-function StageVideoList({ videos, hasLesson, locked, color, onOpen }) {
-  if (!videos.length && !hasLesson) return null;
-  return (
-    <aside className="w-full max-w-[220px] shrink-0 sm:max-w-[240px]">
-      <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500">
-        <Video size={12} aria-hidden="true" /> Video chặng
-      </p>
-      <ul className="space-y-1.5">
-        {hasLesson && (
-          <li>
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => onOpen('')}
-              className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-55 !shadow-none"
-            >
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
-                style={{ background: locked ? '#94A3B8' : `linear-gradient(160deg, ${color.from}, ${color.to})` }}
-              >
-                {locked ? <Lock size={15} /> : <PlayCircle size={16} />}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-black text-slate-800">Video bài giảng</span>
-                <span className="block text-[10px] font-semibold text-slate-500">Mở danh sách phát</span>
-              </span>
-            </button>
-          </li>
-        )}
-        {videos.map((video) => {
-          const vLocked = locked || video.state === 'locked';
-          const watched = video.state === 'completed';
-          return (
-            <li key={video.id}>
-              <button
-                type="button"
-                disabled={vLocked}
-                onClick={() => onOpen(video.id)}
-                title={video.title}
-                className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-55 !shadow-none"
-              >
-                <span
-                  className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
-                  style={{ background: vLocked ? '#E2E8F0' : watched ? '#F59E0B' : `linear-gradient(160deg, ${color.from}, ${color.to})` }}
-                >
-                  {vLocked ? <Lock size={14} className="text-slate-400" /> : <Play size={14} />}
-                  {watched && (
-                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
-                      <Check size={9} strokeWidth={3.5} />
-                    </span>
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span className={`block truncate text-xs font-black ${vLocked ? 'text-slate-400' : 'text-slate-800'}`}>{video.title}</span>
-                  {video.stepLabel ? (
-                    <span className="block truncate text-[10px] font-semibold text-slate-500">{video.stepLabel}</span>
-                  ) : null}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </aside>
-  );
-}
-
 /** Một nút trên lộ trình — bên trong popover có 3 nấc Dễ / Vừa / Khó. */
 function PracticeHubNode({ node, color, isNext, selected, onClick }) {
   const locked = node.state === 'locked';
@@ -255,7 +188,7 @@ function PracticeHubNode({ node, color, isNext, selected, onClick }) {
   return (
     <div className="relative flex flex-col items-center" data-path-hub="">
       {isNext && !selected && (
-        <span className="dp-bob absolute -top-11 z-10 whitespace-nowrap rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wide shadow-sm" style={{ color: color.to }}>
+        <span className="dp-bob absolute -top-11 z-30 whitespace-nowrap rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-xs font-black uppercase tracking-wide shadow-sm" style={{ color: color.to }}>
           Bắt đầu
           <span className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-slate-200 bg-white" />
         </span>
@@ -556,6 +489,50 @@ function UnitStageHeader({ unit, color, onTestOut, onWatch, highlight, hasVideo 
   );
 }
 
+/** Bài đang mở của chặng: bài học thì vào bài, câu hỏi thì vào đúng nấc. */
+export function continuePracticeTarget(topic) {
+  const next = topic?.next;
+  if (!next?.unitId) return null;
+  const unit = (topic.units || []).find((item) => item.id === next.unitId);
+  if (!unit || unit.state === 'locked') return null;
+  const node = (unit.pathNodes || []).find((item) => item.key === next.nodeKey);
+  const level = (node?.levels || []).find((item) => item.key === next.step)
+    || (node?.levels || []).find((item) => item.state === 'active');
+  if (level?.state === 'locked') return null;
+  return {
+    topicId: topic.topic?.id || '',
+    unit,
+    level,
+    kind: level?.kind || next.kind || 'quiz',
+    nodeKey: node?.key || next.nodeKey || 'study',
+    step: level?.key || next.step || 'learn',
+  };
+}
+
+/** Video tiếp theo của chặng đang học: ưu tiên chặng dở, rồi video chưa xem và đang mở. */
+export function continueStageTarget(topic) {
+  const units = topic?.units || [];
+  const nextId = topic?.next?.unitId || '';
+  const ranked = [...units].sort((a, b) => {
+    if (a.id === nextId) return -1;
+    if (b.id === nextId) return 1;
+    return (a.index || 0) - (b.index || 0);
+  });
+  for (const unit of ranked) {
+    if (unit.state === 'locked') continue;
+    const videos = collectUnitVideos(unit);
+    const pending = videos.find((video) => video.state !== 'completed' && video.state !== 'locked');
+    if (pending) return { topicId: topic.topic?.id || '', unit, videoId: pending.id };
+    if (unit.lesson) return { topicId: topic.topic?.id || '', unit, videoId: '' };
+  }
+  return null;
+}
+
+/** Cuộn đúng nút bài đang học ra giữa màn hình. */
+export function focusCurrentPathLesson() {
+  window.dispatchEvent(new CustomEvent('dp-focus-current-lesson'));
+}
+
 /** Chủ đề lộ trình ưu tiên (liên kết URL → đang học dở → đầu tiên). */
 export function pickActivePathTopic(path, initialTopicId = '') {
   const topics = path?.topics || [];
@@ -568,13 +545,20 @@ export function pickActivePathTopic(path, initialTopicId = '') {
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
   path, loading, error, starting, initialTopicId = '', onStartStep, onPathChanged, layout = 'default',
+  continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const topics = useMemo(() => path?.topics || [], [path]);
   const [topicId, setTopicId] = useState('');
   const [popover, setPopover] = useState(null);
   const [videoOpen, setVideoOpen] = useState(null);
   const [lessonOpen, setLessonOpen] = useState(null);
+  const [welcomeLesson, setWelcomeLesson] = useState(null);
   const hubAnchorRef = useRef(null);
+  const continueOpenedRef = useRef(false);
+  const onContinueOpenedRef = useRef(onContinueVideoOpened);
+  const onRequestedLessonOpenedRef = useRef(onRequestedLessonOpened);
+  onContinueOpenedRef.current = onContinueVideoOpened;
+  onRequestedLessonOpenedRef.current = onRequestedLessonOpened;
   const closePopover = useCallback(() => setPopover(null), []);
   const closeVideo = useCallback(() => setVideoOpen(null), []);
   const closeLesson = useCallback(() => setLessonOpen(null), []);
@@ -590,6 +574,34 @@ export default function PathView({
   useEffect(() => {
     if (error) setPopover(null);
   }, [error]);
+
+  useEffect(() => {
+    if (!requestedLesson?.unit || !requestedLesson?.level) return;
+    setLessonOpen({
+      unit: requestedLesson.unit,
+      lesson: requestedLesson.level,
+      color: unitColor(requestedLesson.unit.index),
+    });
+    onRequestedLessonOpenedRef.current?.();
+  }, [requestedLesson]);
+
+  useEffect(() => {
+    if (!continueVideo) {
+      continueOpenedRef.current = false;
+      return;
+    }
+    if (continueOpenedRef.current || !topics.length) return;
+    const preferred = topics.find((item) => item.next) || topics.find((item) => continueStageTarget(item)) || null;
+    const target = preferred ? continueStageTarget(preferred) : null;
+    if (!preferred || !target) return;
+    if (topicId !== preferred.topic.id) {
+      setTopicId(preferred.topic.id);
+      return;
+    }
+    continueOpenedRef.current = true;
+    setVideoOpen({ unit: target.unit, videoId: target.videoId });
+    onContinueOpenedRef.current?.();
+  }, [continueVideo, topics, topicId]);
 
   useEffect(() => {
     if (!popover || videoOpen || lessonOpen) return undefined;
@@ -611,6 +623,30 @@ export default function PathView({
   }, [popover, videoOpen, lessonOpen]);
 
   const current = topics.find((item) => item.topic.id === topicId) || null;
+  const topicsRef = useRef(topics);
+  const currentRef = useRef(current);
+  topicsRef.current = topics;
+  currentRef.current = current;
+
+  useEffect(() => {
+    const onFocus = () => {
+      const list = topicsRef.current || [];
+      const topic = list.find((item) => item.next) || currentRef.current;
+      const next = topic?.next;
+      if (!topic || !next) return;
+      if (topic.topic.id !== currentRef.current?.topic?.id) setTopicId(topic.topic.id);
+      setPopover({ unitId: next.unitId, nodeKey: next.nodeKey || 'study', testOut: false });
+      window.setTimeout(() => {
+        document.querySelector('[data-path-current]')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center',
+        });
+      }, 160);
+    };
+    window.addEventListener('dp-focus-current-lesson', onFocus);
+    return () => window.removeEventListener('dp-focus-current-lesson', onFocus);
+  }, []);
   const color = topicColor(current?.topic.color);
   const openHub = useMemo(() => {
     if (!popover || popover.testOut || !current) return null;
@@ -705,7 +741,7 @@ export default function PathView({
               <button
                 type="button"
                 data-path-hub=""
-                onClick={() => toggleHub(nextUnit, current.next.nodeKey || 'study')}
+                onClick={focusCurrentPathLesson}
                 className="cms-btn cms-btn-primary shrink-0 !py-2.5"
               >
                 <Play size={16} /> Tiếp tục học
@@ -776,7 +812,7 @@ export default function PathView({
                       </div>
                     )}
                   </div>
-                  <div className="relative z-[2] px-1 pb-4 pt-2 sm:px-2">
+                  <div className="relative z-30 px-1 pb-4 pt-14 sm:px-2">
                     <div className="relative flex flex-col items-center gap-5">
                       <div className={`relative mx-auto flex flex-col items-center gap-7 ${laneInner}`}>
                         {pathItems.map((item, index) => {
@@ -790,7 +826,8 @@ export default function PathView({
                             <div
                               key={item.key}
                               ref={hubSelected ? hubAnchorRef : undefined}
-                              className={`relative flex w-full flex-col items-center gap-2 ${hubSelected ? 'z-30' : 'z-0'}`}
+                              data-path-current={hubNext ? '1' : undefined}
+                              className={`relative flex w-full flex-col items-center gap-2 ${hubSelected || hubNext ? 'z-30' : 'z-0'}`}
                               style={{ transform: `translateX(${offset}px)` }}
                             >
                               {index === artAt && !hasVideo && unit.imageUrl ? (
@@ -820,25 +857,16 @@ export default function PathView({
                           );
                         })}
                       </div>
-                      {(hasVideo || unit.imageUrl) && (
-                        <div className="relative z-[2] flex w-full flex-col items-center gap-3 lg:w-auto lg:pt-6">
-                          {unit.imageUrl ? (
-                            <img
-                              src={resolveMediaUrl(unit.imageUrl) || unit.imageUrl}
-                              alt=""
-                              className="dp-float hidden h-20 w-20 object-contain drop-shadow-md lg:block"
-                              draggable={false}
-                            />
-                          ) : null}
-                          <StageVideoList
-                            videos={unitVideos}
-                            hasLesson={Boolean(unit.lesson)}
-                            locked={locked}
-                            color={tone}
-                            onOpen={openUnitVideo}
+                      {unit.imageUrl ? (
+                        <div className="relative z-[2] flex w-full flex-col items-center lg:w-auto lg:pt-6">
+                          <img
+                            src={resolveMediaUrl(unit.imageUrl) || unit.imageUrl}
+                            alt=""
+                            className="dp-float hidden h-20 w-20 object-contain drop-shadow-md lg:block"
+                            draggable={false}
                           />
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   </div>
@@ -860,7 +888,9 @@ export default function PathView({
               onClose={closePopover}
               onOpenLesson={(lesson) => {
                 setPopover(null);
-                setLessonOpen({ unit: openHub.unit, lesson, color: openHub.tone });
+                const next = { unit: openHub.unit, lesson, color: openHub.tone };
+                if (takeWelcomeBackTurn()) setWelcomeLesson(next);
+                else setLessonOpen(next);
               }}
             />
           ) : (
@@ -886,6 +916,17 @@ export default function PathView({
           onWatched={async (videoId) => {
             await dailyPracticeApi.student.videoWatched(videoOpen.unit.id, videoId);
             onPathChanged?.();
+          }}
+        />
+      )}
+      {welcomeLesson && (
+        <WelcomeBackModal
+          unitIndex={welcomeLesson.unit?.index}
+          unitTitle={welcomeLesson.unit?.title}
+          lessonLabel={welcomeLesson.lesson?.title || welcomeLesson.lesson?.label || ''}
+          onEnter={() => {
+            setLessonOpen(welcomeLesson);
+            setWelcomeLesson(null);
           }}
         />
       )}

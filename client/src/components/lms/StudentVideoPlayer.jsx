@@ -118,6 +118,14 @@ export const StudentVideoPlayer = ({
   const seekUnlocked = !antiSeekEnabled
     || lessonCompleted
     || (effectiveDuration > 0 && displayWatched >= requiredSecs(effectiveDuration) && displayWatched > 0);
+  const gateSatisfied = lessonCompleted
+    || (effectiveDuration > 0 && displayWatched >= requiredSecs(effectiveDuration));
+  const showPlayerHints = !isFullscreen
+    && appearance !== 'window'
+    && !overlayVisible
+    && !hasEnded
+    && effectiveDuration > 0
+    && !gateSatisfied;
   seekUnlockedRef.current = seekUnlocked;
 
   // Chỉ reset overlay khi đổi bài — không bật lại nút Play khi parent cập nhật tiến độ
@@ -564,7 +572,7 @@ export const StudentVideoPlayer = ({
     <div className="flex flex-col w-full h-full min-h-0">
       <div
         ref={containerRef}
-        className={`relative w-full h-full min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen || appearance === 'window' ? 'rounded-none' : 'lg:rounded-2xl'}`}
+        className={`relative w-full flex-1 min-h-0 overflow-hidden bg-black shadow-lg group ${isFullscreen || appearance === 'window' ? 'rounded-none' : 'lg:rounded-t-2xl'}`}
         onContextMenu={(e) => e.preventDefault()}
       >
         <div
@@ -661,30 +669,31 @@ export const StudentVideoPlayer = ({
             Đang tải…
           </div>
         ) : null}
-        {appearance !== 'window' && !overlayVisible && !hasEnded && effectiveDuration > 0 ? (
-          <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-1.5 justify-between pointer-events-none">
-            <span className={`text-[10px] px-2 py-1 rounded-md border backdrop-blur-md font-bold ${
-              antiSeekEnabled
-                ? 'bg-amber-500/20 text-amber-200 border-amber-500/30'
-                : 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30'
-            }`}>
-              {antiSeekEnabled ? 'Chống tua đang bật' : 'Tua tự do'}
-            </span>
-            <span className={`text-[10px] px-2 py-1 rounded-md border backdrop-blur-md font-bold ${
-              lessonCompleted || seekUnlocked
-                ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30'
-                : LMS_PLAYER_PROGRESS_BADGE_CLASS
-            }`}>
-              {getPlayerCompletionBadgeText({
-                lessonCompleted,
-                displayWatched,
-                effectiveDuration,
-                requiredWatchSecondsFn: requiredSecs,
-              })}
-            </span>
-          </div>
-        ) : null}
       </div>
+      {showPlayerHints ? (
+        <div
+          className={`shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-slate-950 px-3 py-2 ${
+            appearance === 'window' || isFullscreen ? '' : 'lg:rounded-b-2xl'
+          }`}
+        >
+          <span className={`text-[11px] px-2.5 py-1 rounded-md border font-bold ${
+            antiSeekEnabled
+              ? 'bg-amber-500/15 text-amber-200 border-amber-500/30'
+              : 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
+          }`}
+          >
+            {antiSeekEnabled ? 'Chống tua đang bật' : 'Tua tự do'}
+          </span>
+          <span className={`text-[11px] px-2.5 py-1 rounded-md border font-bold ${LMS_PLAYER_PROGRESS_BADGE_CLASS}`}>
+            {getPlayerCompletionBadgeText({
+              lessonCompleted,
+              displayWatched,
+              effectiveDuration,
+              requiredWatchSecondsFn: requiredSecs,
+            })}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 };

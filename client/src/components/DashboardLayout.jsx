@@ -25,6 +25,7 @@ import WelcomeCelebrationOverlay from './WelcomeCelebrationOverlay';
 import FreeSurveyModal from './student/FreeSurveyModal';
 import FreeUnlockGuide from './student/dailyPractice/FreeUnlockGuide';
 import LoginInboxAlertPopup from './LoginInboxAlertPopup';
+import ClassRoomHost from './classRoom/ClassRoom';
 import { useAttendanceConfirmFlush } from '../utils/attendanceConfirmStore';
 import { isStudentConfirmExpired } from '../utils/scheduleTime';
 import { useAttendanceRealtimeSync } from '../hooks/useAttendanceRealtimeSync';
@@ -63,6 +64,7 @@ const PAGE_TITLES = {
   'lesson-practice': 'Bài giảng',
   'daily-practice': 'Luyện tập hằng ngày',
   'subscription-codes': 'Mã kích hoạt & gói',
+  'meet-classes': 'Lịch Meet',
   'cert-prep': 'Ôn thi MOS/IC3',
   staff: 'Phân quyền',
   hr: 'Nhân sự',
@@ -723,8 +725,16 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       if (String(payload.studentId || '') && myId && String(payload.studentId) !== myId) return;
       queueCourseCelebration(payload);
     };
+    const onPortalLocked = (payload) => {
+      if (payload?.studentId && myId && String(payload.studentId) !== String(myId)) return;
+      window.dispatchEvent(new CustomEvent('free-portal-locked'));
+    };
     socket.on('course:celebration', onCourseCelebration);
-    return () => { socket.off('course:celebration', onCourseCelebration); };
+    socket.on('free-portal-locked', onPortalLocked);
+    return () => {
+      socket.off('course:celebration', onCourseCelebration);
+      socket.off('free-portal-locked', onPortalLocked);
+    };
   }, [socket, role, myId, queueCourseCelebration]);
 
   useEffect(() => {
@@ -1862,6 +1872,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         </main>
 
         {role === 'student' ? <StudentQuizInviteHost /> : null}
+        <ClassRoomHost />
 
         <LoginInboxAlertPopup
           role={role}
@@ -1924,7 +1935,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             onClose={() => setDailyReminderOpen(false)}
             onStart={() => {
               setDailyReminderOpen(false);
-              navigate('/student/daily-practice');
+              navigate('/student/daily-practice?practice=stage');
             }}
           />
         )}

@@ -244,6 +244,13 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
     try {
       await onWatched(videoId);
     } catch { /* lần sau xem lại sẽ ghi tiếp */ }
+    const nextVideo = playable.find((video) => (
+      video.id !== videoId
+      && video.state !== 'locked'
+      && !watchedIds.has(video.id)
+      && (video.source === 'unit' || video.source === 'step')
+    ));
+    if (nextVideo) setCurrentId(nextVideo.id);
     return true;
   };
 

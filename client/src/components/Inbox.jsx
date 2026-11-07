@@ -25,6 +25,7 @@ import {
   isScheduleOngoingNow,
   normalizeScheduleDate,
 } from '../utils/scheduleTime';
+import { openClassRoom } from './classRoom/ClassRoom';
 import {
   resolveMessagingDeepLink,
   existingPeerIdsFromConversations,
@@ -706,8 +707,8 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   const canShowClassroomButton = !activeConv?.isGroup
     && ((viewerRole === 'teacher' && peerRole === 'student')
       || (viewerRole === 'student' && peerRole === 'teacher'));
-  const joinClassUrl = useMemo(() => {
-    if (!canShowClassroomButton || !activeConv?.user) return '';
+  const classroomJoin = useMemo(() => {
+    if (!canShowClassroomButton || !activeConv?.user) return { url: '', scheduleId: '' };
 
     const peerId = entityId(activeConv.user);
     const isTeacher = viewerRole === 'teacher';
@@ -730,20 +731,23 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
         return dateDifference || String(a.startTime || '').localeCompare(String(b.startTime || ''));
       });
 
-    if (!matchingSchedules.length) return '';
+    if (!matchingSchedules.length) return { url: '', scheduleId: '' };
     const schedule = matchingSchedules.find((item) => isScheduleOngoingNow(item, scheduleNow))
       || matchingSchedules.find((item) => String(item.linkHoc || '').trim())
       || matchingSchedules[0];
     const studentProfile = isTeacher
       ? peerProfile
       : (students || []).find((student) => entityId(student) === studentId) || currentUser;
-    return normalizeClassroomUrl(
-      schedule.linkHoc
-      || studentProfile?.joinClassUrl
-      || studentProfile?.linkHoc
-      || studentProfile?.online_meeting_url
-      || '',
-    );
+    return {
+      url: normalizeClassroomUrl(
+        schedule.linkHoc
+        || studentProfile?.joinClassUrl
+        || studentProfile?.linkHoc
+        || studentProfile?.online_meeting_url
+        || '',
+      ),
+      scheduleId: String(schedule._id || schedule.id || ''),
+    };
   }, [
     canShowClassroomButton,
     activeConv,
@@ -2863,19 +2867,18 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                   </div>
                 </div>
                 {canShowClassroomButton && (
-                  isClassTime && joinClassUrl ? (
-                    <a
-                      href={joinClassUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  isClassTime && classroomJoin.scheduleId ? (
+                    <button
+                      type="button"
+                      onClick={() => openClassRoom(classroomJoin.scheduleId)}
                       className={`cms-inbox-classroom-button inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 sm:px-3 ${isClassTime ? 'is-live' : ''}`}
                       aria-label={isClassTime ? 'Lớp học đang diễn ra, vào lớp ngay' : 'Vào lớp học ngay'}
-                      title={isClassTime ? 'Buổi học đang diễn ra. Bấm để vào lớp' : 'Vào lớp học ngay'}
+                      title="Vào phòng học của buổi này. Tài khoản khác không vào được."
                     >
                       {isClassTime && <span className="cms-inbox-classroom-live-dot" aria-hidden="true" />}
                       <Video size={16} aria-hidden="true" />
                       <span className="hidden sm:inline">{isClassTime ? 'Vào lớp học' : 'Vào lớp học ngay'}</span>
-                    </a>
+                    </button>
                   ) : (
                     <button
                       type="button"

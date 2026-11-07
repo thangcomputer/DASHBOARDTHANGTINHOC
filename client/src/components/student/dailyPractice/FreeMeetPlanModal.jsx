@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
 import api from '../../../services/api';
 import { generateVietQRUrl } from '../../bankSelectUtils';
@@ -16,18 +16,7 @@ const SPARKS = [
   { top: '46%', right: '8%', delay: '0.2s', size: 8 },
 ];
 
-function MeetIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="2" y="6" width="13" height="12" rx="2" fill="#fff" />
-      <path d="M16.2 9.2 21 6.6v10.8l-4.8-2.6V9.2z" fill="#fff" />
-      <rect x="3.2" y="7.2" width="11" height="9.6" rx="1.2" fill="#1a73e8" />
-      <path d="M15.4 10.1 20 7.6v8.8l-4.6-2.5v-3.8z" fill="#34a853" />
-      <path d="M3.2 14.2h11v2.6H4.4A1.2 1.2 0 0 1 3.2 15.6v-1.4z" fill="#fbbc04" />
-      <path d="M3.2 7.2h2.4v9.6H4.4A1.2 1.2 0 0 1 3.2 15.6V7.2z" fill="#ea4335" />
-    </svg>
-  );
-}
+const MEET_LOGO = '/uploads/popup/google-meet.webp';
 
 const MEET_SLOTS = [
   { label: 'Sáng', time: '9h-12h' },
@@ -175,6 +164,15 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
           0% { background-position: 0% 50%; }
           100% { background-position: 220% 50%; }
         }
+        @keyframes free-meet-spin { to { transform: rotate(360deg); } }
+        .free-meet-run { overflow: hidden; }
+        .free-meet-run::before {
+          content: "";
+          position: absolute;
+          inset: -70%;
+          background: conic-gradient(#22c55e, #ef4444, #a855f7, #22c55e);
+          animation: free-meet-spin 2.8s linear infinite;
+        }
         .free-meet-spark { animation: free-meet-twinkle 1.4s ease-in-out infinite; text-shadow: 0 0 8px #fde68a; }
         .free-meet-gold {
           background-image: linear-gradient(100deg, #fbbf24 0%, #fff7d6 28%, #f59e0b 46%, #fff 58%, #fbbf24 100%);
@@ -187,32 +185,76 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
         }
       `}</style>
       <div
-        className="w-full max-w-3xl overflow-hidden rounded-[28px] border-2 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.35),0_0_48px_12px_rgba(255,255,255,0.55),0_25px_60px_-12px_rgba(0,0,0,0.45)]"
+        className="w-full max-w-4xl overflow-hidden rounded-[28px] border-2 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.35),0_0_48px_12px_rgba(255,255,255,0.55),0_25px_60px_-12px_rgba(0,0,0,0.45)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="free-meet-plan-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-red-900 to-orange-600 px-6 py-5 text-white">
+        <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-red-900 to-orange-600 px-5 py-5 text-white sm:px-6">
           <button type="button" onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 hover:bg-amber-100 !shadow-none">
             Đóng
           </button>
-          <div className="flex items-center gap-5 pr-16">
-            <img
-              src="/giang-vien-phi-van-thang.png"
-              alt="Giảng viên Phí Văn Thắng"
-              className="h-36 w-36 shrink-0 rounded-full border-[3px] border-white object-cover object-top shadow-[0_0_28px_rgba(255,255,255,0.55)]"
-            />
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-200">Giảng viên Phí Văn Thắng</p>
-              <h2 id="free-meet-plan-title" className="mt-1 text-2xl font-black">
+          <div className="grid items-center gap-4 pr-12 sm:grid-cols-[168px_minmax(0,1fr)_252px] sm:gap-6">
+            <div className="flex flex-col items-center">
+              <img
+                src="/giang-vien-phi-van-thang.png"
+                alt="Giảng viên Phí Văn Thắng"
+                className="h-32 w-32 rounded-full border-[3px] border-white object-cover object-top shadow-[0_0_28px_rgba(255,255,255,0.55)]"
+              />
+              <p className="mt-2 w-full rounded-2xl bg-white px-3 py-1.5 text-center shadow-sm">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Giảng viên</span>
+                <span className="mt-0.5 block whitespace-nowrap text-[15px] font-black tracking-tight text-black">Phí Văn Thắng</span>
+              </p>
+              <p className="mt-2 text-center text-[11px] font-medium leading-5 text-white/90">
+                8 năm kinh nghiệm
+                <span className="block">đào tạo tin học.</span>
+                <span className="mt-0.5 block font-semibold text-amber-100">Nhà sáng lập Thắng Tin Học.</span>
+              </p>
+            </div>
+            <div className="min-w-0 text-center">
+              <h2 id="free-meet-plan-title" className="text-[1.65rem] font-black leading-none tracking-tight sm:text-[1.85rem]">
                 <span className="relative inline-block px-1">
                   <GoldSparkles />
-                  <span className="free-meet-gold">300 XP mỗi ngày</span>
+                  <span className="free-meet-gold whitespace-nowrap">300 XP mỗi ngày</span>
                 </span>
-                {' '}+ học qua <span className="inline-flex items-center gap-1.5 align-middle"><MeetIcon /> Meet</span>
+                <span className="mt-2.5 flex items-center justify-center gap-2 text-base font-black text-white">
+                  <span className="text-amber-200">+</span>
+                  học qua
+                  <img src={MEET_LOGO} alt="Google Meet" className="h-10 w-auto object-contain drop-shadow-md" draggable={false} />
+                </span>
               </h2>
-              <p className="mt-1 text-sm font-semibold text-white/90">8 năm kinh nghiệm đào tạo tin học. Nhà sáng lập Thắng Tin Học.</p>
+              <div className="relative mx-auto mt-2 flex h-24 w-44 items-end justify-center">
+                <span
+                  className="pointer-events-none absolute bottom-1 left-1/2 h-10 w-40 -translate-x-1/2 rounded-[50%] bg-white/40 blur-xl"
+                  aria-hidden="true"
+                />
+                <img
+                  src="/uploads/popup/word-excel-powerpoint-3d.webp"
+                  alt="Word, Excel và PowerPoint"
+                  className="relative h-24 w-full object-contain drop-shadow-[0_12px_16px_rgba(0,0,0,0.28)]"
+                  draggable={false}
+                />
+              </div>
+              <p className="mt-1 text-[13px] font-black leading-5 tracking-tight text-amber-50">
+                Chinh phục tin học văn phòng
+                <span className="mt-0.5 block text-xs font-semibold text-white/90">cùng Thầy Thắng</span>
+              </p>
+            </div>
+            <div className="free-meet-run relative rounded-2xl p-[2px]">
+              <div className="relative z-[1] rounded-[14px] bg-gradient-to-br from-red-950/95 via-red-800/90 to-orange-700/90 px-4 py-3.5">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-200">Quyền lợi</p>
+                <ul className="mt-3 space-y-2.5">
+                  {['Học liên tục', 'Không giới hạn buổi học', 'Có video xem lại buổi học'].map((item) => (
+                    <li key={item} className="flex items-center gap-2.5 whitespace-nowrap text-[13px] font-bold text-white">
+                      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950">
+                        <Check size={12} strokeWidth={3.5} aria-hidden="true" />
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[11px] font-black">
@@ -287,13 +329,21 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                       key={plan.id}
                       type="button"
                       onClick={() => setSelectedId(plan.id)}
-                      className={`relative rounded-2xl border-2 px-3 py-4 text-left !shadow-none ${active ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'} ${plan.featured ? 'ring-2 ring-amber-300' : ''}`}
+                      className={`group relative isolate overflow-visible rounded-2xl border-2 px-3 py-4 text-left !shadow-none transition duration-200 hover:-translate-y-0.5 ${active ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-amber-300'} ${plan.featured ? 'ring-2 ring-amber-300' : ''}`}
                     >
-                      {plan.featured && <span className="absolute -top-2 right-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-amber-950">Nên chọn</span>}
-                      <span className="block text-lg font-black text-slate-900">{plan.label}</span>
-                      <span className="mt-1 block text-[11px] font-black text-amber-600">+300 XP mỗi ngày</span>
-                      <span className="mt-0.5 block text-[11px] font-bold text-slate-500">{plan.hint}</span>
-                      <span className="mt-3 block text-sm font-black text-red-600">
+                      <span
+                        className="pointer-events-none absolute -inset-2 -z-10 rounded-[22px] bg-[radial-gradient(circle,rgba(251,191,36,0.95),rgba(249,115,22,0.55)_42%,transparent_70%)] opacity-0 blur-md transition duration-200 group-hover:opacity-100"
+                        aria-hidden="true"
+                      />
+                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-[14px]" aria-hidden="true">
+                        <span className="absolute inset-y-[-20%] left-[-40%] w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 transition-all duration-700 group-hover:left-[130%] group-hover:opacity-90" />
+                      </span>
+                      {plan.featured && <span className="absolute -top-2 right-2 z-[1] rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-amber-950">Nên chọn</span>}
+                      <img src={MEET_LOGO} alt="" className="mb-1.5 h-8 w-auto object-contain" draggable={false} />
+                      <span className="block text-base font-black tracking-tight text-slate-900">{plan.label}</span>
+                      <span className="mt-1 block whitespace-nowrap text-[11px] font-black text-amber-600">+300 XP mỗi ngày</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-slate-500">{plan.hint}</span>
+                      <span className="mt-3 block text-sm font-black tracking-tight text-red-600">
                         {plan.price > 0 ? `${plan.price.toLocaleString('vi-VN')}đ` : 'Liên hệ'}
                       </span>
                     </button>

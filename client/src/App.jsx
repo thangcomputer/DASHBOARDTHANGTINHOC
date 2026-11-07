@@ -704,6 +704,15 @@ function App() {
       });
     };
     window.addEventListener('free-portal-unlocked', unlock);
+    const lockMenus = () => {
+      setSession((prev) => {
+        if (!prev?.freePortal || prev.freeUnlocked === false) return prev;
+        const next = { ...prev, freeUnlocked: false };
+        saveSession(next);
+        return next;
+      });
+    };
+    window.addEventListener('free-portal-locked', lockMenus);
     const surveyDone = () => {
       setSession((prev) => {
         if (!prev?.freePortal || prev.needsFreeSurvey === false) return prev;
@@ -715,6 +724,7 @@ function App() {
     window.addEventListener('free-survey-done', surveyDone);
     return () => {
       window.removeEventListener('free-portal-unlocked', unlock);
+      window.removeEventListener('free-portal-locked', lockMenus);
       window.removeEventListener('free-survey-done', surveyDone);
     };
   }, []);

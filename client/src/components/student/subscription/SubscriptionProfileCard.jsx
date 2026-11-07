@@ -56,6 +56,7 @@ export default function SubscriptionProfileCard() {
                   <span className="min-w-0 truncate font-semibold text-slate-700">
                     {SOURCE_LABELS[row.source] || row.source} · {row.planLabel}
                     {row.amount ? ` · ${formatVnd(row.amount)}` : ''}
+                    {row.note && row.planLabel !== 'Miễn phí' ? ` · ${row.note}` : ''}
                   </span>
                   <span className="shrink-0 text-slate-400">{formatExpiryDate(row.createdAt)}</span>
                 </li>

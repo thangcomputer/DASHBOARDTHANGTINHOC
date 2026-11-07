@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Award, BookOpen, Calendar, CheckCircle, CheckCircle2, ChevronRight, ClipboardList, Flame, Gamepad2,
-  PlayCircle, Trophy, XCircle,
+  PlayCircle, Trophy, Video, XCircle,
 } from 'lucide-react';
 import LearningGoalCard from './LearningGoalCard';
 import LmsProgressCard from './LmsProgressCard';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
 import WelcomeHero from '../WelcomeHero';
+import { openClassRoom } from '../classRoom/ClassRoom';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
@@ -15,6 +16,7 @@ import dailyPracticeApi from '../../services/dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { isFreePortalCourseName } from '../../utils/enrollments';
+import meetClassApi from '../../services/meetClassApi';
 
 const RECENT_ACTIVITY_LIMIT = 5;
 
@@ -34,6 +36,19 @@ function formatDeadline(deadline) {
   const d = deadline ? new Date(deadline) : null;
   if (!d || Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+}
+
+function vnNow() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+  return { day: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) };
+}
+
+function clockMinutes(value) {
+  const [hour, minute] = String(value || '').split(':').map(Number);
+  if (!Number.isFinite(hour)) return 0;
+  return hour * 60 + (Number.isFinite(minute) ? minute : 0);
 }
 
 function deadlineMs(item) {
@@ -148,10 +163,19 @@ export default function StudentOverviewTab({
   const [videoCourses, setVideoCourses] = useState({ byId: new Map(), byName: new Map(), error: '' });
   const [practice, setPractice] = useState(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [meetClasses, setMeetClasses] = useState([]);
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 30_000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    meetClassApi.mine()
+      .then((res) => { if (!cancelled) setMeetClasses(res.data || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -225,9 +249,18 @@ export default function StudentOverviewTab({
       .sort((a, b) => `${normalizeScheduleDate(a.date)}-${a.startTime || ''}`.localeCompare(`${normalizeScheduleDate(b.date)}-${b.startTime || ''}`))[0] || null;
   }, [mySchedules, ongoingSchedule, nowTick]);
 
-  const isLive = Boolean(ongoingSchedule);
+  const clockForMeet = vnNow();
+  const meetCardsPre = meetClasses.map((item) => {
+    const live = item.day === clockForMeet.day && clockForMeet.minutes >= clockMinutes(item.startTime) && clockForMeet.minutes < clockMinutes(item.endTime);
+    return { ...item, live };
+  });
+  const liveMeet = meetCardsPre.find((item) => item.live);
+  const isLiveSchedule = Boolean(ongoingSchedule);
+  const isLiveMeet = Boolean(liveMeet);
+  const isLive = isLiveSchedule || isLiveMeet;
   const joinUrl = (
     ongoingSchedule?.linkHoc
+    || liveMeet?.linkHoc
     || nextSchedule?.linkHoc
     || viewStudent?.joinClassUrl
     || viewStudent?.linkHoc
@@ -237,11 +270,15 @@ export default function StudentOverviewTab({
   const sessionRange = nextSchedule
     ? `${nextSchedule.startTime || ''}${nextSchedule.endTime ? `–${nextSchedule.endTime}` : ''}`
     : '';
-  const heroChips = isLive
+  const heroChips = isLiveSchedule
     ? [{ tone: 'live', label: `Đang học · Ca ${sessionRange}` }]
-    : nextSchedule
-      ? [{ icon: Calendar, label: `Buổi tới: Ca ${sessionRange} · ${formatDayLabel(nextSchedule.date)}` }]
-      : [];
+    : isLiveMeet
+      ? [{ tone: 'live', label: `Meet · ${liveMeet.slotLabel} ${liveMeet.startTime}–${liveMeet.endTime}` }]
+      : nextSchedule
+        ? [{ icon: Calendar, label: `Buổi tới: Ca ${sessionRange} · ${formatDayLabel(nextSchedule.date)}` }]
+        : meetCardsPre[0]
+          ? [{ icon: Calendar, label: `Meet ${meetCardsPre[0].slotLabel} · ${formatDayLabel(meetCardsPre[0].day)}` }]
+          : [];
 
   // ── Khóa học của tôi: một chỗ duy nhất cho tiến độ ────────────────────────
   const currentCourseName = activeCourseName || viewStudent?.course || '';
@@ -309,11 +346,12 @@ export default function StudentOverviewTab({
       title: atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày',
       sub: atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút',
       cta: 'Chơi ngay',
-      onClick: () => navigate('/student/daily-practice'),
+      onClick: () => navigate('/student/daily-practice?practice=stage'),
     });
   }
 
   const recentActivity = (studyLogs || []).filter((item) => item.type !== 'scheduled').slice(0, RECENT_ACTIVITY_LIMIT);
+  const meetCards = meetCardsPre;
 
   return (
     <div className="cms-sd cms-sd-stack min-w-0 lg:!gap-3 lg:-mb-4 th-dashboard-overview th-dashboard-overview--student">
@@ -322,10 +360,36 @@ export default function StudentOverviewTab({
           role="student"
           name={studentData.name}
           chips={heroChips}
-          joinUrl={isLive ? joinUrl : ''}
-          joinHint={isLive ? 'Chưa có link học' : nextSchedule ? 'Chưa đến giờ học' : 'Chưa có lịch học'}
+          joinUrl={joinUrl}
+          onJoin={isLiveSchedule && !(ongoingSchedule?.linkHoc || '').trim() && (ongoingSchedule?._id || ongoingSchedule?.id)
+            ? () => openClassRoom(ongoingSchedule._id || ongoingSchedule.id)
+            : undefined}
+          joinHint={(freePortalCourse || studentData?.freePortal === true) && !isLive && !nextSchedule && !meetCards.length ? '' : (isLive && !joinUrl ? 'Chưa có link Meet' : isLive ? '' : nextSchedule ? 'Chưa đến giờ học' : meetCards.length ? 'Chưa đến giờ Meet' : 'Chưa có lịch học')}
         />
       </header>
+
+      {meetCards.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+            <Video size={18} className="text-red-600" aria-hidden="true" /> Lịch Meet
+          </h3>
+          <ul className="space-y-2">
+            {meetCards.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-black text-slate-900">{item.slotLabel} {item.startTime}–{item.endTime}</p>
+                  <p className="text-xs font-semibold text-slate-500">{formatDayLabel(item.day)}{item.live ? ' · Đang diễn ra' : ''}</p>
+                </div>
+                {item.live && item.linkHoc ? (
+                  <a href={item.linkHoc} target="_blank" rel="noopener noreferrer" className="cms-btn cms-btn-primary !py-2 text-sm">Vào Meet</a>
+                ) : item.live ? (
+                  <span className="text-xs font-bold text-amber-600">Chờ link từ trung tâm</span>
+                ) : <span className="text-xs font-bold text-slate-400">Chưa đến giờ</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
         <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3">

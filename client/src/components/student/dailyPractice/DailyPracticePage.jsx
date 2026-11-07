@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -14,9 +14,10 @@ import DailyPracticeHero from './DailyPracticeHero';
 import DailyPracticeQuickStats from './DailyPracticeQuickStats';
 import DailyPracticeGoalPanel from './DailyPracticeGoalPanel';
 import Mascot from './Mascot';
-import PathView, { PathResultCard, pickActivePathTopic } from './PathView';
+import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import Celebration from './Celebration';
 import BuyXpModal from './BuyXpModal';
+import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import FreeMeetPlanModal, { isFreePortalAccount } from './FreeMeetPlanModal';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from './Questions';
@@ -53,6 +54,7 @@ function Confetti({ count = 22, spread = 160 }) {
 function HomeScreen({
   overview, loading, error, onStart, starting, initialTopicId = '',
   mode, onModeChange, path, pathLoading, pathError, onStartStep, onPathChanged, onBuyXpPaid,
+  continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const [topicId, setTopicId] = useState('');
   const [difficulty, setDifficulty] = useState('easy');
@@ -81,7 +83,7 @@ function HomeScreen({
   const heroAction = () => {
     gameSounds.tap();
     if (mode === 'path') {
-      if (pathContinue) onStartStep(pathContinue.unitId, pathContinue.nodeKey, pathContinue.step, false);
+      if (pathContinue) focusCurrentPathLesson();
       return;
     }
     if (topicId) onStart(topicId, difficulty);
@@ -162,6 +164,10 @@ function HomeScreen({
               onStartStep={onStartStep}
               onPathChanged={onPathChanged}
               layout="wide"
+              continueVideo={continueVideo}
+              onContinueVideoOpened={onContinueVideoOpened}
+              requestedLesson={requestedLesson}
+              onRequestedLessonOpened={onRequestedLessonOpened}
             />
           )}
 
@@ -840,8 +846,10 @@ function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
 
 /** Luyện tập hằng ngày kiểu trò chơi: chọn chủ đề + độ khó → 10 câu → kết quả. */
 export default function DailyPracticePage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const linkedTopicId = searchParams.get('topicId') || '';
+  const watchStage = searchParams.get('watch') === 'stage';
+  const practiceStage = searchParams.get('practice') === 'stage';
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -851,6 +859,8 @@ export default function DailyPracticePage() {
   const [lastPick, setLastPick] = useState(null);
   const [starting, setStarting] = useState(false);
   const [mode, setMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('watch') === 'stage' || params.get('practice') === 'stage') return 'path';
     try { return localStorage.getItem(MODE_STORAGE_KEY) === 'free' ? 'free' : 'path'; } catch { return 'path'; }
   });
   const [path, setPath] = useState(null);
@@ -859,6 +869,9 @@ export default function DailyPracticePage() {
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [meetOfferOpen, setMeetOfferOpen] = useState(false);
   const [meetNotice, setMeetNotice] = useState('');
+  const [requestedLesson, setRequestedLesson] = useState(null);
+  const [welcomeTarget, setWelcomeTarget] = useState(null);
+  const practiceLockRef = useRef(false);
 
   useEffect(() => {
     if (!isFreePortalAccount() || session) return undefined;
@@ -977,6 +990,61 @@ export default function DailyPracticePage() {
   };
   const start = (topicId, difficulty) => begin({ mode: 'free', topicId, difficulty });
   const startStep = (unitId, nodeKey, step, testOut = false) => begin({ mode: 'path', unitId, nodeKey, step, testOut });
+
+  const clearPracticeParam = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (!next.has('practice')) return prev;
+      next.delete('practice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if ((watchStage || practiceStage) && mode !== 'path') setMode('path');
+  }, [watchStage, practiceStage, mode]);
+
+  useEffect(() => {
+    if (!practiceStage || session || summary || pathLoading || !path) return undefined;
+    if (practiceLockRef.current) return undefined;
+    const topic = (path.topics || []).find((item) => continuePracticeTarget(item));
+    const target = topic ? continuePracticeTarget(topic) : null;
+    practiceLockRef.current = true;
+    if (!target) {
+      clearPracticeParam();
+      practiceLockRef.current = false;
+      return undefined;
+    }
+    clearPracticeParam();
+    if (takeWelcomeBackTurn()) {
+      setWelcomeTarget(target);
+      return undefined;
+    }
+    if (target.kind === 'lesson' && target.level) {
+      setRequestedLesson(target);
+      practiceLockRef.current = false;
+      return undefined;
+    }
+    Promise.resolve(startStep(target.unit.id, target.nodeKey, target.step, false)).finally(() => {
+      practiceLockRef.current = false;
+    });
+    return undefined;
+  }, [practiceStage, session, summary, pathLoading, path, clearPracticeParam]);
+
+  const enterWelcome = () => {
+    const target = welcomeTarget;
+    if (!target) return;
+    setWelcomeTarget(null);
+    if (target.kind === 'lesson' && target.level) {
+      setRequestedLesson(target);
+      practiceLockRef.current = false;
+      return;
+    }
+    practiceLockRef.current = true;
+    Promise.resolve(startStep(target.unit.id, target.nodeKey, target.step, false)).finally(() => {
+      practiceLockRef.current = false;
+    });
+  };
   const goHome = () => {
     setSummary(null);
     setPathError('');
@@ -1034,6 +1102,22 @@ export default function DailyPracticePage() {
           onStartStep={startStep}
           onPathChanged={loadPath}
           onBuyXpPaid={() => { loadOverview(); loadPath(); }}
+          continueVideo={watchStage && mode === 'path'}
+          requestedLesson={requestedLesson}
+          onRequestedLessonOpened={() => setRequestedLesson(null)}
+          onContinueVideoOpened={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete('watch');
+            setSearchParams(next, { replace: true });
+          }}
+        />
+      )}
+      {welcomeTarget && !session && (
+        <WelcomeBackModal
+          unitIndex={welcomeTarget.unit?.index}
+          unitTitle={welcomeTarget.unit?.title}
+          lessonLabel={welcomeTarget.level?.title || welcomeTarget.level?.label || ''}
+          onEnter={enterWelcome}
         />
       )}
       {buyXpOpen && (

@@ -5,7 +5,7 @@ export const PLAN_LABELS = {
   '1m': '1 tháng',
   '3m': '3 tháng',
   '6m': '6 tháng',
-  '12m': '12 tháng',
+  '12m': '1 năm',
   lifetime: 'Vĩnh viễn',
 };
 

@@ -374,7 +374,7 @@ export default function AdminSubscriptionTab() {
       <div className="rounded-2xl bg-gradient-to-r from-red-50 to-amber-50 p-4 ring-1 ring-red-100">
         <h2 className="text-base font-black text-slate-900">Mã kích hoạt & gói tài khoản</h2>
         <p className="mt-1 text-xs text-slate-600">
-          Gói 1/3/6/12 tháng hoặc vĩnh viễn. Hết hạn thì học viên chỉ còn màn gia hạn. Gia hạn bằng mã hoặc thanh toán SePay sẽ cộng tiếp từ ngày hết hạn hiện tại.
+          Cùng gói Meet học viên đăng ký: 1 tháng, 3 tháng, 6 tháng, 1 năm hoặc vĩnh viễn. Hết hạn thì học viên chỉ còn màn gia hạn. Gia hạn bằng mã hoặc thanh toán sẽ cộng tiếp từ ngày hết hạn hiện tại.
         </p>
       </div>
       <PricesCard />

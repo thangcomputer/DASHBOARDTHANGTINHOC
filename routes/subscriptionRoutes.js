@@ -105,11 +105,23 @@ router.get('/students', authMiddleware, branchFilter, checkPermission(PERMISSION
   req.branchFilter || {},
 )));
 router.get('/students/:id', ...requireStudentAdmin, handle((req) => service.studentHistory(req.params.id)));
-router.put('/students/:id', ...requireStudentAdmin, handle((req) => service.adminSetSubscription(req.params.id, {
-  mode: String(req.body?.mode || 'extend'),
-  plan: String(req.body?.plan || ''),
-  expiresAt: req.body?.expiresAt || null,
-  note: String(req.body?.note || '').slice(0, 200),
-}, actorOf(req))));
+router.put('/students/:id', ...requireStudentAdmin, async (req, res) => {
+  try {
+    const mode = String(req.body?.mode || 'extend');
+    const data = await service.adminSetSubscription(req.params.id, {
+      mode,
+      plan: String(req.body?.plan || ''),
+      expiresAt: req.body?.expiresAt || null,
+      note: String(req.body?.note || '').slice(0, 200),
+    }, actorOf(req));
+    if (mode === 'free') {
+      const io = req.app.get('io');
+      if (io) io.to(String(req.params.id)).emit('free-portal-locked', { studentId: String(req.params.id) });
+    }
+    return res.json({ success: true, data });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
 
 module.exports = router;

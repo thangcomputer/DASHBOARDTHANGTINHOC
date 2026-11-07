@@ -50,6 +50,9 @@ export default function AdminStudentSubscriptionPanel({ studentId, compact = fal
     return <p className="flex items-center gap-2 text-xs text-slate-500"><Loader2 size={14} className="animate-spin" /> Đang tải gói tài khoản…</p>;
   }
   const sub = data.subscription;
+  const freePortal = data.freePortal === true;
+  const meetPlan = sub.meetLifetime || ((sub.state === 'active' || sub.state === 'expiring') && sub.plan !== 'lifetime');
+  const xpLine = sub.freeTier ? '60 XP mỗi ngày' : meetPlan ? '300 XP mỗi ngày' : '';
 
   return (
     <div className="space-y-3">
@@ -57,9 +60,10 @@ export default function AdminStudentSubscriptionPanel({ studentId, compact = fal
         <CalendarClock size={20} className={sub.state === 'expired' ? 'text-red-600' : sub.state === 'expiring' ? 'text-orange-600' : 'text-emerald-600'} />
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Gói hiện tại</p>
-          <p className="text-sm font-black text-slate-900">Gói {sub.planLabel}</p>
+          <p className="text-sm font-black text-slate-900">{sub.freeTier ? 'Miễn phí' : `Gói ${sub.planLabel}`}</p>
           <p className="text-xs font-semibold text-slate-600">
-            {sub.state === 'lifetime' ? 'Không giới hạn thời gian' : subscriptionShortLabel(sub)}
+            {xpLine ? `${xpLine}${sub.freeTier ? '' : ' · '}` : ''}
+            {sub.freeTier ? '' : sub.state === 'lifetime' ? 'Không giới hạn thời gian' : subscriptionShortLabel(sub)}
           </p>
         </div>
       </div>
@@ -71,6 +75,7 @@ export default function AdminStudentSubscriptionPanel({ studentId, compact = fal
             <option value="extend">Gia hạn thêm theo gói</option>
             <option value="set">Đặt ngày hết hạn</option>
             <option value="require_activation">Bắt buộc nhập mã (khóa ngay)</option>
+            {freePortal && <option value="free">Về gói miễn phí</option>}
           </select>
         </label>
         {mode === 'extend' && (
@@ -92,9 +97,14 @@ export default function AdminStudentSubscriptionPanel({ studentId, compact = fal
           <input className={`${INPUT} mt-1`} value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder="Ví dụ: tặng thêm 1 tháng" />
         </label>
       </div>
-      {mode === 'extend' && sub.state === 'lifetime' && plan !== 'lifetime' && (
+      {mode === 'extend' && sub.state === 'lifetime' && !sub.freeTier && plan !== 'lifetime' && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-          Học viên đang ở gói Vĩnh viễn — cập nhật sẽ chuyển sang gói {PLAN_LABELS[plan]}, tính từ hôm nay.
+          Học viên đang ở gói Vĩnh viễn. Cập nhật sẽ chuyển sang gói {PLAN_LABELS[plan]}, tính từ hôm nay.
+        </p>
+      )}
+      {mode === 'free' && (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+          Đưa về đúng gói miễn phí học viên thấy: 60 XP mỗi ngày, có thể đăng ký gói Meet.
         </p>
       )}
       <button

@@ -99,6 +99,7 @@ const MENU_CONFIG = {
       { key: 'daily-practice', section: 'HỌC VIÊN', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/admin', hash: 'daily-practice', permission: PERMISSIONS.MANAGE_STUDENT_TRAINING },
       { key: 'cert-prep', section: 'HỌC VIÊN', icon: Trophy, label: 'Ôn thi MOS/IC3', path: '/admin', hash: 'cert-prep', permission: PERMISSIONS.MANAGE_CERT_PREP },
       { key: 'subscription-codes', section: 'HỌC VIÊN', icon: Ticket, label: 'Mã kích hoạt & gói', path: '/admin', hash: 'subscription-codes', permission: PERMISSIONS.MANAGE_STUDENTS },
+      { key: 'meet-classes', section: 'HỌC VIÊN', icon: Video, label: 'Lịch Meet', path: '/admin', hash: 'meet-classes', permission: PERMISSIONS.MANAGE_STUDENTS },
 
       { key: 'teachers', section: 'GIẢNG VIÊN', icon: GraduationCap, label: 'Giảng viên', path: '/admin', hash: 'teachers', permission: PERMISSIONS.VIEW_TEACHERS },
       { key: 'training-videos', section: 'GIẢNG VIÊN', icon: Video, label: 'Luyện tập', path: '/admin', hash: 'training-videos', permission: PERMISSIONS.MANAGE_TRAINING },

@@ -15,7 +15,7 @@ const { buildStudentSearchAndConditions } = require('../utils/personSearchQuery'
 
 const PLANS = ['1m', '3m', '6m', '12m', 'lifetime'];
 const PLAN_MONTHS = { '1m': 1, '3m': 3, '6m': 6, '12m': 12, lifetime: null };
-const PLAN_LABELS = { '1m': '1 tháng', '3m': '3 tháng', '6m': '6 tháng', '12m': '12 tháng', lifetime: 'Vĩnh viễn' };
+const PLAN_LABELS = { '1m': '1 tháng', '3m': '3 tháng', '6m': '6 tháng', '12m': '1 năm', lifetime: 'Vĩnh viễn' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Còn ≤ số ngày này thì coi là "sắp hết hạn" (nhắc + màu cam). */
 const EXPIRING_DAYS = 7;
@@ -100,6 +100,25 @@ function isExpired(student, now = new Date()) {
 }
 
 /**
+ * Gói Meet còn hiệu lực — chỉ tài khoản miễn phí (freePortal) đã mua gói Meet.
+ * HV đăng ký khóa học truyền thống (không freePortal) không thuộc nhóm Meet online.
+ */
+function hasMeetAccess(student, now = new Date()) {
+  if (student?.freePortal !== true) return false;
+  const status = statusOf(student, now);
+  if (status.state === 'expired' || status.freeTier) return false;
+  return Boolean(status.meetLifetime || status.state === 'active' || status.state === 'expiring');
+}
+
+/** Gói Vĩnh viễn đã mua thì không gia hạn. Tài khoản miễn phí chưa mua Meet vẫn đăng ký được. */
+function renewalBlocked(student) {
+  const status = statusOf(student);
+  if (status.state !== 'lifetime') return false;
+  if (student?.freePortal === true && !status.meetLifetime) return false;
+  return true;
+}
+
+/**
  * Gia hạn một lần (atomic theo hạn cũ để 2 lần gia hạn đồng thời không đè nhau).
  * Ghi lịch sử, xóa mốc nhắc của kỳ cũ.
  */
@@ -152,7 +171,7 @@ async function applyRenewal(studentId, plan, { source, code = '', paymentSession
         console.error('[subscription] không cộng được mức 300 XP/ngày:', err.message);
       }
     }
-    return statusOf(updated);
+    return statusOf({ ...updated, freePortal: student.freePortal });
   }
   throw httpError(409, 'Đang có thao tác gia hạn khác, vui lòng thử lại');
 }
@@ -176,14 +195,14 @@ async function redeemCode(studentId, rawCode) {
   const compact = normalizeCode(rawCode).replace(/^TTH/, '');
   if (compact.length !== 8) throw httpError(400, 'Mã kích hoạt không hợp lệ');
   const code = formatCode(compact);
-  const student = await Student.findById(studentId).select('name subscription').lean();
+  const student = await Student.findById(studentId).select('name subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
 
   const existing = await ActivationCode.findOne({ code }).lean();
   if (!existing) throw httpError(404, 'Mã kích hoạt không tồn tại');
   if (existing.status === 'used') throw httpError(409, 'Mã kích hoạt đã được sử dụng');
   if (existing.status === 'revoked') throw httpError(409, 'Mã kích hoạt đã bị thu hồi');
-  if (statusOf(student).state === 'lifetime' && existing.plan !== 'lifetime') {
+  if (renewalBlocked(student) && existing.plan !== 'lifetime') {
     throw httpError(409, 'Tài khoản đang ở gói Vĩnh viễn, không cần gia hạn', 'SUBSCRIPTION_LIFETIME');
   }
 
@@ -322,7 +341,7 @@ async function planCatalog() {
 }
 
 async function myOverview(studentId) {
-  const student = await Student.findById(studentId).select('name subscription').lean();
+  const student = await Student.findById(studentId).select('name subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
   const [plans, history, xpPurchases] = await Promise.all([
     planCatalog(),
@@ -368,7 +387,7 @@ function logView(row) {
     id: String(row._id),
     source: row.source,
     plan: row.plan,
-    planLabel: PLAN_LABELS[row.plan] || row.plan,
+    planLabel: String(row.note || '').startsWith('Về gói miễn phí') ? 'Miễn phí' : (PLAN_LABELS[row.plan] || row.plan),
     previousExpiresAt: row.previousExpiresAt,
     newExpiresAt: row.newExpiresAt,
     amount: row.amount || 0,
@@ -386,9 +405,9 @@ function makeRenewalRef(studentCode) {
 /** HV bấm Gia hạn: tạo phiên chuyển khoản SePay; webhook khớp nội dung + số tiền sẽ tự gia hạn. */
 async function checkout(studentId, plan) {
   assertPlan(plan);
-  const student = await Student.findById(studentId).select('name studentCode branchId subscription').lean();
+  const student = await Student.findById(studentId).select('name studentCode branchId subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
-  if (statusOf(student).state === 'lifetime') {
+  if (renewalBlocked(student)) {
     throw httpError(409, 'Tài khoản đang ở gói Vĩnh viễn, không cần gia hạn', 'SUBSCRIPTION_LIFETIME');
   }
   const amount = (await getPrices())[plan];
@@ -486,28 +505,51 @@ async function simulatePayment(studentId, sessionId) {
  * - mode "extend": gia hạn thêm gói (cộng từ max(hôm nay, hạn cũ)); gói lifetime = vĩnh viễn;
  * - mode "set": đặt ngày hết hạn cụ thể (expiresAt) hoặc "require_activation" = hết hạn ngay, HV phải nhập mã.
  */
+async function syncPlanAllowance(studentId) {
+  try {
+    const { refillDailyXp } = require('./dailyPracticeService');
+    await refillDailyXp(studentId);
+  } catch (err) {
+    console.error('[subscription] không cộng được XP theo gói:', err.message);
+  }
+}
+
 async function adminSetSubscription(studentId, { mode = 'extend', plan = '', expiresAt = null, note = '' } = {}, actor = {}) {
   if (!mongoose.Types.ObjectId.isValid(String(studentId || ''))) throw httpError(400, 'Học viên không hợp lệ');
-  const student = await Student.findById(studentId).select('name subscription').lean();
+  const student = await Student.findById(studentId).select('name subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
 
   if (mode === 'extend') {
     assertPlan(plan);
     const previous = statusOf(student);
-    if (previous.state === 'lifetime' && plan !== 'lifetime') {
-      // Admin chuyển từ vĩnh viễn sang gói theo tháng: tính từ hôm nay.
+    if (previous.state === 'lifetime' && plan !== 'lifetime' && student.freePortal !== true) {
       await Student.updateOne({ _id: studentId }, { $set: { 'subscription.plan': plan, 'subscription.expiresAt': new Date() } });
     }
     return applyRenewal(studentId, plan, { source: 'admin', actor, note });
   }
 
-  let nextPlan = PLANS.includes(plan) && plan !== 'lifetime' ? plan : (student.subscription?.plan && student.subscription.plan !== 'lifetime' ? student.subscription.plan : '1m');
+  if (mode === 'free') {
+    if (student.freePortal !== true) throw httpError(400, 'Chỉ tài khoản miễn phí được đưa về gói miễn phí');
+  }
+
+  const currentPlan = PLANS.includes(student.subscription?.plan) ? student.subscription.plan : 'lifetime';
+  let nextPlan = currentPlan !== 'lifetime' ? currentPlan : '1m';
   let nextExpiresAt;
-  if (mode === 'require_activation') {
+  let nextActivatedAt = null;
+  let defaultNote = 'Đặt ngày hết hạn';
+  if (mode === 'free') {
+    nextPlan = 'lifetime';
+    nextExpiresAt = null;
+    nextActivatedAt = null;
+    defaultNote = 'Về gói miễn phí';
+  } else if (mode === 'require_activation') {
     nextExpiresAt = new Date();
+    nextActivatedAt = null;
+    defaultNote = 'Yêu cầu nhập mã kích hoạt';
   } else if (mode === 'set') {
     nextExpiresAt = expiresAt ? new Date(expiresAt) : null;
     if (!nextExpiresAt || Number.isNaN(nextExpiresAt.getTime())) throw httpError(400, 'Ngày hết hạn không hợp lệ');
+    nextActivatedAt = new Date();
   } else {
     throw httpError(400, 'Thao tác không hợp lệ');
   }
@@ -518,12 +560,13 @@ async function adminSetSubscription(studentId, { mode = 'extend', plan = '', exp
       $set: {
         'subscription.plan': nextPlan,
         'subscription.expiresAt': nextExpiresAt,
+        'subscription.activatedAt': nextActivatedAt,
         'subscription.remindedFor': [],
-        ...(mode === 'set' ? { 'subscription.activatedAt': new Date() } : { 'subscription.activatedAt': null }),
+        ...(mode === 'free' ? { freeUnlocked: false } : {}),
       },
     },
     { returnDocument: 'after' },
-  ).select('name subscription').lean();
+  ).select('name subscription freePortal').lean();
   await SubscriptionLog.create({
     studentId,
     source: 'admin',
@@ -533,18 +576,39 @@ async function adminSetSubscription(studentId, { mode = 'extend', plan = '', exp
     newExpiresAt: nextExpiresAt,
     actorId: String(actor.id || ''),
     actorName: String(actor.name || ''),
-    note: note || (mode === 'require_activation' ? 'Yêu cầu nhập mã kích hoạt' : 'Đặt ngày hết hạn'),
+    note: mode === 'free' ? (note ? `Về gói miễn phí · ${note}` : 'Về gói miễn phí') : (note || defaultNote),
   });
+  await syncPlanAllowance(studentId);
   return statusOf(updated);
 }
 
 /** Admin tìm HV để gia hạn tay (tên / SĐT / mã HV), trong phạm vi chi nhánh được xem. */
+const MAX_MEET_CLASS_STUDENTS = 100;
+
+async function listMeetEligibleStudents(scopeFilter = {}, { limit = MAX_MEET_CLASS_STUDENTS } = {}) {
+  const query = { accountLocked: { $ne: true }, freePortal: true, ...(scopeFilter || {}) };
+  const rows = await Student.find(query)
+    .select('name phone studentCode subscription freePortal')
+    .sort({ name: 1 })
+    .limit(3000)
+    .lean();
+  return rows
+    .filter((row) => hasMeetAccess(row))
+    .slice(0, Math.min(Math.max(1, limit), MAX_MEET_CLASS_STUDENTS))
+    .map((row) => ({
+      id: String(row._id),
+      name: row.name || '',
+      phone: row.phone || '',
+      studentCode: row.studentCode || '',
+    }));
+}
+
 async function searchStudents(query, scopeFilter = {}) {
   const conditions = buildStudentSearchAndConditions(String(query || '').slice(0, 80));
   if (!conditions.length) return [];
   if (scopeFilter && Object.keys(scopeFilter).length) conditions.push(scopeFilter);
   const rows = await Student.find({ $and: conditions })
-    .select('name phone studentCode subscription')
+    .select('name phone studentCode subscription freePortal')
     .sort({ createdAt: -1 })
     .limit(10)
     .lean();
@@ -553,17 +617,18 @@ async function searchStudents(query, scopeFilter = {}) {
     name: row.name || '',
     phone: row.phone || '',
     studentCode: row.studentCode || '',
+    freePortal: row.freePortal === true,
     subscription: statusOf(row),
   }));
 }
 
 async function studentHistory(studentId) {
   const [student, rows] = await Promise.all([
-    Student.findById(studentId).select('name subscription').lean(),
+    Student.findById(studentId).select('name subscription freePortal').lean(),
     SubscriptionLog.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
   ]);
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
-  return { subscription: statusOf(student), history: rows.map(logView) };
+  return { subscription: statusOf(student), freePortal: student.freePortal === true, history: rows.map(logView) };
 }
 
 function dayKey(date) {
@@ -634,6 +699,9 @@ module.exports = {
   nextExpiry,
   statusOf,
   isExpired,
+  hasMeetAccess,
+  listMeetEligibleStudents,
+  MAX_MEET_CLASS_STUDENTS,
   applyRenewal,
   redeemCode,
   generateCodes,
