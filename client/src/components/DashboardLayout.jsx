@@ -40,7 +40,7 @@ import TeacherStudentNoteModal, {
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
 import LearningGoalModal from './student/LearningGoalModal';
 import DailyPracticeReminder from './student/dailyPractice/DailyPracticeReminder';
-import { isFreePortalLocked, isStudentSchedulesApiBlocked } from './student/dailyPractice/FreeFeatureLock';
+import { isStudentSchedulesApiBlocked } from './student/dailyPractice/FreeFeatureLock';
 import dailyPracticeApi from '../services/dailyPracticeApi';
 import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';

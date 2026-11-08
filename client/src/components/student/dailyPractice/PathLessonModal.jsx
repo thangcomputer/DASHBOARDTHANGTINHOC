@@ -22,7 +22,7 @@ function isDirectVideo(url) {
 }
 
 function CheckCard({
-  gate, picked, setPicked, answerText, setAnswerText, checkHint, paidHint, checkError, checkBusy, missed, uploadPct, grading, hintStep, onHintNext, onSubmit, onFile, onHint, onQuit, hintArmed,
+  gate, picked, setPicked, answerText, setAnswerText, checkHint, paidHint, checkError, checkBusy, missed, uploadPct, grading, hintStep, onHintNext, onSubmit, onFile, onHint, onQuit,
 }) {
   if (!gate) return null;
   return (
@@ -108,7 +108,6 @@ export default function PathLessonModal({
   const [answerText, setAnswerText] = useState('');
   const [checkHint, setCheckHint] = useState('');
   const [paidHint, setPaidHint] = useState('');
-  const [hintArmed, setHintArmed] = useState(false);
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [xpPacks, setXpPacks] = useState([]);
   const [checkBusy, setCheckBusy] = useState(false);
@@ -173,7 +172,6 @@ export default function PathLessonModal({
     setAnswerText('');
     setCheckHint('');
     setPaidHint('');
-    setHintArmed(false);
     setCheckError('');
     setMissed(false);
     setCheer(false);
@@ -410,7 +408,6 @@ export default function PathLessonModal({
                 onFile={sendScreenshot}
                 onHint={buyHint}
                 onQuit={onClose}
-                hintArmed={hintArmed}
               />
             </div>
           ) : null}

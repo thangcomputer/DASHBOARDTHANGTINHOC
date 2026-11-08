@@ -143,7 +143,6 @@ export default function SubscriptionGate({ session, children }) {
   const isStudent = role === 'student';
   const studentId = session?.id || session?._id || '';
   const [overview, setOverview] = useState(() => (session?.subscription ? { subscription: session.subscription, plans: [], history: [] } : null));
-  const [loaded, setLoaded] = useState(false);
   const [renewOpen, setRenewOpen] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -152,7 +151,6 @@ export default function SubscriptionGate({ session, children }) {
       const data = await subscriptionApi.student.overview();
       setOverview(data);
     } catch { /* giữ trạng thái cũ khi lỗi mạng */ }
-    setLoaded(true);
   }, [isStudent]);
 
   useEffect(() => { refresh(); }, [refresh]);

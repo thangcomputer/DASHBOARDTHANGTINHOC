@@ -1088,7 +1088,7 @@ async function markVideoWatched(studentId, { unitId, videoId } = {}) {
   const located = locateVideo(unit, rawId);
   const pending = (located?.video?.checks || []).filter((check) => {
     const key = `${storageId}:${check._id}`;
-    return true && key;
+    return Boolean(check?._id);
   });
   if (pending.length) {
     const progress = await DailyPracticePathProgress.findOne({ studentId: sid, unitId: unit._id }).select('passedVideoChecks').lean();

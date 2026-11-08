@@ -689,14 +689,12 @@ function StakeSessionConfirm({
   stakeXp,
   xpTotal,
   starting,
-  recovery = false,
   testOut = false,
   testOutLocked = false,
   onStay,
   onGo,
   onOpenMeet,
 }) {
-  const betting = stakeXp > 0;
   const isStart = variant === 'start';
   const notEnoughXp = typeof xpTotal === 'number' && xpTotal < stakeXp;
   const isBlockedFreeTestOut = testOut && testOutLocked;
@@ -799,10 +797,9 @@ function StakeSessionConfirm({
   );
 }
 
-function clientStakeMeta(pick, stats) {
+function clientStakeMeta(pick) {
   if (pick?.mode !== 'path') return null;
   if (pick.review) return null;
-  const xpTotal = Number(stats?.xpTotal) || 0;
   if (pick.testOut) return { stakeXp: TEST_OUT_XP, recovery: false, testOut: true };
   // Luôn yêu cầu đủ SESSION_STAKE_XP (50 XP), không có recovery 0đ
   return { stakeXp: SESSION_STAKE_XP, recovery: false, testOut: false };

@@ -87,10 +87,6 @@ function darken(hex, amount = 0.28) {
   return `rgb(${channel(0)}, ${channel(2)}, ${channel(4)})`;
 }
 
-function maxXpFor() {
-  return SESSION_STAKE_XP;
-}
-
 /** Hai giọt nước bóng, nằm giữa khoảng trống dưới nút. */
 function PathSnakeConnector({ previousOffset, offset, active, color }) {
   const gradientId = `dpDrop${useId().replace(/:/g, '')}`;
@@ -350,10 +346,7 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }) {
 }
 
 /** Popover 3 nấc Dễ / Vừa / Khó trong nút Luyện / Thử thách / Hoàn thành. */
-function LevelHubPopover({ node, color, starting, onClose, onStartStep, practiceStats }) {
-  const xpEmpty = Boolean(practiceStats?.xpEmpty);
-  const recoveryLeft = Number(practiceStats?.recoveryXpRemainingToday);
-  const recoveryCap = Number(practiceStats?.recoveryDailyCapXp) || 60;
+function LevelHubPopover({ node, color, starting, onClose, onStartStep }) {
   return (
     <div className="dp-pop relative w-full rounded-2xl p-3 text-left text-white shadow-xl sm:p-3.5" style={{ background: `linear-gradient(160deg, ${color.from}, ${color.to})` }}>
       <span data-pop-arrow className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color.from }} />
@@ -416,7 +409,7 @@ function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose
           ? (!canTestOut
             ? 'Đặc quyền chỉ dành cho học viên mua khóa / gói Google Meet (+300 XP/ngày). Học viên miễn phí không thể thi vượt chặng.'
             : `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`)
-          : `${STEP_HINTS[step.key] || ''} ${QUESTION_STAKE_XP} XP/câu — sai trừ ngay; đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`}
+          : `${QUESTION_STAKE_XP} XP/câu — sai trừ ngay; đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`}
       </p>
       {testOut && !canTestOut ? (
         <button

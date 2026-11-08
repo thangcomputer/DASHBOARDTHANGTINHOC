@@ -120,7 +120,6 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
   const [picked, setPicked] = useState(null);
   const [checkHint, setCheckHint] = useState('');
   const [paidHint, setPaidHint] = useState('');
-  const [hintArmed, setHintArmed] = useState(false);
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const [xpPacks, setXpPacks] = useState([]);
   const [checkBusy, setCheckBusy] = useState(false);
@@ -189,7 +188,6 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
     setPicked(null);
     setCheckHint('');
     setPaidHint('');
-    setHintArmed(false);
     setCheckError('');
     setUploadPct(null);
     setGrading(false);

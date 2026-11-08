@@ -797,7 +797,6 @@ async function finishSession(studentId, sessionId) {
     failPenaltyXp: lostXp,
     gainedXp,
     xpDisabled: xpOff,
-    review: isReview,
     streakIncreased: streak > rules.liveStreak(before, day),
     stats: {
       ...(await (async () => {

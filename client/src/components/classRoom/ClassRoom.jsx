@@ -132,8 +132,6 @@ function Room({ scheduleId, onClose }) {
     });
   };
 
-  const offerTo = connectPeer;
-
   useEffect(() => {
     if (!socket) {
       setError('Chưa kết nối được máy chủ. Hãy tải lại trang rồi vào lớp lại.');
