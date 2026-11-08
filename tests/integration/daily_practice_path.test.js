@@ -87,7 +87,18 @@ test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần t
     return service.finishSession(sid, session.id);
   };
   try {
-    await Student.collection.insertMany([{ _id: studentId, name: 'HV Lộ trình' }, { _id: otherStudentId, name: 'HV Vượt' }]);
+    await Student.collection.insertMany([
+      { _id: studentId, name: 'HV Lộ trình' },
+      {
+        _id: otherStudentId,
+        name: 'HV Vượt',
+        subscription: {
+          plan: '3m',
+          activatedAt: new Date(Date.now() - 86400000),
+          expiresAt: new Date(Date.now() + 30 * 86400000),
+        },
+      },
+    ]);
     const topic = await service.createTopic({ name: `Lộ trình ${Date.now()}` });
     topicIds.push(topic.id);
     const otherTopic = await service.createTopic({ name: `Khác ${Date.now()}` });
