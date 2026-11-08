@@ -9,9 +9,10 @@ import PathLessonModal from './PathLessonModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import PathVideoModal from './PathVideoModal';
 import { gameSounds } from '../../../utils/sound';
-import { SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon, unitColor } from '../../../utils/dailyPractice';
+import { QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, topicColor, topicIcon, unitColor } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
 import { DropletMark, PathITBackdrop, PathStageArt } from './PathDecor';
+import FreeMeetPlanModal from './FreeMeetPlanModal';
 
 const STEP_ICONS = { learn: BookOpen, practice: Dumbbell, challenge: Flame };
 const STEP_LABELS = { learn: 'Dễ', practice: 'Vừa', challenge: 'Khó' };
@@ -349,7 +350,10 @@ function StudyHubPopover({ node, color, onClose, onOpenLesson }) {
 }
 
 /** Popover 3 nấc Dễ / Vừa / Khó trong nút Luyện / Thử thách / Hoàn thành. */
-function LevelHubPopover({ node, color, starting, onClose, onStartStep }) {
+function LevelHubPopover({ node, color, starting, onClose, onStartStep, practiceStats }) {
+  const xpEmpty = Boolean(practiceStats?.xpEmpty);
+  const recoveryLeft = Number(practiceStats?.recoveryXpRemainingToday);
+  const recoveryCap = Number(practiceStats?.recoveryDailyCapXp) || 60;
   return (
     <div className="dp-pop relative w-full rounded-2xl p-3 text-left text-white shadow-xl sm:p-3.5" style={{ background: `linear-gradient(160deg, ${color.from}, ${color.to})` }}>
       <span data-pop-arrow className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color.from }} />
@@ -371,16 +375,20 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black leading-tight sm:text-[13px]">Nấc {index + 1} · {STEP_LABELS[step.key] || step.label}</p>
-                  <p className="text-[10px] font-bold leading-tight text-white/75">Cần đúng {step.passPercent}% · cược {maxXpFor()} XP</p>
+                  <p className="text-[10px] font-bold leading-tight text-white/75">
+                    {done
+                      ? `Đã xong · Ôn lại (0 XP) · cần đúng ${step.passPercent}%`
+                      : `Cần đúng ${step.passPercent}% · ${QUESTION_STAKE_XP} XP/câu`}
+                  </p>
                 </div>
                 {!locked && (
                   <button
                     type="button"
                     disabled={starting}
-                    onClick={() => onStartStep(step.key)}
-                    className="shrink-0 rounded-lg bg-white px-2.5 py-1 text-[10px] font-black uppercase text-slate-800 !shadow-none sm:text-[11px]"
+                    onClick={() => onStartStep(step.key, { review: done })}
+                    className="shrink-0 rounded-lg bg-white px-2.5 py-1 text-[10px] font-black uppercase text-slate-800 !shadow-none disabled:cursor-not-allowed disabled:opacity-50 sm:text-[11px]"
                   >
-                    {starting ? '…' : done ? 'Lại' : 'Làm'}
+                    {starting ? '…' : done ? 'Ôn lại' : 'Làm'}
                   </button>
                 )}
               </div>
@@ -393,11 +401,11 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }) {
 }
 
 /** Bảng bắt đầu kiểm tra vượt chặng. */
-function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }) {
+function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose, onStart, onUpgrade }) {
   const order = unit.steps.findIndex((item) => item.key === step.key) + 1;
   return (
     <div className="dp-pop relative w-full max-w-xs rounded-2xl p-4 text-left text-white shadow-lg" style={{ background: `linear-gradient(160deg, ${color.from}, ${color.to})` }}>
-      <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45" style={{ background: color.from }} />
+      <span data-pop-arrow className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45" style={{ background: color.from }} />
       <button type="button" onClick={onClose} aria-label="Đóng" className="absolute right-2 top-2 rounded-full p-1 text-white/80 hover:bg-white/15 !shadow-none"><X size={16} /></button>
       <p className="text-lg font-black">{testOut ? 'Kiểm tra vượt chặng' : step.label}</p>
       <p className="text-xs font-semibold text-white/85">
@@ -405,25 +413,37 @@ function StepPopover({ unit, step, testOut, color, starting, onClose, onStart })
       </p>
       <p className="mt-1 text-xs text-white/80">
         {testOut
-          ? `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`
-          : `${STEP_HINTS[step.key] || ''} Cược ${SESSION_STAKE_XP} XP. Đạt thì nhận lại, trượt hoặc thoát thì mất trắng.`}
+          ? (!canTestOut
+            ? 'Đặc quyền chỉ dành cho học viên mua khóa / gói Google Meet (+300 XP/ngày). Học viên miễn phí không thể thi vượt chặng.'
+            : `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`)
+          : `${STEP_HINTS[step.key] || ''} ${QUESTION_STAKE_XP} XP/câu — sai trừ ngay; đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`}
       </p>
-      <button
-        type="button"
-        disabled={starting}
-        onClick={onStart}
-        className="dp-3d-btn dp-3d-btn--light mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-black uppercase tracking-wide"
-        style={{ color: color.to }}
-      >
-        {starting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-        {step.state === 'completed' && !testOut ? 'Luyện lại' : 'Bắt đầu'} · {testOut ? TEST_OUT_XP : SESSION_STAKE_XP} XP
-      </button>
+      {testOut && !canTestOut ? (
+        <button
+          type="button"
+          onClick={onUpgrade}
+          className="dp-3d-btn mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 py-2.5 text-xs font-black uppercase tracking-wide text-amber-950 shadow-md hover:bg-amber-300"
+        >
+          <Crown size={15} /> Nâng cấp gói để vượt
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={starting}
+          onClick={onStart}
+          className="dp-3d-btn dp-3d-btn--light mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-black uppercase tracking-wide"
+          style={{ color: color.to }}
+        >
+          {starting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+          {step.state === 'completed' && !testOut ? 'Luyện lại' : 'Bắt đầu'} · {testOut ? TEST_OUT_XP : `${QUESTION_STAKE_XP}/câu`}
+        </button>
+      )}
     </div>
   );
 }
 
 /** Banner chặng kiểu Duolingo (ảnh 2): nền màu, CHẶNG N + tiêu đề, nút sổ video. */
-function UnitStageHeader({ unit, color, onTestOut, onWatch, highlight, hasVideo }) {
+function UnitStageHeader({ unit, color, onTestOut, onWatch, highlight, hasVideo, testOutButtonRef }) {
   const locked = unit.state === 'locked';
   const done = unit.state === 'completed';
   const doneSteps = unit.steps.filter((step) => step.state === 'completed').length;
@@ -477,6 +497,7 @@ function UnitStageHeader({ unit, color, onTestOut, onWatch, highlight, hasVideo 
       {locked && unit.canTestOut && (
         <div className="mt-2 flex justify-center">
           <button
+            ref={testOutButtonRef}
             type="button"
             onClick={onTestOut}
             className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-1.5 text-[11px] font-black text-white !shadow-none"
@@ -544,7 +565,7 @@ export function pickActivePathTopic(path, initialTopicId = '') {
 
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
-  path, loading, error, starting, initialTopicId = '', onStartStep, onPathChanged, layout = 'default',
+  path, practiceStats, loading, error, starting, initialTopicId = '', onStartStep, onPathChanged, layout = 'default',
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const topics = useMemo(() => path?.topics || [], [path]);
@@ -553,7 +574,9 @@ export default function PathView({
   const [videoOpen, setVideoOpen] = useState(null);
   const [lessonOpen, setLessonOpen] = useState(null);
   const [welcomeLesson, setWelcomeLesson] = useState(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const hubAnchorRef = useRef(null);
+  const testOutAnchorRef = useRef(null);
   const continueOpenedRef = useRef(false);
   const onContinueOpenedRef = useRef(onContinueVideoOpened);
   const onRequestedLessonOpenedRef = useRef(onRequestedLessonOpened);
@@ -656,6 +679,15 @@ export default function PathView({
     if (!node) return null;
     return { unit, node, tone: unitColor(unit.index) };
   }, [popover, current]);
+  const openTestOut = useMemo(() => {
+    if (!popover?.testOut || !current) return null;
+    const unit = current.units.find((item) => item.id === popover.unitId);
+    if (!unit) return null;
+    const step = unit.pathNodes?.flatMap((n) => n.levels || []).find((level) => level.key === 'challenge')
+      || unit.steps.find((s) => s.key === 'challenge');
+    if (!step) return null;
+    return { unit, step };
+  }, [popover, current]);
   const errorBanner = error ? <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{error}</p> : null;
 
   if (loading && !path) {
@@ -755,8 +787,6 @@ export default function PathView({
               const tone = unitColor(unit.index);
               const locked = unit.state === 'locked';
               const testOutOpen = popover?.unitId === unit.id && popover.testOut;
-              const testOutStep = unit.pathNodes?.flatMap((n) => n.levels || []).find((level) => level.key === 'challenge')
-                || unit.steps.find((step) => step.key === 'challenge');
               const isNextUnit = current.next?.unitId === unit.id;
               const pathItems = buildUnitPathItems(unit);
               const unitVideos = collectUnitVideos(unit);
@@ -797,20 +827,8 @@ export default function PathView({
                       hasVideo={hasVideo}
                       onTestOut={() => toggle(unit, 'challenge', true)}
                       onWatch={() => openUnitVideo('')}
+                      testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
                     />
-                    {testOutOpen && (
-                      <div className="absolute left-1/2 top-full z-30 w-[min(20rem,calc(100%-1.5rem))] -translate-x-1/2" data-path-popover>
-                        <StepPopover
-                          unit={unit}
-                          step={testOutStep}
-                          testOut
-                          color={{ from: '#64748B', to: '#334155' }}
-                          starting={starting}
-                          onClose={closePopover}
-                          onStart={() => onStartStep(unit.id, 'study', 'challenge', true)}
-                        />
-                      </div>
-                    )}
                   </div>
                   <div className="relative z-30 px-1 pb-4 pt-14 sm:px-2">
                     <div className="relative flex flex-col items-center gap-5">
@@ -876,6 +894,27 @@ export default function PathView({
           </div>
         </>
       )}
+      {openTestOut && (
+        <PathHubPopoverPortal
+          anchorRef={testOutAnchorRef}
+          anchorKey={`testout:${openTestOut.unit.id}`}
+        >
+          <StepPopover
+            unit={openTestOut.unit}
+            step={openTestOut.step}
+            testOut
+            canTestOut={path?.canTestOut === true}
+            color={{ from: '#64748B', to: '#334155' }}
+            starting={starting}
+            onClose={closePopover}
+            onUpgrade={() => setUpgradeOpen(true)}
+            onStart={() => {
+              setPopover(null);
+              onStartStep(openTestOut.unit.id, 'study', 'challenge', true);
+            }}
+          />
+        </PathHubPopoverPortal>
+      )}
       {openHub && (
         <PathHubPopoverPortal
           anchorRef={hubAnchorRef}
@@ -897,11 +936,12 @@ export default function PathView({
             <LevelHubPopover
               node={openHub.node}
               color={openHub.tone}
+              practiceStats={practiceStats}
               starting={starting}
               onClose={closePopover}
-              onStartStep={(stepKey) => {
+              onStartStep={(stepKey, opts) => {
                 setPopover(null);
-                onStartStep(openHub.unit.id, openHub.node.key, stepKey, false);
+                onStartStep(openHub.unit.id, openHub.node.key, stepKey, false, opts);
               }}
             />
           )}
@@ -942,6 +982,11 @@ export default function PathView({
           }}
         />
       )}
+      <FreeMeetPlanModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        onPaid={onPathChanged}
+      />
     </div>
   );
 }
@@ -955,7 +1000,7 @@ export function PathResultCard({ result }) {
     title = `Chưa qua ${result.testOut ? 'bài kiểm tra vượt chặng' : `bước ${result.stepLabel}`}`;
     text = result.testOut
       ? `Bạn đạt ${result.scorePercent}% (cần ${result.passPercent}%). Mất ${TEST_OUT_XP} XP. Ôn lại rồi thử lại nhé!`
-      : `Bạn đạt ${result.scorePercent}%, cần từ ${result.passPercent}%. Mất trắng ${SESSION_STAKE_XP} XP cược. Thử lại nhé!`;
+      : `Bạn đạt ${result.scorePercent}%, cần từ ${result.passPercent}%. Sai −${QUESTION_STAKE_XP}/câu và không nhận XP câu đúng. Thử lại nhé!`;
   } else if (result.topicCompleted && (result.unitCompleted || result.testOut)) {
     title = 'Hoàn thành toàn bộ lộ trình!';
     text = 'Bạn đã chinh phục mọi chặng của chủ đề này. Tuyệt vời!';

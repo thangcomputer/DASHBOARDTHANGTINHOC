@@ -30,7 +30,8 @@ const {
 } = require('../services/studentKnownDevices');
 const { socialOAuthDisabled } = require('../utils/googleOAuthDisabled');
 const { statusOf: subscriptionStatusOf } = require('../services/subscriptionService');
-const { freePortalFlags } = require('../services/freePortal');
+const { freePortalFlags, FREE_COURSE_NAME, saveFreeSurvey } = require('../services/freePortal');
+const freePortalSocial = require('../services/freePortalSocial');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 const {
@@ -1659,6 +1660,29 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
   }
 });
 
+// ─── POST /api/auth/free-survey ───────────────────────────────────────────────
+/** Khảo sát onboarding cổng miễn phí (3 câu, lưu một lần). */
+router.post('/free-survey', authMiddleware, async (req, res) => {
+  try {
+    if (req.user?.role !== 'student') {
+      return res.status(403).json({ success: false, message: 'Chỉ học viên' });
+    }
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'Không xác định được tài khoản' });
+    }
+    const survey = await saveFreeSurvey(userId, req.body || {});
+    return res.json({ success: true, data: survey });
+  } catch (error) {
+    const status = Number(error.status) || 500;
+    if (status >= 500) logger.error('[AUTH] free-survey:', error);
+    return res.status(status).json({
+      success: false,
+      message: error.message || 'Lỗi server',
+    });
+  }
+});
+
 // ─── POST /api/auth/welcome-celebration/seen ──────────────────────────────────
 /**
  * Đánh dấu đã xem pháo hoa chào mừng lần đầu (HV/GV).
@@ -2232,6 +2256,164 @@ router.put('/admin/profile', authMiddleware, policyShadowAuth('admin_profile'), 
   } catch (error) {
     logger.error('[AUTH] Admin profile update error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+});
+
+// ─── Cổng miễn phí (luyện tập hằng ngày) ─────────────────────────────────────
+const FREE_PORTAL_OAUTH_STATE = 'free_portal_oauth_state';
+
+router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
+  try {
+    const { name, age, phone, password } = req.body || {};
+    const displayName = String(name || '').trim();
+    const parsedAge = freePortalSocial.parseAge(age);
+    const canonicalPhone = normalizeVNPhone(phone);
+    if (displayName.length < 2) {
+      return res.status(400).json({ success: false, message: 'Hãy nhập họ tên' });
+    }
+    if (!parsedAge) {
+      return res.status(400).json({ success: false, message: 'Tuổi từ 10 đến 80' });
+    }
+    if (!canonicalPhone) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
+    }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu cần ít nhất 6 ký tự' });
+    }
+    const existing = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
+    if (existing) {
+      if (existing.freePortal === true) {
+        return res.status(409).json({ success: false, message: 'Số điện thoại đã có tài khoản miễn phí. Hãy đăng nhập.' });
+      }
+      return res.status(409).json({ success: false, message: 'Số này đã thuộc học viên trung tâm. Hãy đăng nhập ở trang trung tâm.' });
+    }
+    try {
+      const { assertUniqueContact } = require('../utils/uniqueContact');
+      await assertUniqueContact({ phone: canonicalPhone });
+    } catch (dupErr) {
+      if (dupErr.status === 409) {
+        return res.status(409).json({ success: false, message: dupErr.message });
+      }
+      throw dupErr;
+    }
+    await Student.create({
+      name: displayName,
+      phone: canonicalPhone,
+      zalo: canonicalPhone,
+      age: parsedAge,
+      password,
+      course: FREE_COURSE_NAME,
+      price: 0,
+      paid: true,
+      paidAmount: 0,
+      status: 'Đang học',
+      learningMode: 'ONLINE',
+      freePortal: true,
+      freeUnlocked: false,
+      enrollments: [{
+        courseName: FREE_COURSE_NAME,
+        price: 0,
+        paid: true,
+        status: 'active',
+        learningAccess: true,
+        isPrimary: true,
+        totalSessions: 0,
+        remainingSessions: 0,
+      }],
+    });
+    return res.status(201).json({ success: true, message: 'Tạo tài khoản thành công. Hãy đăng nhập.' });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Số điện thoại đã tồn tại' });
+    }
+    logger.error('[AUTH] register-free error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.get('/free-portal/social/status', (req, res) => {
+  res.json({ success: true, data: freePortalSocial.socialStatus() });
+});
+
+router.post('/free-portal/social/exchange', loginLimiter, policyShadowAuth('login_public'), async (req, res) => {
+  try {
+    const { ticket, deviceFingerprint } = req.body || {};
+    if (!ticket) return res.status(400).json({ success: false, message: 'Thiếu phiên mạng xã hội' });
+    const result = await freePortalSocial.exchangeTicket(String(ticket), deviceFingerprint);
+    if (result.needsProfile) {
+      return res.json({
+        success: true,
+        needsProfile: true,
+        ticket: result.ticket,
+        name: result.name,
+        provider: result.provider,
+      });
+    }
+    return res.json({ success: true, needsProfile: false, data: result.session });
+  } catch (err) {
+    logger.error('[AUTH] free-portal social exchange:', err);
+    return res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.post('/free-portal/social/complete', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
+  try {
+    const { ticket, name, age, phone, deviceFingerprint } = req.body || {};
+    if (!ticket) return res.status(400).json({ success: false, message: 'Thiếu phiên mạng xã hội' });
+    const session = await freePortalSocial.completeProfile({
+      token: String(ticket),
+      name,
+      age,
+      phone,
+      fingerprint: deviceFingerprint,
+    });
+    return res.json({ success: true, data: session });
+  } catch (err) {
+    logger.error('[AUTH] free-portal social complete:', err);
+    return res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.get('/free-portal/:provider', (req, res) => {
+  try {
+    const provider = String(req.params.provider || '').toLowerCase();
+    if (!['google', 'facebook'].includes(provider)) {
+      return res.status(404).json({ success: false, message: 'Provider không hỗ trợ' });
+    }
+    const state = crypto.randomBytes(16).toString('hex');
+    const secure = req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+    res.cookie(FREE_PORTAL_OAUTH_STATE, state, { httpOnly: true, sameSite: 'lax', maxAge: 600000, secure });
+    return res.redirect(freePortalSocial.authUrl(provider, req, state));
+  } catch (err) {
+    logger.error('[AUTH] free-portal oauth start:', err);
+    return res.redirect(freePortalSocial.frontUrl({ socialError: err.message || 'Không mở được đăng nhập mạng xã hội' }));
+  }
+});
+
+router.get('/free-portal/:provider/callback', async (req, res) => {
+  const provider = String(req.params.provider || '').toLowerCase();
+  try {
+    if (!['google', 'facebook'].includes(provider)) {
+      return res.redirect(freePortalSocial.frontUrl({ socialError: 'Provider không hỗ trợ' }));
+    }
+    const { code, state, error: oauthError } = req.query || {};
+    if (oauthError) {
+      return res.redirect(freePortalSocial.frontUrl({ socialError: String(oauthError) }));
+    }
+    const saved = req.cookies?.[FREE_PORTAL_OAUTH_STATE];
+    res.clearCookie(FREE_PORTAL_OAUTH_STATE);
+    if (!state || !saved || state !== saved) {
+      return res.redirect(freePortalSocial.frontUrl({ socialError: 'Phiên OAuth không hợp lệ' }));
+    }
+    if (!code) {
+      return res.redirect(freePortalSocial.frontUrl({ socialError: 'Thiếu mã xác nhận' }));
+    }
+    const profile = await freePortalSocial.fetchProfile(provider, req, String(code));
+    const ticket = freePortalSocial.ticketFor(profile);
+    return res.redirect(freePortalSocial.frontUrl({ socialTicket: ticket }));
+  } catch (err) {
+    logger.error('[AUTH] free-portal oauth callback:', err);
+    return res.redirect(freePortalSocial.frontUrl({ socialError: err.message || 'Đăng nhập mạng xã hội thất bại' }));
   }
 });
 

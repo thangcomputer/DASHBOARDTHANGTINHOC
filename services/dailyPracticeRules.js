@@ -5,14 +5,19 @@ const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const XP_BY_DIFFICULTY = { easy: 10, medium: 15, hard: 20 };
 /** Mỗi lần nộp đáp án ở mốc video: trừ XP luyện, đúng hay sai đều trừ. */
 const VIDEO_CHECK_ANSWER_XP = 5;
-/** Mỗi lượt luyện: đặt cược 20 XP — đạt thì nhận lại, trượt/thoát thì mất trắng. */
-const SESSION_STAKE_XP = 20;
+const SESSION_SIZE = 10;
+/** Mỗi câu lộ trình: sai −5 XP ngay; đạt % yêu cầu mới nhận +5/câu đúng. */
+const QUESTION_STAKE_XP = 5;
+/** Cược tối đa một lượt mặc định (SESSION_SIZE câu). */
+const SESSION_STAKE_XP = SESSION_SIZE * QUESTION_STAKE_XP;
 /** Kiểm tra vượt chặng: đạt được thêm 40 XP, không đạt hoặc thoát thì mất 40 XP. */
 const TEST_OUT_XP = 40;
 /** Mỗi ngày (giờ VN) phần XP của gói đặt về mức này. XP đã mua được giữ và cộng thêm. */
 const DAILY_ALLOWANCE_XP = 200;
 /** Tài khoản miễn phí, khi không có gói Meet: mỗi ngày 60 XP. */
 const FREE_PORTAL_DAILY_XP = 60;
+/** Hết XP: phục hồi bằng làm lại nấc đã xong — tối đa XP nhận được mỗi ngày. */
+const RECOVERY_DAILY_CAP_XP = FREE_PORTAL_DAILY_XP;
 /** Gói Meet còn hạn: mỗi ngày 300 XP. Hết hạn quay về mức tài khoản. */
 const MEET_PLAN_DAILY_XP = 300;
 /** @deprecated tên cũ — cùng mức đặt lại mỗi ngày. */
@@ -27,7 +32,6 @@ const XP_PACKS = [
   { id: 'xp300', xp: 300, priceVnd: 25000, label: '300 XP' },
   { id: 'xp800', xp: 800, priceVnd: 59000, label: '800 XP' },
 ];
-const SESSION_SIZE = 10;
 const TOPIC_ICONS = ['book', 'monitor', 'file-text', 'sheet', 'presentation', 'globe', 'keyboard', 'shield', 'cpu', 'mail', 'image', 'code'];
 const TOPIC_COLORS = ['red', 'blue', 'green', 'orange', 'purple', 'teal', 'pink', 'amber', 'sky', 'slate'];
 const DEFAULT_HINT = 'Đọc kỹ đề và loại trừ những phương án chắc chắn sai trước nhé.';
@@ -430,16 +434,71 @@ function streakStatus(profile, today) {
   return { state: 'lost', lostStreak: streak, missedDays };
 }
 
+function answerXpLoss(session = {}) {
+  return (session.answers || []).reduce((sum, row) => sum + Math.min(0, Number(row.xp) || 0), 0);
+}
+
+/** Lộ trình thường: cược theo câu (không trừ trước). Kiểm tra vượt: cược lump TEST_OUT_XP. */
+function usesPerQuestionStake(session = {}) {
+  return session.mode === 'path' && session.recovery !== true && session.review !== true && session.testOut !== true;
+}
+
+function isPracticeXpDisabled(session = {}) {
+  return session.mode === 'free' || session.review === true;
+}
+
+function sessionStakeTotal(questionCount) {
+  const n = Math.max(0, Math.round(Number(questionCount) || 0));
+  return n * QUESTION_STAKE_XP;
+}
+
+/** Thay đổi ròng ví sau lượt. */
+function sessionNetXp(session = {}) {
+  if (isPracticeXpDisabled(session)) return 0;
+  const reward = Math.max(0, (Number(session.xp) || 0) + (Number(session.bonusXp) || 0));
+  const upfront = Math.max(0, Number(session.stakeXp) || 0);
+  const perQLoss = answerXpLoss(session);
+  if (session.recovery === true) return reward;
+  if (session.testOut === true) {
+    if (reward > 0) return reward - upfront;
+    if (upfront > 0 && (session.status === 'finished' || session.status === 'abandoned')) return -upfront;
+    return 0;
+  }
+  if (usesPerQuestionStake(session)) {
+    if (reward > 0) return reward + perQLoss;
+    if (session.status === 'finished' || session.status === 'abandoned') return perQLoss;
+    return 0;
+  }
+  if (reward > 0) return reward - upfront;
+  if (upfront > 0 && (session.status === 'finished' || session.status === 'abandoned')) return -upfront;
+  return 0;
+}
+
+/** XP «luyện hôm nay» — chỉ cộng phục hồi / lời ròng; hoàn cược lượt cược không tính. */
+function sessionTodayDisplayXp(session = {}) {
+  if (isPracticeXpDisabled(session)) return 0;
+  if (session.recovery === true) {
+    const reward = Math.max(0, (Number(session.xp) || 0) + (Number(session.bonusXp) || 0));
+    return reward;
+  }
+  return sessionNetXp(session);
+}
+
 module.exports = {
   TYPES,
   DIFFICULTIES,
   XP_BY_DIFFICULTY,
   VIDEO_CHECK_ANSWER_XP,
+  QUESTION_STAKE_XP,
   SESSION_STAKE_XP,
+  sessionStakeTotal,
+  usesPerQuestionStake,
+  isPracticeXpDisabled,
   TEST_OUT_XP,
   DAILY_ALLOWANCE_XP,
   MEET_PLAN_DAILY_XP,
   FREE_PORTAL_DAILY_XP,
+  RECOVERY_DAILY_CAP_XP,
   DAILY_REFILL_XP,
   allowanceForSubscription,
   applyDailyAllowance,
@@ -469,4 +528,6 @@ module.exports = {
   nextStreak,
   liveStreak,
   streakStatus,
+  sessionNetXp,
+  sessionTodayDisplayXp,
 };

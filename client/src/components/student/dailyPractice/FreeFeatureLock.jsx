@@ -20,6 +20,20 @@ export function isFreePortalLocked(session) {
   return session?.role === 'student' && session?.freePortal === true && session?.freeUnlocked !== true;
 }
 
+/** HV miễn phí: session React hoặc `student_user` trong localStorage. */
+export function resolveStudentSession(session) {
+  if (session?.freePortal === true) return session;
+  const stored = readStudentSession();
+  return stored?.role === 'student' ? (stored || session) : session;
+}
+
+/** Khớp middleware — freePortal chưa có khóa 1 kèm 1 thì `/api/schedules` luôn 403. */
+export function isStudentSchedulesApiBlocked(session) {
+  const source = resolveStudentSession(session);
+  if (source?.role !== 'student' || source?.freePortal !== true) return false;
+  return !hasRealCourseEnrollment(source);
+}
+
 function readStudentSession() {
   try {
     return JSON.parse(localStorage.getItem('student_user') || 'null');

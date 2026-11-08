@@ -40,6 +40,7 @@ import TeacherStudentNoteModal, {
 import TeacherPaymentCelebration from './teacher/TeacherPaymentCelebration';
 import LearningGoalModal from './student/LearningGoalModal';
 import DailyPracticeReminder from './student/dailyPractice/DailyPracticeReminder';
+import { isFreePortalLocked, isStudentSchedulesApiBlocked } from './student/dailyPractice/FreeFeatureLock';
 import dailyPracticeApi from '../services/dailyPracticeApi';
 import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
@@ -172,6 +173,10 @@ function matchScheduleForAttendanceNotif(list, base) {
 
 async function enrichAttendancePayloadFromSchedules(base, studentId) {
   if (!attendancePayloadMissingTeacherOrCa(base) || !studentId) return base;
+  try {
+    const stored = JSON.parse(localStorage.getItem('student_user') || 'null');
+    if (isStudentSchedulesApiBlocked(stored)) return base;
+  } catch { /* ignore */ }
   try {
     const res = await api.schedules.getByStudent(studentId);
     const sch = matchScheduleForAttendanceNotif(res?.data, base);
@@ -747,7 +752,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     return () => { socket.off('teacher:star-bonus-celebration', onStarBonus); };
   }, [socket, role, queueStarBonusCelebration]);
 
-  // HV: popup đặt mục tiêu học — hiện tới khi đặt; hết hạn thì hỏi lại; "Để sau" chỉ ẩn trong phiên này.
+  // HV: chỉ tự mở popup đặt mục tiêu lần đầu; mục tiêu hết hạn không tự bật lại.
   const learningGoalLaterKey = myId ? `cms_learning_goal_later:${myId}` : '';
   useEffect(() => {
     if (role !== 'student' || !myId) return undefined;
@@ -770,7 +775,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (role !== 'student' || !learningGoalData || learningGoalOpen) return;
     if (showWelcomeCelebration || courseCelebration) return;
     const goal = learningGoalData.goal;
-    if (goal && !goal.expired) return;
+    if (goal) return;
     try {
       if (learningGoalLaterKey && sessionStorage.getItem(learningGoalLaterKey) === '1') return;
     } catch { /* ignore */ }
@@ -806,7 +811,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (location.pathname.startsWith('/student/daily-practice')) return;
     const goal = learningGoalData.goal;
     try {
-      const goalPromptPending = (!goal || goal.expired) && sessionStorage.getItem(learningGoalLaterKey) !== '1';
+      const goalPromptPending = !goal && sessionStorage.getItem(learningGoalLaterKey) !== '1';
       if (goalPromptPending) return;
       if (localStorage.getItem(dailyReminderKey) === vnTodayKey()) return;
       localStorage.setItem(dailyReminderKey, vnTodayKey());
@@ -854,7 +859,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   // HV: modal xác nhận điểm danh (blocking)
   useEffect(() => {
-    if (role !== 'student' || !myId) return undefined;
+    if (role !== 'student' || !myId || isStudentSchedulesApiBlocked(session)) return undefined;
     let cancelled = false;
     const requestRevision = attendanceConfirmRevisionRef.current;
     const loadPending = async () => {
@@ -1047,6 +1052,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
 
   /** Mở modal HV từ thông báo: luôn check trạng thái thật (tránh mở Đồng ý khi đã xong). */
   const openStudentAttendanceFromNotif = React.useCallback(async (rawPayload, opts = {}) => {
+    if (isStudentSchedulesApiBlocked(session)) return;
     attendanceConfirmRevisionRef.current += 1;
     const base = rawPayload && typeof rawPayload === 'object' ? { ...rawPayload } : {};
     const scheduleId = base.scheduleId || opts.scheduleId;
@@ -1118,7 +1124,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     } catch {
       setAttendanceConfirm({ ...base, scheduleId, resolved: false, waiting: false });
     }
-  }, [myId]);
+  }, [myId, session]);
 
   const dismissStudentAttendanceConfirm = React.useCallback(() => {
     attendanceConfirmRevisionRef.current += 1;

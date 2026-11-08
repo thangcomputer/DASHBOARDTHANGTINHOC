@@ -26,6 +26,8 @@ const dailyPracticeSessionSchema = new mongoose.Schema({
   stakeXp: { type: Number, default: 0 },
   /** Làm lại nấc cũ để phục hồi (có thể không cược nếu XP thấp). */
   recovery: { type: Boolean, default: false },
+  /** Ôn lại nấc đã xong khi còn XP — không cược, không đổi tiến độ. */
+  review: { type: Boolean, default: false },
   xp: { type: Number, default: 0 },
   bonusXp: { type: Number, default: 0 },
   correctCount: { type: Number, default: 0 },

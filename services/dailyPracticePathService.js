@@ -6,8 +6,10 @@ const DailyPracticeUnit = require('../models/DailyPracticeUnit');
 const DailyPracticeQuestion = require('../models/DailyPracticeQuestion');
 const DailyPracticePathProgress = require('../models/DailyPracticePathProgress');
 const LessonUnit = require('../models/LessonUnit');
+const Student = require('../models/Student');
 const rules = require('./dailyPracticeRules');
 const lessonPracticeService = require('./lessonPracticeService');
+const subscriptionService = require('./subscriptionService');
 const logger = require('../config/logger');
 
 const { httpError } = rules;
@@ -48,6 +50,11 @@ function stepMeta(key) {
 function passPercent(step, { testOut = false } = {}) {
   if (testOut || step === LEGACY_CHECKPOINT) return CHECKPOINT_PASS_PERCENT;
   return STEP_PASS_PERCENT;
+}
+
+function hasTestOutAccess(student, now = new Date()) {
+  const status = subscriptionService.statusOf(student, now);
+  return rules.allowanceForSubscription(status, student) >= rules.MEET_PLAN_DAILY_XP;
 }
 
 function emptyStepVideos() {
@@ -696,6 +703,7 @@ async function loadTopicsPath(studentId, topics) {
 /** Lộ trình của mọi chủ đề đang mở (chỉ chủ đề có chặng đủ câu hỏi). */
 async function getPath(studentId) {
   const sid = requireId(studentId, 'Học viên');
+  const student = await Student.findById(sid).select('subscription freePortal enrollments').lean();
   const topics = await DailyPracticeTopic.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
   for (const topic of topics) {
     try {
@@ -706,6 +714,7 @@ async function getPath(studentId) {
   }
   const paths = await loadTopicsPath(sid, topics);
   return {
+    canTestOut: hasTestOutAccess(student),
     steps: PATH_STEPS.map((step) => ({ ...step, passPercent: passPercent(step.key) })),
     topics: paths.filter((path) => path.units.length > 0),
   };
@@ -763,6 +772,11 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
   }
   const levelState = pathNode?.levels?.find((item) => item.key === step)?.state || '';
   if (testOut) {
+    // Kiểm tra vượt chặng là đặc quyền chỉ dành cho học viên mua khóa / gói Meet
+    const student = await Student.findById(sid).select('subscription freePortal enrollments').lean();
+    if (!hasTestOutAccess(student)) {
+      throw httpError(403, 'Tính năng Kiểm tra vượt chặng chỉ dành riêng cho học viên đã mua gói học. Vui lòng nâng cấp gói để sử dụng.');
+    }
     if (step !== 'challenge' && step !== LEGACY_CHECKPOINT) throw httpError(400, 'Kiểm tra vượt chặng chỉ dùng cấp Khó');
     if (!view.canTestOut) throw httpError(409, 'Chặng này đã hoàn thành');
   } else if (levelState === 'locked') {
@@ -785,8 +799,7 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
       stepLabel: stepMeta(step).label,
       testOut: Boolean(testOut),
       passPercent: passPercent(step, { testOut }),
-      /** Làm lại nấc đã hoàn thành → được phép khi hết XP để phục hồi. */
-      recovery: !testOut && levelState === 'completed',
+      stepCompleted: !testOut && levelState === 'completed',
       failPenaltyXp: testOut ? rules.TEST_OUT_XP : 0,
     },
   };
@@ -1108,6 +1121,31 @@ async function recordPathResult(session) {
   const studentId = session.studentId;
   const nodeKey = String(session.pathNodeKey || 'study').trim();
 
+  if (session.review === true) {
+    const { path } = await topicPathForUnit(studentId, unit);
+    const after = path.units.find((item) => item.id === String(unit._id));
+    const position = path.units.findIndex((item) => item.id === String(unit._id));
+    const following = position >= 0 ? path.units[position + 1] : null;
+    const pathNode = (after?.pathNodes || []).find((item) => item.key === nodeKey);
+    return {
+      unitId: String(unit._id),
+      unitTitle: unit.title,
+      pathNodeKey: nodeKey,
+      pathNodeLabel: pathNode?.label || nodeKey,
+      step: session.step,
+      stepLabel: stepMeta(session.step).label,
+      testOut: false,
+      passed,
+      scorePercent,
+      passPercent: required,
+      unitCompleted: after?.state === 'completed',
+      unlockedUnit: null,
+      topicCompleted: path.units.length > 0 && path.units.every((item) => item.state === 'completed'),
+      next: path.next,
+      review: true,
+    };
+  }
+
   if (passed) {
     if (session.testOut) {
       const { path } = await topicPathForUnit(studentId, unit);
@@ -1171,6 +1209,7 @@ module.exports = {
   assignUnassigned,
   resolveQuestionUnit,
   computeUnits,
+  hasTestOutAccess,
   getPath,
   preparePathSession,
   recordPathResult,

@@ -51,6 +51,7 @@ import { getChatFileType } from '../utils/chatFileType';
 import ScreenCaptureButton from './ScreenCaptureButton';
 import StickerPicker from './StickerPicker';
 import ChatStickerImage from './ChatStickerImage';
+import { isFreePortalLocked } from './student/dailyPractice/FreeFeatureLock';
 
 const ROLE_LABEL = {
   admin: 'Quản trị viên',
@@ -1544,6 +1545,7 @@ export default function FloatingMessenger({ session, role }) {
   const meName = session?.name || 'Tôi';
   const meRole = normalizeChatRole(getMessagingRole(session) || role || session?.role || 'student');
   const canUseAiSupport = meRole === 'student' || meRole === 'teacher';
+  const freePortalApiLocked = isFreePortalLocked(session);
 
   // HV/GV: không tự mở cửa sổ chat ngay khi login.
   // Chỉ hiển thị khi người dùng đã bấm (FAB hoặc chat-head).
@@ -1564,6 +1566,10 @@ export default function FloatingMessenger({ session, role }) {
   // Presence only overlays online — never fall back to local staffs[] for WHO.
   const [fmContacts, setFmContacts] = useState([]);
   useEffect(() => {
+    if (freePortalApiLocked) {
+      setFmContacts([]);
+      return undefined;
+    }
     const fetchContacts = () => {
       messagesAPI.getContacts().then((res) => {
         const data = res?.success && Array.isArray(res.data) ? res.data : [];
@@ -1578,7 +1584,7 @@ export default function FloatingMessenger({ session, role }) {
       return unsub;
     }
     return undefined;
-  }, [usePresenceDirectory, onContactListUpdated]);
+  }, [usePresenceDirectory, onContactListUpdated, freePortalApiLocked]);
 
   const conversations = useMemo(() => {
     const raw = meId ? (getConversations(meId) || []) : [];
@@ -1727,7 +1733,7 @@ export default function FloatingMessenger({ session, role }) {
   tabsRef.current = tabs;
 
   useEffect(() => {
-    if (!canUseAiSupport || !meId || isInbox) return undefined;
+    if (!canUseAiSupport || !meId || isInbox || freePortalApiLocked) return undefined;
     let tokenTail = '';
     try {
       tokenTail = String(
@@ -1749,7 +1755,7 @@ export default function FloatingMessenger({ session, role }) {
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
-  }, [canUseAiSupport, meId, isInbox, syncMessages]);
+  }, [canUseAiSupport, meId, isInbox, syncMessages, freePortalApiLocked]);
 
   useEffect(() => {
     if (!onTypingChange) return undefined;

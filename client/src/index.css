@@ -5066,6 +5066,8 @@ body .cms-login-icon-btn:active { transform: scale(0.96); }
 /* Lộ trình kiểu Duolingo: nút 3D có "đế", nhấn xuống khi bấm */
 body button.dp-node,
 body button.dp-node:not(:disabled):not([aria-disabled='true']) {
+  pointer-events: auto;
+  cursor: pointer;
   box-shadow: 0 7px 0 var(--dp-node-base, #991B1B);
   transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
@@ -5073,6 +5075,10 @@ body button.dp-node:not(:disabled):hover { filter: brightness(1.05); }
 body button.dp-node:not(:disabled):not([aria-disabled='true']):active {
   transform: translate(-50%, calc(-50% + 5px));
   box-shadow: 0 2px 0 var(--dp-node-base, #991B1B);
+}
+body [data-path-popover] button,
+body [data-path-popover] [role='button'] {
+  pointer-events: auto;
 }
 body button.dp-3d-btn:not(:disabled):not([aria-disabled='true']) { box-shadow: 0 5px 0 #0369A1; transition: transform 0.08s ease, box-shadow 0.08s ease; }
 body button.dp-3d-btn:not(:disabled):not([aria-disabled='true']):active { transform: translateY(4px); box-shadow: 0 1px 0 #0369A1; }

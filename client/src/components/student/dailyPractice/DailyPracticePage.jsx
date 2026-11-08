@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, XCircle, Zap,
+  ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, XCircle, Zap,
 } from 'lucide-react';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { LEARNING_GOAL_CHANGED_EVENT, lessonResumeUrl } from '../../../utils/learningGoal';
 import {
-  DIFFICULTIES, QUESTION_TYPES, SESSION_STAKE_XP, difficultyMeta, playQuestionHeaderChips, randomComfort, randomPraise, resultMessage, topicColor, topicIcon,
+  DIFFICULTIES, QUESTION_TYPES, QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP, difficultyMeta, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage, topicColor, topicIcon,
 } from '../../../utils/dailyPractice';
 import DailyPracticeHero from './DailyPracticeHero';
 import DailyPracticeQuickStats from './DailyPracticeQuickStats';
@@ -157,6 +157,7 @@ function HomeScreen({
           {mode === 'path' && (
             <PathView
               path={path}
+              practiceStats={stats}
               loading={pathLoading}
               error={pathError}
               starting={starting}
@@ -273,9 +274,10 @@ function HomeScreen({
 }
 
 // ── Màn chơi ─────────────────────────────────────────────────────────────────
-function QuitConfirm({ answered, total, stakeXp = 0, mandatory = false, quitting, onStay, onQuit }) {
+function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory = false, quitting, onStay, onQuit }) {
   const left = Math.max(0, total - answered);
-  const loseXp = stakeXp > 0;
+  const lossOnQuit = Math.max(stakeXp, quitLossXp);
+  const loseXp = lossOnQuit > 0;
 
   useEffect(() => { gameSounds.sad(); }, []);
 
@@ -290,14 +292,14 @@ function QuitConfirm({ answered, total, stakeXp = 0, mandatory = false, quitting
           <p className="mt-1.5 text-sm text-slate-600">
             {loseXp
               ? mandatory
-                ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất trắng ${stakeXp} XP đã đặt cược, không hoàn lại.`
-                : `Thoát bây giờ bạn mất trắng ${stakeXp} XP đã đặt cược cho lượt này.`
+                ? `Đây là lượt bắt buộc. Thoát bây giờ bạn mất thêm XP còn lại (tối đa −${lossOnQuit} XP cho các câu chưa làm).`
+                : `Thoát bây giờ bạn mất thêm XP (tối đa −${lossOnQuit} XP).`
               : 'Lượt phục hồi này không mất XP nếu thoát. Bạn vẫn nên hoàn thành để nhận XP.'}
           </p>
           {loseXp && (
             <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700 ring-1 ring-red-200">
               <Zap size={13} className="fill-amber-300 text-amber-500" aria-hidden="true" />
-              Mất −{stakeXp} XP nếu thoát
+              Mất tối đa −{lossOnQuit} XP nếu thoát
             </p>
           )}
           {left > 0 && (
@@ -312,7 +314,7 @@ function QuitConfirm({ answered, total, stakeXp = 0, mandatory = false, quitting
           </button>
           <button type="button" onClick={onQuit} disabled={quitting} className="cms-btn cms-btn-outline w-full !py-2.5 !text-red-600">
             {quitting ? <Loader2 size={16} className="animate-spin" /> : null}
-            {loseXp ? `Thoát và mất ${stakeXp} XP` : 'Vẫn thoát'}
+            {loseXp ? `Thoát và mất tối đa ${lossOnQuit} XP` : 'Vẫn thoát'}
           </button>
         </div>
       </div>
@@ -340,12 +342,17 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const total = session.questions.length;
   const meta = QUESTION_TYPES[question.type];
   const level = difficultyMeta(question.difficulty);
-  const xpDisabled = Boolean(session.xpDisabled || session.mode === 'free');
+  const xpDisabled = Boolean(session.xpDisabled || session.mode === 'free' || session.review || session.path?.review);
   const stakeXp = xpDisabled ? 0 : (session.stakeXp ?? 0);
-  const stakeLabel = xpDisabled ? 0 : (session.sessionStakeXp || SESSION_STAKE_XP);
-  const mandatory = !xpDisabled && Boolean(session.mandatory ?? stakeXp > 0);
-  const poolXp = stakeXp > 0 ? stakeXp : stakeLabel;
-  const hintShareXp = !xpDisabled && poolXp > 0 && total > 0 ? Math.floor(poolXp / (2 * total)) : 0;
+  const perQuestionStake = session.perQuestionStakeXp || QUESTION_STAKE_XP;
+  const isTestOutStake = Boolean(session.path?.testOut) && stakeXp > 0;
+  const isPerQuestion = !xpDisabled && !session.recovery && !isTestOutStake && session.mode === 'path';
+  const stakeLabel = xpDisabled ? 0 : (session.sessionStakeXp || total * perQuestionStake || SESSION_STAKE_XP);
+  const mandatory = !xpDisabled && Boolean(session.mandatory ?? (stakeXp > 0 || isPerQuestion));
+  const walletXp = inPlayWalletXp(profileXp, isTestOutStake ? stakeXp : 0);
+  const hintShareXp = !xpDisabled
+    ? (isPerQuestion ? Math.floor(perQuestionStake / 2) : (stakeXp > 0 && total > 0 ? Math.floor(stakeXp / (2 * total)) : 0))
+    : 0;
   const headerChips = useMemo(
     () => playQuestionHeaderChips({ path: session.path, typeLabel: meta.label, levelMeta: level }),
     [session.path, meta.label, level],
@@ -428,6 +435,8 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const progress = Math.round(((index + (result ? 1 : 0)) / total) * 100);
   const immediate = question.type === 'mcq' || question.type === 'truefalse';
   const contextLabel = headerChips[0]?.text || level.label;
+  const answeredCount = index + (result ? 1 : 0);
+  const quitLossXp = isPerQuestion ? Math.max(0, total - answeredCount) * perQuestionStake : stakeXp;
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-3 px-1 sm:gap-4">
@@ -460,11 +469,22 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
             </span>
           )}
           <span
-            className="relative flex h-10 items-center gap-1 rounded-full bg-amber-50 px-2.5 text-sm font-black tabular-nums text-amber-800 ring-1 ring-amber-200"
-            title={stakeXp > 0 ? `Đang cược ${stakeXp} XP` : `Phục hồi · đạt nhận ${stakeLabel} XP`}
+            className="relative flex h-10 min-w-[3.25rem] flex-col items-center justify-center rounded-full bg-amber-50 px-2.5 text-sm font-black tabular-nums text-amber-800 ring-1 ring-amber-200"
+            title={isTestOutStake
+              ? `Tổng ${walletXp} XP · ${stakeXp} XP đang cược (ví tạm ${profileXp}). Đạt sẽ hoàn cược.`
+              : (isPerQuestion
+                ? `Ví ${profileXp} XP · ${perQuestionStake} XP/câu, sai trừ ngay · đạt nhận +${perQuestionStake}/câu đúng`
+                : `Phục hồi · đạt nhận tối đa ${stakeLabel} XP`)}
           >
-            <Zap size={15} className="fill-amber-400 text-amber-500" aria-hidden="true" />
-            {profileXp}
+            <span className="flex items-center gap-1 leading-none">
+              <Zap size={15} className="fill-amber-400 text-amber-500" aria-hidden="true" />
+              {walletXp}
+            </span>
+            {isTestOutStake ? (
+              <span className="mt-0.5 text-[9px] font-bold leading-none text-amber-700/90">−{stakeXp} cược</span>
+            ) : (isPerQuestion ? (
+              <span className="mt-0.5 text-[9px] font-bold leading-none text-amber-700/90">{perQuestionStake}/câu</span>
+            ) : null)}
           </span>
         </div>
       </header>
@@ -484,12 +504,18 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
               <span className="mx-1.5 text-slate-300">·</span>
               {xpDisabled ? (
                 <span className="text-slate-500">Luyện tự do · không tính XP</span>
-              ) : stakeXp > 0 ? (
+              ) : isTestOutStake ? (
                 <span className="text-amber-700">
-                  {session.path?.testOut ? `Cược ${stakeXp} XP · đạt được +${stakeXp} XP` : `Cược ${stakeXp} XP · đạt nhận lại`}
+                  Cược {stakeXp} XP · đạt được +{stakeXp} XP
                 </span>
+              ) : isPerQuestion ? (
+                <span className="text-amber-700">
+                  {perQuestionStake} XP/câu · sai −{perQuestionStake} · đạt % mới nhận +{perQuestionStake}/câu đúng
+                </span>
+              ) : session.review || session.path?.review ? (
+                <span className="text-sky-700">Ôn lại · không tính XP</span>
               ) : (
-                <span className="text-emerald-600">Phục hồi · đạt +{stakeLabel} XP</span>
+                <span className="text-emerald-600">Phục hồi · không cược · XP không đổi</span>
               )}
             </p>
             <h2 className="mt-1 text-base font-black leading-snug text-slate-900 sm:text-lg">{question.prompt}</h2>
@@ -522,6 +548,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           answered={index + (result ? 1 : 0)}
           total={total}
           stakeXp={stakeXp}
+          quitLossXp={quitLossXp}
           mandatory={mandatory}
           quitting={quitting}
           onStay={() => setQuitOpen(false)}
@@ -656,9 +683,25 @@ function FireworkBurst() {
   ));
 }
 
-function RematchConfirm({ stakeXp, xpTotal, starting, onStay, onGo }) {
+/** Xác nhận cược XP — lần đầu bấm Làm / Bắt đầu hoặc Làm lại sau kết quả. */
+function StakeSessionConfirm({
+  variant = 'rematch',
+  stakeXp,
+  xpTotal,
+  starting,
+  recovery = false,
+  testOut = false,
+  testOutLocked = false,
+  onStay,
+  onGo,
+  onOpenMeet,
+}) {
   const betting = stakeXp > 0;
+  const isStart = variant === 'start';
+  const notEnoughXp = typeof xpTotal === 'number' && xpTotal < stakeXp;
+  const isBlockedFreeTestOut = testOut && testOutLocked;
   const [burst, setBurst] = useState(false);
+  const titleId = isStart ? 'dp-stake-start-title' : 'dp-rematch-title';
   useEffect(() => { gameSounds.pick(); }, []);
   useEffect(() => {
     if (!burst) return undefined;
@@ -674,6 +717,29 @@ function RematchConfirm({ stakeXp, xpTotal, starting, onStay, onGo }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onStay, starting, burst]);
 
+  let title = 'Bắt đầu lượt luyện?';
+  let body = '';
+  if (isBlockedFreeTestOut) {
+    title = 'Đặc quyền học viên gói Meet';
+    body = 'Kiểm tra vượt chặng là tính năng chỉ dành riêng cho học viên đã mua khóa / gói Google Meet. Vui lòng nâng cấp gói để mở khóa đặc quyền này và nhận +300 XP mỗi ngày!';
+  } else if (notEnoughXp) {
+    title = 'Không đủ XP để làm bài';
+    body = `Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet (+300 XP/ngày) để tiếp tục!`;
+  } else if (isStart) {
+    title = testOut ? 'Cược để vượt chặng?' : 'Cược XP trước khi làm?';
+    body = testOut
+      ? `Đặt ${stakeXp} XP. Đạt đủ điểm thì vượt chặng và nhận lại XP. Không đạt hoặc thoát giữa chừng thì mất trắng.`
+      : `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay. Đạt % yêu cầu mới nhận +${QUESTION_STAKE_XP}/câu đúng; không đạt thì không nhận XP câu đúng.`;
+  } else {
+    title = 'Cược lại một lần nữa?';
+    body = `Mỗi câu ${QUESTION_STAKE_XP} XP: sai trừ ngay. Đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`;
+  }
+
+  const primaryLabel = isStart
+    ? (testOut ? `Cược ${stakeXp} XP và bắt đầu` : `Bắt đầu (${stakeXp} XP tối đa)`)
+    : `Làm lại (${stakeXp} XP tối đa)`;
+  const PrimaryIcon = isStart ? Play : RotateCcw;
+
   return createPortal(
     <div
       className="fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden bg-slate-950/55 p-4 backdrop-blur-[2px]"
@@ -681,40 +747,48 @@ function RematchConfirm({ stakeXp, xpTotal, starting, onStay, onGo }) {
       onPointerDown={(event) => { if (event.target === event.currentTarget && !starting && !burst) onStay(); }}
     >
       {burst && <FireworkBurst />}
-      <div className="cms-goal-in relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white text-center shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="dp-rematch-title">
+      <div className="cms-goal-in relative w-full max-w-sm overflow-hidden rounded-[28px] bg-white text-center shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="relative bg-gradient-to-br from-amber-50 via-white to-orange-50 px-6 pb-5 pt-6">
           <span className="dp-twinkle absolute left-8 top-8 text-lg" aria-hidden="true">✦</span>
           <span className="dp-twinkle dp-twinkle-late absolute right-10 top-12 text-sm text-orange-400" aria-hidden="true">✦</span>
           <span className="dp-flame absolute right-7 top-6 text-orange-500" aria-hidden="true"><Flame size={22} className="fill-orange-400" /></span>
-          <Mascot mood="determined" size={132} className="relative mx-auto" />
-          <h2 id="dp-rematch-title" className="mt-1 text-xl font-black text-slate-900">
-            {betting ? 'Cược lại một lần nữa?' : 'Làm lại để lấy XP?'}
-          </h2>
-          <p className="mt-1.5 text-sm text-slate-600">
-            {betting
-              ? 'Lần này làm được. Đặt cược rồi vào ngay. Đạt thì nhận lại đủ, trượt hoặc thoát giữa chừng thì mất trắng.'
-              : 'Lượt phục hồi này không mất XP. Làm đạt là nhận XP về túi.'}
-          </p>
+          <Mascot mood={isBlockedFreeTestOut || notEnoughXp ? 'thinking' : 'determined'} size={132} className="relative mx-auto" />
+          <h2 id={titleId} className="mt-1 text-xl font-black text-slate-900">{title}</h2>
+          <p className="mt-1.5 text-sm text-slate-600">{body}</p>
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-800 ring-1 ring-amber-200">
             <Zap size={13} className="fill-amber-300 text-amber-500" aria-hidden="true" />
-            {betting ? `Cược ${stakeXp} XP` : `Đạt nhận +${SESSION_STAKE_XP} XP`}
+            {testOut ? `Cược ${stakeXp} XP` : `${QUESTION_STAKE_XP} XP/câu · tối đa ${stakeXp} XP`}
             {typeof xpTotal === 'number' ? ` · đang có ${xpTotal}` : ''}
           </p>
         </div>
         <div className="flex flex-col gap-2 p-5">
-          <button
-            type="button"
-            onClick={() => {
-              if (starting || burst) return;
-              setBurst(true);
-              gameSounds.win();
-            }}
-            disabled={starting || burst}
-            className="cms-btn cms-btn-primary w-full !py-3"
-          >
-            {starting || burst ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-            {betting ? `Cược ${stakeXp} XP và làm lại` : 'Làm lại ngay'}
-          </button>
+          {isBlockedFreeTestOut || notEnoughXp ? (
+            <button
+              type="button"
+              onClick={() => {
+                onStay();
+                onOpenMeet?.();
+              }}
+              className="cms-btn cms-btn-primary w-full !py-3"
+            >
+              <Crown size={16} className="text-amber-300" />
+              Nâng cấp gói Meet (+300 XP/ngày)
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (starting || burst) return;
+                setBurst(true);
+                gameSounds.win();
+              }}
+              disabled={starting || burst}
+              className="cms-btn cms-btn-primary w-full !py-3"
+            >
+              {starting || burst ? <Loader2 size={16} className="animate-spin" /> : <PrimaryIcon size={16} />}
+              {primaryLabel}
+            </button>
+          )}
           <button type="button" onClick={onStay} disabled={starting || burst} className="cms-btn cms-btn-outline w-full !py-2.5">
             Để sau
           </button>
@@ -725,12 +799,22 @@ function RematchConfirm({ stakeXp, xpTotal, starting, onStay, onGo }) {
   );
 }
 
+function clientStakeMeta(pick, stats) {
+  if (pick?.mode !== 'path') return null;
+  if (pick.review) return null;
+  const xpTotal = Number(stats?.xpTotal) || 0;
+  if (pick.testOut) return { stakeXp: TEST_OUT_XP, recovery: false, testOut: true };
+  // Luôn yêu cầu đủ SESSION_STAKE_XP (50 XP), không có recovery 0đ
+  return { stakeXp: SESSION_STAKE_XP, recovery: false, testOut: false };
+}
+
 function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
   const [rematchOpen, setRematchOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const pathResult = summary.path;
   const message = resultMessage(summary.stars);
   const good = summary.stars >= 2;
+  const xpDisplay = practiceFinishXpDisplay(summary);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -757,18 +841,10 @@ function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
             <p className="text-[11px] font-semibold text-slate-500">câu đúng</p>
           </div>
           <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
-            <p className={`text-2xl font-black tabular-nums ${summary.passed === false || summary.gainedXp < 0 ? 'text-red-600' : 'text-amber-600'}`}>
-              {summary.gainedXp > 0 ? `+${summary.gainedXp}` : summary.gainedXp < 0 ? summary.gainedXp : '0'}
+            <p className={`text-2xl font-black tabular-nums ${!xpDisplay.positive ? 'text-red-600' : 'text-amber-600'}`}>
+              {xpDisplay.prefix}{xpDisplay.amount}
             </p>
-            <p className="text-[11px] font-semibold text-slate-500">
-              {summary.xpDisabled
-                ? 'Không tính XP'
-                : summary.passed
-                  ? `Nhận ${summary.path?.testOut ? summary.gainedXp : (summary.xp || summary.gainedXp)} XP${summary.hintPenaltyXp ? ` (−${summary.hintPenaltyXp} gợi ý)` : ''}`
-                  : summary.failPenaltyXp
-                    ? `Mất trắng −${summary.failPenaltyXp} XP`
-                    : 'XP lượt này'}
-            </p>
+            <p className="text-[11px] font-semibold text-slate-500">{xpDisplay.caption}</p>
           </div>
           <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
             <p className="flex items-center justify-center gap-1 text-2xl font-black text-orange-600 tabular-nums">
@@ -832,8 +908,11 @@ function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
         )}
       </div>
       {rematchOpen && (
-        <RematchConfirm
-          stakeXp={summary.xpDisabled ? 0 : (summary.stakeXp > 0 ? (summary.stats?.sessionStakeXp || SESSION_STAKE_XP) : 0)}
+        <StakeSessionConfirm
+          stakeXp={summary.xpDisabled ? 0 : (
+            summary.path?.testOut ? TEST_OUT_XP
+              : (summary.recovery ? 0 : ((summary.total || 10) * QUESTION_STAKE_XP))
+          )}
           xpTotal={summary.stats?.xpTotal}
           starting={starting}
           onStay={() => setRematchOpen(false)}
@@ -871,6 +950,7 @@ export default function DailyPracticePage() {
   const [meetNotice, setMeetNotice] = useState('');
   const [requestedLesson, setRequestedLesson] = useState(null);
   const [welcomeTarget, setWelcomeTarget] = useState(null);
+  const [stakeConfirm, setStakeConfirm] = useState(null);
   const practiceLockRef = useRef(false);
 
   useEffect(() => {
@@ -988,8 +1068,22 @@ export default function DailyPracticePage() {
       setStarting(false);
     }
   };
+  const queueBegin = (pick) => {
+    const meta = clientStakeMeta(pick, overview?.stats);
+    if (!meta) {
+      begin(pick);
+      return;
+    }
+    setStakeConfirm({
+      pick,
+      ...meta,
+      xpTotal: overview?.stats?.xpTotal,
+    });
+  };
   const start = (topicId, difficulty) => begin({ mode: 'free', topicId, difficulty });
-  const startStep = (unitId, nodeKey, step, testOut = false) => begin({ mode: 'path', unitId, nodeKey, step, testOut });
+  const startStep = (unitId, nodeKey, step, testOut = false, opts = {}) => queueBegin({
+    mode: 'path', unitId, nodeKey, step, testOut, review: opts.review === true,
+  });
 
   const clearPracticeParam = useCallback(() => {
     setSearchParams((prev) => {
@@ -1025,7 +1119,7 @@ export default function DailyPracticePage() {
       practiceLockRef.current = false;
       return undefined;
     }
-    Promise.resolve(startStep(target.unit.id, target.nodeKey, target.step, false)).finally(() => {
+    Promise.resolve(queueBegin({ mode: 'path', unitId: target.unit.id, nodeKey: target.nodeKey, step: target.step, testOut: false })).finally(() => {
       practiceLockRef.current = false;
     });
     return undefined;
@@ -1041,7 +1135,7 @@ export default function DailyPracticePage() {
       return;
     }
     practiceLockRef.current = true;
-    Promise.resolve(startStep(target.unit.id, target.nodeKey, target.step, false)).finally(() => {
+    Promise.resolve(queueBegin({ mode: 'path', unitId: target.unit.id, nodeKey: target.nodeKey, step: target.step, testOut: false })).finally(() => {
       practiceLockRef.current = false;
     });
   };
@@ -1118,6 +1212,27 @@ export default function DailyPracticePage() {
           unitTitle={welcomeTarget.unit?.title}
           lessonLabel={welcomeTarget.level?.title || welcomeTarget.level?.label || ''}
           onEnter={enterWelcome}
+        />
+      )}
+      {stakeConfirm && !session && (
+        <StakeSessionConfirm
+          variant="start"
+          stakeXp={stakeConfirm.stakeXp}
+          xpTotal={stakeConfirm.xpTotal}
+          recovery={stakeConfirm.recovery}
+          testOut={stakeConfirm.testOut}
+          testOutLocked={stakeConfirm.testOut && path?.canTestOut !== true}
+          starting={starting}
+          onStay={() => setStakeConfirm(null)}
+          onOpenMeet={() => {
+            setStakeConfirm(null);
+            setMeetOfferOpen(true);
+          }}
+          onGo={() => {
+            const pick = stakeConfirm.pick;
+            setStakeConfirm(null);
+            begin(pick);
+          }}
         />
       )}
       {buyXpOpen && (

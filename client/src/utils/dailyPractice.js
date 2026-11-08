@@ -62,7 +62,9 @@ export const DIFFICULTIES = [
 export const difficultyMeta = (id) => DIFFICULTIES.find((d) => d.id === id) || DIFFICULTIES[0];
 /** XP đặt cược mỗi lượt luyện (khớp backend). */
 export const VIDEO_CHECK_ANSWER_XP = 5;
-export const SESSION_STAKE_XP = 20;
+export const QUESTION_STAKE_XP = 5;
+/** 10 câu × 5 XP/câu */
+export const SESSION_STAKE_XP = 50;
 /** Kiểm tra vượt: đạt được 40 XP, không đạt hoặc thoát mất 40 XP. */
 export const TEST_OUT_XP = 40;
 /** @deprecated dùng TEST_OUT_XP */
@@ -150,4 +152,58 @@ export function resultMessage(stars) {
   if (stars === 2) return { title: 'Rất tốt!', text: 'Chỉ sai vài câu. Xem lại phần giải thích để nhớ lâu hơn.' };
   if (stars === 1) return { title: 'Cố lên!', text: 'Bạn đang tiến bộ. Ôn lại các câu sai rồi chơi lại nhé.' };
   return { title: 'Đừng nản nhé!', text: 'Ai cũng bắt đầu từ đây. Thử độ khó Dễ để làm quen trước.' };
+}
+
+/** Trong lượt có cược: ví đã trừ stake — hiển thị tổng (ví + đang cược) cho khớp màn ngoài. */
+export function inPlayWalletXp(profileXp, stakeXp) {
+  const wallet = Math.max(0, Number(profileXp) || 0);
+  const stake = Math.max(0, Number(stakeXp) || 0);
+  return stake > 0 ? wallet + stake : wallet;
+}
+
+/**
+ * XP màn kết quả / celebration.
+ * gainedXp là thay đổi ròng ví; đạt chỉ hoàn cược → hiển thị +reward và giải thích ví giữ nguyên.
+ */
+export function practiceFinishXpDisplay(summary) {
+  if (!summary || summary.xpDisabled) {
+    return { amount: 0, prefix: '', caption: 'Không tính XP', positive: true };
+  }
+  const gained = Number(summary.gainedXp) || 0;
+  const reward = Math.max(0, Number(summary.xp) || 0);
+  const stake = Math.max(0, Number(summary.stakeXp) || 0);
+  const hintNote = summary.hintPenaltyXp ? ` (−${summary.hintPenaltyXp} gợi ý)` : '';
+
+  if (!summary.passed) {
+    return {
+      amount: gained,
+      prefix: gained < 0 ? '' : '+',
+      caption: gained < 0
+        ? `Ròng ${gained} XP · không đạt nên không nhận XP câu đúng`
+        : (stake ? `Mất trắng −${stake} XP` : 'XP lượt này'),
+      positive: false,
+    };
+  }
+  if (gained > 0) {
+    return {
+      amount: gained,
+      prefix: '+',
+      caption: `Lời +${gained} XP${hintNote}`,
+      positive: true,
+    };
+  }
+  if (reward > 0) {
+    return {
+      amount: reward,
+      prefix: '+',
+      caption: `Hoàn ${reward} XP cược · ví giữ nguyên${hintNote}`,
+      positive: true,
+    };
+  }
+  return {
+    amount: 0,
+    prefix: '',
+    caption: `Hoàn cược · ví giữ nguyên${hintNote}`,
+    positive: true,
+  };
 }

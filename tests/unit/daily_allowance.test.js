@@ -96,6 +96,22 @@ test('cùng ngày tài khoản miễn phí đang 200 thì hạ phần trong ngà
   assert.equal(next.xpTotal, 160);
 });
 
+test('sessionNetXp: net ví sau lượt path', () => {
+  assert.equal(rules.sessionNetXp({ mode: 'free', xp: 50 }), 0);
+  const twoWrong = [{ xp: -5 }, { xp: -5 }];
+  assert.equal(rules.sessionNetXp({ mode: 'path', status: 'finished', xp: 40, answers: twoWrong }), 30, 'đạt: +40 −10');
+  assert.equal(rules.sessionNetXp({ mode: 'path', status: 'finished', xp: 0, answers: twoWrong }), -10, 'trượt: chỉ trừ câu sai');
+  assert.equal(rules.sessionNetXp({ mode: 'path', testOut: true, stakeXp: 40, xp: 80, status: 'finished' }), 40);
+  assert.equal(rules.sessionNetXp({ mode: 'path', recovery: true, stakeXp: 0, xp: 20, status: 'finished' }), 20, 'phục hồi đạt');
+});
+
+test('sessionTodayDisplayXp: hero XP luyện hôm nay', () => {
+  const wrong = [{ xp: -5 }];
+  assert.equal(rules.sessionTodayDisplayXp({ mode: 'path', status: 'finished', xp: 25, answers: wrong }), 20);
+  assert.equal(rules.sessionTodayDisplayXp({ mode: 'path', status: 'finished', xp: 0, answers: wrong }), -5);
+  assert.equal(rules.sessionTodayDisplayXp({ mode: 'path', recovery: true, stakeXp: 0, xp: 20, status: 'finished' }), 20, 'phục hồi đạt');
+});
+
 test('trừ XP của gói trước, XP mua được cộng vào ví mua', () => {
   const spent = rules.applyXpDelta({ dailyXp: 200, purchasedXp: 100 }, -20, 'spend');
   assert.equal(spent.dailyXp, 180);

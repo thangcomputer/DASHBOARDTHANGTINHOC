@@ -154,7 +154,10 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9700] flex items-center justify-center bg-slate-950/45 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9700] flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-950/45 p-2 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <style>{`
         @keyframes free-meet-twinkle {
           0%, 100% { opacity: 0.15; transform: scale(0.45) rotate(0deg); }
@@ -185,26 +188,26 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
         }
       `}</style>
       <div
-        className="w-full max-w-4xl overflow-hidden rounded-[28px] border-2 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.35),0_0_48px_12px_rgba(255,255,255,0.55),0_25px_60px_-12px_rgba(0,0,0,0.45)]"
+        className="my-2 w-full max-w-4xl max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[28px] border-2 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.35),0_0_48px_12px_rgba(255,255,255,0.55),0_25px_60px_-12px_rgba(0,0,0,0.45)] sm:my-auto sm:max-h-[min(100dvh-2rem,920px)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="free-meet-plan-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-red-900 to-orange-600 px-5 py-5 text-white sm:px-6">
+        <div className="relative bg-gradient-to-r from-slate-950 via-red-900 to-orange-600 px-4 py-4 text-white sm:px-6 sm:py-5">
           <button type="button" onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 hover:bg-amber-100 !shadow-none">
             Đóng
           </button>
-          <div className="grid items-center gap-4 pr-12 sm:grid-cols-[168px_minmax(0,1fr)_252px] sm:gap-6">
+          <div className="grid items-start gap-4 pr-10 sm:pr-12 sm:grid-cols-[minmax(0,168px)_minmax(0,1fr)_minmax(0,252px)] sm:items-center sm:gap-6">
             <div className="flex flex-col items-center">
               <img
                 src="/giang-vien-phi-van-thang.png"
                 alt="Giảng viên Phí Văn Thắng"
-                className="h-32 w-32 rounded-full border-[3px] border-white object-cover object-top shadow-[0_0_28px_rgba(255,255,255,0.55)]"
+                className="h-24 w-24 rounded-full border-[3px] border-white object-cover object-top shadow-[0_0_28px_rgba(255,255,255,0.55)] sm:h-32 sm:w-32"
               />
-              <p className="mt-2 w-full rounded-2xl bg-white px-3 py-1.5 text-center shadow-sm">
+              <p className="mt-2 w-full max-w-[220px] rounded-2xl bg-white px-3 py-1.5 text-center shadow-sm">
                 <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Giảng viên</span>
-                <span className="mt-0.5 block whitespace-nowrap text-[15px] font-black tracking-tight text-black">Phí Văn Thắng</span>
+                <span className="mt-0.5 block text-[15px] font-black tracking-tight text-black">Phí Văn Thắng</span>
               </p>
               <p className="mt-2 text-center text-[11px] font-medium leading-5 text-white/90">
                 8 năm kinh nghiệm
@@ -213,18 +216,18 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
               </p>
             </div>
             <div className="min-w-0 text-center">
-              <h2 id="free-meet-plan-title" className="text-[1.65rem] font-black leading-none tracking-tight sm:text-[1.85rem]">
+              <h2 id="free-meet-plan-title" className="text-xl font-black leading-tight tracking-tight sm:text-[1.85rem] sm:leading-none">
                 <span className="relative inline-block px-1">
                   <GoldSparkles />
-                  <span className="free-meet-gold whitespace-nowrap">300 XP mỗi ngày</span>
+                  <span className="free-meet-gold">300 XP mỗi ngày</span>
                 </span>
-                <span className="mt-2.5 flex items-center justify-center gap-2 text-base font-black text-white">
+                <span className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-sm font-black text-white sm:mt-2.5 sm:gap-2 sm:text-base">
                   <span className="text-amber-200">+</span>
-                  học qua
-                  <img src={MEET_LOGO} alt="Google Meet" className="h-10 w-auto object-contain drop-shadow-md" draggable={false} />
+                  <span>học qua</span>
+                  <img src={MEET_LOGO} alt="Google Meet" className="h-8 w-auto object-contain drop-shadow-md sm:h-10" draggable={false} />
                 </span>
               </h2>
-              <div className="relative mx-auto mt-2 flex h-24 w-44 items-end justify-center">
+              <div className="relative mx-auto mt-2 flex h-20 w-full max-w-[11rem] items-end justify-center sm:h-24 sm:max-w-none sm:w-44">
                 <span
                   className="pointer-events-none absolute bottom-1 left-1/2 h-10 w-40 -translate-x-1/2 rounded-[50%] bg-white/40 blur-xl"
                   aria-hidden="true"
@@ -241,12 +244,12 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                 <span className="mt-0.5 block text-xs font-semibold text-white/90">cùng Thầy Thắng</span>
               </p>
             </div>
-            <div className="free-meet-run relative rounded-2xl p-[2px]">
+            <div className="free-meet-run relative w-full max-w-md rounded-2xl p-[2px] sm:max-w-none">
               <div className="relative z-[1] rounded-[14px] bg-gradient-to-br from-red-950/95 via-red-800/90 to-orange-700/90 px-4 py-3.5">
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-200">Quyền lợi</p>
                 <ul className="mt-3 space-y-2.5">
                   {['Học liên tục', 'Không giới hạn buổi học', 'Có video xem lại buổi học'].map((item) => (
-                    <li key={item} className="flex items-center gap-2.5 whitespace-nowrap text-[13px] font-bold text-white">
+                    <li key={item} className="flex items-start gap-2.5 text-left text-[13px] font-bold leading-snug text-white">
                       <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950">
                         <Check size={12} strokeWidth={3.5} aria-hidden="true" />
                       </span>
@@ -257,7 +260,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
               </div>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[11px] font-black">
+          <div className="mt-4 grid grid-cols-1 gap-2 text-center text-[11px] font-black min-[380px]:grid-cols-3">
             {MEET_SLOTS.map((slot) => (
               <span key={slot.label} className="rounded-2xl border border-white/25 bg-white/10 px-2 py-2">
                 <span className="block text-amber-200">{slot.label}</span>
@@ -266,7 +269,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
             ))}
           </div>
         </div>
-        <div className="px-5 py-5">
+        <div className="px-4 py-4 sm:px-5 sm:py-5">
           {notice && !paid ? (
             <p className="mb-3 rounded-2xl bg-amber-50 px-3 py-2 text-center text-sm font-black text-amber-900">{notice}</p>
           ) : null}
@@ -321,7 +324,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
                 {plans.map((plan) => {
                   const active = plan.id === selected.id;
                   return (
@@ -329,7 +332,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                       key={plan.id}
                       type="button"
                       onClick={() => setSelectedId(plan.id)}
-                      className={`group relative isolate overflow-visible rounded-2xl border-2 px-3 py-4 text-left !shadow-none transition duration-200 hover:-translate-y-0.5 ${active ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-amber-300'} ${plan.featured ? 'ring-2 ring-amber-300' : ''}`}
+                      className={`group relative isolate min-w-[9.5rem] shrink-0 snap-start overflow-visible rounded-2xl border-2 px-3 py-4 text-left !shadow-none transition duration-200 hover:-translate-y-0.5 sm:min-w-0 ${active ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-amber-300'} ${plan.featured ? 'ring-2 ring-amber-300' : ''}`}
                     >
                       <span
                         className="pointer-events-none absolute -inset-2 -z-10 rounded-[22px] bg-[radial-gradient(circle,rgba(251,191,36,0.95),rgba(249,115,22,0.55)_42%,transparent_70%)] opacity-0 blur-md transition duration-200 group-hover:opacity-100"
@@ -341,7 +344,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                       {plan.featured && <span className="absolute -top-2 right-2 z-[1] rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-amber-950">Nên chọn</span>}
                       <img src={MEET_LOGO} alt="" className="mb-1.5 h-8 w-auto object-contain" draggable={false} />
                       <span className="block text-base font-black tracking-tight text-slate-900">{plan.label}</span>
-                      <span className="mt-1 block whitespace-nowrap text-[11px] font-black text-amber-600">+300 XP mỗi ngày</span>
+                      <span className="mt-1 block text-[11px] font-black leading-tight text-amber-600">+300 XP mỗi ngày</span>
                       <span className="mt-0.5 block text-[11px] font-semibold text-slate-500">{plan.hint}</span>
                       <span className="mt-3 block text-sm font-black tracking-tight text-red-600">
                         {plan.price > 0 ? `${plan.price.toLocaleString('vi-VN')}đ` : 'Liên hệ'}

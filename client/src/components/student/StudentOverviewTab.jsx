@@ -16,6 +16,7 @@ import dailyPracticeApi from '../../services/dailyPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT } from '../../utils/learningGoal';
 import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } from '../../utils/scheduleTime';
 import { isFreePortalCourseName } from '../../utils/enrollments';
+import { isFreePortalLocked } from './dailyPractice/FreeFeatureLock';
 import meetClassApi from '../../services/meetClassApi';
 
 const RECENT_ACTIVITY_LIMIT = 5;
@@ -215,6 +216,11 @@ export default function StudentOverviewTab({
 
   useEffect(() => {
     let cancelled = false;
+    let session = null;
+    try {
+      session = JSON.parse(localStorage.getItem('student_user') || 'null');
+    } catch { /* ignore */ }
+    if (isFreePortalLocked(session)) return () => { cancelled = true; };
     api.quizzes.getStudentQuizzes()
       .then((res) => {
         if (!res?.success || cancelled) return;

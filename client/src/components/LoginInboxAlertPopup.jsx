@@ -12,6 +12,7 @@ import {
 import { LOGIN_OVERLAY_EVENT, getActiveLoginOverlayIds } from '../utils/loginOverlayGate';
 import { visibleInboxUnread } from '../lib/inboxUnread';
 import { LMS_PLAYER_OPEN_EVENT, isLmsPlayerOpen } from '../utils/lmsPlayerOverlay';
+import { isFreePortalLocked, isStudentSchedulesApiBlocked } from './student/dailyPractice/FreeFeatureLock';
 
 export const LOGIN_ALERT_STORAGE_PREFIX = 'cms_login_alert';
 
@@ -183,6 +184,11 @@ export default function LoginInboxAlertPopup({ role, userId, adminRole = '', blo
 
     const loadUpcoming = async () => {
       if (role !== 'student') return [];
+      let session = null;
+      try {
+        session = JSON.parse(localStorage.getItem('student_user') || 'null');
+      } catch { /* ignore */ }
+      if (isStudentSchedulesApiBlocked(session)) return [];
       try {
         const res = await api.schedules.getByStudent(userId);
         if (res?.success && Array.isArray(res.data) && res.data.length) {
@@ -201,7 +207,12 @@ export default function LoginInboxAlertPopup({ role, userId, adminRole = '', blo
     };
 
     const run = async () => {
-      if (typeof syncRef.current === 'function') {
+      let session = null;
+      try {
+        session = JSON.parse(localStorage.getItem('student_user') || 'null');
+      } catch { /* ignore */ }
+      const skipMsgSync = role === 'student' && isFreePortalLocked(session);
+      if (!skipMsgSync && typeof syncRef.current === 'function') {
         try { await syncRef.current(userId); } catch { /* ignore */ }
       }
       // Đợi React cập nhật messages — tránh đếm nhầm lời chào AI.

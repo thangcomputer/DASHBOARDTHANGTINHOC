@@ -55,7 +55,7 @@ const DROPLETS = [
 
 /**
  * Popup đặt mục tiêu học (giữa màn hình) + bộ đếm phút học cho học viên.
- * Hiện khi chưa có mục tiêu hoặc mục tiêu đã hết hạn; "Để sau" chỉ ẩn tới lần mở app sau.
+ * Hiện tự động khi chưa từng đặt mục tiêu; mục tiêu hết hạn không tự bật lại.
  */
 export function LearningGoalHost({ user }: { user: DemoUser }) {
   const enabled = user.role === 'student' && !user.previewMode;
@@ -92,7 +92,7 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
 
   useEffect(() => {
     if (!enabled || !data || open || dismissedRef.current) return;
-    if (data.goal && !data.goal.expired) return;
+    if (data.goal) return;
     setOpen(true);
   }, [data, enabled, open]);
 
@@ -113,7 +113,7 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
   }, [enabled]);
 
   if (!enabled) return null;
-  const goalSettled = Boolean(data) && !open && (Boolean(data?.goal && !data.goal.expired) || dismissedRef.current);
+  const goalSettled = Boolean(data) && !open && (Boolean(data?.goal) || dismissedRef.current);
   return (
     <>
       <DailyPracticeReminder userId={user.id} ready={goalSettled && !pinLocked} />

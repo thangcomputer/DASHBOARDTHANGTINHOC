@@ -6,6 +6,7 @@ import { loadState } from './dataStorage';
 import { resolveMessagingActor, normalizeMessage } from '../lib/messagingIdentity';
 import { sortConversationsByLastMessageAt } from '../lib/conversationList';
 import { isAiSupportConversationId } from '../utils/aiSupport';
+import { isFreePortalLocked } from '../components/student/dailyPractice/FreeFeatureLock';
 
 /** Tin người thật chưa đọc — bỏ hệ thống / AI / thu hồi (khớp badge “cần xử lý”). */
 function countsAsHumanUnread(msg, viewerId) {
@@ -394,6 +395,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
 
   const syncMessages = useCallback(async (userId) => {
     if (!userId) return;
+    if (currentUser?.role === 'student' && isFreePortalLocked(currentUser)) return;
     try {
       const json = await api.messages.syncByUser(userId);
       if (json.success) {
@@ -454,7 +456,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
     } catch (err) {
       console.log('Sync messages failed', err);
     }
-  }, []);
+  }, [currentUser]);
 
   // ── Soft Delete Message (Chỉ ẩn phía người dùng) ──
   const softDeleteMessage = useCallback(async (msgId) => {

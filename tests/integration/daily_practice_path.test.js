@@ -34,6 +34,32 @@ test('computeUnits: chặng sau mở khi chặng trước xong; bước sau mở
   assert.equal(firstQuiz.levels.find((s) => s.key === 'challenge').passPercent, 60);
 });
 
+test('quyền kiểm tra vượt lấy theo trạng thái gói đang hiệu lực, không theo cờ freePortal', () => {
+  const now = new Date('2026-11-08T00:00:00.000Z');
+  const paidStudent = {
+    freePortal: true,
+    subscription: {
+      plan: '3m',
+      activatedAt: new Date('2026-10-01T00:00:00.000Z'),
+      expiresAt: new Date('2027-02-08T00:00:00.000Z'),
+    },
+  };
+  assert.equal(pathService.hasTestOutAccess(paidStudent, now), true);
+  assert.equal(pathService.hasTestOutAccess({
+    freePortal: true,
+    subscription: { plan: '3m', expiresAt: new Date('2026-11-07T00:00:00.000Z') },
+  }, now), false);
+
+  const pathView = read('client/src/components/student/dailyPractice/PathView.jsx');
+  assert.ok(pathView.includes('canTestOut={path?.canTestOut === true}'));
+  assert.ok(pathView.includes('onClick={onUpgrade}'));
+  assert.ok(!pathView.includes('isFreePortalAccount'));
+
+  const practicePage = read('client/src/components/student/dailyPractice/DailyPracticePage.jsx');
+  assert.ok(practicePage.includes('testOutLocked={stakeConfirm.testOut && path?.canTestOut !== true}'));
+  assert.ok(!practicePage.includes('isFreePortal={isFreePortalAccount()}'));
+});
+
 test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần tự, kiểm tra vượt chặng', { skip: dbSkip }, async () => {
   const service = require('../../services/dailyPracticeService');
   const Student = require('../../models/Student');
@@ -163,7 +189,7 @@ test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần t
       stepLabel: 'Vừa',
       kind: 'quiz',
     });
-    assert.ok(result.gainedXp > 0, 'lộ trình vẫn cộng XP + chuỗi ngày');
+    assert.equal(result.gainedXp, 0, 'đạt lượt có cược: hoàn cược, ví ròng 0');
 
     const quizNodes = ['practice-1', 'challenge', 'practice-2', 'complete'];
     for (const nodeKey of quizNodes) {

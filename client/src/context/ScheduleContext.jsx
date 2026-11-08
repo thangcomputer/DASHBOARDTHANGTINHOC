@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import api from '../services/api';
 import { mapSchedule } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
+import { isStudentSchedulesApiBlocked } from '../components/student/dailyPractice/FreeFeatureLock';
 
 const ScheduleContext = createContext(null);
 
@@ -16,7 +17,10 @@ const SCHEDULE_SOCKET_EVENTS = [
 function scheduleKey(user) {
   if (!user?.role) return null;
   const id = user.id || user._id;
-  if (user.role === 'student') return ['schedules', 'student', id];
+  if (user.role === 'student') {
+    if (isStudentSchedulesApiBlocked(user)) return null;
+    return ['schedules', 'student', id];
+  }
   if (['admin', 'staff', 'teacher'].includes(user.role)) return ['schedules', user.role, id];
   return null;
 }

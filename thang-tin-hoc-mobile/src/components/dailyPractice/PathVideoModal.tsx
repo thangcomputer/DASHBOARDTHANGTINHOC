@@ -7,6 +7,7 @@ import { resolveMobilePublicUrl } from '../../services/apiClient';
 import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../../utils/videoSource';
 import { dailyPracticeApi, type DpPathUnit, type DpUnitVideos } from '../../services/dailyPracticeApi';
 import { noteStudyMediaProgress } from '../../services/studyActivity';
+import type { GameSound } from './useGameSounds';
 import { spacing } from '../../theme/tokens';
 
 type PlaylistItem = { id: string; title: string; url: string; source: 'unit' | 'step' | 'lesson'; locked: boolean; stepLabel?: string };

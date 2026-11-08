@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Award, Clock, HelpCircle, User, X } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 import api from '../../services/api';
+import { isFreePortalLocked } from './dailyPractice/FreeFeatureLock';
 import {
   hasBlockingLoginOverlay,
   setLoginOverlay,
@@ -96,6 +97,11 @@ export default function StudentQuizInviteHost() {
   useEffect(() => {
     let cancelled = false;
     const timers = [];
+    let session = null;
+    try {
+      session = JSON.parse(localStorage.getItem('student_user') || 'null');
+    } catch { /* ignore */ }
+    if (isFreePortalLocked(session)) return () => { cancelled = true; };
 
     (async () => {
       try {

@@ -23,7 +23,7 @@ import { buildStudentActivityLogs, isStudentScheduleLog, isStudentScoreLog } fro
 import { MilestoneEvaluationModal } from './student/MilestoneEvaluationModal';
 import { StudentNoteModal } from './student/StudentNoteModal';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
-import { useFreePortalLock, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
+import { isFreePortalLocked, useFreePortalLock, useFreePortalMenu } from './student/dailyPractice/FreeFeatureLock';
 import FreeFeatureLock from './student/dailyPractice/FreeFeatureLock';
 import {
   StudentLazyEvaluationTab,
@@ -137,6 +137,7 @@ const StudentDashboard = () => {
     session = {};
   }
   const STUDENT_ID = session.id || session._id || null;
+  const freePortalApiLocked = isFreePortalLocked(session);
   const { students, teachers, getSchedulesByStudent, rateTeacher, getTeacherRating, RATING_CRITERIA, privateEvaluations, submitPrivateEvaluation, studentTrainingData, examSubjectsCatalog } = useData();
   const { setSchedulesLocal } = useScheduleContext();
   const student = students.find(s => String(s.id) === String(STUDENT_ID));
@@ -329,7 +330,7 @@ const StudentDashboard = () => {
   };
 
   const fetchMyAssignments = useCallback(() => {
-    if (!STUDENT_ID) return;
+    if (!STUDENT_ID || freePortalApiLocked) return;
     const names = [...new Set(
       (enrollments || [])
         .map((e) => String(e.courseName || e.name || '').trim())
@@ -363,7 +364,7 @@ const StudentDashboard = () => {
         setMyAssignments(merged);
       })
       .catch(() => {});
-  }, [enrollments, viewStudent?.course, studentData?.course, STUDENT_ID]);
+  }, [enrollments, viewStudent?.course, studentData?.course, STUDENT_ID, freePortalApiLocked]);
 
   useEffect(() => {
     fetchMyAssignments();
@@ -452,12 +453,12 @@ const StudentDashboard = () => {
   const [myQuizzes, setMyQuizzes] = useState([]);
 
   const fetchMyQuizzes = useCallback(async () => {
-    if (!STUDENT_ID) return;
+    if (!STUDENT_ID || freePortalApiLocked) return;
     try {
       const res = await api.quizzes.getStudentQuizzes();
       if (res.success) setMyQuizzes(res.data || []);
     } catch { /* ignore */ }
-  }, [STUDENT_ID]);
+  }, [STUDENT_ID, freePortalApiLocked]);
 
   useEffect(() => {
     fetchMyQuizzes();
@@ -516,7 +517,7 @@ const StudentDashboard = () => {
   }, [submittedMilestones, submittedMilestonesStorageKey]);
 
   useEffect(() => {
-    if (!STUDENT_ID) {
+    if (!STUDENT_ID || freePortalApiLocked) {
       setMilestoneEvalsReady(true);
       return undefined;
     }
@@ -543,7 +544,7 @@ const StudentDashboard = () => {
       if (!cancelled) setMilestoneEvalsReady(true);
     });
     return () => { cancelled = true; };
-  }, [STUDENT_ID]);
+  }, [STUDENT_ID, freePortalApiLocked]);
 
   // Popup đánh giá mốc: buổi 1 (GV) | hết khóa (trung tâm → GV trong MỘT modal)
   useEffect(() => {

@@ -24,8 +24,8 @@ import { useGameSounds, type GameSound } from '../components/dailyPractice/useGa
 import { LEARNING_GOAL_CHANGED_EVENT } from '../services/learningGoalApi';
 import { getMobileImageSource } from '../services/apiClient';
 import {
-  DP_DIFFICULTIES, DP_TOPIC_COLORS, DP_TYPES, dailyPracticeApi, playQuestionHeaderChips, randomComfort, randomPraise, resultMessage, unitColor,
-  type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpStepKey,
+  DP_DIFFICULTIES, DP_PLAN_XP_CAP, DP_PLANS, DP_TOPIC_COLORS, DP_TYPES, dailyPracticeApi, dpIsPro, dpXpCapReached, playQuestionHeaderChips, randomComfort, randomPraise, resultMessage, unitColor,
+  type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpPlanType, type DpStepKey,
   type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath,
 } from '../services/dailyPracticeApi';
 import { colors, spacing } from '../theme/tokens';
@@ -84,9 +84,74 @@ const MODES: Array<{ id: PracticeMode; label: string; icon: LucideIcon }> = [
 ];
 type PracticeMode = 'path' | 'free';
 
+// ── Thanh XP ngày (gói miễn phí) ─────────────────────────────────────────────
+
+/** Thanh tiến độ XP ngày — hiển thị 60 XP free / ngày và kích thích mua gói. */
+function XpCapBar({ earned, cap }: { earned: number; cap: number }) {
+  const pct = Math.min(1, earned / cap);
+  const full = pct >= 1;
+  const remaining = Math.max(0, cap - earned);
+  return (
+    <View style={styles.xpCapWrap}>
+      <View style={styles.xpCapRow}>
+        <View style={styles.xpCapLabelRow}>
+          <Zap size={12} color={full ? '#DC2626' : '#D97706'} fill={full ? '#FCA5A5' : '#FCD34D'} />
+          <Text style={[styles.xpCapLabel, full && styles.xpCapLabelFull]}>
+            {full ? 'Đã đạt giới hạn XP miễn phí' : `XP miễn phí hôm nay: ${earned} / ${cap}`}
+          </Text>
+        </View>
+        <Text style={[styles.xpCapPct, full && styles.xpCapLabelFull]}>{`${Math.round(pct * 100)}%`}</Text>
+      </View>
+      <View style={styles.xpCapTrack}>
+        <View style={[styles.xpCapFill, { width: `${pct * 100}%` as unknown as number, backgroundColor: full ? '#EF4444' : '#F59E0B' }]} />
+      </View>
+      <Text style={styles.xpCapHint}>
+        {full
+          ? '⛔ Hết lượt — chỉ ôn bài cũ. Mua gói để '
+          : `Còn ${remaining} XP hôm nay. Mua gói để `}
+        <Text style={styles.xpCapHintBold}>{'mở bài mới & nhận 300 XP/ngày →'}</Text>
+      </Text>
+    </View>
+  );
+}
+
+// ── Banner hết XP free — chặn mở bài mới ─────────────────────────────────────
+/** Card cảnh báo khi học viên free hết 60 XP/ngày — chỉ ôn bài cũ được. */
+function XpCapBanner({ onBuyPress }: { onBuyPress: () => void }) {
+  return (
+    <View style={styles.xpCapBanner}>
+      <View style={styles.xpCapBannerTop}>
+        <Lock size={18} color="#B91C1C" />
+        <Text style={styles.xpCapBannerTitle}>Đã hết {DP_PLAN_XP_CAP.free} XP miễn phí hôm nay</Text>
+      </View>
+      <Text style={styles.xpCapBannerDesc}>
+        {'Bạn vẫn có thể ôn lại các bài đã học, nhưng '}
+        <Text style={styles.xpCapBannerBold}>không thể mở khóa bài tiếp theo</Text>
+        {' cho đến ngày mai hoặc khi mua gói (+300 XP/ngày).'}
+      </Text>
+      <View style={styles.xpCapBannerPlans}>
+        {DP_PLANS.filter((p) => p.id !== 'free').map((plan) => (
+          <View key={plan.id} style={styles.xpCapPlanRow}>
+            <Zap size={13} color="#D97706" fill="#FCD34D" />
+            <Text style={styles.xpCapPlanText}>
+              <Text style={styles.xpCapPlanBold}>{plan.label}</Text>
+              {` (${plan.priceText}) — +300 XP/ngày`}
+              {plan.badge ? <Text style={styles.xpCapPlanBadge}>{` · ${plan.badge}`}</Text> : null}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <Pressable onPress={onBuyPress} style={styles.xpCapBannerBtn} accessibilityRole="button">
+        <Crown size={16} color="#FFFFFF" />
+        <Text style={styles.xpCapBannerBtnText}>Nâng cấp gói Google Meet ngay</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function HomeView({
   topics, stats, loading, error, starting, onStart, play, initialTopicId = '',
-  mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onPathChanged,
+  mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onPathChanged, onBuyXp,
 }: {
   topics: DpTopic[];
   stats: DpStats | null;
@@ -103,6 +168,8 @@ function HomeView({
   pathError: string;
   onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean) => void;
   onPathChanged: () => void;
+  /** Điều hướng đến màn mua gói XP. */
+  onBuyXp: () => void;
 }) {
   const [topicId, setTopicId] = useState('');
   const [difficulty, setDifficulty] = useState<DpDifficulty>('easy');
@@ -150,7 +217,16 @@ function HomeView({
             </View>
           ))}
         </View>
+        {/* Thanh tiến độ XP ngày — chỉ hiện với gói miễn phí */}
+        {stats && !dpIsPro(stats.planType) && stats.todayXpCap ? (
+          <XpCapBar earned={stats.todayXp || 0} cap={stats.todayXpCap} />
+        ) : null}
       </View>
+
+      {/* Banner chặn mở bài mới khi free hết 60 XP — hiển thị nổi bật */}
+      {stats && dpXpCapReached(stats) ? (
+        <XpCapBanner onBuyPress={onBuyXp} />
+      ) : null}
 
       <View style={styles.modeTabs} accessibilityRole="tablist">
         {MODES.map(({ id, label, icon: Icon }) => {
@@ -1171,19 +1247,25 @@ function RelatedLessonCard({ lesson }: { lesson: DpRelatedLesson }) {
   );
 }
 
-function ResultView({ summary, play, starting, onReplay, onHome, onNextStep }: {
+function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onBuyXp }: {
   summary: DpSummary;
   play: (s: GameSound) => void;
   starting: boolean;
   onReplay: () => void;
   onHome: () => void;
   onNextStep: (next: DpNextStep) => void;
+  /** Điều hướng đến màn mua gói khi free hết XP. */
+  onBuyXp: () => void;
 }) {
   const pathResult = summary.path || null;
   const nextStep = pathResult?.passed ? pathResult.next : null;
   const good = summary.stars >= 2;
   const message = resultMessage(summary.stars);
   const stars = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
+  /** Lượt này không tính XP do hết 60 XP free/ngày. */
+  const capReached = Boolean(summary.xpCapReached || summary.xpDisabled);
+  /** Khi cap reached: chặn nút mở bài tiếp theo, chỉ cho ôn lại. */
+  const canProceedToNext = nextStep && !capReached;
 
   useEffect(() => {
     Animated.stagger(180, stars.map((value, i) => Animated.spring(value, {
@@ -1207,13 +1289,37 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep }: {
         <Text style={[styles.muted, styles.center]}>{message.text}</Text>
         <View style={styles.resultStats}>
           <View style={styles.resultStat}><Text style={[styles.resultValue, { color: '#059669' }]}>{`${summary.correctCount}/${summary.total}`}</Text><Text style={styles.statLabel}>câu đúng</Text></View>
-          <View style={styles.resultStat}><Text style={[styles.resultValue, { color: '#D97706' }]}>{`+${summary.gainedXp}`}</Text><Text style={styles.statLabel}>{summary.bonusXp ? `XP (thưởng +${summary.bonusXp})` : 'XP'}</Text></View>
+          <View style={styles.resultStat}>
+            <Text style={[styles.resultValue, { color: capReached ? '#94A3B8' : summary.gainedXp < 0 ? '#DC2626' : summary.gainedXp > 0 ? '#D97706' : '#64748B' }]}>
+              {capReached ? '—' : summary.gainedXp > 0 ? `+${summary.gainedXp}` : summary.gainedXp < 0 ? String(summary.gainedXp) : '0'}
+            </Text>
+            <Text style={styles.statLabel}>{capReached ? 'Hết XP free' : 'XP ròng lượt này'}</Text>
+          </View>
           <View style={styles.resultStat}>
             <View style={styles.inline}><Flame size={20} color="#EA580C" fill="#FDBA74" /><Text style={[styles.resultValue, { color: '#EA580C' }]}>{summary.stats.streak}</Text></View>
             <Text style={styles.statLabel}>{summary.streakIncreased ? 'chuỗi ngày tăng!' : 'ngày liên tiếp'}</Text>
           </View>
         </View>
       </View>
+
+      {/* Banner hết XP free — chặn mở bài mới, kích thích mua gói */}
+      {capReached ? (
+        <View style={styles.resultCapBanner}>
+          <View style={styles.xpCapBannerTop}>
+            <Lock size={16} color="#B91C1C" />
+            <Text style={styles.xpCapBannerTitle}>Đã dùng hết {DP_PLAN_XP_CAP.free} XP miễn phí hôm nay</Text>
+          </View>
+          <Text style={styles.xpCapBannerDesc}>
+            {'Streak & tiến độ bài cũ vẫn được ghi nhận. Nhưng để '}
+            <Text style={styles.xpCapBannerBold}>mở khóa bài tiếp theo</Text>
+            {' bạn cần nâng cấp gói (+300 XP/ngày).'}
+          </Text>
+          <Pressable onPress={onBuyXp} style={styles.xpCapBannerBtn} accessibilityRole="button">
+            <Crown size={15} color="#FFFFFF" />
+            <Text style={styles.xpCapBannerBtnText}>Nâng cấp gói Google Meet ngay</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {pathResult ? <PathResultCard result={pathResult} /> : null}
       {summary.relatedLesson ? <RelatedLessonCard lesson={summary.relatedLesson} /> : null}
@@ -1236,15 +1342,21 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep }: {
           <ArrowLeft size={17} color={colors.ink} />
           <Text style={styles.secondaryText}>{pathResult ? 'Về lộ trình' : 'Chủ đề khác'}</Text>
         </Pressable>
-        {nextStep ? (
+        {canProceedToNext ? (
           <Pressable onPress={() => onNextStep(nextStep)} disabled={starting} style={[styles.primary, styles.flex, starting && styles.disabled]} accessibilityRole="button">
             {starting ? <ActivityIndicator color="#FFFFFF" /> : <Play size={17} color="#FFFFFF" />}
             <Text numberOfLines={1} style={styles.primaryText}>{`Tiếp: ${nextStep.stepLabel}`}</Text>
           </Pressable>
+        ) : capReached && nextStep ? (
+          /* Có bài tiếp nhưng hết XP — hiện nút mua thay nút tiếp */
+          <Pressable onPress={onBuyXp} style={[styles.primary, styles.flex, { backgroundColor: '#7C3AED' } as never]} accessibilityRole="button">
+            <Crown size={17} color="#FFFFFF" />
+            <Text style={styles.primaryText}>Mua gói để tiếp</Text>
+          </Pressable>
         ) : (
           <Pressable onPress={onReplay} disabled={starting} style={[styles.primary, styles.flex, starting && styles.disabled]} accessibilityRole="button">
             <RotateCcw size={17} color="#FFFFFF" />
-            <Text style={styles.primaryText}>{pathResult && !pathResult.passed ? 'Làm lại' : 'Chơi lại'}</Text>
+            <Text style={styles.primaryText}>{pathResult && !pathResult.passed ? 'Làm lại' : 'Ôn lại'}</Text>
           </Pressable>
         )}
       </View>
@@ -1326,6 +1438,10 @@ export function DailyPracticeScreen() {
     load();
     loadPath();
   };
+  /** TODO: điều hướng đến màn mua gói XP khi có màn đó. */
+  const goToBuyXp = () => {
+    // navigation.navigate('XpPackages');
+  };
 
   return (
     <AppScreen scroll={false}>
@@ -1342,7 +1458,7 @@ export function DailyPracticeScreen() {
               setSession(null);
               setSummary(data);
               setCelebrating(true);
-              setStats((prev) => (prev ? { ...prev, ...data.stats, todayXp: (prev.todayXp || 0) + data.gainedXp } : data.stats));
+              setStats((prev) => (prev ? { ...prev, ...data.stats } : data.stats));
               DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT, null);
               scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}
@@ -1361,6 +1477,7 @@ export function DailyPracticeScreen() {
             onReplay={() => { if (lastPick) void begin(lastPick); }}
             onNextStep={(next) => { void startStep(next.unitId, next.nodeKey || 'study', next.step); }}
             onHome={goHome}
+            onBuyXp={goToBuyXp}
           />
         ) : (
           <HomeView
@@ -1380,6 +1497,7 @@ export function DailyPracticeScreen() {
             pathError={pathError}
             onStartStep={(unitId, nodeKey, step, testOut) => { void startStep(unitId, nodeKey, step, testOut); }}
             onPathChanged={loadPath}
+            onBuyXp={goToBuyXp}
           />
         )}
       </ScrollView>
@@ -1710,4 +1828,34 @@ const styles = StyleSheet.create({
   pathResultBad: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
   pathResultIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   pathResultTitle: { fontSize: 14, fontWeight: '900' },
+  xpCapWrap: { gap: 6, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A' },
+  xpCapRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  xpCapLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  xpCapLabel: { color: '#B45309', fontSize: 12, fontWeight: '800' },
+  xpCapLabelFull: { color: '#DC2626' },
+  xpCapPct: { color: '#B45309', fontSize: 12, fontWeight: '900' },
+  xpCapTrack: { height: 8, borderRadius: 999, backgroundColor: '#FEF3C7', overflow: 'hidden' },
+  xpCapFill: { height: '100%', borderRadius: 999 },
+  xpCapHint: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  xpCapHintBold: { color: '#B45309', fontWeight: '900' },
+  xpCapBanner: {
+    padding: spacing.md, borderRadius: 20, borderWidth: 1.5, borderColor: '#FECACA', backgroundColor: '#FEF2F2', gap: 10,
+  },
+  xpCapBannerTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  xpCapBannerTitle: { color: '#991B1B', fontSize: 15, fontWeight: '900' },
+  xpCapBannerDesc: { color: '#475569', fontSize: 13, lineHeight: 18 },
+  xpCapBannerBold: { color: '#991B1B', fontWeight: '900' },
+  xpCapBannerPlans: { gap: 6, paddingVertical: 4 },
+  xpCapPlanRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  xpCapPlanText: { color: '#334155', fontSize: 12 },
+  xpCapPlanBold: { color: '#0F172A', fontWeight: '900' },
+  xpCapPlanBadge: { color: '#059669', fontWeight: '900', fontSize: 11 },
+  xpCapBannerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44,
+    borderRadius: 12, backgroundColor: '#DC2626',
+  },
+  xpCapBannerBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  resultCapBanner: {
+    padding: spacing.md, borderRadius: 18, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB', gap: 8,
+  },
 });

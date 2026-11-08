@@ -3,6 +3,7 @@ import api from '../services/api';
 import { mapStudent, mapSchedule } from '../lib/entityMaps';
 import { useSocket } from './SocketContext';
 import { loadState } from './dataStorage';
+import { isFreePortalLocked, isStudentSchedulesApiBlocked } from '../components/student/dailyPractice/FreeFeatureLock';
 
 /**
  * Background sync, system logs for DataProvider.
@@ -45,6 +46,7 @@ export function useDataSync({
     inFlightSyncRef.current = (async () => {
     try {
       const isStudent = currentUser.role === 'student';
+      const freePortalApiLocked = isStudent && isFreePortalLocked(currentUser);
       const isAdmin = currentUser.role === 'admin' || currentUser.role === 'staff';  // ⭐ Staff cũng cần fetch teachers/transactions
 
       const promises = [];
@@ -63,11 +65,15 @@ export function useDataSync({
       }
       if (isStudent) {
         promises.push(api.students.getById(currentUser.id || currentUser._id).catch(() => ({ success: false })));
-        promises.push(api.schedules.getByStudent(currentUser.id || currentUser._id).catch(() => ({ success: false })));
+        promises.push(isStudentSchedulesApiBlocked(currentUser)
+          ? Promise.resolve({ success: false })
+          : api.schedules.getByStudent(currentUser.id || currentUser._id).catch(() => ({ success: false })));
       }
 
       // Handle Groups (everyone except student has groups at this index)
-      promises.push(api.messages.getGroups(currentUser.id || currentUser._id).catch(() => ({ success: false })));
+      promises.push(freePortalApiLocked
+        ? Promise.resolve({ success: false })
+        : api.messages.getGroups(currentUser.id || currentUser._id).catch(() => ({ success: false })));
 
       // Fetch only the training dataset needed by the current role.
       const isAdminTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_training')) : false;

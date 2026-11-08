@@ -180,7 +180,8 @@ test('lượt chơi đầy đủ: bắt đầu → trả lời → gợi ý → 
     await service.useHint(studentId, session.id, { questionId: byType.mcq.id });
     const mcq = await service.answerQuestion(studentId, session.id, { questionId: byType.mcq.id, answer: CORRECT.mcq });
     assert.equal(mcq.correct, true);
-    assert.equal(mcq.xp, 5, 'đã dùng gợi ý nên nửa XP');
+    assert.equal(mcq.xp, 0, 'luyện tự do không cộng XP từng câu');
+    assert.ok(session.xpDisabled || session.mode === 'free');
     await assert.rejects(service.answerQuestion(studentId, session.id, { questionId: byType.mcq.id, answer: CORRECT.mcq }), { status: 409 });
     await assert.rejects(service.useHint(studentId, session.id, { questionId: byType.mcq.id }), { status: 409 });
 
@@ -196,15 +197,18 @@ test('lượt chơi đầy đủ: bắt đầu → trả lời → gợi ý → 
     const summary = await service.finishSession(studentId, session.id);
     assert.equal(summary.correctCount, 5);
     assert.equal(summary.stars, 2);
-    assert.equal(summary.xp, 5 + 4 * 10);
-    assert.equal(summary.bonusXp, 10, '5/6 ≥ 80% được thưởng');
+    assert.equal(summary.xp, 0);
+    assert.equal(summary.bonusXp, 0);
+    assert.equal(summary.gainedXp, 0, 'luyện tự do không đổi ví');
+    assert.equal(summary.xpDisabled, true);
+    assert.equal(summary.passed, true, '≥60% vẫn tính đạt lượt tự do');
     assert.equal(summary.stats.streak, 1);
     assert.equal(summary.streakIncreased, true);
     assert.deepEqual(summary.review.map((r) => r.type), ['order']);
     await assert.rejects(service.finishSession(studentId, session.id), { status: 409 });
 
     const profile = await DailyPracticeProfile.findOne({ studentId }).lean();
-    assert.equal(profile.xpTotal, 55);
+    assert.equal(profile.xpTotal, 200, 'mới tạo hồ sơ nhận allowance ngày, không cộng từ luyện tự do');
 
     await new Promise((resolve) => { setTimeout(resolve, 200); });
     const log = await StudyTimeLog.findOne({ studentId }).lean();
@@ -212,7 +216,7 @@ test('lượt chơi đầy đủ: bắt đầu → trả lời → gợi ý → 
 
     const now = new Date();
     const xpMap = await service.xpByStudent(new Date(now.getTime() - 3600e3), new Date(now.getTime() + 3600e3), [studentId]);
-    assert.equal(xpMap.get(String(studentId)), 55, 'XP tuần cho bảng xếp hạng');
+    assert.equal(xpMap.get(String(studentId)) || 0, 0, 'BXH tuần tính net XP lộ trình, không gồm luyện tự do');
 
     const again = await service.startSession(studentId, { topicId, difficulty: 'hard' });
     assert.equal(again.total, 6, 'thiếu câu đúng độ khó thì bù từ độ khó khác cùng chủ đề');

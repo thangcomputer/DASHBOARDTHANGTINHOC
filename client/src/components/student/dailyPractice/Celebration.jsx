@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Flame, Gift, Target, Timer, Zap } from 'lucide-react';
 import { gameSounds } from '../../../utils/sound';
+import { practiceFinishXpDisplay } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
 
 function useCountUp(target, duration = 900) {
@@ -49,7 +50,8 @@ function StageShell({ children, button, onNext }) {
 }
 
 function DoneStage({ summary, onNext }) {
-  const xp = useCountUp(summary.gainedXp);
+  const xpDisplay = practiceFinishXpDisplay(summary);
+  const xp = useCountUp(xpDisplay.amount);
   const good = summary.stars >= 2;
   useEffect(() => {
     if (good) gameSounds.win();
@@ -59,8 +61,9 @@ function DoneStage({ summary, onNext }) {
     <StageShell button="Nhận XP" onNext={onNext}>
       <div className="dp-fly-in"><Mascot mood={good ? 'celebrate' : 'sad'} size={150} /></div>
       <h2 className="text-3xl font-black text-sky-600">{good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!'}</h2>
+      <p className="max-w-xs text-xs font-semibold text-slate-500">{xpDisplay.caption}</p>
       <div className="grid w-full grid-cols-3 gap-2.5">
-        <StatCard label="Tổng XP" tone="#F59E0B" icon={Zap} value={xp} delay={150} />
+        <StatCard label="Nhận về" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
         <StatCard label="Combo" tone="#0EA5E9" icon={Target} value={`x${summary.maxCombo || 0}`} delay={300} />
         <StatCard label="Thời gian" tone="#10B981" icon={Timer} value={formatDuration(summary.durationSeconds)} delay={450} />
       </div>

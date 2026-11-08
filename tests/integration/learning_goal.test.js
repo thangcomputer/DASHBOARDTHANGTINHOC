@@ -242,16 +242,18 @@ test('API chỉ dành cho học viên và dùng chung cho web + mobile', () => {
   assert.ok(mobileApi.includes("'/lesson-practice/my/study-heartbeat'"));
 });
 
-test('popup tự mở khi chưa có / hết hạn mục tiêu, không đè khóa PIN trên mobile', () => {
+test('popup chỉ tự mở khi chưa từng đặt mục tiêu, không đè khóa PIN trên mobile', () => {
   const layout = read('client/src/components/DashboardLayout.jsx');
-  assert.ok(layout.includes('if (goal && !goal.expired) return;'));
+  assert.ok(layout.includes('if (goal) return;'));
+  assert.ok(layout.includes('const goalPromptPending = !goal && sessionStorage.getItem(learningGoalLaterKey) !== \'1\';'));
   assert.ok(layout.includes('<LearningGoalModal'));
   assert.ok(read('client/src/App.jsx').includes("session?.role === 'student' && <StudyHeartbeat />"));
   assert.ok(read('client/src/components/student/StudentProfileTab.jsx').includes('onClick={openLearningGoal}'));
   assert.ok(read('client/src/components/student/StudentOverviewTab.jsx').includes('<LearningGoalCard />'));
 
   const host = read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx');
-  assert.ok(host.includes('if (data.goal && !data.goal.expired) return;'));
+  assert.ok(host.includes('if (data.goal) return;'));
+  assert.ok(host.includes('Boolean(data?.goal) || dismissedRef.current'));
   assert.ok(host.includes('{open && !pinLocked ? ('), 'không hiện đè khóa PIN');
   assert.ok(read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx').includes('<LearningGoalHost user={user} />'));
   assert.ok(read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LearningGoalCard />'));

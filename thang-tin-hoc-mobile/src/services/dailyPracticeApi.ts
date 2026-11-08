@@ -24,6 +24,20 @@ export type DpStats = {
   streakState?: 'new' | 'active' | 'at_risk' | 'lost';
   lostStreak?: number;
   missedDays?: number;
+  /**
+   * Loại gói của học viên:
+   * - 'free'    : Miễn phí — 60 XP/ngày, chỉ ôn bài cũ khi hết XP
+   * - '1m'      : 1 tháng  — 300 XP/ngày, mở khóa bài mới (199.000đ)
+   * - '3m'      : 3 tháng  — 300 XP/ngày, mở khóa bài mới (399.000đ)
+   * - '6m'      : 6 tháng  — 300 XP/ngày, mở khóa bài mới (599.000đ)
+   * - '12m'     : 1 năm    — 300 XP/ngày, mở khóa bài mới (999.000đ)
+   * - 'lifetime': Vĩnh viễn — 300 XP/ngày, mở khóa bài mới (1.500.000đ)
+   */
+  planType?: DpPlanType | string;
+  /** Giới hạn XP mỗi ngày theo gói (backend tính theo planType). */
+  todayXpCap?: number;
+  /** Học viên đã hết XP ngày hôm nay. */
+  xpCapReached?: boolean;
 };
 
 export type DpQuestion = {
@@ -206,6 +220,16 @@ export type DpSummary = {
   durationSeconds?: number;
   firstToday?: boolean;
   week?: Array<{ day: string; label: string; played: boolean; today: boolean }>;
+  /**
+   * Phiên này không tính XP vì học viên free đã đạt giới hạn 60 XP/ngày.
+   * Vẫn ghi nhận streak & tiến độ bài CŨ, nhưng không mở khóa bài MỚI.
+   */
+  xpDisabled?: boolean;
+  /**
+   * Học viên free đã hết XP ngày — kích thích mua gói.
+   * Khi true: hiện banner chặn mở bài mới, CTA → trang mua gói.
+   */
+  xpCapReached?: boolean;
 };
 
 /** Video bài giảng admin gắn với chủ đề — mở đúng môn → buổi → mục. */
@@ -245,6 +269,50 @@ export const dailyPracticeApi = {
     `/related-topics?subjectId=${encodeURIComponent(subjectId)}${unitId ? `&unitId=${encodeURIComponent(unitId)}` : ''}`,
   ),
 };
+
+// ── Gói XP ───────────────────────────────────────────────────────────────────
+
+export type DpPlanType = 'free' | '1m' | '3m' | '6m' | '12m' | 'lifetime';
+
+/** Giới hạn XP/ngày theo từng gói (tất cả các gói mua đều là 300 XP mỗi ngày, gói Free là 60 XP). */
+export const DP_PLAN_XP_CAP: Record<DpPlanType, number> = {
+  free:     60,   // Miễn phí — 60 XP/ngày, chỉ ôn bài cũ khi hết
+  '1m':     300,  // 1 tháng  — 300 XP/ngày, mở bài mới
+  '3m':     300,  // 3 tháng  — 300 XP/ngày, mở bài mới
+  '6m':     300,  // 6 tháng  — 300 XP/ngày, mở bài mới
+  '12m':    300,  // 1 năm    — 300 XP/ngày, mở bài mới
+  lifetime: 300,  // Vĩnh viễn — 300 XP/ngày, mở bài mới
+};
+
+export const DP_PLANS: Array<{
+  id: DpPlanType;
+  label: string;
+  duration: string;
+  priceText: string;
+  xpPerDay: number;
+  canUnlock: boolean;
+  hint: string;
+  badge?: string;
+}> = [
+  { id: 'free',     label: 'Miễn phí', duration: '',        priceText: '0đ',        xpPerDay: 60,  canUnlock: false, hint: 'Mồi nhử trải nghiệm' },
+  { id: '1m',       label: '1 tháng',  duration: '1 tháng', priceText: '199.000đ',  xpPerDay: 300, canUnlock: true,  hint: 'Làm quen' },
+  { id: '3m',       label: '3 tháng',  duration: '3 tháng', priceText: '399.000đ',  xpPerDay: 300, canUnlock: true,  hint: 'Phổ biến', badge: 'Nên chọn' },
+  { id: '6m',       label: '6 tháng',  duration: '6 tháng', priceText: '599.000đ',  xpPerDay: 300, canUnlock: true,  hint: 'Học chắc' },
+  { id: '12m',      label: '1 năm',    duration: '1 năm',   priceText: '999.000đ',  xpPerDay: 300, canUnlock: true,  hint: 'Tiết kiệm nhất' },
+  { id: 'lifetime', label: 'Vĩnh viễn', duration: 'Vĩnh viễn', priceText: '1.500.000đ', xpPerDay: 300, canUnlock: true,  hint: 'Học mãi', badge: 'Tốt nhất' },
+];
+
+/** Học viên có gói trả phí (được mở khóa bài mới). */
+export function dpIsPro(planType?: DpPlanType | string): boolean {
+  return planType === '1m' || planType === '3m' || planType === '6m' || planType === '12m' || planType === 'lifetime'
+    || planType === 'monthly' || planType === 'quarterly' || planType === 'biannual';
+}
+
+/** Học viên free đã hết XP ngày (không mở khóa bài mới được). */
+export function dpXpCapReached(stats: DpStats): boolean {
+  if (dpIsPro(stats.planType)) return false;
+  return (stats.todayXp || 0) >= (stats.todayXpCap ?? DP_PLAN_XP_CAP.free);
+}
 
 export const DP_DIFFICULTIES: Array<{ id: DpDifficulty; label: string; stars: number; color: string; soft: string; xp: number }> = [
   { id: 'easy', label: 'Dễ', stars: 1, color: '#10B981', soft: '#ECFDF5', xp: 10 },
