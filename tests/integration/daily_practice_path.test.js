@@ -189,7 +189,7 @@ test('lộ trình trên DB: tự tạo chặng Tổng hợp, mở khóa tuần t
       stepLabel: 'Vừa',
       kind: 'quiz',
     });
-    assert.equal(result.gainedXp, 0, 'đạt lượt có cược: hoàn cược, ví ròng 0');
+    assert.equal(result.gainedXp, 50, 'đạt lượt có cược: 10 câu đúng +50 XP');
 
     const quizNodes = ['practice-1', 'challenge', 'practice-2', 'complete'];
     for (const nodeKey of quizNodes) {

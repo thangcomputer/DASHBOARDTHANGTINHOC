@@ -287,7 +287,7 @@ function QuitConfirm({ answered, total, stakeXp = 0, quitLossXp = 0, mandatory =
         <div className={`px-6 pb-5 pt-6 ${loseXp ? 'bg-gradient-to-br from-red-50 via-white to-amber-50' : 'bg-gradient-to-br from-sky-50 via-white to-slate-100'}`}>
           <Mascot mood="quit" size={96} className="mx-auto" />
           <h2 id="dp-quit-title" className="mt-2 text-xl font-black text-slate-900">
-            {loseXp ? 'Thoát sẽ mất XP!' : 'Thoát lượt này?'}
+            {loseXp ? 'Bạn sẽ mất chuỗi hôm nay!' : 'Thoát lượt này?'}
           </h2>
           <p className="mt-1.5 text-sm text-slate-600">
             {loseXp
@@ -446,9 +446,9 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           type="button"
           onClick={() => setQuitOpen(true)}
           aria-label="Thoát"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
+          className="flex h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
         >
-          <LogOut size={17} aria-hidden="true" />
+          <LogOut size={16} aria-hidden="true" /> Thoát
         </button>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-bold text-slate-500">
@@ -465,7 +465,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         <div className="relative shrink-0">
           {combo >= 2 && (
             <span className="dp-combo absolute -left-2 -top-2 z-[1] flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white shadow-sm">
-              x{combo}
+              Combo x{combo}
             </span>
           )}
           <span

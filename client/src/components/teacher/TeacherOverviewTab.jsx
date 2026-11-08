@@ -255,7 +255,7 @@ export default function TeacherOverviewTab({
           role="teacher"
           name={teacherName}
           chips={heroChips}
-          joinUrl={ongoingSchedule && !(ongoingSchedule._id || ongoingSchedule.id) ? ongoingJoinUrl : ''}
+          joinUrl={ongoingSchedule ? ongoingJoinUrl : ''}
           onJoin={(ongoingSchedule?._id || ongoingSchedule?.id) ? () => openClassRoom(ongoingSchedule._id || ongoingSchedule.id) : undefined}
           joinHint={ongoingSchedule ? 'Chưa có buổi để vào' : todaySessionCount ? 'Chưa đến giờ dạy' : 'Chưa có lịch dạy'}
         />

@@ -1941,7 +1941,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
             onClose={() => setDailyReminderOpen(false)}
             onStart={() => {
               setDailyReminderOpen(false);
-              navigate('/student/daily-practice?practice=stage');
+              navigate('/student/daily-practice');
             }}
           />
         )}

@@ -6,6 +6,7 @@ import {
   LEARNING_GOAL_CHANGED_EVENT,
   STUDY_MINUTE_EVENT,
   formatStudyMinutes,
+  lessonResumeUrl,
   openLearningGoal,
   periodLabel,
 } from '../../utils/learningGoal';
@@ -32,7 +33,9 @@ export default function LearningGoalCard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const openVideoMission = () => {
-    navigate('/student/daily-practice?watch=stage');
+    lessonPracticeApi.student.resumePoint()
+      .then((res) => navigate(res?.data?.unitId ? lessonResumeUrl(res.data) : '/student/lesson-practice'))
+      .catch(() => navigate('/student/lesson-practice'));
   };
 
   const load = useCallback(() => {
@@ -144,7 +147,7 @@ export default function LearningGoalCard() {
             unit="câu"
             gradient="from-sky-400 to-blue-600"
             bar="bg-sky-500"
-            onClick={() => navigate('/student/daily-practice?practice=stage')}
+            onClick={() => navigate('/student/daily-practice')}
           />
           <MissionTile
             icon={PlayCircle}

@@ -721,7 +721,7 @@ const AppSidebar = ({
             }`}
           >
             <CalendarClock size={13} className="shrink-0" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">{subscriptionShortLabel(studentSubscription.subscription, { freePortal: session?.freePortal === true })}</span>
+            <span className="min-w-0 flex-1 truncate">{subscriptionShortLabel(studentSubscription.subscription)}</span>
             {studentSubscription.subscription.state !== 'lifetime' && (
               <button
                 type="button"

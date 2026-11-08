@@ -116,7 +116,7 @@ export function reminderCopy(stats = {}, topicCount = 0) {
       mood: 'sad',
       badge: 'Bạn đã lỡ chuỗi',
       title: `Bạn đã lỡ chuỗi 🔥 ${stats.lostStreak} ngày!`,
-      text: `Đã ${stats.missedDays} ngày bạn chưa luyện tập. Đừng để công sức trôi đi. Luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
+      text: `Đã ${stats.missedDays} ngày bạn chưa luyện tập. Đừng để công sức trôi đi — luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
       cta: 'Lấy lại phong độ ngay',
     };
   }

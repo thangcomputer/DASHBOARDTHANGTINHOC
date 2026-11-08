@@ -352,7 +352,7 @@ export default function StudentOverviewTab({
       title: atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày',
       sub: atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút',
       cta: 'Chơi ngay',
-      onClick: () => navigate('/student/daily-practice?practice=stage'),
+      onClick: () => navigate('/student/daily-practice'),
     });
   }
 
@@ -366,7 +366,7 @@ export default function StudentOverviewTab({
           role="student"
           name={studentData.name}
           chips={heroChips}
-          joinUrl={joinUrl}
+          joinUrl={isLive ? joinUrl : ''}
           onJoin={isLiveSchedule && !(ongoingSchedule?.linkHoc || '').trim() && (ongoingSchedule?._id || ongoingSchedule?.id)
             ? () => openClassRoom(ongoingSchedule._id || ongoingSchedule.id)
             : undefined}

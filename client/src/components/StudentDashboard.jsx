@@ -768,7 +768,7 @@ const StudentDashboard = () => {
       )}
 
       <div className="min-w-0">
-        {sectionHash && (
+        {currentHash && (
           <ClassReminder
             nextClassTime={viewStudent.nextClassTime}
             linkHoc={viewStudent.joinClassUrl}
