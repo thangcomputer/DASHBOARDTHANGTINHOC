@@ -13,6 +13,7 @@ type YouTubePlayer = {
   getIframe: () => HTMLIFrameElement;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   playVideo?: () => void;
+  pauseVideo?: () => void;
   destroy: () => void;
 };
 
@@ -88,6 +89,7 @@ export function VideoPlayerFrame({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
   const progressRef = useRef<VideoPlayerProgress>({
     currentTime: 0,
     duration: 0,
@@ -109,6 +111,18 @@ export function VideoPlayerFrame({
     const currentPlayerApi: VideoPlayerApi = {
       getCurrentTime: () => progressRef.current.currentTime,
       getDuration: () => progressRef.current.duration,
+      pause: () => {
+        if (videoRef.current) videoRef.current.pause();
+        else if (youtubePlayerRef.current) youtubePlayerRef.current.pauseVideo?.();
+      },
+      play: () => {
+        if (videoRef.current) void videoRef.current.play();
+        else if (youtubePlayerRef.current) youtubePlayerRef.current.playVideo?.();
+      },
+      seekTo: (position: number) => {
+        if (videoRef.current) videoRef.current.currentTime = position;
+        else if (youtubePlayerRef.current) youtubePlayerRef.current.seekTo(position, true);
+      },
     };
     if (playerApiRef) playerApiRef.current = currentPlayerApi;
     return () => {
@@ -274,6 +288,7 @@ export function VideoPlayerFrame({
           events: {
             onReady: () => {
               if (!youtubePlayer) return;
+              youtubePlayerRef.current = youtubePlayer;
               const iframe = youtubePlayer.getIframe();
               iframe.referrerPolicy = 'origin';
               iframe.style.width = '100%';
@@ -305,6 +320,7 @@ export function VideoPlayerFrame({
       return () => {
         disposed = true;
         stopPolling();
+        youtubePlayerRef.current = null;
         youtubePlayer?.destroy();
         mountRef.current?.classList.remove('mobile-youtube-player');
         mountStyle.remove();

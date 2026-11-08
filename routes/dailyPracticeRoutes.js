@@ -25,7 +25,13 @@ const userId = (req) => req.user.id || req.user._id;
 
 function sendError(res, err) {
   if (err && err.status) {
-    return res.status(err.status).json({ success: false, message: err.message, code: err.code || undefined });
+    return res.status(err.status).json({
+      success: false,
+      message: err.message,
+      code: err.code || undefined,
+      ...(typeof err.currentXp === 'number' ? { currentXp: err.currentXp } : {}),
+      ...(typeof err.needXp === 'number' ? { needXp: err.needXp } : {}),
+    });
   }
   logger.error('[DAILY_PRACTICE]', err);
   return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
@@ -33,6 +39,7 @@ function sendError(res, err) {
 
 const handle = (fn) => async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     return res.json({ success: true, data: await fn(req) });
   } catch (err) {
     return sendError(res, err);
@@ -84,10 +91,25 @@ router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/answer', ...
   text: req.body?.text,
   imageDataUrl: req.body?.imageDataUrl,
 })));
+router.post(['/my/path/videos/check', '/path/videos/check'], ...requireStudent, handle((req) => pathService.answerVideoCheck(userId(req), {
+  unitId: req.body?.unitId,
+  videoId: decodeURIComponent(req.body?.videoId || ''),
+  checkId: req.body?.checkId,
+  checkIndex: req.body?.checkIndex,
+  choiceIndex: req.body?.choiceIndex !== undefined ? req.body.choiceIndex : req.body?.optionIndex,
+  text: req.body?.text,
+  imageDataUrl: req.body?.imageDataUrl,
+})));
 router.post('/my/path/units/:unitId/videos/:videoId/checks/:checkId/hint', ...requireStudent, handle((req) => pathService.buyVideoHint(userId(req), {
   unitId: req.params.unitId,
   videoId: decodeURIComponent(req.params.videoId),
   checkId: req.params.checkId,
+})));
+router.post(['/my/path/videos/hint', '/path/videos/hint'], ...requireStudent, handle((req) => pathService.buyVideoHint(userId(req), {
+  unitId: req.body?.unitId,
+  videoId: decodeURIComponent(req.body?.videoId || ''),
+  checkId: req.body?.checkId,
+  checkIndex: req.body?.checkIndex,
 })));
 router.post('/my/path/videos/watched', ...requireStudent, handle((req) => pathService.markVideoWatched(userId(req), {
   unitId: req.body?.unitId,
@@ -115,17 +137,29 @@ router.get('/my/related-topics', ...requireStudent, handle((req) => service.rela
   subjectId: String(req.query?.subjectId || ''),
   unitId: String(req.query?.unitId || ''),
 })));
-router.post('/my/xp/purchase', ...requireStudent, handle((req) => service.createXpPurchase(userId(req), String(req.body?.packId || ''))));
-router.get('/my/xp/purchase/:sessionId', ...requireStudent, handle((req) => service.getXpPurchaseStatus(userId(req), req.params.sessionId)));
-router.post('/my/xp/purchase/:sessionId/simulate-paid', ...requireStudent, async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy endpoint' });
-  }
-  try {
-    return res.json({ success: true, data: await service.simulateXpPurchase(userId(req), req.params.sessionId) });
-  } catch (err) {
-    return sendError(res, err);
-  }
-});
+router.post(
+  ['/my/xp/purchase', '/my/xp-purchases', '/my/xp-purchase', '/my-xp-purchases', '/my/xp/purchases'],
+  ...requireStudent,
+  handle((req) => service.createXpPurchase(userId(req), String(req.body?.packId || ''))),
+);
+router.get(
+  ['/my/xp/purchase/:sessionId', '/my/xp-purchases/:sessionId', '/my/xp-purchase/:sessionId', '/my-xp-purchases/:sessionId', '/my/xp/purchases/:sessionId'],
+  ...requireStudent,
+  handle((req) => service.getXpPurchaseStatus(userId(req), req.params.sessionId)),
+);
+router.post(
+  ['/my/xp/purchase/:sessionId/simulate-paid', '/my/xp-purchases/:sessionId/simulate-paid', '/my/xp-purchase/:sessionId/simulate-paid', '/my-xp-purchases/:sessionId/simulate-paid', '/my/xp/purchases/:sessionId/simulate-paid'],
+  ...requireStudent,
+  async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy endpoint' });
+    }
+    try {
+      return res.json({ success: true, data: await service.simulateXpPurchase(userId(req), req.params.sessionId) });
+    } catch (err) {
+      return sendError(res, err);
+    }
+  },
+);
 
 module.exports = router;

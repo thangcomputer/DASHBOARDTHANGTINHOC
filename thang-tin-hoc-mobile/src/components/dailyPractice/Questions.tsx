@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Check, GripVertical, Lock, X } from 'lucide-react-native';
 import type { DpAnswer, DpAnswerResult, DpQuestion, DpReveal } from '../../services/dailyPracticeApi';
 import { Draggable, DropZone } from './DragKit';
@@ -44,9 +44,11 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
   onSubmit: (answer: DpAnswer) => void;
   play: (sound: GameSound) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const twoColumns = width >= 500;
   const eliminated = new Set(reveal?.eliminate || []);
   return (
-    <View style={styles.gap}>
+    <View style={[styles.gap, twoColumns && styles.mcqGrid]}>
       {(question.options || []).map((option, index) => {
         const isCorrect = Boolean(result) && result?.correctAnswer.correctIndex === index;
         const isWrong = Boolean(result) && chosen === index && !isCorrect;
@@ -56,13 +58,20 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
             key={option}
             disabled={Boolean(result) || out}
             onPress={() => { play('tap'); onSubmit({ index }); }}
-            style={[styles.option, isCorrect && styles.chipOk, isWrong && styles.chipBad, out && styles.optionOut]}
+            style={[
+              styles.option,
+              twoColumns && styles.optionHalf,
+              isCorrect && styles.chipOk,
+              isWrong && styles.chipBad,
+              out && styles.optionOut,
+            ]}
             accessibilityRole="button"
           >
-            <View style={[styles.letter, isCorrect && { backgroundColor: '#10B981' }, isWrong && { backgroundColor: '#EF4444' }]}>
+            <View style={[styles.letter, isCorrect && { backgroundColor: '#10B981', borderColor: '#10B981' }, isWrong && { backgroundColor: '#EF4444', borderColor: '#EF4444' }]}>
               <Text style={[styles.letterText, (isCorrect || isWrong) && { color: '#FFFFFF' }]}>{String.fromCharCode(65 + index)}</Text>
             </View>
             <Text style={[styles.optionText, out && styles.optionTextOut]}>{option}</Text>
+            {isCorrect ? <Mark ok /> : isWrong ? <Mark ok={false} /> : null}
           </Pressable>
         );
       })}
@@ -418,15 +427,17 @@ const styles = StyleSheet.create({
   chipBad: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
   chipText: { color: '#1E293B', fontSize: 14, fontWeight: '800' },
   chipTextSelected: { color: '#075985' },
+  mcqGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   option: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 2,
-    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', boxShadow: '0px 3px 0px #CBD5E1',
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 2,
+    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', boxShadow: '0px 3px 0px #E2E8F0', minHeight: 54,
   },
+  optionHalf: { width: '48%', flexGrow: 1 },
   optionOut: { opacity: 0.45, backgroundColor: '#F8FAFC' },
-  optionText: { flex: 1, color: '#1E293B', fontSize: 15, fontWeight: '700' },
+  optionText: { flex: 1, color: '#1E293B', fontSize: 16, fontWeight: '600', lineHeight: 22 },
   optionTextOut: { textDecorationLine: 'line-through', color: '#94A3B8' },
-  letter: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
-  letterText: { color: '#64748B', fontSize: 12, fontWeight: '900' },
+  letter: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  letterText: { color: '#475569', fontSize: 14, fontWeight: '900' },
   tf: {
     flex: 1, alignItems: 'center', gap: 8, paddingVertical: 22, borderRadius: 16, borderWidth: 2,
     borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', boxShadow: '0px 3px 0px #CBD5E1',
@@ -434,21 +445,21 @@ const styles = StyleSheet.create({
   tfIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   tfText: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
   orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  orderNum: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' },
-  orderNumText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  orderNum: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' },
+  orderNumText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   orderChip: { flex: 1 },
   matchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   matchLeft: { width: '40%', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 12, backgroundColor: '#0F172A' },
-  matchLeftText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  matchLeftText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   slot: {
     flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 10, borderRadius: 12,
     borderWidth: 2, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC',
   },
   slotFilled: { borderStyle: 'solid', borderColor: '#7DD3FC', backgroundColor: '#F0F9FF' },
-  slotText: { flex: 1, color: '#94A3B8', fontSize: 13, fontWeight: '700' },
+  slotText: { flex: 1, color: '#94A3B8', fontSize: 14, fontWeight: '700' },
   slotTextFilled: { color: '#075985', fontWeight: '900' },
   bank: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, minHeight: 54, padding: 10, borderRadius: 16, backgroundColor: '#F1F5F9' },
-  bankDone: { color: '#94A3B8', fontSize: 12, fontWeight: '700', padding: 6 },
+  bankDone: { color: '#94A3B8', fontSize: 13, fontWeight: '700', padding: 6 },
   fillText: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, padding: 14, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
   fillWord: { color: '#1E293B', fontSize: 16, fontWeight: '600' },
   blank: {
@@ -456,10 +467,10 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4,
   },
   blankText: { color: '#075985', fontSize: 15, fontWeight: '900' },
-  blankFix: { color: '#059669', fontSize: 11, fontWeight: '800' },
+  blankFix: { color: '#059669', fontSize: 12, fontWeight: '800' },
   bins: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   binWrap: { flexGrow: 1, flexBasis: '45%' },
   bin: { minHeight: 120, padding: 8, borderRadius: 14, borderWidth: 2, borderStyle: 'dashed', backgroundColor: '#FFFFFF' },
-  binTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', textAlign: 'center', paddingVertical: 4, borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
+  binTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', textAlign: 'center', paddingVertical: 4, borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
   binItems: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 });

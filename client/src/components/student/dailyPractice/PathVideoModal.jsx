@@ -472,7 +472,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
                     )}
                   </div>
                   <p className="text-[11px] font-semibold text-slate-500">
-                    Đúng thì không mất XP và xem tiếp. Sai mất {VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.
+                    Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP và xem tiếp. Sai mất {VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.
                   </p>
                   </>
                   )}

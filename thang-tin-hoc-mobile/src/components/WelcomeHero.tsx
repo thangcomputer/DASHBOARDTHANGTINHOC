@@ -136,12 +136,12 @@ export function WelcomeHero({ role = 'student', name, chips = [], joinUrl, joinH
               <Video size={14} color="#FFFFFF" />
               <Text style={styles.joinActiveText}>{variant.joinLabel}</Text>
             </Pressable>
-          ) : (
+          ) : joinHint ? (
             <View style={styles.joinIdle} accessibilityState={{ disabled: true }} accessibilityLabel={joinHint}>
               <Video size={14} color="#334155" style={{ opacity: 0.7 }} />
               <Text style={styles.joinIdleText}>{joinHint}</Text>
             </View>
-          )}
+          ) : null}
         </View>
         <View style={styles.heroBox}>
           <View style={styles.shadow} />

@@ -992,7 +992,9 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, choiceInd
   if (!unit) throw httpError(404, 'Không tìm thấy chặng');
   const located = locateVideo(unit, videoId);
   if (!located) throw httpError(404, 'Không tìm thấy video');
-  const check = (located.video.checks || []).find((item) => String(item._id) === String(checkId));
+  const check = (located.video.checks || []).find((item, idx) => (
+    checkId ? String(item._id) === String(checkId) : idx === Number(checkIndex)
+  ));
   if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
   if (check.kind === 'text' && !normAnswer(text)) throw httpError(400, 'Hãy nhập đáp án');
   if (check.kind === 'choice' && !Number.isInteger(Number(choiceIndex))) throw httpError(400, 'Hãy chọn đáp án');
@@ -1005,9 +1007,22 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, choiceInd
   else status = (await gradeScreen(check, imageDataUrl)) ? 'CORRECT' : 'INCORRECT';
   const key = `${located.storageId}:${check._id}`;
   if (status === 'CORRECT') {
-    await rememberPassedCheck(sid, unit, key);
-    const profile = await getProfile(sid);
-    return { correct: true, needsReview: false, hint: '', cost: 0, profileXp: profile?.xpTotal ?? 0 };
+    const firstPass = await rememberPassedCheck(sid, unit, key);
+    // Đúng lần đầu ở mốc này: +XP (mốc đã qua thì không cộng lại).
+    const reward = firstPass ? cost : 0;
+    const profile = reward > 0
+      ? await adjustProfileXp(sid, reward, { source: 'reward' })
+      : await getProfile(sid);
+    return {
+      correct: true,
+      needsReview: false,
+      hint: '',
+      cost: 0,
+      gainedXp: reward,
+      profileXp: rules.clampXp(profile?.xpTotal),
+      purchasedXp: rules.clampXp(profile?.purchasedXp),
+      dailyXp: rules.clampXp(profile?.dailyXp),
+    };
   }
   if (status === 'NEEDS_REVIEW') {
     const profile = await getProfile(sid);
@@ -1015,30 +1030,39 @@ async function answerVideoCheck(studentId, { unitId, videoId, checkId, choiceInd
       correct: false,
       needsReview: true,
       cost: 0,
-      profileXp: profile?.xpTotal ?? 0,
+      profileXp: rules.clampXp(profile?.xpTotal),
+      purchasedXp: rules.clampXp(profile?.purchasedXp),
+      dailyXp: rules.clampXp(profile?.dailyXp),
       hint: 'Chưa đủ ý để kết luận. Hãy viết rõ hơn, lần này không mất XP.',
     };
   }
   const profile = await getProfile(sid);
   if (cost > 0 && (profile?.xpTotal || 0) < cost) {
-    throw httpError(402, `Sai mất ${cost} XP. Bạn chưa đủ XP.`);
+    const err = httpError(402, `Sai mất ${cost} XP. Bạn chưa đủ XP.`);
+    err.currentXp = rules.clampXp(profile?.xpTotal);
+    err.needXp = cost;
+    throw err;
   }
   const next = cost > 0 ? await adjustProfileXp(sid, -cost, { source: 'spend' }) : profile;
   return {
     correct: false,
     needsReview: false,
     cost,
-    profileXp: next?.xpTotal ?? 0,
+    profileXp: rules.clampXp(next?.xpTotal),
+    purchasedXp: rules.clampXp(next?.purchasedXp),
+    dailyXp: rules.clampXp(next?.dailyXp),
     hint: check.shortHint || 'Bài này chưa được. Xem lại thao tác vừa làm.',
   };
 }
 
-async function buyVideoHint(studentId, { unitId, videoId, checkId } = {}) {
+async function buyVideoHint(studentId, { unitId, videoId, checkId, checkIndex } = {}) {
   const sid = requireId(studentId, 'Học viên');
   const unit = await DailyPracticeUnit.findOne({ _id: requireId(unitId, 'Chặng'), active: true }).lean();
   if (!unit) throw httpError(404, 'Không tìm thấy chặng');
   const located = locateVideo(unit, videoId);
-  const check = located && (located.video.checks || []).find((item) => String(item._id) === String(checkId));
+  const check = located && (located.video.checks || []).find((item, idx) => (
+    checkId ? String(item._id) === String(checkId) : idx === Number(checkIndex)
+  ));
   if (!check) throw httpError(404, 'Không tìm thấy câu hỏi trong video');
   if (!check.paidHint) throw httpError(400, 'Mốc này không có gợi ý thêm');
   const cost = Math.max(0, Number(check.hintCostXp) || 0);
@@ -1046,25 +1070,44 @@ async function buyVideoHint(studentId, { unitId, videoId, checkId } = {}) {
   if (cost > 0) {
     const profile = await getProfile(sid);
     if ((profile?.xpTotal || 0) < cost) {
-      throw httpError(402, `Cần ${cost} XP để xem gợi ý. Bạn chưa đủ XP.`);
+      const err = httpError(402, `Cần ${cost} XP để xem gợi ý. Bạn chưa đủ XP.`);
+      err.currentXp = rules.clampXp(profile?.xpTotal);
+      err.needXp = cost;
+      throw err;
     }
     const next = await adjustProfileXp(sid, -cost, { source: 'spend' });
     await rememberPassedCheck(sid, unit, `${located.storageId}:${check._id}`);
-    return { hint: check.paidHint, cost, profileXp: next?.xpTotal ?? 0, passed: true };
+    return {
+      hint: check.paidHint,
+      cost,
+      profileXp: rules.clampXp(next?.xpTotal),
+      purchasedXp: rules.clampXp(next?.purchasedXp),
+      dailyXp: rules.clampXp(next?.dailyXp),
+      passed: true,
+    };
   }
   const profile = await getProfile(sid);
   await rememberPassedCheck(sid, unit, `${located.storageId}:${check._id}`);
-  return { hint: check.paidHint, cost: 0, profileXp: profile?.xpTotal ?? 0, passed: true };
+  return {
+    hint: check.paidHint,
+    cost: 0,
+    profileXp: rules.clampXp(profile?.xpTotal),
+    purchasedXp: rules.clampXp(profile?.purchasedXp),
+    dailyXp: rules.clampXp(profile?.dailyXp),
+    passed: true,
+  };
 }
 
 async function rememberPassedCheck(studentId, unit, key) {
   const filter = { studentId, unitId: unit._id };
   const update = { $addToSet: { passedVideoChecks: key }, $setOnInsert: { topicId: unit.topicId } };
   try {
-    await DailyPracticePathProgress.updateOne(filter, update, { upsert: true });
+    const res = await DailyPracticePathProgress.updateOne(filter, update, { upsert: true });
+    return Boolean(res.modifiedCount || res.upsertedCount);
   } catch (err) {
     if (err?.code !== 11000) throw err;
-    await DailyPracticePathProgress.updateOne(filter, { $addToSet: { passedVideoChecks: key } });
+    const res = await DailyPracticePathProgress.updateOne(filter, { $addToSet: { passedVideoChecks: key } });
+    return Boolean(res.modifiedCount);
   }
 }
 

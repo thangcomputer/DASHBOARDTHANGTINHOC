@@ -452,6 +452,11 @@ function sessionStakeTotal(questionCount) {
   return n * QUESTION_STAKE_XP;
 }
 
+/** Gợi ý trong lượt cược theo câu: trừ ngay ½ XP của câu. */
+function hintCostXp() {
+  return Math.floor(QUESTION_STAKE_XP / 2);
+}
+
 /** Thay đổi ròng ví sau lượt. */
 function sessionNetXp(session = {}) {
   if (isPracticeXpDisabled(session)) return 0;
@@ -492,6 +497,8 @@ module.exports = {
   QUESTION_STAKE_XP,
   SESSION_STAKE_XP,
   sessionStakeTotal,
+  hintCostXp,
+  answerXpLoss,
   usesPerQuestionStake,
   isPracticeXpDisabled,
   TEST_OUT_XP,

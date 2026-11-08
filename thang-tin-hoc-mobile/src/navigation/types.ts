@@ -48,7 +48,7 @@ export type AppStackParamList = {
   CertPrepLevel: { levelId: string; courseName: string };
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
-  DailyPractice: { topicId?: string } | undefined;
+  DailyPractice: { topicId?: string; watch?: 'stage'; practice?: 'stage' } | undefined;
 };
 
 export type MainTabsParamList = {

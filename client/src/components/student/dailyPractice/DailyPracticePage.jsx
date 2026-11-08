@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Crown, Flame, Lightbulb, Loader2, LogOut, Play, PlayCircle, RotateCcw, Route, Shuffle, Sparkles, Star, Trophy, XCircle, Zap,
 } from 'lucide-react';
-import dailyPracticeApi from '../../../services/dailyPracticeApi';
+import dailyPracticeApi, { DAILY_PRACTICE_STATS_EVENT } from '../../../services/dailyPracticeApi';
 import { gameSounds } from '../../../utils/sound';
 import { LEARNING_GOAL_CHANGED_EVENT, lessonResumeUrl } from '../../../utils/learningGoal';
 import {
@@ -57,6 +57,7 @@ function HomeScreen({
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const [topicId, setTopicId] = useState('');
+  const [activePathTopicId, setActivePathTopicId] = useState(initialTopicId);
   const [difficulty, setDifficulty] = useState('easy');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
   const topics = useMemo(() => overview?.topics || [], [overview]);
@@ -64,7 +65,13 @@ function HomeScreen({
   const xpEmpty = Boolean(stats.xpEmpty || (stats.xpTotal || 0) <= 0);
   const xpPacks = stats.xpPacks || [];
   const selected = topics.find((topic) => topic.id === topicId);
-  const pathTopic = useMemo(() => pickActivePathTopic(path, initialTopicId), [path, initialTopicId]);
+  const pathTopic = useMemo(() => {
+    if (activePathTopicId) {
+      const found = (path?.topics || []).find((item) => item.topic.id === activePathTopicId);
+      if (found) return found;
+    }
+    return pickActivePathTopic(path, initialTopicId);
+  }, [path, activePathTopicId, initialTopicId]);
 
   useEffect(() => {
     if (topicId || !topics.length) return;
@@ -162,6 +169,7 @@ function HomeScreen({
               error={pathError}
               starting={starting}
               initialTopicId={initialTopicId}
+              onTopicChange={setActivePathTopicId}
               onStartStep={onStartStep}
               onPathChanged={onPathChanged}
               layout="wide"
@@ -334,6 +342,15 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const [hintText, setHintText] = useState('');
   const [busy, setBusy] = useState(false);
   const [profileXp, setProfileXp] = useState(() => session.profileXp ?? stats?.xpTotal ?? 0);
+  useEffect(() => {
+    const onStatsChanged = (event) => {
+      if (typeof event?.detail?.xpTotal === 'number') {
+        setProfileXp(event.detail.xpTotal);
+      }
+    };
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
+    return () => window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
+  }, []);
   const [combo, setCombo] = useState(0);
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
@@ -342,11 +359,12 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const total = session.questions.length;
   const meta = QUESTION_TYPES[question.type];
   const level = difficultyMeta(question.difficulty);
-  const xpDisabled = Boolean(session.xpDisabled || session.mode === 'free' || session.review || session.path?.review);
+  const isPathSession = session.mode === 'path' || Boolean(session.path);
+  const xpDisabled = Boolean(session.xpDisabled || (!isPathSession && session.mode === 'free') || session.review || session.path?.review);
   const stakeXp = xpDisabled ? 0 : (session.stakeXp ?? 0);
   const perQuestionStake = session.perQuestionStakeXp || QUESTION_STAKE_XP;
   const isTestOutStake = Boolean(session.path?.testOut) && stakeXp > 0;
-  const isPerQuestion = !xpDisabled && !session.recovery && !isTestOutStake && session.mode === 'path';
+  const isPerQuestion = !xpDisabled && !session.recovery && !isTestOutStake && isPathSession;
   const stakeLabel = xpDisabled ? 0 : (session.sessionStakeXp || total * perQuestionStake || SESSION_STAKE_XP);
   const mandatory = !xpDisabled && Boolean(session.mandatory ?? (stakeXp > 0 || isPerQuestion));
   const walletXp = inPlayWalletXp(profileXp, isTestOutStake ? stakeXp : 0);
@@ -377,7 +395,8 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         gameSounds.wrong();
       }
     } catch (err) {
-      setError(err.message || 'Không gửi được câu trả lời');
+      if (err.status === 402) setBuyXpOpen(true);
+      else setError(err.message || 'Không gửi được câu trả lời');
     } finally {
       setBusy(false);
     }
@@ -385,14 +404,20 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
 
   const askHint = async () => {
     if (reveal || result || busy) return;
+    if (!xpDisabled && hintShareXp > 0 && profileXp < hintShareXp) {
+      setBuyXpOpen(true);
+      return;
+    }
     setBusy(true);
     try {
       const data = await dailyPracticeApi.student.hint(session.id, question.id);
       gameSounds.hint();
+      if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       setReveal(data.reveal || {});
       setHintText(data.hint || '');
     } catch (err) {
-      setError(err.message || 'Không lấy được gợi ý');
+      if (err.status === 402) setBuyXpOpen(true);
+      else setError(err.message || 'Không lấy được gợi ý');
     } finally {
       setBusy(false);
     }
@@ -439,37 +464,39 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
   const quitLossXp = isPerQuestion ? Math.max(0, total - answeredCount) * perQuestionStake : stakeXp;
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-3 px-1 sm:gap-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 pt-6 pb-12 sm:gap-6 sm:px-6 sm:pt-10">
       {/* Thanh trên: thoát · tiến độ · XP */}
-      <header className="flex items-center gap-2.5 sm:gap-3">
+      <header className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200/80 sm:gap-4 sm:px-5 sm:py-3.5">
         <button
           type="button"
           onClick={() => setQuitOpen(true)}
           aria-label="Thoát"
-          className="flex h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 !shadow-none"
         >
           <LogOut size={16} aria-hidden="true" /> Thoát
         </button>
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-bold text-slate-500">
-            <span className="truncate">{contextLabel}</span>
-            <span className="shrink-0 tabular-nums text-slate-700">{index + 1}/{total}</span>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="truncate text-xs font-extrabold text-slate-600 sm:text-[13px]">{contextLabel}</span>
+            <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-black tabular-nums text-slate-700">
+              {index + 1}/{total}
+            </span>
           </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200/70">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
         <div className="relative shrink-0">
           {combo >= 2 && (
-            <span className="dp-combo absolute -left-2 -top-2 z-[1] flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white shadow-sm">
+            <span className="dp-combo absolute -top-3 right-0 z-[1] flex h-5 min-w-5 items-center justify-center whitespace-nowrap rounded-full bg-orange-500 px-2 text-[10px] font-black leading-none text-white shadow-sm">
               Combo x{combo}
             </span>
           )}
           <span
-            className="relative flex h-10 min-w-[3.25rem] flex-col items-center justify-center rounded-full bg-amber-50 px-2.5 text-sm font-black tabular-nums text-amber-800 ring-1 ring-amber-200"
+            className="relative flex h-10 items-center gap-2 rounded-xl bg-amber-50/90 px-3.5 text-sm font-black tabular-nums text-amber-900 ring-1 ring-amber-200/90"
             title={isTestOutStake
               ? `Tổng ${walletXp} XP · ${stakeXp} XP đang cược (ví tạm ${profileXp}). Đạt sẽ hoàn cược.`
               : (isPerQuestion
@@ -477,62 +504,56 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
                 : `Phục hồi · đạt nhận tối đa ${stakeLabel} XP`)}
           >
             <span className="flex items-center gap-1 leading-none">
-              <Zap size={15} className="fill-amber-400 text-amber-500" aria-hidden="true" />
+              <Zap size={16} className="fill-amber-400 text-amber-500" aria-hidden="true" />
               {walletXp}
             </span>
             {isTestOutStake ? (
-              <span className="mt-0.5 text-[9px] font-bold leading-none text-amber-700/90">−{stakeXp} cược</span>
+              <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">−{stakeXp} cược</span>
             ) : (isPerQuestion ? (
-              <span className="mt-0.5 text-[9px] font-bold leading-none text-amber-700/90">{perQuestionStake}/câu</span>
+              <span className="rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-amber-900">{perQuestionStake} XP/câu</span>
             ) : null)}
           </span>
         </div>
       </header>
 
       {/* Thẻ câu */}
-      <section className={`relative rounded-[22px] bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-5 ${result && !result.correct ? 'dp-shake' : ''}`}>
+      <section className={`relative rounded-[28px] bg-white p-6 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 sm:p-8 ${result && !result.correct ? 'dp-shake' : ''}`}>
         {result?.correct && <Confetti />}
-        <div className="flex items-start gap-3">
-          <Mascot
-            mood={result ? (result.correct ? 'happy' : 'sad') : reveal ? 'idea' : 'studying'}
-            size={48}
-            className="mt-0.5 hidden shrink-0 sm:block"
-          />
+        <div className="flex items-start gap-4 border-b border-slate-100 pb-5 sm:gap-5 sm:pb-6">
+          <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-slate-50 ring-1 ring-emerald-100/80 sm:flex">
+            <Mascot
+              mood={result ? (result.correct ? 'happy' : 'sad') : reveal ? 'idea' : 'studying'}
+              size={52}
+              className="shrink-0"
+            />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold text-slate-400">
-              {meta.label}
-              <span className="mx-1.5 text-slate-300">·</span>
-              {xpDisabled ? (
-                <span className="text-slate-500">Luyện tự do · không tính XP</span>
-              ) : isTestOutStake ? (
-                <span className="text-amber-700">
-                  Cược {stakeXp} XP · đạt được +{stakeXp} XP
-                </span>
-              ) : isPerQuestion ? (
-                <span className="text-amber-700">
-                  {perQuestionStake} XP/câu · sai −{perQuestionStake} · đạt % mới nhận +{perQuestionStake}/câu đúng
-                </span>
-              ) : session.review || session.path?.review ? (
-                <span className="text-sky-700">Ôn lại · không tính XP</span>
-              ) : (
-                <span className="text-emerald-600">Phục hồi · không cược · XP không đổi</span>
-              )}
-            </p>
-            <h2 className="mt-1 text-base font-black leading-snug text-slate-900 sm:text-lg">{question.prompt}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-lg bg-red-50 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider text-red-600 ring-1 ring-red-100">
+                Câu hỏi :
+              </span>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                {meta.label}
+              </span>
+            </div>
+            <h2 className="mt-2.5 text-xl font-black leading-snug tracking-tight text-slate-900 sm:text-2xl">
+              {question.prompt}
+            </h2>
           </div>
         </div>
 
         {question.imageUrl && (
-          <img src={question.imageUrl} alt="" className="mt-3 max-h-52 w-full rounded-xl object-contain ring-1 ring-slate-100" />
+          <img src={question.imageUrl} alt="" className="mt-5 max-h-60 w-full rounded-2xl bg-slate-50 object-contain p-2 ring-1 ring-slate-200/70" />
         )}
 
         {hintText && (
-          <p className="dp-pop mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">
-            <Lightbulb size={15} className="mt-0.5 shrink-0 fill-amber-300 text-amber-500" /> {hintText}
+          <p className="dp-pop mt-5 flex items-start gap-2.5 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200">
+            <Lightbulb size={17} className="mt-0.5 shrink-0 fill-amber-300 text-amber-500" />
+            <span>{hintText}</span>
           </p>
         )}
 
-        <div className="mt-4" key={question.id}>
+        <div className="mt-6" key={question.id}>
           {question.type === 'mcq' && <McqQuestion {...props} chosen={chosen} onSubmit={submit} />}
           {question.type === 'truefalse' && <TrueFalseQuestion {...props} chosen={chosen} onSubmit={submit} />}
           {question.type === 'order' && <OrderQuestion {...props} />}
@@ -540,7 +561,33 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           {question.type === 'fill' && <FillQuestion {...props} />}
           {question.type === 'sort' && <SortQuestion {...props} />}
         </div>
-        {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
+        {error && <p className="mt-4 text-sm font-semibold text-red-600">{error}</p>}
+
+        {!result && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+            <button
+              type="button"
+              onClick={askHint}
+              disabled={Boolean(reveal) || busy}
+              aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, trừ ngay ${hintShareXp} XP`)}
+              title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, trừ ngay −${hintShareXp} XP`}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-200/90 bg-amber-50/70 px-4 text-xs font-extrabold text-amber-800 transition hover:bg-amber-100/80 disabled:opacity-50 !shadow-none"
+            >
+              <Lightbulb size={17} className={reveal ? 'text-slate-400' : 'fill-amber-300 text-amber-500'} />
+              <span>{reveal ? 'Đã mở gợi ý' : 'Gợi ý'}</span>
+              {!xpDisabled && !reveal && hintShareXp > 0 && (
+                <span className="rounded-md bg-amber-200/80 px-1.5 py-0.5 text-[11px] font-black text-amber-900">−{hintShareXp} XP</span>
+              )}
+            </button>
+            {!immediate ? (
+              <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary min-w-[160px] !py-3">
+                {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />} Kiểm tra
+              </button>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">Chọn một đáp án phía trên để trả lời</p>
+            )}
+          </div>
+        )}
       </section>
 
       {quitOpen && (
@@ -556,50 +603,26 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
         />
       )}
 
-      {!result ? (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={askHint}
-            disabled={Boolean(reveal) || busy}
-            aria-label={reveal ? 'Đã dùng gợi ý' : (xpDisabled ? 'Gợi ý' : `Gợi ý, mất ½ XP câu này (−${hintShareXp})`)}
-            title={xpDisabled ? 'Gợi ý (không ảnh hưởng XP)' : `Gợi ý, mất ½ phần XP của câu này (−${hintShareXp} XP khi đạt)`}
-            className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 text-amber-600 transition hover:bg-amber-50 disabled:opacity-50 !shadow-none"
-          >
-            <Lightbulb size={18} className={reveal ? 'text-slate-400' : 'fill-amber-300 text-amber-500'} />
-            {!xpDisabled && !reveal && hintShareXp > 0 && (
-              <span className="text-[10px] font-black text-amber-700">−{hintShareXp}</span>
-            )}
-          </button>
-          {!immediate && (
-            <button type="button" onClick={() => submit(pending)} disabled={!pending || busy} className="cms-btn cms-btn-primary flex-1 !py-3">
-              {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />} Kiểm tra
-            </button>
-          )}
-          {immediate && (
-            <p className="flex-1 text-right text-[11px] font-semibold text-slate-400">Chọn đáp án để trả lời</p>
-          )}
-        </div>
-      ) : (
-        <div className={`dp-slide-up flex items-center gap-3 rounded-[20px] px-3.5 py-3 sm:px-4 ${result.correct ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-red-50 ring-1 ring-red-200'}`}>
+      {result && (
+        <div className={`dp-slide-up flex items-center gap-4 rounded-2xl px-5 py-4 shadow-sm ${result.correct ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-red-50 ring-1 ring-red-200'}`}>
           <div className="min-w-0 flex-1">
-              <p className={`flex flex-wrap items-center gap-1.5 text-base font-black ${result.correct ? 'text-emerald-700' : 'text-red-600'}`}>
-                {result.correct ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                {feedbackTitle}
-              </p>
-              {!result.correct && result.correctAnswer?.text && (
-                <p className="mt-0.5 truncate text-sm font-semibold text-slate-700">Đáp án: {result.correctAnswer.text}</p>
-              )}
-              {result.explanation && <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{result.explanation}</p>}
+            <p className={`flex flex-wrap items-center gap-2 text-base font-black sm:text-lg ${result.correct ? 'text-emerald-700' : 'text-red-600'}`}>
+              {result.correct ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+              {feedbackTitle}
+            </p>
+            {!result.correct && result.correctAnswer?.text && (
+              <p className="mt-1 truncate text-sm font-bold text-slate-700">Đáp án đúng: {result.correctAnswer.text}</p>
+            )}
+            {result.explanation && <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-600">{result.explanation}</p>}
           </div>
           <button
             type="button"
             onClick={next}
             disabled={busy}
-            className={`cms-btn shrink-0 !px-4 !py-2.5 text-white sm:!px-5 ${result.correct ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-red-600 hover:!bg-red-700'}`}
+            className={`cms-btn shrink-0 !rounded-xl !px-5 !py-3 text-white ${result.correct ? '!bg-emerald-600 hover:!bg-emerald-700' : '!bg-red-600 hover:!bg-red-700'}`}
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-            {index + 1 < total ? 'Tiếp' : 'Kết quả'}
+            {index + 1 < total ? 'Tiếp theo' : 'Kết quả'}
             <ArrowRight size={16} />
           </button>
         </div>
@@ -734,8 +757,8 @@ function StakeSessionConfirm({
   }
 
   const primaryLabel = isStart
-    ? (testOut ? `Cược ${stakeXp} XP và bắt đầu` : `Bắt đầu (${stakeXp} XP tối đa)`)
-    : `Làm lại (${stakeXp} XP tối đa)`;
+    ? (testOut ? `Cược ${stakeXp} XP` : 'Bắt đầu')
+    : 'Làm lại';
   const PrimaryIcon = isStart ? Play : RotateCcw;
 
   return createPortal(
@@ -759,7 +782,10 @@ function StakeSessionConfirm({
             {typeof xpTotal === 'number' ? ` · đang có ${xpTotal}` : ''}
           </p>
         </div>
-        <div className="flex flex-col gap-2 p-5">
+        <div className="grid grid-cols-2 gap-2.5 p-4">
+          <button type="button" onClick={onStay} disabled={starting || burst} className="cms-btn cms-btn-outline w-full !py-2.5 text-sm">
+            Để sau
+          </button>
           {isBlockedFreeTestOut || notEnoughXp ? (
             <button
               type="button"
@@ -767,10 +793,10 @@ function StakeSessionConfirm({
                 onStay();
                 onOpenMeet?.();
               }}
-              className="cms-btn cms-btn-primary w-full !py-3"
+              className="cms-btn cms-btn-primary w-full !py-2.5 text-sm"
             >
               <Crown size={16} className="text-amber-300" />
-              Nâng cấp gói Meet (+300 XP/ngày)
+              Nâng cấp gói
             </button>
           ) : (
             <button
@@ -781,15 +807,12 @@ function StakeSessionConfirm({
                 gameSounds.win();
               }}
               disabled={starting || burst}
-              className="cms-btn cms-btn-primary w-full !py-3"
+              className="cms-btn cms-btn-primary w-full !py-2.5 text-sm"
             >
               {starting || burst ? <Loader2 size={16} className="animate-spin" /> : <PrimaryIcon size={16} />}
               {primaryLabel}
             </button>
           )}
-          <button type="button" onClick={onStay} disabled={starting || burst} className="cms-btn cms-btn-outline w-full !py-2.5">
-            Để sau
-          </button>
         </div>
       </div>
     </div>,
@@ -805,13 +828,18 @@ function clientStakeMeta(pick) {
   return { stakeXp: SESSION_STAKE_XP, recovery: false, testOut: false };
 }
 
-function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
+function ResultScreen({ summary, liveXpTotal, onReplay, onHome, onNextStep, onOpenBuyXp, starting }) {
   const [rematchOpen, setRematchOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const pathResult = summary.path;
   const message = resultMessage(summary.stars);
   const good = summary.stars >= 2;
   const xpDisplay = practiceFinishXpDisplay(summary);
+  const rematchStakeXp = summary.xpDisabled ? 0 : (
+    summary.path?.testOut ? TEST_OUT_XP
+      : (summary.recovery ? 0 : ((summary.total || 10) * QUESTION_STAKE_XP))
+  );
+  const currentXpTotal = typeof liveXpTotal === 'number' ? liveXpTotal : summary.stats?.xpTotal;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -896,7 +924,17 @@ function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
           <button
             type="button"
             disabled={starting}
-            onClick={() => (pathResult && !pathResult.passed ? setRematchOpen(true) : onReplay())}
+            onClick={() => {
+              if (pathResult && !pathResult.passed) {
+                if (typeof currentXpTotal === 'number' && currentXpTotal < rematchStakeXp) {
+                  onOpenBuyXp?.();
+                } else {
+                  setRematchOpen(true);
+                }
+              } else {
+                onReplay();
+              }
+            }}
             className="cms-btn cms-btn-primary !py-3"
           >
             {starting ? <Loader2 size={17} className="animate-spin" /> : <RotateCcw size={17} />}
@@ -906,13 +944,14 @@ function ResultScreen({ summary, onReplay, onHome, onNextStep, starting }) {
       </div>
       {rematchOpen && (
         <StakeSessionConfirm
-          stakeXp={summary.xpDisabled ? 0 : (
-            summary.path?.testOut ? TEST_OUT_XP
-              : (summary.recovery ? 0 : ((summary.total || 10) * QUESTION_STAKE_XP))
-          )}
-          xpTotal={summary.stats?.xpTotal}
+          stakeXp={rematchStakeXp}
+          xpTotal={currentXpTotal}
           starting={starting}
           onStay={() => setRematchOpen(false)}
+          onOpenMeet={() => {
+            setRematchOpen(false);
+            onOpenBuyXp?.();
+          }}
           onGo={onReplay}
         />
       )}
@@ -1028,7 +1067,30 @@ export default function DailyPracticePage() {
       .finally(() => setPathLoading(false));
   }, []);
 
+  const refreshPathAndOverview = useCallback(() => {
+    loadPath();
+    loadOverview(true);
+  }, [loadPath, loadOverview]);
+
   useEffect(() => { loadOverview(); loadPath(); }, [loadOverview, loadPath]);
+
+  useEffect(() => {
+    const onStatsChanged = (event) => {
+      if (event?.detail) applyStats(event.detail);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadOverview(true);
+    };
+    const onFocus = () => loadOverview(true);
+    window.addEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [applyStats, loadOverview]);
 
   const changeMode = (next) => {
     setMode(next);
@@ -1050,15 +1112,15 @@ export default function DailyPracticePage() {
       loadOverview(true);
     } catch (err) {
       const message = err.message || 'Không bắt đầu được lượt chơi';
-      if (err.status === 402 || /hết xp/i.test(message)) {
+      if (err.status === 402 || /hết xp|không đủ xp/i.test(message)) {
         loadOverview(true);
         setBuyXpOpen(true);
       }
       if (pick.mode === 'path') {
-        setPathError(message);
+        if (err.status !== 402) setPathError(message);
         setSummary(null);
         loadPath();
-      } else {
+      } else if (err.status !== 402) {
         setError(message);
       }
     } finally {
@@ -1071,10 +1133,16 @@ export default function DailyPracticePage() {
       begin(pick);
       return;
     }
+    const xpTotal = overview?.stats?.xpTotal;
+    const isBlockedFreeTestOut = meta.testOut && path?.canTestOut !== true;
+    if (!isBlockedFreeTestOut && typeof xpTotal === 'number' && xpTotal < meta.stakeXp) {
+      setBuyXpOpen(true);
+      return;
+    }
     setStakeConfirm({
       pick,
       ...meta,
-      xpTotal: overview?.stats?.xpTotal,
+      xpTotal,
     });
   };
   const start = (topicId, difficulty) => begin({ mode: 'free', topicId, difficulty });
@@ -1171,9 +1239,11 @@ export default function DailyPracticePage() {
       ) : summary ? (
         <ResultScreen
           summary={summary}
+          liveXpTotal={overview?.stats?.xpTotal}
           starting={starting}
-          onReplay={() => lastPick && begin(lastPick)}
+          onReplay={() => lastPick && queueBegin(lastPick)}
           onNextStep={(next) => startStep(next.unitId, next.nodeKey || 'study', next.step)}
+          onOpenBuyXp={() => setBuyXpOpen(true)}
           onHome={goHome}
         />
       ) : (
@@ -1191,7 +1261,7 @@ export default function DailyPracticePage() {
           pathLoading={pathLoading}
           pathError={pathError}
           onStartStep={startStep}
-          onPathChanged={loadPath}
+          onPathChanged={refreshPathAndOverview}
           onBuyXpPaid={() => { loadOverview(); loadPath(); }}
           continueVideo={watchStage && mode === 'path'}
           requestedLesson={requestedLesson}
@@ -1215,15 +1285,17 @@ export default function DailyPracticePage() {
         <StakeSessionConfirm
           variant="start"
           stakeXp={stakeConfirm.stakeXp}
-          xpTotal={stakeConfirm.xpTotal}
+          xpTotal={overview?.stats?.xpTotal ?? stakeConfirm.xpTotal}
           recovery={stakeConfirm.recovery}
           testOut={stakeConfirm.testOut}
           testOutLocked={stakeConfirm.testOut && path?.canTestOut !== true}
           starting={starting}
           onStay={() => setStakeConfirm(null)}
           onOpenMeet={() => {
+            const lockedTestOut = stakeConfirm.testOut && path?.canTestOut !== true;
             setStakeConfirm(null);
-            setMeetOfferOpen(true);
+            if (lockedTestOut) setMeetOfferOpen(true);
+            else setBuyXpOpen(true);
           }}
           onGo={() => {
             const pick = stakeConfirm.pick;

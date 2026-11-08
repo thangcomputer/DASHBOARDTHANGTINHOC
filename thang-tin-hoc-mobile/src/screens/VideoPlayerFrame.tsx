@@ -13,6 +13,9 @@ export type VideoPlayerProgress = {
 export type VideoPlayerApi = {
   getCurrentTime: () => number;
   getDuration: () => number;
+  pause?: () => void;
+  play?: () => void;
+  seekTo?: (sec: number) => void;
 };
 
 export function VideoPlayerFrame({

@@ -1,21 +1,30 @@
 import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsType from 'expo-notifications';
 import { getMobileApiTokens, mobileApiRequest } from './apiClient';
 import { getMobileSoundEnabled } from './soundPreferences';
 
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const appIsActive = AppState.currentState === 'active';
-    const isIncomingCall = notification.request.content.data?.event === 'call:incoming';
-    return {
-      shouldShowBanner: !appIsActive || !isIncomingCall,
-      shouldShowList: !appIsActive || !isIncomingCall,
-      shouldPlaySound: !appIsActive,
-      shouldSetBadge: false,
-    };
-  },
-});
+function getNotificationsModule(): typeof NotificationsType | null {
+  if (Platform.OS === 'web') return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('expo-notifications') as typeof NotificationsType;
+}
+
+const nativeNotifications = getNotificationsModule();
+if (nativeNotifications) {
+  nativeNotifications.setNotificationHandler({
+    handleNotification: async (notification) => {
+      const appIsActive = AppState.currentState === 'active';
+      const isIncomingCall = notification.request.content.data?.event === 'call:incoming';
+      return {
+        shouldShowBanner: !appIsActive || !isIncomingCall,
+        shouldShowList: !appIsActive || !isIncomingCall,
+        shouldPlaySound: !appIsActive,
+        shouldSetBadge: false,
+      };
+    },
+  });
+}
 
 let registeredExpoPushToken = '';
 let registeredSessionKey = '';
@@ -28,30 +37,30 @@ function getProjectId() {
 }
 
 async function configureAndroidChannels() {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('default', {
+  if (Platform.OS !== 'android' || !nativeNotifications) return;
+  await nativeNotifications.setNotificationChannelAsync('default', {
     name: 'Thông báo',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: nativeNotifications.AndroidImportance.HIGH,
     sound: 'default',
     vibrationPattern: [0, 250, 250, 250],
   });
-  await Notifications.setNotificationChannelAsync('silent', {
+  await nativeNotifications.setNotificationChannelAsync('silent', {
     name: 'Thông báo (không âm thanh)',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: nativeNotifications.AndroidImportance.HIGH,
     sound: null,
     vibrationPattern: [0, 250, 250, 250],
   });
-  await Notifications.setNotificationChannelAsync('calls', {
+  await nativeNotifications.setNotificationChannelAsync('calls', {
     name: 'Cuộc gọi đến',
-    importance: Notifications.AndroidImportance.MAX,
+    importance: nativeNotifications.AndroidImportance.MAX,
     sound: 'default',
     vibrationPattern: [0, 400, 200, 400, 200, 700],
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    lockscreenVisibility: nativeNotifications.AndroidNotificationVisibility.PUBLIC,
   });
 }
 
 export async function registerMobilePushNotifications(requestPermission = false) {
-  if (Platform.OS === 'web') return false;
+  if (Platform.OS === 'web' || !nativeNotifications) return false;
   const projectId = getProjectId();
   if (!projectId) {
     if (requestPermission) {
@@ -61,15 +70,15 @@ export async function registerMobilePushNotifications(requestPermission = false)
   }
 
   await configureAndroidChannels();
-  let permission = await Notifications.getPermissionsAsync();
+  let permission = await nativeNotifications.getPermissionsAsync();
   if (permission.status !== 'granted' && requestPermission) {
-    permission = await Notifications.requestPermissionsAsync();
+    permission = await nativeNotifications.requestPermissionsAsync();
   }
   if (permission.status !== 'granted') return false;
 
   const tokens = getMobileApiTokens();
   if (!tokens?.sessionId) return false;
-  const pushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  const pushToken = (await nativeNotifications.getExpoPushTokenAsync({ projectId })).data;
   const soundEnabled = await getMobileSoundEnabled();
   const sessionKey = `${tokens.sessionId}:${pushToken}:${soundEnabled}`;
   if (sessionKey === registeredSessionKey) return true;
@@ -100,6 +109,32 @@ export async function requestWebNotificationPermission(): Promise<NotificationPe
     throw new Error('Thông báo trên web chỉ hoạt động qua HTTPS hoặc localhost.');
   }
   return window.Notification.requestPermission();
+}
+
+export type MobileNotificationResponse = NotificationsType.NotificationResponse;
+
+export function addMobileNotificationReceivedListener(
+  listener: (notification: NotificationsType.Notification) => void,
+): { remove: () => void } | null {
+  if (Platform.OS === 'web' || !nativeNotifications) return null;
+  return nativeNotifications.addNotificationReceivedListener(listener);
+}
+
+export function addMobileNotificationResponseReceivedListener(
+  listener: (response: NotificationsType.NotificationResponse) => void,
+): { remove: () => void } | null {
+  if (Platform.OS === 'web' || !nativeNotifications) return null;
+  return nativeNotifications.addNotificationResponseReceivedListener(listener);
+}
+
+export async function getMobileLastNotificationResponseAsync(): Promise<NotificationsType.NotificationResponse | null> {
+  if (Platform.OS === 'web' || !nativeNotifications) return null;
+  return nativeNotifications.getLastNotificationResponseAsync();
+}
+
+export async function clearMobileLastNotificationResponseAsync(): Promise<void> {
+  if (Platform.OS === 'web' || !nativeNotifications) return;
+  return nativeNotifications.clearLastNotificationResponseAsync();
 }
 
 export async function unregisterMobilePushNotifications() {

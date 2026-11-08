@@ -97,7 +97,7 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
   const eliminated = new Set(reveal?.eliminate || []);
   const locked = Boolean(result);
   return (
-    <div className="grid gap-2.5 sm:grid-cols-2">
+    <div className="grid gap-3.5 sm:grid-cols-2">
       {question.options.map((option, index) => {
         const isCorrect = locked && result.correctAnswer?.correctIndex === index;
         const isWrongPick = locked && chosen === index && !isCorrect;
@@ -108,20 +108,23 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
             type="button"
             disabled={locked || out}
             onClick={() => { gameSounds.tap(); onSubmit({ index }); }}
-            className={`${CHIP} flex items-center gap-3 !py-3 text-left text-[15px] ${
+            className={`${CHIP} group flex items-center gap-3.5 !rounded-2xl !px-4 !py-4 text-left text-[15px] sm:!px-5 ${
               isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop'
                 : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake'
                   : out ? 'border-slate-100 bg-slate-50 text-slate-300 line-through opacity-60'
-                    : CHIP_IDLE
+                    : 'border-slate-200/90 hover:border-sky-400 hover:bg-sky-50/40'
             }`}
           >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${
-              isCorrect ? 'bg-emerald-500 text-white' : isWrongPick ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-500'
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${
+              isCorrect ? 'bg-emerald-500 text-white'
+                : isWrongPick ? 'bg-red-500 text-white'
+                  : out ? 'bg-slate-100 text-slate-300'
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-sky-500 group-hover:text-white'
             }`}
             >
               {String.fromCharCode(65 + index)}
             </span>
-            <span className="flex-1">{option}</span>
+            <span className="flex-1 leading-snug">{option}</span>
           </button>
         );
       })}

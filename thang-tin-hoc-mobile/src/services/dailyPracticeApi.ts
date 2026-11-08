@@ -1,7 +1,34 @@
+import { DeviceEventEmitter } from 'react-native';
 import { mobileApiRequest } from './apiClient';
+
+export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
+export const QUESTION_STAKE_XP = 5;
+export const SESSION_STAKE_XP = 50;
+export const TEST_OUT_XP = 50;
+
+export function emitDailyPracticeStats(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return;
+  const obj = payload as Record<string, unknown>;
+  const stats = (obj.stats && typeof obj.stats === 'object') ? { ...(obj.stats as Record<string, unknown>) } : {};
+  if (typeof obj.profileXp === 'number' && typeof stats.xpTotal !== 'number') {
+    stats.xpTotal = obj.profileXp;
+  }
+  if (typeof obj.currentXp === 'number' && typeof stats.xpTotal !== 'number') {
+    stats.xpTotal = obj.currentXp;
+  }
+  if (Object.keys(stats).length === 0) return;
+  DeviceEventEmitter.emit(DAILY_PRACTICE_STATS_EVENT, stats);
+}
 
 export type DpDifficulty = 'easy' | 'medium' | 'hard';
 export type DpType = 'mcq' | 'truefalse' | 'order' | 'match' | 'fill' | 'sort';
+
+export type DpXpPack = {
+  id?: string;
+  xp: number;
+  priceVnd: number;
+  label: string;
+};
 
 export type DpTopic = {
   id: string;
@@ -14,6 +41,11 @@ export type DpTopic = {
 
 export type DpStats = {
   xpTotal: number;
+  purchasedXp?: number;
+  dailyAllowanceXp?: number;
+  dailyRefillXp?: number;
+  xpEmpty?: boolean;
+  xpPacks?: DpXpPack[];
   streak: number;
   bestStreak: number;
   playedToday: boolean;
@@ -24,19 +56,8 @@ export type DpStats = {
   streakState?: 'new' | 'active' | 'at_risk' | 'lost';
   lostStreak?: number;
   missedDays?: number;
-  /**
-   * Loại gói của học viên:
-   * - 'free'    : Miễn phí — 60 XP/ngày, chỉ ôn bài cũ khi hết XP
-   * - '1m'      : 1 tháng  — 300 XP/ngày, mở khóa bài mới (199.000đ)
-   * - '3m'      : 3 tháng  — 300 XP/ngày, mở khóa bài mới (399.000đ)
-   * - '6m'      : 6 tháng  — 300 XP/ngày, mở khóa bài mới (599.000đ)
-   * - '12m'     : 1 năm    — 300 XP/ngày, mở khóa bài mới (999.000đ)
-   * - 'lifetime': Vĩnh viễn — 300 XP/ngày, mở khóa bài mới (1.500.000đ)
-   */
   planType?: DpPlanType | string;
-  /** Giới hạn XP mỗi ngày theo gói (backend tính theo planType). */
   todayXpCap?: number;
-  /** Học viên đã hết XP ngày hôm nay. */
   xpCapReached?: boolean;
 };
 
@@ -81,6 +102,8 @@ export type DpAnswerResult = {
   answered: number;
   correctAnswer: DpCorrectAnswer;
   explanation: string;
+  profileXp?: number;
+  wrongPenaltyXp?: number;
 };
 
 export type DpReveal = {
@@ -91,22 +114,34 @@ export type DpReveal = {
   item?: { name: string; group: string };
 };
 
-export type DpStepKey = 'learn' | 'practice' | 'challenge' | 'checkpoint';
+export type DpStepKey = 'learn' | 'practice' | 'challenge' | 'checkpoint' | string;
 export type DpNodeState = 'completed' | 'active' | 'locked';
+
+export type DpVideoCheck = {
+  prompt: string;
+  options: string[];
+  passed?: boolean;
+  hintBought?: boolean;
+  hint?: string;
+};
 
 export type DpPathStep = {
   key: DpStepKey;
   label: string;
+  title?: string;
+  content?: string;
+  kind?: 'lesson' | 'quiz';
   difficulty: DpDifficulty | null;
   passPercent: number;
   state: DpNodeState;
-  videos?: { id: string; title: string; url: string; step?: DpStepKey; state: DpNodeState }[];
+  videos?: DpPathVideo[];
 };
 
 export type DpPathNode = {
   key: string;
   label: string;
   icon: string;
+  kind?: 'study' | 'quiz';
   sortOrder: number;
   state: DpNodeState;
   levels: DpPathStep[];
@@ -131,10 +166,14 @@ export type DpPathVideo = {
   id: string;
   title: string;
   url: string;
+  content?: string;
   state: DpNodeState;
   source?: 'unit' | 'step';
   step?: DpStepKey;
   stepLabel?: string;
+  checks?: DpVideoCheck[];
+  checksPassed?: boolean;
+  hintCostXp?: number;
 };
 
 /** Danh sách phát của popup video: video riêng của chặng + video buổi bài giảng đã gắn (nếu HV được mở). */
@@ -161,6 +200,7 @@ export type DpNextStep = {
   nodeLabel: string;
   step: DpStepKey;
   stepLabel: string;
+  kind?: 'lesson' | 'quiz';
 };
 
 export type DpTopicPath = {
@@ -188,9 +228,19 @@ export type DpPathResult = {
 
 export type DpSession = {
   id: string;
+  mode?: 'path' | 'free';
   difficulty: DpDifficulty;
   total: number;
   questions: DpQuestion[];
+  xpDisabled?: boolean;
+  stakeXp?: number;
+  perQuestionStakeXp?: number;
+  sessionStakeXp?: number;
+  recovery?: boolean;
+  review?: boolean;
+  mandatory?: boolean;
+  profileXp?: number;
+  xpPacks?: DpXpPack[];
   path?: {
     unitId: string;
     unitTitle: string;
@@ -200,6 +250,7 @@ export type DpSession = {
     step: DpStepKey;
     stepLabel: string;
     testOut: boolean;
+    review?: boolean;
     passPercent: number;
   };
 };
@@ -211,6 +262,9 @@ export type DpSummary = {
   xp: number;
   bonusXp: number;
   gainedXp: number;
+  stakeXp?: number;
+  recovery?: boolean;
+  reviewMode?: boolean;
   streakIncreased: boolean;
   stats: DpStats;
   review: Array<{ id: string; prompt: string; correctAnswer: DpCorrectAnswer; explanation: string }>;
@@ -220,15 +274,7 @@ export type DpSummary = {
   durationSeconds?: number;
   firstToday?: boolean;
   week?: Array<{ day: string; label: string; played: boolean; today: boolean }>;
-  /**
-   * Phiên này không tính XP vì học viên free đã đạt giới hạn 60 XP/ngày.
-   * Vẫn ghi nhận streak & tiến độ bài CŨ, nhưng không mở khóa bài MỚI.
-   */
   xpDisabled?: boolean;
-  /**
-   * Học viên free đã hết XP ngày — kích thích mua gói.
-   * Khi true: hiện banner chặn mở bài mới, CTA → trang mua gói.
-   */
   xpCapReached?: boolean;
 };
 
@@ -245,6 +291,37 @@ export type DpRelatedLesson = {
   completed?: boolean;
 };
 
+export type DpXpCheckout = {
+  sessionId?: string;
+  orderCode: string;
+  xp: number;
+  amount: number;
+  qrUrl?: string;
+  bankName?: string;
+  accountNo?: string;
+  accountName?: string;
+  transferContent?: string;
+  canSimulate?: boolean;
+  payment?: {
+    qrUrl?: string;
+    bankName?: string;
+    accountNo?: string;
+    accountName?: string;
+    transferContent?: string;
+    canSimulate?: boolean;
+  };
+};
+
+export type DpXpPurchaseStatus = {
+  sessionId?: string;
+  orderCode?: string;
+  status: 'pending' | 'paid' | 'expired' | 'cancelled' | string;
+  xp?: number;
+  currentXp?: number;
+  profileXp?: number;
+  purchasedXp?: number;
+};
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const payload = await mobileApiRequest<{ data?: T }>(
     `/daily-practice/my${path}`,
@@ -256,19 +333,132 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 
 /** Luyện tập hằng ngày — cùng API với web. */
 export const dailyPracticeApi = {
-  overview: () => call<{ topics: DpTopic[]; stats: DpStats }>('/overview'),
-  start: (topicId: string, difficulty: DpDifficulty) => call<DpSession>('/sessions', { topicId, difficulty }),
+  overview: () => call<{ topics: DpTopic[]; stats: DpStats }>('/overview').then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  start: (topicId: string, difficulty: DpDifficulty) => call<DpSession>('/sessions', { topicId, difficulty }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
   path: () => call<{ topics: DpTopicPath[] }>('/path'),
   unitVideos: (unitId: string) => call<DpUnitVideos>(`/path/units/${encodeURIComponent(unitId)}/videos`),
   videoWatched: (unitId: string, videoId: string) => call<{ watched: boolean }>('/path/videos/watched', { unitId, videoId }),
-  startPath: (unitId: string, step: DpStepKey, testOut = false, nodeKey = '') => call<DpSession>('/sessions', { mode: 'path', unitId, step, testOut, nodeKey }),
-  answer: (sessionId: string, questionId: string, answer: DpAnswer) => call<DpAnswerResult>(`/sessions/${sessionId}/answer`, { questionId, answer }),
-  hint: (sessionId: string, questionId: string) => call<{ hint: string; reveal: DpReveal }>(`/sessions/${sessionId}/hint`, { questionId }),
-  finish: (sessionId: string) => call<DpSummary>(`/sessions/${sessionId}/finish`, {}),
+  answerVideoCheck: (
+    unitId: string,
+    videoId: string,
+    checkIndex: number,
+    optionIndex: number,
+    extra: { text?: string; checkId?: string; imageDataUrl?: string } = {},
+  ) => call<{
+    correct: boolean;
+    passed?: boolean;
+    allChecksPassed?: boolean;
+    xpDelta?: number;
+    profileXp?: number;
+    hint?: string;
+    needsReview?: boolean;
+  }>('/path/videos/check', { unitId, videoId, checkIndex, choiceIndex: optionIndex, optionIndex, ...extra }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  buyVideoHint: (unitId: string, videoId: string, checkIndex: number) => call<{
+    hint: string;
+    costXp: number;
+    profileXp: number;
+  }>('/path/videos/hint', { unitId, videoId, checkIndex }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  startPath: (unitId: string, step: DpStepKey, testOut = false, nodeKey = '', opts: { review?: boolean } = {}) => call<DpSession>(
+    '/sessions',
+    { mode: 'path', unitId, step, testOut, nodeKey, review: Boolean(opts.review) },
+  ).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  answer: (sessionId: string, questionId: string, answer: DpAnswer) => call<DpAnswerResult>(`/sessions/${sessionId}/answer`, { questionId, answer }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  hint: (sessionId: string, questionId: string) => call<{ hint: string; reveal: DpReveal; profileXp?: number; hintPenaltyXp?: number }>(`/sessions/${sessionId}/hint`, { questionId }).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  finish: (sessionId: string) => call<DpSummary>(`/sessions/${sessionId}/finish`, {}).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  abandon: (sessionId: string) => call<{ abandoned?: boolean; profileXp?: number; stats?: DpStats }>(`/sessions/${sessionId}/abandon`, {}).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
   relatedTopics: (subjectId: string, unitId = '') => call<DpTopic[]>(
     `/related-topics?subjectId=${encodeURIComponent(subjectId)}${unitId ? `&unitId=${encodeURIComponent(unitId)}` : ''}`,
   ),
+  buyXp: (packId: string) => call<DpXpCheckout>('/xp/purchase', { packId }),
+  createXpCheckout: (packIdOrXp: string | number) => {
+    const packId = typeof packIdOrXp === 'string' ? packIdOrXp : `xp_${packIdOrXp}`;
+    return call<DpXpCheckout>('/xp/purchase', { packId });
+  },
+  xpPurchaseStatus: (sessionId: string) => call<DpXpPurchaseStatus>(`/xp/purchase/${encodeURIComponent(sessionId)}`).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
+  simulateXpPaid: (sessionId: string) => call<DpXpPurchaseStatus>(`/xp/purchase/${encodeURIComponent(sessionId)}/simulate-paid`, {}).then((data) => {
+    emitDailyPracticeStats(data);
+    return data;
+  }),
 };
+
+export function inPlayWalletXp(profileXp = 0, stakeXp = 0) {
+  return Math.max(0, (Number(profileXp) || 0) + (Number(stakeXp) || 0));
+}
+
+export function practiceFinishXpDisplay(summary: Partial<DpSummary> = {}) {
+  if (summary.xpDisabled) {
+    return {
+      amount: 0,
+      prefix: '',
+      positive: true,
+      caption: summary.reviewMode
+        ? 'Ôn lại — không cộng và không trừ XP'
+        : 'Luyện tự do — không tính XP',
+    };
+  }
+  const net = Number(summary.gainedXp) || 0;
+  const stake = Number(summary.stakeXp) || 0;
+  const passed = summary.path ? Boolean(summary.path.passed) : true;
+  if (net > 0) {
+    return {
+      amount: net,
+      prefix: '+',
+      positive: true,
+      caption: summary.recovery
+        ? `Phục hồi · không cược · nhận +${net} XP`
+        : (stake > 0 ? `Hoàn ${stake} XP cược · nhận thêm +${net} XP` : `Hoàn thành nấc · cộng +${net} XP vào ví`),
+    };
+  }
+  if (net < 0) {
+    const lost = Math.abs(net);
+    return {
+      amount: lost,
+      prefix: '−',
+      positive: false,
+      caption: !passed
+        ? `Chưa đạt ${summary.path?.passPercent || 60}% · trừ ${lost} XP câu sai/gợi ý, không nhận XP câu đúng`
+        : `Đạt nấc · câu sai nhiều hơn câu đúng (−${lost} XP ròng)`,
+    };
+  }
+  return {
+    amount: 0,
+    prefix: '',
+    positive: passed,
+    caption: summary.recovery
+      ? 'Chưa đạt điểm vượt — không mất thêm XP'
+      : 'Ví XP không đổi sau lượt này',
+  };
+}
 
 // ── Gói XP ───────────────────────────────────────────────────────────────────
 

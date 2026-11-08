@@ -78,18 +78,7 @@ export function LearningGoalCard() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const [data, setData] = useState<LearningGoalData | null>(null);
   const openVideoMission = () => {
-    getStudyResumePoint()
-      .then((point) => navigation.navigate('MainTabs', {
-        screen: 'CourseVideos',
-        params: point ? {
-          resumeKey: Date.now(),
-          resumeSubjectId: point.subjectId,
-          resumeCourseId: point.courseId,
-          resumeUnitId: point.unitId,
-          resumeSectionId: point.sectionId,
-        } : undefined,
-      }))
-      .catch(() => navigation.navigate('MainTabs', { screen: 'CourseVideos' }));
+    navigation.navigate('DailyPractice', { watch: 'stage' });
   };
 
   const load = useCallback(() => {
@@ -246,15 +235,15 @@ const styles = StyleSheet.create({
   metric: { gap: 6 },
   metricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   metricLabel: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metricLabelText: { color: '#475569', fontSize: 12, fontWeight: '800' },
-  metricValue: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  metricLabelText: { color: '#475569', fontSize: 13, fontWeight: '800' },
+  metricValue: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   track: { height: 10, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 999 },
-  done: { color: '#059669', fontSize: 11, fontWeight: '800' },
+  done: { color: '#059669', fontSize: 12, fontWeight: '800' },
   evidence: { gap: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: spacing.md },
   evidenceLabel: { color: '#334155', fontSize: 13, fontWeight: '900' },
   missionCount: {
-    color: '#475569', fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2,
+    color: '#475569', fontSize: 12, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2,
     borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden',
   },
   missionRow: { flexDirection: 'row', gap: spacing.sm },
@@ -274,10 +263,10 @@ const styles = StyleSheet.create({
   },
   missionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 2 },
   missionTitle: { flexShrink: 1, color: colors.ink, fontSize: 13, fontWeight: '900' },
-  missionMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  missionMeta: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   missionMetaDone: { color: '#059669' },
   missionTrack: { height: 6, marginTop: 4, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
-  periodEvidence: { color: '#94A3B8', fontSize: 11 },
+  periodEvidence: { color: '#94A3B8', fontSize: 12 },
   hintRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
-  hint: { flex: 1, color: '#94A3B8', fontSize: 11, lineHeight: 15 },
+  hint: { flex: 1, color: '#94A3B8', fontSize: 12, lineHeight: 16 },
 });

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Check, Flame, Gift, Target, Timer, Zap, type LucideIcon } from 'lucide-react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Award, Check, Crown, Flame, Gift, Star, Target, Timer, Trophy, Zap, type LucideIcon } from 'lucide-react-native';
 import { Mascot } from './Mascot';
 import type { GameSound } from './useGameSounds';
-import type { DpSummary } from '../../services/dailyPracticeApi';
+import { practiceFinishXpDisplay, type DpSummary } from '../../services/dailyPracticeApi';
 import { spacing } from '../../theme/tokens';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 function useCountUp(target: number, duration = 900) {
   const [value, setValue] = useState(0);
@@ -23,7 +25,7 @@ function useCountUp(target: number, duration = 900) {
 function PopIn({ delay = 0, children, style }: { delay?: number; children: React.ReactNode; style?: object }) {
   const value = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.spring(value, { toValue: 1, delay, friction: 6, tension: 90, useNativeDriver: true }).start();
+    Animated.spring(value, { toValue: 1, delay, friction: 6, tension: 90, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [delay, value]);
   return (
     <Animated.View style={[style, { opacity: value, transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
@@ -61,24 +63,75 @@ function Shell({ children, button, onNext }: { children: React.ReactNode; button
 }
 
 function DoneStage({ summary, play, onNext }: { summary: DpSummary; play: (s: GameSound) => void; onNext: () => void }) {
-  const xp = useCountUp(summary.gainedXp);
+  const xpDisplay = practiceFinishXpDisplay(summary);
+  const xp = useCountUp(xpDisplay.amount);
   const good = summary.stars >= 2;
   const fly = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     play(good ? 'win' : 'sad');
-    Animated.spring(fly, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }).start();
+    Animated.spring(fly, { toValue: 1, friction: 5, tension: 60, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [fly, good, play]);
   return (
     <Shell button="NHẬN XP" onNext={onNext}>
       <Animated.View style={{ opacity: fly, transform: [{ translateY: fly.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }, { rotate: fly.interpolate({ inputRange: [0, 1], outputRange: ['-12deg', '0deg'] }) }] }}>
-        <Mascot mood={good ? 'happy' : 'idle'} size={140} />
+        <Mascot mood={good ? 'done' : 'determinedSoft'} size={140} />
       </Animated.View>
       <Text style={styles.doneTitle}>{good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!'}</Text>
+      <Text style={styles.doneCaption}>{xpDisplay.caption}</Text>
       <View style={styles.statRow}>
-        <StatCard label="TỔNG XP" tone="#F59E0B" icon={Zap} value={xp} delay={150} />
+        <StatCard label="NHẬN VỀ" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
         <StatCard label="COMBO" tone="#0EA5E9" icon={Target} value={`x${summary.maxCombo || 0}`} delay={300} />
         <StatCard label="THỜI GIAN" tone="#10B981" icon={Timer} value={formatDuration(summary.durationSeconds)} delay={450} />
       </View>
+    </Shell>
+  );
+}
+
+function CourseTrophyStage({ summary, play, onNext }: { summary: DpSummary; play: (s: GameSound) => void; onNext: () => void }) {
+  const pathResult = summary.path;
+  const isFullCourse = Boolean(pathResult?.topicCompleted);
+  useEffect(() => {
+    play('win');
+  }, [play]);
+  return (
+    <Shell button="NHẬN CÚP VINH DANH" onNext={onNext}>
+      <PopIn style={styles.trophyCard}>
+        <View style={styles.trophyBadge}>
+          <Crown size={14} color="#D97706" fill="#FBBF24" />
+          <Text style={styles.trophyBadgeText}>
+            {isFullCourse ? 'VINH DANH HOÀN THÀNH KHÓA HỌC' : `HOÀN THÀNH CHẶNG · ${pathResult?.unitTitle || ''}`}
+          </Text>
+        </View>
+        <View style={styles.trophyCenterRow}>
+          <Mascot mood="graduate" size={88} />
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', gap: 4, marginBottom: 6 }}>
+              {[1, 2, 3].map((n) => (
+                <Star key={n} size={n === 2 ? 22 : 17} color="#F59E0B" fill="#FBBF24" />
+              ))}
+            </View>
+            <View style={styles.trophyCupBox}>
+              <Trophy size={46} color="#FFFFFF" />
+            </View>
+            <Text style={styles.trophyRibbon}>{isFullCourse ? 'CÚP VÀNG TOÀN KHÓA' : 'CÚP VƯỢT CHẶNG'}</Text>
+          </View>
+          <Mascot mood="celebrate" size={88} />
+        </View>
+        <Text style={styles.trophyTitle}>
+          {isFullCourse ? 'Chúc mừng bạn đã hoàn thành khóa học!' : `Chinh phục thành công ${pathResult?.unitTitle || 'chặng học'}!`}
+        </Text>
+        <Text style={styles.trophyDesc}>
+          {isFullCourse
+            ? 'Tuyệt vời! Bạn đã vượt qua toàn bộ các chặng thử thách và rước Cúp Vàng Vinh Danh!'
+            : (pathResult?.unlockedUnit
+              ? `Xuất sắc! Bạn đã mở khóa Chặng ${pathResult.unlockedUnit.index}: ${pathResult.unlockedUnit.title}.`
+              : 'Phong độ rất ấn tượng! Hãy tiếp tục tiến bước trên lộ trình chinh phục khóa học.')}
+        </Text>
+        <View style={styles.trophyMetaPill}>
+          <Award size={15} color="#D97706" />
+          <Text style={styles.trophyMetaText}>{`Đạt ${pathResult?.scorePercent || 100}% chính xác · Danh hiệu Học Viên Xuất Sắc`}</Text>
+        </View>
+      </PopIn>
     </Shell>
   );
 }
@@ -90,8 +143,8 @@ function StreakStage({ summary, play, onNext }: { summary: DpSummary; play: (s: 
   useEffect(() => {
     play('correct');
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(flicker, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(flicker, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(flicker, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(flicker, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
     ]));
     loop.start();
     return () => loop.stop();
@@ -151,11 +204,13 @@ function QuestStage({ play, onNext }: { play: (s: GameSound) => void; onNext: ()
  * Đã luyện tập xong → chuỗi ngày (khi tăng) → nhiệm vụ hằng ngày (lượt đầu trong ngày) → kết quả chi tiết.
  */
 export function Celebration({ summary, play, onDone }: { summary: DpSummary; play: (s: GameSound) => void; onDone: () => void }) {
+  const hasTrophyStage = Boolean(summary.path?.passed && (summary.path?.topicCompleted || summary.path?.unitCompleted || summary.path?.testOut));
   const stages = useMemo(() => [
     'done',
+    ...(hasTrophyStage ? ['trophy'] : []),
     ...(summary.streakIncreased ? ['streak'] : []),
     ...(summary.firstToday ? ['quest'] : []),
-  ], [summary]);
+  ], [summary, hasTrophyStage]);
   const [index, setIndex] = useState(0);
   const next = () => {
     play('tap');
@@ -163,6 +218,7 @@ export function Celebration({ summary, play, onDone }: { summary: DpSummary; pla
     else onDone();
   };
   const stage = stages[index];
+  if (stage === 'trophy') return <CourseTrophyStage key="trophy" summary={summary} play={play} onNext={next} />;
   if (stage === 'streak') return <StreakStage key="streak" summary={summary} play={play} onNext={next} />;
   if (stage === 'quest') return <QuestStage key="quest" play={play} onNext={next} />;
   return <DoneStage key="done" summary={summary} play={play} onNext={next} />;
@@ -176,9 +232,10 @@ const styles = StyleSheet.create({
   } as never,
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
   doneTitle: { color: '#0284C7', fontSize: 26, fontWeight: '900', textAlign: 'center' },
+  doneCaption: { color: '#64748B', fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: -6 },
   statRow: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' },
   statCard: { flex: 1, borderWidth: 2, borderRadius: 16, overflow: 'hidden', backgroundColor: '#FFFFFF' },
-  statLabel: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', textAlign: 'center', paddingVertical: 4, letterSpacing: 0.6 },
+  statLabel: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', textAlign: 'center', paddingVertical: 4, letterSpacing: 0.6 },
   statBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12 },
   statValue: { fontSize: 19, fontWeight: '900' },
   speech: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
@@ -198,4 +255,29 @@ const styles = StyleSheet.create({
   questFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 999, backgroundColor: '#FBBF24' },
   questCount: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', textAlign: 'center' },
   questChest: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0EA5E9' },
+  trophyCard: {
+    alignSelf: 'stretch', alignItems: 'center', padding: spacing.lg, borderRadius: 28, borderWidth: 2,
+    borderColor: '#FCD34D', backgroundColor: '#FFFBEB', gap: 12,
+  },
+  trophyBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: 999, borderWidth: 1, borderColor: '#FCD34D', backgroundColor: '#FEF3C7',
+  },
+  trophyBadgeText: { color: '#92400E', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  trophyCenterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 4 },
+  trophyCupBox: {
+    width: 92, height: 92, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F59E0B', borderWidth: 3, borderColor: '#FDE68A',
+  },
+  trophyRibbon: {
+    marginTop: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8,
+    backgroundColor: '#78350F', color: '#FEF3C7', fontSize: 11, fontWeight: '900', letterSpacing: 0.6,
+  },
+  trophyTitle: { color: '#0F172A', fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  trophyDesc: { color: '#475569', fontSize: 14, fontWeight: '600', textAlign: 'center', lineHeight: 21 },
+  trophyMetaPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 14, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A',
+  },
+  trophyMetaText: { color: '#92400E', fontSize: 12, fontWeight: '800' },
 });

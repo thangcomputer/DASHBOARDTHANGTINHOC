@@ -86,13 +86,30 @@ function numberOrNull(value: unknown) {
   return value == null || value === '' || !Number.isFinite(parsed) ? null : parsed;
 }
 
+function isFreePortalWithoutRealCourse(user?: DemoUser | null): boolean {
+  if (!user || user.role !== 'student') return false;
+  const hasRealEnrollment = Array.isArray(user.enrollments) && user.enrollments.some((enrollment) => {
+    const label = String(enrollment?.courseName || '').trim().toLocaleLowerCase('vi');
+    return Boolean(label) && label !== 'tài khoản miễn phí' && enrollment.status === 'Đang học';
+  });
+  if (hasRealEnrollment) return false;
+  return user.freePortal === true || String(user.course || '').trim().toLocaleLowerCase('vi') === 'tài khoản miễn phí';
+}
+
 export async function getStudentQuizzes(user: DemoUser): Promise<StudentQuiz[]> {
   if (user.role !== 'student' || !user.id) {
     throw new Error('Không thể tải bài trắc nghiệm: tài khoản học viên không hợp lệ.');
   }
   if (user.previewMode) return [];
+  if (isFreePortalWithoutRealCourse(user) && user.freeUnlocked !== true) return [];
 
-  const response = await mobileApiRequest<{ data?: Raw[] }>('/quizzes/student');
+  let response: { data?: Raw[] };
+  try {
+    response = await mobileApiRequest<{ data?: Raw[] }>('/quizzes/student');
+  } catch (err) {
+    if ((err as { status?: number })?.status === 403) return [];
+    throw err;
+  }
   if (!Array.isArray(response.data)) {
     throw new Error('Phản hồi danh sách bài trắc nghiệm không hợp lệ.');
   }
@@ -235,6 +252,13 @@ export async function getStudentEvaluationActivity(user: DemoUser): Promise<Stud
   );
   const rawStudent = record(student.data?.student);
   const enrollments = Array.isArray(rawStudent.enrollments) ? rawStudent.enrollments.map(record) : [];
+  const hasRealCourse = enrollments.some((enrollment) => {
+    const status = text(enrollment.status || 'active').toLowerCase();
+    if (['cancelled', 'refunded', 'pending_payment', 'completed', 'hoàn thành', 'hoan thanh'].includes(status)) return false;
+    const label = text(enrollment.courseName).toLowerCase();
+    return Boolean(label) && label !== 'tài khoản miễn phí';
+  });
+  if (rawStudent.freePortal === true && !hasRealCourse) return [];
   const teacherIds = [...new Set(enrollments.map((enrollment) => {
     const teacher = record(enrollment.teacherId);
     return text(teacher._id || teacher.id || enrollment.teacherId);

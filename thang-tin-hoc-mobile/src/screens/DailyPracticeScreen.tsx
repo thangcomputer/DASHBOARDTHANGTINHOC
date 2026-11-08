@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, DeviceEventEmitter, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Animated, DeviceEventEmitter, Easing, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import {
-  ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Globe,
-  Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Monitor, Play, PlayCircle, Presentation, RotateCcw, Route, Sheet, ShieldCheck,
-  Shuffle, Sparkles, Star, Trophy, Video as VideoIcon, X, XCircle, Zap,
+  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronRight, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Globe,
+  HelpCircle, Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
+  ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, X, XCircle, Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -14,19 +16,24 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList } from '../navigation/types';
 import { AppHeader, AppScreen } from '../components/ui';
 import { Mascot, type MascotMood } from '../components/dailyPractice/Mascot';
-import { DropletMark, PathITBackdrop, PathMascotBuddy, StageDropletBadge } from '../components/dailyPractice/PathDecor';
+import { DropletMark, PathITBackdrop, PathMascotBuddy, PathSnakeConnector, StageBuddiesOverlay } from '../components/dailyPractice/PathDecor';
 import { DragProvider } from '../components/dailyPractice/DragKit';
 import { Celebration } from '../components/dailyPractice/Celebration';
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
+import { VideoPlayerFrame, type VideoPlayerApi } from './VideoPlayerFrame';
+import { resolveMobilePublicUrl } from '../services/apiClient';
+import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/videoSource';
 import { useAuth } from '../app/AuthContext';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from '../components/dailyPractice/Questions';
 import { useGameSounds, type GameSound } from '../components/dailyPractice/useGameSounds';
-import { LEARNING_GOAL_CHANGED_EVENT } from '../services/learningGoalApi';
+import { getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
 import { getMobileImageSource } from '../services/apiClient';
 import {
-  DP_DIFFICULTIES, DP_PLAN_XP_CAP, DP_PLANS, DP_TOPIC_COLORS, DP_TYPES, dailyPracticeApi, dpIsPro, dpXpCapReached, playQuestionHeaderChips, randomComfort, randomPraise, resultMessage, unitColor,
+  DAILY_PRACTICE_STATS_EVENT, DP_DIFFICULTIES, DP_PLAN_XP_CAP, DP_PLANS, DP_TOPIC_COLORS, DP_TYPES,
+  QUESTION_STAKE_XP, SESSION_STAKE_XP, TEST_OUT_XP,
+  dailyPracticeApi, dpIsPro, dpXpCapReached, inPlayWalletXp, playQuestionHeaderChips, practiceFinishXpDisplay, randomComfort, randomPraise, resultMessage, unitColor,
   type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpPlanType, type DpStepKey,
-  type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath,
+  type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath, type DpXpCheckout, type DpXpPack,
 } from '../services/dailyPracticeApi';
 import { colors, spacing } from '../theme/tokens';
 
@@ -35,6 +42,7 @@ const TOPIC_ICONS: Record<string, LucideIcon> = {
   keyboard: Keyboard, shield: ShieldCheck, cpu: Cpu, mail: Mail, image: ImageIcon, code: Code2,
 };
 const CONFETTI_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const gradient = (from: string, to: string) => ({ backgroundColor: to, backgroundImage: `linear-gradient(180deg, ${from} 0%, ${to} 100%)` } as never);
 
 function Confetti({ count = 18, spread = 150 }: { count?: number; spread?: number }) {
@@ -45,7 +53,7 @@ function Confetti({ count = 18, spread = 150 }: { count?: number; spread?: numbe
     return { dx: Math.cos(angle) * distance, dy: Math.sin(angle) * distance - 30, rot: `${(i % 2 ? 1 : -1) * (200 + i * 20)}deg`, color: CONFETTI_COLORS[i % CONFETTI_COLORS.length] };
   }), [count, spread]);
   useEffect(() => {
-    Animated.timing(burst, { toValue: 1, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(burst, { toValue: 1, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [burst]);
   return (
     <View pointerEvents="none" style={styles.confettiLayer}>
@@ -72,86 +80,280 @@ function useShake(trigger: unknown) {
   useEffect(() => {
     if (!trigger) return;
     shake.setValue(0);
-    Animated.sequence([0, 1, -1, 1, -1, 0].map((v) => Animated.timing(shake, { toValue: v, duration: 60, useNativeDriver: true }))).start();
+    Animated.sequence([0, 1, -1, 1, -1, 0].map((v) => Animated.timing(shake, { toValue: v, duration: 60, useNativeDriver: USE_NATIVE_DRIVER }))).start();
   }, [shake, trigger]);
   return shake.interpolate({ inputRange: [-1, 1], outputRange: [-7, 7] });
 }
 
 // ── Màn chọn ─────────────────────────────────────────────────────────────────
 const MODES: Array<{ id: PracticeMode; label: string; icon: LucideIcon }> = [
-  { id: 'path', label: 'Lộ trình', icon: Route },
+  { id: 'path', label: 'Theo lộ trình', icon: Route },
   { id: 'free', label: 'Luyện tự do', icon: Shuffle },
 ];
 type PracticeMode = 'path' | 'free';
 
-// ── Thanh XP ngày (gói miễn phí) ─────────────────────────────────────────────
+const GOAL_KEY_PREFIX = 'daily_practice_goal_v1';
+const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-/** Thanh tiến độ XP ngày — hiển thị 60 XP free / ngày và kích thích mua gói. */
-function XpCapBar({ earned, cap }: { earned: number; cap: number }) {
-  const pct = Math.min(1, earned / cap);
-  const full = pct >= 1;
-  const remaining = Math.max(0, cap - earned);
+function DailyPracticeGoalPanel({
+  stats,
+  userId,
+  onWatchVideo,
+  onGoPractice,
+}: {
+  stats: DpStats | null;
+  userId?: string;
+  onWatchVideo?: () => void;
+  onGoPractice?: () => void;
+}) {
+  const storageKey = `${GOAL_KEY_PREFIX}:${userId || 'guest'}`;
+  const [goal, setGoal] = useState<{ dailyTarget: number; pace: 'self' | 'guided' }>({ dailyTarget: 1, pace: 'self' });
+  const [goalData, setGoalData] = useState<LearningGoalData | null>(null);
+
+  useEffect(() => {
+    getLearningGoal().then(setGoalData).catch(() => {});
+    const sub1 = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next: LearningGoalData) => {
+      if (next) setGoalData(next);
+      else getLearningGoal().then(setGoalData).catch(() => {});
+    });
+    const sub2 = DeviceEventEmitter.addListener(STUDY_MINUTE_EVENT, (res: { todayMinutes?: number }) => {
+      const todayMinutes = Number(res?.todayMinutes);
+      if (!Number.isFinite(todayMinutes)) return;
+      setGoalData((prev) => {
+        if (!prev) return prev;
+        const delta = Math.max(0, todayMinutes - (prev.progress.todayMinutes || 0));
+        return {
+          ...prev,
+          progress: { ...prev.progress, todayMinutes, periodMinutes: (prev.progress.periodMinutes || 0) + delta },
+        };
+      });
+    });
+    return () => { sub1.remove(); sub2.remove(); };
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(storageKey)
+      .then((raw) => {
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.dailyTarget === 'number') {
+          setGoal({
+            dailyTarget: Math.min(5, Math.max(1, Number(parsed.dailyTarget) || 1)),
+            pace: parsed.pace === 'guided' ? 'guided' : 'self',
+          });
+        }
+      })
+      .catch(() => undefined);
+  }, [storageKey]);
+
+  const updateGoal = (patch: Partial<{ dailyTarget: number; pace: 'self' | 'guided' }>) => {
+    setGoal((prev) => {
+      const next = { ...prev, ...patch };
+      AsyncStorage.setItem(storageKey, JSON.stringify(next)).catch(() => undefined);
+      return next;
+    });
+  };
+
+  const todaySessions = stats?.todaySessions || (stats?.playedToday ? 1 : 0);
+  const streak = stats?.streak || 0;
+  const bestStreak = stats?.bestStreak || 0;
+  const playedToday = Boolean(stats?.playedToday);
+  const todayProgress = Math.min(100, Math.round((todaySessions / Math.max(1, goal.dailyTarget)) * 100));
+
+  const progress: Partial<LearningGoalProgress> = goalData?.progress || {};
+  const todayQuestions = progress.todayQuestions ?? (stats?.playedToday ? 10 : 0);
+  const todayVideos = progress.todayVideos ?? 0;
+  const qDone = todayQuestions >= 10;
+  const vDone = todayVideos >= 1;
+  const missionDoneCount = (qDone ? 1 : 0) + (vDone ? 1 : 0);
+  const periodQuestions = progress.periodQuestions ?? todayQuestions;
+  const periodVideos = progress.periodVideos ?? todayVideos;
+  const period = goalData?.goal?.period || 'month';
+  const todayIdx = (new Date().getDay() + 6) % 7;
+
   return (
-    <View style={styles.xpCapWrap}>
-      <View style={styles.xpCapRow}>
-        <View style={styles.xpCapLabelRow}>
-          <Zap size={12} color={full ? '#DC2626' : '#D97706'} fill={full ? '#FCA5A5' : '#FCD34D'} />
-          <Text style={[styles.xpCapLabel, full && styles.xpCapLabelFull]}>
-            {full ? 'Đã đạt giới hạn XP miễn phí' : `XP miễn phí hôm nay: ${earned} / ${cap}`}
+    <View style={styles.gapMd}>
+      {/* Mục tiêu hôm nay */}
+      <View style={styles.goalCard}>
+        <View style={styles.goalHeaderRow}>
+          <View style={styles.inline}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FEF2F2' }]}>
+              <Target size={17} color="#DC2626" />
+            </View>
+            <View>
+              <Text style={styles.goalCardTitle}>Mục tiêu hôm nay</Text>
+              <Text style={styles.goalCardSub}>Kế hoạch rèn luyện hằng ngày</Text>
+            </View>
+          </View>
+          <View style={[styles.goalBadge, todayProgress >= 100 ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#F1F5F9' }]}>
+            <Text style={[styles.goalBadgeText, { color: todayProgress >= 100 ? '#047857' : '#334155' }]}>{`${todayProgress}%`}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.pathTrack, { height: 8 }]}>
+          <View style={[styles.pathFill, { width: `${todayProgress}%`, backgroundColor: todayProgress >= 100 ? '#10B981' : '#EF4444' }]} />
+        </View>
+
+        <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
+          <Text style={[styles.goalInfoTitle, { color: '#1E3A8A' }]}>Kế hoạch học tập</Text>
+          <Text style={[styles.goalInfoSub, { color: '#1D4ED8' }]}>Chọn số bài mỗi ngày để xây dựng thói quen học tập đều đặn.</Text>
+        </View>
+
+        <View style={{ gap: 6 }}>
+          <View style={styles.goalHeaderRow}>
+            <Text style={styles.goalLabelSmall}>Số lượt luyện mỗi ngày</Text>
+            <Text style={styles.goalValueSmall}>{`${goal.dailyTarget} lượt`}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[1, 2, 3, 4, 5].map((n) => {
+              const active = goal.dailyTarget === n;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => updateGoal({ dailyTarget: n })}
+                  style={[styles.goalTargetBtn, active && styles.goalTargetBtnActive]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.goalTargetBtnText, active && { color: '#FFFFFF' }]}>{n}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.goalFooterBox}>
+          <Calendar size={15} color="#64748B" />
+          <Text style={styles.goalFooterText}>
+            {'Đã hoàn thành '}
+            <Text style={{ fontWeight: '800', color: '#0F172A' }}>{`${todaySessions}/${goal.dailyTarget}`}</Text>
+            {' lượt bài hôm nay'}
           </Text>
         </View>
-        <Text style={[styles.xpCapPct, full && styles.xpCapLabelFull]}>{`${Math.round(pct * 100)}%`}</Text>
       </View>
-      <View style={styles.xpCapTrack}>
-        <View style={[styles.xpCapFill, { width: `${pct * 100}%` as unknown as number, backgroundColor: full ? '#EF4444' : '#F59E0B' }]} />
-      </View>
-      <Text style={styles.xpCapHint}>
-        {full
-          ? '⛔ Hết lượt — chỉ ôn bài cũ. Mua gói để '
-          : `Còn ${remaining} XP hôm nay. Mua gói để `}
-        <Text style={styles.xpCapHintBold}>{'mở bài mới & nhận 300 XP/ngày →'}</Text>
-      </Text>
-    </View>
-  );
-}
 
-// ── Banner hết XP free — chặn mở bài mới ─────────────────────────────────────
-/** Card cảnh báo khi học viên free hết 60 XP/ngày — chỉ ôn bài cũ được. */
-function XpCapBanner({ onBuyPress }: { onBuyPress: () => void }) {
-  return (
-    <View style={styles.xpCapBanner}>
-      <View style={styles.xpCapBannerTop}>
-        <Lock size={18} color="#B91C1C" />
-        <Text style={styles.xpCapBannerTitle}>Đã hết {DP_PLAN_XP_CAP.free} XP miễn phí hôm nay</Text>
-      </View>
-      <Text style={styles.xpCapBannerDesc}>
-        {'Bạn vẫn có thể ôn lại các bài đã học, nhưng '}
-        <Text style={styles.xpCapBannerBold}>không thể mở khóa bài tiếp theo</Text>
-        {' cho đến ngày mai hoặc khi mua gói (+300 XP/ngày).'}
-      </Text>
-      <View style={styles.xpCapBannerPlans}>
-        {DP_PLANS.filter((p) => p.id !== 'free').map((plan) => (
-          <View key={plan.id} style={styles.xpCapPlanRow}>
-            <Zap size={13} color="#D97706" fill="#FCD34D" />
-            <Text style={styles.xpCapPlanText}>
-              <Text style={styles.xpCapPlanBold}>{plan.label}</Text>
-              {` (${plan.priceText}) — +300 XP/ngày`}
-              {plan.badge ? <Text style={styles.xpCapPlanBadge}>{` · ${plan.badge}`}</Text> : null}
-            </Text>
+      {/* Nhiệm vụ hôm nay — Đồng bộ Web & Image 1 + 6 */}
+      <View style={styles.goalCard}>
+        <View style={styles.goalHeaderRow}>
+          <View style={styles.inline}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB' }]}>
+              <Sparkles size={17} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.goalCardTitle}>Nhiệm vụ hôm nay</Text>
+              <Text style={styles.goalCardSub}>Hoàn thành mục tiêu học và rèn luyện</Text>
+            </View>
           </View>
-        ))}
+          <View style={[styles.goalBadge, { backgroundColor: '#F1F5F9' }]}>
+            <Text style={[styles.goalBadgeText, { color: '#334155' }]}>{`${missionDoneCount}/2 hoàn thành`}</Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {/* Cột 1: Luyện tập (Xanh lá) */}
+          <Pressable
+            onPress={onGoPractice}
+            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Luyện tập: ${qDone ? 'Hoàn thành' : `${todayQuestions}/10 câu`}`}
+          >
+            <View style={[styles.missionSquareIcon, { backgroundColor: '#10B981' }]}>
+              <Gamepad2 size={20} color="#FFFFFF" />
+              {qDone ? (
+                <View style={styles.missionCheckBadge}>
+                  <Check size={10} strokeWidth={3.5} color="#059669" />
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.flex}>
+              <Text style={[styles.missionRowTitle, { color: '#065F46' }]}>Luyện tập</Text>
+              <Text style={[styles.missionRowSub, { color: '#059669' }]}>
+                {qDone ? `Hoàn thành · ${todayQuestions} câu` : `${todayQuestions}/10 câu`}
+              </Text>
+              <View style={[styles.missionRowTrack, { backgroundColor: '#D1FAE5' }]}>
+                <View style={[styles.missionRowFill, { width: `${Math.min(100, Math.round((todayQuestions / 10) * 100))}%`, backgroundColor: '#10B981' }]} />
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Cột 2: Xem video (Tím / Trắng đồng bộ Web) */}
+          <Pressable
+            onPress={onWatchVideo}
+            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Xem video: ${todayVideos}/1 video`}
+          >
+            <View style={[styles.missionCircleIcon, { backgroundColor: '#A855F7' }]}>
+              <PlayCircle size={22} color="#FFFFFF" />
+            </View>
+            <View style={styles.flex}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.missionRowTitle, { color: '#0F172A' }]}>Xem video</Text>
+                <ChevronRight size={14} color="#94A3B8" />
+              </View>
+              <Text style={[styles.missionRowSub, { color: '#64748B' }]}>
+                {`${todayVideos}/1 video`}
+              </Text>
+              <View style={[styles.missionRowTrack, { backgroundColor: '#F1F5F9' }]}>
+                <View style={[styles.missionRowFill, { width: `${Math.min(100, Math.round(todayVideos * 100))}%`, backgroundColor: '#A855F7' }]} />
+              </View>
+            </View>
+          </Pressable>
+        </View>
+
+        <Text style={styles.missionFooterText}>
+          {`Cả ${periodLabel(period)}: ${periodQuestions} câu · ${periodVideos} video`}
+        </Text>
       </View>
-      <Pressable onPress={onBuyPress} style={styles.xpCapBannerBtn} accessibilityRole="button">
-        <Crown size={16} color="#FFFFFF" />
-        <Text style={styles.xpCapBannerBtnText}>Nâng cấp gói Google Meet ngay</Text>
-      </Pressable>
+
+      {/* Chuỗi luyện tập */}
+      <View style={styles.goalCard}>
+        <View style={styles.goalHeaderRow}>
+          <View style={styles.inline}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED' }]}>
+              <Flame size={17} color="#EA580C" />
+            </View>
+            <View>
+              <Text style={styles.goalCardTitle}>Chuỗi học tập</Text>
+              <Text style={styles.goalCardSub}>{`Kỷ lục cao nhất: ${bestStreak} ngày`}</Text>
+            </View>
+          </View>
+          <View style={styles.inline}>
+            <Flame size={14} color="#EA580C" fill="#FB923C" />
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#EA580C' }}>{`${streak} ngày`}</Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {WEEK_DAYS.map((label, idx) => {
+            const isToday = idx === todayIdx;
+            const active = (isToday && playedToday) || (idx < todayIdx && streak >= (todayIdx - idx + (playedToday ? 1 : 0)));
+            return (
+              <View
+                key={label}
+                style={[
+                  styles.weekCell,
+                  active
+                    ? { borderColor: '#FDBA74', backgroundColor: '#FFF7ED' }
+                    : isToday
+                      ? { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }
+                      : { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+                ]}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
+                <Flame size={15} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
+              </View>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }
 
 function HomeView({
   topics, stats, loading, error, starting, onStart, play, initialTopicId = '',
-  mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onPathChanged, onBuyXp,
+  mode, onModeChange, pathTopics, pathLoading, pathError, onStartStep, onQuickStart, onPathChanged, onBuyXp,
+  initialWatchStage = false,
 }: {
   topics: DpTopic[];
   stats: DpStats | null;
@@ -166,13 +368,26 @@ function HomeView({
   pathTopics: DpTopicPath[];
   pathLoading: boolean;
   pathError: string;
-  onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean) => void;
+  onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean, opts?: { review?: boolean }) => void;
+  onQuickStart: (activeTopic?: DpTopicPath | null) => void;
   onPathChanged: () => void;
   /** Điều hướng đến màn mua gói XP. */
   onBuyXp: () => void;
+  initialWatchStage?: boolean;
 }) {
+  const { user } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
+  const isWide = windowWidth >= 1024;
   const [topicId, setTopicId] = useState('');
+  const [selectedPathTopicId, setSelectedPathTopicId] = useState('');
   const [difficulty, setDifficulty] = useState<DpDifficulty>('easy');
+  const [continueVideo, setContinueVideo] = useState(Boolean(initialWatchStage));
+
+  useEffect(() => {
+    if (initialWatchStage) {
+      setContinueVideo(true);
+    }
+  }, [initialWatchStage]);
   const selected = topics.find((t) => t.id === topicId);
   useEffect(() => {
     if (topicId || !topics.length) return;
@@ -180,148 +395,300 @@ function HomeView({
     setTopicId(linked ? linked.id : topics[0].id);
   }, [topicId, topics, initialTopicId]);
 
+  const activePathTopic = (selectedPathTopicId ? pathTopics.find((t) => t.topic.id === selectedPathTopicId) : null)
+    || (initialTopicId ? pathTopics.find((t) => t.topic.id === initialTopicId) : null)
+    || pathTopics.find((t) => t.next && t.completedUnits > 0)
+    || pathTopics[0]
+    || null;
+  const activeTopicTitle = mode === 'path'
+    ? activePathTopic?.topic.name || topics[0]?.name || 'Lộ trình'
+    : selected?.name || topics[0]?.name || 'Chủ đề';
+  const completedUnits = activePathTopic?.completedUnits || 0;
+  const totalUnits = activePathTopic?.totalUnits || 0;
+
+  const mascotMood: MascotMood = stats?.playedToday
+    ? 'happy'
+    : stats?.streakState === 'lost'
+      ? 'sad'
+      : stats?.streakState === 'at_risk'
+        ? 'determined'
+        : 'idle';
+
+  const heroHeadline = stats?.playedToday
+    ? 'Hôm nay bạn đã hoàn thành bài luyện tập!'
+    : stats?.streakState === 'lost'
+      ? `Cùng bắt đầu lại nào!${stats.lostStreak ? ` Bạn vừa lỡ chuỗi ${stats.lostStreak} ngày` : ''}`
+      : stats?.streakState === 'at_risk'
+        ? `Duy trì chuỗi học ${stats.streak} ngày — hôm nay bạn chưa luyện tập!`
+        : 'Chào bạn! Cùng luyện tập vài phút để nâng cao kỹ năng nhé.';
+
+  const heroSub = mode === 'path'
+    ? 'Vượt qua từng chặng học để mở bài tiếp theo và duy trì chuỗi học tập 🔥'
+    : 'Ôn tập trắc nghiệm tự do không tính XP, giúp bạn củng cố kiến thức bất cứ lúc nào.';
+
   return (
     <View style={styles.gapLg}>
-      <View style={styles.hero}>
-        <View style={styles.heroRow}>
-          <Mascot mood={stats?.playedToday ? 'happy' : stats?.streakState === 'lost' ? 'sad' : 'idle'} size={92} />
+      {/* Tiêu đề trang giống Web App */}
+      <View style={{ gap: 2 }}>
+        <Text style={styles.pageEyebrow}>LỘ TRÌNH KỸ NĂNG · THẮNG TIN HỌC</Text>
+        <Text style={styles.pageMainTitle}>Luyện tập hằng ngày</Text>
+        <Text style={styles.muted}>
+          Luyện theo từng chặng để củng cố kiến thức và tích lũy XP. Chế độ luyện tự do giúp bạn ôn tập nhanh mọi lúc.
+        </Text>
+      </View>
+
+      {/* Dark Hero Banner đồng bộ DailyPracticeHero.jsx */}
+      <View style={[styles.heroDark, isWide && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+        <View style={[styles.heroDarkLeft, isWide && { flex: 1, paddingRight: 16 }]}>
+          <View style={styles.heroMascotWrap}>
+            <Mascot mood={mascotMood} size={96} />
+          </View>
           <View style={styles.flex}>
-            <Text style={styles.eyebrow}>LUYỆN TẬP HẰNG NGÀY</Text>
-            <Text style={styles.heroTitle}>
-              {stats?.playedToday
-                ? 'Hôm nay bạn đã luyện tập — giỏi lắm!'
-                : stats?.streakState === 'lost'
-                  ? `Lấy lại phong độ nào!${stats.lostStreak ? ` Bạn vừa lỡ chuỗi ${stats.lostStreak} ngày` : ''}`
-                  : stats?.streakState === 'at_risk'
-                    ? `Giữ lửa chuỗi ${stats.streak} ngày — hôm nay chưa luyện!`
-                    : 'Sẵn sàng thử thách hôm nay chưa?'}
-            </Text>
-            <Text style={styles.muted}>
-              {mode === 'path' ? 'Đi hết từng chặng để mở chặng mới, nhận XP và giữ chuỗi ngày 🔥' : 'Trả lời 10 câu để nhận XP và giữ chuỗi ngày 🔥'}
-              {!stats?.playedToday && (stats?.todayPlayers || 0) > 0 ? <Text style={styles.socialInline}>{` · ${stats?.todayPlayers} bạn đã luyện hôm nay`}</Text> : null}
-            </Text>
+            <View style={styles.heroStreakPill}>
+              <Flame size={13} color="#FDBA74" />
+              <Text style={styles.heroStreakPillText}>
+                {`Chuỗi luyện tập · ${stats?.streak || 0} ngày`}
+              </Text>
+              {!stats?.playedToday && (stats?.todayPlayers || 0) > 0 ? (
+                <Text style={styles.heroStreakSocialText}>{`· ${stats?.todayPlayers} bạn đã luyện`}</Text>
+              ) : null}
+            </View>
+            <Text style={styles.heroDarkTitle}>{heroHeadline}</Text>
+            <Text style={styles.heroDarkSub}>{heroSub}</Text>
+            <Pressable
+              onPress={() => { play('tap'); onQuickStart(activePathTopic); }}
+              disabled={starting}
+              style={styles.heroWhiteBtn}
+              accessibilityRole="button"
+            >
+              {starting ? <ActivityIndicator size="small" color="#B91C1C" /> : <Play size={16} color="#B91C1C" fill="#B91C1C" />}
+              <Text style={styles.heroWhiteBtnText}>
+                {stats?.playedToday
+                  ? 'Tiếp tục luyện tập'
+                  : mode === 'path'
+                    ? 'Xem lộ trình bên dưới'
+                    : 'Bắt đầu luyện tập'}
+              </Text>
+            </Pressable>
           </View>
         </View>
-        <View style={styles.statsRow}>
-          {[
-            { icon: Flame, value: stats?.streak || 0, label: 'ngày liên tiếp', from: '#FB923C', to: '#EA580C' },
-            { icon: Zap, value: stats?.todayXp || 0, label: 'XP hôm nay', from: '#FBBF24', to: '#D97706' },
-            { icon: Trophy, value: stats?.xpTotal || 0, label: 'tổng XP', from: '#F87171', to: '#B91C1C' },
-          ].map(({ icon: Icon, value, label, from, to }) => (
-            <View key={label} style={styles.stat}>
-              <View style={[styles.statIcon, gradient(from, to)]}><Icon size={16} color="#FFFFFF" /></View>
-              <View>
-                <Text style={styles.statValue}>{value}</Text>
-                <Text style={styles.statLabel}>{label}</Text>
+
+        {stats ? (
+          <View style={[styles.heroDarkStatsCol, isWide && { width: 320 }]}>
+            <View style={styles.heroDarkStatsGrid}>
+              <View style={styles.heroGlassBox}>
+                <View style={styles.inline}>
+                  <Flame size={15} color="#FB923C" />
+                  <Text style={styles.heroGlassVal}>{stats.streak || 0}</Text>
+                </View>
+                <Text style={styles.heroGlassLbl}>Ngày liên tiếp</Text>
+                <Text style={styles.heroGlassMeta}>{`Kỷ lục ${stats.bestStreak || 0}`}</Text>
+              </View>
+              <View style={styles.heroGlassBox}>
+                <View style={styles.inline}>
+                  <Target size={15} color="#34D399" />
+                  <Text style={styles.heroGlassVal}>{`+${stats.todayXp || 0}`}</Text>
+                </View>
+                <Text style={styles.heroGlassLbl}>XP luyện hôm nay</Text>
+                <Text style={styles.heroGlassMeta}>{`${stats.todaySessions || 0} lượt hoàn thành`}</Text>
+              </View>
+              <View style={styles.heroGlassBox}>
+                <View style={styles.inline}>
+                  <Zap size={15} color="#FBBF24" />
+                  <Text style={styles.heroGlassVal}>{(stats.xpTotal || 0).toLocaleString('vi-VN')}</Text>
+                </View>
+                <Text style={styles.heroGlassLbl}>XP luyện</Text>
+                <Text style={styles.heroGlassMeta}>{`Mỗi ngày bù về ${stats.dailyAllowanceXp ?? 50} XP`}</Text>
               </View>
             </View>
-          ))}
-        </View>
-        {/* Thanh tiến độ XP ngày — chỉ hiện với gói miễn phí */}
-        {stats && !dpIsPro(stats.planType) && stats.todayXpCap ? (
-          <XpCapBar earned={stats.todayXp || 0} cap={stats.todayXpCap} />
+            <Text style={styles.heroDarkCaption}>
+              {'XP luyện để chơi và mở gợi ý. '}
+              {(stats.purchasedXp || 0) > 0 ? `Trong đó XP đã mua: ${(stats.purchasedXp || 0).toLocaleString('vi-VN')}. ` : ''}
+              {'XP học bài nằm ở thẻ Học bài.'}
+            </Text>
+          </View>
         ) : null}
       </View>
 
-      {/* Banner chặn mở bài mới khi free hết 60 XP — hiển thị nổi bật */}
-      {stats && dpXpCapReached(stats) ? (
-        <XpCapBanner onBuyPress={onBuyXp} />
-      ) : null}
-
-      <View style={styles.modeTabs} accessibilityRole="tablist">
-        {MODES.map(({ id, label, icon: Icon }) => {
-          const active = mode === id;
-          return (
-            <Pressable
-              key={id}
-              onPress={() => { play('tap'); onModeChange(id); }}
-              style={[styles.modeTab, active && styles.modeTabActive]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-            >
-              <Icon size={16} color={active ? colors.brand : '#64748B'} />
-              <Text style={[styles.modeTabText, active && { color: colors.brand }]}>{label}</Text>
-            </Pressable>
-          );
-        })}
+      {/* 4 Quick Stat Cards đồng bộ DailyPracticeQuickStats.jsx */}
+      <View style={styles.quickStatGrid}>
+        <View style={styles.quickStatCard}>
+          <View style={[styles.statIcon, { backgroundColor: '#F0F9FF' }]}><BookOpen size={18} color="#0284C7" /></View>
+          <View style={styles.flex}>
+            <Text style={styles.statLabel}>Môn / chủ đề</Text>
+            <Text numberOfLines={1} style={styles.quickStatValue}>{activeTopicTitle}</Text>
+          </View>
+        </View>
+        <View style={styles.quickStatCard}>
+          <View style={[styles.statIcon, { backgroundColor: '#F5F3FF' }]}><Route size={18} color="#7C3AED" /></View>
+          <View style={styles.flex}>
+            <Text style={styles.statLabel}>Tiến độ lộ trình</Text>
+            <Text numberOfLines={1} style={styles.quickStatValue}>{totalUnits ? `${completedUnits}/${totalUnits} chặng` : 'Đang cập nhật'}</Text>
+          </View>
+        </View>
+        <View style={styles.quickStatCard}>
+          <View style={[styles.statIcon, { backgroundColor: '#FFF7ED' }]}><Flame size={18} color="#EA580C" /></View>
+          <View style={styles.flex}>
+            <Text style={styles.statLabel}>Chuỗi hiện tại</Text>
+            <Text numberOfLines={1} style={styles.quickStatValue}>{`${stats?.streak || 0} ngày`}</Text>
+          </View>
+        </View>
+        <View style={styles.quickStatCard}>
+          <View style={[styles.statIcon, { backgroundColor: '#FFFBEB' }]}><Trophy size={18} color="#D97706" /></View>
+          <View style={styles.flex}>
+            <Text style={styles.statLabel}>XP luyện</Text>
+            <Text numberOfLines={1} style={styles.quickStatValue}>{`${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP`}</Text>
+          </View>
+        </View>
       </View>
 
-      {mode === 'path' ? (
-        <PathView
-          topics={pathTopics}
-          loading={pathLoading}
-          error={pathError}
-          starting={starting}
-          play={play}
-          initialTopicId={initialTopicId}
-          onStartStep={onStartStep}
-          onPathChanged={onPathChanged}
-        />
-      ) : null}
-
-      {mode === 'free' && error ? <Text style={styles.error}>{error}</Text> : null}
-      {mode === 'free' && loading ? <ActivityIndicator color={colors.brand} /> : null}
-      {mode === 'free' && !loading && !topics.length && !error ? (
-        <View style={styles.empty}>
-          <Mascot mood="thinking" size={72} />
-          <Text style={styles.emptyTitle}>Trung tâm đang soạn câu hỏi luyện tập.</Text>
-          <Text style={styles.muted}>Quay lại sau nhé!</Text>
+      {/* Banner hết XP luyện tập — chỉ hiện khi xpEmpty hoặc xpTotal <= 0 giống Web */}
+      {stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
+        <View style={styles.xpEmptyBanner}>
+          <View style={[styles.inline, { flex: 1 }]}>
+            <View style={styles.xpEmptyIconWrap}>
+              <Zap size={20} color="#FFFFFF" />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.xpEmptyTitle}>Bạn đã hết XP luyện hôm nay</Text>
+              <Text style={styles.xpEmptyDesc}>
+                {`Mỗi ngày hệ thống tự bù về ${stats.dailyAllowanceXp ?? 50} XP lúc 0h. Muốn luyện tiếp ngay, bạn có thể mua thêm gói XP.`}
+              </Text>
+            </View>
+          </View>
+          <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.xpEmptyBuyBtn} accessibilityRole="button">
+            <ShoppingBag size={16} color="#FFFFFF" />
+            <Text style={styles.xpEmptyBuyBtnText}>Mua XP</Text>
+          </Pressable>
         </View>
       ) : null}
 
-      {mode === 'free' && topics.length ? (
-        <>
-          <Text style={styles.sectionTitle}>1. Chọn chủ đề</Text>
-          <View style={styles.topicGrid}>
-            {topics.map((topic) => {
-              const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
-              const color = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
-              const active = topic.id === topicId;
+      {/* Layout 2 cột trên màn hình rộng (trái: Lộ trình / Tự do, phải: Mục tiêu & Nhiệm vụ) */}
+      <View style={isWide ? { flexDirection: 'row', alignItems: 'flex-start', gap: 20 } : styles.gapLg}>
+        <View style={[styles.gapMd, isWide && { flex: 8, minWidth: 0 }]}>
+          <View style={styles.modeTabs} accessibilityRole="tablist">
+            {MODES.map(({ id, label, icon: Icon }) => {
+              const active = mode === id;
               return (
                 <Pressable
-                  key={topic.id}
-                  onPress={() => { play('tap'); setTopicId(topic.id); }}
-                  style={[styles.topic, { borderColor: active ? color.to : '#E2E8F0', backgroundColor: active ? color.soft : '#FFFFFF' }]}
-                  accessibilityRole="button"
+                  key={id}
+                  onPress={() => { play('tap'); onModeChange(id); }}
+                  style={[styles.modeTab, active && styles.modeTabActive]}
+                  accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
                 >
-                  <View style={[styles.topicIcon, gradient(color.from, color.to)]}><Icon size={20} color="#FFFFFF" /></View>
-                  <Text numberOfLines={1} style={styles.topicName}>{topic.name}</Text>
-                  <Text numberOfLines={1} style={styles.topicDesc}>{topic.description || `${topic.counts.easy + topic.counts.medium + topic.counts.hard} câu hỏi`}</Text>
-                  {active ? <View style={styles.topicCheck}><CheckCircle2 size={18} color={color.to} /></View> : null}
+                  <Icon size={16} color={active ? '#DC2626' : '#64748B'} />
+                  <Text style={[styles.modeTabText, active && { color: '#DC2626' }]}>{label}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.sectionTitle}>2. Chọn độ khó</Text>
-          <View style={styles.row}>
-            {DP_DIFFICULTIES.map((level) => {
-              const active = level.id === difficulty;
-              return (
-                <Pressable
-                  key={level.id}
-                  onPress={() => { play('tap'); setDifficulty(level.id); }}
-                  style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', backgroundColor: active ? level.soft : '#FFFFFF' }]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                >
-                  <View style={styles.starsRow}>
-                    {[1, 2, 3].map((n) => <Star key={n} size={14} color={n <= level.stars ? level.color : '#CBD5E1'} fill={n <= level.stars ? level.color : 'transparent'} />)}
-                  </View>
-                  <Text style={[styles.levelLabel, active && { color: level.color }]}>{level.label}</Text>
-                  <Text style={styles.levelMeta}>{`${level.xp} XP · ${selected?.counts[level.id] || 0} câu`}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {mode === 'path' ? (
+            <PathView
+              topics={pathTopics}
+              loading={pathLoading}
+              error={pathError}
+              starting={starting}
+              play={play}
+              initialTopicId={initialTopicId}
+              onTopicChange={setSelectedPathTopicId}
+              onStartStep={onStartStep}
+              onPathChanged={onPathChanged}
+              continueVideo={continueVideo}
+              onContinueVideoOpened={() => setContinueVideo(false)}
+            />
+          ) : null}
 
-          <Pressable onPress={() => topicId && onStart(topicId, difficulty)} disabled={!topicId || starting} style={[styles.primary, styles.primaryBig]} accessibilityRole="button">
-            {starting ? <ActivityIndicator color="#FFFFFF" /> : <Play size={18} color="#FFFFFF" />}
-            <Text style={styles.primaryText}>Bắt đầu luyện tập</Text>
-          </Pressable>
-        </>
-      ) : null}
+          {mode === 'free' && error ? <Text style={styles.error}>{error}</Text> : null}
+          {mode === 'free' && loading ? <ActivityIndicator color={colors.brand} /> : null}
+          {mode === 'free' && !loading && !topics.length && !error ? (
+            <View style={styles.empty}>
+              <Mascot mood="thinking" size={72} />
+              <Text style={styles.emptyTitle}>Trung tâm đang soạn câu hỏi luyện tập.</Text>
+              <Text style={styles.muted}>Quay lại sau nhé!</Text>
+            </View>
+          ) : null}
+
+          {mode === 'free' && topics.length ? (
+            <View style={[styles.card, { gap: 14 }]}>
+              <View style={styles.freeModeNotice}>
+                <Text style={styles.freeModeNoticeBold}>Chế độ luyện tự do — Ôn tập không tính XP: </Text>
+                <Text style={styles.freeModeNoticeText}>
+                  Chỉ gồm câu hỏi trắc nghiệm để bạn ôn nhanh. Không cộng và không trừ XP; muốn nhận XP và mở khóa bài học hãy chuyển sang tab Theo lộ trình.
+                </Text>
+              </View>
+
+              <Text style={styles.sectionTitle}>1. Chọn chủ đề</Text>
+              <View style={styles.topicGrid}>
+                {topics.map((topic) => {
+                  const Icon = TOPIC_ICONS[topic.icon] || BookOpen;
+                  const color = DP_TOPIC_COLORS[topic.color] || DP_TOPIC_COLORS.red;
+                  const active = topic.id === topicId;
+                  return (
+                    <Pressable
+                      key={topic.id}
+                      onPress={() => { play('tap'); setTopicId(topic.id); }}
+                      style={[styles.topic, { borderColor: active ? color.to : '#E2E8F0', backgroundColor: active ? color.soft : '#FFFFFF' }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <View style={[styles.topicIcon, gradient(color.from, color.to)]}><Icon size={20} color="#FFFFFF" /></View>
+                      <Text numberOfLines={1} style={styles.topicName}>{topic.name}</Text>
+                      <Text numberOfLines={1} style={styles.topicDesc}>{topic.description || `${topic.counts.easy + topic.counts.medium + topic.counts.hard} câu hỏi`}</Text>
+                      {active ? <View style={styles.topicCheck}><CheckCircle2 size={18} color={color.to} /></View> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.sectionTitle}>2. Độ khó (chỉ trắc nghiệm · 0 XP)</Text>
+              <View style={styles.row}>
+                {DP_DIFFICULTIES.map((level) => {
+                  const active = level.id === difficulty;
+                  return (
+                    <Pressable
+                      key={level.id}
+                      onPress={() => { play('tap'); setDifficulty(level.id); }}
+                      style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', backgroundColor: active ? level.soft : '#FFFFFF' }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <View style={styles.starsRow}>
+                        {[1, 2, 3].map((n) => <Star key={n} size={14} color={n <= level.stars ? level.color : '#CBD5E1'} fill={n <= level.stars ? level.color : 'transparent'} />)}
+                      </View>
+                      <Text style={[styles.levelLabel, active && { color: level.color }]}>{level.label}</Text>
+                      <Text style={styles.levelMeta}>{`Ôn tập · 0 XP · ${selected?.counts[level.id] || 0} câu`}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Pressable onPress={() => topicId && onStart(topicId, difficulty)} disabled={!topicId || starting} style={[styles.primary, styles.primaryBig]} accessibilityRole="button">
+                {starting ? <ActivityIndicator color="#FFFFFF" /> : <Play size={18} color="#FFFFFF" />}
+                <Text style={styles.primaryText}>Bắt đầu ôn tự do (0 XP)</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={isWide ? { flex: 4, minWidth: 290 } : undefined}>
+          <DailyPracticeGoalPanel
+            stats={stats}
+            userId={user?.id}
+            onWatchVideo={() => {
+              play('tap');
+              onModeChange('path');
+              setContinueVideo(true);
+            }}
+            onGoPractice={() => {
+              play('tap');
+              onModeChange('path');
+              onQuickStart(activePathTopic);
+            }}
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -334,23 +701,53 @@ const STEP_HINTS: Partial<Record<DpStepKey, string>> = {
   challenge: 'Câu hỏi mức khó — qua cấp này để mở chặng tiếp theo',
 };
 
-function buildUnitPathItems(unit: DpPathUnit) {
-  const items: Array<
-    | { kind: 'video'; key: string; video: DpPathVideo; state: DpNodeState }
-    | { kind: 'hub'; key: string; node: DpPathNode; state: DpNodeState }
-  > = [];
-  for (const video of unit.videos || []) {
-    items.push({ kind: 'video', key: `video-${video.id}`, video, state: video.state });
-  }
+/** Danh sách video của chặng (unit + từng cấp) để hiện & mở video. */
+export function collectUnitVideos(unit: DpPathUnit): DpPathVideo[] {
+  const items: DpPathVideo[] = [];
+  const seen = new Set<string>();
+  const push = (video?: DpPathVideo) => {
+    if (!video?.id || seen.has(video.id)) return;
+    seen.add(video.id);
+    items.push(video);
+  };
+  for (const video of unit.videos || []) push(video);
   for (const node of unit.pathNodes || []) {
     for (const level of node.levels || []) {
       for (const video of level.videos || []) {
-        items.push({ kind: 'video', key: `video-${video.id}`, video, state: video.state });
+        push({ ...video, stepLabel: video.stepLabel || level.label || '' });
       }
     }
-    items.push({ kind: 'hub', key: `hub-${node.key}`, node, state: node.state });
   }
   return items;
+}
+
+/** Video tiếp theo của chặng đang học: ưu tiên chặng dở, rồi video chưa xem và đang mở. */
+export function continueStageTarget(topic?: DpTopicPath | null) {
+  const units = topic?.units || [];
+  const nextId = topic?.next?.unitId || '';
+  const ranked = [...units].sort((a, b) => {
+    if (a.id === nextId) return -1;
+    if (b.id === nextId) return 1;
+    return (a.index || 0) - (b.index || 0);
+  });
+  for (const unit of ranked) {
+    if (unit.state === 'locked') continue;
+    const videos = collectUnitVideos(unit);
+    const pending = videos.find((v) => v.state !== 'completed' && v.state !== 'locked');
+    if (pending) return { topicId: topic?.topic?.id || '', unit, videoId: pending.id };
+    if (unit.lesson) return { topicId: topic?.topic?.id || '', unit, videoId: '' };
+    if (videos.length > 0) return { topicId: topic?.topic?.id || '', unit, videoId: videos[0]?.id || '' };
+  }
+  return null;
+}
+
+function buildUnitPathItems(unit: DpPathUnit) {
+  return (unit.pathNodes || []).map((node) => ({
+    kind: 'hub' as const,
+    key: `hub-${node.key}`,
+    node,
+    state: node.state,
+  }));
 }
 const NODE_ICONS: Record<string, LucideIcon> = { book: BookOpen, dumbbell: Dumbbell, flame: Flame, crown: Crown };
 const STEP_ICONS: Record<DpStepKey, LucideIcon> = { learn: BookOpen, practice: Dumbbell, challenge: Flame, checkpoint: Trophy };
@@ -409,8 +806,8 @@ function StepNode({ step, isNext, unitProgress, color, selected, onPress }: {
   useEffect(() => {
     if (!isNext || selected) return undefined;
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(bob, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(bob, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(bob, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(bob, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
     ]));
     loop.start();
     return () => loop.stop();
@@ -485,7 +882,7 @@ function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { fro
   );
 }
 
-/** Một nút trên lộ trình — popover 3 nấc Dễ / Vừa / Khó. */
+/** Một nút trên lộ trình — popover 3 nấc Dễ / Vừa / Khó (hoặc nút Học). */
 function PracticeHubNode({ node, color, isNext, selected, onPress }: {
   node: DpPathNode;
   color: { from: string; to: string };
@@ -494,6 +891,7 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
   onPress: () => void;
 }) {
   const locked = node.state === 'locked';
+  const done = node.state === 'completed';
   const size = 74;
   const box = size + 24;
   const levels = node.levels || [];
@@ -503,12 +901,14 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
   useEffect(() => {
     if (!isNext || selected) return undefined;
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(bob, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(bob, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(bob, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
+      Animated.timing(bob, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: USE_NATIVE_DRIVER }),
     ]));
     loop.start();
     return () => loop.stop();
   }, [bob, isNext, selected]);
+  const nodeTone = done ? { from: '#FFD84D', to: '#F59E0B' } : color;
+  const baseShadowColor = locked ? '#C4C9D1' : done ? '#D97706' : darken(color.to, 0.2);
   return (
     <View style={styles.nodeWrap}>
       {isNext && !selected ? (
@@ -526,12 +926,14 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
           accessibilityState={{ expanded: selected, disabled: locked }}
           style={({ pressed }) => [
             styles.node,
+            locked
+              ? { backgroundColor: '#E5E7EB' }
+              : gradient(nodeTone.from, nodeTone.to),
             {
               width: size,
               height: size - 6,
               borderRadius: size / 2,
-              backgroundColor: locked ? '#E5E7EB' : color.from,
-              boxShadow: `0px ${pressed ? 2 : 7}px 0px ${locked ? '#C4C9D1' : darken(color.to, 0.15)}`,
+              boxShadow: `0px ${pressed ? 2 : 7}px 0px ${baseShadowColor}`,
               transform: [{ translateY: pressed ? 5 : 0 }],
               alignItems: 'center',
               justifyContent: 'center',
@@ -565,11 +967,11 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }: {
   color: { from: string; to: string };
   starting: boolean;
   onClose: () => void;
-  onStartStep: (stepKey: DpStepKey) => void;
+  onStartStep: (stepKey: DpStepKey, opts?: { review?: boolean }) => void;
 }) {
   const pop = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
+    Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [pop]);
   return (
     <Animated.View style={[styles.popover, styles.hubPopover, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
@@ -588,22 +990,766 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }: {
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.hubLevelTitle}>{`Nấc ${index + 1} · ${STEP_LABELS[step.key] || step.label}`}</Text>
-              <Text style={styles.hubLevelXp}>{`Cần đúng ${step.passPercent}% · +${maxXpFor(step)} XP`}</Text>
+              <Text style={styles.hubLevelXp}>
+                {done ? 'Đã xong · Ôn lại (0 XP)' : `Cần đúng ${step.passPercent}% · 5 XP/câu (tối đa 50 XP)`}
+              </Text>
             </View>
             {!locked ? (
               <Pressable
-                onPress={() => onStartStep(step.key)}
+                onPress={() => onStartStep(step.key, { review: done })}
                 disabled={starting}
                 style={styles.hubLevelBtn}
                 accessibilityRole="button"
               >
-                <Text style={styles.hubLevelBtnText}>{starting ? '…' : done ? 'Lại' : 'Làm'}</Text>
+                <Text style={styles.hubLevelBtnText}>{starting ? '…' : done ? 'Ôn lại' : 'Làm'}</Text>
               </Pressable>
             ) : null}
           </View>
         );
       })}
     </Animated.View>
+  );
+}
+
+/** Popover cho nút Học (Bài 1, Bài 2, Bài 3). */
+function StudyHubPopover({ node, color, onClose, onOpenLesson }: {
+  node: DpPathNode;
+  color: { from: string; to: string };
+  onClose: () => void;
+  onOpenLesson: (step: DpPathStep) => void;
+}) {
+  const pop = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
+  }, [pop]);
+  return (
+    <Animated.View style={[styles.popover, styles.hubPopover, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
+      <View style={[styles.popoverArrow, { backgroundColor: color.from }]} />
+      <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng"><X size={16} color="rgba(255,255,255,0.85)" /></Pressable>
+      <Text style={styles.popoverTitle}>{`${node.label} · Nội dung chặng`}</Text>
+      <Text style={styles.popoverMeta}>Đọc lý thuyết, xem video & trả lời câu kiểm tra nhanh</Text>
+      {(node.levels || []).map((step, index) => {
+        const locked = step.state === 'locked';
+        const done = step.state === 'completed';
+        return (
+          <View key={step.key} style={[styles.hubLevelRow, locked && styles.hubLevelRowLocked]}>
+            <View style={[styles.hubLevelIcon, done && { backgroundColor: '#10B981' }]}>
+              {done ? <Check size={16} strokeWidth={3} color="#FFFFFF" /> : locked ? <Lock size={14} color="#FFFFFF" /> : <BookOpen size={16} color="#FFFFFF" />}
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.hubLevelTitle}>{step.label || `Bài ${index + 1}`}</Text>
+              <Text numberOfLines={1} style={styles.hubLevelXp}>{step.title || step.videos?.[0]?.title || 'Lý thuyết & bài tập nhanh'}</Text>
+            </View>
+            {!locked ? (
+              <Pressable onPress={() => onOpenLesson(step)} style={styles.hubLevelBtn} accessibilityRole="button">
+                <Text style={styles.hubLevelBtnText}>{done ? 'XEM LẠI' : 'HỌC'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        );
+      })}
+    </Animated.View>
+  );
+}
+
+async function processScreenshot(asset: ImagePicker.ImagePickerAsset, onProgress?: (pct: number) => void): Promise<string> {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve, reject) => {
+      onProgress?.(20);
+      const img = new (window as any).Image();
+      img.onload = () => {
+        onProgress?.(60);
+        const scale = Math.min(1, 960 / Math.max(img.width, 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Không tạo được canvas'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        onProgress?.(90);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Không đọc được hình ảnh'));
+      img.src = asset.uri;
+    });
+  } else {
+    onProgress?.(30);
+    if (asset.base64) {
+      onProgress?.(90);
+      const mime = asset.mimeType || 'image/jpeg';
+      return `data:${mime};base64,${asset.base64}`;
+    }
+    throw new Error('Không đọc được dữ liệu ảnh');
+  }
+}
+
+/** Popup nội dung bài học (nút Học) + câu hỏi kiểm tra nhanh kết nối API. */
+function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpenVideo }: {
+  unit: DpPathUnit;
+  step: DpPathStep;
+  color: { from: string; to: string };
+  play: (s: GameSound) => void;
+  onClose: () => void;
+  onCompleted: () => void;
+  onOpenVideo: (videoId: string) => void;
+}) {
+  const stepVideo = step.videos?.[0] || null;
+  const checkBucketId = stepVideo?.id || `lesson-${step.key}`;
+  const checks = useMemo(
+    () => stepVideo?.checks || [],
+    [stepVideo?.checks],
+  );
+  const lessonBodyContent = step.content || stepVideo?.content || '';
+  const [passedKeys, setPassedKeys] = useState<Set<string>>(() => new Set());
+  const [gate, setGate] = useState<any>(null);
+  const gateRef = useRef<any>(null);
+  const playerApiRef = useRef<VideoPlayerApi | null>(null);
+
+  const [picked, setPicked] = useState<number | null>(null);
+  const [answerText, setAnswerText] = useState('');
+  const [checkHint, setCheckHint] = useState('');
+  const [checkError, setCheckError] = useState('');
+  const [checkBusy, setCheckBusy] = useState(false);
+  const [missed, setMissed] = useState(false);
+  const [cheer, setCheer] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [grading, setGrading] = useState(false);
+
+  const [done, setDone] = useState(step.state === 'completed');
+  const [finishing, setFinishing] = useState(false);
+  const [errMsg, setErrMsg] = useState('');
+
+  const rawUrl = stepVideo?.url || '';
+  const url = playableVideoUrl(rawUrl) || (rawUrl.startsWith('/uploads/') ? rawUrl : '');
+  const embedded = embeddedVideoUrl(rawUrl);
+  const playable = Boolean(embedded || isDirectVideoUrl(rawUrl) || rawUrl.startsWith('/uploads/'));
+
+  useEffect(() => {
+    if (!unit.id) return undefined;
+    let alive = true;
+    dailyPracticeApi.unitVideos(unit.id)
+      .then((res: any) => {
+        if (alive && Array.isArray(res?.passedCheckIds)) {
+          setPassedKeys(new Set(res.passedCheckIds));
+        }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [unit.id]);
+
+  const onTick = (time: number) => {
+    if (!stepVideo || !checks.length) return;
+    if (gateRef.current) {
+      playerApiRef.current?.pause?.();
+      return;
+    }
+    const next = checks
+      .filter((check: any) => {
+        const id = String(check._id || check.id || '');
+        return !passedKeys.has(`${stepVideo.id}:${id}`) && !passedKeys.has(id);
+      })
+      .sort((a: any, b: any) => (Number(a.atSec) || 0) - (Number(b.atSec) || 0))
+      .find((check: any) => time + 0.3 >= (Number(check.atSec) || 0));
+    if (next) {
+      playerApiRef.current?.pause?.();
+      gateRef.current = next;
+      setGate(next);
+      setPicked(null);
+      setAnswerText('');
+      setCheckHint('');
+      setCheckError('');
+      setMissed(false);
+      setCheer(false);
+      setUploadPct(null);
+      setGrading(false);
+    }
+  };
+
+  const closeGate = () => {
+    gateRef.current = null;
+    setGate(null);
+    setCheer(false);
+    setUploadPct(null);
+    setGrading(false);
+    playerApiRef.current?.play?.();
+  };
+
+  const submitCheck = async (imageDataUrl?: string) => {
+    if (!gate || !stepVideo || !unit.id || checkBusy) return;
+    setCheckBusy(true);
+    setCheckError('');
+    try {
+      const checkId = String(gate._id || gate.id || '');
+      const checkIndex = checks.findIndex((c: any) => String(c._id || c.id || '') === checkId);
+      const res = await dailyPracticeApi.answerVideoCheck(
+        unit.id,
+        stepVideo.id,
+        Math.max(0, checkIndex),
+        picked ?? 0,
+        { text: answerText, checkId, imageDataUrl: imageDataUrl || '' },
+      );
+      if (res.correct) {
+        setMissed(false);
+        play('correct');
+        setCheer(true);
+        setTimeout(() => {
+          setPassedKeys((prev) => {
+            const next = new Set(prev);
+            next.add(`${stepVideo.id}:${checkId}`);
+            next.add(checkId);
+            return next;
+          });
+          closeGate();
+        }, 1200);
+      } else if (res.needsReview) {
+        setMissed(false);
+        setCheckHint(res.hint || 'Chưa đủ ý để kết luận. Hãy viết rõ hơn, lần này không mất XP.');
+      } else {
+        setMissed(true);
+        setPicked(null);
+        setAnswerText('');
+        setCheckHint(res.hint || (gate.kind === 'screen' ? 'AI chưa chấp nhận. Hãy tải đáp án mới.' : 'Chưa đúng ý. Thử lại nhé!'));
+        play('wrong');
+      }
+    } catch (err) {
+      setMissed(false);
+      setCheckError(err instanceof Error ? err.message : 'Chưa gửi được câu trả lời');
+    } finally {
+      setCheckBusy(false);
+    }
+  };
+
+  const pickAndSendScreenshot = async () => {
+    if (checkBusy || uploadPct !== null) return;
+    setMissed(false);
+    setCheckError('');
+    try {
+      if (Platform.OS !== 'web') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          setCheckError('Cần cấp quyền truy cập ảnh để gửi bài.');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.7,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setUploadPct(15);
+      setGrading(false);
+      const timer = setInterval(() => {
+        setUploadPct((prev) => (prev !== null && prev < 85 ? prev + 12 : prev));
+      }, 100);
+      let dataUrl = '';
+      try {
+        dataUrl = await processScreenshot(asset);
+      } finally {
+        clearInterval(timer);
+      }
+      setUploadPct(100);
+      setGrading(true);
+      await submitCheck(dataUrl);
+    } catch (err) {
+      setCheckError(err instanceof Error ? err.message : 'Không tải được ảnh');
+    } finally {
+      setUploadPct(null);
+      setGrading(false);
+    }
+  };
+
+  const buyHint = async () => {
+    if (!gate || !stepVideo || !unit.id || checkBusy) return;
+    setCheckBusy(true);
+    setCheckError('');
+    try {
+      const checkId = String(gate._id || gate.id || '');
+      const checkIndex = checks.findIndex((c: any) => String(c._id || c.id || '') === checkId);
+      const res = await dailyPracticeApi.buyVideoHint(unit.id, stepVideo.id, Math.max(0, checkIndex));
+      setCheckHint(res.hint || gate.paidHint || gate.shortHint || 'Đọc kỹ lý thuyết nhé!');
+      play('hint');
+    } catch (err) {
+      setCheckError(err instanceof Error ? err.message : 'Chưa lấy được gợi ý');
+    } finally {
+      setCheckBusy(false);
+    }
+  };
+
+  const finishLesson = async () => {
+    setFinishing(true);
+    try {
+      if (stepVideo?.id) {
+        await dailyPracticeApi.videoWatched(unit.id, stepVideo.id);
+      }
+      setDone(true);
+      play('tap');
+      onCompleted();
+    } catch {
+      // ignore
+    } finally {
+      setFinishing(false);
+    }
+  };
+
+  const pendingChecksCount = checks.filter((c: any) => {
+    const id = String(c._id || c.id || '');
+    return !passedKeys.has(`${stepVideo?.id}:${id}`) && !passedKeys.has(id);
+  }).length;
+
+  const gateChoices: string[] = gate
+    ? (Array.isArray(gate.choices) ? gate.choices : Array.isArray(gate.options) ? gate.options : [])
+    : [];
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.quitBackdrop}>
+        <View style={[styles.quitCard, { maxWidth: 560, maxHeight: '92%' }]}>
+          <View style={[styles.lessonModalHead, gradient(color.from, color.to)]}>
+            <BookOpen size={20} color="#FFFFFF" />
+            <View style={[styles.flex, { marginLeft: 10 }]}>
+              <Text style={styles.lessonModalEyebrow}>{(step.label || 'Bài học').toUpperCase()}</Text>
+              <Text numberOfLines={1} style={styles.lessonModalTitle}>{step.title || stepVideo?.title || step.label}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.lessonModalClose} accessibilityRole="button">
+              <X size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          <ScrollView style={{ maxHeight: 500 }} contentContainerStyle={{ padding: spacing.lg, gap: 14 }}>
+            {lessonBodyContent ? (
+              <View style={styles.lessonBodyBox}>
+                {lessonBodyContent.split(/\n+/).filter(Boolean).map((line: string, idx: number) => (
+                  <Text key={idx} style={styles.lessonBodyText}>{line.replace(/\*\*/g, '')}</Text>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.lessonBodyBox}>
+                <Text style={styles.lessonBodyText}>
+                  {unit.description || `Nội dung trọng tâm của ${unit.title}. Hãy nắm vững lý thuyết trước khi sang các bài luyện tập trắc nghiệm.`}
+                </Text>
+              </View>
+            )}
+
+            {stepVideo?.url && playable ? (
+              <View style={styles.lessonVideoFrameWrap}>
+                <VideoPlayerFrame
+                  key={stepVideo.id}
+                  videoUrl={resolveMobilePublicUrl(url)}
+                  embeddedUrl={embedded}
+                  title={stepVideo.title || step.title || step.label}
+                  lessonId={`dp-lesson-${stepVideo.id}`}
+                  antiSeekEnabled={false}
+                  done={done}
+                  playerApiRef={playerApiRef}
+                  onProgress={(progress) => onTick(progress.currentTime)}
+                  onWatched={async () => {
+                    if (stepVideo?.id) {
+                      await dailyPracticeApi.videoWatched(unit.id, stepVideo.id);
+                      setDone(true);
+                      onCompleted();
+                    }
+                    return true;
+                  }}
+                />
+
+                {gate ? (
+                  <View style={styles.videoGateOverlay}>
+                    <View style={styles.videoGateCard}>
+                      {cheer ? (
+                        <View style={{ alignItems: 'center', padding: 14, gap: 6 }}>
+                          <Mascot mood="celebrate" size={60} />
+                          <Text style={{ fontSize: 15, fontWeight: '900', color: '#059669' }}>Chính xác! +5 XP</Text>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Đang tiếp tục video…</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View style={styles.videoGateTopRow}>
+                            <Text style={styles.videoGateTime}>{`DỪNG Ở GIÂY ${gate.atSec || 0}`}</Text>
+                            <Pressable
+                              onPress={closeGate}
+                              style={styles.videoGateCloseBtn}
+                              accessibilityRole="button"
+                              accessibilityLabel="Đóng"
+                            >
+                              <X size={15} color="#64748B" />
+                            </Pressable>
+                          </View>
+
+                          {missed ? (
+                            <View style={[styles.videoGateMissedBox, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                              <Mascot mood="sad" size={32} />
+                              <Text style={[styles.videoGateMissedText, { flex: 1 }]}>
+                                {gate.kind === 'screen'
+                                  ? 'AI chưa chấp nhận (mất 2 XP). Hãy tải đáp án mới.'
+                                  : `Chưa đúng (mất 2 XP). Hãy ${gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'} nhé!`}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          <Text style={styles.videoGatePrompt}>{gate.prompt}</Text>
+
+                          {gate.kind === 'screen' ? (
+                            uploadPct !== null ? (
+                              <View style={styles.videoGateUploadProgress}>
+                                <View style={styles.videoGateUploadTrack}>
+                                  <View
+                                    style={[
+                                      styles.videoGateUploadFill,
+                                      { width: `${grading ? 100 : uploadPct}%` },
+                                      grading && { backgroundColor: '#0284C7' },
+                                    ]}
+                                  />
+                                </View>
+                                <Text style={styles.videoGateUploadText}>
+                                  {grading ? 'AI đang chấm…' : `Đang tải ảnh lên ${uploadPct}%`}
+                                </Text>
+                              </View>
+                            ) : (
+                              <Pressable
+                                onPress={() => void pickAndSendScreenshot()}
+                                disabled={checkBusy}
+                                style={styles.videoGateScreenPickBtn}
+                                accessibilityRole="button"
+                              >
+                                <ImageIcon size={18} color="#1E293B" />
+                                <Text style={styles.videoGateScreenPickText}>
+                                  {missed ? 'Tải đáp án mới' : 'Gửi ảnh bài làm'}
+                                </Text>
+                              </Pressable>
+                            )
+                          ) : gateChoices.length > 0 ? (
+                            <View style={{ gap: 6, marginVertical: 4 }}>
+                              {gateChoices.map((choice: string, index: number) => {
+                                const isPicked = picked === index;
+                                return (
+                                  <Pressable
+                                    key={index}
+                                    onPress={() => setPicked(index)}
+                                    style={[
+                                      styles.videoGateChoiceBtn,
+                                      isPicked && styles.videoGateChoiceBtnActive,
+                                    ]}
+                                    accessibilityRole="button"
+                                  >
+                                    <Text style={[styles.videoGateChoiceText, isPicked && styles.videoGateChoiceTextActive]}>
+                                      {choice}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          ) : (
+                            <View style={{ marginVertical: 4 }}>
+                              <TextInput
+                                value={answerText}
+                                onChangeText={setAnswerText}
+                                placeholder="Nhập đáp án của bạn…"
+                                placeholderTextColor="#94A3B8"
+                                style={styles.videoGateTextInput}
+                              />
+                            </View>
+                          )}
+
+                          {checkHint ? (
+                            <View style={styles.videoGateHintBox}>
+                              <Lightbulb size={13} color="#D97706" />
+                              <Text style={styles.videoGateHintText}>{checkHint}</Text>
+                            </View>
+                          ) : null}
+
+                          {checkError ? <Text style={styles.videoGateErrorText}>{checkError}</Text> : null}
+
+                          <View style={styles.videoGateActionsRow}>
+                            {gate.kind !== 'screen' ? (
+                              <Pressable
+                                disabled={checkBusy || (gateChoices.length > 0 ? picked === null : !answerText.trim())}
+                                onPress={() => void submitCheck()}
+                                style={[
+                                  styles.videoGateSubmitBtn,
+                                  (checkBusy || (gateChoices.length > 0 ? picked === null : !answerText.trim())) && { opacity: 0.5 },
+                                ]}
+                                accessibilityRole="button"
+                              >
+                                {checkBusy ? (
+                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                  <Text style={styles.videoGateSubmitBtnText}>Trả lời</Text>
+                                )}
+                              </Pressable>
+                            ) : null}
+                            <Pressable
+                              onPress={closeGate}
+                              style={styles.videoGateCancelBtn}
+                              accessibilityRole="button"
+                            >
+                              <Text style={styles.videoGateCancelBtnText}>Thôi</Text>
+                            </Pressable>
+                            {Number(gate.hintCostXp) > 0 ? (
+                              <Pressable
+                                disabled={checkBusy}
+                                onPress={() => void buyHint()}
+                                style={styles.videoGateHintBtn}
+                                accessibilityRole="button"
+                              >
+                                <Text style={styles.videoGateHintBtnText}>Gợi ý · {gate.hintCostXp} XP</Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
+
+                          <Text style={styles.videoGateFootNote}>
+                            {`Đúng lần đầu +5 XP và xem tiếp. Sai mất 2 XP rồi ${gate.kind === 'screen' ? 'tải đáp án mới' : gateChoices.length > 0 ? 'chọn lại' : 'nhập lại'}.`}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {stepVideo?.url && pendingChecksCount > 0 ? (
+              <Text style={styles.lessonPendingNote}>
+                Video dừng ở từng mốc. Trả lời đúng mới xem tiếp. Chưa tua được quá phần đã xem.
+              </Text>
+            ) : null}
+
+            {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
+          </ScrollView>
+          <View style={styles.lessonModalFoot}>
+            <Pressable onPress={onClose} style={styles.lessonFootCloseBtn} accessibilityRole="button">
+              <Text style={styles.lessonFootCloseBtnText}>Đóng</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { void finishLesson(); }}
+              disabled={finishing}
+              style={[
+                styles.lessonFootDoneBtn,
+                done && styles.lessonFootDoneBtnDone,
+              ]}
+              accessibilityRole="button"
+            >
+              {finishing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <CheckCircle2 size={16} color="#FFFFFF" />
+              )}
+              <Text style={styles.lessonFootDoneBtnText}>
+                {done ? 'Đã học xong' : 'Đánh dấu đã học'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** Đài vinh danh & Cúp hoàn thành khóa học ở cuối lộ trình (đồng bộ Web CourseFinaleMonument). */
+function CourseFinaleMonument({ current, play, onOpenCeremony }: {
+  current: DpTopicPath;
+  play: (s: GameSound) => void;
+  onOpenCeremony: () => void;
+}) {
+  const completed = current.completedUnits || 0;
+  const total = current.totalUnits || 0;
+  const courseDone = !current.next && total > 0 && completed >= total;
+
+  return (
+    <View style={styles.finaleDoneCard}>
+      {courseDone ? <Confetti count={24} spread={180} /> : null}
+      <View style={styles.finaleBadge}>
+        <Sparkles size={13} color="#FEF3C7" />
+        <Text style={styles.finaleBadgeText}>
+          {courseDone ? 'ĐÃ CHINH PHỤC TOÀN BỘ KHÓA HỌC' : `ĐÍCH ĐẾN CUỐI KHÓA · ${completed}/${total} CHẶNG`}
+        </Text>
+      </View>
+      <View style={styles.finaleStageRow}>
+        <Mascot mood="graduate" size={76} />
+        <View style={styles.finaleCupWrap}>
+          <View style={styles.finaleCrownBadge}>
+            <Crown size={18} color="#FFFFFF" fill="#FEF08A" />
+          </View>
+          <View style={styles.finaleCupCircle}>
+            <Trophy size={46} color="#FFFFFF" />
+          </View>
+          <View style={styles.finaleStarsRow}>
+            {[0, 1, 2].map((i) => <Star key={i} size={14} color="#F59E0B" fill="#FBBF24" />)}
+          </View>
+        </View>
+        <Mascot mood="celebrate" size={76} />
+      </View>
+      <Text style={styles.finaleDoneTitle}>
+        {courseDone
+          ? `Chúc mừng hoàn thành khóa học ${current.topic.name}!`
+          : `Cúp Vàng Vinh Danh — ${current.topic.name}`}
+      </Text>
+      <Text style={styles.finaleDoneSub}>
+        {courseDone
+          ? `Tuyệt vời! Bạn đã vượt qua trọn vẹn ${total}/${total} chặng học và chính thức rước Cúp Vàng Vinh Danh cùng linh vật Thắng Tin Học!`
+          : `Hoàn thành hết ${total} chặng học (${completed}/${total} đã xong) để chính thức mở khóa lễ trao Cúp Vàng Vinh Danh cùng linh vật chúc mừng!`}
+      </Text>
+      <Pressable
+        onPress={() => { play('win'); onOpenCeremony(); }}
+        style={styles.finaleBtn}
+        accessibilityRole="button"
+      >
+        <Trophy size={17} color="#FFFFFF" />
+        <Text style={styles.finaleBtnText}>
+          {courseDone ? 'Nhận Cúp & Xem Vinh Danh' : 'Xem Hiệu Ứng Chúc Mừng Nhận Cúp'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function CourseTrophyCeremonyModal({ current, play, onClose }: {
+  current: DpTopicPath;
+  play: (s: GameSound) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => { play('win'); }, [play]);
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.quitBackdrop}>
+        <View style={[styles.quitCard, styles.finaleModalCard]}>
+          <Confetti count={34} spread={210} />
+          <View style={styles.finaleBadge}>
+            <Award size={14} color="#FEF3C7" />
+            <Text style={styles.finaleBadgeText}>CHỨNG NHẬN CHINH PHỤC LỘ TRÌNH</Text>
+          </View>
+          <View style={styles.finaleStageRow}>
+            <Mascot mood="graduate" size={82} />
+            <View style={styles.finaleCupWrap}>
+              <View style={styles.finaleCrownBadge}>
+                <Crown size={20} color="#FFFFFF" fill="#FEF08A" />
+              </View>
+              <View style={styles.finaleCupCircle}>
+                <Trophy size={52} color="#FFFFFF" />
+              </View>
+              <View style={styles.finaleStarsRow}>
+                {[0, 1, 2].map((i) => <Star key={i} size={15} color="#F59E0B" fill="#FBBF24" />)}
+              </View>
+            </View>
+            <Mascot mood="celebrate" size={82} />
+          </View>
+          <Text style={styles.finaleDoneTitle}>CHÚC MỪNG HOÀN THÀNH KHÓA HỌC!</Text>
+          <Text style={styles.finaleModalTopic}>{current.topic.name}</Text>
+          <Text style={styles.finaleDoneSub}>
+            {`Bạn đã kiên trì vượt qua toàn bộ ${current.totalUnits}/${current.totalUnits} chặng học và thử thách. Chiếc Cúp Vàng này là minh chứng cho nỗ lực tuyệt vời của bạn!`}
+          </Text>
+          <View style={styles.finaleStatsRow}>
+            <View style={styles.finaleStatBox}>
+              <Text style={styles.finaleStatVal}>100%</Text>
+              <Text style={styles.finaleStatLbl}>Hoàn thành</Text>
+            </View>
+            <View style={styles.finaleStatBox}>
+              <Text style={styles.finaleStatVal}>{`${current.totalUnits}/${current.totalUnits}`}</Text>
+              <Text style={styles.finaleStatLbl}>Chặng đã vượt</Text>
+            </View>
+            <View style={styles.finaleStatBox}>
+              <Text style={styles.finaleStatVal}>Cúp Vàng</Text>
+              <Text style={styles.finaleStatLbl}>Danh hiệu</Text>
+            </View>
+          </View>
+          <Pressable onPress={onClose} style={[styles.finaleBtn, { alignSelf: 'stretch' }]} accessibilityRole="button">
+            <Trophy size={18} color="#FFFFFF" />
+            <Text style={styles.finaleBtnText}>Tuyệt vời! Tiếp tục chinh phục</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** Header chặng kiểu Duolingo đồng bộ Web UnitStageHeader. */
+function UnitStageHeader({
+  unit,
+  tone,
+  locked,
+  isNextUnit,
+  doneSteps,
+  totalSteps,
+  progress,
+  onOpenVideo,
+  onToggleTestOut,
+}: {
+  unit: DpPathUnit;
+  tone: { from: string; to: string };
+  locked: boolean;
+  isNextUnit: boolean;
+  doneSteps: number;
+  totalSteps: number;
+  progress: number;
+  onOpenVideo: () => void;
+  onToggleTestOut: () => void;
+}) {
+  const hasGuide = Boolean(unit.lesson) || collectUnitVideos(unit).length > 0;
+  const done = unit.state === 'completed';
+  const statusLabel = done
+    ? (unit.testedOut ? 'Đã vượt' : 'Hoàn thành')
+    : isNextUnit && !locked
+      ? 'Đang học'
+      : locked
+        ? 'Chưa mở'
+        : 'Mở khóa';
+
+  return (
+    <View style={styles.unitHeaderOuter}>
+      {/* Banner chặng đồng bộ Web */}
+      <View
+        style={[
+          styles.unitHeaderBanner,
+          locked
+            ? gradient('#94A3B8', '#64748B')
+            : gradient(tone.from, tone.to),
+          {
+            boxShadow: `0px 4px 0px ${locked ? '#475569' : darken(tone.to, 0.22)}`,
+          } as never,
+        ]}
+      >
+        <View style={styles.unitHeaderLeft}>
+          <Text style={styles.unitHeaderEyebrow}>{`Chặng ${unit.index} · ${statusLabel}`}</Text>
+          <Text numberOfLines={2} style={styles.unitHeaderTitle}>{unit.title}</Text>
+          {unit.description ? <Text numberOfLines={2} style={styles.unitHeaderDesc}>{unit.description}</Text> : null}
+          <View style={styles.unitHeaderProgressWrap}>
+            <View style={styles.unitHeaderProgressTrack}>
+              <View style={[styles.unitHeaderProgressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+            <Text style={styles.unitHeaderProgressCount}>{`${doneSteps}/${totalSteps}`}</Text>
+          </View>
+        </View>
+        <View style={styles.unitHeaderRight}>
+          {hasGuide ? (
+            <Pressable
+              onPress={onOpenVideo}
+              style={styles.unitHeaderGuideBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Video & hướng dẫn chặng"
+            >
+              <BookOpen size={20} color="#FFFFFF" />
+            </Pressable>
+          ) : (
+            <View style={[styles.unitHeaderGuideBtn, { opacity: 0.7 }]}>
+              {locked ? <Lock size={18} color="#FFFFFF" /> : <BookOpen size={18} color="#FFFFFF" />}
+            </View>
+          )}
+        </View>
+      </View>
+      {locked && unit.canTestOut ? (
+        <View style={{ alignItems: 'center', marginTop: 8 }}>
+          <Pressable onPress={onToggleTestOut} style={styles.unitStageTestOut} accessibilityRole="button">
+            <FastForward size={13} color="#FFFFFF" />
+            <Text style={styles.unitStageTestOutText}>Kiểm tra vượt</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -620,7 +1766,7 @@ function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }:
   const order = unit.steps.findIndex((item) => item.key === step.key) + 1;
   const pop = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
+    Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: USE_NATIVE_DRIVER }).start();
   }, [pop]);
   return (
     <Animated.View style={[styles.popover, gradient(color.from, color.to), { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }] }]}>
@@ -647,21 +1793,53 @@ function StepPopover({ unit, step, testOut, color, starting, onClose, onStart }:
 }
 
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
-function PathView({ topics, loading, error, starting, play, initialTopicId = '', onStartStep, onPathChanged }: {
+function PathView({
+  topics,
+  loading,
+  error,
+  starting,
+  play,
+  initialTopicId = '',
+  onTopicChange,
+  onStartStep,
+  onPathChanged,
+  continueVideo = false,
+  onContinueVideoOpened,
+}: {
   topics: DpTopicPath[];
   loading: boolean;
   error: string;
   starting: boolean;
   play: (s: GameSound) => void;
   initialTopicId?: string;
-  onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean) => void;
+  onTopicChange?: (topicId: string) => void;
+  onStartStep: (unitId: string, nodeKey: string, step: DpStepKey, testOut: boolean, opts?: { review?: boolean }) => void;
   onPathChanged: () => void;
+  continueVideo?: boolean;
+  onContinueVideoOpened?: () => void;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { user } = useAuth();
   const [topicId, setTopicId] = useState('');
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const [videoOpen, setVideoOpen] = useState<{ unit: DpPathUnit; videoId: string } | null>(null);
+  const [lessonOpen, setLessonOpen] = useState<{ unit: DpPathUnit; step: DpPathStep } | null>(null);
+  const [trophyCeremonyOpen, setTrophyCeremonyOpen] = useState(false);
+  const targetAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (!continueVideo) {
+      targetAppliedRef.current = false;
+      return;
+    }
+    if (videoOpen || lessonOpen || targetAppliedRef.current) return;
+    const activeTopic = topics.find((item) => item.topic.id === topicId) || topics[0];
+    const target = continueStageTarget(activeTopic);
+    if (!target) return;
+    targetAppliedRef.current = true;
+    onContinueVideoOpened?.();
+    setVideoOpen({ unit: target.unit, videoId: target.videoId });
+  }, [continueVideo, topics, topicId, videoOpen, lessonOpen, onContinueVideoOpened]);
 
   useEffect(() => {
     if (topicId && topics.some((item) => item.topic.id === topicId)) return;
@@ -670,6 +1848,10 @@ function PathView({ topics, loading, error, starting, play, initialTopicId = '',
     const inProgress = topics.find((item) => item.next && item.completedUnits > 0);
     setTopicId((linked || inProgress || topics[0]).topic.id);
   }, [topicId, topics, initialTopicId]);
+
+  useEffect(() => {
+    if (topicId && onTopicChange) onTopicChange(topicId);
+  }, [topicId, onTopicChange]);
 
   useEffect(() => {
     if (error) setPopover(null);
@@ -735,33 +1917,34 @@ function PathView({ topics, loading, error, starting, play, initialTopicId = '',
 
       {current ? (
         <>
-          <View style={[styles.card, styles.pathSummaryCard]}>
-            <View style={styles.pathSummaryMascot} pointerEvents="none">
-              <Mascot mood={current.next ? 'idle' : 'happy'} size={48} />
+          <View style={[styles.card, { borderColor: '#E2E8F0' }]}>
+            <View style={styles.pathSummaryTopRow}>
+              <View style={styles.flex}>
+                <View style={styles.inline}>
+                  <DropletMark size={12} fill={color.to} />
+                  <Text style={[styles.pathEyebrow, { color: color.to }]}>{`LỘ TRÌNH ${current.topic.name.toUpperCase()}`}</Text>
+                </View>
+                <View style={[styles.inline, { marginTop: 6 }]}>
+                  <View style={styles.pathTrack}><View style={[styles.pathFill, gradient(color.from, color.to), { width: `${percent}%` }]} /></View>
+                  <Text style={styles.pathCount}>{`${current.completedUnits}/${current.totalUnits}`}</Text>
+                </View>
+                <Text style={[styles.muted, { marginTop: 6 }]}>
+                  {current.next
+                    ? `Tiếp theo: Chặng ${nextUnit?.index} · ${current.next.unitTitle} — ${current.next.stepLabel}`
+                    : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
+                </Text>
+              </View>
+              {current.next && nextUnit ? (
+                <Pressable
+                  onPress={() => { if (nextUnit && current.next) toggleHub(nextUnit, current.next.nodeKey || 'study'); }}
+                  style={styles.primary}
+                  accessibilityRole="button"
+                >
+                  <Play size={16} color="#FFFFFF" />
+                  <Text style={styles.primaryText}>Tiếp tục học</Text>
+                </Pressable>
+              ) : null}
             </View>
-            <View style={styles.inline}>
-              <DropletMark size={12} fill={color.to} />
-              <Text style={[styles.pathEyebrow, { color: color.to }]}>{`LỘ TRÌNH ${current.topic.name.toUpperCase()}`}</Text>
-            </View>
-            <View style={styles.inline}>
-              <View style={styles.pathTrack}><View style={[styles.pathFill, gradient(color.from, color.to), { width: `${percent}%` }]} /></View>
-              <Text style={styles.pathCount}>{`${current.completedUnits}/${current.totalUnits}`}</Text>
-            </View>
-            <Text style={styles.muted}>
-              {current.next
-                ? `Tiếp theo: Chặng ${nextUnit?.index} · ${current.next.unitTitle} — ${current.next.stepLabel}`
-                : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
-            </Text>
-            {current.next && nextUnit ? (
-              <Pressable
-                onPress={() => { if (nextUnit && current.next) toggleHub(nextUnit, current.next.nodeKey || 'study'); }}
-                style={styles.primary}
-                accessibilityRole="button"
-              >
-                <Play size={16} color="#FFFFFF" />
-                <Text style={styles.primaryText}>Tiếp tục học</Text>
-              </Pressable>
-            ) : null}
           </View>
 
           <View style={styles.pathTimelineWrap}>
@@ -778,50 +1961,22 @@ function PathView({ topics, loading, error, starting, play, initialTopicId = '',
               const tone = unitColor(unit.index);
               const isLast = unitIdx === current.units.length - 1;
               const pathItems = buildUnitPathItems(unit);
+              const unitVideos = collectUnitVideos(unit);
+              const preferredVideoId = unitVideos.find((v) => v.state !== 'completed' && v.state !== 'locked')?.id || unitVideos[0]?.id || '';
               return (
                 <View key={unit.id} style={[styles.pathUnitRow, !isLast && styles.pathUnitRowBorder]}>
-                  <View style={styles.unitStageCenter}>
-                    <StageDropletBadge index={unit.index} locked={locked} accentTo={tone.to} />
-                    <View style={styles.unitStageMetaRow}>
-                      <Text style={styles.unitStageEyebrow}>{`Chặng ${unit.index}`}</Text>
-                      {unit.state === 'completed' ? (
-                        <View style={[styles.unitStagePill, { backgroundColor: tone.to }]}>
-                          <Text style={styles.unitStagePillText}>{unit.testedOut ? 'Đã vượt' : 'Xong'}</Text>
-                        </View>
-                      ) : null}
-                      {isNextUnit && !locked ? (
-                        <View style={styles.unitStageActivePill}>
-                          <Text style={styles.unitStageActivePillText}>Đang học</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text numberOfLines={2} style={styles.unitStageTitleCenter}>{unit.title}</Text>
-                    {unit.description ? <Text numberOfLines={2} style={styles.unitStageDescCenter}>{unit.description}</Text> : null}
-                    <View style={styles.unitStageProgressRowCenter}>
-                      <View style={styles.unitStageTrack}>
-                        <View style={[styles.unitStageFill, gradient(tone.from, tone.to), { width: `${Math.round(progress * 100)}%` }]} />
-                      </View>
-                      <Text style={styles.unitStageCount}>{`${doneSteps}/${totalSteps}`}</Text>
-                    </View>
-                    <View style={styles.unitStageActions}>
-                      {unit.lesson || unit.videos?.length ? (
-                        <Pressable
-                          onPress={() => { play('tap'); setPopover(null); setVideoOpen({ unit, videoId: '' }); }}
-                          style={[styles.unitStageBtn, { backgroundColor: locked ? '#94A3B8' : tone.to }]}
-                          accessibilityRole="button"
-                        >
-                          <PlayCircle size={13} color="#FFFFFF" />
-                          <Text style={styles.unitStageBtnText}>Video chặng</Text>
-                        </Pressable>
-                      ) : null}
-                      {locked && unit.canTestOut ? (
-                        <Pressable onPress={() => toggleTestOut(unit)} style={styles.unitStageTestOut} accessibilityRole="button">
-                          <FastForward size={12} color="#FFFFFF" />
-                          <Text style={styles.unitStageTestOutText}>Kiểm tra vượt</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  </View>
+                  <StageBuddiesOverlay unitIndex={unitIdx} unlocked={!locked} />
+                  <UnitStageHeader
+                    unit={unit}
+                    tone={tone}
+                    locked={locked}
+                    isNextUnit={isNextUnit}
+                    doneSteps={doneSteps}
+                    totalSteps={totalSteps}
+                    progress={progress}
+                    onOpenVideo={() => { play('tap'); setPopover(null); setVideoOpen({ unit, videoId: preferredVideoId }); }}
+                    onToggleTestOut={() => toggleTestOut(unit)}
+                  />
                   {testOutOpen && testOutStep ? (
                     <StepPopover
                       unit={unit}
@@ -851,52 +2006,40 @@ function PathView({ topics, loading, error, starting, play, initialTopicId = '',
                               <PathMascotBuddy side={mascotSide} mood={locked ? 'thinking' : 'idle'} size={50} />
                             ) : null}
                             {previous !== null ? (
-                              <View style={styles.connector} pointerEvents="none">
-                                {[0.12, 0.32, 0.52, 0.72, 0.88].map((t) => (
-                                  <View
-                                    key={t}
-                                    style={[styles.connectorDroplet, {
-                                      left: (previous - offset) * (1 - t) - 5,
-                                      top: 2 + t * NODE_CONNECTOR_STEP,
-                                      opacity: 0.45 + t * 0.5,
-                                    }]}
-                                  >
-                                    <DropletMark size={t > 0.7 ? 10 : 8} fill={linkActive ? tone.from : '#CBD5E1'} />
-                                  </View>
-                                ))}
-                              </View>
+                              <PathSnakeConnector fromX={previous} toX={offset} active={linkActive} color={tone} />
                             ) : null}
-                            {item.kind === 'video' ? (
-                              <VideoNode
-                                video={item.video}
-                                color={tone}
-                                onPress={() => {
-                                  play('tap');
-                                  setPopover(null);
-                                  setVideoOpen({ unit, videoId: item.video.id });
-                                }}
-                              />
-                            ) : (
-                              <PracticeHubNode
-                                node={item.node}
-                                color={tone}
-                                isNext={hubNext}
-                                selected={Boolean(hubSelected)}
-                                onPress={() => toggleHub(unit, item.node.key)}
-                              />
-                            )}
+                            <PracticeHubNode
+                              node={item.node}
+                              color={tone}
+                              isNext={hubNext}
+                              selected={Boolean(hubSelected)}
+                              onPress={() => toggleHub(unit, item.node.key)}
+                            />
                             {hubSelected ? (
                               <View style={{ transform: [{ translateX: -offset }], width: '100%', maxWidth: 340 }}>
-                                <LevelHubPopover
-                                  node={item.node}
-                                  color={tone}
-                                  starting={starting}
-                                  onClose={() => setPopover(null)}
-                                  onStartStep={(stepKey) => {
-                                    setPopover(null);
-                                    onStartStep(unit.id, item.node.key, stepKey, false);
-                                  }}
-                                />
+                                {item.node.kind === 'study' || item.node.icon === 'book' ? (
+                                  <StudyHubPopover
+                                    node={item.node}
+                                    color={tone}
+                                    onClose={() => setPopover(null)}
+                                    onOpenLesson={(step) => {
+                                      play('tap');
+                                      setPopover(null);
+                                      setLessonOpen({ unit, step });
+                                    }}
+                                  />
+                                ) : (
+                                  <LevelHubPopover
+                                    node={item.node}
+                                    color={tone}
+                                    starting={starting}
+                                    onClose={() => setPopover(null)}
+                                    onStartStep={(stepKey, opts) => {
+                                      setPopover(null);
+                                      onStartStep(unit.id, item.node.key, stepKey, false, opts);
+                                    }}
+                                  />
+                                )}
                               </View>
                             ) : null}
                           </View>
@@ -907,8 +2050,33 @@ function PathView({ topics, loading, error, starting, play, initialTopicId = '',
                 </View>
               );
             })}
+            <View style={{ padding: spacing.md, zIndex: 2 }}>
+              <CourseFinaleMonument
+                current={current}
+                play={play}
+                onOpenCeremony={() => setTrophyCeremonyOpen(true)}
+              />
+            </View>
           </View>
         </>
+      ) : null}
+      {trophyCeremonyOpen && current ? (
+        <CourseTrophyCeremonyModal
+          current={current}
+          play={play}
+          onClose={() => setTrophyCeremonyOpen(false)}
+        />
+      ) : null}
+      {lessonOpen ? (
+        <PathLessonModal
+          unit={lessonOpen.unit}
+          step={lessonOpen.step}
+          color={unitColor(lessonOpen.unit.index)}
+          play={play}
+          onClose={() => setLessonOpen(null)}
+          onCompleted={onPathChanged}
+          onOpenVideo={(videoId) => setVideoOpen({ unit: lessonOpen.unit, videoId })}
+        />
       ) : null}
       {videoOpen ? (
         <PathVideoModal
@@ -931,14 +2099,16 @@ function PathView({ topics, loading, error, starting, play, initialTopicId = '',
 
 function PathResultCard({ result }: { result: DpPathResult }) {
   const passed = result.passed;
+  const isCourseComplete = passed && Boolean(result.topicCompleted && (result.unitCompleted || result.testOut));
+  const isUnitTrophy = passed && Boolean(result.unitCompleted || result.testOut);
   let title: string;
   let text: string;
   if (!passed) {
     title = `Chưa qua ${result.testOut ? 'bài kiểm tra vượt chặng' : `bước ${result.stepLabel}`}`;
     text = `Bạn đạt ${result.scorePercent}%, cần từ ${result.passPercent}%. Ôn lại rồi thử lần nữa nhé!`;
-  } else if (result.topicCompleted && (result.unitCompleted || result.testOut)) {
-    title = 'Hoàn thành toàn bộ lộ trình!';
-    text = 'Bạn đã chinh phục mọi chặng của chủ đề này. Tuyệt vời!';
+  } else if (isCourseComplete) {
+    title = 'CHÚC MỪNG HOÀN THÀNH KHÓA HỌC!';
+    text = `Bạn đã chinh phục trọn vẹn lộ trình và xuất sắc nhận Cúp Vàng Vinh Danh tại chặng “${result.unitTitle}”!`;
   } else if (result.testOut) {
     title = 'Vượt chặng thành công!';
     text = `Đã hoàn thành đến chặng “${result.unitTitle}”.`;
@@ -949,6 +2119,28 @@ function PathResultCard({ result }: { result: DpPathResult }) {
     title = `Qua bước ${result.stepLabel} (${result.scorePercent}%)`;
     text = result.next ? `Bước tiếp theo: ${result.next.stepLabel} · ${result.next.unitTitle}` : 'Tiếp tục giữ phong độ nhé!';
   }
+
+  if (isCourseComplete || isUnitTrophy) {
+    return (
+      <View style={styles.pathTrophyResult}>
+        <View style={styles.finaleCupCircleSmall}>
+          <Trophy size={28} color="#FFFFFF" />
+        </View>
+        <View style={styles.flex}>
+          <View style={styles.inline}>
+            <Sparkles size={13} color="#D97706" />
+            <Text style={styles.pathTrophyEyebrow}>
+              {isCourseComplete ? 'CÚP VÀNG HOÀN THÀNH KHÓA HỌC' : 'DANH HIỆU VƯỢT CHẶNG'}
+            </Text>
+          </View>
+          <Text style={styles.pathTrophyTitle}>{title}</Text>
+          <Text style={styles.muted}>{text}</Text>
+        </View>
+        <Mascot mood="happy" size={56} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.pathResult, passed ? styles.pathResultOk : styles.pathResultBad]}>
       <View style={[styles.pathResultIcon, { backgroundColor: passed ? '#059669' : '#F59E0B' }]}>
@@ -962,11 +2154,258 @@ function PathResultCard({ result }: { result: DpPathResult }) {
   );
 }
 
+// ── Mua thêm XP (VietQR + Polling + Sandbox — đồng bộ BuyXpModal.jsx) ────────
+const DEFAULT_XP_PACKS: DpXpPack[] = [
+  { id: 'xp_100', xp: 100, priceVnd: 10000, label: '100 XP · 10.000đ' },
+  { id: 'xp_300', xp: 300, priceVnd: 25000, label: '300 XP · 25.000đ' },
+  { id: 'xp_800', xp: 800, priceVnd: 59000, label: '800 XP · 59.000đ' },
+];
+
+function BuyXpModal({ packs, play, onClose, onPurchased }: {
+  packs?: DpXpPack[];
+  play: (s: GameSound) => void;
+  onClose: () => void;
+  onPurchased: () => void;
+}) {
+  const list = packs?.length ? packs : DEFAULT_XP_PACKS;
+  const [selectedXp, setSelectedXp] = useState<number>(list[0]?.xp || 100);
+  const [checkout, setCheckout] = useState<DpXpCheckout | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [errMsg, setErrMsg] = useState('');
+
+  const selectedPack = list.find((p) => p.xp === selectedXp) || list[0];
+  const sessionKey = checkout?.sessionId || checkout?.orderCode || '';
+
+  useEffect(() => {
+    if (!sessionKey || paid) return undefined;
+    const timer = setInterval(() => {
+      dailyPracticeApi.xpPurchaseStatus(sessionKey)
+        .then((res) => {
+          if (res.status === 'paid') {
+            setPaid(true);
+            play('win');
+            onPurchased();
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [sessionKey, onPurchased, paid, play]);
+
+  const createOrder = async () => {
+    setBusy(true);
+    setErrMsg('');
+    try {
+      const packId = selectedPack?.id || `xp_${selectedXp}`;
+      const data = await dailyPracticeApi.buyXp(packId);
+      setCheckout(data);
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : 'Không tạo được đơn mua XP');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const simulatePaid = async () => {
+    if (!sessionKey || simulating) return;
+    setSimulating(true);
+    setErrMsg('');
+    try {
+      const res = await dailyPracticeApi.simulateXpPaid(sessionKey);
+      if (res.status === 'paid') {
+        setPaid(true);
+        play('win');
+        onPurchased();
+      }
+    } catch (err) {
+      setErrMsg(err instanceof Error ? err.message : 'Không xác nhận được thanh toán thử');
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  const qrUrl = checkout?.payment?.qrUrl || checkout?.qrUrl || '';
+  const bankName = checkout?.payment?.bankName || checkout?.bankName || '';
+  const accountNo = checkout?.payment?.accountNo || checkout?.accountNo || '';
+  const transferContent = checkout?.payment?.transferContent || checkout?.transferContent || checkout?.orderCode || '';
+  const canSimulate = Boolean(checkout?.payment?.canSimulate || checkout?.canSimulate || __DEV__);
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.quitBackdrop}>
+        <View style={[styles.quitCard, { maxWidth: 420 }]}>
+          <View style={styles.buyXpHeader}>
+            <View style={styles.buyXpIconWrap}>
+              <ShoppingBag size={18} color="#D97706" />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.buyXpTitle}>Mua XP luyện tập</Text>
+              <Text style={styles.muted}>Chuyển khoản là cộng XP, luyện tiếp được ngay</Text>
+            </View>
+            <Pressable onPress={onClose} style={{ padding: 6 }} accessibilityRole="button">
+              <X size={18} color="#64748B" />
+            </Pressable>
+          </View>
+
+          {paid ? (
+            <View style={{ alignItems: 'center', padding: spacing.xl, gap: 10 }}>
+              <Mascot mood="celebrate" size={88} />
+              <Text style={[styles.quitTitle, { color: '#047857' }]}>{`Đã cộng +${checkout?.xp || selectedXp} XP!`}</Text>
+              <Text style={styles.quitText}>Ví XP của bạn đã được cập nhật. Chúc bạn luyện tập vui vẻ!</Text>
+              <Pressable onPress={onClose} style={[styles.primary, { alignSelf: 'stretch', marginTop: 8 }]} accessibilityRole="button">
+                <Check size={16} color="#FFFFFF" />
+                <Text style={styles.primaryText}>Luyện tiếp ngay</Text>
+              </Pressable>
+            </View>
+          ) : checkout ? (
+            <View style={{ padding: spacing.lg, gap: 12, alignItems: 'center' }}>
+              {qrUrl ? (
+                <Image source={{ uri: qrUrl }} style={{ width: 210, height: 210, borderRadius: 14 }} resizeMode="contain" />
+              ) : (
+                <View style={{ padding: 24, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', gap: 6 }}>
+                  <QrCode size={42} color="#64748B" />
+                  <Text style={styles.muted}>Chuyển khoản theo thông tin bên dưới</Text>
+                </View>
+              )}
+              <View style={styles.buyXpTransferBox}>
+                <Text style={styles.buyXpTransferLine}>{`Gói: +${checkout.xp} XP · ${(checkout.amount || 0).toLocaleString('vi-VN')}đ`}</Text>
+                {bankName || accountNo ? <Text style={styles.muted}>{`Ngân hàng: ${bankName} · STK: ${accountNo}`}</Text> : null}
+                {transferContent ? <Text style={styles.buyXpCode}>{`Nội dung CK: ${transferContent}`}</Text> : null}
+              </View>
+              <View style={styles.inline}>
+                <ActivityIndicator size="small" color="#D97706" />
+                <Text style={styles.muted}>Đang chờ xác nhận thanh toán tự động…</Text>
+              </View>
+              {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
+              <View style={[styles.row, { alignSelf: 'stretch' }]}>
+                <Pressable onPress={() => setCheckout(null)} style={[styles.secondary, styles.flex]} accessibilityRole="button">
+                  <Text style={styles.secondaryText}>Đổi gói</Text>
+                </Pressable>
+                {canSimulate ? (
+                  <Pressable onPress={() => { void simulatePaid(); }} disabled={simulating} style={[styles.primary, styles.flex]} accessibilityRole="button">
+                    {simulating ? <ActivityIndicator color="#FFFFFF" /> : <RefreshCw size={15} color="#FFFFFF" />}
+                    <Text style={styles.primaryText}>Giả lập đã TT</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : (
+            <View style={{ padding: spacing.lg, gap: 10 }}>
+              {list.map((pack) => {
+                const active = pack.xp === selectedXp;
+                return (
+                  <Pressable
+                    key={pack.id || pack.xp}
+                    onPress={() => { play('tap'); setSelectedXp(pack.xp); }}
+                    style={[
+                      styles.buyXpPackCard,
+                      active && { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' },
+                    ]}
+                    accessibilityRole="button"
+                  >
+                    <View style={[styles.buyXpPackBolt, { backgroundColor: active ? '#F59E0B' : '#F1F5F9' }]}>
+                      <Zap size={16} color={active ? '#FFFFFF' : '#64748B'} fill={active ? '#FEF08A' : 'transparent'} />
+                    </View>
+                    <View style={styles.flex}>
+                      <Text style={styles.buyXpPackTitle}>{`+${pack.xp} XP`}</Text>
+                      <Text style={styles.muted}>{`Đủ khoảng ${Math.max(1, Math.round(pack.xp / 20))} lượt luyện`}</Text>
+                    </View>
+                    <Text style={styles.buyXpPackPrice}>{`${pack.priceVnd.toLocaleString('vi-VN')}đ`}</Text>
+                  </Pressable>
+                );
+              })}
+              {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
+              <Pressable onPress={() => { void createOrder(); }} disabled={busy} style={[styles.primary, { marginTop: 4 }]} accessibilityRole="button">
+                {busy ? <ActivityIndicator color="#FFFFFF" /> : <ShoppingBag size={16} color="#FFFFFF" />}
+                <Text style={styles.primaryText}>{`Mua ${selectedXp} XP`}</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Xác nhận mức cược XP trước khi vào bài ───────────────────────────────────
+function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, onConfirm, onBuyXp }: {
+  stakeXp: number;
+  xpTotal: number;
+  testOut: boolean;
+  busy: boolean;
+  play: (s: GameSound) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onBuyXp: () => void;
+}) {
+  const notEnough = xpTotal < stakeXp;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.quitBackdrop}>
+        <View style={[styles.quitCard, { maxWidth: 400 }]}>
+          <View style={[styles.quitHero, { backgroundColor: '#FFFBEB' }]}>
+            <Mascot mood={notEnough ? 'thinking' : 'happy'} size={86} />
+            <Text style={styles.quitTitle}>
+              {notEnough ? 'Không đủ XP để làm bài' : testOut ? 'Kiểm tra vượt chặng' : 'Sẵn sàng vào bài tập?'}
+            </Text>
+            {notEnough ? (
+              <>
+                <Text style={styles.quitText}>
+                  {`Bài tập này yêu cầu ${stakeXp} XP (cần ≥ ${stakeXp} XP để bắt đầu). Hiện bạn chỉ có ${xpTotal} XP trong ví. Vui lòng nâng cấp gói Meet (+300 XP/ngày) hoặc mua thêm XP để tiếp tục!`}
+                </Text>
+                <View style={styles.quitProgress}>
+                  <Zap size={13} color="#D97706" fill="#FCD34D" />
+                  <Text style={styles.quitProgressText}>{`5 XP/câu · tối đa ${stakeXp} XP · đang có ${xpTotal}`}</Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.stakeGrid2Col}>
+                <View style={styles.stakeColBox}>
+                  <Text style={styles.statLabel}>Mức cược lượt này</Text>
+                  <Text style={styles.stakeColValue}>{`5 XP/câu · tối đa ${stakeXp}`}</Text>
+                </View>
+                <View style={styles.stakeColBox}>
+                  <Text style={styles.statLabel}>Ví XP hiện có</Text>
+                  <Text style={styles.stakeColValue}>{`${xpTotal} XP`}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+          {notEnough ? (
+            <View style={styles.quitActions}>
+              <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.primary} accessibilityRole="button">
+                <Crown size={16} color="#FFFFFF" />
+                <Text style={styles.primaryText}>Nâng cấp gói Meet (+300 XP/ngày)</Text>
+              </Pressable>
+              <Pressable onPress={onCancel} style={styles.secondary} accessibilityRole="button">
+                <Text style={[styles.secondaryText, { color: '#64748B' }]}>Để sau</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[styles.row, { padding: spacing.lg }]}>
+              <Pressable onPress={onCancel} disabled={busy} style={[styles.secondary, styles.flex]} accessibilityRole="button">
+                <Text style={[styles.secondaryText, { color: '#64748B' }]}>Để sau</Text>
+              </Pressable>
+              <Pressable onPress={onConfirm} disabled={busy} style={[styles.primary, styles.flex]} accessibilityRole="button">
+                {busy ? <ActivityIndicator color="#FFFFFF" /> : <Play size={16} color="#FFFFFF" />}
+                <Text style={styles.primaryText}>Bắt đầu</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Xác nhận thoát ───────────────────────────────────────────────────────────
-function QuitConfirm({ stats, answered, total, play, onStay, onQuit }: {
+function QuitConfirm({ stats, answered, total, busy, play, onStay, onQuit }: {
   stats: DpStats | null;
   answered: number;
   total: number;
+  busy?: boolean;
   play: (s: GameSound) => void;
   onStay: () => void;
   onQuit: () => void;
@@ -998,11 +2437,12 @@ function QuitConfirm({ stats, answered, total, play, onStay, onQuit }: {
             ) : null}
           </View>
           <View style={styles.quitActions}>
-            <Pressable onPress={onStay} style={styles.primary} accessibilityRole="button">
+            <Pressable onPress={onStay} disabled={busy} style={styles.primary} accessibilityRole="button">
               <Play size={16} color="#FFFFFF" />
               <Text style={styles.primaryText}>Ở lại luyện tiếp</Text>
             </Pressable>
-            <Pressable onPress={onQuit} style={styles.secondary} accessibilityRole="button">
+            <Pressable onPress={onQuit} disabled={busy} style={styles.secondary} accessibilityRole="button">
+              {busy ? <ActivityIndicator size="small" color="#64748B" /> : null}
               <Text style={[styles.secondaryText, { color: '#64748B' }]}>Vẫn thoát</Text>
             </Pressable>
           </View>
@@ -1022,6 +2462,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   onDraggingChange: (dragging: boolean) => void;
 }) {
   const [quitOpen, setQuitOpen] = useState(false);
+  const [quitting, setQuitting] = useState(false);
   const [index, setIndex] = useState(0);
   const [pending, setPending] = useState<DpAnswer | null>(null);
   const [chosen, setChosen] = useState<number | boolean | null>(null);
@@ -1030,6 +2471,9 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [hintText, setHintText] = useState('');
   const [busy, setBusy] = useState(false);
   const [xp, setXp] = useState(0);
+  const [profileXp, setProfileXp] = useState<number | null>(() => (
+    typeof session.profileXp === 'number' ? session.profileXp : typeof stats?.xpTotal === 'number' ? stats.xpTotal : null
+  ));
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [combo, setCombo] = useState(0);
@@ -1042,8 +2486,25 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     () => playQuestionHeaderChips(session.path, meta.label, level),
     [session.path, meta.label, level],
   );
+  const stakeXp = Number(session.stakeXp) || 0;
+  const isTestOutStake = Boolean(session.path?.testOut && stakeXp > 0);
+  const isPerQuestionStake = Boolean(session.path && !session.path.testOut && stakeXp > 0);
+  const walletXp = profileXp !== null ? inPlayWalletXp(profileXp, isTestOutStake ? stakeXp : 0) : null;
+  const hintCostXp = 2;
   const shakeX = useShake(result && !result.correct ? `${index}-wrong` : null);
   const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (typeof stats?.xpTotal === 'number') setProfileXp(stats.xpTotal);
+  }, [stats?.xpTotal]);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats>; xpTotal?: number | null }) => {
+      if (typeof detail?.xpTotal === 'number') setProfileXp(detail.xpTotal);
+      else if (typeof detail?.stats?.xpTotal === 'number') setProfileXp(detail.stats.xpTotal);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     Animated.timing(progress, { toValue: (index + (result ? 1 : 0)) / total, duration: 400, useNativeDriver: false }).start();
@@ -1058,11 +2519,12 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       const data = await dailyPracticeApi.answer(session.id, question.id, answer);
       setResult(data);
       setXp(data.sessionXp);
+      if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       setTitle(data.correct ? randomPraise() : randomComfort());
       setCombo((value) => (data.correct ? value + 1 : 0));
       if (data.correct) {
         comboPop.setValue(0.6);
-        Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }).start();
+        Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: USE_NATIVE_DRIVER }).start();
       }
       play(data.correct ? 'correct' : 'wrong');
     } catch (err) {
@@ -1080,6 +2542,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       play('hint');
       setReveal(data.reveal || {});
       setHintText(data.hint || '');
+      if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không lấy được gợi ý');
     } finally {
@@ -1106,20 +2569,43 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
     }
   };
 
+  const confirmQuit = async () => {
+    if (quitting) return;
+    setQuitting(true);
+    try {
+      await dailyPracticeApi.abandon(session.id);
+    } catch {
+      // vẫn cho thoát nếu phiên đã đóng
+    } finally {
+      setQuitting(false);
+      setQuitOpen(false);
+      onQuit();
+    }
+  };
+
   const props = { question, reveal, result, play, onChange: setPending };
   const immediate = question.type === 'mcq' || question.type === 'truefalse';
   const mood: MascotMood = result ? (result.correct ? 'happy' : 'sad') : reveal ? 'thinking' : 'idle';
+  const stepTitle = session.path
+    ? `Chặng ${session.path.unitIndex} · ${session.path.pathNodeLabel || session.path.unitTitle} · ${session.path.stepLabel}`
+    : `Luyện tự do · ${level.label}`;
 
   return (
     <DragProvider onDraggingChange={onDraggingChange}>
-      <View style={styles.gapMd}>
-        <View style={styles.topBar}>
+      <View style={styles.playWrap}>
+        <View style={styles.topBarCard}>
           <Pressable onPress={() => setQuitOpen(true)} style={styles.quitBtn} accessibilityRole="button">
             <LogOut size={15} color="#475569" />
             <Text style={styles.quitBtnText}>Thoát</Text>
           </Pressable>
-          <View style={styles.progressTrack}>
-            <Animated.View style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+          <View style={styles.flex}>
+            <View style={styles.topBarMetaRow}>
+              <Text numberOfLines={1} style={styles.topBarStepTitle}>{stepTitle}</Text>
+              <Text style={styles.topBarCount}>{`${index + 1}/${total}`}</Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <Animated.View style={[styles.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+            </View>
           </View>
           {combo >= 2 ? (
             <Animated.View style={[styles.comboChip, { transform: [{ scale: comboPop }] }]} accessibilityLabel={`Combo ${combo} câu đúng liên tiếp`}>
@@ -1127,10 +2613,24 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <Text style={styles.comboText}>{`x${combo}`}</Text>
             </Animated.View>
           ) : null}
-          <View style={styles.xpPill}><Zap size={14} color="#F59E0B" fill="#FBBF24" /><Text style={styles.xpText}>{xp}</Text></View>
+          {session.xpDisabled ? (
+            <View style={[styles.xpPill, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
+              <Text style={[styles.xpText, { color: '#64748B', fontSize: 12 }]}>{session.review ? 'Ôn tập · 0 XP' : '0 XP'}</Text>
+            </View>
+          ) : walletXp !== null ? (
+            <View style={styles.xpPill}>
+              <Zap size={14} color="#F59E0B" fill="#FBBF24" />
+              <View style={{ alignItems: 'center' }}>
+                <Text style={styles.xpText}>{walletXp}</Text>
+                {isPerQuestionStake ? <Text style={styles.xpSubText}>{`${QUESTION_STAKE_XP}/câu`}</Text> : null}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.xpPill}><Zap size={14} color="#F59E0B" fill="#FBBF24" /><Text style={styles.xpText}>{xp}</Text></View>
+          )}
         </View>
 
-        <Animated.View style={[styles.card, { transform: [{ translateX: shakeX }] }]}>
+        <Animated.View style={[styles.playQuestionCard, { transform: [{ translateX: shakeX }] }]}>
           {result?.correct ? <Confetti key={`c-${index}`} /> : null}
           <View style={styles.badgeRow}>
             <Text style={styles.badgeDark}>{`Câu ${index + 1}/${total}`}</Text>
@@ -1141,10 +2641,15 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             ))}
           </View>
           <View style={styles.promptRow}>
-            <Mascot mood={mood} size={56} />
+            <View style={styles.promptMascotBox}>
+              <Mascot mood={mood} size={58} />
+            </View>
             <View style={styles.flex}>
+              <View style={styles.questionLabelRow}>
+                <Text style={styles.questionLabelBadge}>Câu hỏi :</Text>
+                {!immediate && meta.instruction ? <Text style={styles.instructionInline}>{meta.instruction}</Text> : null}
+              </View>
               <Text style={styles.prompt}>{question.prompt}</Text>
-              <Text style={styles.instruction}>{meta.instruction}</Text>
             </View>
           </View>
           {question.imageUrl ? <Image source={getMobileImageSource(question.imageUrl)} style={styles.image} resizeMode="contain" /> : null}
@@ -1163,6 +2668,30 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             {question.type === 'sort' ? <SortQuestion {...props} /> : null}
           </View>
           {error ? <Text style={styles.errorInline}>{error}</Text> : null}
+
+          {!result ? (
+            <View style={styles.playCardFooter}>
+              <Pressable
+                onPress={() => { void askHint(); }}
+                disabled={Boolean(reveal) || busy}
+                style={[styles.hintFooterBtn, reveal ? styles.disabled : null]}
+                accessibilityRole="button"
+              >
+                <Lightbulb size={16} color="#D97706" fill={reveal ? 'transparent' : '#FCD34D'} />
+                <Text style={styles.hintFooterBtnText}>
+                  {reveal ? 'Đã dùng gợi ý' : session.xpDisabled ? 'Gợi ý' : `Gợi ý · −${hintCostXp} XP`}
+                </Text>
+              </Pressable>
+              {!immediate ? (
+                <Pressable onPress={() => { void submit(pending); }} disabled={!pending || busy} style={[styles.primary, (!pending || busy) && styles.disabled]} accessibilityRole="button">
+                  {busy ? <ActivityIndicator color="#FFFFFF" /> : <CheckCircle2 size={17} color="#FFFFFF" />}
+                  <Text style={styles.primaryText}>Kiểm tra</Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.selectAnswerHint}>Chọn 1 đáp án bên trên</Text>
+              )}
+            </View>
+          ) : null}
         </Animated.View>
 
         {quitOpen ? (
@@ -1170,25 +2699,13 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
             stats={stats}
             answered={index + (result ? 1 : 0)}
             total={total}
+            busy={quitting}
             play={play}
             onStay={() => setQuitOpen(false)}
-            onQuit={() => { setQuitOpen(false); onQuit(); }}
+            onQuit={() => { void confirmQuit(); }}
           />
         ) : null}
-        {!result ? (
-          <View style={styles.row}>
-            <Pressable onPress={() => { void askHint(); }} disabled={Boolean(reveal) || busy} style={[styles.secondary, reveal ? styles.disabled : null]} accessibilityRole="button">
-              <Lightbulb size={17} color="#F59E0B" fill={reveal ? 'transparent' : '#FCD34D'} />
-              <Text style={styles.secondaryText}>{reveal ? 'Đã dùng gợi ý' : 'Gợi ý (½ XP)'}</Text>
-            </Pressable>
-            {!immediate ? (
-              <Pressable onPress={() => { void submit(pending); }} disabled={!pending || busy} style={[styles.primary, styles.flex, (!pending || busy) && styles.disabled]} accessibilityRole="button">
-                {busy ? <ActivityIndicator color="#FFFFFF" /> : <CheckCircle2 size={17} color="#FFFFFF" />}
-                <Text style={styles.primaryText}>Kiểm tra</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : (
+        {result ? (
           <View style={[styles.feedback, result.correct ? styles.feedbackOk : styles.feedbackBad]}>
             <View style={styles.feedbackRow}>
               <Mascot mood={result.correct ? 'happy' : 'sad'} size={52} />
@@ -1196,7 +2713,13 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
                 <View style={styles.feedbackTitleRow}>
                   {result.correct ? <CheckCircle2 size={20} color="#047857" /> : <XCircle size={20} color="#DC2626" />}
                   <Text style={[styles.feedbackTitle, { color: result.correct ? '#047857' : '#DC2626' }]}>{title}</Text>
-                  {result.correct ? <Text style={styles.feedbackXp}>{`+${result.xp} XP`}</Text> : null}
+                  {result.wrongPenaltyXp ? (
+                    <Text style={[styles.feedbackXp, { color: '#DC2626' }]}>
+                      {`−${result.wrongPenaltyXp} XP`}
+                    </Text>
+                  ) : result.correct && result.xp > 0 ? (
+                    <Text style={styles.feedbackXp}>{`+${result.xp} XP`}</Text>
+                  ) : null}
                 </View>
                 {!result.correct ? <Text style={styles.feedbackAnswer}>{`Đáp án: ${result.correctAnswer.text}`}</Text> : null}
                 {result.explanation ? <Text style={styles.feedbackExplain}>{result.explanation}</Text> : null}
@@ -1208,7 +2731,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <ArrowRight size={17} color="#FFFFFF" />
             </Pressable>
           </View>
-        )}
+        ) : null}
       </View>
     </DragProvider>
   );
@@ -1265,11 +2788,12 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
   /** Lượt này không tính XP do hết 60 XP free/ngày. */
   const capReached = Boolean(summary.xpCapReached || summary.xpDisabled);
   /** Khi cap reached: chặn nút mở bài tiếp theo, chỉ cho ôn lại. */
-  const canProceedToNext = nextStep && !capReached;
+  const canProceedToNext = nextStep && !summary.xpCapReached;
+  const finishXp = practiceFinishXpDisplay(summary);
 
   useEffect(() => {
     Animated.stagger(180, stars.map((value, i) => Animated.spring(value, {
-      toValue: i < summary.stars ? 1 : 0.6, friction: 4, tension: 120, useNativeDriver: true,
+      toValue: i < summary.stars ? 1 : 0.6, friction: 4, tension: 120, useNativeDriver: USE_NATIVE_DRIVER,
     }))).start();
   }, [stars, summary.stars]);
 
@@ -1290,10 +2814,10 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
         <View style={styles.resultStats}>
           <View style={styles.resultStat}><Text style={[styles.resultValue, { color: '#059669' }]}>{`${summary.correctCount}/${summary.total}`}</Text><Text style={styles.statLabel}>câu đúng</Text></View>
           <View style={styles.resultStat}>
-            <Text style={[styles.resultValue, { color: capReached ? '#94A3B8' : summary.gainedXp < 0 ? '#DC2626' : summary.gainedXp > 0 ? '#D97706' : '#64748B' }]}>
-              {capReached ? '—' : summary.gainedXp > 0 ? `+${summary.gainedXp}` : summary.gainedXp < 0 ? String(summary.gainedXp) : '0'}
+            <Text style={[styles.resultValue, { color: !finishXp.positive ? '#DC2626' : finishXp.amount > 0 ? '#D97706' : '#64748B' }]}>
+              {`${finishXp.prefix}${finishXp.amount}`}
             </Text>
-            <Text style={styles.statLabel}>{capReached ? 'Hết XP free' : 'XP ròng lượt này'}</Text>
+            <Text style={styles.statLabel}>{summary.xpCapReached ? 'Hết XP free' : 'XP ròng lượt này'}</Text>
           </View>
           <View style={styles.resultStat}>
             <View style={styles.inline}><Flame size={20} color="#EA580C" fill="#FDBA74" /><Text style={[styles.resultValue, { color: '#EA580C' }]}>{summary.stats.streak}</Text></View>
@@ -1303,7 +2827,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
       </View>
 
       {/* Banner hết XP free — chặn mở bài mới, kích thích mua gói */}
-      {capReached ? (
+      {summary.xpCapReached ? (
         <View style={styles.resultCapBanner}>
           <View style={styles.xpCapBannerTop}>
             <Lock size={16} color="#B91C1C" />
@@ -1366,7 +2890,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
 
 type PracticePick =
   | { mode: 'free'; topicId: string; difficulty: DpDifficulty }
-  | { mode: 'path'; unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean };
+  | { mode: 'path'; unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; review?: boolean };
 
 /** Luyện tập hằng ngày kiểu trò chơi — cùng API, luật chơi với web. */
 export function DailyPracticeScreen() {
@@ -1387,6 +2911,8 @@ export function DailyPracticeScreen() {
   const [pathTopics, setPathTopics] = useState<DpTopicPath[]>([]);
   const [pathLoading, setPathLoading] = useState(true);
   const [pathError, setPathError] = useState('');
+  const [stakePrompt, setStakePrompt] = useState<{ unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; stakeXp: number } | null>(null);
+  const [buyXpOpen, setBuyXpOpen] = useState(false);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   const load = useCallback(() => {
@@ -1405,21 +2931,44 @@ export function DailyPracticeScreen() {
   }, []);
   useEffect(() => { load(); loadPath(); }, [load, loadPath]);
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(DAILY_PRACTICE_STATS_EVENT, (detail?: Partial<DpStats> & { stats?: Partial<DpStats>; xpTotal?: number | null }) => {
+      if (!detail) return;
+      setStats((prev) => {
+        const nextPatch = detail.stats || detail;
+        if (!prev) return nextPatch as DpStats;
+        return {
+          ...prev,
+          ...nextPatch,
+          xpTotal: typeof detail.xpTotal === 'number' ? detail.xpTotal : (typeof nextPatch.xpTotal === 'number' ? nextPatch.xpTotal : prev.xpTotal),
+        };
+      });
+    });
+    return () => sub.remove();
+  }, []);
+
   const begin = async (pick: PracticePick) => {
     setStarting(true);
     setError('');
     setPathError('');
     try {
       const data = pick.mode === 'path'
-        ? await dailyPracticeApi.startPath(pick.unitId, pick.step, pick.testOut, pick.nodeKey || '')
+        ? await dailyPracticeApi.startPath(pick.unitId, pick.step, pick.testOut, pick.nodeKey || '', { review: pick.review })
         : await dailyPracticeApi.start(pick.topicId, pick.difficulty);
+      setStakePrompt(null);
       setLastPick(pick);
       setSummary(null);
       setSession(data);
       scrollRef.current?.scrollTo({ y: 0, animated: false });
     } catch (err) {
+      const status = (err as { status?: number })?.status;
       const message = err instanceof Error ? err.message : 'Không bắt đầu được lượt chơi';
-      if (pick.mode === 'path') {
+      if (status === 402) {
+        setStakePrompt(null);
+        setBuyXpOpen(true);
+        load();
+      } else if (pick.mode === 'path') {
+        setStakePrompt(null);
         setPathError(message);
         setSummary(null);
         loadPath();
@@ -1431,16 +2980,50 @@ export function DailyPracticeScreen() {
     }
   };
   const start = (topicId: string, difficulty: DpDifficulty) => begin({ mode: 'free', topicId, difficulty });
-  const startStep = (unitId: string, nodeKey: string, step: DpStepKey, testOut = false) => begin({ mode: 'path', unitId, nodeKey, step, testOut });
+  const startStep = (unitId: string, nodeKey: string, step: DpStepKey, testOut = false, opts: { review?: boolean } = {}) => {
+    if (opts.review) {
+      return begin({ mode: 'path', unitId, nodeKey, step, testOut: false, review: true });
+    }
+    const stakeXp = testOut ? TEST_OUT_XP : SESSION_STAKE_XP;
+    setStakePrompt({ unitId, nodeKey: nodeKey || '', step, testOut, stakeXp });
+    return undefined;
+  };
+  const quickStart = (preferredTopic?: DpTopicPath | null) => {
+    const target = (preferredTopic?.next ? preferredTopic : null)
+      || (linkedTopicId ? pathTopics.find((t) => t.topic.id === linkedTopicId && t.next) : null)
+      || pathTopics.find((t) => t.next && t.completedUnits > 0)
+      || pathTopics.find((t) => t.next);
+    if (target?.next) {
+      setMode('path');
+      startStep(target.next.unitId, target.next.nodeKey || 'practice-1', target.next.step, false);
+      return;
+    }
+    if (topics[0]) {
+      setMode('free');
+      void start(topics[0].id, 'easy');
+    }
+  };
+  useEffect(() => {
+    if (route.params?.watch === 'stage') {
+      setMode('path');
+    }
+  }, [route.params?.watch]);
+
+  useEffect(() => {
+    if (route.params?.practice === 'stage' && pathTopics.length > 0 && !session && !summary) {
+      setMode('path');
+      quickStart();
+    }
+  }, [route.params?.practice, pathTopics]);
+
   const goHome = () => {
     setSummary(null);
     setPathError('');
     load();
     loadPath();
   };
-  /** TODO: điều hướng đến màn mua gói XP khi có màn đó. */
   const goToBuyXp = () => {
-    // navigation.navigate('XpPackages');
+    setBuyXpOpen(true);
   };
 
   return (
@@ -1452,7 +3035,7 @@ export function DailyPracticeScreen() {
             session={session}
             play={play}
             stats={stats}
-            onQuit={() => setSession(null)}
+            onQuit={() => { setSession(null); load(); loadPath(); }}
             onDraggingChange={(dragging) => setScrollEnabled(!dragging)}
             onFinished={(data) => {
               setSession(null);
@@ -1475,13 +3058,13 @@ export function DailyPracticeScreen() {
             play={play}
             starting={starting}
             onReplay={() => { if (lastPick) void begin(lastPick); }}
-            onNextStep={(next) => { void startStep(next.unitId, next.nodeKey || 'study', next.step); }}
+            onNextStep={(next) => { startStep(next.unitId, next.nodeKey || 'study', next.step); }}
             onHome={goHome}
             onBuyXp={goToBuyXp}
           />
         ) : (
           <HomeView
-            key={linkedTopicId}
+            key={`${linkedTopicId}-${route.params?.watch || ''}`}
             topics={topics}
             stats={stats}
             loading={loading}
@@ -1495,12 +3078,45 @@ export function DailyPracticeScreen() {
             pathTopics={pathTopics}
             pathLoading={pathLoading}
             pathError={pathError}
-            onStartStep={(unitId, nodeKey, step, testOut) => { void startStep(unitId, nodeKey, step, testOut); }}
-            onPathChanged={loadPath}
+            onStartStep={(unitId, nodeKey, step, testOut, opts) => { startStep(unitId, nodeKey, step, testOut, opts); }}
+            onQuickStart={quickStart}
+            onPathChanged={() => { load(); loadPath(); }}
             onBuyXp={goToBuyXp}
+            initialWatchStage={route.params?.watch === 'stage'}
           />
         )}
       </ScrollView>
+      {stakePrompt ? (
+        <StakeSessionConfirm
+          stakeXp={stakePrompt.stakeXp}
+          xpTotal={stats?.xpTotal || 0}
+          testOut={stakePrompt.testOut}
+          busy={starting}
+          play={play}
+          onCancel={() => { if (!starting) setStakePrompt(null); }}
+          onConfirm={() => {
+            void begin({
+              mode: 'path',
+              unitId: stakePrompt.unitId,
+              nodeKey: stakePrompt.nodeKey,
+              step: stakePrompt.step,
+              testOut: stakePrompt.testOut,
+            });
+          }}
+          onBuyXp={() => {
+            setStakePrompt(null);
+            setBuyXpOpen(true);
+          }}
+        />
+      ) : null}
+      {buyXpOpen ? (
+        <BuyXpModal
+          packs={stats?.xpPacks}
+          play={play}
+          onClose={() => setBuyXpOpen(false)}
+          onPurchased={() => { load(); loadPath(); }}
+        />
+      ) : null}
     </AppScreen>
   );
 }
@@ -1510,7 +3126,7 @@ const styles = StyleSheet.create({
   relatedCard: { gap: spacing.md, padding: spacing.md, borderRadius: 22, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
   relatedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   relatedIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DC2626' },
-  relatedEyebrow: { color: '#DC2626', fontSize: 11, fontWeight: '800' },
+  relatedEyebrow: { color: '#DC2626', fontSize: 12, fontWeight: '800' },
   relatedTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
   flex: { flex: 1, minWidth: 0 },
   center: { textAlign: 'center' },
@@ -1527,13 +3143,13 @@ const styles = StyleSheet.create({
     backgroundImage: 'linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 50%, #FFFBEB 100%)',
   } as never,
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  eyebrow: { color: '#DC2626', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  eyebrow: { color: '#DC2626', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   heroTitle: { color: colors.ink, fontSize: 18, fontWeight: '900', marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: 6 },
   stat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.85)' },
   statIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   statValue: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  statLabel: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  statLabel: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   empty: { alignItems: 'center', gap: 6, padding: spacing.xl, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
   emptyTitle: { color: colors.ink, fontSize: 15, fontWeight: '800', textAlign: 'center' },
   sectionTitle: { color: '#334155', fontSize: 14, fontWeight: '900' },
@@ -1541,12 +3157,12 @@ const styles = StyleSheet.create({
   topic: { width: '48%', flexGrow: 1, padding: 12, borderRadius: 18, borderWidth: 2, gap: 4 },
   topicIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   topicName: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  topicDesc: { color: colors.muted, fontSize: 11 },
+  topicDesc: { color: colors.muted, fontSize: 12 },
   topicCheck: { position: 'absolute', top: 10, right: 10 },
   level: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 16, borderWidth: 2, gap: 2 },
   starsRow: { flexDirection: 'row', gap: 2 },
   levelLabel: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  levelMeta: { color: '#94A3B8', fontSize: 10, fontWeight: '700' },
+  levelMeta: { color: '#94A3B8', fontSize: 12, fontWeight: '700' },
   primary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, paddingHorizontal: 18, borderRadius: 14,
     backgroundColor: colors.brand, backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
@@ -1586,11 +3202,11 @@ const styles = StyleSheet.create({
   xpText: { color: '#B45309', fontSize: 14, fontWeight: '900' },
   card: { padding: spacing.lg, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, gap: 10 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  badgeDark: { color: '#FFFFFF', backgroundColor: '#0F172A', fontSize: 11, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
-  badge: { fontSize: 11, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
+  badgeDark: { color: '#FFFFFF', backgroundColor: '#0F172A', fontSize: 12, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
+  badge: { fontSize: 12, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
   promptRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  prompt: { color: colors.ink, fontSize: 17, fontWeight: '900', lineHeight: 23 },
-  instruction: { color: '#94A3B8', fontSize: 12, fontWeight: '700', marginTop: 2 },
+  prompt: { color: colors.ink, fontSize: 19, fontWeight: '800', lineHeight: 28 },
+  instruction: { color: '#94A3B8', fontSize: 13, fontWeight: '700', marginTop: 2 },
   image: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#F8FAFC' },
   hintBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
   hintText: { flex: 1, color: '#92400E', fontSize: 13, fontWeight: '700' },
@@ -1626,8 +3242,8 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 16, borderWidth: 2 },
   chipIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   chipName: { color: colors.ink, fontSize: 13, fontWeight: '900' },
-  chipMeta: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  pathEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  chipMeta: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  pathEyebrow: { fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
   pathTrack: { flex: 1, height: 12, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   pathFill: { height: '100%', borderRadius: 999 },
   pathCount: { color: '#334155', fontSize: 13, fontWeight: '900' },
@@ -1673,23 +3289,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(15,23,42,0.06)',
   },
   unitStageMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  unitStageEyebrow: { color: '#64748B', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.6 },
+  unitStageEyebrow: { color: '#64748B', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.6 },
   unitStagePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  unitStagePillText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  unitStagePillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   unitStageActivePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: '#FBBF24' },
-  unitStageActivePillText: { color: '#78350F', fontSize: 9, fontWeight: '900' },
+  unitStageActivePillText: { color: '#78350F', fontSize: 11, fontWeight: '900' },
   unitStageTitleCenter: { color: colors.ink, fontSize: 17, fontWeight: '900', textAlign: 'center', maxWidth: 280 },
-  unitStageDescCenter: { color: colors.muted, fontSize: 11, textAlign: 'center', maxWidth: 300 },
+  unitStageDescCenter: { color: colors.muted, fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 300 },
   unitStageProgressRowCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, width: '100%', maxWidth: 260 },
   unitStageTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
-  unitStageDesc: { color: colors.muted, fontSize: 11, marginTop: 2 },
+  unitStageDesc: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 },
   unitStageProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   unitStageTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   unitStageFill: { height: '100%', borderRadius: 999 },
-  unitStageCount: { color: '#64748B', fontSize: 10, fontWeight: '800' },
+  unitStageCount: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   unitStageActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 8 },
   unitStageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 },
-  unitStageBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  unitStageBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   unitStageTestOut: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1699,7 +3315,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#1E293B',
   },
-  unitStageTestOutText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  unitStageTestOutText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   nodeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, paddingVertical: 4, paddingRight: spacing.md },
   nodeRowItem: { flexDirection: 'row', alignItems: 'flex-end' },
   nodeRowDash: { width: 14, height: 3, borderRadius: 999, marginBottom: 28, marginHorizontal: 2 },
@@ -1740,7 +3356,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.1)',
   },
   unitBannerMiniBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.25)' },
-  unitBannerMiniBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  unitBannerMiniBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   unitBannerNotch: {
     position: 'absolute',
     bottom: -10,
@@ -1752,10 +3368,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  unitEyebrow: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  unitEyebrow: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1.8 },
   unitTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  unitDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 12, textAlign: 'center' },
-  unitProgressText: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '800', marginTop: 2 },
+  unitDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  unitProgressText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '800', marginTop: 2 },
   unitActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 10 },
   unitVideoChip: {
     flexDirection: 'row',
@@ -1783,7 +3399,7 @@ const styles = StyleSheet.create({
   decorSparkle: { position: 'absolute', opacity: 0.6 },
   mascotShadow: { position: 'absolute', bottom: -2, alignSelf: 'center', width: 64, height: 12, borderRadius: 999 },
   unitLockChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.2)' },
-  unitLockText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
+  unitLockText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.6 },
   nodeWrap: { alignItems: 'center' },
   node: { alignItems: 'center', justifyContent: 'center' },
   nodeCrown: { position: 'absolute', top: -10, right: -2 },
@@ -1798,8 +3414,8 @@ const styles = StyleSheet.create({
   popoverArrow: { position: 'absolute', top: -7, left: 127, width: 16, height: 16, transform: [{ rotate: '45deg' }] },
   popoverClose: { position: 'absolute', top: 6, right: 6, padding: 6, zIndex: 2 },
   popoverTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
-  popoverMeta: { color: 'rgba(255,255,255,0.88)', fontSize: 12, fontWeight: '800' },
-  popoverHint: { color: 'rgba(255,255,255,0.82)', fontSize: 12, marginTop: 2 },
+  popoverMeta: { color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '800' },
+  popoverHint: { color: 'rgba(255,255,255,0.82)', fontSize: 13, marginTop: 2 },
   popoverButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 10, borderRadius: 12, backgroundColor: '#FFFFFF',
   },
@@ -1812,17 +3428,17 @@ const styles = StyleSheet.create({
   hubLevelRowLocked: { opacity: 0.6, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.1)' },
   hubLevelIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
   hubLevelTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
-  hubLevelHint: { color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 1 },
-  hubLevelXp: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800', marginTop: 2 },
+  hubLevelHint: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 1 },
+  hubLevelXp: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', marginTop: 2 },
   hubLevelBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: '#FFFFFF' },
-  hubLevelBtnText: { color: '#1E293B', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+  hubLevelBtnText: { color: '#1E293B', fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
   comboChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#F97316' },
   comboText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   nodeBubble: {
     marginBottom: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, overflow: 'hidden', backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: colors.line, fontSize: 11, fontWeight: '900', letterSpacing: 0.8,
+    borderWidth: 1, borderColor: colors.line, fontSize: 12, fontWeight: '900', letterSpacing: 0.8,
   },
-  nodeLabel: { marginTop: 8, color: '#334155', fontSize: 12, fontWeight: '900' },
+  nodeLabel: { marginTop: 8, color: '#334155', fontSize: 13, fontWeight: '900' },
   pathResult: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 22, borderWidth: 1 },
   pathResultOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   pathResultBad: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
@@ -1836,7 +3452,7 @@ const styles = StyleSheet.create({
   xpCapPct: { color: '#B45309', fontSize: 12, fontWeight: '900' },
   xpCapTrack: { height: 8, borderRadius: 999, backgroundColor: '#FEF3C7', overflow: 'hidden' },
   xpCapFill: { height: '100%', borderRadius: 999 },
-  xpCapHint: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  xpCapHint: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   xpCapHintBold: { color: '#B45309', fontWeight: '900' },
   xpCapBanner: {
     padding: spacing.md, borderRadius: 20, borderWidth: 1.5, borderColor: '#FECACA', backgroundColor: '#FEF2F2', gap: 10,
@@ -1847,9 +3463,9 @@ const styles = StyleSheet.create({
   xpCapBannerBold: { color: '#991B1B', fontWeight: '900' },
   xpCapBannerPlans: { gap: 6, paddingVertical: 4 },
   xpCapPlanRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  xpCapPlanText: { color: '#334155', fontSize: 12 },
+  xpCapPlanText: { color: '#334155', fontSize: 13 },
   xpCapPlanBold: { color: '#0F172A', fontWeight: '900' },
-  xpCapPlanBadge: { color: '#059669', fontWeight: '900', fontSize: 11 },
+  xpCapPlanBadge: { color: '#059669', fontWeight: '900', fontSize: 12 },
   xpCapBannerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44,
     borderRadius: 12, backgroundColor: '#DC2626',
@@ -1858,4 +3474,574 @@ const styles = StyleSheet.create({
   resultCapBanner: {
     padding: spacing.md, borderRadius: 18, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB', gap: 8,
   },
+  quickStatGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  quickStatCard: {
+    flexBasis: '48%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10,
+    borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+  },
+  quickStatValue: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  quickBuyBtn: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#FFFBEB',
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  quickBuyBtnText: { color: '#B45309', fontSize: 11, fontWeight: '900' },
+  lessonModalHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.lg },
+  lessonModalEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  lessonModalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 2 },
+  lessonModalClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
+  lessonVideoCallout: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16,
+    borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2',
+  },
+  lessonVideoCalloutTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  lessonBodyBox: { gap: 8, padding: 14, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  lessonBodyText: { color: '#334155', fontSize: 14, lineHeight: 21 },
+  lessonCheckCard: { padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  lessonCheckPrompt: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  lessonCheckOpt: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
+  },
+  lessonCheckOptLetter: {
+    width: 24, height: 24, borderRadius: 8, textAlign: 'center', lineHeight: 24,
+    backgroundColor: '#E2E8F0', color: '#334155', fontSize: 12, fontWeight: '900', overflow: 'hidden',
+  },
+  lessonCheckOptText: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  lessonVideoFrameWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    position: 'relative',
+  },
+  videoGateOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    zIndex: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  videoGateCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '94%',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    gap: 8,
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  videoGateTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  videoGateTime: {
+    color: '#B45309',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  videoGateCloseBtn: {
+    padding: 4,
+  },
+  videoGateMissedBox: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  videoGateMissedText: {
+    color: '#B91C1C',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  videoGatePrompt: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  videoGateChoiceBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  videoGateChoiceBtnActive: {
+    backgroundColor: '#0284C7',
+  },
+  videoGateChoiceText: {
+    color: '#1E293B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  videoGateChoiceTextActive: {
+    color: '#FFFFFF',
+  },
+  videoGateTextInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  videoGateHintBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  videoGateHintText: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  videoGateErrorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  videoGateActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  videoGateSubmitBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#059669',
+  },
+  videoGateSubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  videoGateCancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  videoGateCancelBtnText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  videoGateHintBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#0F172A',
+  },
+  videoGateHintBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  videoGateScreenPickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginVertical: 4,
+  },
+  videoGateScreenPickText: {
+    color: '#1E293B',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  videoGateUploadProgress: {
+    gap: 6,
+    marginVertical: 6,
+  },
+  videoGateUploadTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  videoGateUploadFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#0284C7',
+  },
+  videoGateUploadText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  videoGateFootNote: {
+    color: '#64748B',
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  lessonPendingNote: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginTop: -2,
+  },
+  lessonModalFoot: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  lessonFootCloseBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  lessonFootCloseBtnText: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  lessonFootDoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+  },
+  lessonFootDoneBtnDone: {
+    backgroundColor: '#F87171',
+  },
+  lessonFootDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  finaleLockedCard: {
+    alignItems: 'center', gap: 6, padding: spacing.lg, borderRadius: 24, borderWidth: 2, borderStyle: 'dashed',
+    borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
+  },
+  finaleLockedCup: {
+    width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A',
+  },
+  finaleLockedEyebrow: { color: '#D97706', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  finaleLockedTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', textAlign: 'center' },
+  finaleDoneCard: {
+    alignItems: 'center', gap: 10, padding: spacing.xl, borderRadius: 28, borderWidth: 2, borderColor: '#FCD34D',
+    backgroundColor: '#FFFBEB', overflow: 'hidden',
+    backgroundImage: 'linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 50%, #FEF3C7 100%)',
+  } as never,
+  finaleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 5,
+    borderRadius: 999, backgroundColor: '#D97706',
+  },
+  finaleBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  finaleStageRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 14, marginVertical: 6 },
+  finaleCupWrap: { alignItems: 'center' },
+  finaleCrownBadge: {
+    width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EA580C', borderWidth: 2, borderColor: '#FFFFFF', marginBottom: -10, zIndex: 2,
+  },
+  finaleCupCircle: {
+    width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F59E0B', borderWidth: 4, borderColor: '#FEF3C7',
+    boxShadow: '0px 10px 24px rgba(217, 119, 6, 0.35)',
+  } as never,
+  finaleCupCircleSmall: {
+    width: 56, height: 56, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F59E0B', borderWidth: 2, borderColor: '#FEF3C7',
+  },
+  finaleStarsRow: {
+    flexDirection: 'row', gap: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A', marginTop: -10,
+  },
+  finaleDoneTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  finaleDoneSub: { color: '#475569', fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 380 },
+  finaleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, paddingHorizontal: 22,
+    borderRadius: 16, backgroundColor: '#D97706', marginTop: 4,
+    backgroundImage: 'linear-gradient(180deg, #F59E0B 0%, #D97706 55%, #B45309 100%)',
+  } as never,
+  finaleBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  finaleModalCard: {
+    maxWidth: 460, padding: spacing.xl, alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB',
+    borderWidth: 2, borderColor: '#FCD34D',
+  },
+  finaleModalTopic: { color: '#B45309', fontSize: 16, fontWeight: '900', textAlign: 'center' },
+  finaleStatsRow: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginVertical: 4 },
+  finaleStatBox: {
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  finaleStatVal: { color: '#B45309', fontSize: 15, fontWeight: '900' },
+  finaleStatLbl: { color: '#64748B', fontSize: 11, fontWeight: '800', marginTop: 2 },
+  pathTrophyResult: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: spacing.lg, borderRadius: 24,
+    borderWidth: 2, borderColor: '#FCD34D', backgroundColor: '#FFFBEB',
+  },
+  pathTrophyEyebrow: { color: '#B45309', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  pathTrophyTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
+  buyXpHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.lg,
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+  },
+  buyXpIconWrap: {
+    width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+  },
+  buyXpTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
+  buyXpTransferBox: {
+    alignSelf: 'stretch', padding: 12, borderRadius: 14, backgroundColor: '#FFFBEB',
+    borderWidth: 1, borderColor: '#FDE68A', gap: 4, alignItems: 'center',
+  },
+  buyXpTransferLine: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  buyXpCode: { color: '#B45309', fontSize: 13, fontWeight: '900', marginTop: 2 },
+  buyXpPackCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18,
+    borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+  },
+  buyXpPackBolt: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  buyXpPackTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
+  buyXpPackPrice: { color: '#DC2626', fontSize: 16, fontWeight: '900' },
+  stakeGrid2Col: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginTop: 8 },
+  stakeColBox: {
+    flex: 1, padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF',
+    borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', gap: 2,
+  },
+  stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  playWrap: { gap: spacing.lg, paddingTop: 20, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  topBarCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+    boxShadow: '0px 4px 12px rgba(15, 23, 42, 0.04)',
+  } as never,
+  topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  topBarStepTitle: { flex: 1, color: '#475569', fontSize: 13, fontWeight: '800', marginRight: 8 },
+  topBarCount: { color: '#334155', fontSize: 12, fontWeight: '900' },
+  xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '800' },
+  playQuestionCard: {
+    padding: spacing.xl, borderRadius: 26, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+    gap: 14, boxShadow: '0px 10px 28px rgba(15, 23, 42, 0.06)',
+  } as never,
+  promptMascotBox: {
+    padding: 6, borderRadius: 18, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9',
+  },
+  questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
+  questionLabelBadge: {
+    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: '#FEF2F2',
+    borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 12, fontWeight: '900',
+    textTransform: 'uppercase', letterSpacing: 0.6, overflow: 'hidden',
+  },
+  instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '700' },
+  playCardFooter: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    paddingTop: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: '#F1F5F9',
+  },
+  hintFooterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
+  },
+  hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '900' },
+  selectAnswerHint: { color: '#94A3B8', fontSize: 13, fontWeight: '700' },
+  pageEyebrow: { color: '#DC2626', fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
+  pageMainTitle: { color: colors.ink, fontSize: 24, fontWeight: '900' },
+  heroDark: {
+    padding: spacing.lg,
+    borderRadius: 26,
+    backgroundColor: '#0F172A',
+    backgroundImage: 'linear-gradient(135deg, #0F172A 0%, #1E293B 55%, #7F1D1D 100%)',
+    gap: spacing.md,
+  } as never,
+  heroDarkLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  heroMascotWrap: { padding: 4, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)' },
+  heroStreakPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  heroStreakPillText: { color: '#FEF3C7', fontSize: 12, fontWeight: '900' },
+  heroStreakSocialText: { color: '#FCD34D', fontSize: 12, fontWeight: '700' },
+  heroDarkTitle: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', marginTop: 4 },
+  heroDarkSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 19, marginTop: 2 },
+  heroWhiteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 14, backgroundColor: '#FFFFFF', alignSelf: 'flex-start', marginTop: 10,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.2)',
+  } as never,
+  heroWhiteBtnText: { color: '#B91C1C', fontSize: 13, fontWeight: '900' },
+  heroDarkStatsCol: { gap: 8, marginTop: 4 },
+  heroDarkStatsGrid: { flexDirection: 'row', gap: 6 },
+  heroGlassBox: {
+    flex: 1, padding: 8, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroGlassVal: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  heroGlassLbl: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '800', marginTop: 2 },
+  heroGlassMeta: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 1 },
+  heroDarkCaption: { color: 'rgba(255,255,255,0.75)', fontSize: 12, lineHeight: 17 },
+  xpEmptyBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    padding: spacing.md, borderRadius: 20, backgroundColor: '#FEF2F2',
+    borderWidth: 1.5, borderColor: '#FECACA',
+  },
+  xpEmptyIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' },
+  xpEmptyTitle: { color: '#991B1B', fontSize: 14, fontWeight: '900' },
+  xpEmptyDesc: { color: '#7F1D1D', fontSize: 12, lineHeight: 17, marginTop: 2 },
+  xpEmptyBuyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: '#DC2626',
+  },
+  xpEmptyBuyBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  goalCard: {
+    padding: spacing.md, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF', gap: 10,
+  },
+  goalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  goalIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  goalCardTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  goalCardSub: { color: colors.muted, fontSize: 12 },
+  goalBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  goalBadgeText: { fontSize: 12, fontWeight: '900' },
+  goalInfoBox: { padding: 8, borderRadius: 12, borderWidth: 1 },
+  goalInfoTitle: { fontSize: 12, fontWeight: '900' },
+  goalInfoSub: { fontSize: 11, marginTop: 1 },
+  goalLabelSmall: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  goalValueSmall: { color: colors.ink, fontSize: 12, fontWeight: '900' },
+  goalTargetBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7,
+    borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
+  },
+  goalTargetBtnActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  goalTargetBtnText: { color: colors.ink, fontSize: 13, fontWeight: '900' },
+  goalFooterBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
+  goalFooterText: { color: '#64748B', fontSize: 12 },
+  questItemBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
+  questCheckCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  questItemTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  questItemDesc: { color: colors.muted, fontSize: 12 },
+  questItemTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  weekCell: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  freeModeNotice: {
+    padding: 10, borderRadius: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
+  },
+  freeModeNoticeBold: { color: '#1E40AF', fontSize: 12, fontWeight: '900' },
+  freeModeNoticeText: { color: '#1E3A8A', fontSize: 12, lineHeight: 17 },
+  unitHeaderOuter: { width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: 12 },
+  unitHeaderBanner: {
+    flexDirection: 'row', alignItems: 'stretch', borderRadius: 18, overflow: 'hidden',
+  },
+  unitHeaderLeft: { flex: 1, padding: 14, gap: 3 },
+  unitHeaderEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
+  unitHeaderTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  unitHeaderDesc: { color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 18 },
+  unitHeaderProgressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  unitHeaderProgressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
+  unitHeaderProgressFill: { height: '100%', borderRadius: 999, backgroundColor: '#FFFFFF' },
+  unitHeaderProgressCount: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '900' },
+  unitHeaderRight: {
+    width: 64, borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  unitHeaderGuideBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  missionRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  missionSquareIcon: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  missionCircleIcon: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  missionCheckBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+  },
+  missionRowTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  missionRowSub: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 1,
+  },
+  missionRowTrack: {
+    height: 5,
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  missionRowFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  missionFooterText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  pathSummaryTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
 });

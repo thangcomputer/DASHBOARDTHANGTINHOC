@@ -17,6 +17,7 @@ type AuthContextValue = {
   /** Gói tài khoản HV (null với GV / chưa tải). Hết hạn → RootNavigator chỉ hiện màn gia hạn. */
   subscription: SubscriptionOverview | null;
   refreshSubscription: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   signIn: (role: UserRole, phone: string, password: string) => Promise<void>;
   updateAvatar: (avatar: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -59,46 +60,82 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     };
   }, [user?.id, user?.role, user?.previewMode, refreshSubscription]);
 
-  useEffect(() => {
-    const current = userRef.current;
-    if (!current || current.previewMode) return undefined;
-    let cancelled = false;
-    let running = false;
-    const revalidate = async () => {
-      const sessionUser = userRef.current;
-      if (running || !sessionUser || sessionUser.previewMode) return;
-      running = true;
-      try {
-        const me = await mobileApiRequest<{ data?: { status?: string; learningAccess?: boolean } }>('/auth/me');
-        if (cancelled) return;
-        const status = String(me.data?.status || '').toLowerCase();
-        const reason = sessionUser.role === 'student' && me.data?.learningAccess === false
-          ? 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.'
-          : sessionUser.role === 'teacher' && ['pending', 'locked'].includes(status)
-            ? 'Tài khoản giảng viên chưa được duyệt. Vui lòng hoàn thành bài kiểm tra đầu vào trên máy tính.'
-            : '';
-        if (!reason) return;
+  const refreshUser = useMemo(() => async () => {
+    const sessionUser = userRef.current;
+    if (!sessionUser || sessionUser.previewMode) return;
+    try {
+      const me = await mobileApiRequest<{
+        data?: {
+          status?: string;
+          learningAccess?: boolean;
+          freePortal?: boolean;
+          freeUnlocked?: boolean;
+          needsFreeSurvey?: boolean;
+          course?: string;
+          avatar?: string;
+        };
+      }>('/auth/me');
+      const status = String(me.data?.status || '').toLowerCase();
+      const reason = sessionUser.role === 'student' && me.data?.learningAccess === false
+        ? 'Bạn không còn khóa học đang học (đã hủy/hoàn phí). Vui lòng đăng ký và thanh toán khóa mới để đăng nhập lại.'
+        : sessionUser.role === 'teacher' && ['pending', 'locked'].includes(status)
+          ? 'Tài khoản giảng viên chưa được duyệt. Vui lòng hoàn thành bài kiểm tra đầu vào trên máy tính.'
+          : '';
+      if (reason) {
         await unregisterMobilePushNotifications().catch(() => {});
         await authService.signOut().catch(() => {});
         await clearLastActive(pinUserKey(sessionUser)).catch(() => {});
         disconnectSocket();
         setUser(null);
         setAuthError(reason);
-      } catch {
-        // Lỗi mạng bỏ qua; phiên hết hạn đã được apiClient phát sự kiện mobile:session-expired.
-      } finally {
-        running = false;
+        return;
       }
-    };
-    void revalidate();
+      if (sessionUser.role === 'student' && me.data) {
+        const nextFreePortal = me.data.freePortal === true;
+        const nextFreeUnlocked = me.data.freeUnlocked === true;
+        const nextNeedsFreeSurvey = me.data.needsFreeSurvey === true;
+        const nextCourse = typeof me.data.course === 'string' && me.data.course ? me.data.course : sessionUser.course;
+        if (
+          sessionUser.freePortal !== nextFreePortal
+          || sessionUser.freeUnlocked !== nextFreeUnlocked
+          || sessionUser.needsFreeSurvey !== nextNeedsFreeSurvey
+          || sessionUser.course !== nextCourse
+        ) {
+          const updatedUser: DemoUser = {
+            ...sessionUser,
+            freePortal: nextFreePortal,
+            freeUnlocked: nextFreeUnlocked,
+            needsFreeSurvey: nextNeedsFreeSurvey,
+            course: nextCourse,
+          };
+          const tokens = getMobileApiTokens();
+          if (tokens) {
+            await saveMobileSession({ user: updatedUser, tokens }).catch(() => {});
+          }
+          setUser(updatedUser);
+        }
+      }
+    } catch {
+      // Lỗi mạng bỏ qua; phiên hết hạn đã được apiClient phát sự kiện mobile:session-expired.
+    }
+  }, []);
+
+  useEffect(() => {
+    const current = userRef.current;
+    if (!current || current.previewMode) return undefined;
+    void refreshUser();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void revalidate();
+      if (state === 'active') void refreshUser();
+    });
+    const freeUnlockedListener = DeviceEventEmitter.addListener('mobile:free-portal-unlocked', () => {
+      void refreshUser();
+      void refreshSubscription();
     });
     return () => {
-      cancelled = true;
       subscription.remove();
+      freeUnlockedListener.remove();
     };
-  }, [user?.id, user?.role, user?.previewMode]);
+  }, [user?.id, user?.role, user?.previewMode, refreshUser, refreshSubscription]);
 
   useEffect(() => {
     const connectAuthenticatedSocket = () => {
@@ -175,6 +212,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     authError,
     subscription,
     refreshSubscription,
+    refreshUser,
     async signIn(role, phone, password) {
       setIsSigningIn(true);
       setAuthError('');
@@ -208,7 +246,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setAuthError('');
       }
     },
-  }), [user, isRestoringSession, isSigningIn, authError, subscription, refreshSubscription]);
+  }), [user, isRestoringSession, isSigningIn, authError, subscription, refreshSubscription, refreshUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -174,12 +174,35 @@ function mapRealScheduleRow(raw: Record<string, any>, role: UserRole): ScheduleI
   };
 }
 
+const FREE_PORTAL_COURSE_NAME = 'tài khoản miễn phí';
+
+function isFreePortalWithoutRealCourse(user?: DemoUser | null): boolean {
+  if (!user) return false;
+  const role = String(user.role || 'student').toLowerCase();
+  if (role !== 'student') return false;
+  const hasRealEnrollment = Array.isArray(user.enrollments) && user.enrollments.some((enrollment) => {
+    const label = String(enrollment?.courseName || '').trim().toLocaleLowerCase('vi');
+    return Boolean(label) && label !== FREE_PORTAL_COURSE_NAME && enrollment.status === 'Đang học';
+  });
+  if (hasRealEnrollment) return false;
+  return user.freePortal === true || String(user.course || '').trim().toLocaleLowerCase('vi') === FREE_PORTAL_COURSE_NAME;
+}
+
 async function readRealScheduleList(role: UserRole): Promise<ScheduleItem[]> {
-  const payload = await mobileApiRequest<{ data?: Record<string, any>[] }>('/schedules?limit=500');
-  if (!Array.isArray(payload.data)) {
-    throw new Error('Phản hồi danh sách lịch học không hợp lệ.');
+  if (role === 'student') {
+    const session = await loadMobileSession<DemoUser>().catch(() => null);
+    if (isFreePortalWithoutRealCourse(session?.user)) return [];
   }
-  return payload.data.map((row) => mapRealScheduleRow(row, role));
+  try {
+    const payload = await mobileApiRequest<{ data?: Record<string, any>[] }>('/schedules?limit=500');
+    if (!Array.isArray(payload.data)) {
+      throw new Error('Phản hồi danh sách lịch học không hợp lệ.');
+    }
+    return payload.data.map((row) => mapRealScheduleRow(row, role));
+  } catch (err) {
+    if ((err as { status?: number })?.status === 403) return [];
+    throw err;
+  }
 }
 
 type NotificationPage = {
@@ -569,6 +592,9 @@ export const authService = {
       completedSessions: typeof rawUser.completedSessions === 'number' ? rawUser.completedSessions : undefined,
       totalSessions: typeof rawUser.totalSessions === 'number' ? rawUser.totalSessions : undefined,
       avgGrade: typeof rawUser.avgGrade === 'number' ? rawUser.avgGrade : undefined,
+      freePortal: rawUser.freePortal === true,
+      freeUnlocked: rawUser.freeUnlocked === true,
+      needsFreeSurvey: rawUser.needsFreeSurvey === true,
     };
     const session: MobileStoredSession<DemoUser> = {
       user,
@@ -643,24 +669,29 @@ export const scheduleService = {
     if (!user || user.role !== 'student') {
       throw new Error('Chỉ học viên đã đăng nhập mới được tải xác nhận điểm danh.');
     }
-    if (user.previewMode || (__DEV__ && qaState)) return [];
-    const response = await mobileApiRequest<{ data?: Record<string, any>[] }>('/schedules/pending-confirm');
-    if (!Array.isArray(response.data)) {
-      throw new Error('Phản hồi xác nhận điểm danh đang chờ không hợp lệ.');
+    if (user.previewMode || (__DEV__ && qaState) || isFreePortalWithoutRealCourse(user)) return [];
+    try {
+      const response = await mobileApiRequest<{ data?: Record<string, any>[] }>('/schedules/pending-confirm');
+      if (!Array.isArray(response.data)) {
+        throw new Error('Phản hồi xác nhận điểm danh đang chờ không hợp lệ.');
+      }
+      return response.data.map((raw) => ({
+        ...mapRealScheduleRow({
+          ...raw,
+          _id: raw.scheduleId,
+          course: raw.course,
+          status: 'scheduled',
+        }, 'student'),
+        teacherName: String(raw.teacherName || 'Giảng viên'),
+        studentName: String(raw.studentName || user.name),
+        attendanceSessionNumber: raw.sessionNumber ?? raw.sessionOrdinalPreview ?? raw.completedSessions ?? null,
+        attendanceTotalSessions: raw.totalSessions ?? raw.sessionTotalPreview ?? null,
+        weekday: String(raw.weekday || ''),
+      }));
+    } catch (err) {
+      if ((err as { status?: number })?.status === 403) return [];
+      throw err;
     }
-    return response.data.map((raw) => ({
-      ...mapRealScheduleRow({
-        ...raw,
-        _id: raw.scheduleId,
-        course: raw.course,
-        status: 'scheduled',
-      }, 'student'),
-      teacherName: String(raw.teacherName || 'Giảng viên'),
-      studentName: String(raw.studentName || user.name),
-      attendanceSessionNumber: raw.sessionNumber ?? raw.sessionOrdinalPreview ?? raw.completedSessions ?? null,
-      attendanceTotalSessions: raw.totalSessions ?? raw.sessionTotalPreview ?? null,
-      weekday: String(raw.weekday || ''),
-    }));
   },
   async create(
     input: {
@@ -811,7 +842,13 @@ export const assignmentService = {
     }
     if (role === 'student' && !qaState) {
       if (!user) throw new Error('Không thể tải bài tập: tài khoản học viên không hợp lệ.');
-      return getStudentAssignments(user);
+      if (isFreePortalWithoutRealCourse(user) && user.freeUnlocked !== true) return [];
+      try {
+        return await getStudentAssignments(user);
+      } catch (err) {
+        if ((err as { status?: number })?.status === 403) return [];
+        throw err;
+      }
     }
     if (role === 'teacher' && !qaState && !user?.previewMode) {
       if (!user) throw new Error('Không thể tải bài tập: tài khoản giảng viên không hợp lệ.');
@@ -965,6 +1002,7 @@ export const notificationService = {
 export const messageService = {
   async conversations(_role: UserRole = 'student', user?: DemoUser | null) {
     if (!user) throw new Error('Không thể tải danh bạ khi chưa đăng nhập.');
+    if (isFreePortalWithoutRealCourse(user) && user.freeUnlocked !== true) return [];
     return getMessageContacts(user);
   },
   async thread(conversationId = 'chat-1', role: UserRole = 'student', user?: DemoUser | null) {
@@ -1234,10 +1272,15 @@ export const teacherProfileService = {
 export const evaluationService = {
   async activity(user?: DemoUser | null) {
     if (!user || user.role !== 'student') throw new Error('Không thể tải nhật ký: tài khoản học viên không hợp lệ.');
-    if (qaState || user.previewMode) {
+    if (qaState || user.previewMode || isFreePortalWithoutRealCourse(user)) {
       return readMockList([] as Awaited<ReturnType<typeof getStudentEvaluationActivity>>);
     }
-    return getStudentEvaluationActivity(user);
+    try {
+      return await getStudentEvaluationActivity(user);
+    } catch (err) {
+      if ((err as { status?: number })?.status === 403) return [];
+      throw err;
+    }
   },
   async list(user?: DemoUser | null) {
     if (qaState === 'evaluation-not-eligible') {
@@ -1466,7 +1509,12 @@ export const quizService = {
         mySubmission: null,
       })));
     }
-    return getStudentQuizzes(user);
+    try {
+      return await getStudentQuizzes(user);
+    } catch (err) {
+      if ((err as { status?: number })?.status === 403) return [];
+      throw err;
+    }
   },
 };
 

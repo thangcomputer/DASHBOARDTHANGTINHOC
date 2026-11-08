@@ -84,8 +84,15 @@ router.post('/backup/import', ...requireAdmin, (req, res, next) => {
   } catch (err) { return sendError(res, err); }
 });
 
-router.get('/subjects', ...requireAdmin, async (req, res) => {
+router.get('/subjects', authMiddleware, async (req, res) => {
   try {
+    if (req.user?.role === 'student') {
+      const data = await service.listStudentCatalog(req.user.id || req.user._id);
+      return res.json({ success: true, data: data?.subjects || [] });
+    }
+    if (!req.user || !['admin', 'staff'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Chỉ quản trị được dùng chức năng này' });
+    }
     const data = await service.listSubjectsAdmin();
     return res.json({ success: true, data });
   } catch (err) { return sendError(res, err); }

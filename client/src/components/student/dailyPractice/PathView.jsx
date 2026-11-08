@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, X,
+  Award, BookOpen, Check, Crown, Dumbbell, FastForward, Flame, Loader2, Lock, Play, Route, Sparkles, Star, Trophy, X,
 } from 'lucide-react';
 import { resolveMediaUrl } from '../../../services/api';
 import dailyPracticeApi from '../../../services/dailyPracticeApi';
@@ -435,7 +435,223 @@ function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose
   );
 }
 
-/** Banner chặng kiểu Duolingo (ảnh 2): nền màu, CHẶNG N + tiêu đề, nút sổ video. */
+const FINALE_CONFETTI = ['#F59E0B', '#EF4444', '#10B981', '#0EA5E9', '#A855F7', '#F97316', '#FACC15'];
+
+function PathConfettiBurst({ count = 36, spread = 220 }) {
+  const pieces = useMemo(() => Array.from({ length: count }, (_, i) => {
+    const angle = (i / count) * Math.PI * 2 + (i % 4) * 0.14;
+    const distance = spread * (0.48 + ((i * 7) % 11) / 17);
+    return {
+      dx: `${Math.round(Math.cos(angle) * distance)}px`,
+      dy: `${Math.round(Math.sin(angle) * distance - 44)}px`,
+      rot: `${(i * 73) % 720 - 360}deg`,
+      color: FINALE_CONFETTI[i % FINALE_CONFETTI.length],
+      delay: `${(i * 38) % 300}ms`,
+    };
+  }), [count, spread]);
+  return pieces.map((piece, index) => (
+    <span
+      key={index}
+      className="cms-goal-confetti"
+      style={{ background: piece.color, '--dx': piece.dx, '--dy': piece.dy, '--rot': piece.rot, animationDelay: piece.delay }}
+      aria-hidden="true"
+    />
+  ));
+}
+
+/** Popup hiệu ứng vinh danh & chúc mừng hoàn thành khóa học (Cúp vàng + Linh vật + Pháo giấy). */
+function CourseTrophyCeremonyModal({ topicName, completedUnits, totalUnits, isCompleted, onClose }) {
+  const [burstKey, setBurstKey] = useState(0);
+  useEffect(() => {
+    gameSounds.win();
+  }, [burstKey]);
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9500] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chúc mừng hoàn thành khóa học"
+      onClick={onClose}
+    >
+      <div
+        className="dp-pop relative w-full max-w-lg overflow-hidden rounded-[32px] border-2 border-amber-300 bg-gradient-to-b from-amber-50 via-white to-amber-50/60 p-6 text-center shadow-[0_28px_70px_-12px_rgba(245,158,11,0.45)] sm:p-8"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div key={burstKey}>
+          <PathConfettiBurst count={48} spread={250} />
+        </div>
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-amber-300/35 blur-3xl" />
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Đóng"
+          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-100 hover:text-slate-800 !shadow-none"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="relative inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-3.5 py-1 text-[11px] font-black uppercase tracking-widest text-amber-900 shadow-sm">
+          <Crown size={14} className="fill-amber-400 text-amber-600" aria-hidden="true" />
+          Vinh Danh Hoàn Thành Khóa Học
+        </div>
+
+        <div className="relative mt-6 flex items-center justify-center gap-3 sm:gap-6">
+          <div className="dp-fly-in">
+            <Mascot mood="graduate" size={110} />
+          </div>
+          <div className="relative flex flex-col items-center">
+            <div className="mb-2 flex items-center gap-1">
+              {[1, 2, 3].map((n) => (
+                <Star
+                  key={n}
+                  size={n === 2 ? 26 : 19}
+                  className="dp-star-in fill-amber-400 text-amber-500 drop-shadow-sm"
+                  style={{ animationDelay: `${n * 130}ms` }}
+                />
+              ))}
+            </div>
+            <div className="dp-bounce relative flex h-28 w-28 items-center justify-center rounded-[28px] bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 text-white shadow-[0_10px_0_#B45309,0_18px_36px_rgba(245,158,11,0.5)] ring-4 ring-amber-200">
+              <Trophy size={58} strokeWidth={2.2} className="drop-shadow-md" aria-hidden="true" />
+              <Sparkles size={20} className="absolute -right-2 -top-2 fill-yellow-200 text-amber-500" aria-hidden="true" />
+            </div>
+            <span className="mt-3 rounded-lg bg-amber-900 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100 shadow-sm">
+              Cúp Vàng Toàn Khóa
+            </span>
+          </div>
+          <div className="dp-fly-in">
+            <Mascot mood="celebrate" size={102} />
+          </div>
+        </div>
+
+        <h3 className="mt-6 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+          Chúc mừng hoàn thành khóa học!
+        </h3>
+        <p className="mt-1 text-sm font-black uppercase tracking-wide text-amber-700">
+          {topicName}
+        </p>
+        <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-600">
+          {isCompleted
+            ? `Xuất sắc! Bạn đã chinh phục trọn vẹn ${completedUnits}/${totalUnits} chặng học và chính thức rước Cúp Vàng Vinh Danh của khóa học.`
+            : `Chinh phục trọn vẹn ${totalUnits} chặng của lộ trình ${topicName} để rước Cúp Vàng Vinh Danh. Hiện bạn đã hoàn thành ${completedUnits}/${totalUnits} chặng — cố lên nhé!`}
+        </p>
+
+        <div className="mt-5 grid grid-cols-3 gap-2.5">
+          <div className="rounded-2xl border border-amber-200 bg-white/90 p-3 shadow-sm">
+            <p className="text-lg font-black text-amber-600 tabular-nums">{completedUnits}/{totalUnits}</p>
+            <p className="text-[11px] font-bold text-slate-500">Chặng vượt qua</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-white/90 p-3 shadow-sm">
+            <p className="text-lg font-black text-emerald-600">Cúp Vàng</p>
+            <p className="text-[11px] font-bold text-slate-500">Danh hiệu</p>
+          </div>
+          <div className="rounded-2xl border border-sky-200 bg-white/90 p-3 shadow-sm">
+            <p className="text-lg font-black text-sky-600">Xuất sắc</p>
+            <p className="text-[11px] font-bold text-slate-500">Hạng tốt nghiệp</p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => setBurstKey((k) => k + 1)}
+            className="flex items-center justify-center gap-1.5 rounded-2xl border-2 border-amber-300 bg-amber-50 py-3 text-xs font-black uppercase tracking-wide text-amber-900 transition hover:bg-amber-100 !shadow-none"
+          >
+            <Sparkles size={16} className="text-amber-600" /> Bắn pháo hoa
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="dp-3d-btn flex items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-xs font-black uppercase tracking-wide text-white shadow-md hover:from-amber-600 hover:to-orange-600"
+          >
+            <Trophy size={16} /> Tuyệt vời!
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Đài vinh danh & Cúp Vàng + Linh vật chúc mừng ở cuối lộ trình khóa học. */
+function CourseFinaleMonument({ topicName, completedUnits, totalUnits, lastNodeOffset = 0, onCelebrate }) {
+  const isCompleted = totalUnits > 0 && completedUnits >= totalUnits;
+  return (
+    <div className="relative z-10 mt-6 px-3 pb-8 pt-6 sm:px-6">
+      <PathSnakeConnector
+        previousOffset={lastNodeOffset}
+        offset={0}
+        active={isCompleted}
+        color="#F59E0B"
+      />
+      <div className="relative mx-auto max-w-xl overflow-hidden rounded-[28px] border-2 border-amber-300/90 bg-gradient-to-b from-amber-50/95 via-white to-amber-50/60 p-5 text-center shadow-[0_16px_40px_-14px_rgba(245,158,11,0.3)] sm:p-7">
+        {isCompleted && <PathConfettiBurst count={32} spread={200} />}
+        <div className="pointer-events-none absolute -top-20 left-1/2 h-44 w-44 -translate-x-1/2 rounded-full bg-amber-300/30 blur-2xl" />
+
+        <div className="relative inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-3.5 py-1 text-[11px] font-black uppercase tracking-widest text-amber-900 shadow-sm">
+          <Crown size={14} className="fill-amber-400 text-amber-600" aria-hidden="true" />
+          {isCompleted ? 'Đã chinh phục trọn khóa học' : 'Đích đến hoàn thành khóa học'}
+        </div>
+
+        <div className="relative mt-4 flex items-center justify-center gap-3 sm:gap-6">
+          <div className="dp-float">
+            <Mascot mood="graduate" size={92} />
+          </div>
+
+          <button
+            type="button"
+            onClick={onCelebrate}
+            aria-label="Xem hiệu ứng chúc mừng hoàn thành khóa học"
+            className="group relative flex flex-col items-center focus:outline-none !shadow-none"
+          >
+            <div className="mb-1.5 flex items-center gap-1">
+              {[1, 2, 3].map((n) => (
+                <Star
+                  key={n}
+                  size={n === 2 ? 22 : 16}
+                  className="fill-amber-400 text-amber-500 drop-shadow-sm transition-transform group-hover:scale-110"
+                />
+              ))}
+            </div>
+            <div className="dp-bounce relative flex h-24 w-24 items-center justify-center rounded-[26px] bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 text-white shadow-[0_8px_0_#B45309,0_14px_28px_rgba(245,158,11,0.42)] ring-4 ring-amber-200 transition-transform group-hover:scale-105">
+              <Trophy size={48} strokeWidth={2.2} className="drop-shadow-md" aria-hidden="true" />
+              <Sparkles size={18} className="absolute -right-1.5 -top-1.5 fill-yellow-200 text-amber-500" aria-hidden="true" />
+            </div>
+            <span className="mt-2.5 rounded-lg bg-amber-900 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100 shadow-sm">
+              Cúp Vinh Danh
+            </span>
+          </button>
+
+          <div className="dp-float">
+            <Mascot mood="celebrate" size={86} />
+          </div>
+        </div>
+
+        <h4 className="mt-4 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+          {isCompleted ? `Chúc mừng tốt nghiệp ${topicName}!` : `Cúp Vàng Khóa Học · ${topicName}`}
+        </h4>
+        <p className="mx-auto mt-1.5 max-w-md text-xs font-semibold leading-relaxed text-slate-600 sm:text-sm">
+          {isCompleted
+            ? `Tuyệt vời! Bạn đã hoàn thành toàn bộ ${completedUnits}/${totalUnits} chặng và xuất sắc nhận Cúp Vàng Vinh Danh.`
+            : `Hoàn thành hết ${totalUnits} chặng (${completedUnits}/${totalUnits} chặng đã vượt) để mở khóa Cúp Vàng và linh vật vinh danh tốt nghiệp!`}
+        </p>
+
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={onCelebrate}
+            className="dp-3d-btn inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md hover:from-amber-600 hover:to-orange-600 sm:text-sm"
+          >
+            <Trophy size={16} aria-hidden="true" />
+            {isCompleted ? 'Nhận Cúp & Xem Vinh Danh' : 'Xem Hiệu Ứng Chúc Mừng Nhận Cúp'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function UnitStageHeader({ unit, color, onTestOut, onWatch, highlight, hasVideo, testOutButtonRef }) {
   const locked = unit.state === 'locked';
   const done = unit.state === 'completed';
@@ -558,16 +774,23 @@ export function pickActivePathTopic(path, initialTopicId = '') {
 
 /** Lộ trình luyện tập: chủ đề → chặng → Học / Luyện / Thử thách / Kiểm tra chặng (mở khóa tuần tự). */
 export default function PathView({
-  path, practiceStats, loading, error, starting, initialTopicId = '', onStartStep, onPathChanged, layout = 'default',
+  path, practiceStats, loading, error, starting, initialTopicId = '', onTopicChange, onStartStep, onPathChanged, layout = 'default',
   continueVideo = false, onContinueVideoOpened, requestedLesson = null, onRequestedLessonOpened,
 }) {
   const topics = useMemo(() => path?.topics || [], [path]);
   const [topicId, setTopicId] = useState('');
+  const onTopicChangeRef = useRef(onTopicChange);
+  onTopicChangeRef.current = onTopicChange;
+
+  useEffect(() => {
+    if (topicId) onTopicChangeRef.current?.(topicId);
+  }, [topicId]);
   const [popover, setPopover] = useState(null);
   const [videoOpen, setVideoOpen] = useState(null);
   const [lessonOpen, setLessonOpen] = useState(null);
   const [welcomeLesson, setWelcomeLesson] = useState(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [trophyModalOpen, setTrophyModalOpen] = useState(false);
   const hubAnchorRef = useRef(null);
   const testOutAnchorRef = useRef(null);
   const continueOpenedRef = useRef(false);
@@ -576,8 +799,14 @@ export default function PathView({
   onContinueOpenedRef.current = onContinueVideoOpened;
   onRequestedLessonOpenedRef.current = onRequestedLessonOpened;
   const closePopover = useCallback(() => setPopover(null), []);
-  const closeVideo = useCallback(() => setVideoOpen(null), []);
-  const closeLesson = useCallback(() => setLessonOpen(null), []);
+  const closeVideo = useCallback(() => {
+    setVideoOpen(null);
+    onPathChanged?.();
+  }, [onPathChanged]);
+  const closeLesson = useCallback(() => {
+    setLessonOpen(null);
+    onPathChanged?.();
+  }, [onPathChanged]);
 
   useEffect(() => {
     if (topicId && topics.some((item) => item.topic.id === topicId)) return;
@@ -647,7 +876,7 @@ export default function PathView({
   useEffect(() => {
     const onFocus = () => {
       const list = topicsRef.current || [];
-      const topic = list.find((item) => item.next) || currentRef.current;
+      const topic = (currentRef.current?.next ? currentRef.current : list.find((item) => item.next)) || currentRef.current;
       const next = topic?.next;
       if (!topic || !next) return;
       if (topic.topic.id !== currentRef.current?.topic?.id) setTopicId(topic.topic.id);
@@ -884,8 +1113,32 @@ export default function PathView({
                 </article>
               );
             })}
+            {current.units.length > 0 && (() => {
+              const lastUnit = current.units[current.units.length - 1];
+              const lastItems = buildUnitPathItems(lastUnit);
+              const lastIdx = Math.max(0, lastItems.length - 1);
+              const lastOffset = (NODE_OFFSETS[lastIdx % NODE_OFFSETS.length] / 58) * offsetScale;
+              return (
+                <CourseFinaleMonument
+                  topicName={current.topic.name}
+                  completedUnits={current.completedUnits}
+                  totalUnits={current.totalUnits}
+                  lastNodeOffset={lastOffset}
+                  onCelebrate={() => setTrophyModalOpen(true)}
+                />
+              );
+            })()}
           </div>
         </>
+      )}
+      {trophyModalOpen && current && (
+        <CourseTrophyCeremonyModal
+          topicName={current.topic.name}
+          completedUnits={current.completedUnits}
+          totalUnits={current.totalUnits}
+          isCompleted={current.totalUnits > 0 && current.completedUnits >= current.totalUnits}
+          onClose={() => setTrophyModalOpen(false)}
+        />
       )}
       {openTestOut && (
         <PathHubPopoverPortal
@@ -987,6 +1240,7 @@ export default function PathView({
 /** Kết quả bước lộ trình trên màn tổng kết. */
 export function PathResultCard({ result }) {
   const passed = result.passed;
+  const isGrandSuccess = Boolean(passed && (result.topicCompleted || result.unitCompleted || result.testOut));
   let title;
   let text;
   if (!passed) {
@@ -996,7 +1250,7 @@ export function PathResultCard({ result }) {
       : `Bạn đạt ${result.scorePercent}%, cần từ ${result.passPercent}%. Sai −${QUESTION_STAKE_XP}/câu và không nhận XP câu đúng. Thử lại nhé!`;
   } else if (result.topicCompleted && (result.unitCompleted || result.testOut)) {
     title = 'Hoàn thành toàn bộ lộ trình!';
-    text = 'Bạn đã chinh phục mọi chặng của chủ đề này. Tuyệt vời!';
+    text = 'Bạn đã chinh phục mọi chặng của chủ đề này và giành Cúp Vàng Vinh Danh. Tuyệt vời!';
   } else if (result.testOut) {
     title = 'Vượt chặng thành công!';
     text = `Đã hoàn thành đến chặng “${result.unitTitle}”. Bạn được +${TEST_OUT_XP} XP.`;
@@ -1007,6 +1261,26 @@ export function PathResultCard({ result }) {
     title = `Qua bước ${result.stepLabel} (${result.scorePercent}%)`;
     text = result.next ? `Bước tiếp theo: ${result.next.stepLabel} · ${result.next.unitTitle}` : 'Tiếp tục giữ phong độ nhé!';
   }
+
+  if (isGrandSuccess) {
+    return (
+      <section className="dp-slide-up relative flex items-center gap-4 overflow-hidden rounded-[24px] border-2 border-amber-300 bg-gradient-to-r from-amber-50 via-yellow-50/70 to-amber-50 p-4 shadow-sm sm:p-5">
+        <PathConfettiBurst count={24} spread={160} />
+        <div className="dp-bounce relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 text-white shadow-[0_5px_0_#B45309] ring-2 ring-amber-200">
+          <Trophy size={28} aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-900">
+            <Award size={12} /> {result.topicCompleted ? 'Cúp Vàng Khóa Học' : 'Cúp Vượt Chặng'}
+          </span>
+          <p className="mt-1 text-base font-black text-slate-900">{title}</p>
+          <p className="text-xs font-semibold text-slate-600">{text}</p>
+        </div>
+        <Mascot mood="graduate" size={64} className="hidden shrink-0 sm:block" />
+      </section>
+    );
+  }
+
   return (
     <section className={`dp-slide-up flex items-center gap-3 rounded-[24px] p-4 ring-1 ${passed ? 'bg-emerald-50 ring-emerald-200' : 'bg-amber-50 ring-amber-200'}`}>
       <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${passed ? 'bg-emerald-600' : 'bg-amber-500'}`}>

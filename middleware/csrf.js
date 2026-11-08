@@ -39,6 +39,27 @@ function csrfProtection(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   if (shouldSkip(req)) return next();
 
+  // Requests with explicit Bearer tokens are not vulnerable to CSRF attacks
+  // because browsers never attach Authorization headers cross-origin automatically.
+  const authHeader = req.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  // Mobile client requests identified by custom header
+  if (req.get('x-client-platform') === 'mobile' || req.get('x-mobile-app') === 'true') {
+    return next();
+  }
+
+  // In non-production, allow requests from local dev origins (e.g. Expo web on localhost:8081)
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd) {
+    const origin = req.get('origin');
+    if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return next();
+    }
+  }
+
   const cookieToken = req.cookies?.[COOKIE_NAME];
   const headerToken = req.get(HEADER_NAME);
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {

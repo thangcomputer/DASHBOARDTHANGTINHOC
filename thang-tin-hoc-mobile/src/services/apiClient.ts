@@ -61,8 +61,20 @@ async function persistSessionTokens(nextTokens: MobileApiTokens) {
 
 export function getMobileApiBaseUrl() {
   const configuredBaseUrl = String(process.env.EXPO_PUBLIC_MOBILE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+  if (__DEV__ && Platform.OS === 'web') {
+    const webHost = globalThis.location?.hostname;
+    if (configuredBaseUrl && webHost) {
+      try {
+        const parsed = new URL(configuredBaseUrl);
+        parsed.hostname = webHost;
+        return parsed.origin;
+      } catch {
+        // fallback below
+      }
+    }
+    return `http://${webHost || 'localhost'}:5000`;
+  }
   if (configuredBaseUrl) return configuredBaseUrl;
-  if (__DEV__ && Platform.OS === 'web') return 'http://localhost:5000';
   throw new Error('Chưa cấu hình EXPO_PUBLIC_MOBILE_API_BASE_URL cho ứng dụng mobile.');
 }
 
@@ -187,7 +199,7 @@ async function getCsrfToken() {
   const response = await fetchWithTimeout(apiUrl('/auth/csrf-token'), {
     method: 'GET',
     credentials: 'include',
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', 'X-Client-Platform': 'mobile' },
   });
   const payload = await parseResponse(response);
   const token = typeof payload.csrfToken === 'string' ? payload.csrfToken : '';
@@ -207,6 +219,7 @@ async function rotateTokens() {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         'X-CSRF-Token': csrf,
+        'X-Client-Platform': 'mobile',
       };
       const cookie = cookieHeader(csrf);
       if (cookie) headers.Cookie = cookie;
@@ -250,6 +263,7 @@ async function request(
   const method = init.method || 'GET';
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
+  headers.set('X-Client-Platform', 'mobile');
   if (typeof init.body === 'string' && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }

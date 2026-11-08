@@ -41,20 +41,46 @@ function mapExistingRating(raw: Raw) {
 }
 
 export async function getStudentEvaluations(user: DemoUser): Promise<DemoEvaluation[]> {
-  if (user.role !== 'student' || !user.id) {
-    throw new Error('Không thể tải đánh giá: tài khoản học viên không hợp lệ.');
+  if (!user || (user.role && user.role !== 'student')) {
+    return [];
   }
-  const [student, privateResponse] = await Promise.all([
-    getStudentDetail(user),
-    mobileApiRequest<{ data?: Raw[] }>('/evaluations/mine'),
-  ]);
-  if (!Array.isArray(privateResponse.data)) {
-    throw new Error('Phản hồi đánh giá riêng tư không hợp lệ.');
+  const isFree = user.freePortal === true || String(user.course || '').trim().toLocaleLowerCase('vi') === 'tài khoản miễn phí';
+  const hasRealCourseFromUser = Array.isArray(user.enrollments) && user.enrollments.some((enrollment) => {
+    const status = text(enrollment?.status || 'active').toLowerCase();
+    if (['cancelled', 'refunded', 'pending_payment', 'completed', 'hoàn thành', 'hoan thanh'].includes(status)) return false;
+    const label = normalizeCourse(enrollment?.courseName);
+    return Boolean(label) && label !== 'tài khoản miễn phí';
+  });
+  if (isFree && !hasRealCourseFromUser) return [];
+
+  let student: Record<string, unknown> = {};
+  try {
+    student = await getStudentDetail(user);
+  } catch (err) {
+    if ((err as { status?: number })?.status === 403) return [];
   }
-  const privateRows = privateResponse.data;
+
   const enrollments = Array.isArray(student.enrollments)
     ? student.enrollments.map(record)
     : [];
+  const hasRealCourse = enrollments.some((enrollment) => {
+    const status = text(enrollment.status || 'active').toLowerCase();
+    if (['cancelled', 'refunded', 'pending_payment', 'completed', 'hoàn thành', 'hoan thanh'].includes(status)) return false;
+    const label = normalizeCourse(enrollment.courseName);
+    return Boolean(label) && label !== 'tài khoản miễn phí';
+  });
+  if ((student.freePortal === true || isFree) && !hasRealCourse) return [];
+
+  let privateRows: Raw[] = [];
+  try {
+    const privateResponse = await mobileApiRequest<{ data?: Raw[] }>('/evaluations/mine');
+    if (Array.isArray(privateResponse.data)) {
+      privateRows = privateResponse.data;
+    }
+  } catch (err) {
+    if ((err as { status?: number })?.status === 403) return [];
+    throw err;
+  }
   const courseRows = enrollments.length
     ? enrollments
     : text(student.course)

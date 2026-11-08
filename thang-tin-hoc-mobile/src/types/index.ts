@@ -22,6 +22,9 @@ export type DemoUser = {
   zalo?: string;
   enrollmentStatus?: 'active' | 'completed' | 'cancelled';
   paid?: boolean;
+  freePortal?: boolean;
+  freeUnlocked?: boolean;
+  needsFreeSurvey?: boolean;
   enrollments?: DemoEnrollment[];
   videoOrders?: DemoVideoOrder[];
 };
