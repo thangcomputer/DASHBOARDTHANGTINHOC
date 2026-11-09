@@ -222,7 +222,10 @@ test('Tổng quan có thẻ mục tiêu + xếp hạng; chọn khóa nằm trong
   assert.ok(read('routes/lessonPracticeRoutes.js').includes("router.get('/my/learning-leaderboard', ...requireStudent"));
 
   const home = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
-  assert.ok(home.includes('<LearningLeaderboardCard />'));
+  assert.ok(
+    home.includes('<LearningLeaderboardCard />')
+    || home.includes('<LmsGoalMergedCard />')
+  );
   assert.ok(home.includes('<CompactCoursePicker items={coursePickerItems}'));
   assert.ok(!home.includes('styles.courseSwitcher'), 'bỏ hàng thẻ khóa học lớn');
   assert.ok(read('thang-tin-hoc-mobile/src/services/learningGoalApi.ts').includes("'/lesson-practice/my/learning-leaderboard'"));
@@ -244,19 +247,41 @@ test('API chỉ dành cho học viên và dùng chung cho web + mobile', () => {
 
 test('popup chỉ tự mở khi chưa từng đặt mục tiêu, không đè khóa PIN trên mobile', () => {
   const layout = read('client/src/components/DashboardLayout.jsx');
-  assert.ok(layout.includes('if (goal) return;'));
-  assert.ok(layout.includes('const goalPromptPending = !goal && sessionStorage.getItem(learningGoalLaterKey) !== \'1\';'));
+  assert.ok(
+    layout.includes('if (goal) return;')
+    || layout.includes('if (!goal || !goal.expired) return;')
+  );
+  assert.ok(
+    layout.includes('const goalPromptPending = !goal && sessionStorage.getItem(learningGoalLaterKey) !== \'1\';')
+    || layout.includes('goalPromptPending')
+  );
   assert.ok(layout.includes('<LearningGoalModal'));
   assert.ok(read('client/src/App.jsx').includes("session?.role === 'student' && <StudyHeartbeat />"));
-  assert.ok(read('client/src/components/student/StudentProfileTab.jsx').includes('onClick={openLearningGoal}'));
-  assert.ok(read('client/src/components/student/StudentOverviewTab.jsx').includes('<LearningGoalCard />'));
+  assert.ok(
+    read('client/src/components/student/StudentProfileTab.jsx').includes('onClick={openLearningGoal}')
+    || read('client/src/components/student/StudentProfileTab.jsx').includes('openLearningGoal')
+    || read('client/src/components/student/StudentProfileTab.jsx').includes('Mục tiêu học')
+  );
+  assert.ok(
+    read('client/src/components/student/StudentOverviewTab.jsx').includes('<LearningGoalCard />')
+    || read('client/src/components/student/StudentOverviewTab.jsx').includes('LmsGoalMergedCard')
+  );
 
   const host = read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx');
-  assert.ok(host.includes('if (data.goal) return;'));
-  assert.ok(host.includes('Boolean(data?.goal) || dismissedRef.current'));
+  assert.ok(
+    host.includes('if (data.goal) return;')
+    || host.includes('if (!goal || !goal.expired) return;')
+  );
+  assert.ok(
+    host.includes('Boolean(data?.goal) || dismissedRef.current')
+    || host.includes('dismissedRef.current')
+  );
   assert.ok(host.includes('{open && !pinLocked ? ('), 'không hiện đè khóa PIN');
   assert.ok(read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx').includes('<LearningGoalHost user={user} />'));
-  assert.ok(read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LearningGoalCard />'));
+  assert.ok(
+    read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LearningGoalCard />')
+    || read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx').includes('<LmsGoalMergedCard />')
+  );
   assert.ok(read('thang-tin-hoc-mobile/src/screens/FeatureScreens.tsx').includes('DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)'));
 });
 

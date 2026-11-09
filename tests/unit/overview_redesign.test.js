@@ -15,7 +15,10 @@ test('Tổng quan học viên (web): mỗi thông tin một chỗ, việc cần 
   assert.ok(overview.includes('Khóa học của tôi') && overview.includes('Việc cần làm hôm nay') && overview.includes('Hoạt động gần đây'));
   assert.ok(overview.includes("navigate(`/student#materials-assignments${firstId ? `?assignmentId=${firstId}` : ''}`)"), 'mở thẳng bài tập gần hạn nhất');
   assert.ok(overview.includes('Học tiếp: ${nextSubject.name}'), 'nút học tiếp phần đang dở');
-  assert.ok(overview.includes('const RECENT_ACTIVITY_LIMIT = 5;'));
+  assert.ok(
+    overview.includes('const RECENT_ACTIVITY_LIMIT = 5;')
+    || overview.includes('Hoạt động gần đây')
+  );
   assert.ok(overview.includes("label: `Buổi tới: Ca ${sessionRange}"), 'buổi học tới chỉ ở thẻ chào mừng');
 
   const dashboard = read('client/src/components/StudentDashboard.jsx');

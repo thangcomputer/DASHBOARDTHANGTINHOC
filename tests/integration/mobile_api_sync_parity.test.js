@@ -62,5 +62,5 @@ test('mobile revalidates the session with /auth/me like the web learning gate', 
   assert.ok(auth.includes("AppState.addEventListener('change'"));
   const authRoutes = read('routes/authRoutes.js');
   const me = authRoutes.slice(authRoutes.indexOf("router.get('/me'"));
-  assert.ok(me.includes('learningAccess:      studentHasLearningAccess(user)'));
+  assert.ok(/learningAccess:\s+studentHasLearningAccess\(user\)/.test(me));
 });

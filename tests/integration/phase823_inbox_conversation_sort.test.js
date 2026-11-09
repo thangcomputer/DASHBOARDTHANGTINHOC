@@ -160,7 +160,7 @@ describe('Phase 8.23 conversation list ordering', { concurrency: false }, () => 
 
   it('hides recruitment and support filters from the student mobile inbox but keeps all conversations visible in All', () => {
     const mobileInbox = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
-    const studentFilterDefinition = mobileInbox.match(/:\s*\[([\s\S]*?)\n      \];/)?.[1] || '';
+    const studentFilterDefinition = mobileInbox.match(/:\s*\[([\s\S]*?)\n\s*\];/)?.[1] || '';
 
     assert.ok(studentFilterDefinition.includes("{ id: 'all' as const, label: 'Tất cả' }"));
     assert.ok(studentFilterDefinition.includes("{ id: 'teacher' as const, label: 'Giảng viên' }"));

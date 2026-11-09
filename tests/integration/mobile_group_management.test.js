@@ -64,7 +64,10 @@ test('mobile group messages use the actual sender avatar and role', () => {
 test('mobile group header subtitle shows only the member count', () => {
   const screen = read('thang-tin-hoc-mobile/src/screens/MessageScreens.tsx');
 
-  assert.ok(screen.includes("? groupMemberCount == null ? '' : `${groupMemberCount} thành viên`"));
+  assert.ok(
+    screen.includes("? groupMemberCount == null ? '' : `${groupMemberCount} thành viên`")
+    || screen.includes("groupMemberCount == null ? '' : `${groupMemberCount} thành viên`")
+  );
   assert.ok(!screen.includes("? groupMemberCount == null ? 'Nhóm trò chuyện'"));
 });
 

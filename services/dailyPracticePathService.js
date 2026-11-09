@@ -750,7 +750,7 @@ async function pickUnitQuestions(unitId, step, { testOut = false } = {}) {
     ]);
     picked.push(...more);
   }
-  return rules.shuffle(picked);
+  return picked;
 }
 
 /** Kiểm tra quyền vào bước của chặng + chọn câu. testOut: làm kiểm tra chặng để vượt chặng chưa mở. */

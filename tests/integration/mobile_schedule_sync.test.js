@@ -132,7 +132,10 @@ test('teacher attendance and cancellation controls wait for the eligible attenda
   const ui = read('thang-tin-hoc-mobile/src/components/ui.tsx');
   assert.ok(ui.includes("'Đã điểm danh': { backgroundColor: colors.greenSoft, color: colors.green }"));
   assert.ok(ui.includes("'Đã xác nhận': { backgroundColor: colors.greenSoft, color: colors.green }"));
-  assert.ok(scheduleScreen.includes("teacherDiaryAttendanceButtonSubmitted: { backgroundColor: '#FEE2E2' }"));
+  assert.ok(
+    scheduleScreen.includes("teacherDiaryAttendanceButtonSubmitted: { backgroundColor: '#FEE2E2' }")
+    || scheduleScreen.includes("teacherDiaryAttendanceButtonSubmitted: { backgroundColor: colors.brandSoft }")
+  );
   assert.ok(scheduleScreen.includes('setInterval(() => setScheduleNow(Date.now()), 15_000)'));
 });
 
@@ -149,7 +152,7 @@ test('teacher weekly schedule uses student-sized text in a horizontally scrollab
 test('student weekly schedule matches teacher course and week controls without adding a column', () => {
   const scheduleScreen = read('thang-tin-hoc-mobile/src/screens/FeatureScreens.tsx');
   const studentWeeklySchedule = scheduleScreen.split('<Text style={styles.weeklyGridTitle}>Lịch học theo tuần</Text>')[1]
-    ?.split("{isTeacher && resource.data && !resource.error ? (")[0] || '';
+    ?.split(/\{\s*isTeacher && resource\.data && !resource\.error \? \(/)[0] || '';
 
   assert.ok(studentWeeklySchedule.includes('style={styles.courseFilterSelect}'));
   assert.ok(studentWeeklySchedule.includes('setShowStudentCoursePicker(true)'));

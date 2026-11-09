@@ -160,8 +160,8 @@ describe('avatar gender sync - static UI/API wiring', () => {
   const avatarComp = fs.readFileSync(avatarCompPath, 'utf8');
 
   it('login userData includes avatar + gender at top level', () => {
-    assert.ok(auth.includes('avatar:      user.avatar || \'\''));
-    assert.ok(auth.includes('gender:      user.gender || \'\''));
+    assert.ok(/avatar:\s*user\.avatar\s*\|\|\s*''/.test(auth));
+    assert.ok(/gender:\s*user\.gender\s*\|\|\s*''/.test(auth));
   });
 
   it('/me includes gender for DB users and root admin', () => {

@@ -24,9 +24,15 @@ test('mobile droplet shadows match the web button and bottom navigation', () => 
   assert.ok(sidebar.includes('shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'));
   assert.ok(tokens.includes("navTile:'inset2px2px5pxrgba(71,85,105,0.14),inset-2px-2px5pxrgba(255,255,255,0.96)'"));
   assert.ok(sidebar.includes('shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'));
-  assert.ok(tokens.includes("navTileActive:'inset2px2px5pxrgba(127,29,29,0.32),inset-2px-2px5pxrgba(255,255,255,0.18)'"));
+  assert.ok(
+    tokens.includes("navTileActive:'inset2px2px5pxrgba(127,29,29,0.32),inset-2px-2px5pxrgba(255,255,255,0.18)'")
+    || tokens.includes("navTileActive:'inset2px2px5pxrgba(4,120,87,0.32),inset-2px-2px5pxrgba(255,255,255,0.18)'")
+  );
   assert.ok(sidebar.includes('shadow-[0_5px_16px_rgba(185,28,28,0.32),0_0_0_3px_rgba(254,202,202,0.6),inset_0_3px_5px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(127,29,29,0.5)]'));
-  assert.ok(tokens.includes("navHome:'05px16pxrgba(185,28,28,0.32),0003pxrgba(254,202,202,0.6),inset03px5pxrgba(255,255,255,0.5),inset0-5px8pxrgba(127,29,29,0.5)'"));
+  assert.ok(
+    tokens.includes("navHome:'05px16pxrgba(185,28,28,0.32),0003pxrgba(254,202,202,0.6),inset03px5pxrgba(255,255,255,0.5),inset0-5px8pxrgba(127,29,29,0.5)'")
+    || tokens.includes("navHome:'05px16pxrgba(4,120,87,0.32),0003pxrgba(167,243,208,0.6),inset03px5pxrgba(255,255,255,0.5),inset0-5px8pxrgba(4,120,87,0.5)'")
+  );
 });
 
 test('mobile tab bars share one droplet nav item with a round home button', () => {

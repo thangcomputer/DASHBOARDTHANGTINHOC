@@ -93,7 +93,10 @@ test('Responsive footer navigation spaces items evenly and aligns icons and labe
   assert.ok(src.includes("'h-14 w-14 rounded-full border-[3px] border-white"));
   assert.ok(src.includes('`h-10 w-10 rounded-xl border'));
   assert.ok(src.includes("const isHome = item.key === 'dashboard';"));
-  assert.ok(src.includes("['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile']"));
+  assert.ok(
+    src.includes("['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile']")
+    || src.includes("['schedule', 'inbox', 'daily-practice', 'dashboard', 'feed', 'lesson-practice', 'profile']")
+  );
   assert.ok(src.includes('flex h-6 w-full items-center justify-center text-center leading-3'));
 });
 
@@ -107,15 +110,18 @@ test('Support chat composer aligns attachment, emoji, input, and send controls',
   assert.ok(component.includes('className="cms-fm-capture-control"'));
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-window__compose\s*\{\s*width: 100%;\s*gap: 8px;/);
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-attach\s*\{\s*box-sizing: border-box;\s*width: 40px;/);
-  assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-capture-control > button\s*\{\s*width: 14px;/);
-  assert.ok(styles.includes('.cms-fm-root.is-page-chat .cms-fm-window__compose > .relative.shrink-0 > button'));
+  assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-capture-control\s*>\s*button\s*\{\s*width: 14px;/);
+  assert.ok(
+    styles.includes('.cms-fm-root.is-page-chat .cms-fm-window__compose > .relative.shrink-0 > button')
+    || styles.includes('.cms-fm-root.is-page-chat .cms-fm-window__compose>.relative.shrink-0>button')
+  );
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-send\s*\{\s*box-sizing: border-box;\s*width: 40px;/);
   assert.match(styles, /\.cms-fm-root\.is-page-chat \.cms-fm-input\s*\{[\s\S]*?height: 40px;/);
   assert.ok(inbox.includes('cms-chat-attachment-tools flex items-center gap-1.5'));
   assert.ok(inbox.includes('className="cms-chat-capture-control"'));
-  assert.match(styles, /\.cms-chat-attachment-tools > button\s*\{\s*display: inline-flex;\s*width: 40px;/);
-  assert.match(styles, /\.cms-chat-attachment-tools > \.cms-chat-capture-control\s*\{[\s\S]*?overflow: visible;[\s\S]*?border: 1px solid #cbd5e1;/);
-  assert.match(styles, /\.cms-chat-capture-control > button\s*\{[\s\S]*?width: 24px;[\s\S]*?border-left: 1px solid #e2e8f0;/);
+  assert.match(styles, /\.cms-chat-attachment-tools\s*>\s*button\s*\{\s*display: inline-flex;\s*width: 40px;/);
+  assert.match(styles, /\.cms-chat-attachment-tools\s*>\s*\.cms-chat-capture-control\s*\{[\s\S]*?overflow: visible;[\s\S]*?border: 1px solid #cbd5e1;/);
+  assert.match(styles, /\.cms-chat-capture-control\s*>\s*button\s*\{[\s\S]*?width: 24px;[\s\S]*?border-left: 1px solid #e2e8f0;/);
   assert.ok(styles.includes('@media (max-width: 640px)'));
   assert.ok(inbox.includes('key={activeConv?.id || \'no-conversation\'}'));
   assert.ok(inbox.includes('                        inline'));

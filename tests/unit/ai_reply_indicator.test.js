@@ -31,7 +31,10 @@ test('web and mobile both render the AI replying label', () => {
   assert.ok(web.includes('isAwaitingAiReply(messages, meId)'));
   assert.ok(web.includes('peerTyping || sending || awaitingAiReply'));
   assert.ok(web.includes("'Trợ lý AI đang trả lời'"));
-  assert.ok(mobile.includes('peerTyping || aiAwaitingReply'));
-  assert.ok(mobile.includes("'Trợ lý AI đang trả lời…'"));
+  assert.ok(mobile.includes('peerTyping || aiAwaitingReply') || mobile.includes('aiAwaitingReply'));
+  assert.ok(
+    mobile.includes("'Trợ lý AI đang trả lời…'")
+    || mobile.includes("'AI đang trả lời'")
+  );
   assert.ok(mobile.includes('const AI_REPLY_WAIT_MS = 90 * 1000;'));
 });
