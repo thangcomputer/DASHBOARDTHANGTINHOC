@@ -32,7 +32,7 @@ function resolveExamSubjectId(inputId, label) {
 function getExamSubjectInitials(label, id, shortHint) {
   const short = String(shortHint || '').trim();
   if (short && short.length <= 3 && !/\s/.test(short)) return short.toUpperCase();
-  const words = String(label || '').trim().split(/[\s()\-–-/&,+]+/).filter((w) => /[a-zA-Z0-9]/.test(w));
+  const words = String(label || '').trim().split(/[\s()–/&,+-]+/).filter((w) => /[a-zA-Z0-9]/.test(w));
   if (words.length >= 2) {
     return words.slice(0, 2).map((w) => (w.match(/[a-zA-Z0-9]/) || [''])[0]).join('').toUpperCase().slice(0, 3);
   }

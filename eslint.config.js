@@ -27,8 +27,8 @@ module.exports = [
     ignores: [
       'node_modules/**',
       'client/**',
-      'thang-tin-hoc-mobile/dist/**',
-      'thang-tin-hoc-mobile/.expo/**',
+      'landingpage-dewskill/**',
+      'thang-tin-hoc-mobile/**',
       'modules/**/*ModelName*',
       'uploads/**',
       'tests/**',

@@ -7,7 +7,6 @@ import {
 import LmsGoalMergedCard from './LmsGoalMergedCard';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
 import WelcomeHero from '../WelcomeHero';
-import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import dailyPracticeApi from '../../services/dailyPracticeApi';
@@ -16,8 +15,6 @@ import { isScheduleOngoingNow, getScheduleDisplayKind, normalizeScheduleDate } f
 import { isFreePortalCourseName } from '../../utils/enrollments';
 import { isFreePortalLocked } from './dailyPractice/FreeFeatureLock';
 import meetClassApi from '../../services/meetClassApi';
-
-const RECENT_ACTIVITY_LIMIT = 5;
 
 function normalizeCourseName(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
@@ -77,72 +74,7 @@ function TaskRow({ icon: Icon, tone, title, sub, cta, onClick }) {
   );
 }
 
-function StudyLogRow({ item }) {
-  const isCancelled = item.type === 'cancelled' || item.type === 'attendance_cancel' || item.type === 'schedule_cancel';
-  const isPastPending = ['past_pending', 'pending_attendance', 'overdue_attendance'].includes(item.type);
-  const isOverdue = item.type === 'overdue_attendance' || item.displayKind === 'overdue_attendance';
-  const isHomework = item.type === 'homework';
-  const isQuiz = item.type === 'quiz';
-  const isPassed = isQuiz ? (item.isPassed ?? item.meta?.isPassed) : undefined;
-  const isAttendance = item.type === 'attendance';
-  const isGradeUpdate = item.type === 'grade_update';
-  const isEvaluation = item.type === 'evaluation';
-  const isCourseComplete = item.type === 'course_complete';
 
-  const badge = isPastPending ? (isOverdue ? 'Quá hạn điểm danh' : 'Chưa điểm danh')
-    : isCancelled ? 'Hủy'
-      : isGradeUpdate ? 'Cập nhật điểm'
-        : isEvaluation ? 'Đánh giá'
-          : isCourseComplete ? 'Hoàn thành'
-            : isHomework ? 'Bài nộp'
-              : isQuiz ? 'Trắc nghiệm'
-                : isAttendance ? 'Điểm danh' : '';
-
-  return (
-    <div className={`flex items-start gap-2.5 px-3.5 py-3 ${isCancelled || isOverdue ? 'bg-red-50/30' : isPastPending ? 'bg-orange-50/40' : ''}`}>
-      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${isCancelled || isOverdue ? 'bg-red-100 text-red-600'
-        : isPastPending ? 'bg-orange-100 text-orange-700'
-          : isHomework ? 'bg-purple-100 text-purple-600'
-            : isQuiz ? 'bg-amber-100 text-amber-600'
-              : 'bg-emerald-100 text-emerald-600'
-        }`}
-      >
-        {isCancelled ? <XCircle size={15} aria-hidden="true" />
-          : isPastPending ? <Calendar size={15} aria-hidden="true" />
-            : isHomework ? <ClipboardList size={15} aria-hidden="true" />
-              : isQuiz ? <Award size={15} aria-hidden="true" />
-                : <CheckCircle size={15} aria-hidden="true" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-xs font-bold text-slate-800">
-            {item.index ? `Buổi ${item.index}: ` : ''}{item.date}{item.time ? ` (${item.time})` : ''}
-          </p>
-          {badge && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-extrabold text-slate-600">{badge}</span>}
-        </div>
-        {item.note && <p className="mt-0.5 truncate text-xs text-slate-500">{item.note}</p>}
-      </div>
-      {!isCancelled && item.grade != null && (
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
-          {isQuiz ? (
-            <span className={`text-xs font-extrabold tabular-nums ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
-              {item.rawScore != null ? `${Math.round(item.rawScore)}%` : `${item.grade} / 10`}
-            </span>
-          ) : (
-            <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>{item.grade} / 10</span>
-          )}
-          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-extrabold ${isQuiz
-            ? (isPassed ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-600')
-            : getGradePillClasses(item.grade)
-            }`}
-          >
-            {isQuiz ? (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function StudentOverviewTab({
   studentData,
@@ -153,7 +85,7 @@ export default function StudentOverviewTab({
   progressPct,
   myAssignments,
   mySchedules = [],
-  studyLogs = [],
+  studyLogs: _studyLogs = [],
 }) {
   const navigate = useNavigate();
   const [pendingQuizzes, setPendingQuizzes] = useState([]);
@@ -387,7 +319,6 @@ export default function StudentOverviewTab({
     });
   }
 
-  const recentActivity = (studyLogs || []).filter((item) => item.type !== 'scheduled').slice(0, RECENT_ACTIVITY_LIMIT);
   const meetCards = meetCardsPre;
 
   return (
@@ -576,25 +507,6 @@ export default function StudentOverviewTab({
             </section>
 
             {/* Hoạt động gần đây - Đã ẩn trên Web và Mobile theo yêu cầu */}
-            {false && (
-              <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-                  <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                    <ClipboardList size={18} className="text-emerald-500" aria-hidden="true" /> Hoạt động gần đây
-                  </h3>
-                  <button type="button" onClick={() => navigate('/student#schedule')} className="flex items-center gap-0.5 text-xs font-black text-red-600 !shadow-none">
-                    Xem nhật ký đầy đủ <ChevronRight size={14} aria-hidden="true" />
-                  </button>
-                </div>
-                {recentActivity.length ? (
-                  <div className="divide-y divide-slate-100">
-                    {recentActivity.map((item, idx) => <StudyLogRow key={`${item.type}-${item.date}-${idx}`} item={item} />)}
-                  </div>
-                ) : (
-                  <p className="px-4 py-8 text-center text-xs font-semibold text-slate-400">Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</p>
-                )}
-              </section>
-            )}
           </div>
 
           {/* Cột phải: mục tiêu + bảng xếp hạng, nằm ngay đầu trang */}

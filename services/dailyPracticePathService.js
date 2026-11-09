@@ -989,7 +989,7 @@ async function gradeScreen(check, imageDataUrl) {
   return correct;
 }
 
-async function answerVideoCheck(studentId, { unitId, videoId, checkId, choiceIndex, text, imageDataUrl } = {}) {
+async function answerVideoCheck(studentId, { unitId, videoId, checkId, checkIndex, choiceIndex, text, imageDataUrl } = {}) {
   const sid = requireId(studentId, 'Học viên');
   const unit = await DailyPracticeUnit.findOne({ _id: requireId(unitId, 'Chặng'), active: true }).lean();
   if (!unit) throw httpError(404, 'Không tìm thấy chặng');
