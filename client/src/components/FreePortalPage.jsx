@@ -1,5 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, Lock, User, Calendar, Flame, Route } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  User,
+  Calendar,
+  Flame,
+  Route,
+  Zap,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
+  ArrowLeft,
+  Phone,
+} from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
 import { isValidVNPhone, limitPhoneInput, normalizePhone } from '../utils/validators';
@@ -7,7 +21,7 @@ import { unlockAudio } from '../utils/sound';
 
 function GoogleIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true">
       <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.7z" />
       <path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1C3.4 21.3 7.4 24 12 24z" />
       <path fill="#FBBC05" d="M5.4 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.7.4-2.4V6.5H1.4C.5 8.3 0 10.1 0 12s.5 3.7 1.4 5.5l4-3.1z" />
@@ -18,7 +32,7 @@ function GoogleIcon() {
 
 function FacebookIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true">
       <path fill="#1877F2" d="M24 12.1C24 5.4 18.6 0 12 0S0 5.4 0 12.1C0 18.1 4.4 23.1 10.1 24v-8.4H7.1v-3.5h3V9.4c0-3 1.8-4.6 4.5-4.6 1.3 0 2.6.2 2.6.2v2.9h-1.5c-1.5 0-1.9.9-1.9 1.8v2.2h3.3l-.5 3.5h-2.8V24C19.6 23.1 24 18.1 24 12.1z" />
     </svg>
   );
@@ -53,6 +67,7 @@ export default function FreePortalPage({ onLogin }) {
   };
 
   useEffect(() => {
+    document.title = 'Vào luyện tập | DewSkill';
     let cancelled = false;
     fetch(`${API_BASE}/auth/free-portal/social/status`)
       .then((response) => response.json())
@@ -261,128 +276,346 @@ export default function FreePortalPage({ onLogin }) {
     window.location.href = `${origin}/api/auth/free-portal/${provider}`;
   };
 
+  const landingUrl = window.location.port === '5173' ? 'http://localhost:3100' : '/';
+
   return (
-    <div className="cms-login-bg relative min-h-[100dvh] overflow-x-clip overflow-y-auto font-sans">
-      <div className="cms-login-aura cms-login-aura--red" aria-hidden="true" />
-      <div className="cms-login-aura cms-login-aura--blue" aria-hidden="true" />
-      <div className="relative z-10 flex min-h-[100dvh] flex-col md:flex-row">
-        <section className="relative flex flex-col justify-center overflow-hidden bg-gradient-to-br from-rose-50 via-white to-amber-50 px-6 py-8 md:w-1/2 md:px-12 lg:px-16">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-red-200/70 blur-3xl" aria-hidden="true" />
-          <div className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-amber-200/80 blur-3xl" aria-hidden="true" />
-          <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-black text-red-700">
-            <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
-            Luyện tập hằng ngày
+    <div className="relative min-h-[100dvh] bg-[#f4fbf8] text-slate-900 font-sans selection:bg-emerald-500/20 flex flex-col justify-between overflow-x-clip">
+      {/* Background ambient lighting matching DewSkill landing theme */}
+      <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -right-20 top-1/4 h-96 w-96 rounded-full bg-teal-200/35 blur-3xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-amber-100/50 blur-3xl" aria-hidden="true" />
+
+      {/* Top Header Bar */}
+      <header className="relative z-10 w-full border-b border-emerald-100/70 bg-white/70 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
+          <a href={landingUrl} className="flex items-center gap-2 group transition" title="Trang chủ DewSkill">
+            <img
+              src="/brand/logo-horizontal.png"
+              alt="DewSkill"
+              className="h-8 sm:h-9 w-auto max-w-[150px] sm:max-w-[180px] object-contain transition group-hover:opacity-90"
+              onError={(e) => {
+                // If horizontal logo fails, show fallback badge & text
+                e.target.style.display = 'none';
+                const sibling = e.target.nextElementSibling;
+                if (sibling) sibling.style.display = 'flex';
+              }}
+            />
+            <span style={{ display: 'none' }} className="items-center gap-1.5 text-xl font-black tracking-tight text-slate-800">
+              <span className="text-emerald-600">💧</span> Dew<span className="text-emerald-600">Skill</span>
+            </span>
+          </a>
+
+          <a
+            href={landingUrl}
+            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-white px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-emerald-800 shadow-xs transition hover:bg-emerald-50 hover:text-emerald-900 active:scale-95"
+          >
+            <ArrowLeft size={16} />
+            <span>Về trang chủ</span>
+          </a>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center gap-8 px-4 py-6 sm:px-6 lg:flex-row lg:gap-14 lg:px-8 lg:py-10">
+        {/* Left Column: Brand & Gamified Learning Pitch (order-2 on mobile, order-1 on desktop) */}
+        <section className="order-2 lg:order-1 flex flex-1 flex-col justify-center space-y-5 lg:max-w-xl">
+          {/* Badge */}
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white/90 px-3.5 py-1.5 text-xs font-black text-emerald-800 shadow-xs backdrop-blur-xs">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-600" />
+            </span>
+            <span>DewSkill • Cổng luyện tập hằng ngày</span>
           </div>
-          <h1 className="mt-6 max-w-xl text-3xl font-black leading-tight text-slate-950 sm:text-4xl lg:text-5xl">
-            Luyện tin học mỗi ngày, <span className="text-red-600">chuyên nghiệp hơn</span> mỗi tuần
+
+          {/* Heading */}
+          <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+            Luyện tin học mỗi ngày,{' '}
+            <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">
+              nâng trình vượt bậc
+            </span>
           </h1>
-          <p className="mt-4 max-w-lg text-base leading-relaxed text-slate-600 sm:text-lg">
-            Dành cho người đi làm và người mới bắt đầu. Mỗi ngày một lượt ngắn: xem bài, trả lời câu hỏi, giữ chuỗi để kiến thức văn phòng nằm lòng.
+
+          {/* Subtitle */}
+          <p className="text-sm sm:text-base font-medium leading-relaxed text-slate-600">
+            Học tập theo mô hình game hóa: 5-10 phút mỗi ngày, thực hành bài tập tình huống thực tế, duy trì chuỗi ngọn lửa Streak và tích lũy XP thăng cấp.
           </p>
-          <div className="mt-6 grid max-w-lg grid-cols-3 gap-3">
-            {[
-              { icon: Calendar, label: 'Mỗi ngày một lượt' },
-              { icon: Flame, label: 'Giữ chuỗi luyện' },
-              { icon: Route, label: 'Lộ trình rõ việc' },
-            ].map((item) => (
-              <div key={item.label} className="rounded-2xl border border-red-100 bg-white px-2 py-3 text-center shadow-sm">
-                <span className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600"><item.icon size={16} aria-hidden="true" /></span>
-                <span className="block text-[11px] font-bold text-slate-700">{item.label}</span>
+
+          {/* Mascot Companion Box */}
+          <div className="flex items-center gap-3.5 rounded-3xl border border-emerald-100 bg-white/80 p-3.5 sm:p-4 shadow-sm backdrop-blur-xs">
+            <img
+              src="/mascot/tot-nghiep-vui-ve.gif"
+              alt="Mascot DewSkill"
+              className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 object-contain drop-shadow-sm"
+              onError={(e) => {
+                e.target.src = '/brand/favicon.png';
+              }}
+            />
+            <div className="text-xs sm:text-sm">
+              <div className="flex items-center gap-1.5 font-black text-emerald-800">
+                <Sparkles size={14} className="text-emerald-600 shrink-0" />
+                <span>Trợ lý học tập Dewy</span>
               </div>
-            ))}
+              <p className="mt-0.5 text-slate-600">
+                Đăng ký tài khoản miễn phí để nhận ngay <strong className="text-emerald-700 font-black">+60 XP</strong> chào mừng và mở khóa các chặng học tin học đầu tiên!
+              </p>
+            </div>
           </div>
+
+          {/* 3 Feature Value Props */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/70 bg-white/70 p-3.5 shadow-xs backdrop-blur-xs transition hover:border-emerald-200 hover:bg-white">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <Zap size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-slate-900">Mỗi ngày 1 lượt</h4>
+                <p className="text-[11px] leading-tight text-slate-500 mt-0.5">Lý thuyết ngắn gọn, làm bài trắc nghiệm & AI chấm ngay</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/70 bg-white/70 p-3.5 shadow-xs backdrop-blur-xs transition hover:border-emerald-200 hover:bg-white">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                <Flame size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-slate-900">Giữ chuỗi Streak</h4>
+                <p className="text-[11px] leading-tight text-slate-500 mt-0.5">Duy trì phản xạ tin học hằng ngày không lo ngắt quãng</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/70 bg-white/70 p-3.5 shadow-xs backdrop-blur-xs transition hover:border-emerald-200 hover:bg-white">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <Route size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-slate-900">Lộ trình bài bản</h4>
+                <p className="text-[11px] leading-tight text-slate-500 mt-0.5">Word, Excel, PowerPoint chuẩn công sở thực chiến</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust Guarantees */}
+          <div className="flex flex-wrap items-center gap-y-2 gap-x-5 text-xs font-semibold text-slate-500 pt-1">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              100% tài khoản học thử miễn phí
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              Không cần thẻ ngân hàng
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              Bảo mật tài khoản an toàn
+            </span>
           </div>
         </section>
 
-        <section className="flex flex-1 items-center justify-center px-4 py-8 md:w-1/2 md:px-8">
-          <form onSubmit={register} className="w-full max-w-md space-y-5">
-            <div className="flex justify-center">
-              <div className="cms-login-logo">
-                <img src="/logo-thang-tin-hoc.svg" alt="Thắng Tin Học" className="h-11 max-w-[200px] object-contain sm:h-12" />
-                <span className="cms-login-shine" aria-hidden="true" />
+        {/* Right Column: Clean, Professional Auth Card (order-1 on mobile, order-2 on desktop) */}
+        <section className="order-1 lg:order-2 w-full max-w-md lg:max-w-[430px]">
+          <div className="relative rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-2xl shadow-emerald-950/10 backdrop-blur-md sm:p-7">
+            {/* Card Brand Header */}
+            <div className="text-center space-y-1.5 mb-4">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+                <Sparkles size={13} className="text-emerald-600 shrink-0" />
+                <span>{pending ? 'Bước cuối cùng' : 'Tài khoản miễn phí'}</span>
               </div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                {pending ? 'Hoàn tất hồ sơ' : mode === 'register' ? 'Vào luyện tập ngay' : 'Đăng nhập học tập'}
+              </h2>
+              <p className="text-xs sm:text-sm font-medium text-slate-500">
+                {pending
+                  ? 'Liên kết mạng xã hội thành công! Nhập thông tin để hoàn tất.'
+                  : mode === 'register'
+                  ? 'Đăng ký nhanh bằng số điện thoại hoặc mạng xã hội'
+                  : 'Nhập số điện thoại và mật khẩu để tiếp tục chặng học'}
+              </p>
             </div>
-            <div className="cms-login-card space-y-4 px-5 py-6 sm:px-7 sm:py-8">
-              <div className="space-y-2 text-center">
-                <div className="cms-login-chip mx-auto">
-                  <span>Tài khoản miễn phí</span>
+
+            {/* Social Logins */}
+            {!pending && (
+              <div className="space-y-3 mb-4">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => startSocial('google')}
+                    className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-xs transition hover:border-emerald-300 hover:bg-emerald-50/30 active:scale-95 cursor-pointer"
+                  >
+                    <GoogleIcon />
+                    <span>Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startSocial('facebook')}
+                    className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-xs transition hover:border-emerald-300 hover:bg-emerald-50/30 active:scale-95 cursor-pointer"
+                  >
+                    <FacebookIcon />
+                    <span>Facebook</span>
+                  </button>
                 </div>
-                <h2 className="text-2xl font-black text-white">{pending ? 'Hoàn tất đăng ký' : 'Vào luyện tập'}</h2>
-                <p className="text-sm font-medium text-slate-400">
-                  {pending
-                    ? 'Google hoặc Facebook đã xác nhận. Nhập tuổi và số điện thoại để hoàn tất.'
-                    : 'Đăng ký bằng họ tên, tuổi, số điện thoại và mật khẩu. Hoặc dùng Google, Facebook.'}
-                </p>
+
+                <div className="relative flex items-center justify-center text-xs text-slate-400">
+                  <div className="w-full border-t border-slate-200" />
+                  <span className="absolute bg-white px-3 font-semibold text-slate-400">
+                    hoặc số điện thoại
+                  </span>
+                </div>
               </div>
-              {!pending && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => startSocial('google')} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-3 py-2.5 text-sm font-black text-slate-800 !shadow-none">
-                    <GoogleIcon /> Google
-                  </button>
-                  <button type="button" onClick={() => startSocial('facebook')} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-3 py-2.5 text-sm font-black text-slate-800 !shadow-none">
-                    <FacebookIcon /> Facebook
-                  </button>
+            )}
+
+            {/* Segmented Mode Tabs (Register / Login) */}
+            {!pending && (
+              <div className="mb-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 text-xs sm:text-sm font-bold" role="tablist">
+                <button
+                  type="button"
+                  onClick={() => { setMode('register'); setError(''); }}
+                  className={`rounded-xl py-2 transition-all cursor-pointer ${
+                    mode === 'register'
+                      ? 'bg-white text-emerald-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  Đăng ký mới
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setError(''); }}
+                  className={`rounded-xl py-2 transition-all cursor-pointer ${
+                    mode === 'login'
+                      ? 'bg-white text-emerald-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  Đăng nhập
+                </button>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={register} className="space-y-3">
+              {(mode === 'register' || pending) && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 ml-1">Họ và tên</label>
+                  <div className="relative flex items-center">
+                    <User size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Nguyễn Văn A"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
                 </div>
               )}
-              {!pending && (
-                <div className="cms-login-roles" role="tablist" aria-label="Đăng ký hoặc đăng nhập">
-                  <button type="button" onClick={() => { setMode('register'); setError(''); }} className={`cms-login-role ${mode === 'register' ? 'is-active' : ''}`}>Đăng ký</button>
-                  <button type="button" onClick={() => { setMode('login'); setError(''); }} className={`cms-login-role ${mode === 'login' ? 'is-active' : ''}`}>Đăng nhập</button>
+
+              {(mode === 'register' || pending) && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 ml-1">Tuổi</label>
+                  <div className="relative flex items-center">
+                    <Calendar size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={age}
+                      onChange={(e) => setAge(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                      placeholder="Ví dụ: 18"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
                 </div>
               )}
-              {(mode === 'register' || pending) && (
-                <label className="block space-y-1.5">
-                  <span className="ml-1 block text-xs font-bold text-slate-400">Họ tên</span>
-                  <span className="cms-login-field">
-                    <User size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
-                    <input value={name} onChange={(e) => setName(e.target.value)} className="cms-login-input" placeholder="Nguyễn Văn A" />
-                  </span>
-                </label>
-              )}
-              {(mode === 'register' || pending) && (
-                <label className="block space-y-1.5">
-                  <span className="ml-1 block text-xs font-bold text-slate-400">Tuổi</span>
-                  <span className="cms-login-field">
-                    <Calendar size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
-                    <input value={age} inputMode="numeric" onChange={(e) => setAge(e.target.value.replace(/\D/g, '').slice(0, 2))} className="cms-login-input" placeholder="18" />
-                  </span>
-                </label>
-              )}
-              <label className="block space-y-1.5">
-                <span className="ml-1 block text-xs font-bold text-slate-400">Số điện thoại</span>
-                <span className="cms-login-field">
-                  <User size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
-                  <input value={phone} inputMode="numeric" onChange={(e) => setPhone(limitPhoneInput(e.target.value))} className="cms-login-input" placeholder="VD: 0912345678" />
-                </span>
-              </label>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 ml-1">Số điện thoại</label>
+                <div className="relative flex items-center">
+                  <Phone size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={phone}
+                    onChange={(e) => setPhone(limitPhoneInput(e.target.value))}
+                    placeholder="Ví dụ: 0912345678"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </div>
+              </div>
+
               {!pending && (
-                <label className="block space-y-1.5">
-                  <span className="ml-1 block text-xs font-bold text-slate-400">Mật khẩu</span>
-                  <span className="cms-login-field">
-                    <Lock size={18} className="shrink-0 text-slate-400" aria-hidden="true" />
-                    <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className="cms-login-input" placeholder="Ít nhất 6 ký tự" />
-                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="shrink-0 text-slate-400 !shadow-none" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 ml-1">Mật khẩu</label>
+                  <div className="relative flex items-center">
+                    <Lock size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Ít nhất 6 ký tự"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-11 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
-                  </span>
-                </label>
+                  </div>
+                </div>
               )}
-              {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-bold text-red-300">{error}</p>}
+
+              {/* Error Message */}
+              {error && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-bold text-rose-700 animate-in fade-in">
+                  {error}
+                </div>
+              )}
+
+              {/* Device Conflict */}
               {deviceConflict && (
-                <button type="button" onClick={() => login(true)} className="w-full rounded-xl bg-amber-500/15 px-3 py-2 text-sm font-bold text-amber-200 !shadow-none">
-                  Tài khoản đang mở ở máy khác. Đăng nhập trên máy này
+                <button
+                  type="button"
+                  onClick={() => login(true)}
+                  className="w-full rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100 cursor-pointer"
+                >
+                  Tài khoản đang mở ở máy khác. Bấm để đăng nhập trên máy này
                 </button>
               )}
-              <button type="submit" disabled={loading} className="cms-login-submit">
-                <span className="cms-login-shine" aria-hidden="true" />
-                <Lock size={16} aria-hidden="true" />
-                {loading ? 'Đang xử lý…' : pending ? 'Hoàn tất đăng ký' : mode === 'register' ? 'Tạo tài khoản miễn phí' : 'Đăng nhập ngay'}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 py-3.5 px-6 text-sm sm:text-base font-black text-white shadow-lg shadow-emerald-600/25 transition-all hover:shadow-emerald-600/35 hover:from-emerald-600 hover:to-teal-700 active:scale-98 disabled:opacity-60 cursor-pointer"
+              >
+                <Lock size={16} />
+                <span>
+                  {loading
+                    ? 'Đang xử lý…'
+                    : pending
+                    ? 'Hoàn tất đăng ký'
+                    : mode === 'register'
+                    ? 'Tạo tài khoản miễn phí'
+                    : 'Đăng nhập ngay'}
+                </span>
               </button>
+            </form>
+
+            {/* Card Footer Assurance */}
+            <div className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-slate-400">
+              <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+              <span>Bảo mật 100% • Không yêu cầu thẻ thanh toán</span>
             </div>
-          </form>
+          </div>
         </section>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 w-full border-t border-emerald-100/60 py-3.5 text-center text-xs font-medium text-slate-500">
+        <p>© 2026 DewSkill - Nền tảng tự học tin học thế hệ mới</p>
+      </footer>
     </div>
   );
 }
