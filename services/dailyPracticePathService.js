@@ -53,8 +53,10 @@ function passPercent(step, { testOut = false } = {}) {
 }
 
 function hasTestOutAccess(student, now = new Date()) {
+  if (student?.freePortal !== true) return true;
   const status = subscriptionService.statusOf(student, now);
-  return rules.allowanceForSubscription(status, student) >= rules.MEET_PLAN_DAILY_XP;
+  if (status.state === 'expired' || status.freeTier) return false;
+  return Boolean(status.meetLifetime || status.state === 'active' || status.state === 'expiring');
 }
 
 function emptyStepVideos() {

@@ -721,7 +721,9 @@ const AppSidebar = ({
           const isLifetime = sub.state === 'lifetime' && (Boolean(sub.meetLifetime) || !freePortalAccount);
           const isFree = !hasActivePaid && !isLifetime;
           const expiring = sub.state === 'expiring';
-          const shortLabel = subscriptionShortLabel(sub, { freePortal: freePortalAccount });
+          const shortLabel = subscriptionShortLabel(sub);
+          const cycleUnit = sub.resetCycle === 'monthly' ? '/tháng' : sub.resetCycle === 'never' ? '' : '/ngày';
+          const freeXpText = `${sub.dailyXpLimit || 60} XP${cycleUnit}`;
 
           if (isFree) {
             return (
@@ -738,7 +740,7 @@ const AppSidebar = ({
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Sparkles size={11} className="shrink-0 text-emerald-400/70" />
-                  <p className="text-[10px] text-emerald-400/80 leading-tight">60 XP/ngày</p>
+                  <p className="text-[10px] text-emerald-400/80 leading-tight">{freeXpText}</p>
                 </div>
               </div>
             );

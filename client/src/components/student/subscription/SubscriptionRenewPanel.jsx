@@ -71,7 +71,7 @@ export default function SubscriptionRenewPanel({ overview, onRenewed }) {
                   <div className={`bg-gradient-to-br px-3 py-3 text-white ${PLAN_TONES[plan.id] || PLAN_TONES['1m']}`}>
                     {plan.id === 'lifetime' && <Sparkles size={14} className="absolute right-2 top-2 opacity-80" aria-hidden="true" />}
                     <p className="text-lg font-black leading-tight">{plan.label}</p>
-                    <p className="text-[11px] font-semibold opacity-90">Meet · 300 XP mỗi ngày</p>
+                    <p className="text-[11px] font-semibold opacity-90">Meet · {plan.dailyXp || 300} XP {plan.resetCycle === 'monthly' ? 'mỗi tháng' : plan.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'}</p>
                   </div>
                   <div className="flex flex-1 flex-col justify-between gap-2 p-3">
                     <p className={`text-base font-black ${sellable ? 'text-slate-900' : 'text-slate-400'}`}>

@@ -58,6 +58,10 @@ router.put('/plans', ...requireFinanceAdmin, handle(async (req) => {
   return service.planCatalog();
 }));
 
+router.get('/xp-config', ...requireStudentAdmin, handle(() => service.getXpConfig()));
+router.put('/xp-config', ...requireStudentAdmin, handle(async (req) => service.setXpConfig(req.body || {})));
+router.post('/xp-config/reset-all', ...requireStudentAdmin, handle(() => service.resetAllStudentsXp()));
+
 router.get('/codes', ...requireStudentAdmin, handle((req) => service.listCodes({
   status: String(req.query.status || ''),
   plan: String(req.query.plan || ''),
@@ -113,6 +117,7 @@ router.put('/students/:id', ...requireStudentAdmin, async (req, res) => {
       plan: String(req.body?.plan || ''),
       expiresAt: req.body?.expiresAt || null,
       note: String(req.body?.note || '').slice(0, 200),
+      customXp: req.body?.customXp != null ? Number(req.body.customXp) : null,
     }, actorOf(req));
     if (mode === 'free') {
       const io = req.app.get('io');

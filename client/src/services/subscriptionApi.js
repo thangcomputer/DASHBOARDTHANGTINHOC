@@ -24,6 +24,9 @@ const subscriptionApi = {
   admin: {
     plans: async () => parse(await apiFetch('/subscription/plans')),
     setPrices: async (prices) => parse(await apiFetch('/subscription/plans', json('PUT', { prices }))),
+    getXpConfig: async () => parse(await apiFetch('/subscription/xp-config')),
+    setXpConfig: async (config) => parse(await apiFetch('/subscription/xp-config', json('PUT', config))),
+    resetAllXp: async () => parse(await apiFetch('/subscription/xp-config/reset-all', json('POST'))),
     codes: async (params = {}) => {
       const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString();
       return parse(await apiFetch(`/subscription/codes${query ? `?${query}` : ''}`));

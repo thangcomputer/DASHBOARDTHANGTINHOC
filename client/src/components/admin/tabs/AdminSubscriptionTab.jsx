@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Ban, Copy, Download, Loader2, Plus, RefreshCw, Save, Search, Ticket, UserCog,
+  Ban, Copy, Download, Loader2, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Ticket, UserCog,
 } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
 import { useToast } from '../../../utils/useToast';
@@ -72,6 +72,193 @@ function PricesCard() {
         </div>
       )}
       <p className="mt-2 text-[11px] text-slate-500">Giá 0 = gói không bán qua thanh toán, học viên chỉ kích hoạt được bằng mã.</p>
+    </Card>
+  );
+}
+
+function XpConfigCard() {
+  const toast = useToast();
+  const [config, setConfig] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  useEffect(() => {
+    subscriptionApi.admin.getXpConfig().then(setConfig).catch((err) => toast.error(err.message));
+  }, [toast]);
+
+  const save = async () => {
+    if (!config) return;
+    setSaving(true);
+    try {
+      const updated = await subscriptionApi.admin.setXpConfig(config);
+      setConfig(updated);
+      toast.success('Đã lưu cấu hình mức XP và chu kỳ đặt lại');
+    } catch (err) {
+      toast.error(err.message || 'Không lưu được cấu hình XP');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetAllNow = async () => {
+    if (!window.confirm('Bạn có chắc muốn đặt lại ví XP của toàn bộ học viên về mức mới ngay bây giờ không?')) return;
+    setResetting(true);
+    try {
+      const res = await subscriptionApi.admin.resetAllXp();
+      toast.success(`Đã đặt lại ví XP cho ${res.modifiedCount} học viên thành công!`);
+    } catch (err) {
+      toast.error(err.message || 'Không đặt lại được ví XP');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <Card
+      icon={Sparkles}
+      title="Thiết lập mức XP & Chu kỳ đặt lại ví học viên"
+      right={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={resetAllNow}
+            disabled={!config || resetting}
+            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+          >
+            {resetting ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+            Đặt lại ví tất cả HV ngay
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={!config || saving}
+            className="cms-btn cms-btn-primary !py-1.5 text-xs flex items-center gap-1.5"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            Lưu cấu hình XP
+          </button>
+        </div>
+      }
+    >
+      {!config ? (
+        <Loader2 size={18} className="animate-spin text-slate-400" />
+      ) : (
+        <div className="space-y-4">
+          {/* 1. Chọn chu kỳ reset */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              Chu kỳ đặt lại ví XP:
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { id: 'daily', label: 'Reset mỗi ngày', desc: 'Đặt lại về mức gói đầu ngày (00:00 giờ VN)' },
+                { id: 'monthly', label: 'Reset mỗi tháng', desc: 'Đặt lại về mức gói đầu tháng mới (ngày 1 hàng tháng)' },
+                { id: 'never', label: 'Không cho reset', desc: 'Tặng 1 lần khi đăng ký / kích hoạt, không tự động đặt lại' },
+              ].map((item) => {
+                const active = config.resetCycle === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setConfig((prev) => ({ ...prev, resetCycle: item.id }))}
+                    className={`text-left p-2.5 rounded-xl border transition cursor-pointer ${
+                      active
+                        ? 'border-red-500 bg-red-50/70 text-red-950 ring-2 ring-red-200'
+                        : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold">{item.label}</span>
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${active ? 'border-red-600 bg-red-600' : 'border-slate-300'}`}>
+                        {active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{item.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Mức XP cho tài khoản cơ bản */}
+          <div className="pt-2 border-t border-slate-100">
+            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide mb-2">
+              1. Tài khoản cơ bản (Chưa mua gói)
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                Tài khoản miễn phí (Cổng học thử)
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    className={INPUT}
+                    value={config.freeAccountXp}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, freeAccountXp: Math.max(0, Number(e.target.value) || 0) }))}
+                  />
+                  <span className="text-xs font-semibold text-slate-500 shrink-0">XP</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 font-normal">Học viên tự do đăng ký qua web, chưa đăng ký khóa học hay gói Meet.</p>
+              </label>
+
+              <label className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                Tài khoản theo khóa học (Học viên chính thức)
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    className={INPUT}
+                    value={config.courseAccountXp}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, courseAccountXp: Math.max(0, Number(e.target.value) || 0) }))}
+                  />
+                  <span className="text-xs font-semibold text-slate-500 shrink-0">XP</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 font-normal">Học viên đóng học phí học các khóa tại trung tâm (Word, Excel, PowerPoint...).</p>
+              </label>
+            </div>
+          </div>
+
+          {/* 3. Mức XP theo từng gói học Meet */}
+          <div className="pt-2 border-t border-slate-100">
+            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide mb-2">
+              2. Tài khoản đăng ký theo gói học Google Meet
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {[
+                { id: '1m', label: 'Gói 1 tháng', defaultHint: 'VD: 400 XP' },
+                { id: '3m', label: 'Gói 3 tháng', defaultHint: 'VD: 500 XP' },
+                { id: '6m', label: 'Gói 6 tháng', defaultHint: 'VD: 600 XP' },
+                { id: '12m', label: 'Gói 1 năm', defaultHint: 'VD: 800 XP' },
+                { id: 'lifetime', label: 'Gói Vĩnh viễn', defaultHint: 'VD: 1000 XP' },
+              ].map((item) => (
+                <label key={item.id} className="block text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  {item.label}
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="10"
+                      className={INPUT}
+                      value={config.planXp?.[item.id] ?? 0}
+                      onChange={(e) => {
+                        const val = Math.max(0, Number(e.target.value) || 0);
+                        setConfig((prev) => ({
+                          ...prev,
+                          planXp: { ...prev.planXp, [item.id]: val },
+                        }));
+                      }}
+                    />
+                    <span className="text-[11px] font-semibold text-slate-500 shrink-0">XP</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-normal">{item.defaultHint}</p>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -378,6 +565,7 @@ export default function AdminSubscriptionTab() {
         </p>
       </div>
       <PricesCard />
+      <XpConfigCard />
       <GenerateCard onCreated={() => setReloadKey((n) => n + 1)} />
       <CodesCard reloadKey={reloadKey} />
       <StudentRenewCard />

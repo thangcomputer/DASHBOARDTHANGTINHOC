@@ -60,13 +60,18 @@ function nextExpiry(currentExpiresAt, plan, now = new Date()) {
 }
 
 /** Trạng thái gói để hiển thị + chặn truy cập. Thiếu trường (HV cũ) = vĩnh viễn. */
-function statusOf(student, now = new Date()) {
+function statusOf(student, now = new Date(), xpConfig = null) {
   const sub = student?.subscription || {};
   const plan = PLANS.includes(sub.plan) ? sub.plan : 'lifetime';
   const expiresAt = sub.expiresAt ? new Date(sub.expiresAt) : null;
+  const cfg = xpConfig || DEFAULT_XP_CONFIG;
+  const resetCycle = cfg.resetCycle || 'daily';
   if (plan === 'lifetime' || !expiresAt) {
     const boughtLifetime = plan === 'lifetime' && Boolean(sub.activatedAt);
     const freeTier = student?.freePortal === true && !boughtLifetime;
+    const dailyXpLimit = freeTier
+      ? (cfg.freeAccountXp || 60)
+      : (student?.freePortal === true && boughtLifetime ? (cfg.planXp?.lifetime || 1000) : (cfg.courseAccountXp || 200));
     return {
       plan: freeTier ? 'free' : 'lifetime',
       planLabel: freeTier ? 'Miễn phí' : PLAN_LABELS.lifetime,
@@ -76,6 +81,8 @@ function statusOf(student, now = new Date()) {
       activated: student?.freePortal === true ? boughtLifetime : true,
       meetLifetime: student?.freePortal === true && boughtLifetime,
       freeTier,
+      dailyXpLimit,
+      resetCycle,
     };
   }
   const msLeft = expiresAt.getTime() - now.getTime();
@@ -83,6 +90,10 @@ function statusOf(student, now = new Date()) {
   let state = 'active';
   if (msLeft <= 0) state = 'expired';
   else if (daysLeft <= EXPIRING_DAYS) state = 'expiring';
+  const freeTier = student?.freePortal === true && state === 'expired';
+  const dailyXpLimit = freeTier
+    ? (cfg.freeAccountXp || 60)
+    : (cfg.planXp?.[plan] || 400);
   return {
     plan,
     planLabel: student?.freePortal === true && state === 'expired' ? 'Miễn phí' : PLAN_LABELS[plan],
@@ -91,7 +102,9 @@ function statusOf(student, now = new Date()) {
     daysLeft: Math.max(0, daysLeft),
     activated: Boolean(sub.activatedAt),
     meetLifetime: false,
-    freeTier: student?.freePortal === true && state === 'expired',
+    freeTier,
+    dailyXpLimit,
+    resetCycle,
   };
 }
 
@@ -318,6 +331,66 @@ const DEFAULT_PLAN_PRICES = {
   lifetime: 1500000,
 };
 
+const DEFAULT_XP_CONFIG = {
+  freeAccountXp: 60,
+  courseAccountXp: 200,
+  planXp: {
+    '1m': 400,
+    '3m': 500,
+    '6m': 600,
+    '12m': 800,
+    lifetime: 1000,
+  },
+  resetCycle: 'daily',
+};
+
+async function getXpConfig() {
+  const settings = await SystemSettings.findOne({ _key: 'main' }).select('subscriptionXpSettings').lean();
+  const raw = settings?.subscriptionXpSettings || {};
+  return {
+    freeAccountXp: Number.isFinite(Number(raw.freeAccountXp)) && Number(raw.freeAccountXp) >= 0 ? Number(raw.freeAccountXp) : DEFAULT_XP_CONFIG.freeAccountXp,
+    courseAccountXp: Number.isFinite(Number(raw.courseAccountXp)) && Number(raw.courseAccountXp) >= 0 ? Number(raw.courseAccountXp) : DEFAULT_XP_CONFIG.courseAccountXp,
+    planXp: Object.fromEntries(
+      PLANS.map((plan) => {
+        const val = Number(raw.planXp?.[plan]);
+        return [plan, Number.isFinite(val) && val >= 0 ? val : DEFAULT_XP_CONFIG.planXp[plan]];
+      })
+    ),
+    resetCycle: ['daily', 'monthly', 'never'].includes(raw.resetCycle) ? raw.resetCycle : DEFAULT_XP_CONFIG.resetCycle,
+  };
+}
+
+async function setXpConfig(input = {}) {
+  const update = {};
+  if (input.freeAccountXp != null) {
+    update['subscriptionXpSettings.freeAccountXp'] = Math.max(0, Number(input.freeAccountXp) || 0);
+  }
+  if (input.courseAccountXp != null) {
+    update['subscriptionXpSettings.courseAccountXp'] = Math.max(0, Number(input.courseAccountXp) || 0);
+  }
+  if (input.planXp && typeof input.planXp === 'object') {
+    for (const plan of PLANS) {
+      if (input.planXp[plan] != null) {
+        update[`subscriptionXpSettings.planXp.${plan}`] = Math.max(0, Number(input.planXp[plan]) || 0);
+      }
+    }
+  }
+  if (input.resetCycle && ['daily', 'monthly', 'never'].includes(input.resetCycle)) {
+    update['subscriptionXpSettings.resetCycle'] = input.resetCycle;
+  }
+  await SystemSettings.findOneAndUpdate({ _key: 'main' }, { $set: update }, { upsert: true, setDefaultsOnInsert: true });
+  return getXpConfig();
+}
+
+async function resetAllStudentsXp() {
+  const xpConfig = await getXpConfig();
+  const res = await DailyPracticeProfile.updateMany(
+    {},
+    { $set: { xpAllowanceDay: '', xpAllowanceAmount: 0 } },
+  );
+  return { modifiedCount: res.modifiedCount, resetCycle: xpConfig.resetCycle };
+}
+
 async function getPrices() {
   const settings = await SystemSettings.findOne({ _key: 'main' }).select('subscriptionPrices').lean();
   const raw = settings?.subscriptionPrices || {};
@@ -343,30 +416,45 @@ async function setPrices(input = {}) {
 }
 
 async function planCatalog() {
-  const prices = await getPrices();
-  return PLANS.map((plan) => ({
-    id: plan,
-    label: PLAN_LABELS[plan],
-    months: PLAN_MONTHS[plan],
-    price: prices[plan],
-    dailyXp: 300,
-    benefits: PLAN_BENEFITS,
-  }));
+  const [prices, xpConfig] = await Promise.all([
+    getPrices(),
+    getXpConfig(),
+  ]);
+  const cycleText = xpConfig.resetCycle === 'monthly' ? 'mỗi tháng' : xpConfig.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày';
+  return PLANS.map((plan) => {
+    const xp = xpConfig.planXp[plan] || 400;
+    return {
+      id: plan,
+      label: PLAN_LABELS[plan],
+      months: PLAN_MONTHS[plan],
+      price: prices[plan],
+      dailyXp: xp,
+      resetCycle: xpConfig.resetCycle,
+      benefits: [
+        'Học qua Meet với giảng viên',
+        `${xp} XP ${cycleText} khi gói còn hạn`,
+        `Hết hạn thì tài khoản miễn phí về ${xpConfig.freeAccountXp} XP ${cycleText}`,
+        'Xem video và dùng tính năng tự học trong hạn gói',
+      ],
+    };
+  });
 }
 
 async function myOverview(studentId) {
   const student = await Student.findById(studentId).select('name subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
-  const [plans, history, xpPurchases] = await Promise.all([
+  const [plans, history, xpPurchases, xpConfig] = await Promise.all([
     planCatalog(),
     SubscriptionLog.find({ studentId }).sort({ createdAt: -1 }).limit(20).lean(),
     xpPurchaseHistory(studentId),
+    getXpConfig(),
   ]);
   return {
-    subscription: statusOf(student),
+    subscription: statusOf(student, new Date(), xpConfig),
     plans,
     history: history.map(logView),
     xpPurchases,
+    xpConfig,
   };
 }
 
@@ -528,10 +616,49 @@ async function syncPlanAllowance(studentId) {
   }
 }
 
-async function adminSetSubscription(studentId, { mode = 'extend', plan = '', expiresAt = null, note = '' } = {}, actor = {}) {
+async function adminSetSubscription(studentId, { mode = 'extend', plan = '', expiresAt = null, note = '', customXp = null } = {}, actor = {}) {
   if (!mongoose.Types.ObjectId.isValid(String(studentId || ''))) throw httpError(400, 'Học viên không hợp lệ');
   const student = await Student.findById(studentId).select('name subscription freePortal').lean();
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
+
+  if (mode === 'set_xp') {
+    const targetXp = Math.max(0, Math.round(Number(customXp) || 0));
+    const profile = await DailyPracticeProfile.findOne({ studentId }).lean();
+    const purchasedXp = profile?.purchasedXp != null ? profile.purchasedXp : 0;
+    await DailyPracticeProfile.findOneAndUpdate(
+      { studentId },
+      {
+        $set: {
+          dailyXp: targetXp,
+          xpTotal: targetXp + purchasedXp,
+          xpAllowanceAmount: targetXp,
+        },
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+    await SubscriptionLog.create({
+      studentId,
+      source: 'admin',
+      plan: student.subscription?.plan || '1m',
+      actorId: String(actor.id || ''),
+      actorName: String(actor.name || ''),
+      note: note ? `Admin đặt số dư XP: ${targetXp} (${note})` : `Admin đặt số dư XP: ${targetXp}`,
+    });
+    return statusOf(student, new Date(), await getXpConfig());
+  }
+
+  if (mode === 'refill_now') {
+    await syncPlanAllowance(studentId);
+    await SubscriptionLog.create({
+      studentId,
+      source: 'admin',
+      plan: student.subscription?.plan || '1m',
+      actorId: String(actor.id || ''),
+      actorName: String(actor.name || ''),
+      note: note ? `Admin đặt lại ví XP về mức gói (${note})` : 'Admin đặt lại ví XP về mức gói',
+    });
+    return statusOf(student, new Date(), await getXpConfig());
+  }
 
   if (mode === 'extend') {
     assertPlan(plan);
@@ -637,12 +764,20 @@ async function searchStudents(query, scopeFilter = {}) {
 }
 
 async function studentHistory(studentId) {
-  const [student, rows] = await Promise.all([
+  const [student, rows, profile, xpConfig] = await Promise.all([
     Student.findById(studentId).select('name subscription freePortal').lean(),
     SubscriptionLog.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
+    DailyPracticeProfile.findOne({ studentId }).select('xpTotal dailyXp purchasedXp xpAllowanceDay xpAllowanceAmount').lean(),
+    getXpConfig(),
   ]);
   if (!student) throw httpError(404, 'Không tìm thấy học viên');
-  return { subscription: statusOf(student), freePortal: student.freePortal === true, history: rows.map(logView) };
+  return {
+    subscription: statusOf(student, new Date(), xpConfig),
+    freePortal: student.freePortal === true,
+    history: rows.map(logView),
+    dailyPractice: profile,
+    xpConfig,
+  };
 }
 
 function dayKey(date) {
@@ -734,4 +869,8 @@ module.exports = {
   studentHistory,
   pickReminder,
   sendExpiryReminders,
+  DEFAULT_XP_CONFIG,
+  getXpConfig,
+  setXpConfig,
+  resetAllStudentsXp,
 };

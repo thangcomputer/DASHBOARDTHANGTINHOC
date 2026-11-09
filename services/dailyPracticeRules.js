@@ -317,22 +317,39 @@ function dayDiff(fromKey, toKey) {
   return Math.round((Date.parse(`${toKey}T00:00:00Z`) - Date.parse(`${fromKey}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
 }
 
-function allowanceForSubscription(subscriptionStatus, student) {
+function allowanceForSubscription(subscriptionStatus, student, xpConfig = null) {
   const state = subscriptionStatus?.state;
   const plan = subscriptionStatus?.plan;
-  if (state === 'lifetime' && student?.freePortal === true && subscriptionStatus?.meetLifetime) return MEET_PLAN_DAILY_XP;
-  if ((state === 'active' || state === 'expiring') && plan && plan !== 'lifetime') return MEET_PLAN_DAILY_XP;
-  if (student?.freePortal === true) return FREE_PORTAL_DAILY_XP;
-  return DAILY_ALLOWANCE_XP;
+  const freeXp = Number(xpConfig?.freeAccountXp) > 0 ? Number(xpConfig.freeAccountXp) : FREE_PORTAL_DAILY_XP;
+  const courseXp = Number(xpConfig?.courseAccountXp) > 0 ? Number(xpConfig.courseAccountXp) : DAILY_ALLOWANCE_XP;
+  const planXp = xpConfig?.planXp || {};
+  const getPlanXp = (p, fallback = MEET_PLAN_DAILY_XP) => {
+    const val = Number(planXp[p]);
+    return Number.isFinite(val) && val > 0 ? val : fallback;
+  };
+
+  if (state === 'lifetime' && student?.freePortal === true && subscriptionStatus?.meetLifetime) {
+    return getPlanXp('lifetime', 1000);
+  }
+  if ((state === 'active' || state === 'expiring') && plan && plan !== 'lifetime') {
+    return getPlanXp(plan, 400);
+  }
+  if (student?.freePortal === true) {
+    return freeXp;
+  }
+  return courseXp;
 }
 
 /**
- * Sang ngày mới: phần XP của gói về đúng mức ngày, XP đã mua giữ nguyên và cộng thêm.
- * Cùng ngày không đụng số đang có, trừ khi mức gói tăng (200 lên 300) thì cộng phần chênh.
+ * Đặt lại ví XP theo chu kỳ (ngày / tháng / không reset):
+ * phần XP của gói về đúng mức gói, XP đã mua giữ nguyên và cộng thêm.
+ * Trong cùng kỳ không đụng số đang có, trừ khi mức gói tăng thì cộng phần chênh lệch.
  */
-function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP) {
+function applyDailyAllowance(profile, today, allowance = DAILY_ALLOWANCE_XP, isSamePeriod = null) {
   const day = String(today || '');
-  const sameDay = Boolean(profile) && String(profile.xpAllowanceDay || '') === day;
+  const sameDay = isSamePeriod !== null
+    ? Boolean(isSamePeriod)
+    : (Boolean(profile) && String(profile.xpAllowanceDay || '') === day);
   const tracked = profile?.purchasedXp != null && profile?.dailyXp != null;
   const applied = Number(profile?.xpAllowanceAmount) > 0
     ? Number(profile.xpAllowanceAmount)

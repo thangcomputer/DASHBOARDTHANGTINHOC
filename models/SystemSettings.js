@@ -22,6 +22,24 @@ const systemSettingsSchema = new mongoose.Schema({
     lifetime: { type: Number, default: 0 },
   },
 
+  // ── Cấu hình mức XP và chu kỳ đặt lại ví theo loại tài khoản / gói (Admin thiết lập) ──
+  subscriptionXpSettings: {
+    freeAccountXp: { type: Number, default: 60 },
+    courseAccountXp: { type: Number, default: 200 },
+    planXp: {
+      '1m': { type: Number, default: 400 },
+      '3m': { type: Number, default: 500 },
+      '6m': { type: Number, default: 600 },
+      '12m': { type: Number, default: 800 },
+      lifetime: { type: Number, default: 1000 },
+    },
+    resetCycle: {
+      type: String,
+      enum: ['daily', 'monthly', 'never'],
+      default: 'daily',
+    },
+  },
+
   // ── Popup thông báo/quảng cáo (HV / GV / Nhân viên) ─────────────────────
   popupIsActive: { type: Boolean, default: false },
   popupTitle: { type: String, default: '' },

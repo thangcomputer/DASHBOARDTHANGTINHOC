@@ -600,11 +600,11 @@ export default function StudentProfileTab({
               </h4>
               <p className="text-xs text-slate-500 truncate mt-0.5">
                 {freeTier
-                  ? 'Gói miễn phí (60 XP mỗi ngày)'
+                  ? `Gói miễn phí (${subscription?.dailyXpLimit || 60} XP ${subscription?.resetCycle === 'monthly' ? 'mỗi tháng' : subscription?.resetCycle === 'never' ? 'tặng kèm' : 'mỗi ngày'})`
                   : isLifetime
                     ? 'Không giới hạn thời gian'
                     : subscription
-                      ? `Hạn: ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày`
+                      ? `Hạn: ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày${subscription?.dailyXpLimit ? ` · ${subscription.dailyXpLimit} XP ${subscription?.resetCycle === 'monthly' ? '/tháng' : subscription?.resetCycle === 'never' ? '' : '/ngày'}` : ''}`
                       : 'Kích hoạt hoặc gia hạn để học tiếp'}
               </p>
             </div>

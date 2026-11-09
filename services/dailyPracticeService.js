@@ -260,16 +260,36 @@ async function getProfile(studentId) {
   return DailyPracticeProfile.findOne({ studentId }).lean();
 }
 
-/** Đầu mỗi ngày (giờ VN) đặt ví về mức gói: miễn phí 60 XP, học viên thường 200 XP, gói Meet còn hạn 300 XP. */
+/** Đặt ví về mức gói theo chu kỳ (mỗi ngày, mỗi tháng hoặc không reset). */
 async function refillDailyXp(studentId) {
   const today = learningGoalService.vnDayKey();
+  const xpConfig = await subscriptionService.getXpConfig();
   const student = await Student.findById(studentId).select('subscription freePortal').lean();
-  const allowance = rules.allowanceForSubscription(subscriptionService.statusOf(student), student);
-  if (allowance === rules.MEET_PLAN_DAILY_XP) {
+  const status = subscriptionService.statusOf(student, new Date(), xpConfig);
+  const allowance = rules.allowanceForSubscription(status, student, xpConfig);
+  const isMeetActive = status.meetLifetime || ((status.state === 'active' || status.state === 'expiring') && status.plan !== 'lifetime');
+  if (isMeetActive) {
     const { unlockFreePortal } = require('./freePortal');
     await unlockFreePortal(studentId);
   }
+
+  const resetCycle = xpConfig.resetCycle || 'daily';
+  let periodKey = today;
+  let isSamePeriod = false;
+
   let profile = await DailyPracticeProfile.findOne({ studentId }).lean();
+
+  if (resetCycle === 'daily') {
+    periodKey = today;
+    isSamePeriod = Boolean(profile) && String(profile.xpAllowanceDay || '') === periodKey;
+  } else if (resetCycle === 'monthly') {
+    periodKey = today.slice(0, 7); // YYYY-MM
+    isSamePeriod = Boolean(profile) && String(profile.xpAllowanceDay || '').slice(0, 7) === periodKey;
+  } else if (resetCycle === 'never') {
+    periodKey = 'never';
+    isSamePeriod = Boolean(profile?.xpAllowanceDay);
+  }
+
   if (!profile) {
     try {
       return await DailyPracticeProfile.create({
@@ -278,7 +298,7 @@ async function refillDailyXp(studentId) {
         dailyXp: allowance,
         purchasedXp: 0,
         xpBrokeDay: '',
-        xpAllowanceDay: today,
+        xpAllowanceDay: periodKey,
         xpAllowanceAmount: allowance,
       });
     } catch (err) {
@@ -286,12 +306,12 @@ async function refillDailyXp(studentId) {
       profile = await DailyPracticeProfile.findOne({ studentId }).lean();
     }
   }
-  const next = rules.applyDailyAllowance(profile, today, allowance);
+  const next = rules.applyDailyAllowance(profile, periodKey, allowance, isSamePeriod);
   if (!next.changed) return profile;
   const filter = next.sameDayUpgrade
     ? {
       studentId,
-      xpAllowanceDay: today,
+      xpAllowanceDay: periodKey,
       $or: [
         { xpAllowanceAmount: { $lt: allowance } },
         { xpAllowanceAmount: null },
@@ -301,14 +321,21 @@ async function refillDailyXp(studentId) {
     : next.sameDayDowngrade
       ? {
         studentId,
-        xpAllowanceDay: today,
+        xpAllowanceDay: periodKey,
         $or: [
           { xpAllowanceAmount: { $gt: allowance } },
           { xpAllowanceAmount: null },
           { xpAllowanceAmount: { $exists: false } },
         ],
       }
-      : { studentId, xpAllowanceDay: { $ne: today } };
+      : {
+        studentId,
+        $or: [
+          { xpAllowanceDay: { $ne: periodKey } },
+          { xpAllowanceDay: null },
+          { xpAllowanceDay: { $exists: false } },
+        ],
+      };
   const updated = await DailyPracticeProfile.findOneAndUpdate(
     filter,
     {
@@ -317,7 +344,7 @@ async function refillDailyXp(studentId) {
         dailyXp: next.dailyXp,
         purchasedXp: next.purchasedXp,
         xpBrokeDay: next.xpBrokeDay,
-        xpAllowanceDay: today,
+        xpAllowanceDay: periodKey,
         xpAllowanceAmount: next.xpAllowanceAmount,
       }
     },
