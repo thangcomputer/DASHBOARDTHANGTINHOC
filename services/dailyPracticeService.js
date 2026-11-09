@@ -490,7 +490,7 @@ async function pickQuestions(topicId, difficulty) {
     ]);
     picked.push(...more);
   }
-  return rules.shuffle(picked);
+  return picked;
 }
 
 async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
@@ -509,7 +509,7 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     // Bước mới: Bắt buộc kiểm tra ví phải có ≥ stakeNeed XP (ví dụ 50 XP). Không đủ -> Chặn luôn!
     await assertCanSpendXp(sid, { recovery: false, stake: stakeNeed });
   }
-  const shuffledQuestions = rules.shuffle(prepared.questions);
+  const sessionQuestions = prepared.questions;
   const { session, profileXp } = await createStakedSession({
     studentId: sid,
     topicId: prepared.topic._id,
@@ -519,7 +519,7 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     step,
     pathNodeKey: prepared.pathInfo.pathNodeKey,
     testOut: Boolean(testOut),
-    questionIds: shuffledQuestions.map((q) => q._id),
+    questionIds: sessionQuestions.map((q) => q._id),
     recovery: false,
     review,
   }, { stakeXp: stakeDeductAtStart });
@@ -530,8 +530,8 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     recovery: false,
     topic: topicView(prepared.topic),
     difficulty: prepared.difficulty,
-    total: shuffledQuestions.length,
-    questions: shuffledQuestions.map((q) => rules.publicQuestion(q)),
+    total: sessionQuestions.length,
+    questions: sessionQuestions.map((q) => rules.publicQuestion(q)),
     path: { ...prepared.pathInfo, recovery, review },
     profileXp,
     review,
