@@ -260,15 +260,17 @@ async function exchangeTicket(token, fingerprint) {
     needsProfile: true,
     ticket: token,
     name: student?.name || profile.name || '',
+    email: student?.email || profile.email || '',
     provider: profile.provider,
   };
 }
 
-async function completeProfile({ token, name, age, phone, fingerprint }) {
+async function completeProfile({ token, name, age, phone, email, fingerprint }) {
   const profile = readTicket(token);
   const parsedAge = parseAge(age);
   const canonicalPhone = normalizeVNPhone(phone);
   const displayName = String(name || profile.name || '').trim();
+  const rawEmail = String(email || profile.email || '').trim().toLowerCase();
   if (!parsedAge) {
     const error = new Error('Tuổi từ 10 đến 80');
     error.status = 400;
@@ -309,7 +311,7 @@ async function completeProfile({ token, name, age, phone, fingerprint }) {
     student.zalo = canonicalPhone;
     student.age = parsedAge;
     student[field] = profile.providerId;
-    if (profile.email && !student.email) student.email = profile.email;
+    if (rawEmail) student.email = rawEmail;
     if (profile.avatar && !student.avatar) student.avatar = profile.avatar;
     student.freePortal = true;
     await student.save();
@@ -320,7 +322,7 @@ async function completeProfile({ token, name, age, phone, fingerprint }) {
     phone: canonicalPhone,
     zalo: canonicalPhone,
     age: parsedAge,
-    email: profile.email || undefined,
+    email: rawEmail || undefined,
     avatar: profile.avatar || '',
     password: crypto.randomBytes(24).toString('hex'),
     [field]: profile.providerId,

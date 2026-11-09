@@ -4,6 +4,7 @@ import {
   EyeOff,
   Lock,
   User,
+  Mail,
   Calendar,
   Flame,
   Route,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
-import { isValidVNPhone, limitPhoneInput, normalizePhone } from '../utils/validators';
+import { isValidVNPhone, isValidEmail, limitPhoneInput, normalizePhone } from '../utils/validators';
 import { unlockAudio } from '../utils/sound';
 
 function GoogleIcon() {
@@ -41,6 +42,7 @@ function FacebookIcon() {
 export default function FreePortalPage({ onLogin }) {
   const [mode, setMode] = useState('register');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [age, setAge] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -103,6 +105,7 @@ export default function FreePortalPage({ onLogin }) {
       if (data.needsProfile) {
         setPending({ ticket: data.ticket, provider: data.provider });
         setName(data.name || '');
+        if (data.email) setEmail(data.email);
         setMode('register');
         return;
       }
@@ -165,8 +168,13 @@ export default function FreePortalPage({ onLogin }) {
     event.preventDefault();
     const id = normalizePhone(phone);
     const parsedAge = Number(age);
+    const trimmedEmail = email.trim().toLowerCase();
     if (name.trim().length < 2) {
       setError('Hãy nhập họ tên');
+      return;
+    }
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+      setError('Địa chỉ email không đúng định dạng (VD: example@gmail.com)');
       return;
     }
     if (!Number.isInteger(parsedAge) || parsedAge < 10 || parsedAge > 80) {
@@ -193,6 +201,7 @@ export default function FreePortalPage({ onLogin }) {
           name: name.trim(),
           age: parsedAge,
           phone: id,
+          email: trimmedEmail || undefined,
           deviceFingerprint: getDeviceFingerprint(),
         }),
       });
@@ -221,8 +230,17 @@ export default function FreePortalPage({ onLogin }) {
     }
     const id = normalizePhone(phone);
     const parsedAge = Number(age);
+    const trimmedEmail = email.trim().toLowerCase();
     if (name.trim().length < 2) {
       setError('Hãy nhập họ tên');
+      return;
+    }
+    if (!trimmedEmail) {
+      setError('Hãy nhập địa chỉ Gmail / Email');
+      return;
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Địa chỉ Gmail / Email không đúng định dạng (VD: example@gmail.com)');
       return;
     }
     if (!Number.isInteger(parsedAge) || parsedAge < 10 || parsedAge > 80) {
@@ -248,7 +266,13 @@ export default function FreePortalPage({ onLogin }) {
           'Content-Type': 'application/json',
           ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         },
-        body: JSON.stringify({ name: name.trim(), age: parsedAge, phone: id, password }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: trimmedEmail,
+          age: parsedAge,
+          phone: id,
+          password,
+        }),
       });
       const data = await response.json();
       if (!data.success) {
@@ -294,7 +318,6 @@ export default function FreePortalPage({ onLogin }) {
               alt="DewSkill"
               className="h-8 sm:h-9 w-auto max-w-[150px] sm:max-w-[180px] object-contain transition group-hover:opacity-90"
               onError={(e) => {
-                // If horizontal logo fails, show fallback badge & text
                 e.target.style.display = 'none';
                 const sibling = e.target.nextElementSibling;
                 if (sibling) sibling.style.display = 'flex';
@@ -504,6 +527,22 @@ export default function FreePortalPage({ onLogin }) {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Nguyễn Văn A"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(mode === 'register' || pending) && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 ml-1">Gmail / Email</label>
+                  <div className="relative flex items-center">
+                    <Mail size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="vidu@gmail.com"
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                     />
                   </div>

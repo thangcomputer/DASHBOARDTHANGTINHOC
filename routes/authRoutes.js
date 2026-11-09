@@ -1494,6 +1494,7 @@ router.post('/register-teacher', sensitiveFlowLimiter, policyShadowAuth('registe
       });
     }
     const canonicalPhone = normalizeVNPhone(phone);
+    const rawEmail = String(email || '').trim().toLowerCase();
     if (!canonicalPhone) {
       return res.status(400).json({ success: false, message: 'Số điện thoại không hợp lệ' });
     }
@@ -1504,7 +1505,7 @@ router.post('/register-teacher', sensitiveFlowLimiter, policyShadowAuth('registe
 
     try {
       const { assertUniqueContact } = require('../utils/uniqueContact');
-      await assertUniqueContact({ phone: canonicalPhone });
+      await assertUniqueContact({ phone: canonicalPhone, ...(rawEmail ? { email: rawEmail } : {}) });
     } catch (dupErr) {
       if (dupErr.status === 409) {
         return res.status(409).json({ success: false, message: dupErr.message });
@@ -2264,7 +2265,7 @@ const FREE_PORTAL_OAUTH_STATE = 'free_portal_oauth_state';
 
 router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
   try {
-    const { name, age, phone, password } = req.body || {};
+    const { name, age, phone, password, email } = req.body || {};
     const displayName = String(name || '').trim();
     const parsedAge = freePortalSocial.parseAge(age);
     const canonicalPhone = normalizeVNPhone(phone);
@@ -2279,6 +2280,9 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     }
     if (!password || String(password).length < 6) {
       return res.status(400).json({ success: false, message: 'Mật khẩu cần ít nhất 6 ký tự' });
+    }
+    if (rawEmail && !/^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(rawEmail)) {
+      return res.status(400).json({ success: false, message: 'Địa chỉ email không hợp lệ' });
     }
     const existing = await Student.findOne({ $or: [{ phone: canonicalPhone }, { zalo: canonicalPhone }] });
     if (existing) {
@@ -2300,6 +2304,7 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
       name: displayName,
       phone: canonicalPhone,
       zalo: canonicalPhone,
+      ...(rawEmail ? { email: rawEmail } : {}),
       age: parsedAge,
       password,
       course: FREE_COURSE_NAME,
@@ -2358,13 +2363,14 @@ router.post('/free-portal/social/exchange', loginLimiter, policyShadowAuth('logi
 
 router.post('/free-portal/social/complete', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
   try {
-    const { ticket, name, age, phone, deviceFingerprint } = req.body || {};
+    const { ticket, name, age, phone, email, deviceFingerprint } = req.body || {};
     if (!ticket) return res.status(400).json({ success: false, message: 'Thiếu phiên mạng xã hội' });
     const session = await freePortalSocial.completeProfile({
       token: String(ticket),
       name,
       age,
       phone,
+      email,
       fingerprint: deviceFingerprint,
     });
     return res.json({ success: true, data: session });
