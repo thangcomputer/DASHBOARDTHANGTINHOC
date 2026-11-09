@@ -725,50 +725,38 @@ const AppSidebar = ({
 
           if (isFree) {
             return (
-              <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1.5 transition hover:border-emerald-500/30">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
-                    <Sparkles size={13} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold text-emerald-100 leading-tight">
-                      Gói miễn phí
-                    </p>
-                    <p className="text-[10px] text-emerald-400/80 leading-tight">
-                      60 XP/ngày
-                    </p>
-                  </div>
+              <div title={shortLabel} className="mt-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1.5 transition hover:border-emerald-500/30">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[11px] font-bold text-emerald-100 leading-tight truncate">Gói miễn phí</p>
+                  <button
+                    type="button"
+                    onClick={studentSubscription.openRenew}
+                    className="shrink-0 rounded-md bg-emerald-600/90 hover:bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white transition cursor-pointer active:scale-95 !shadow-none"
+                  >
+                    Nâng cấp
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={studentSubscription.openRenew}
-                  className="shrink-0 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 px-2 py-1 text-[10px] font-bold tracking-wide text-white transition cursor-pointer active:scale-95 !shadow-none"
-                >
-                  Nâng cấp
-                </button>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Sparkles size={11} className="shrink-0 text-emerald-400/70" />
+                  <p className="text-[10px] text-emerald-400/80 leading-tight">60 XP/ngày</p>
+                </div>
               </div>
             );
           }
 
           if (isLifetime) {
             return (
-              <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 transition">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-400/20 text-amber-300">
-                    <Crown size={13} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold text-amber-100 leading-tight">
-                      Gói Vĩnh viễn
-                    </p>
-                    <p className="text-[10px] text-amber-300/80 leading-tight">
-                      Không giới hạn
-                    </p>
-                  </div>
+              <div title={shortLabel} className="mt-2.5 rounded-xl border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 transition">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[11px] font-bold text-amber-100 leading-tight truncate">Gói Vĩnh viễn</p>
+                  <span className="shrink-0 rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-amber-200">
+                    VĨNH VIỄN
+                  </span>
                 </div>
-                <span className="shrink-0 rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-amber-200">
-                  VĨNH VIỄN
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Crown size={11} className="shrink-0 text-amber-300/70" />
+                  <p className="text-[10px] text-amber-300/80 leading-tight">Không giới hạn</p>
+                </div>
               </div>
             );
           }
@@ -776,25 +764,19 @@ const AppSidebar = ({
           if (expiring) {
             return (
               <div title={shortLabel} className="mt-2.5 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-orange-400/25 text-orange-300">
-                    <CalendarClock size={13} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold text-orange-200 leading-tight">
-                      {sub.planLabel || 'Gói học'}
-                    </p>
-                    <p className="text-[10px] font-semibold text-orange-300/90 leading-tight">
-                      Còn {sub.daysLeft} ngày
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-[11px] font-bold text-orange-200 leading-tight truncate">Gói {sub.planLabel || 'học'}</p>
                   <button
                     type="button"
                     onClick={studentSubscription.openRenew}
-                    className="shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
+                    className="shrink-0 rounded-md bg-gradient-to-r from-orange-500 to-red-500 px-2 py-0.5 text-[10px] font-bold text-white transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
                   >
                     Gia hạn
                   </button>
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <CalendarClock size={11} className="shrink-0 text-orange-300/70" />
+                  <p className="text-[10px] font-semibold text-orange-300/90 leading-tight">Còn {sub.daysLeft} ngày</p>
                 </div>
               </div>
             );
@@ -802,25 +784,19 @@ const AppSidebar = ({
 
           return (
             <div title={shortLabel} className="mt-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
-                  <CalendarClock size={13} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-bold text-slate-100 leading-tight">
-                    {sub.planLabel || 'Gói học'}
-                  </p>
-                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight">
-                    Còn {sub.daysLeft} ngày
-                  </p>
-                </div>
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-[11px] font-bold text-slate-100 leading-tight truncate">Gói {sub.planLabel || 'học'}</p>
                 <button
                   type="button"
                   onClick={studentSubscription.openRenew}
-                  className="shrink-0 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition active:scale-95 !shadow-none cursor-pointer"
+                  className="shrink-0 rounded-md bg-emerald-600/90 hover:bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white transition active:scale-95 !shadow-none cursor-pointer"
                 >
                   Gia hạn
                 </button>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <CalendarClock size={11} className="shrink-0 text-emerald-400/70" />
+                <p className="text-[10px] font-semibold text-emerald-400 leading-tight">Còn {sub.daysLeft} ngày</p>
               </div>
             </div>
           );
