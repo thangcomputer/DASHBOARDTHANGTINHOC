@@ -15,7 +15,7 @@ import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../uti
 import { visibleInboxUnread } from '../lib/inboxUnread';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
 import FreeFeatureLock, { useFreePortalLock, useFreePortalMenu, FREE_HIDDEN_KEYS } from './student/dailyPractice/FreeFeatureLock';
-import { subscriptionShortLabel, formatExpiryDate } from '../utils/subscription';
+import { subscriptionShortLabel } from '../utils/subscription';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
@@ -343,8 +343,9 @@ const AppSidebar = ({
           } catch { /* ignore */ }
         }
 
-        // Teacher không có quyền /api/staff - chỉ thử khi admin/staff (tránh 403 ồn console)
-        if (!g && role !== 'student' && role !== 'teacher') {
+        // Chỉ thử /api/staff khi có quyền manage_staff hoặc super_admin (tránh 403 ồn console cho SUPPORT/staff thường)
+        const canManageStaff = adminRole === 'SUPER_ADMIN' || (Array.isArray(userPermissions) && userPermissions.includes('manage_staff'));
+        if (!g && role !== 'student' && role !== 'teacher' && canManageStaff) {
           try {
             const sRes = await api.staff.getAll();
             const list = Array.isArray(sRes?.data) ? sRes.data : [];
@@ -715,19 +716,57 @@ const AppSidebar = ({
         </div>
         {role === 'student' && studentSubscription?.subscription && (() => {
           const sub = studentSubscription.subscription;
-          const isLifetime = sub.state === 'lifetime';
+          const freePortalAccount = session?.freePortal === true;
+          const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || Boolean(sub.meetLifetime);
+          const isLifetime = sub.state === 'lifetime' && (Boolean(sub.meetLifetime) || !freePortalAccount);
+          const isFree = !hasActivePaid && !isLifetime;
           const expiring = sub.state === 'expiring';
+          const shortLabel = subscriptionShortLabel(sub, { freePortal: freePortalAccount });
+
+          if (isFree) {
+            return (
+              <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1.5 transition hover:border-emerald-500/30">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
+                    <Sparkles size={13} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-bold text-emerald-100 leading-tight">
+                      Gói miễn phí
+                    </p>
+                    <p className="text-[10px] text-emerald-400/80 leading-tight">
+                      60 XP/ngày
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={studentSubscription.openRenew}
+                  className="shrink-0 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 px-2 py-1 text-[10px] font-bold tracking-wide text-white transition cursor-pointer active:scale-95 !shadow-none"
+                >
+                  Nâng cấp
+                </button>
+              </div>
+            );
+          }
 
           if (isLifetime) {
             return (
-              <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 transition">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
-                  <Crown size={12} />
+              <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 transition">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-400/20 text-amber-300">
+                    <Crown size={13} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-bold text-amber-100 leading-tight">
+                      Gói Vĩnh viễn
+                    </p>
+                    <p className="text-[10px] text-amber-300/80 leading-tight">
+                      Không giới hạn
+                    </p>
+                  </div>
                 </div>
-                <span className="min-w-0 flex-1 truncate text-xs font-extrabold text-amber-100">
-                  {subscriptionShortLabel(sub)}
-                </span>
-                <span className="shrink-0 rounded bg-amber-400/25 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-amber-200">
+                <span className="shrink-0 rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-amber-200">
                   VĨNH VIỄN
                 </span>
               </div>
@@ -736,22 +775,24 @@ const AppSidebar = ({
 
           if (expiring) {
             return (
-              <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-400/25 text-orange-300">
-                  <CalendarClock size={12} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-extrabold text-orange-200 leading-tight">
-                    Còn {sub.daysLeft} ngày
-                  </p>
-                  <p className="text-[10px] font-semibold text-orange-300/80 leading-tight">
-                    Hạn: {formatExpiryDate(sub.expiresAt)}
-                  </p>
+              <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-orange-400/25 text-orange-300">
+                    <CalendarClock size={13} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-bold text-orange-200 leading-tight">
+                      {sub.planLabel ? `Gói ${sub.planLabel}` : 'Gói học'}
+                    </p>
+                    <p className="text-[10px] font-semibold text-orange-300/90 leading-tight">
+                      Còn {sub.daysLeft} ngày
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={studentSubscription.openRenew}
-                  className="shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-2.5 py-1 text-[10px] font-black text-white shadow-xs transition hover:brightness-110 active:scale-95 !shadow-none"
+                  className="shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
                 >
                   Gia hạn
                 </button>
@@ -760,22 +801,24 @@ const AppSidebar = ({
           }
 
           return (
-            <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-                <CalendarClock size={12} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-bold text-slate-200 leading-tight">
-                  Hạn: {formatExpiryDate(sub.expiresAt)}
-                </p>
-                <p className="text-[10px] font-semibold text-emerald-400 leading-tight">
-                  Còn {sub.daysLeft} ngày
-                </p>
+            <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                  <CalendarClock size={13} />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-bold text-slate-100 leading-tight">
+                    {sub.planLabel ? `Gói ${sub.planLabel}` : 'Gói học'}
+                  </p>
+                  <p className="text-[10px] font-semibold text-emerald-400 leading-tight">
+                    Còn {sub.daysLeft} ngày
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={studentSubscription.openRenew}
-                className="shrink-0 rounded-lg bg-red-600/90 hover:bg-red-500 px-2.5 py-1 text-[10px] font-black text-white shadow-xs transition active:scale-95 !shadow-none"
+                className="shrink-0 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition active:scale-95 !shadow-none cursor-pointer"
               >
                 Gia hạn
               </button>

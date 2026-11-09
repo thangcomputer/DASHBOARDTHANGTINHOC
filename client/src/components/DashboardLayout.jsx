@@ -1648,8 +1648,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   ]);
 
   useEffect(() => {
-    triggerBackgroundSync();
-  }, [triggerBackgroundSync]);
+    triggerBackgroundSync?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Deep-link hồ sơ HV từ chat (điểm danh bù…): hoạt động cả khi đang ở /admin/inbox (AdminDashboard chưa mount). */
   useEffect(() => {

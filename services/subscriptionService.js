@@ -68,10 +68,10 @@ function statusOf(student, now = new Date()) {
     const boughtLifetime = plan === 'lifetime' && Boolean(sub.activatedAt);
     const freeTier = student?.freePortal === true && !boughtLifetime;
     return {
-      plan: 'lifetime',
+      plan: freeTier ? 'free' : 'lifetime',
       planLabel: freeTier ? 'Miễn phí' : PLAN_LABELS.lifetime,
       expiresAt: null,
-      state: 'lifetime',
+      state: freeTier ? 'free' : 'lifetime',
       daysLeft: null,
       activated: student?.freePortal === true ? boughtLifetime : true,
       meetLifetime: student?.freePortal === true && boughtLifetime,
@@ -310,10 +310,24 @@ async function revokeCode(id) {
   return codeView(doc);
 }
 
+const DEFAULT_PLAN_PRICES = {
+  '1m': 199000,
+  '3m': 399000,
+  '6m': 699000,
+  '12m': 1199000,
+  lifetime: 1500000,
+};
+
 async function getPrices() {
   const settings = await SystemSettings.findOne({ _key: 'main' }).select('subscriptionPrices').lean();
   const raw = settings?.subscriptionPrices || {};
-  return Object.fromEntries(PLANS.map((plan) => [plan, Math.max(0, Number(raw[plan]) || 0)]));
+  return Object.fromEntries(
+    PLANS.map((plan) => {
+      const val = Number(raw[plan]);
+      const price = Number.isFinite(val) && val > 0 ? val : (DEFAULT_PLAN_PRICES[plan] || 0);
+      return [plan, price];
+    }),
+  );
 }
 
 async function setPrices(input = {}) {

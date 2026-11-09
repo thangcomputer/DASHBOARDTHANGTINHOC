@@ -66,11 +66,12 @@ export default function StudentProfileTab({
   const { onLogout } = useData();
   const subCtx = useStudentSubscription();
   const subscription = subCtx?.subscription;
-  const isLifetime = subscription?.state === 'lifetime';
   const freePortalAccount = (() => {
     try { return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true; } catch { return false; }
   })();
-  const freeTier = subscription?.freeTier === true || (freePortalAccount && isLifetime && !subscription?.meetLifetime);
+  const hasActivePaid = (subscription?.state === 'active' || subscription?.state === 'expiring') || Boolean(subscription?.meetLifetime);
+  const isLifetime = subscription?.state === 'lifetime' && (Boolean(subscription?.meetLifetime) || !freePortalAccount);
+  const freeTier = !hasActivePaid && !isLifetime;
   const history = subCtx?.overview?.history || [];
 
   const [openSections, setOpenSections] = useState({
@@ -598,23 +599,23 @@ export default function StudentProfileTab({
                 {planName}
               </h4>
               <p className="text-xs text-slate-500 truncate mt-0.5">
-                {isLifetime
-                  ? 'Không giới hạn thời gian'
-                  : freeTier
-                    ? '60 XP mỗi ngày'
+                {freeTier
+                  ? 'Gói miễn phí (60 XP mỗi ngày)'
+                  : isLifetime
+                    ? 'Không giới hạn thời gian'
                     : subscription
                       ? `Hạn: ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày`
                       : 'Kích hoạt hoặc gia hạn để học tiếp'}
               </p>
             </div>
           </div>
-          {!isLifetime && (
+          {(!isLifetime || freeTier) && (
             <button
               type="button"
               onClick={subCtx?.openRenew || (() => setShowTuitionModal(true))}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-xs whitespace-nowrap transition-colors cursor-pointer shrink-0"
             >
-              Gia hạn
+              {freeTier ? 'Nâng cấp gói' : 'Gia hạn'}
             </button>
           )}
         </div>
@@ -631,7 +632,7 @@ export default function StudentProfileTab({
                 <div key={idx} className="pt-2 flex items-center justify-between text-xs">
                   <div className="min-w-0 flex-1 pr-2">
                     <p className="font-semibold text-slate-700 truncate">
-                      Thanh toán · {h.planLabel || h.planId || 'Gói học'} {h.amount ? `· ${formatVnd(h.amount)}đ` : ''}
+                      Thanh toán · {h.planLabel || h.planId || 'Gói học'} {h.amount ? `· ${formatVnd(h.amount)}` : ''}
                     </p>
                   </div>
                   <span className="text-slate-400 font-mono shrink-0">

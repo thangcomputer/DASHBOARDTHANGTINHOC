@@ -172,7 +172,9 @@ export function SubscriptionStatusCard({
   if (!subscription) return null;
   const sub = subscription.subscription;
   const expiring = sub.state === 'expiring';
-  const isLifetime = sub.state === 'lifetime';
+  const hasActivePaid = (sub.state === 'active' || sub.state === 'expiring') || Boolean(sub.meetLifetime);
+  const isLifetime = sub.state === 'lifetime' && Boolean(sub.meetLifetime);
+  const isFree = !hasActivePaid && !isLifetime;
   const isDrawer = variant === 'drawer';
 
   if (isDrawer) {
@@ -232,7 +234,7 @@ export function SubscriptionStatusCard({
               accessibilityRole="button"
               accessibilityLabel="Gia hạn tài khoản"
             >
-              <Text style={styles.drawerRenewBtnText}>Gia hạn</Text>
+              <Text style={styles.drawerRenewBtnText}>{isFree ? 'Nâng cấp' : 'Gia hạn'}</Text>
             </Pressable>
           )}
         </View>

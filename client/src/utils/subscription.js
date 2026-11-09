@@ -22,14 +22,15 @@ export function formatExpiryDate(iso) {
 export function subscriptionShortLabel(subscription, options = {}) {
   if (!subscription) return '';
   const freePortal = options.freePortal === true;
-  if (subscription.freeTier || (freePortal && subscription.state === 'lifetime' && !subscription.meetLifetime)) {
+  const hasActivePaid = subscription.state === 'active' || subscription.state === 'expiring' || Boolean(subscription.meetLifetime);
+  if (!hasActivePaid && (subscription.freeTier || subscription.state === 'free' || (freePortal && !subscription.meetLifetime))) {
     return 'Gói miễn phí';
   }
   if (subscription.state === 'lifetime') return 'Gói Vĩnh viễn';
   if (subscription.state === 'expired') {
     return subscription.activated ? `Đã hết hạn ${formatExpiryDate(subscription.expiresAt)}` : 'Chưa kích hoạt';
   }
-  return `Hạn: ${formatExpiryDate(subscription.expiresAt)} · còn ${subscription.daysLeft} ngày`;
+  return `Gói ${subscription.planLabel || ''} · còn ${subscription.daysLeft} ngày`;
 }
 
 /** Chuẩn hóa mã người dùng gõ: bỏ khoảng trắng/gạch, viết hoa, thêm gạch theo dạng TTH-XXXX-XXXX. */
@@ -56,7 +57,7 @@ export function reminderMilestoneKey(subscription) {
 /** Khớp server `hasMeetAccess`: cổng miễn phí đã mua gói Meet còn hạn. */
 export function hasMeetAccessClient(subscription) {
   if (!subscription) return false;
-  if (subscription.state === 'expired' || subscription.freeTier) return false;
+  if (subscription.state === 'expired' || subscription.freeTier || subscription.state === 'free') return false;
   return Boolean(subscription.meetLifetime || subscription.state === 'active' || subscription.state === 'expiring');
 }
 

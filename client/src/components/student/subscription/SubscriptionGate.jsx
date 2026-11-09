@@ -159,7 +159,13 @@ export default function SubscriptionGate({ session, children }) {
     if (!isStudent) return undefined;
     const onExpired = () => refresh();
     window.addEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
-    return () => window.removeEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
+    window.addEventListener('free-portal-unlocked', onExpired);
+    window.addEventListener('cms:subscription-updated', onExpired);
+    return () => {
+      window.removeEventListener(SUBSCRIPTION_EXPIRED_EVENT, onExpired);
+      window.removeEventListener('free-portal-unlocked', onExpired);
+      window.removeEventListener('cms:subscription-updated', onExpired);
+    };
   }, [isStudent, refresh]);
 
   const onRenewed = useCallback(() => {
