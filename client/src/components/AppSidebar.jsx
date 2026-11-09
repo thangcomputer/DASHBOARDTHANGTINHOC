@@ -775,53 +775,53 @@ const AppSidebar = ({
 
           if (expiring) {
             return (
-              <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
-                <div className="flex min-w-0 items-center gap-2">
+              <div title={shortLabel} className="mt-2.5 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
+                <div className="flex items-center gap-2">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-orange-400/25 text-orange-300">
                     <CalendarClock size={13} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold text-orange-200 leading-tight">
-                      {sub.planLabel ? `Gói ${sub.planLabel}` : 'Gói học'}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold text-orange-200 leading-tight">
+                      {sub.planLabel || 'Gói học'}
                     </p>
                     <p className="text-[10px] font-semibold text-orange-300/90 leading-tight">
                       Còn {sub.daysLeft} ngày
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={studentSubscription.openRenew}
+                    className="shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
+                  >
+                    Gia hạn
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={studentSubscription.openRenew}
-                  className="shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition hover:brightness-110 active:scale-95 !shadow-none cursor-pointer"
-                >
-                  Gia hạn
-                </button>
               </div>
             );
           }
 
           return (
-            <div title={shortLabel} className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
-              <div className="flex min-w-0 items-center gap-2">
+            <div title={shortLabel} className="mt-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
+              <div className="flex items-center gap-2">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
                   <CalendarClock size={13} />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] font-bold text-slate-100 leading-tight">
-                    {sub.planLabel ? `Gói ${sub.planLabel}` : 'Gói học'}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-slate-100 leading-tight">
+                    {sub.planLabel || 'Gói học'}
                   </p>
                   <p className="text-[10px] font-semibold text-emerald-400 leading-tight">
                     Còn {sub.daysLeft} ngày
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={studentSubscription.openRenew}
+                  className="shrink-0 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition active:scale-95 !shadow-none cursor-pointer"
+                >
+                  Gia hạn
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={studentSubscription.openRenew}
-                className="shrink-0 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white shadow-xs transition active:scale-95 !shadow-none cursor-pointer"
-              >
-                Gia hạn
-              </button>
             </div>
           );
         })()}

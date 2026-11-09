@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Check, ChevronLeft, ChevronRight, Flame, Gamepad2,
+  Check, ChevronLeft, ChevronRight, Crown, Flame, Gamepad2,
   Lock, Medal, PlayCircle, Sparkles, Target, Trophy,
 } from 'lucide-react';
 import { apiFetch, resolveMediaUrl } from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
+import { useStudentSubscription } from './subscription/subscriptionContext';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
   STUDY_MINUTE_EVENT,
@@ -39,6 +40,7 @@ function pct(v, t) { return !t ? 0 : Math.min(100, Math.round(((v || 0) / t) * 1
 /* ─── main component ─────────────────────────────────────── */
 export default function LmsGoalMergedCard() {
   const navigate = useNavigate();
+  const subCtx = useStudentSubscription();
 
   /* LMS */
   const [lms, setLms] = useState(null);
@@ -192,7 +194,7 @@ export default function LmsGoalMergedCard() {
               openVideo={openVideo}
             />
           )}
-          {tab === 'history' && <HistoryList rows={lms?.history || []} />}
+          {tab === 'history' && <HistoryList rows={lms?.history || []} subHistory={subCtx?.overview?.history || []} />}
           {tab === 'badges' && <BadgeGrid badges={lms?.badges || []} />}
           {tab === 'rank' && <RankList board={board} period={period} onPeriod={setPeriod} />}
         </div>
@@ -332,14 +334,41 @@ function GoalContent({
 }
 
 /* ── Sub-components ─────────────────────────────────────────── */
-function HistoryList({ rows }) {
-  if (!rows.length) return <p className="py-3 text-center text-xs text-slate-400">Chưa có XP học bài.</p>;
+function formatVndCompact(n) {
+  if (!n) return '';
+  return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+}
+
+function HistoryList({ rows, subHistory = [] }) {
+  // Merge XP rows + subscription purchases into one timeline
+  const merged = [];
+  for (const r of rows) {
+    merged.push({ kind: 'xp', id: r.id, label: r.label, amount: r.amount, at: r.at });
+  }
+  for (const h of subHistory) {
+    merged.push({
+      kind: 'sub',
+      id: h.id || `sub-${h.createdAt}`,
+      label: `Mua gói ${h.planLabel || h.plan || ''}`.trim(),
+      amount: h.amount || 0,
+      at: h.createdAt,
+    });
+  }
+  // Sort newest first
+  merged.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+
+  if (!merged.length) return <p className="py-3 text-center text-xs text-slate-400">Chưa có lịch sử.</p>;
   return (
     <ul className="divide-y divide-slate-50">
-      {rows.slice(0, 8).map(r => (
+      {merged.slice(0, 10).map(r => (
         <li key={r.id} className="flex items-center gap-2 py-1.5 text-xs">
+          {r.kind === 'sub' && <Crown size={12} className="shrink-0 text-amber-500" />}
           <span className="flex-1 truncate font-semibold text-slate-700">{r.label}</span>
-          <span className="shrink-0 font-black text-emerald-700">+{r.amount}</span>
+          {r.kind === 'xp' ? (
+            <span className="shrink-0 font-black text-emerald-700">+{r.amount}</span>
+          ) : (
+            <span className="shrink-0 font-bold text-amber-600">{r.amount ? formatVndCompact(r.amount) : ''}</span>
+          )}
           <span className="shrink-0 text-slate-400">{formatWhen(r.at)}</span>
         </li>
       ))}
