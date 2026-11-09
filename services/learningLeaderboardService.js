@@ -35,8 +35,7 @@ function shortName(fullName) {
   const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 2) return parts.join(' ') || 'Học viên';
   const middle = parts.slice(1, -1).map((part) => `${part[0].toUpperCase()}.`).join(' ');
-  return `${parts[0]} ${middle} ${parts[parts.length - 1]
-    } `;
+  return `${parts[0]} ${middle} ${parts[parts.length - 1]}`;
 }
 
 function scoreRow(goal, logs) {

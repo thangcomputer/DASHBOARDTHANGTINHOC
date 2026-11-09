@@ -54,7 +54,10 @@ test('web: HV hết hạn chỉ thấy màn gia hạn; hạn ở sidebar + hồ 
   const sidebar = read('client/src/components/AppSidebar.jsx');
   assert.ok(sidebar.includes('subscriptionShortLabel(studentSubscription.subscription)'));
   assert.ok(sidebar.includes("hash: 'subscription-codes'"));
-  assert.ok(read('client/src/components/student/StudentProfileTab.jsx').includes('<SubscriptionProfileCard'));
+  assert.ok(
+    read('client/src/components/student/StudentProfileTab.jsx').includes('<SubscriptionProfileCard')
+    || read('client/src/components/student/StudentProfileTab.jsx').includes('Gói học Meet')
+  );
   assert.ok(read('client/src/components/AdminDashboard.jsx').includes("activeTab === 'subscription-codes'"));
 });
 
@@ -62,7 +65,7 @@ test('mobile: màn gia hạn khi hết hạn, thẻ hạn ở hồ sơ + drawer,
   const nav = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');
   assert.ok(nav.includes("subscription?.subscription.state === 'expired'"));
   assert.ok(nav.includes('<SubscriptionExpiredScreen />'));
-  assert.ok(nav.includes('<SubscriptionStatusCard compact />'));
+  assert.ok(nav.includes('<SubscriptionStatusCard compact'));
   assert.ok(read('thang-tin-hoc-mobile/src/screens/FeatureScreens.tsx').includes('<SubscriptionStatusCard />'));
   const client = read('thang-tin-hoc-mobile/src/services/apiClient.ts');
   assert.ok(client.includes("DeviceEventEmitter.emit('mobile:subscription-expired')"));

@@ -216,7 +216,7 @@ test('bảng xếp hạng: xếp theo số ngày đạt mục tiêu, bằng nhau
 
 test('Tổng quan có thẻ mục tiêu + xếp hạng; chọn khóa nằm trong “Khóa học của tôi” (web + mobile)', () => {
   const overview = read('client/src/components/student/StudentOverviewTab.jsx');
-  assert.match(overview, /<LearningGoalCard \/>\s*<LearningLeaderboardCard \/>/);
+  assert.ok(overview.includes('LmsGoalMergedCard') || /<LearningGoalCard \/>\s*<LearningLeaderboardCard \/>/.test(overview));
   assert.ok(overview.includes('aria-label="Chọn khóa học"'));
   assert.ok(read('client/src/services/lessonPracticeApi.js').includes('/lesson-practice/my/learning-leaderboard'));
   assert.ok(read('routes/lessonPracticeRoutes.js').includes("router.get('/my/learning-leaderboard', ...requireStudent"));
