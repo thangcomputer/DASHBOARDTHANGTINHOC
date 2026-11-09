@@ -404,7 +404,7 @@ function MessageBubble({
           <p className={`mt-1 px-1 text-[10px] font-semibold ${Number(m.aiImageRemaining) <= 0 ? 'text-amber-700' : 'text-slate-500'
             }`}>
             {Number(m.aiImageRemaining) <= 0
-              ? 'Đã hết lượt gửi ảnh hôm nay — ngày mai gửi tiếp nhé.'
+              ? 'Đã hết lượt gửi ảnh hôm nay - ngày mai gửi tiếp nhé.'
               : `Còn ${Number(m.aiImageRemaining)} ảnh hôm nay`}
           </p>
         ) : null}
@@ -623,8 +623,8 @@ function ChatWindow({
       text = 'Đã kết nối nhân viên hỗ trợ';
     } else if (aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT) {
       text = supportOnline
-        ? 'Đã gửi yêu cầu hỗ trợ — nhân viên sẽ tiếp nhận tại đây.'
-        : 'Đã gửi yêu cầu. Chưa có nhân viên trực tuyến — bạn cứ nhắn tiếp.';
+        ? 'Đã gửi yêu cầu hỗ trợ - nhân viên sẽ tiếp nhận tại đây.'
+        : 'Đã gửi yêu cầu. Chưa có nhân viên trực tuyến - bạn cứ nhắn tiếp.';
     }
     if (!text) {
       setStatusFlash('');
@@ -972,25 +972,25 @@ function ChatWindow({
               <span className="w-9 h-9 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500 to-red-700 text-white ring-1 ring-red-200">
                 <Users size={19} strokeWidth={2.4} />
               </span>
+            ) : isAiPeer ? (
+              <span className="w-9 h-9 rounded-full flex items-center justify-center bg-emerald-600 text-white ring-1 ring-emerald-200 shadow-sm">
+                <Bot size={20} strokeWidth={2.3} />
+              </span>
             ) : (
               <AvatarImage
                 user={{ ...tab.user, role: tab.user.role === 'admin' && !isSuper ? 'staff' : tab.user.role, name: displayName }}
                 className={`w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 ${isRealAvatar(tab.user?.avatar) ? 'cms-fm-avatar--photo' : ''}`}
               />
             )}
-            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+            <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${isOnline || isAiPeer ? 'bg-emerald-500' : 'bg-slate-300'}`} />
           </span>
           <div className="min-w-0">
-            <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">{displayName}</p>
+            <p className="text-[13px] font-bold text-slate-900 truncate leading-tight">
+              {isAiPeer ? 'Trợ lý AI' : displayName}
+            </p>
             <p className={`text-[10px] font-semibold ${isOnline || isAiPeer ? 'text-emerald-600' : 'text-slate-400'}`}>
               {isAiPeer
-                ? (aiStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
-                  ? 'Nhân viên hỗ trợ · Đã kết nối'
-                  : aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
-                    ? 'Đang kết nối nhân viên hỗ trợ'
-                    : aiStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
-                      ? 'Đã xử lý'
-                      : 'Trợ lý AI · Luôn sẵn sàng')
+                ? 'Đang trực tuyến'
                 : `${displayRoleLabel} · ${isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}`}
             </p>
           </div>
@@ -1048,8 +1048,8 @@ function ChatWindow({
       </div>
       {isAiPeer && statusFlash ? (
         <p className={`shrink-0 px-3 py-1.5 text-[10px] font-semibold text-center leading-snug border-b animate-in fade-in duration-200 ${aiStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
-            ? 'border-amber-100 bg-amber-50 text-amber-800'
-            : 'border-emerald-100 bg-emerald-50 text-emerald-800'
+          ? 'border-amber-100 bg-amber-50 text-amber-800'
+          : 'border-emerald-100 bg-emerald-50 text-emerald-800'
           }`}>
           {statusFlash}
         </p>
@@ -1103,13 +1103,13 @@ function ChatWindow({
           messageSearchQuery ? (
             <p className="text-center text-[12px] text-slate-500 py-8">Không tìm thấy tin nhắn phù hợp.</p>
           ) : (
-          fullPage ? null : (
-            <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
-              {isAiPeer
-                ? 'Hỏi Trợ lý AI về tin học, Office, MOS, LMS…'
-                : `Chat với ${tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.`}
-            </p>
-          )
+            fullPage ? null : (
+              <p className="text-center text-[12px] text-slate-400 py-8 px-3 font-medium">
+                {isAiPeer
+                  ? 'Hỏi Trợ lý AI về tin học, Office, MOS, LMS…'
+                  : `Chat với ${tab.user.name}. Có thể gửi ảnh, dán ảnh màn hình hoặc dán link.`}
+              </p>
+            )
           )
         ) : (
           visibleMessages.map((m, idx) => {
@@ -1253,7 +1253,7 @@ function ChatWindow({
           {aiStatus === AI_SUPPORT_STATUS.AI_ACTIVE && !peerTyping && !questionBlocked ? (
             <div className="space-y-1.5">
 
-              {/* Bước 0: Lần 1 — đồng ý / không — chỉ hiện khi có AI reply và canShowEscalate */}
+              {/* Bước 0: Lần 1 - đồng ý / không - chỉ hiện khi có AI reply và canShowEscalate */}
               {(!feedbackPhase || feedbackPhase === 'agree') && canShowEscalate ? (
                 <>
                   <p className="text-[11px] text-slate-500 text-center font-semibold">Bạn đồng ý câu trả lời này không?</p>
@@ -1298,7 +1298,7 @@ function ChatWindow({
                 </p>
               ) : null}
 
-              {/* Bước 3: Lần 2 — đồng ý kết quả tiếp theo không? */}
+              {/* Bước 3: Lần 2 - đồng ý kết quả tiếp theo không? */}
               {feedbackPhase === 'disagree2' ? (
                 <>
                   <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn có đồng ý với kết quả tiếp theo này không?</p>
@@ -1315,7 +1315,7 @@ function ChatWindow({
                 </>
               ) : null}
 
-              {/* Bước 4: Lựa chọn cuối — giải thích thêm hay gặp nhân viên */}
+              {/* Bước 4: Lựa chọn cuối - giải thích thêm hay gặp nhân viên */}
               {feedbackPhase === 'final_choice' ? (
                 <>
                   <p className="text-[11px] text-slate-600 text-center font-semibold">Bạn muốn?</p>
@@ -1427,7 +1427,7 @@ function ChatWindow({
                   if (imageBlocked) return;
                   imageRef.current?.click();
                 }}
-                title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay — ngày mai gửi tiếp` : 'Đính kèm ảnh'}
+                title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay - ngày mai gửi tiếp` : 'Đính kèm ảnh'}
                 aria-label={imageBlocked ? 'Hết lượt gửi ảnh hôm nay' : 'Đính kèm ảnh'}
               >
                 <ImagePlus size={16} />
@@ -1437,7 +1437,7 @@ function ChatWindow({
                 disabled={uploading || imageBlocked || questionBlocked}
                 buttonClassName="cms-fm-attach"
                 className="cms-fm-capture-control"
-                title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay — ngày mai gửi tiếp` : 'Chụp màn hình'}
+                title={imageBlocked ? `Hết ${imageLimit} ảnh hôm nay - ngày mai gửi tiếp` : 'Chụp màn hình'}
                 onCaptured={(file) => stageImage(file)}
                 onError={(msg) => toast.error(msg)}
               />
@@ -1563,7 +1563,7 @@ export default function FloatingMessenger({ session, role }) {
   const usePresenceDirectory = isElevatedPresenceDirectoryViewer(session);
 
   // Elevated + non-elevated: GET /contacts is the authorization source.
-  // Presence only overlays online — never fall back to local staffs[] for WHO.
+  // Presence only overlays online - never fall back to local staffs[] for WHO.
   const [fmContacts, setFmContacts] = useState([]);
   useEffect(() => {
     if (freePortalApiLocked) {
@@ -1589,7 +1589,7 @@ export default function FloatingMessenger({ session, role }) {
   const conversations = useMemo(() => {
     const raw = meId ? (getConversations(meId) || []) : [];
     if (!isTrueSuperAdmin) return raw;
-    // SUPER: chỉ HIGH_ADMIN từ contacts — không hiện group / HV / GV / staff activity
+    // SUPER: chỉ HIGH_ADMIN từ contacts - không hiện group / HV / GV / staff activity
     const allowed = new Set((fmContacts || []).map((c) => String(c.id)));
     return raw.filter((c) => {
       if (!c || c.isGroup) return false;
@@ -1909,7 +1909,7 @@ export default function FloatingMessenger({ session, role }) {
       if (!res?.success) throw new Error(res?.message || 'Không bật lại được Trợ lý AI');
       setAiStatusMap((prev) => ({ ...prev, [tab.id]: AI_SUPPORT_STATUS.AI_ACTIVE }));
       setAiFeedback((prev) => ({ ...prev, [tab.id]: { phase: 'idle', replyId: prev[tab.id]?.replyId || '' } }));
-      toast.success('Trợ lý AI đã sẵn sàng — bạn có thể hỏi tiếp');
+      toast.success('Trợ lý AI đã sẵn sàng - bạn có thể hỏi tiếp');
     } catch (err) {
       toast.error(err.message || 'Không bật lại được Trợ lý AI');
     } finally {
@@ -2162,7 +2162,7 @@ export default function FloatingMessenger({ session, role }) {
   const sendAiMessage = useCallback(async (tab, text) => {
     if (!tab?.id || !text) return;
     if (sendingMap[tab.id]) return;
-    // KHÔNG reset phase ở đây — phase đã được set trước khi gọi hàm này
+    // KHÔNG reset phase ở đây - phase đã được set trước khi gọi hàm này
     // useEffect sẽ chuyển phase khi AI trả lời xong
     setSendingMap((prev) => ({ ...prev, [tab.id]: true }));
     try {
@@ -2219,11 +2219,28 @@ export default function FloatingMessenger({ session, role }) {
     } catch { /* ignore */ }
   }, [sendAiMessage]);
 
-  /** Gặp nhân viên trực tiếp → escalate */
+  /** Gặp nhân viên trực tiếp → chuyển ngay sang cuộc trò chuyện với nhân viên */
   const handleFinalStaff = useCallback(async (tab) => {
     if (!tab?.id) return;
-    await handleEscalate(tab);
-  }, [handleEscalate]);
+    void aiSupportAPI.escalate(tab.id).catch(() => null);
+    const onlineIds = new Set((onlineUsers || []).map((user) => String(user.userId || user.id || '')));
+    const supportContact = fmContacts
+      .filter((contact) => (
+        String(contact?.productRole || '').toUpperCase() === 'SUPPORT'
+        || String(contact?.adminRole || '').toUpperCase() === 'SUPPORT'
+        || String(contact?.role || '').toLowerCase() === 'support'
+        || String(contact?.role || '').toLowerCase() === 'admin'
+        || String(contact?.role || '').toLowerCase() === 'staff'
+      ))
+      .sort((a, b) => Number(onlineIds.has(String(b.id || ''))) - Number(onlineIds.has(String(a.id || '')))
+        || String(a.name || '').localeCompare(String(b.name || ''), 'vi'))[0];
+    if (supportContact) {
+      closeChat(tab.id);
+      openChat(supportContact, { expand: true });
+    } else {
+      await handleEscalate(tab);
+    }
+  }, [closeChat, fmContacts, handleEscalate, onlineUsers, openChat]);
 
   const handleSupportPageClose = (convId) => {
     closeChat(convId);
@@ -2407,7 +2424,7 @@ export default function FloatingMessenger({ session, role }) {
     }
   };
 
-  /** Gửi lại ảnh đã có (Hỏi lại) — không upload mới, không trừ thêm quota ảnh. */
+  /** Gửi lại ảnh đã có (Hỏi lại) - không upload mới, không trừ thêm quota ảnh. */
   const handleSendExistingImage = async (tab, fileUrl, caption = '', fileName = '') => {
     const url = String(fileUrl || '').trim();
     if (!url) return false;
@@ -2610,7 +2627,7 @@ export default function FloatingMessenger({ session, role }) {
       )}
 
       <div className="cms-fm-dock">
-        {/* Panel danh bạ nhân viên — HV/GV chỉ sau escalate AI */}
+        {/* Panel danh bạ nhân viên - HV/GV chỉ sau escalate AI */}
         {showHumanSupportPanel ? (
           <div className="cms-fm-support">
             <div className="cms-fm-support__head">
@@ -2751,7 +2768,7 @@ export default function FloatingMessenger({ session, role }) {
           </div>
         ) : null}
 
-        {/* FAB — HV/GV: mở Trợ lý AI trước; sau escalate mới mở danh bạ SUPPORT */}
+        {/* FAB - HV/GV: mở Trợ lý AI trước; sau escalate mới mở danh bạ SUPPORT */}
         {!openWindow && !fabExpanded && !isInbox && !isSuper && (meRole === 'student' || meRole === 'teacher' || meRole === 'staff') && (
           <div
             ref={supportFabRef}

@@ -1,5 +1,5 @@
 /**
- * Phase 7.7 — Controlled cutover + production activation for /api/system-logs
+ * Phase 7.7 - Controlled cutover + production activation for /api/system-logs
  * (alongside backups, monitoring, tenants Policy-primary).
  *
  * Legacy gate: auth + isAdmin (role admin|staff). VIEW_LOGS unused for HTTP.
@@ -56,10 +56,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -190,7 +190,7 @@ test('Phase7.7 all three actions resolve POLICY under production allowlist', asy
 // ── 6–12 Role parity (MATCH Legacy isAdmin) ──────────────────────────────────
 
 test('Phase7.7 role parity: SUPER/HIGH/STAFF/SUPPORT ALLOW; teacher/student/unauth DENY', () => {
-  // Legacy isAdmin: role admin|staff — adminRole does not deny when role matches
+  // Legacy isAdmin: role admin|staff - adminRole does not deny when role matches
   const matrix = [
     [{ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' }, 'ALLOW'],
     [{ role: 'admin', adminRole: 'HIGH_ADMIN' }, 'ALLOW'],
@@ -337,10 +337,10 @@ test('Phase7.7 rollback TESTED AND RESTORED: OFF / remove system-logs → LEGACY
   if (parsed) assert.equal(parsed.POLICY_CUTOVER_ENABLED, 'true');
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('backups'));
-      assert.ok(restoredRoutes.includes('monitoring'));
-      assert.ok(restoredRoutes.includes('tenants'));
-      assert.ok(restoredRoutes.includes('system-logs'));
+    assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('monitoring'));
+    assert.ok(restoredRoutes.includes('tenants'));
+    assert.ok(restoredRoutes.includes('system-logs'));
   }
 });
 
@@ -350,8 +350,8 @@ test('Phase7.7 functional smoke: GET list authz PASS; POST/DELETE mutations NOT 
   assert.equal(parity('create', staff).policy.decision, 'ALLOW');
   assert.equal(parity('delete', staff).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — destructive/persistent production mutation',
-    'NOT EXECUTED — destructive/persistent production mutation',
+    'NOT EXECUTED - destructive/persistent production mutation',
+    'NOT EXECUTED - destructive/persistent production mutation',
   );
 });
 
@@ -375,7 +375,7 @@ test('Phase7.7 static: wiring + isolation + CQRS OFF + no Policy side effects + 
   if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 
   for (const a of ACTIONS) {
     assert.ok(routes.includes(`guard('${a}')`), a);

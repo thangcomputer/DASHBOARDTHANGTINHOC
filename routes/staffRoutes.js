@@ -1,11 +1,11 @@
 /**
- * staffRoutes.js — Quản lý tài khoản nội bộ (Admin / Staff) CRUD
+ * staffRoutes.js - Quản lý tài khoản nội bộ (Admin / Staff) CRUD
  * Thêm: validate branchId tồn tại trong Branches, auto-fill branchCode
  */
 const express = require('express');
-const bcrypt  = require('bcryptjs');
+const bcrypt = require('bcryptjs');
 const Teacher = require('../models/Teacher');
-const Branch  = require('../models/Branch');
+const Branch = require('../models/Branch');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowStaff } = require('../middleware/policyShadowStaff');
 const { staffCutoverGate } = require('../middleware/staffCutoverGate');
@@ -18,7 +18,7 @@ const { assertUniqueContact } = require('../utils/uniqueContact');
 
 const router = express.Router();
 /**
- * Phase 7.28 — Controlled cutover for LIVE /api/staff ONLY.
+ * Phase 7.28 - Controlled cutover for LIVE /api/staff ONLY.
  *
  * Flow: auth → policyShadowStaff → staffCutoverGate → handler
  * Legacy manage_staff permission gate retained inside staffCutoverGate.
@@ -117,13 +117,13 @@ router.post('/', guard('create'), async (req, res) => {
 
     const newStaff = await Teacher.create({
       name, phone: canonicalPhone, password,
-      role:        resolvedRole,
+      role: resolvedRole,
       adminRole,
       permissions: safePermissions,
-      branchId:    (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? null : (branchId  || null),
-      branchCode:  (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? ''   : branchCode,
-      status:    'active',
-      gender:    gender || 'male',
+      branchId: (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? null : (branchId || null),
+      branchCode: (adminRole === 'SUPER_ADMIN' || adminRole === 'HIGH_ADMIN' || adminRole === 'SUPPORT') ? '' : branchCode,
+      status: 'active',
+      gender: gender || 'male',
       approvedBy: req.user?.name || 'Admin',
       approvedAt: new Date(),
       teacherCode: await generateTeacherCode(),
@@ -166,7 +166,7 @@ router.put('/:id', guard('update'), async (req, res) => {
     const { name, adminRole, permissions = [], status, password, branchId, gender, phone } = req.body;
     const updates = {};
 
-    if (name)   updates.name   = name;
+    if (name) updates.name = name;
     if (status) updates.status = status;
     if (gender) updates.gender = gender;
 
@@ -212,33 +212,33 @@ router.put('/:id', guard('update'), async (req, res) => {
 
       updates.adminRole = adminRole;
       if (adminRole === 'SUPER_ADMIN') {
-        updates.role        = 'admin';
+        updates.role = 'admin';
         updates.permissions = [];
-        updates.branchId    = null;
-        updates.branchCode  = '';
+        updates.branchId = null;
+        updates.branchCode = '';
       } else if (adminRole === 'HIGH_ADMIN') {
-        updates.role        = 'admin';
+        updates.role = 'admin';
         const perms = await sanitizeAssignedPermissions(req, permissions);
         updates.permissions = perms.length ? perms : [...HIGH_ADMIN_DEFAULT_PERMISSIONS];
-        updates.branchId    = null;
-        updates.branchCode  = '';
+        updates.branchId = null;
+        updates.branchCode = '';
       } else if (adminRole === 'SUPPORT') {
-        updates.role        = 'staff';
+        updates.role = 'staff';
         const perms = await sanitizeAssignedPermissions(req, permissions);
         updates.permissions = perms.length ? perms : [...SUPPORT_DEFAULT_PERMISSIONS];
-        updates.branchId    = null;
-        updates.branchCode  = '';
+        updates.branchId = null;
+        updates.branchCode = '';
       } else {
-        updates.role        = 'staff';
+        updates.role = 'staff';
         updates.permissions = await sanitizeAssignedPermissions(req, permissions);
         if (branchId) {
           const branch = await Branch.findById(branchId);
           if (!branch)
             return res.status(400).json({ success: false, message: 'Chi nhánh không hợp lệ' });
-          updates.branchId   = branchId;
+          updates.branchId = branchId;
           updates.branchCode = branch.code || '';
         } else if (branchId === null || branchId === '') {
-          updates.branchId   = null;
+          updates.branchId = null;
           updates.branchCode = '';
         }
       }
@@ -247,7 +247,7 @@ router.put('/:id', guard('update'), async (req, res) => {
       if (branchId) {
         const branch = await Branch.findById(branchId);
         if (branch) {
-          updates.branchId   = branchId;
+          updates.branchId = branchId;
           updates.branchCode = branch.code || '';
         }
       }

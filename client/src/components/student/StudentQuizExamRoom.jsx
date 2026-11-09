@@ -9,7 +9,7 @@ import { useToast } from '../../utils/useToast';
 import { useData } from '../../context/DataContext';
 import ExamClickOutsideGuard from '../exam/ExamClickOutsideGuard';
 
-/** Lớp phủ toàn app — che sidebar/header/messenger */
+/** Lớp phủ toàn app - che sidebar/header/messenger */
 function ExamOverlay({ children }) {
   if (typeof document === 'undefined') return children;
   return createPortal(
@@ -42,6 +42,16 @@ async function leaveBrowserFullscreen() {
       await document.exitFullscreen();
     }
   } catch { /* ignore */ }
+}
+
+function shuffleList(list) {
+  if (!Array.isArray(list)) return [];
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 export default function StudentQuizExamRoom({ quizId, onBack }) {
@@ -134,7 +144,9 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
           await tryPendingForfeit();
           return;
         }
-        setQuizData(res.data);
+        const questionsWithIndex = (res.data.questions || []).map((q, idx) => ({ ...q, originalIndex: idx }));
+        const shuffledQuestions = res.data.mySubmission ? questionsWithIndex : shuffleList(questionsWithIndex);
+        setQuizData({ ...res.data, questions: shuffledQuestions });
         setTimeLeft((res.data.timeLimitMinutes || 15) * 60);
 
         if (res.data.mySubmission) {
@@ -191,9 +203,11 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
 
     const questions = quizDataRef.current.questions || [];
     const answersMap = selectedAnswersRef.current;
-    const answerArray = questions.map((_, idx) => (
-      answersMap[idx] !== undefined ? answersMap[idx] : null
-    ));
+    const answerArray = new Array(questions.length).fill(null);
+    questions.forEach((q, displayIdx) => {
+      const origIdx = q.originalIndex !== undefined ? q.originalIndex : displayIdx;
+      answerArray[origIdx] = answersMap[displayIdx] !== undefined ? answersMap[displayIdx] : null;
+    });
 
     try {
       const res = await api.quizzes.submit(quizId, answerArray);
@@ -247,7 +261,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
     if (resultData) leaveBrowserFullscreen();
   }, [resultData]);
 
-  // Reload / đóng tab vẫn cảnh báo + ghi rớt (không bắt F5/Back browser — chỉ nút ← trong phòng thi)
+  // Reload / đóng tab vẫn cảnh báo + ghi rớt (không bắt F5/Back browser - chỉ nút ← trong phòng thi)
   useEffect(() => {
     const inExam = () => Boolean(quizDataRef.current && !resultDataRef.current && !loading);
 
@@ -353,7 +367,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                 <Award size={40} />
               </div>
               <h1 className="text-2xl sm:text-3xl font-black mb-1">{quizData?.title || 'Bài trắc nghiệm'}</h1>
-              <p className="text-xs text-slate-400 mb-6">Giảng viên: {quizData?.teacherName || '—'}</p>
+              <p className="text-xs text-slate-400 mb-6">Giảng viên: {quizData?.teacherName || '-'}</p>
 
               <div className="inline-flex flex-col items-center justify-center px-8 py-4 rounded-2xl bg-white/5 border border-white/10 mb-6">
                 <span className="text-4xl sm:text-5xl font-black text-amber-400 tabular-nums">
@@ -383,7 +397,7 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                 </div>
                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">
                   <span className="text-slate-400 block text-[10px]">Thời gian làm</span>
-                  <span className="text-white font-bold text-sm">{quizData?.timeLimitMinutes != null ? `${quizData.timeLimitMinutes} phút` : '—'}</span>
+                  <span className="text-white font-bold text-sm">{quizData?.timeLimitMinutes != null ? `${quizData.timeLimitMinutes} phút` : '-'}</span>
                 </div>
                 <div className="bg-white/5 p-3 rounded-xl border border-white/5">
                   <span className="text-slate-400 block text-[10px]">Trạng thái</span>
@@ -415,10 +429,10 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                           <div
                             key={optionIndex}
                             className={`rounded-xl border px-3 py-2 text-xs font-semibold ${correct
-                                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                                : picked
-                                  ? 'border-red-400/40 bg-red-500/10 text-red-200'
-                                  : 'border-white/10 bg-black/10 text-slate-300'
+                              ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                              : picked
+                                ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                                : 'border-white/10 bg-black/10 text-slate-300'
                               }`}
                           >
                             <span className="mr-1 font-black">{String.fromCharCode(65 + optionIndex)}.</span>
@@ -515,13 +529,13 @@ export default function StudentQuizExamRoom({ quizId, onBack }) {
                             setSelectedAnswers(prev => ({ ...prev, [currentIndex]: optIdx }));
                           }}
                           className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 ${isSelected
-                              ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-900/20'
-                              : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
+                            ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-md shadow-emerald-900/20'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300'
                             }`}
                         >
                           <span className={`w-7 h-7 rounded-full border text-xs font-black flex items-center justify-center shrink-0 transition-all ${isSelected
-                              ? 'bg-emerald-500 border-emerald-400 text-slate-950'
-                              : 'border-white/20 text-slate-400'
+                            ? 'bg-emerald-500 border-emerald-400 text-slate-950'
+                            : 'border-white/20 text-slate-400'
                             }`}>
                             {String.fromCharCode(65 + optIdx)}
                           </span>

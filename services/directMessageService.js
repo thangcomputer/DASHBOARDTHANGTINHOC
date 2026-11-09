@@ -1,5 +1,5 @@
 /**
- * Canonical direct/group message send — shared by HTTP + Socket.
+ * Canonical direct/group message send - shared by HTTP + Socket.
  * LIVE messaging only. Does not touch Enterprise RBAC.
  * Phase 8.24: conversationId from DB-resolved peer transport role (ignore wrong client role).
  */
@@ -369,7 +369,7 @@ async function sendCanonicalMessageInner({
     }
   }
 
-  // Trợ lý AI — hook riêng, không ảnh hưởng luồng tin nhắn thường
+  // Trợ lý AI - hook riêng, không ảnh hưởng luồng tin nhắn thường
   if (
     !isGroupFinal
     && String(finalReceiverId) === 'ai_support'

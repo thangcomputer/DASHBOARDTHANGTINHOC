@@ -29,7 +29,7 @@ export function formatLocalDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-/** Ngày lịch (YYYY-MM-DD local) đã trước hôm nay — không cho xếp/sửa. */
+/** Ngày lịch (YYYY-MM-DD local) đã trước hôm nay - không cho xếp/sửa. */
 export function isScheduleDateBeforeToday(dateInput, now = new Date()) {
   const key = normalizeScheduleDate(dateInput);
   const today = formatLocalDateKey(now);
@@ -52,7 +52,7 @@ export function normalizeScheduleDate(raw) {
     return formatLocalDateKey(raw);
   }
   const s = String(raw).trim();
-  // Chỉ YYYY-MM-DD thuần (không có giờ) — giữ nguyên ngày lịch
+  // Chỉ YYYY-MM-DD thuần (không có giờ) - giữ nguyên ngày lịch
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return formatLocalDateKey(new Date());
@@ -175,7 +175,7 @@ export function isScheduleOngoingNow(schedule, now = new Date()) {
 
 /**
  * Buổi scheduled đã qua giờ kết thúc (chưa điểm danh / chưa hủy).
- * Chỉ dùng cho nhãn UI — không đổi status DB / không trừ buổi.
+ * Chỉ dùng cho nhãn UI - không đổi status DB / không trừ buổi.
  */
 export function isSchedulePastEnd(schedule, now = new Date()) {
   if (!schedule) return false;
@@ -201,7 +201,7 @@ export function isSchedulePastEnd(schedule, now = new Date()) {
   return now.getTime() > endAt;
 }
 
-/** Nhãn hiển thị lịch (không ghi DB) — aligned with attendance state machine */
+/** Nhãn hiển thị lịch (không ghi DB) - aligned with attendance state machine */
 export const SCHEDULE_DISPLAY = {
   completed: { kind: 'completed', label: 'Đã học', shortLabel: 'Đã học' },
   cancelled: { kind: 'cancelled', label: 'Đã hủy', shortLabel: 'Đã hủy' },

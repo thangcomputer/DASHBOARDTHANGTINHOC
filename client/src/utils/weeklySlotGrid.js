@@ -130,7 +130,7 @@ export function occupyingMatchesCourse(sch, courseName) {
   return !sc || sc === course;
 }
 
-/** Ca hôm nay đã hết (qua giờ kết thúc) — không xếp mới. Ca đang diễn ra vẫn được. */
+/** Ca hôm nay đã hết (qua giờ kết thúc) - không xếp mới. Ca đang diễn ra vẫn được. */
 export function isWeekSlotElapsed(dateKey, startTime, endTime, now = new Date()) {
   const day = normalizeScheduleDate(dateKey);
   const today = formatLocalDateKey(now);
@@ -260,7 +260,7 @@ function studentLabel(student, sch) {
   ).trim();
 }
 
-/** Ca của hàng HV khác cùng ngày (đã lưu + hold vừa chọn) — khóa trùng trên lưới. */
+/** Ca của hàng HV khác cùng ngày (đã lưu + hold vừa chọn) - khóa trùng trên lưới. */
 export function otherTeacherRowRanges({
   rows,
   schedules,

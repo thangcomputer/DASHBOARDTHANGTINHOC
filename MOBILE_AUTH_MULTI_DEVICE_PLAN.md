@@ -262,12 +262,12 @@ Tất cả kiểm thử dưới đây là đề xuất; chưa chạy ở giai đ
 
 ### Phased rollout
 
-1. **Phase 0 — quan sát:** thêm test/telemetry trong môi trường staging; chưa thay đổi hành vi production.
-2. **Phase 1 — additive backend:** tạo model/session logic có feature flag; legacy path tiếp tục mặc định; chưa đổi UI web.
-3. **Phase 2 — internal test:** kiểm thử student/teacher test account trên staging với app prototype; kiểm tra concurrent sessions, CSRF, Socket.IO và revoke.
-4. **Phase 3 — canary mobile:** bật cho nhóm nhỏ/tài khoản thử nghiệm; giới hạn role student/teacher và chức năng không bao gồm exam.
-5. **Phase 4 — mở rộng:** tăng nhóm theo số liệu lỗi login/refresh, revoke, socket reconnect và support ticket; chỉ sau khi chủ hệ thống duyệt.
-6. **Phase 5 — web sessions (nếu cần):** chuyển web sang session ID riêng trong release tách biệt; không gộp âm thầm vào mobile MVP.
+1. **Phase 0 - quan sát:** thêm test/telemetry trong môi trường staging; chưa thay đổi hành vi production.
+2. **Phase 1 - additive backend:** tạo model/session logic có feature flag; legacy path tiếp tục mặc định; chưa đổi UI web.
+3. **Phase 2 - internal test:** kiểm thử student/teacher test account trên staging với app prototype; kiểm tra concurrent sessions, CSRF, Socket.IO và revoke.
+4. **Phase 3 - canary mobile:** bật cho nhóm nhỏ/tài khoản thử nghiệm; giới hạn role student/teacher và chức năng không bao gồm exam.
+5. **Phase 4 - mở rộng:** tăng nhóm theo số liệu lỗi login/refresh, revoke, socket reconnect và support ticket; chỉ sau khi chủ hệ thống duyệt.
+6. **Phase 5 - web sessions (nếu cần):** chuyển web sang session ID riêng trong release tách biệt; không gộp âm thầm vào mobile MVP.
 
 ### Rollback
 

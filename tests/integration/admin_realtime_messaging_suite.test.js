@@ -60,7 +60,7 @@ describe('Admin-to-Admin Realtime Messaging Matrix Verification', () => {
 
   it('4. Realtime Typing Peer Rooms for Admin-to-Admin', () => {
     const convSuperHigh = 'admin_admin__admin_high_111';
-    
+
     // When Super Admin is typing, peer is High Admin 1
     const peersForSuper = listTypingReadPeerTokens(convSuperHigh, 'admin');
     assert.equal(peersForSuper.length, 1);

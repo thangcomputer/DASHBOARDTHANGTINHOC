@@ -1,5 +1,5 @@
 /**
- * Zalo OA messaging — gửi tin nhắn text (OTP, mật khẩu tạm).
+ * Zalo OA messaging - gửi tin nhắn text (OTP, mật khẩu tạm).
  */
 const axios = require('axios');
 const logger = require('../../config/logger');

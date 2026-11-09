@@ -256,7 +256,7 @@ export function useDataSchedule({
     }
     addNotification(schedule.studentId, 'student', `📅 Lịch học mới: ${schedule.course} lúc ${schedule.startTime} ngày ${formatScheduleDateVi(schedule.date)}`);
 
-    // Gửi lên server — không gửi local id
+    // Gửi lên server - không gửi local id
     const payload = { ...newSched };
     delete payload.id;
     delete payload._id;
@@ -326,7 +326,7 @@ export function useDataSchedule({
       const sid = res.data?.studentId?._id || res.data?.studentId;
       if (sid) {
         addNotification(sid, 'student',
-          `📅 Lịch học đã cập nhật — ${payload.note || ''} ${payload.startTime || ''} ngày ${formatScheduleDateVi(payload.date) || ''}`.trim());
+          `📅 Lịch học đã cập nhật - ${payload.note || ''} ${payload.startTime || ''} ngày ${formatScheduleDateVi(payload.date) || ''}`.trim());
       }
       return res;
     } catch (err) {

@@ -27,7 +27,7 @@ router.post('/', [authMiddleware, checkPermission(PERMISSIONS.MANAGE_STUDENTS), 
 ### Legacy Fallback
 ```javascript
 // Line 573-579
-    // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
+    // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) - random + isFirstLogin
     const plainPassword = req.body.password != null && String(req.body.password).trim() !== ''
       ? String(req.body.password).trim()
       : generateTempPassword(8);

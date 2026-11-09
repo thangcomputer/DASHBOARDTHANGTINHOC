@@ -28,9 +28,9 @@ function courseKeyOf(name) {
 }
 
 function slotLabel(sch) {
-  if (!sch) return '—';
+  if (!sch) return '-';
   if (sch.startTime && sch.endTime) return `${sch.startTime} – ${sch.endTime}`;
-  return sch.startTime || '—';
+  return sch.startTime || '-';
 }
 
 export default function StudentWeeklyScheduleGrid({
@@ -154,7 +154,7 @@ export default function StudentWeeklyScheduleGrid({
                     return (
                       <td key={dateKey} className={`px-1.5 py-1.5 ${isToday ? 'bg-red-50/40' : ''}`}>
                         <div className="w-full min-h-9 px-1.5 py-1.5 rounded-lg text-[10px] font-bold text-center text-slate-300">
-                          —
+                          -
                         </div>
                       </td>
                     );

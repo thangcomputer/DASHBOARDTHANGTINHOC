@@ -41,7 +41,7 @@ const TeacherSchema = new mongoose.Schema(
     zaloId: { type: String, sparse: true, unique: true },
     avatar: { type: String, default: '' }, // URL ảnh đại diện
     gender: { type: String, enum: ['male', 'female', 'Nam', 'Nữ', ''], default: '' },
-    /** Canonical GV###### — display/reference only; assignment uses ObjectId */
+    /** Canonical GV###### - display/reference only; assignment uses ObjectId */
     teacherCode: { type: String, default: '' },
 
     // ── Tài khoản đăng nhập ────────────────────────────────────────
@@ -113,12 +113,12 @@ const TeacherSchema = new mongoose.Schema(
       type: [String],
       default: [],
       // Các giá trị hợp lệ:
-      // 'manage_students'  — Quản lý học viên
-      // 'manage_schedule'  — Lịch dạy
-      // 'manage_finance'   — Tài chính
-      // 'manage_training'  — Đào tạo GV/HV
-      // 'system_settings'  — Cài đặt hệ thống
-      // 'manage_staff'     — Quản lý nhân viên nội bộ (SUPER_ADMIN only)
+      // 'manage_students'  - Quản lý học viên
+      // 'manage_schedule'  - Lịch dạy
+      // 'manage_finance'   - Tài chính
+      // 'manage_training'  - Đào tạo GV/HV
+      // 'system_settings'  - Cài đặt hệ thống
+      // 'manage_staff'     - Quản lý nhân viên nội bộ (SUPER_ADMIN only)
     },
     approvedBy: {
       type: String,
@@ -146,7 +146,7 @@ const TeacherSchema = new mongoose.Schema(
     // ── Thống kê ─────────────────────────────────────────────────
     totalSessionsTaught: { type: Number, default: 0 },
     averageRating: { type: Number, min: 0, max: 5, default: 0 },
-    /** Số lượt đánh giá công khai (HV → GV) — đồng bộ khi submit teacher_rating */
+    /** Số lượt đánh giá công khai (HV → GV) - đồng bộ khi submit teacher_rating */
     ratingCount: { type: Number, min: 0, default: 0 },
 
     // Lương cứng / buổi dạy (không phụ thuộc sao)
@@ -199,7 +199,7 @@ const TeacherSchema = new mongoose.Schema(
     welcomeCelebrationSeen: { type: Boolean, default: false },
     deviceFingerprint: { type: String, default: null, select: false }, // ⭐ Device lock: fingerprint máy đang đăng nhập
 
-    // ── MFA (TOTP) — dành cho tài khoản nội bộ admin/staff ────────
+    // ── MFA (TOTP) - dành cho tài khoản nội bộ admin/staff ────────
     mfaEnabled: { type: Boolean, default: false },
     mfaSecret: { type: String, default: '', select: false },
     mfaPendingSecret: { type: String, default: '', select: false },
@@ -234,7 +234,7 @@ TeacherSchema.methods.comparePassword = async function (candidatePassword) {
 // ── Method: Xử lý đăng nhập sai ─────────────────────────────────
 TeacherSchema.methods.incLoginAttempts = async function () {
   const MAX_ATTEMPTS = 5;
-  const LOCK_TIME    = 15 * 60 * 1000; // 15 phút
+  const LOCK_TIME = 15 * 60 * 1000; // 15 phút
 
   // Reset nếu hết thời gian khóa
   if (this.lockUntil && this.lockUntil < Date.now()) {

@@ -1,6 +1,6 @@
 /**
  * Policy shadow for LIVE schedule routes (Wave 6.8).
- * Mirrors routes/scheduleRoutes.js — role/ownership gates (MANAGE_SCHEDULE unused live).
+ * Mirrors routes/scheduleRoutes.js - role/ownership gates (MANAGE_SCHEDULE unused live).
  */
 const { studentMatchesTeacher } = require('../enrollmentService');
 
@@ -92,7 +92,7 @@ function evaluateCreate(subject, ctx) {
   if (!['admin', 'staff', 'teacher'].includes(role)) {
     return { decision: 'DENY', reason: 'role_cannot_create', statusHint: 403 };
   }
-  // Legacy: no branchFilter / no MANAGE_SCHEDULE on POST — staff may create any student
+  // Legacy: no branchFilter / no MANAGE_SCHEDULE on POST - staff may create any student
   if (role === 'teacher') {
     if (!teacherCanAccessStudent(ctx.targetStudent, subject.id, ctx.assignedStudentIds)) {
       return { decision: 'DENY', reason: 'teacher_not_owner', statusHint: 403 };
@@ -122,7 +122,7 @@ function evaluateUpdate(subject, ctx) {
     if (!scheduleStudentId || scheduleStudentId !== String(subject.id)) {
       return { decision: 'DENY', reason: 'student_not_self_schedule', statusHint: 403 };
     }
-    // Field restriction is business validation — authz self check is enough for shadow
+    // Field restriction is business validation - authz self check is enough for shadow
   }
   return { decision: 'ALLOW', reason: 'schedule_update_ok', statusHint: 200 };
 }

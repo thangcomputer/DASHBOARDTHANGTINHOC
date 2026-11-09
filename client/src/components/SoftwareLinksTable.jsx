@@ -33,7 +33,7 @@ function toArticleHtml(raw) {
 }
 
 /**
- * Bảng Link phần mềm — bấm "Xem hướng dẫn" mở bài viết đầy đủ (như Tin tức).
+ * Bảng Link phần mềm - bấm "Xem hướng dẫn" mở bài viết đầy đủ (như Tin tức).
  */
 export default function SoftwareLinksTable({
   items = [],
@@ -183,7 +183,7 @@ export default function SoftwareLinksTable({
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
-                        {String(row.description || row.desc || '').trim() || '—'}
+                        {String(row.description || row.desc || '').trim() || '-'}
                       </td>
                       <td className="px-4 py-3.5">
                         {canViewGuide ? (

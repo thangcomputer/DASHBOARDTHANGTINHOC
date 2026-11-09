@@ -56,7 +56,7 @@ export function readCurrentYouTubeQuality(player) {
 
 /**
  * Best-effort gợi ý mức cao nhất (không pause/seek).
- * YouTube có thể bỏ qua — chỉ thử, không hứa hiệu lực.
+ * YouTube có thể bỏ qua - chỉ thử, không hứa hiệu lực.
  */
 export function preferMaxYouTubeQuality(player) {
   if (!player) return false;
@@ -120,7 +120,7 @@ export default function LmsBrandedPlayerChrome({
   isFullscreen = false,
   onToggleFullscreen = null,
   brandLabel = 'THẮNG TIN HỌC',
-  /** () => YT.Player | null — để chọn độ phân giải */
+  /** () => YT.Player | null - để chọn độ phân giải */
   getPlayer = null,
   /** Chất lượng thực tế từ onPlaybackQualityChange */
   actualPlaybackQuality = null,

@@ -1,4 +1,4 @@
-# Analytics & Report Service Review — Sprint 4.3 Batch 3
+# Analytics & Report Service Review - Sprint 4.3 Batch 3
 
 ## Domains: `analytics`, `report`
 

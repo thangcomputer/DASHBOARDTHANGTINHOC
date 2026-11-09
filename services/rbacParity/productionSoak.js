@@ -1,5 +1,5 @@
 /**
- * Phase 8.17 — Production soak orchestration helpers (NON-AUTHORITATIVE).
+ * Phase 8.17 - Production soak orchestration helpers (NON-AUTHORITATIVE).
  *
  * Does NOT enable feature flags.
  * Does NOT promote Enterprise.
@@ -40,7 +40,7 @@ const PRODUCTION_SOAK_RESULT = Object.freeze({
 });
 
 const MIN_SOAK_DURATION_SECONDS = 1;
-/** Upper bound: 24h — reject infinite / absurd windows. */
+/** Upper bound: 24h - reject infinite / absurd windows. */
 const MAX_SOAK_DURATION_SECONDS = 86400;
 
 const SAFE_MISMATCH_KEYS = Object.freeze([

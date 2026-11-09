@@ -18,7 +18,7 @@ function mockRes() {
   };
 }
 
-test('MANAGE_TEACHERS required for write — VIEW_TEACHERS alone is 403', async () => {
+test('MANAGE_TEACHERS required for write - VIEW_TEACHERS alone is 403', async () => {
   const orig = Teacher.findById;
   Teacher.findById = () => ({
     select() {
@@ -373,7 +373,7 @@ test('realtimeEmit helpers export emitBranch/emitDataRefresh', () => {
   const io = {
     to(room) {
       rooms.push(room);
-      return { emit() {} };
+      return { emit() { } };
     },
   };
   rt.emitBranch(io, 'b1', 'data:refresh', { x: 1 });

@@ -1,4 +1,4 @@
-# Phase 5 Blocker — Tenant Isolation on Live DM
+# Phase 5 Blocker - Tenant Isolation on Live DM
 
 **Status:** CLOSED  
 **Closed:** 2026-08-10 (Phase 5.1)  

@@ -1,5 +1,5 @@
 /**
- * Phase 5.1 — Fail-closed tenant isolation for private DM.
+ * Phase 5.1 - Fail-closed tenant isolation for private DM.
  * Enforced in MessagingPolicy.canSendMessage (REST + Socket share sendCanonicalMessage).
  */
 'use strict';
@@ -134,7 +134,7 @@ function installStubs() {
     const rows = ids.map((id) => DOCS[id]).filter((h) => h?.kind === 'student').map((h) => ({ ...h.doc }));
     return { select() { return this; }, lean: async () => rows };
   };
-  // No Branch.tenantId fallback in these fixtures — tenants are explicit on docs
+  // No Branch.tenantId fallback in these fixtures - tenants are explicit on docs
   Branch.findById = () => leanChain(null);
 }
 
@@ -371,7 +371,7 @@ describe('Phase 5.1 tenant isolation', { concurrency: false }, () => {
     assert.equal(d.code, POLICY_CODES.TENANT_MISMATCH);
   });
 
-  it('REST/Socket path: sendCanonicalMessage — no persistence / no receive on cross-tenant', async () => {
+  it('REST/Socket path: sendCanonicalMessage - no persistence / no receive on cross-tenant', async () => {
     const { sendCanonicalMessage } = require('../../services/directMessageService');
     let creates = 0;
     Message.create = async (doc) => {
@@ -393,7 +393,7 @@ describe('Phase 5.1 tenant isolation', { concurrency: false }, () => {
         sender: actor(IDS.studentA1),
         receiverId: IDS.supportB1,
         receiverRole: 'staff',
-        receiverTenantId: TENANT_A, // client spoof — ignored
+        receiverTenantId: TENANT_A, // client spoof - ignored
         content: 'cross-tenant probe',
         notifyUser: harness.notifyUser,
         io: harness.io,

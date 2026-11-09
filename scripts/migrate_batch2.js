@@ -7,7 +7,7 @@ const batch2Files = ['financeRoutes.js', 'invoiceRoutes.js', 'analyticsRoutes.js
 batch2Files.forEach(file => {
   const filePath = path.join(ROUTES_DIR, file);
   if (!fs.existsSync(filePath)) return;
-  
+
   let content = fs.readFileSync(filePath, 'utf8');
 
   // 1. Update imports
@@ -16,7 +16,7 @@ batch2Files.forEach(file => {
     (match, imports) => {
       let newImports = imports.split(',').map(i => i.trim())
         .filter(i => i !== 'checkPermission' && i !== 'checkAnyPermission' && i !== 'isAdmin' && i !== 'isSuperAdmin' && i !== 'isTeacher' && i !== 'isStaff');
-      
+
       return `const { ${newImports.join(', ')} } = require('../shared/middleware/authMiddleware');\nconst { authorize, authorizeAny, authorizeAll } = require('../shared/middleware/authorize');\nconst legacyMapping = require('../shared/constants/legacyPermissionMapping');\nconst NEW_PERMISSIONS = require('../shared/constants/permissions');`;
     }
   );

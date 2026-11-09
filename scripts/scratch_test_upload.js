@@ -6,7 +6,7 @@ async function testUploadAuth() {
     const res = await axios.post('http://localhost:5000/api/teachers/upload-practical', {}, {
       validateStatus: () => true
     });
-    
+
     console.log(`Response Status: ${res.status}`);
     if (res.status === 401) {
       console.log('✅ PASSED: Route is protected. Unauthorized access blocked.');

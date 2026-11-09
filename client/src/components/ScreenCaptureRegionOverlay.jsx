@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 
 /**
  * Overlay chọn vùng trên ảnh đã capture (kéo chuột / dấu +).
- * onConfirm(regionPx) — tọa độ theo pixel canvas gốc.
+ * onConfirm(regionPx) - tọa độ theo pixel canvas gốc.
  */
 export default function ScreenCaptureRegionOverlay({
   open,

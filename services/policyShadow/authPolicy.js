@@ -196,7 +196,7 @@ function evaluateLegacyAuth(subject, action, _ctx = {}) {
 
 /**
  * Policy ignores untrusted actor-identity spoofs.
- * body.role / body.userId on login/forgot/admin may be OPERATION PARAMS in Legacy —
+ * body.role / body.userId on login/forgot/admin may be OPERATION PARAMS in Legacy -
  * they are not used as actor identity here.
  */
 function evaluatePolicyAuth(subject, action, ctx = {}, _untrusted = {}) {

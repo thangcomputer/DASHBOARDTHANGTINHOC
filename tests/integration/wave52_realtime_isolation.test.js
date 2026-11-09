@@ -1,6 +1,6 @@
 /**
- * Wave 5.2 — realtime isolation (emit helpers + room semantics).
- * No live Socket.IO server required — records io.to() rooms.
+ * Wave 5.2 - realtime isolation (emit helpers + room semantics).
+ * No live Socket.IO server required - records io.to() rooms.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

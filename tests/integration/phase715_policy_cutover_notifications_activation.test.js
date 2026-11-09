@@ -1,5 +1,5 @@
 /**
- * Phase 7.15 — Controlled cutover + production activation for /api/notifications
+ * Phase 7.15 - Controlled cutover + production activation for /api/notifications
  *
  * LIVE: auth-only self-scope list/count/unread/mark_read/dismiss;
  * broadcast: isAdmin (admin|staff). Socket emit stays in notificationCenter handler.
@@ -63,10 +63,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -323,7 +323,7 @@ test('Phase7.15 rollback: remove notifications → LEGACY; prior stay POLICY; re
 test('Phase7.15 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'files', 'feed', 'schedules', 'messages', 'settings',
   ];
   for (const fam of legacyFamilies) {
@@ -386,8 +386,8 @@ test('Phase7.15 functional smoke: list/count authz; broadcast mutation NOT EXECU
   assert.equal(parity('list', staff).policy.decision, 'ALLOW');
   assert.equal(parity('count', staff).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — broadcast/mark-read/dismiss production mutation',
-    'NOT EXECUTED — broadcast/mark-read/dismiss production mutation',
+    'NOT EXECUTED - broadcast/mark-read/dismiss production mutation',
+    'NOT EXECUTED - broadcast/mark-read/dismiss production mutation',
   );
   assert.ok(ACTIONS.has('broadcast'));
 });

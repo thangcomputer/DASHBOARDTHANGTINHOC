@@ -44,107 +44,107 @@ export function useDataSync({
     setIsRefetching(true);
 
     inFlightSyncRef.current = (async () => {
-    try {
-      const isStudent = currentUser.role === 'student';
-      const freePortalApiLocked = isStudent && isFreePortalLocked(currentUser);
-      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'staff';  // ⭐ Staff cũng cần fetch teachers/transactions
+      try {
+        const isStudent = currentUser.role === 'student';
+        const freePortalApiLocked = isStudent && isFreePortalLocked(currentUser);
+        const isAdmin = currentUser.role === 'admin' || currentUser.role === 'staff';  // ⭐ Staff cũng cần fetch teachers/transactions
 
-      const promises = [];
+        const promises = [];
 
-      if (isAdmin) {
-        const perms = currentUser.permissions || [];
-        const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
-        const hasPerm = (p) => isSuper || perms.includes(p);
-        const dummyRes = { success: true, data: [] };
+        if (isAdmin) {
+          const perms = currentUser.permissions || [];
+          const isSuper = currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN';
+          const hasPerm = (p) => isSuper || perms.includes(p);
+          const dummyRes = { success: true, data: [] };
 
-        // Admin TeachersContext and FinanceContext already own these SWR requests.
-        // Do not fetch the same large lists again during the initial background sync.
-        promises.push((hasPerm('manage_staff') || hasPerm('manage_hr') || isSuper) ? api.staff.getAll().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
-        promises.push((hasPerm('manage_training') || hasPerm('manage_students')) ? api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
-        promises.push(hasPerm('view_evaluations') ? api.evaluations.getPrivate().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
-      }
-      if (isStudent) {
-        promises.push(api.students.getById(currentUser.id || currentUser._id).catch(() => ({ success: false })));
-        promises.push(isStudentSchedulesApiBlocked(currentUser)
+          // Admin TeachersContext and FinanceContext already own these SWR requests.
+          // Do not fetch the same large lists again during the initial background sync.
+          promises.push((hasPerm('manage_staff') || hasPerm('manage_hr') || isSuper) ? api.staff.getAll().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+          promises.push((hasPerm('manage_training') || hasPerm('manage_students')) ? api.examResults.getAll({ limit: 200 }).catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+          promises.push(hasPerm('view_evaluations') ? api.evaluations.getPrivate().catch(() => ({ success: false })) : Promise.resolve(dummyRes));
+        }
+        if (isStudent) {
+          promises.push(api.students.getById(currentUser.id || currentUser._id).catch(() => ({ success: false })));
+          promises.push(isStudentSchedulesApiBlocked(currentUser)
+            ? Promise.resolve({ success: false })
+            : api.schedules.getByStudent(currentUser.id || currentUser._id).catch(() => ({ success: false })));
+        }
+
+        // Handle Groups (everyone except student has groups at this index)
+        promises.push(freePortalApiLocked
           ? Promise.resolve({ success: false })
-          : api.schedules.getByStudent(currentUser.id || currentUser._id).catch(() => ({ success: false })));
-      }
+          : api.messages.getGroups(currentUser.id || currentUser._id).catch(() => ({ success: false })));
 
-      // Handle Groups (everyone except student has groups at this index)
-      promises.push(freePortalApiLocked
-        ? Promise.resolve({ success: false })
-        : api.messages.getGroups(currentUser.id || currentUser._id).catch(() => ({ success: false })));
+        // Fetch only the training dataset needed by the current role.
+        const isAdminTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_training')) : false;
+        // TeacherTrainingLMS loads its lightweight overview when the tab opens.
+        // Do not pull the full training catalog during dashboard startup.
+        const needsTeacherTraining = isAdmin;
+        promises.push((!needsTeacherTraining || (isAdmin && !isAdminTrainingPerm))
+          ? Promise.resolve({ success: false })
+          : api.settings.getTrainingData().catch(() => ({ success: false })));
 
-      // Fetch only the training dataset needed by the current role.
-      const isAdminTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_training')) : false;
-      // TeacherTrainingLMS loads its lightweight overview when the tab opens.
-      // Do not pull the full training catalog during dashboard startup.
-      const needsTeacherTraining = isAdmin;
-      promises.push((!needsTeacherTraining || (isAdmin && !isAdminTrainingPerm))
-        ? Promise.resolve({ success: false })
-        : api.settings.getTrainingData().catch(() => ({ success: false })));
+        // Student training data is not needed by teachers.
+        const isAdminStudentTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_student_training')) : false;
+        const needsStudentTraining = isAdmin || isStudent;
+        promises.push((!needsStudentTraining || (isAdmin && !isAdminStudentTrainingPerm))
+          ? Promise.resolve({ success: true, data: {} })
+          : api.settings.getStudentTrainingData().catch(() => ({ success: false })));
 
-      // Student training data is not needed by teachers.
-      const isAdminStudentTrainingPerm = isAdmin ? (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('manage_student_training')) : false;
-      const needsStudentTraining = isAdmin || isStudent;
-      promises.push((!needsStudentTraining || (isAdmin && !isAdminStudentTrainingPerm))
-        ? Promise.resolve({ success: true, data: {} })
-        : api.settings.getStudentTrainingData().catch(() => ({ success: false })));
+        const results = await Promise.all(promises);
+        let idx = 0;
 
-      const results = await Promise.all(promises);
-      let idx = 0;
-
-      if (isAdmin) {
-        const staffRes = results[idx++];
-        if (staffRes?.success) setStaffs(staffRes.data.map(st => ({ ...st, id: st._id })));
-        const examResultsRes = results[idx++];
-        if (Array.isArray(examResultsRes)) setExamResultsRef.current(examResultsRes.map(r => ({ ...r, id: r._id || r.id })));
-        const evalsRes = results[idx++];
-        if (evalsRes?.success) {
-          setPrivateEvaluations(evalsRes.data.map((e) => ({
-            ...e,
-            id: e._id || e.id,
-            comment: e.content || e.comment || '',
-          })));
+        if (isAdmin) {
+          const staffRes = results[idx++];
+          if (staffRes?.success) setStaffs(staffRes.data.map(st => ({ ...st, id: st._id })));
+          const examResultsRes = results[idx++];
+          if (Array.isArray(examResultsRes)) setExamResultsRef.current(examResultsRes.map(r => ({ ...r, id: r._id || r.id })));
+          const evalsRes = results[idx++];
+          if (evalsRes?.success) {
+            setPrivateEvaluations(evalsRes.data.map((e) => ({
+              ...e,
+              id: e._id || e.id,
+              comment: e.content || e.comment || '',
+            })));
+          }
         }
-      }
-      if (isStudent) {
-        const studentRes = results[idx++];
-        if (studentRes?.success) setStudents([mapStudent(studentRes.data)]);
-        const schedulesRes = results[idx++];
-        if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
-      }
-
-      // Groups
-      const groupsRes = results[idx++];
-      if (groupsRes?.success) setGroupsRef.current?.(groupsRes.data.map(g => ({ ...g, id: g._id })));
-
-      // Training Data is the second to last promise
-      const trainingDataRes = results[idx++];
-      if (trainingDataRes?.success) {
-        setTrainingData(trainingDataRes.data);
-      }
-
-      // Student Training Data is the last promise
-      const studentTrainingRes = results[idx++];
-      if (studentTrainingRes?.success) {
-        setStudentTrainingData(studentTrainingRes.data);
-      }
-
-      if (isStudent || (isAdmin && (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('system_settings')))) {
-        const examCfg = await api.settings.getStudentExamConfig().catch(() => null);
-        if (examCfg?.success && examCfg.data) {
-          applyStudentExamConfigFromServer(examCfg.data);
+        if (isStudent) {
+          const studentRes = results[idx++];
+          if (studentRes?.success) setStudents([mapStudent(studentRes.data)]);
+          const schedulesRes = results[idx++];
+          if (schedulesRes?.success) setSchedulesRef.current(schedulesRes.data.map(mapSchedule));
         }
+
+        // Groups
+        const groupsRes = results[idx++];
+        if (groupsRes?.success) setGroupsRef.current?.(groupsRes.data.map(g => ({ ...g, id: g._id })));
+
+        // Training Data is the second to last promise
+        const trainingDataRes = results[idx++];
+        if (trainingDataRes?.success) {
+          setTrainingData(trainingDataRes.data);
+        }
+
+        // Student Training Data is the last promise
+        const studentTrainingRes = results[idx++];
+        if (studentTrainingRes?.success) {
+          setStudentTrainingData(studentTrainingRes.data);
+        }
+
+        if (isStudent || (isAdmin && (currentUser.id === 'admin' || currentUser.adminRole === 'SUPER_ADMIN' || currentUser.adminRole === 'HIGH_ADMIN' || (currentUser.permissions || []).includes('system_settings')))) {
+          const examCfg = await api.settings.getStudentExamConfig().catch(() => null);
+          if (examCfg?.success && examCfg.data) {
+            applyStudentExamConfigFromServer(examCfg.data);
+          }
+        }
+      } catch (e) {
+        if (e.status === 401 && onLogout) {
+          onLogout();
+        }
+      } finally {
+        setTimeout(() => setIsRefetching(false), 500);
+        inFlightSyncRef.current = null;
       }
-    } catch (e) {
-      if (e.status === 401 && onLogout) {
-        onLogout();
-      }
-    } finally {
-      setTimeout(() => setIsRefetching(false), 500);
-      inFlightSyncRef.current = null;
-    }
     })();
 
     return inFlightSyncRef.current;
@@ -156,7 +156,7 @@ export function useDataSync({
     setPrivateEvaluations,
   ]);
 
-  // Background sync — interval dài hơn; focus/visibility bị debounce bởi MIN_SYNC_GAP_MS
+  // Background sync - interval dài hơn; focus/visibility bị debounce bởi MIN_SYNC_GAP_MS
   useEffect(() => {
     const handleSync = () => {
       if (document.visibilityState === 'visible') {
@@ -178,7 +178,7 @@ export function useDataSync({
     }, 120_000);
 
     document.addEventListener('visibilitychange', handleSync);
-    // Bỏ window focus — trùng visibilitychange và dễ spam khi Alt-Tab
+    // Bỏ window focus - trùng visibilitychange và dễ spam khi Alt-Tab
 
     return () => {
       clearInterval(interval);

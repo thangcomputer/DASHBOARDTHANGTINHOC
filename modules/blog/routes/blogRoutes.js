@@ -1,5 +1,5 @@
 /**
- * Blog / Tin tức trung tâm — mọi role đọc; Admin/Staff (manage_blog) đăng bài.
+ * Blog / Tin tức trung tâm - mọi role đọc; Admin/Staff (manage_blog) đăng bài.
  */
 const express = require('express');
 const path = require('path');
@@ -34,7 +34,7 @@ function slugify(raw) {
 async function uniqueSlug(base, excludeId) {
   let slug = slugify(base);
   let n = 0;
-  for (;;) {
+  for (; ;) {
     const candidate = n === 0 ? slug : `${slug}-${n}`;
     const q = { slug: candidate, deletedAt: null };
     if (excludeId) q._id = { $ne: excludeId };
@@ -120,27 +120,27 @@ const upload = multer({
 
 router.use(authMiddleware);
 
-// ─── GET /api/blog/posts — danh sách public (đã xuất bản) ───────────────────
-router.get('/posts',blogController.get_posts);
+// ─── GET /api/blog/posts - danh sách public (đã xuất bản) ───────────────────
+router.get('/posts', blogController.get_posts);
 
-// ─── GET /api/blog/posts/:slugOrId — chi tiết ────────────────────────────────
-router.get('/posts/:slugOrId',blogController.get_posts_slugOrId);
+// ─── GET /api/blog/posts/:slugOrId - chi tiết ────────────────────────────────
+router.get('/posts/:slugOrId', blogController.get_posts_slugOrId);
 
 // ─── Manage ──────────────────────────────────────────────────────────────────
-router.get('/manage/posts', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.get_manage_posts);
+router.get('/manage/posts', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.get_manage_posts);
 
 /** Chi tiết bài cho editor (đủ contentHtml + attachments) */
-router.get('/manage/posts/:id', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.get_manage_posts_id);
+router.get('/manage/posts/:id', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.get_manage_posts_id);
 
-router.post('/manage/posts', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.post_manage_posts);
+router.post('/manage/posts', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.post_manage_posts);
 
-router.put('/manage/posts/:id', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.put_manage_posts_id);
+router.put('/manage/posts/:id', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.put_manage_posts_id);
 
-router.post('/manage/posts/:id/publish', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.post_manage_posts_id_publish);
+router.post('/manage/posts/:id/publish', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.post_manage_posts_id_publish);
 
-router.post('/manage/posts/:id/hide', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.post_manage_posts_id_hide);
+router.post('/manage/posts/:id/hide', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.post_manage_posts_id_hide);
 
-router.delete('/manage/posts/:id', authorize(NEW_PERMISSIONS.CMS_PUBLISH),blogController.delete_manage_posts_id);
+router.delete('/manage/posts/:id', authorize(NEW_PERMISSIONS.CMS_PUBLISH), blogController.delete_manage_posts_id);
 
 router.post('/manage/upload', authorize(NEW_PERMISSIONS.CMS_PUBLISH), (req, res) => {
   upload.array('files', 8)(req, res, (err) => {

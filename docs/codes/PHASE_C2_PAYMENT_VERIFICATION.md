@@ -1,4 +1,4 @@
-# PHASE C2 — PAYMENT VERIFICATION
+# PHASE C2 - PAYMENT VERIFICATION
 
 ## Order (unchanged)
 
@@ -36,7 +36,7 @@ Covers: HV/TTH extract, amounts, legacy match, ambiguous fail-closed, format hel
 ## Invoice / Ledger
 
 ```text
-UNCHANGED — still ObjectId references; no studentCode on finance docs
+UNCHANGED - still ObjectId references; no studentCode on finance docs
 ```
 
 ## FE QR

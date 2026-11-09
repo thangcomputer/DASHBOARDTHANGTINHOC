@@ -11,7 +11,7 @@ Phạm vi: client `ExamMonitor` + utils proctor + API audit `/api/proctor`
 | 2 | False positive cao: mất mặt confirm ~1.2s, gaze/eye cứng → dễ hủy bài oan |
 | 3 | Không phát hiện **nhiều khuôn mặt** một cách rõ ràng |
 | 4 | Không đo FPS / độ phân giải thấp / flap camera bật-tắt |
-| 5 | Không có **điểm rủi ro** — mọi sự kiện đều hard-violation |
+| 5 | Không có **điểm rủi ro** - mọi sự kiện đều hard-violation |
 | 6 | Không audit log server (JWT); sự kiện chỉ local/UI |
 | 7 | Camera denied: không có nút **Thử lại** rõ ràng |
 | 8 | UX trạng thái chưa chuẩn hóa (xanh/vàng/cam/đỏ) |
@@ -46,8 +46,8 @@ Phạm vi: client `ExamMonitor` + utils proctor + API audit `/api/proctor`
 
 ## 3. Đề xuất nâng cấp tiếp
 
-1. **MediaPipe Face Landmarker** (WASM) làm fallback khi không có `FaceDetector` (Firefox) — tăng độ chính xác mắt/gaze  
-2. Liveness nhẹ (nháy mắt / quay đầu) trước khi vào bài — eKYC bước 1  
+1. **MediaPipe Face Landmarker** (WASM) làm fallback khi không có `FaceDetector` (Firefox) - tăng độ chính xác mắt/gaze  
+2. Liveness nhẹ (nháy mắt / quay đầu) trước khi vào bài - eKYC bước 1  
 3. Giám thị realtime qua Socket.io (push sự kiện `critical` tới phòng giám sát)  
 4. Snapshot có watermark chỉ khi `PROCTOR_ALLOW_SNAPSHOT=1` + consent  
 5. Calibration oval theo từng thí sinh (30s đầu) giảm FP tư thế  
@@ -58,12 +58,12 @@ Phạm vi: client `ExamMonitor` + utils proctor + API audit `/api/proctor`
 | File | Thay đổi |
 |------|----------|
 | `client/src/components/ExamMonitor.jsx` | Viết lại: health, risk, multi-face, UX, retry, audit |
-| `client/src/utils/proctor/config.js` | **Mới** — cấu hình ngưỡng |
-| `client/src/utils/proctor/vision.js` | **Mới** — CV heuristics |
-| `client/src/utils/proctor/cameraHealth.js` | **Mới** — camera/FPS |
-| `client/src/utils/proctor/riskEngine.js` | **Mới** — risk + confirm tracker |
-| `client/src/utils/proctor/eventLog.js` | **Mới** — event log + UI status |
-| `client/src/utils/proctor/index.js` | **Mới** — re-export |
+| `client/src/utils/proctor/config.js` | **Mới** - cấu hình ngưỡng |
+| `client/src/utils/proctor/vision.js` | **Mới** - CV heuristics |
+| `client/src/utils/proctor/cameraHealth.js` | **Mới** - camera/FPS |
+| `client/src/utils/proctor/riskEngine.js` | **Mới** - risk + confirm tracker |
+| `client/src/utils/proctor/eventLog.js` | **Mới** - event log + UI status |
+| `client/src/utils/proctor/index.js` | **Mới** - re-export |
 | `client/src/services/api.js` | `proctorAPI` |
 | `models/ProctorEvent.js` | **Mới** |
 | `services/proctorAuditService.js` | **Mới** |

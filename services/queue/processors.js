@@ -91,7 +91,7 @@ async function processWelcomeJob(data) {
   if (email) {
     results.email = await sendEmail({
       to: email,
-      subject: '[Thang Tin Hoc] Chao mung — thong tin dang nhap',
+      subject: '[Thang Tin Hoc] Chao mung - thong tin dang nhap',
       text,
       html:
         '<p>Xin chao <b>' + name + '</b>,</p>' +

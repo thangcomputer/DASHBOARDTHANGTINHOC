@@ -729,14 +729,17 @@ async function topicPathForUnit(studentId, unit) {
 
 async function pickUnitQuestions(unitId, step, { testOut = false } = {}) {
   const base = { unitId, status: 'published' };
+  let picked = [];
   if (testOut || step === LEGACY_CHECKPOINT) {
-    return DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
+    picked = await DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
+    return rules.shuffle(picked);
   }
   const meta = stepMeta(step);
   if (!meta?.difficulty) {
-    return DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
+    picked = await DailyPracticeQuestion.aggregate([{ $match: base }, { $sample: { size: rules.SESSION_SIZE } }]);
+    return rules.shuffle(picked);
   }
-  const picked = await DailyPracticeQuestion.aggregate([
+  picked = await DailyPracticeQuestion.aggregate([
     { $match: { ...base, difficulty: meta.difficulty } },
     { $sample: { size: rules.SESSION_SIZE } },
   ]);
@@ -747,7 +750,7 @@ async function pickUnitQuestions(unitId, step, { testOut = false } = {}) {
     ]);
     picked.push(...more);
   }
-  return picked;
+  return rules.shuffle(picked);
 }
 
 /** Kiểm tra quyền vào bước của chặng + chọn câu. testOut: làm kiểm tra chặng để vượt chặng chưa mở. */
@@ -768,7 +771,7 @@ async function preparePathSession(studentId, { unitId, step, nodeKey, testOut = 
   const pathNode = (view.pathNodes || []).find((item) => item.key === nk);
   if (!pathNode && !testOut) throw httpError(400, 'Nút lộ trình không hợp lệ');
   if (!testOut && pathNode?.kind === 'study') {
-    throw httpError(400, 'Nút Học bài dùng xem Bài 1, 2… — hãy chọn nút Luyện tập / Thử thách để làm câu');
+    throw httpError(400, 'Nút Học bài dùng xem Bài 1, 2… - hãy chọn nút Luyện tập / Thử thách để làm câu');
   }
   const levelState = pathNode?.levels?.find((item) => item.key === step)?.state || '';
   if (testOut) {
@@ -824,7 +827,7 @@ async function markSteps(studentId, topicId, unitId, steps, { complete = false, 
 
 /**
  * Danh sách phát của chặng cho popup video: video riêng của chặng + video của buổi bài giảng đã gắn
- * (chỉ khi HV được mở buổi đó — cùng luật mua khóa / mở tuần tự như trang bài giảng).
+ * (chỉ khi HV được mở buổi đó - cùng luật mua khóa / mở tuần tự như trang bài giảng).
  */
 async function unitVideos(studentId, unitId) {
   const sid = requireId(studentId, 'Học viên');

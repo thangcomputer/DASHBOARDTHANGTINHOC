@@ -1,5 +1,5 @@
 /**
- * Phase 7.17 — Controlled cutover gate for LIVE /api/feed ONLY.
+ * Phase 7.17 - Controlled cutover gate for LIVE /api/feed ONLY.
  *
  * LEGACY (default):
  *   - All actions → authentication already applied on routes; pass-through.
@@ -76,7 +76,7 @@ function feedCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] feed authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] feed authority helper failed - Legacy gate',
       );
     }
 
@@ -121,7 +121,7 @@ function feedCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] feed Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] feed Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

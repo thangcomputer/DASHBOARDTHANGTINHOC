@@ -60,7 +60,7 @@ const LoginPage = ({ onLogin }) => {
           const url = res.data.logoUrl;
           setDynamicLogo(url.startsWith('http') ? url : `${API}${url}`);
         }
-      }).catch(() => {});
+      }).catch(() => { });
   }, [API]);
 
   const doLogin = async (forceDevice = false) => {
@@ -93,11 +93,11 @@ const LoginPage = ({ onLogin }) => {
         const user = data.data.user ? { ...data.data.user } : { ...data.data };
         const accessToken = data.data.accessToken || user.accessToken;
         const refreshToken = data.data.refreshToken || user.refreshToken;
-        
+
         user.accessToken = accessToken;
         user.token = accessToken; // Ensure compatibility with SocketProvider
         user.refreshToken = refreshToken;
-        
+
         if (!user.id && user._id) user.id = user._id;
         clearOtherRoleSessions(role);
         localStorage.setItem(`${role}_user`, JSON.stringify(user));
@@ -181,7 +181,7 @@ const LoginPage = ({ onLogin }) => {
     const ok = await copyTextToClipboard(forgotContact.message);
     setCopied(ok);
     if (ok) toast.success('Đã copy tin nhắn');
-    else toast.error('Không copy được — hãy bôi đen và Ctrl+C');
+    else toast.error('Không copy được - hãy bôi đen và Ctrl+C');
   };
 
   const handleOpenForgotZalo = () => {
@@ -222,8 +222,8 @@ const LoginPage = ({ onLogin }) => {
         <div className="hidden md:flex md:w-1/2 p-10 lg:p-16 flex-col justify-center relative min-w-0">
           <div className="absolute top-10 left-10">
             <div className="cms-login-chip">
-               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
-               <span>Hệ thống quản lý trực tuyến</span>
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
+              <span>Hệ thống quản lý trực tuyến</span>
             </div>
           </div>
           <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000">
@@ -282,70 +282,70 @@ const LoginPage = ({ onLogin }) => {
                 ))}
               </div>
 
-            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5" noValidate>
-              {inactivityMsg && (
-                <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-3 text-amber-300 text-sm font-bold">
-                  <Clock size={18} aria-hidden="true" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
-                </div>
-              )}
-              {error && (
-                <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex flex-col gap-2 text-red-400 text-sm font-bold">
-                  <div className="flex items-center gap-3">
-                    <AlertCircle size={18} aria-hidden="true" className="shrink-0" />
-                    <span>{error}</span>
+              <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5" noValidate>
+                {inactivityMsg && (
+                  <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-3 text-amber-300 text-sm font-bold">
+                    <Clock size={18} aria-hidden="true" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
                   </div>
-                  {(String(error).includes('đăng ký') || String(error).includes('khóa học')) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const q = new URLSearchParams({ reEnroll: '1' });
-                        if (phone) q.set('phone', normalizePhone(phone) || phone);
-                        navigate(`/dangkykhoahoc?${q.toString()}`);
-                      }}
-                      className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black  tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
-                    >
-                      Đăng ký / thanh toán khóa học
-                      <NavArrow size={14} className="text-white" />
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="space-y-3 sm:space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">Số điện thoại</label>
-                  <div className="cms-login-field group">
-                    <User size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
-                    <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(limitPhoneInput(e.target.value))} autoComplete="tel" maxLength={PHONE_MAX_DIGITS + 1}
-                      className="cms-login-input"
-                      placeholder="VD: 0912345678" />
+                )}
+                {error && (
+                  <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex flex-col gap-2 text-red-400 text-sm font-bold">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle size={18} aria-hidden="true" className="shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                    {(String(error).includes('đăng ký') || String(error).includes('khóa học')) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const q = new URLSearchParams({ reEnroll: '1' });
+                          if (phone) q.set('phone', normalizePhone(phone) || phone);
+                          navigate(`/dangkykhoahoc?${q.toString()}`);
+                        }}
+                        className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black  tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
+                      >
+                        Đăng ký / thanh toán khóa học
+                        <NavArrow size={14} className="text-white" />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">Số điện thoại</label>
+                    <div className="cms-login-field group">
+                      <User size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                      <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(limitPhoneInput(e.target.value))} autoComplete="tel" maxLength={PHONE_MAX_DIGITS + 1}
+                        className="cms-login-input"
+                        placeholder="VD: 0912345678" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="login-password" className="text-xs font-bold text-slate-400 block ml-1">Mật khẩu</label>
+                    <div className="cms-login-field group">
+                      <Lock size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                      <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
+                        className="cms-login-input"
+                        placeholder="••••••••" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} className="shrink-0 text-slate-400 hover:text-white transition-colors">
+                        {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="login-password" className="text-xs font-bold text-slate-400 block ml-1">Mật khẩu</label>
-                  <div className="cms-login-field group">
-                    <Lock size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
-                    <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
-                      className="cms-login-input"
-                      placeholder="••••••••" />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} className="shrink-0 text-slate-400 hover:text-white transition-colors">
-                      {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-                    </button>
-                  </div>
+                <div className="flex justify-end -mt-2">
+                  <button type="button" onClick={() => { setShowForgot(true); setForgotRole(role); setForgotStep(1); }}
+                    className="text-xs font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1">
+                    <KeyRound size={12} aria-hidden="true" /> Quên mật khẩu?
+                  </button>
                 </div>
-              </div>
-              <div className="flex justify-end -mt-2">
-                <button type="button" onClick={() => { setShowForgot(true); setForgotRole(role); setForgotStep(1); }}
-                  className="text-xs font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1">
-                  <KeyRound size={12} aria-hidden="true" /> Quên mật khẩu?
+                <button type="submit" disabled={loading} className="cms-login-submit">
+                  <span className="cms-login-shine" aria-hidden="true" />
+                  {loading
+                    ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                    : <><LogIn size={18} aria-hidden="true" /> Đăng nhập ngay</>}
                 </button>
-              </div>
-              <button type="submit" disabled={loading} className="cms-login-submit">
-                <span className="cms-login-shine" aria-hidden="true" />
-                {loading
-                  ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
-                  : <><LogIn size={18} aria-hidden="true" /> Đăng nhập ngay</>}
-              </button>
-            </form>
+              </form>
             </div>
 
             <div className="grid grid-cols-3 gap-2 md:hidden">
@@ -378,7 +378,7 @@ const LoginPage = ({ onLogin }) => {
                 <div>
                   <h3 className="text-white font-black text-lg">Quên mật khẩu</h3>
                   <p className="text-white/70 text-xs font-medium">
-                    {forgotStep === 1 ? 'Nhập SĐT › xác nhận' : 'Tin nhắn đã sẵn — chỉ việc gửi'}
+                    {forgotStep === 1 ? 'Nhập SĐT › xác nhận' : 'Tin nhắn đã sẵn - chỉ việc gửi'}
                   </p>
                 </div>
               </div>
@@ -419,7 +419,7 @@ const LoginPage = ({ onLogin }) => {
                   ) : (
                     <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3">
                       <p className="text-sky-300 text-xs font-bold leading-relaxed">
-                        Nhập SĐT đăng ký — sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.
+                        Nhập SĐT đăng ký - sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.
                       </p>
                     </div>
                   )}
@@ -454,7 +454,7 @@ const LoginPage = ({ onLogin }) => {
 
                   <div className={`rounded-xl p-3 text-xs font-bold ${copied ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-sky-500/10 border border-sky-500/20 text-sky-300'}`}>
                     {copied
-                      ? '✓ Đã copy — mở Zalo Admin rồi dán (Ctrl+VN? / giữ để dán) và gửi.'
+                      ? '✓ Đã copy - mở Zalo Admin rồi dán (Ctrl+VN? / giữ để dán) và gửi.'
                       : '① Bấm Copy › ② Bấm Zalo Admin › dán tin nhắn và gửi.'}
                   </div>
 
@@ -462,11 +462,10 @@ const LoginPage = ({ onLogin }) => {
                     <button
                       type="button"
                       onClick={handleCopyForgotMessage}
-                      className={`py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition ${
-                        copied
+                      className={`py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition ${copied
                           ? 'bg-emerald-500 text-white'
                           : 'bg-white/5 border border-white/15 text-white hover:bg-white/10'
-                      }`}
+                        }`}
                     >
                       {copied ? <Check size={16} /> : <Copy size={16} />}
                       {copied ? 'Đã copy' : 'Copy'}

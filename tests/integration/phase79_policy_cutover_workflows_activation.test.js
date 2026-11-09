@@ -1,5 +1,5 @@
 /**
- * Phase 7.9 — Controlled cutover + production activation for /api/workflows
+ * Phase 7.9 - Controlled cutover + production activation for /api/workflows
  * (alongside backups, monitoring, tenants, system-logs, ai Policy-primary).
  *
  * Legacy gate: auth + isAdmin (role admin|staff). Advance/realtime stay in Legacy service.
@@ -56,10 +56,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -295,7 +295,7 @@ test('Phase7.9 advance protection: gate/shadow/policy never call advance or emit
     assert.ok(!src.includes('enqueue('));
     assert.ok(!src.includes('io.emit'));
   }
-  // Shadow may lean-read WorkflowInstance for ctx only — no mutation APIs
+  // Shadow may lean-read WorkflowInstance for ctx only - no mutation APIs
   assert.ok(!shadow.includes('.create('));
   assert.ok(!shadow.includes('findOneAndUpdate'));
   assert.ok(!shadow.includes('findByIdAndDelete'));
@@ -359,16 +359,16 @@ test('Phase7.9 rollback: remove workflows → LEGACY; prior families stay POLICY
   const parsed = parseDotEnvFile();
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('workflows'));
-      assert.ok(restoredRoutes.includes('ai'));
-      assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('workflows'));
+    assert.ok(restoredRoutes.includes('ai'));
+    assert.ok(restoredRoutes.includes('backups'));
   }
 });
 
 test('Phase7.9 cross-family isolation: only allowlisted families Policy-primary', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'courses', 'training', 'quizzes', 'assignments', 'evaluations', 
+    'courses', 'training', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'files', 'builder', 'blog', 'feed', 'schedules',
     'messages', 'notifications', 'settings', 'staff', 'branches', 'employees',
   ];
@@ -386,8 +386,8 @@ test('Phase7.9 functional smoke: definitions/list authz PASS; create/sync/advanc
   assert.equal(parity('list', staff).policy.decision, 'ALLOW');
   assert.equal(parity('get', staff).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/sync/advance production mutation',
-    'NOT EXECUTED — create/sync/advance production mutation',
+    'NOT EXECUTED - create/sync/advance production mutation',
+    'NOT EXECUTED - create/sync/advance production mutation',
   );
 });
 
@@ -406,7 +406,7 @@ test('Phase7.9 static final authority + isolation + CQRS OFF + no wildcard', () 
   if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 
   for (const a of ACTIONS) {
     assert.ok(routes.includes(`guard('${a}')`), a);

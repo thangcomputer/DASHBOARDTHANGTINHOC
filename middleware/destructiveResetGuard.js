@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Phase 1 data-safety remediation — fail-closed kill switch for
+ * Phase 1 data-safety remediation - fail-closed kill switch for
  * POST /api/settings/reset-data (bulk deleteMany across Student/Finance/etc).
  *
  * Independent of RBAC (settingsGuard/checkPermission): even a valid

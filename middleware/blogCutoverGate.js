@@ -1,5 +1,5 @@
 /**
- * Phase 7.16 — Controlled cutover gate for LIVE /api/blog ONLY.
+ * Phase 7.16 - Controlled cutover gate for LIVE /api/blog ONLY.
  *
  * LEGACY (default):
  *   - list/get → auth already applied (router.use); pass-through
@@ -113,7 +113,7 @@ function blogCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] blog authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] blog authority helper failed - Legacy gate',
       );
     }
 
@@ -158,7 +158,7 @@ function blogCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] blog Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] blog Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

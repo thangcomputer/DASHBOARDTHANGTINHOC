@@ -63,7 +63,7 @@ export function getLessonCompletionProgressUi(lesson) {
     required,
     towardGatePct,
     remainingPct: towardGatePct == null ? null : Math.max(0, 100 - towardGatePct),
-    /** @deprecated dùng fullyWatched — trước đây = isCompleted (cửa 67%) */
+    /** @deprecated dùng fullyWatched - trước đây = isCompleted (cửa 67%) */
     completed: fullyWatched,
     gateCompleted,
     fullyWatched,
@@ -136,7 +136,7 @@ export function getLessonAccessStatusLines(lesson, opts = {}) {
   if (p.freeSeek && !p.eligible) {
     lines.push({
       key: 'freeseek',
-      text: 'Tua tự do — vẫn cần đủ tiến độ xem',
+      text: 'Tua tự do - vẫn cần đủ tiến độ xem',
       tone: 'warn',
     });
   }
@@ -228,7 +228,7 @@ export function lessonSidebarChipClass(tone) {
 }
 
 /**
- * Player overlay badge — “Đã hoàn thành” chỉ khi xem đủ 100% video;
+ * Player overlay badge - “Đã hoàn thành” chỉ khi xem đủ 100% video;
  * cửa ≥67% / isCompleted → “Đủ điều kiện…”.
  */
 export function getPlayerCompletionBadgeText({
@@ -285,7 +285,7 @@ export function lessonChapterKey(lesson) {
   return String(lesson?.chapterTitle || 'Chương 1');
 }
 
-/** Số thứ tự trong chương (0-based) — tránh nhảy cóc khi dùng index toàn khóa. */
+/** Số thứ tự trong chương (0-based) - tránh nhảy cóc khi dùng index toàn khóa. */
 export function getChapterLessonIndex(lessons, lesson) {
   if (!lesson) return 0;
   const key = lessonChapterKey(lesson);

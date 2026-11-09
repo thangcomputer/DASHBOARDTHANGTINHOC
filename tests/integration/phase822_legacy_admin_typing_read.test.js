@@ -1,5 +1,5 @@
 /**
- * Phase 8.22 — Legacy admin_admin typing/read room targeting.
+ * Phase 8.22 - Legacy admin_admin typing/read room targeting.
  * Does NOT change RBAC, identity, conversationId, or DM message send.
  */
 const { describe, it } = require('node:test');

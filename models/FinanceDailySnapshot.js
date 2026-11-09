@@ -1,5 +1,5 @@
 /**
- * FinanceDailySnapshot — pre-aggregate theo ngày/chi nhánh từ Ledger (rebuild được).
+ * FinanceDailySnapshot - pre-aggregate theo ngày/chi nhánh từ Ledger (rebuild được).
  * Không phải SoT độc lập.
  */
 const mongoose = require('mongoose');

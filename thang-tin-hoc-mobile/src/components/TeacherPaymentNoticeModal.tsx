@@ -43,7 +43,7 @@ export function TeacherPaymentNoticeModal({ user, onViewFinance }: { user: DemoU
     if (!enabled) return undefined;
     let alive = true;
     const load = () => {
-      getTeacherPaymentNotices().then((notices) => { if (alive) enqueue(notices); }).catch(() => {});
+      getTeacherPaymentNotices().then((notices) => { if (alive) enqueue(notices); }).catch(() => { });
     };
     load();
     const realtime = DeviceEventEmitter.addListener(SOCKET_EVENTS.TEACHER_PAYMENT_RECEIVED, (raw: unknown) => {
@@ -80,7 +80,7 @@ export function TeacherPaymentNoticeModal({ user, onViewFinance }: { user: DemoU
 
   const dismiss = useCallback(() => {
     if (!current) return;
-    markTeacherPaymentNoticeSeen(current.id).catch(() => {});
+    markTeacherPaymentNoticeSeen(current.id).catch(() => { });
     setQueue((existing) => existing.filter((notice) => notice.id !== current.id));
   }, [current]);
 
@@ -122,7 +122,7 @@ export function TeacherPaymentNoticeModal({ user, onViewFinance }: { user: DemoU
             <Text style={styles.subtitle}>
               Admin đã chuyển tiền hoa hồng cho bạn{current.month ? ` (${current.month})` : ''}.
             </Text>
-            {remaining > 0 ? <Text style={styles.remaining}>{`Còn ${remaining} lần thanh toán khác — đóng để xem tiếp.`}</Text> : null}
+            {remaining > 0 ? <Text style={styles.remaining}>{`Còn ${remaining} lần thanh toán khác - đóng để xem tiếp.`}</Text> : null}
             <View style={styles.stats}>
               <View style={[styles.stat, styles.statSessions]}>
                 <Text style={styles.statLabel}>Số buổi</Text>
@@ -149,7 +149,7 @@ export function TeacherPaymentNoticeModal({ user, onViewFinance }: { user: DemoU
           </View>
         </Animated.View>
       </Pressable>
-    </Modal>
+    </Modal >
   );
 }
 
@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.brand,
-    backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
-    boxShadow: '0px 8px 18px rgba(185, 28, 28, 0.3), inset 0px 2px 3px rgba(255, 255, 255, 0.35), inset 0px -3px 6px rgba(127, 29, 29, 0.45)',
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 55%, #047857 100%)',
+    boxShadow: '0px 8px 18px rgba(4, 120, 87, 0.3), inset 0px 2px 3px rgba(255, 255, 255, 0.35), inset 0px -3px 6px rgba(4, 120, 87, 0.45)',
   } as never,
   primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
 });

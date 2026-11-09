@@ -1,8 +1,8 @@
-# ADD STUDENT — Hình thức học trước, địa điểm sau
+# ADD STUDENT - Hình thức học trước, địa điểm sau
 
 **Date:** 2026-08-11  
 **Component:** [`client/src/components/admin/shared/AddStudentModal.jsx`](../../client/src/components/admin/shared/AddStudentModal.jsx)  
-**Scope:** UI-only — không đổi Branch schema, payment/QR, Messaging
+**Scope:** UI-only - không đổi Branch schema, payment/QR, Messaging
 
 ---
 
@@ -10,16 +10,16 @@
 
 Super Admin, bước **2. Đăng ký khóa học**:
 
-1. Cơ sở (chi nhánh) — mọi branch trong list  
-2. Hình thức học — Tại cơ sở / Online  
+1. Cơ sở (chi nhánh) - mọi branch trong list  
+2. Hình thức học - Tại cơ sở / Online  
 3. Khóa học & học phí  
 
 Vấn đề: chọn chi nhánh tên chứa `online` mới ép `learningMode = ONLINE`; đổi hình thức **không** lọc địa điểm → dễ chọn nhầm địa điểm online khi đang «Tại cơ sở».
 
 ## Flow mới
 
-1. **Hình thức học** — Tại cơ sở (`OFFLINE`) / Online (`ONLINE`)  
-2. **Địa điểm (chi nhánh)** — list đã lọc theo hình thức  
+1. **Hình thức học** - Tại cơ sở (`OFFLINE`) / Online (`ONLINE`)  
+2. **Địa điểm (chi nhánh)** - list đã lọc theo hình thức  
 3. Khóa học & học phí  
 
 ### Lọc địa điểm (heuristic, không schema)
@@ -36,7 +36,7 @@ Caption dưới label địa điểm:
 - Online → «Cơ sở / khu online»  
 - Tại cơ sở → «Cơ sở đào tạo trực tiếp»
 
-Staff không Super Admin: không hiện dropdown địa điểm (giữ behavior cũ — branch theo context).
+Staff không Super Admin: không hiện dropdown địa điểm (giữ behavior cũ - branch theo context).
 
 ---
 

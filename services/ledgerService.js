@@ -1,5 +1,5 @@
 /**
- * Ledger service — append-only accounting (Phase 10 / ADR 0001).
+ * Ledger service - append-only accounting (Phase 10 / ADR 0001).
  * Financial revenue = Σ signedAmount (payment − refund). Soft-delete course không đụng ledger.
  */
 const LedgerEntry = require('../models/LedgerEntry');
@@ -90,7 +90,7 @@ async function settlePayment({
   const key = idempotencyKey
     || `payment:${source}:${student?._id || 'x'}:${sourceRef || invoice?._id || 'missing-ref'}`;
   if (!idempotencyKey && !(sourceRef || invoice?._id)) {
-    logger.warn('[ledger] settlePayment missing stable sourceRef/invoice — key may collide');
+    logger.warn('[ledger] settlePayment missing stable sourceRef/invoice - key may collide');
   }
 
   const { entry, created } = await postEntry({
@@ -122,7 +122,7 @@ async function settlePayment({
     const sameEnr = wantEnr ? gotEnr === wantEnr : true;
     if (!(sameStudent && sameAmt && sameType && sameEnr)) {
       const err = new Error(
-        'Ledger idempotency trùng nhưng khác enrollment/số tiền — từ chối ghi im lặng',
+        'Ledger idempotency trùng nhưng khác enrollment/số tiền - từ chối ghi im lặng',
       );
       err.status = 409;
       err.code = 'LEDGER_IDEMPOTENCY_COLLISION';
@@ -184,7 +184,7 @@ async function postRefund({
   const key = idempotencyKey
     || `refund:${student?._id || 'x'}:${sourceRef || 'missing-ref'}`;
   if (!idempotencyKey && !sourceRef) {
-    logger.warn('[ledger] postRefund missing stable sourceRef — key may collide');
+    logger.warn('[ledger] postRefund missing stable sourceRef - key may collide');
   }
 
   const { entry, created } = await postEntry({
@@ -239,7 +239,7 @@ async function postRefund({
         actor,
       });
     } catch (err) {
-      logger.error('[ledger] credit note on refund FAILED — void refund entry: %s', err.message);
+      logger.error('[ledger] credit note on refund FAILED - void refund entry: %s', err.message);
       try {
         await voidLedgerEntry({
           entryId: entry._id,
@@ -344,7 +344,7 @@ async function reconciliationReport({ branchId = null, from = null, to = null } 
     if (from) invMatch.createdAt.$gte = new Date(from);
     if (to) invMatch.createdAt.$lte = new Date(to);
   }
-  // Invoice không có branchId — lọc qua student nếu có branch
+  // Invoice không có branchId - lọc qua student nếu có branch
   let invoiceTotal = 0;
   let invoiceCount = 0;
   if (branchId) {
@@ -377,7 +377,7 @@ async function reconciliationReport({ branchId = null, from = null, to = null } 
   };
 }
 
-/** Pure helper — soft-delete course không đổi Σ ledger (dùng trong test). */
+/** Pure helper - soft-delete course không đổi Σ ledger (dùng trong test). */
 function financialRevenueUnaffectedByCourseDelete(ledgerNetBefore, ledgerNetAfter) {
   return Number(ledgerNetBefore) === Number(ledgerNetAfter);
 }
@@ -444,9 +444,9 @@ async function listLedgerEntries({
 }
 
 /**
- * Ghi PAYMENT còn thiếu cho enrollment đã paid (active) — thường gặp sau đăng ký lại
+ * Ghi PAYMENT còn thiếu cho enrollment đã paid (active) - thường gặp sau đăng ký lại
  * khi settlePayment trả created:false do trùng idempotency mà UI vẫn giữ paid + HĐ.
- * Chỉ match theo enrollmentId (không soft-match courseName — tránh gắn nhầm payment khóa đã hủy).
+ * Chỉ match theo enrollmentId (không soft-match courseName - tránh gắn nhầm payment khóa đã hủy).
  */
 async function healOrphanEnrollmentPayments(student) {
   if (!student?._id) return { healed: 0 };
@@ -510,7 +510,7 @@ async function healOrphanEnrollmentPayments(student) {
 }
 
 /**
- * Student Finance Card — 5 chỉ tiêu TO-BE (+ outstanding).
+ * Student Finance Card - 5 chỉ tiêu TO-BE (+ outstanding).
  */
 async function getStudentFinanceCard(studentId) {
   const Student = require('../models/Student');
@@ -523,7 +523,7 @@ async function getStudentFinanceCard(studentId) {
     throw err;
   }
 
-  // Heal orphans chỉ qua admin reconcile endpoint — không mint revenue trên GET card
+  // Heal orphans chỉ qua admin reconcile endpoint - không mint revenue trên GET card
   // (tránh silent PAYMENT từ UI flags / SePay half-state)
 
   const enrollments = Array.isArray(student.enrollments) ? student.enrollments : [];
@@ -570,7 +570,7 @@ async function getStudentFinanceCard(studentId) {
     registeredFee,
     /** UI "Đã thanh toán" = chỉ khóa còn hiệu lực đã thu (không tính khóa đã hủy) */
     paidCashIn: activePaidCash,
-    /** Gross ledger (mọi PAYMENT từng ghi) — đối soát */
+    /** Gross ledger (mọi PAYMENT từng ghi) - đối soát */
     ledgerPayments,
     refundedCashOut,
     activeCourseValue,
@@ -945,7 +945,7 @@ async function revenueByCourseFromLedger({
 }
 
 /**
- * Net revenue theo ngày/tháng (PAYMENT − REFUND) từ Ledger — BI / Analytics.
+ * Net revenue theo ngày/tháng (PAYMENT − REFUND) từ Ledger - BI / Analytics.
  * Bucket theo Asia/Ho_Chi_Minh (không dùng UTC midnight).
  */
 async function listNetRevenueByDay({

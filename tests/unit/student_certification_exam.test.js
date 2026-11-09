@@ -24,7 +24,7 @@ function seqRandom(seq) {
   };
 }
 
-test('A — question shuffle: same ids, count, no duplicates', async () => {
+test('A - question shuffle: same ids, count, no duplicates', async () => {
   const {
     buildCertificationExamInstance,
   } = await loadMod();
@@ -40,7 +40,7 @@ test('A — question shuffle: same ids, count, no duplicates', async () => {
   assert.deepEqual(raw, original);
 });
 
-test('B/C — option shuffle remaps answer to same text', async () => {
+test('B/C - option shuffle remaps answer to same text', async () => {
   const { withShuffledOptions } = await loadMod();
   const q = makeQ('x', ['A', 'B', 'C', 'D'], 2);
   const original = structuredClone(q);
@@ -58,7 +58,7 @@ test('B/C — option shuffle remaps answer to same text', async () => {
   }
 });
 
-test('D — multiple questions independent (no shared options array)', async () => {
+test('D - multiple questions independent (no shared options array)', async () => {
   const { buildCertificationExamInstance } = await loadMod();
   const raw = [
     makeQ('1', ['A1', 'B1', 'C1', 'D1'], 0),
@@ -70,7 +70,7 @@ test('D — multiple questions independent (no shared options array)', async () 
   assert.equal(raw[0].options[0], 'A1');
 });
 
-test('E — grading regression with remapped answers', async () => {
+test('E - grading regression with remapped answers', async () => {
   const { buildCertificationExamInstance, gradeMcByAnswerIndex } = await loadMod();
   const raw = [
     makeQ('1', ['Paris', 'London', 'Berlin', 'Rome'], 0),
@@ -87,7 +87,7 @@ test('E — grading regression with remapped answers', async () => {
   });
 });
 
-test('F — no mutation of raw source', async () => {
+test('F - no mutation of raw source', async () => {
   const { withShuffledOptions, buildCertificationExamInstance } = await loadMod();
   const q = makeQ('m', ['A', 'B', 'C', 'D'], 1);
   const snap = structuredClone(q);
@@ -96,7 +96,7 @@ test('F — no mutation of raw source', async () => {
   assert.deepEqual(q, snap);
 });
 
-test('G — reload stability via resolveCertificationExamAttempt', async () => {
+test('G - reload stability via resolveCertificationExamAttempt', async () => {
   const {
     buildCertificationExamInstance,
     resolveCertificationExamAttempt,
@@ -126,7 +126,7 @@ test('G — reload stability via resolveCertificationExamAttempt', async () => {
   assert.equal(resumed.timeLeft, 500);
 });
 
-test('H — malformed options do not throw', async () => {
+test('H - malformed options do not throw', async () => {
   const { withShuffledOptions, buildCertificationExamInstance } = await loadMod();
   assert.doesNotThrow(() => withShuffledOptions({ id: 'e', options: [], answer: 0 }));
   assert.doesNotThrow(() => withShuffledOptions({ id: 'e2', options: ['only'], answer: 0 }));

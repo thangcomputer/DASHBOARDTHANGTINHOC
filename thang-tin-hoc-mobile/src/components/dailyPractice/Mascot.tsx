@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, Platform, StyleSheet, type ImageSourcePropType } from 'react-native';
 
 export type MascotMood =
@@ -41,7 +41,7 @@ const MOOD_SRC: Record<MascotMood, ImageSourcePropType> = {
 const BOUNCE_MOODS = new Set<MascotMood>(['happy', 'celebrate', 'graduate', 'done', 'energy']);
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
-/** Linh vật đồng hành luyện tập — hiển thị GIF động theo cảm xúc từng ngữ cảnh (đồng bộ Web App). */
+/** Linh vật đồng hành luyện tập - hiển thị GIF động theo cảm xúc từng ngữ cảnh (đồng bộ Web App). */
 export function Mascot({ mood = 'idle', size = 96 }: { mood?: MascotMood; size?: number }) {
   const key: MascotMood = mood && MOOD_SRC[mood] ? mood : 'idle';
   const source = MOOD_SRC[key];

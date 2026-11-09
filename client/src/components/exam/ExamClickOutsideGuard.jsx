@@ -166,7 +166,7 @@ export default function ExamClickOutsideGuard({
                 <p className="text-orange-600 font-extrabold mt-3 text-xs  tracking-wide">
                   Cảnh báo {strikeCount}/{maxStrikes}
                   {strikeCount < maxStrikes
-                    ? ` — còn ${maxStrikes - strikeCount} lần, lần sau bài thi sẽ bị hủy.`
+                    ? ` - còn ${maxStrikes - strikeCount} lần, lần sau bài thi sẽ bị hủy.`
                     : ''}
                 </p>
               )}

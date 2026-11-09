@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   DeviceEventEmitter,
@@ -144,8 +144,8 @@ export function TeacherFinanceScreen() {
       payments.unshift({
         id: 'synthetic-pending-commission',
         description: overview.pendingSessionsCount > 0
-          ? `Hoa hồng ${overview.pendingSessionsCount} buổi dạy đã hoàn thành — chờ Admin chuyển`
-          : 'Hoa hồng buổi dạy đã hoàn thành — chờ Admin chuyển',
+          ? `Hoa hồng ${overview.pendingSessionsCount} buổi dạy đã hoàn thành - chờ Admin chuyển`
+          : 'Hoa hồng buổi dạy đã hoàn thành - chờ Admin chuyển',
         month: 'Hiện tại',
         amount: syntheticAmount,
         status: 'pending',
@@ -245,7 +245,7 @@ export function TeacherFinanceScreen() {
 
       const rows: Array<Array<string | number>> = [
         [`BẢNG KÊ THU NHẬP ${monthTitle.toUpperCase()}`],
-        [`Giảng viên: ${user?.name || '—'}`],
+        [`Giảng viên: ${user?.name || '-'}`],
         [],
         ['Học viên', 'Khóa học', 'Ngày dạy', 'Buổi số', 'Tiền/buổi (VNĐ)'],
       ];
@@ -255,8 +255,8 @@ export function TeacherFinanceScreen() {
           rows.push([
             student.studentName,
             session.course,
-            session.date ? new Date(`${session.date}T12:00:00`).toLocaleDateString('vi-VN') : '—',
-            session.number || '—',
+            session.date ? new Date(`${session.date}T12:00:00`).toLocaleDateString('vi-VN') : '-',
+            session.number || '-',
             session.amount,
           ]);
         });

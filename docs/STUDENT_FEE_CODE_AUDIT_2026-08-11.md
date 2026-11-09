@@ -2,13 +2,13 @@
 
 **Status:** REPORT ONLY (không đổi runtime)  
 **Date:** 2026-08-11  
-**Authority:** Live paths — `models/Student.js`, `AddStudentModal.jsx`, `routes/studentRoutes.js`, `routes/webhookRoutes.js`, `TuitionPaymentModal.jsx`, `models/Employee.js`, `routes/employeeRoutes.js`
+**Authority:** Live paths - `models/Student.js`, `AddStudentModal.jsx`, `routes/studentRoutes.js`, `routes/webhookRoutes.js`, `TuitionPaymentModal.jsx`, `models/Employee.js`, `routes/employeeRoutes.js`
 
 ---
 
 ## Kết luận
 
-**Không khớp.** Mã học viên phục vụ **nhận học phí (SePay / QR)**. Nhân viên **không có** `employeeCode` — chỉ `_id` Mongo + chi trả lương thủ công (VietQR outbound). Hai luồng không dùng chung prefix, uniqueness hay logic khớp CK.
+**Không khớp.** Mã học viên phục vụ **nhận học phí (SePay / QR)**. Nhân viên **không có** `employeeCode` - chỉ `_id` Mongo + chi trả lương thủ công (VietQR outbound). Hai luồng không dùng chung prefix, uniqueness hay logic khớp CK.
 
 Ngoài ra, **trong nội bộ học viên** mã cũng **lệch** (`TTH…` phía QR vs `HV…` phía server).
 
@@ -29,9 +29,9 @@ Ngoài ra, **trong nội bộ học viên** mã cũng **lệch** (`TTH…` phía
 
 ## 1. Mã học viên
 
-- Lưu: `models/Student.js` — `studentCode` (“Mã HV dùng trong nội dung QR”).
+- Lưu: `models/Student.js` - `studentCode` (“Mã HV dùng trong nội dung QR”).
 - Sinh mã:
-  - `client/src/components/admin/shared/AddStudentModal.jsx`: `TTH` + 5 số cuối `Date.now()` — gắn vào nội dung CK / payload khi QR thành công.
+  - `client/src/components/admin/shared/AddStudentModal.jsx`: `TTH` + 5 số cuối `Date.now()` - gắn vào nội dung CK / payload khi QR thành công.
   - `routes/studentRoutes.js` create: nếu trống → `HV` + 8 số từ `Date.now()`.
   - Lưu chưa thanh toán / cash thường **không** gửi `TTH` từ modal → server gán **`HV…`**.
 - `client/src/components/TuitionPaymentModal.jsx`: dùng `studentCode` đã lưu, không có thì lấy đuôi `_id`.
@@ -67,7 +67,7 @@ flowchart TD
 | Nơi | Pattern |
 |-----|---------|
 | AddStudent / AddEnrollment | `{Tên8} TTH##### Nop hoc phi` |
-| RegistrationForm | `{branch?} {TÊN8} Nop hoc phi` — **không có** TTH/HV |
+| RegistrationForm | `{branch?} {TÊN8} Nop hoc phi` - **không có** TTH/HV |
 | TuitionPaymentModal | `{studentCode} Nop hoc phi {khóa}` |
 | Hint chi nhánh (docs UI) | `CS1 TTH### Nop hoc phi` |
 
@@ -77,7 +77,7 @@ flowchart TD
 
 ## 3. Mã / thanh toán nhân viên
 
-- `models/Employee.js`: name, phone, salary, bank… — **không** `employeeCode`.
+- `models/Employee.js`: name, phone, salary, bank… - **không** `employeeCode`.
 - Trả lương: `routes/employeeRoutes.js` `POST /:id/pay` → `PayrollLog`; QR VietQR tới tài khoản NV với ghi chú tự do.
 - **Không** dùng SePay inbound / `studentCode`.
 
@@ -87,10 +87,10 @@ flowchart TD
 
 | Câu hỏi | Trả lời |
 |---------|---------|
-| Cùng prefix TTH/HV? | **Không** — NV không có mã |
+| Cùng prefix TTH/HV? | **Không** - NV không có mã |
 | Cùng rule unique? | **Không** |
 | Cùng logic khớp thanh toán? | **Không** |
-| Mã HV có ổn định nội bộ? | **Một phần** — TTH (QR) vs HV (server) dễ lệch |
+| Mã HV có ổn định nội bộ? | **Một phần** - TTH (QR) vs HV (server) dễ lệch |
 
 ---
 
@@ -99,7 +99,7 @@ flowchart TD
 1. QR hiện `TTH…` nhưng bản ghi lưu `HV…` (cash / quên gửi code) → rematch webhook theo mã khó.
 2. `studentCode` không unique → trùng timestamp hiếm nhưng có thể.
 3. Form đăng ký công khai CK theo tên, không theo mã lưu DB.
-4. Nhân viên không có hệ mã song song — không thể “đối soát mã NV ↔ mã HV”.
+4. Nhân viên không có hệ mã song song - không thể “đối soát mã NV ↔ mã HV”.
 
 ---
 
@@ -108,4 +108,4 @@ flowchart TD
 - **HV ↔ NV:** không cùng hệ mã / không cùng luồng thanh toán → **không khớp**.
 - **HV mã ↔ thanh toán học phí:** có thiết kế khớp qua `studentCode` + session, nhưng **triển khai không thống nhất** (TTH vs HV, nhiều format CK).
 
-Báo cáo only — chưa sửa code. Chuẩn hóa (một prefix `studentCode`, gửi mã khi create, optional `employeeCode`) chỉ khi được yêu cầu riêng.
+Báo cáo only - chưa sửa code. Chuẩn hóa (một prefix `studentCode`, gửi mã khi create, optional `employeeCode`) chỉ khi được yêu cầu riêng.

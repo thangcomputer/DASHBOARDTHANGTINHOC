@@ -47,7 +47,7 @@ artifacts/mongo_data/
 .vscode/
 .idea/
 
-# Thư mục lồng nhau nhầm (bản copy utils) — không đưa lên Git
+# Thư mục lồng nhau nhầm (bản copy utils) - không đưa lên Git
 /dashboardthangtinhoc/
 
 # One-shot generators / local probes (do not re-commit to root)
@@ -75,3 +75,7 @@ full_deploy.cjs
 deploy/full_deploy.cjs
 
 backups/
+
+# Separate standalone project
+landingpage-dewskill/
+

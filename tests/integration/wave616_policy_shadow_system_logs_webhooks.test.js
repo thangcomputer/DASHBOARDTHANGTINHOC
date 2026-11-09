@@ -1,6 +1,6 @@
 /**
- * Wave 6.16 — Policy SHADOW for LIVE /api/system-logs + /api/webhooks (SePay).
- * JWT webhook session/status already shadowed by financePolicy (Wave 6.6) — not re-wired.
+ * Wave 6.16 - Policy SHADOW for LIVE /api/system-logs + /api/webhooks (SePay).
+ * JWT webhook session/status already shadowed by financePolicy (Wave 6.6) - not re-wired.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -150,7 +150,7 @@ test('Wave6.16 SEPAY: verified / dev_skip ALLOW; invalid/missing/not_configured 
   );
 });
 
-test('Wave6.16 SEPAY: spoof body/header fields ignored — decision follows trusted ctx only', () => {
+test('Wave6.16 SEPAY: spoof body/header fields ignored - decision follows trusted ctx only', () => {
   assert.equal(
     assertWh('spoof-deny', { verificationStatus: 'invalid_signature' }, {
       bodyRole: 'admin',

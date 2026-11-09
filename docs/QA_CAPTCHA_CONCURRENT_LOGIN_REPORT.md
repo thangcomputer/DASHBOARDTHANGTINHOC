@@ -7,7 +7,7 @@
 
 | ID | Name | Result | Actual |
 |----|------|--------|--------|
-| CAPTCHA-00 | Server exposes captcha answer (NODE_ENV=test + CAPTCHA_BYPASS=1) | WARN | answer hidden — internal concurrent login may fail unless bypass on server |
+| CAPTCHA-00 | Server exposes captcha answer (NODE_ENV=test + CAPTCHA_BYPASS=1) | WARN | answer hidden - internal concurrent login may fail unless bypass on server |
 | AUTH-CONC-02a | Concurrent public login (36 HV+GV) | PASS | ok=36/36 wall=1707ms |
 | AUTH-CONC-02b | Concurrent internal login (7 Admin+Staff) | WARN | ok=0/7 wall=15ms sample=400:Mã bảo vệ không đúng. Vui lòng thử lại. |
 | AUTH-CONC-02 | Concurrent password(+CAPTCHA) login summary (43 users) | PASS | ok=36/43 public=36 internal=0 bypass=false |

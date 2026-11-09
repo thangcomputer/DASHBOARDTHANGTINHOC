@@ -346,7 +346,7 @@ export default function StudentQuestionBankPanel({
       toast.success(sqForm.id ? 'Đã cập nhật!' : 'Đã thêm câu hỏi!');
       setSqForm(null);
     } catch (err) {
-      toast.error(err.message || 'Lưu server thất bại — thử lại');
+      toast.error(err.message || 'Lưu server thất bại - thử lại');
     }
   };
 
@@ -374,7 +374,7 @@ export default function StudentQuestionBankPanel({
               disabled={coursesLoading || courses.length === 0}
               className="w-full border-2 border-sky-200 rounded-xl px-3 py-2.5 text-sm font-bold text-sky-900 bg-sky-50/40 outline-none focus:border-sky-500 disabled:opacity-60"
             >
-              {!selectedCourse && <option value="">— Chọn khóa học —</option>}
+              {!selectedCourse && <option value="">- Chọn khóa học -</option>}
               {courses.map((course) => (
                 <option key={course._id || course.id} value={course._id || course.id}>{course.name}</option>
               ))}
@@ -477,7 +477,7 @@ export default function StudentQuestionBankPanel({
                 : 'border-emerald-200 bg-emerald-50 text-emerald-800'
                 }`}
             >
-              {studentEssayRequired?.[activeSection] === false ? 'Tắt — chỉ TN' : 'Bật — TN + TL'}
+              {studentEssayRequired?.[activeSection] === false ? 'Tắt - chỉ TN' : 'Bật - TN + TL'}
             </button>
           </div>
           <div className="flex items-center gap-2 ml-auto">
@@ -514,10 +514,10 @@ export default function StudentQuestionBankPanel({
               <Volume2 size={16} className="text-slate-500 shrink-0" />
               {examWarningSoundUrl ? (
                 <span className="truncate text-emerald-700">
-                  Đã có file — {String(examWarningSoundUrl).split('/').pop()}
+                  Đã có file - {String(examWarningSoundUrl).split('/').pop()}
                 </span>
               ) : (
-                <span className="text-slate-400">Chưa tải — dùng beep mặc định</span>
+                <span className="text-slate-400">Chưa tải - dùng beep mặc định</span>
               )}
             </div>
           </div>
@@ -555,7 +555,7 @@ export default function StudentQuestionBankPanel({
                     studentExamFiles,
                     examWarningSoundUrl: '',
                   });
-                  toast.success('Đã gỡ âm thanh — dùng beep mặc định');
+                  toast.success('Đã gỡ âm thanh - dùng beep mặc định');
                 } catch (err) {
                   toast.error(err.message || 'Gỡ thất bại');
                 }
@@ -788,7 +788,7 @@ export default function StudentQuestionBankPanel({
                   </div>
                   <div>
                     <label className="text-[11px] font-bold  text-slate-500 block mb-2">
-                      Đáp án — bấm chữ cái để chọn đúng
+                      Đáp án - bấm chữ cái để chọn đúng
                     </label>
                     <div className="space-y-2">
                       {(sqForm.options || ['', '', '', '']).map((opt, i) => (
@@ -825,7 +825,7 @@ export default function StudentQuestionBankPanel({
                 <>
                   <div>
                     <label className="text-[11px] font-bold  text-slate-500 block mb-2">
-                      File đề riêng (PDF / Excel) <span className="text-slate-400 font-normal normal-case">— chỉ gắn với câu này</span>
+                      File đề riêng (PDF / Excel) <span className="text-slate-400 font-normal normal-case">- chỉ gắn với câu này</span>
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
                       {sqForm.attachedFileUrl ? (

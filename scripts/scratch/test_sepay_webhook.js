@@ -42,9 +42,9 @@ async function getLatestPendingSession() {
 
 // ─── Bước 2: Gửi webhook giả mạo SePay ────────────────────────────────────
 async function sendFakeWebhook(session) {
-  // Nội dung chuyển khoản giả — chứa ref của session
+  // Nội dung chuyển khoản giả - chứa ref của session
   const fakeContent = `Chuyen khoan ${session.ref} thanh toan hoc phi`;
-  
+
   const payload = JSON.stringify({
     transferAmount: session.amount,
     content: fakeContent,
@@ -75,7 +75,7 @@ async function sendFakeWebhook(session) {
       res.on('end', () => {
         const result = JSON.parse(data);
         console.log(`\n📥 Phản hồi từ server:`, result);
-        
+
         if (result.success && result.matched) {
           console.log('\n🎉 WEBHOOK HOẠT ĐỘNG! Hệ thống đã nhận diện thanh toán thành công!');
           console.log('   ✅ Session đã được cập nhật sang trạng thái PAID trong database.');

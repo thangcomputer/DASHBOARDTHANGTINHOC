@@ -1,6 +1,6 @@
 /**
  * Certification exam instance helpers (StudentTest only).
- * Shuffle is presentation-only — never mutate Question Bank source objects.
+ * Shuffle is presentation-only - never mutate Question Bank source objects.
  */
 
 /** Fisher–Yates. Optional `random` for deterministic tests. */

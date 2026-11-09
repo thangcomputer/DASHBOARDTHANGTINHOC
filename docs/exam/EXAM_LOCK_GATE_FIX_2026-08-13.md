@@ -18,7 +18,7 @@ Student could exit mid-exam (admin notified as locked/failed) then re-enter and 
 - `canEnterCertificationExam` / `isExamProgressLocked` in `examSubjects.js`
 - `khong_dat` = locked until admin resets to `chua_thi` (no self-retry)
 - `beginOrResumeExam` refuses locked subjects + clears attempt
-- Exam room shows "Đã rớt — chờ admin mở khóa"
+- Exam room shows "Đã rớt - chờ admin mở khóa"
 - `applyFailAndLock` on all fail/exit paths; clears certification attempt
 - Score writes use `revertOnFail: true`
 

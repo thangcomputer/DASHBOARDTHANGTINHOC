@@ -1,5 +1,5 @@
 /**
- * Phase 7.23 — Controlled cutover gate for LIVE /api/assignments ONLY.
+ * Phase 7.23 - Controlled cutover gate for LIVE /api/assignments ONLY.
  *
  * LEGACY (default):
  *   All actions → auth (+ branchFilter on create/update) already applied; pass-through.
@@ -168,7 +168,7 @@ function assignmentsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] assignments authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] assignments authority helper failed - Legacy gate',
       );
     }
 
@@ -213,7 +213,7 @@ function assignmentsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] assignments Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] assignments Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

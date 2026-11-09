@@ -79,7 +79,7 @@ function isAdminLike(subject) {
 }
 
 /**
- * GET /forms/:idOrSlug — published public; draft/admin path returns 404 (not 403) for others.
+ * GET /forms/:idOrSlug - published public; draft/admin path returns 404 (not 403) for others.
  * ctx.form: { status } | null (null = missing → ALLOW handler 404).
  */
 function evaluateFormGet(subject, ctx = {}) {
@@ -102,7 +102,7 @@ function evaluateFormGet(subject, ctx = {}) {
       tenant: 'ignored',
     };
   }
-  // draft / archived — Legacy hides with HTTP 404 for non-admin
+  // draft / archived - Legacy hides with HTTP 404 for non-admin
   if (isAdminLike(subject)) {
     return {
       decision: 'ALLOW',

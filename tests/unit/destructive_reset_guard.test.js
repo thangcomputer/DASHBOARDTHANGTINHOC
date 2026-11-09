@@ -67,7 +67,7 @@ test('destructiveResetGuard: blocks with 403 in production when flag is false (T
     else process.env.ALLOW_DESTRUCTIVE_RESET = originalFlag;
   }
 
-  assert.equal(nextCalled, false, 'next() must not be called — no route handler, no deleteMany() reached');
+  assert.equal(nextCalled, false, 'next() must not be called - no route handler, no deleteMany() reached');
   assert.equal(res.statusCode, 403);
   assert.equal(res.body.success, false);
   assert.equal(res.body.code, 'DESTRUCTIVE_RESET_DISABLED');

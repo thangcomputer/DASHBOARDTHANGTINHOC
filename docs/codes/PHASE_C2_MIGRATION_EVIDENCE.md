@@ -1,4 +1,4 @@
-# PHASE C2 — MIGRATION EVIDENCE
+# PHASE C2 - MIGRATION EVIDENCE
 
 **Environment:** LOCAL/DEV `mongodb://127.0.0.1:27018/dashboardthangtinhoc`  
 **Production confirmed:** NO  

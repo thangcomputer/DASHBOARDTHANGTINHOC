@@ -28,7 +28,7 @@ test('Tổng quan học viên + giảng viên (web): dùng thẻ chào mừng, b
   const student = read('client/src/components/student/StudentOverviewTab.jsx');
   assert.ok(student.includes('<WelcomeHero') && student.includes('role="student"'));
   assert.ok(!student.includes('studentBanners'));
-  assert.ok(student.includes("joinUrl={isLive ? joinUrl : ''}"));
+  assert.ok(student.includes('showJoin={false}'), 'học viên: vào lớp chỉ ở Lịch học hôm nay');
 
   const teacher = read('client/src/components/teacher/TeacherOverviewTab.jsx');
   assert.ok(teacher.includes('<WelcomeHero') && teacher.includes('role="teacher"'));
@@ -41,7 +41,7 @@ test('trang chủ mobile: cùng thẻ chào mừng cho học viên và giảng v
   const home = read('thang-tin-hoc-mobile/src/screens/HomeScreen.tsx');
   assert.ok(home.includes('role="teacher"') && home.includes('role="student"'));
   assert.ok(!home.includes('getDashboardBanners'), 'không còn tải banner ảnh');
-  assert.ok(home.includes("joinUrl={firstScheduleIsLive ? studentJoinUrl : ''}"));
+  assert.ok(home.includes('showJoin={false}'), 'mobile học viên: không nút vào lớp trên banner');
   const hero = read('thang-tin-hoc-mobile/src/components/WelcomeHero.tsx');
   assert.ok(hero.includes("require('../assets/student-hero.png')"));
   assert.ok(hero.includes("require('../assets/teacher-hero.png')"));

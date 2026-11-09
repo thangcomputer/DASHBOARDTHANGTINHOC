@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 
 /**
- * SecurityGuard — chỉ bật ở production, không dùng debugger loop (gây lag).
+ * SecurityGuard - chỉ bật ở production, không dùng debugger loop (gây lag).
  */
 const SecurityGuard = () => {
   useEffect(() => {

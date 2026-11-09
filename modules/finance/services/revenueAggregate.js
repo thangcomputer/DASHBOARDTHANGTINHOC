@@ -1,5 +1,5 @@
 /**
- * Enrollment revenue helpers — projection / legacy.
+ * Enrollment revenue helpers - projection / legacy.
  * Migrated to Repository Pattern (Batch 3).
  */
 const { analyticsRepository } = require('../../analytics/repositories');

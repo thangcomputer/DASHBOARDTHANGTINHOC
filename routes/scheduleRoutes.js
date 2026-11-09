@@ -1,9 +1,9 @@
-const express  = require('express');
-const router   = express.Router();
+const express = require('express');
+const router = express.Router();
 const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
-const Student  = require('../models/Student');
-const Teacher  = require('../models/Teacher');
+const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
 const ScheduleHistory = require('../models/ScheduleHistory');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const logger = require('../config/logger');
@@ -74,7 +74,7 @@ function addMinutesToTimeHHmm(time, addMins) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-/** Buổi học cố định 1h30 — luôn suy ra end từ start */
+/** Buổi học cố định 1h30 - luôn suy ra end từ start */
 function endTimeFromStartOrDefault(startTime, endTime) {
   const fromStart = addMinutesToTimeHHmm(startTime, SESSION_DURATION_MINS);
   if (!fromStart) return String(endTime || '').trim();
@@ -209,7 +209,7 @@ async function notifyAttendanceTaken(io, {
   await NotificationService.notifyAdmins(
     io,
     '📋 Điểm danh buổi học',
-    `GV ${gv} điểm danh HV ${name} — ${courseLabel}: buổi ${progress}.`,
+    `GV ${gv} điểm danh HV ${name} - ${courseLabel}: buổi ${progress}.`,
     {
       studentId: String(studentId),
       teacherName: gv,
@@ -438,7 +438,7 @@ router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async
     const filter = { ...req.branchFilter }; // {} for admin, {branchId:...} for staff
     const role = String(req.user.role || '').toLowerCase();
 
-    // Scope theo role — chặn IDOR dump toàn bộ lịch
+    // Scope theo role - chặn IDOR dump toàn bộ lịch
     if (role === 'teacher') {
       filter.teacherId = req.user.id;
     } else if (role === 'student') {
@@ -450,7 +450,7 @@ router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async
       if (studentId) filter.studentId = studentId;
     }
 
-    if (status)    filter.status    = status;
+    if (status) filter.status = status;
     if (date) {
       const d = new Date(date);
       const nextDay = new Date(d);
@@ -466,7 +466,7 @@ router.get('/', [authMiddleware, branchFilter, ...schedulesGuard('list')], async
       Schedule.find(filter)
         .populate('teacherId', 'name phone')
         .populate('studentId', 'name course phone zalo')
-        // Ưu tiên ca mới — tránh limit 500 chỉ còn lịch cũ, mất lịch hủy / ca gần đây
+        // Ưu tiên ca mới - tránh limit 500 chỉ còn lịch cũ, mất lịch hủy / ca gần đây
         .sort({ date: -1, startTime: -1 })
         .skip(skip)
         .limit(limitNum),
@@ -501,7 +501,7 @@ router.get('/stats', [authMiddleware, branchFilter, ...schedulesGuard('stats')],
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     const [total, scheduled, completed, cancelled, thisMonth] = await Promise.all([
       Schedule.countDocuments(bf),
@@ -523,7 +523,7 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
   try {
     const { status, month } = req.query;
     const filter = { teacherId: req.params.teacherId };
-    
+
     // Authorization: Chỉ chính GV đó hoặc Admin mới được xem
     if (req.user.role !== 'admin' && req.user.role !== 'staff' && String(req.user.id) !== String(req.params.teacherId)) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền xem lịch của người khác' });
@@ -536,7 +536,7 @@ router.get('/teacher/:teacherId', [authMiddleware, ...schedulesGuard('get_teache
       const [year, m] = month.split('-').map(Number);
       filter.date = {
         $gte: new Date(year, m - 1, 1),
-        $lt:  new Date(year, m,     1),
+        $lt: new Date(year, m, 1),
       };
     }
 
@@ -645,7 +645,7 @@ async function ensureAttendanceSessionPreview(sch) {
       await require('../models/Schedule').updateOne(
         { _id: id },
         { $set: { sessionOrdinalPreview: next, sessionTotalPreview: total } },
-      ).catch(() => {});
+      ).catch(() => { });
     }
   } catch { /* giữ sch */ }
   return sch;
@@ -751,7 +751,7 @@ router.get('/student/:studentId', [authMiddleware, ...schedulesGuard('get_studen
 
     // Thống kê buổi học
     const completed = schedules.filter(s => s.status === 'completed').length;
-    const upcoming  = schedules.filter(s => s.status === 'scheduled').length;
+    const upcoming = schedules.filter(s => s.status === 'scheduled').length;
 
     res.json({
       success: true,
@@ -852,7 +852,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     const scheduleCourseId = selectedEnrollment?.courseId || courseIdInput || null;
     if (selectedEnrollment?.courseName) courseFinal = selectedEnrollment.courseName;
 
-    // Mỗi buổi cố định 1h30 — nếu thiếu/lệch endTime thì chuẩn hóa theo startTime
+    // Mỗi buổi cố định 1h30 - nếu thiếu/lệch endTime thì chuẩn hóa theo startTime
     const resolvedEndTime = endTimeFromStartOrDefault(startTime, endTime);
 
     const timeErr = assertEndAfterStart(startTime, resolvedEndTime);
@@ -939,8 +939,8 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
     let paymentStatus = 'pending';
     const studentDoc = await Student.findById(studentId).lean();
     if (studentDoc && studentDoc.teacher_payment_status === 'PAID_IN_ADVANCE') {
-       finalPaidToTeacher = true;
-       paymentStatus = 'paid';
+      finalPaidToTeacher = true;
+      paymentStatus = 'paid';
     }
 
     const schedule = await Schedule.create({
@@ -950,7 +950,7 @@ router.post('/', [authMiddleware, ...schedulesGuard('create')], async (req, res)
       courseId: scheduleCourseId,
       date: new Date(date),
       startTime, endTime: resolvedEndTime,
-      course: courseFinal, 
+      course: courseFinal,
       linkHoc: linkHoc || '',
       note: (() => {
         if (incomingStatus === 'completed') {
@@ -1094,7 +1094,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       return res.status(409).json({
         success: false,
         code: 'ATTENDANCE_MAKEUP_ALREADY_APPROVED',
-        message: 'Buổi học đã được điểm danh bù — không thể sửa lịch.',
+        message: 'Buổi học đã được điểm danh bù - không thể sửa lịch.',
       });
     }
 
@@ -1105,7 +1105,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       if (String(schedule.status) === 'completed') {
         return res.status(409).json({
           success: false,
-          message: 'Buổi đã được tính — không thể từ chối điểm danh bù.',
+          message: 'Buổi đã được tính - không thể từ chối điểm danh bù.',
         });
       }
       if (String(schedule.status) === 'cancelled') {
@@ -1146,7 +1146,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
             await NotificationService.send(ioAttend, {
               type: 'SCHEDULE',
               title: '📋 Xác nhận điểm danh buổi học',
-              content: `${payload.teacherName} đã điểm danh buổi ${payload.sessionNumber || '?'} — vui lòng xác nhận Đồng ý / Không đồng ý.`,
+              content: `${payload.teacherName} đã điểm danh buổi ${payload.sessionNumber || '?'} - vui lòng xác nhận Đồng ý / Không đồng ý.`,
               receivers: String(payload.studentId),
               payload: { kind: 'attendance_confirm_pending', ...payload },
               link: '/student',
@@ -1355,16 +1355,16 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
 
     // Cập nhật các field được phép
     const updates = {};
-    if (status)    updates.status    = status;
+    if (status) updates.status = status;
     if (isRejectMakeup) updates.studentConfirmStatus = 'admin_rejected';
-    if (linkHoc)   updates.linkHoc   = linkHoc;
+    if (linkHoc) updates.linkHoc = linkHoc;
     if (startTime) {
       updates.startTime = startTime;
       updates.endTime = endTimeFromStartOrDefault(startTime);
     } else if (endTime !== undefined) {
       updates.endTime = endTimeFromStartOrDefault(schedule.startTime, endTime);
     }
-    if (date)      updates.date      = new Date(date);
+    if (date) updates.date = new Date(date);
     const noteVal = note !== undefined ? note : topic;
     if (req.body._lateNote) {
       updates.note = req.body._lateNote;
@@ -1389,7 +1389,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
     }
 
     const io = req.app.get('io');
-    // Lý do hủy — ghi vào note trước khi save (emit socket sau DB write)
+    // Lý do hủy - ghi vào note trước khi save (emit socket sau DB write)
     const cancelReason = (status === 'cancelled' && schedule.status !== 'cancelled')
       ? String(req.body?.cancelReason || req.body?.reason || req.body?.note || '').trim()
       : '';
@@ -1422,7 +1422,7 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       }
     }
 
-    // Thông báo + realtime SAU khi DB commit — tránh HV refetch còn thấy lịch cũ
+    // Thông báo + realtime SAU khi DB commit - tránh HV refetch còn thấy lịch cũ
     if (schedule.studentId && io && updated) {
       const NotificationService = require('../services/NotificationService');
       const notifDate = new Date(updated.date || schedule.date).toLocaleDateString();
@@ -1441,91 +1441,91 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       };
 
       if (status === 'cancelled' && schedule.status !== 'cancelled') {
-         // Ghi ScheduleHistory CANCELLED (route PUT)
-         ScheduleHistory.create({
-           scheduleId: schedule._id,
-           actorId: req.user?.id || req.user?._id || schedule.teacherId,
-           actorName: req.user?.name || schedule.teacherName || 'Unknown',
-           actorRole: req.user?.role || 'teacher',
-           action: 'CANCELLED',
-           reason: cancelReason,
-           oldValue: { status: schedule.status, startTime: schedule.startTime, endTime: schedule.endTime },
-           newValue: { status: 'cancelled', startTime: schedule.startTime, endTime: schedule.endTime },
-           studentName: schedule.studentName || updated?.studentId?.name || 'Học viên',
-           teacherName: schedule.teacherName || updated?.teacherId?.name || 'Giảng viên',
-           scheduledDate: schedule.date,
-           course: schedule.course,
-         }).catch(e => logger.warn('[ScheduleHistory] PUT CANCELLED log err:', e.message));
+        // Ghi ScheduleHistory CANCELLED (route PUT)
+        ScheduleHistory.create({
+          scheduleId: schedule._id,
+          actorId: req.user?.id || req.user?._id || schedule.teacherId,
+          actorName: req.user?.name || schedule.teacherName || 'Unknown',
+          actorRole: req.user?.role || 'teacher',
+          action: 'CANCELLED',
+          reason: cancelReason,
+          oldValue: { status: schedule.status, startTime: schedule.startTime, endTime: schedule.endTime },
+          newValue: { status: 'cancelled', startTime: schedule.startTime, endTime: schedule.endTime },
+          studentName: schedule.studentName || updated?.studentId?.name || 'Học viên',
+          teacherName: schedule.teacherName || updated?.teacherId?.name || 'Giảng viên',
+          scheduledDate: schedule.date,
+          course: schedule.course,
+        }).catch(e => logger.warn('[ScheduleHistory] PUT CANCELLED log err:', e.message));
 
-         const makeupRejectionPayload = isRejectMakeup
-           ? {
-             ...buildAttendanceConfirmPayload(updated),
-             kind: 'attendance_rejected',
-             rejected: true,
-           }
-           : null;
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: isRejectMakeup ? '❌ Buổi điểm danh bù không được tính' : '❌ Lịch học bị hủy',
-           content: isRejectMakeup
-             ? `Admin không tính buổi điểm danh bù ngày ${notifDate}. Buổi học không được cộng vào tiến độ hoặc lương.`
-             : cancelReason
-               ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
-               : `Lịch học ngày ${notifDate} đã bị hủy.`,
-           receivers: String(scheduleScope.studentId),
-           payload: makeupRejectionPayload || { scheduleId: String(updated._id), reason: cancelReason },
-           link: '/student#schedule'
-         }).catch((e) => logger.warn('[SCHEDULE] cancel notif:', e.message));
+        const makeupRejectionPayload = isRejectMakeup
+          ? {
+            ...buildAttendanceConfirmPayload(updated),
+            kind: 'attendance_rejected',
+            rejected: true,
+          }
+          : null;
+        NotificationService.send(io, {
+          type: 'SCHEDULE',
+          title: isRejectMakeup ? '❌ Buổi điểm danh bù không được tính' : '❌ Lịch học bị hủy',
+          content: isRejectMakeup
+            ? `Admin không tính buổi điểm danh bù ngày ${notifDate}. Buổi học không được cộng vào tiến độ hoặc lương.`
+            : cancelReason
+              ? `Lịch học ngày ${notifDate} đã bị hủy. Lý do: ${cancelReason}`
+              : `Lịch học ngày ${notifDate} đã bị hủy.`,
+          receivers: String(scheduleScope.studentId),
+          payload: makeupRejectionPayload || { scheduleId: String(updated._id), reason: cancelReason },
+          link: '/student#schedule'
+        }).catch((e) => logger.warn('[SCHEDULE] cancel notif:', e.message));
 
-         if (isRejectMakeup && scheduleScope.teacherId) {
-           const { notifyTeacherMakeupRejected } = require('../services/teacherAdminNotifier');
-           notifyTeacherMakeupRejected(io, schedule, req.user).catch(() => {});
-         }
-         if (isRejectMakeup) {
-           await emitAttendanceConfirmEvents(io, updated, 'attendance:rejected', {
-             rejected: true,
-             kind: 'admin_makeup_rejected',
-           });
-         }
+        if (isRejectMakeup && scheduleScope.teacherId) {
+          const { notifyTeacherMakeupRejected } = require('../services/teacherAdminNotifier');
+          notifyTeacherMakeupRejected(io, schedule, req.user).catch(() => { });
+        }
+        if (isRejectMakeup) {
+          await emitAttendanceConfirmEvents(io, updated, 'attendance:rejected', {
+            rejected: true,
+            kind: 'admin_makeup_rejected',
+          });
+        }
 
-         emitScheduleEvent(io, scheduleScope, 'schedule:cancelled', {
-           ...updatedPayload,
-           scheduleId: String(updated._id),
-           reason: cancelReason,
-           status: 'cancelled',
-         });
+        emitScheduleEvent(io, scheduleScope, 'schedule:cancelled', {
+          ...updatedPayload,
+          scheduleId: String(updated._id),
+          reason: cancelReason,
+          status: 'cancelled',
+        });
       } else if (
         (startTime && startTime !== schedule.startTime)
         || (date && new Date(date).getTime() !== new Date(schedule.date).getTime())
         || (endTime !== undefined && String(endTime) !== String(schedule.endTime || ''))
       ) {
-         // Ghi ScheduleHistory UPDATED (đổi giờ / ngày)
-         ScheduleHistory.create({
-           scheduleId: schedule._id,
-           actorId: req.user?.id || req.user?._id || schedule.teacherId,
-           actorName: req.user?.name || schedule.teacherName || 'Unknown',
-           actorRole: req.user?.role || 'teacher',
-           action: 'UPDATED',
-           reason: `Đổi ca: ${schedule.startTime || '?'}–${schedule.endTime || '?'} → ${updated.startTime || schedule.startTime}–${updated.endTime || schedule.endTime}`,
-           oldValue: { status: schedule.status, date: schedule.date, startTime: schedule.startTime, endTime: schedule.endTime },
-           newValue: { status: updated.status, date: updated.date, startTime: updated.startTime, endTime: updated.endTime },
-           studentName: schedule.studentName || updated?.studentId?.name || 'Học viên',
-           teacherName: schedule.teacherName || updated?.teacherId?.name || 'Giảng viên',
-           scheduledDate: updated.date || schedule.date,
-           course: schedule.course,
-         }).catch(e => logger.warn('[ScheduleHistory] PUT UPDATED log err:', e.message));
+        // Ghi ScheduleHistory UPDATED (đổi giờ / ngày)
+        ScheduleHistory.create({
+          scheduleId: schedule._id,
+          actorId: req.user?.id || req.user?._id || schedule.teacherId,
+          actorName: req.user?.name || schedule.teacherName || 'Unknown',
+          actorRole: req.user?.role || 'teacher',
+          action: 'UPDATED',
+          reason: `Đổi ca: ${schedule.startTime || '?'}–${schedule.endTime || '?'} → ${updated.startTime || schedule.startTime}–${updated.endTime || schedule.endTime}`,
+          oldValue: { status: schedule.status, date: schedule.date, startTime: schedule.startTime, endTime: schedule.endTime },
+          newValue: { status: updated.status, date: updated.date, startTime: updated.startTime, endTime: updated.endTime },
+          studentName: schedule.studentName || updated?.studentId?.name || 'Học viên',
+          teacherName: schedule.teacherName || updated?.teacherId?.name || 'Giảng viên',
+          scheduledDate: updated.date || schedule.date,
+          course: schedule.course,
+        }).catch(e => logger.warn('[ScheduleHistory] PUT UPDATED log err:', e.message));
 
-         NotificationService.send(io, {
-           type: 'SCHEDULE',
-           title: '🔄 Lịch học đã thay đổi',
-           content: `Lịch học đã cập nhật thành: ${updated.startTime || schedule.startTime} ngày ${notifDate}.`,
-           receivers: String(scheduleScope.studentId),
-           payload: { scheduleId: String(updated._id || schedule._id), type: 'schedule' },
-           link: '/student#schedule'
-         }).catch((e) => logger.warn('[SCHEDULE] reschedule notif:', e.message));
+        NotificationService.send(io, {
+          type: 'SCHEDULE',
+          title: '🔄 Lịch học đã thay đổi',
+          content: `Lịch học đã cập nhật thành: ${updated.startTime || schedule.startTime} ngày ${notifDate}.`,
+          receivers: String(scheduleScope.studentId),
+          payload: { scheduleId: String(updated._id || schedule._id), type: 'schedule' },
+          link: '/student#schedule'
+        }).catch((e) => logger.warn('[SCHEDULE] reschedule notif:', e.message));
       }
 
-      // Đổi giờ/ngày/hủy/link/topic: HV + GV nhận document mới (trừ khi chỉ studentNote — emit riêng bên dưới)
+      // Đổi giờ/ngày/hủy/link/topic: HV + GV nhận document mới (trừ khi chỉ studentNote - emit riêng bên dưới)
       const onlyStudentNote =
         'studentNote' in req.body
         && Object.keys(updates).every((k) => ['studentNote', 'hasUnreadStudentNote'].includes(k));
@@ -1588,10 +1588,10 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       if (student) {
         // Automatically mark as paid if Admin paid in advance
         if (student.teacher_payment_status === 'PAID_IN_ADVANCE') {
-           await Schedule.findByIdAndUpdate(schedule._id, { 
-             is_paid_to_teacher: true,
-             paymentStatus: 'paid'
-           });
+          await Schedule.findByIdAndUpdate(schedule._id, {
+            is_paid_to_teacher: true,
+            paymentStatus: 'paid'
+          });
         }
       }
     }
@@ -1601,53 +1601,53 @@ router.put('/:scheduleId', [authMiddleware, ...schedulesGuard('update')], async 
       const nextStudentNote = String(req.body.studentNote || '').trim();
       const live = updated || schedule;
       try {
-         if (nextStudentNote && schedule.teacherId) {
-           const NotificationService = require('../services/NotificationService');
-           await NotificationService.send(io, {
-             type: 'SYSTEM',
-             title: '📝 Ghi chú mới từ học viên',
-             content: `Học viên ${schedule.studentName} vừa để lại ghi chú trên lịch học ngày ${new Date(schedule.date).toLocaleDateString('vi-VN')}.`,
-             receivers: [schedule.teacherId.toString()],
-             payload: {
-               kind: 'student_schedule_note',
-               type: 'schedule',
-               scheduleId: schedule._id.toString(),
-               studentId: schedule.studentId,
-               studentName: schedule.studentName || '',
-               studentNote: nextStudentNote,
-               date: schedule.date,
-               startTime: schedule.startTime || '',
-               endTime: schedule.endTime || '',
-               course: schedule.course || '',
-             },
-             link: '/teacher#schedule',
-           });
-         } else if (!nextStudentNote) {
-           const NotificationService = require('../services/NotificationService');
-           await NotificationService.retractStudentScheduleNotes(io, {
-             scheduleId: schedule._id,
-             teacherId: schedule.teacherId,
-             studentName: schedule.studentName || '',
-             dateLabel: new Date(schedule.date).toLocaleDateString('vi-VN'),
-           });
-         }
+        if (nextStudentNote && schedule.teacherId) {
+          const NotificationService = require('../services/NotificationService');
+          await NotificationService.send(io, {
+            type: 'SYSTEM',
+            title: '📝 Ghi chú mới từ học viên',
+            content: `Học viên ${schedule.studentName} vừa để lại ghi chú trên lịch học ngày ${new Date(schedule.date).toLocaleDateString('vi-VN')}.`,
+            receivers: [schedule.teacherId.toString()],
+            payload: {
+              kind: 'student_schedule_note',
+              type: 'schedule',
+              scheduleId: schedule._id.toString(),
+              studentId: schedule.studentId,
+              studentName: schedule.studentName || '',
+              studentNote: nextStudentNote,
+              date: schedule.date,
+              startTime: schedule.startTime || '',
+              endTime: schedule.endTime || '',
+              course: schedule.course || '',
+            },
+            link: '/teacher#schedule',
+          });
+        } else if (!nextStudentNote) {
+          const NotificationService = require('../services/NotificationService');
+          await NotificationService.retractStudentScheduleNotes(io, {
+            scheduleId: schedule._id,
+            teacherId: schedule.teacherId,
+            studentName: schedule.studentName || '',
+            dateLabel: new Date(schedule.date).toLocaleDateString('vi-VN'),
+          });
+        }
 
-         const raw = live && typeof live.toObject === 'function' ? live.toObject() : live;
-         emitScheduleEvent(io, {
-           branchId: live.branchId || schedule.branchId,
-           teacherId: live.teacherId || schedule.teacherId,
-           studentId: live.studentId || schedule.studentId,
-         }, 'schedule:updated', {
-           ...(raw || {}),
-           _id: String(live._id || schedule._id),
-           id: String(live._id || schedule._id),
-           studentNote: nextStudentNote,
-           hasUnreadStudentNote: Boolean(nextStudentNote),
-           teacherId: live.teacherId?._id || live.teacherId || schedule.teacherId,
-           studentId: live.studentId?._id || live.studentId || schedule.studentId,
-         });
+        const raw = live && typeof live.toObject === 'function' ? live.toObject() : live;
+        emitScheduleEvent(io, {
+          branchId: live.branchId || schedule.branchId,
+          teacherId: live.teacherId || schedule.teacherId,
+          studentId: live.studentId || schedule.studentId,
+        }, 'schedule:updated', {
+          ...(raw || {}),
+          _id: String(live._id || schedule._id),
+          id: String(live._id || schedule._id),
+          studentNote: nextStudentNote,
+          hasUnreadStudentNote: Boolean(nextStudentNote),
+          teacherId: live.teacherId?._id || live.teacherId || schedule.teacherId,
+          studentId: live.studentId?._id || live.studentId || schedule.studentId,
+        });
       } catch (e) {
-         logger.error('[SCHEDULE] Notify error:', e);
+        logger.error('[SCHEDULE] Notify error:', e);
       }
     }
 
@@ -1708,7 +1708,7 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
         await NotificationService.notifyAdmins(
           io,
           '⚠️ Tranh chấp điểm danh buổi học',
-          `HV ${payload.studentName} không đồng ý điểm danh buổi ${payload.sessionNumber || '?'} — GV ${payload.teacherName} · ${payload.course} · ${payload.dateLabel} ${payload.timeRange}.`,
+          `HV ${payload.studentName} không đồng ý điểm danh buổi ${payload.sessionNumber || '?'} - GV ${payload.teacherName} · ${payload.course} · ${payload.dateLabel} ${payload.timeRange}.`,
           { kind: 'attendance_dispute', ...payload },
           '/admin/students',
         ).catch((e) => logger.warn('[SCHEDULE] dispute admin notif:', e.message));
@@ -1717,11 +1717,11 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
           await NotificationService.send(io, {
             type: 'SCHEDULE',
             title: '⚠️ Học viên không đồng ý điểm danh',
-            content: `HV ${payload.studentName} không xác nhận buổi ${payload.sessionNumber || '?'} — đang giải quyết (chờ Admin).`,
+            content: `HV ${payload.studentName} không xác nhận buổi ${payload.sessionNumber || '?'} - đang giải quyết (chờ Admin).`,
             receivers: tid,
             payload: { kind: 'attendance_dispute', ...payload },
             link: '/teacher#students',
-          }).catch(() => {});
+          }).catch(() => { });
         }
         if (sid) {
           await NotificationService.send(io, {
@@ -1731,7 +1731,7 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
             receivers: sid,
             payload: { kind: 'attendance_dispute', ...payload },
             link: '/student#schedule',
-          }).catch(() => {});
+          }).catch(() => { });
         }
         await emitAttendanceConfirmEvents(io, sch, 'attendance:disputed');
       }
@@ -1747,24 +1747,24 @@ router.post('/:scheduleId/student-confirm', [authMiddleware], async (req, res) =
         course: sch.course,
         date: sch.date,
         extraPayload: payload,
-      }).catch(() => {});
+      }).catch(() => { });
 
       if (tid) {
         await NotificationService.send(io, {
           type: 'SCHEDULE',
           title: '✅ Học viên đã xác nhận điểm danh',
-          content: `HV ${payload.studentName} đồng ý buổi ${payload.sessionNumber || '?'} — buổi đã được tính.`,
+          content: `HV ${payload.studentName} đồng ý buổi ${payload.sessionNumber || '?'} - buổi đã được tính.`,
           receivers: tid,
           payload: { kind: 'attendance_confirmed', ...payload },
           link: '/teacher#students',
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       if (sch.teacherId) {
         const { maybeNotifyStarBonusEligibility } = require('../services/teacherAdminNotifier');
-        maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => {});
+        maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => { });
       }
-      checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => {});
+      checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => { });
       await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed', {
         completedSessions: result.meta?.completedSessions ?? payload.sessionNumber,
         totalSessions: result.meta?.totalSessions ?? payload.totalSessions,
@@ -1837,7 +1837,7 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
     if (result.meta?.rejected) {
       if (io) {
         const sessionLabel = payload.sessionNumber != null ? String(payload.sessionNumber) : '?';
-        const msg = `Buổi ${sessionLabel} (${payload.course}) ngày ${payload.dateLabel} không được chấp thuận — không tính vào tiến độ và lương buổi.`;
+        const msg = `Buổi ${sessionLabel} (${payload.course}) ngày ${payload.dateLabel} không được chấp thuận - không tính vào tiến độ và lương buổi.`;
         if (tid) {
           await NotificationService.send(io, {
             type: 'SCHEDULE',
@@ -1846,7 +1846,7 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
             receivers: tid,
             payload: { kind: 'attendance_rejected', rejected: true, ...payload },
             link: '/teacher#students',
-          }).catch(() => {});
+          }).catch(() => { });
         }
         if (sid) {
           await NotificationService.send(io, {
@@ -1856,7 +1856,7 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
             receivers: sid,
             payload: { kind: 'attendance_rejected', rejected: true, ...payload },
             link: '/student#schedule',
-          }).catch(() => {});
+          }).catch(() => { });
         }
         await emitAttendanceConfirmEvents(io, sch, 'attendance:rejected', { rejected: true });
         emitScheduleEvent(io, {
@@ -1877,9 +1877,9 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
         course: sch.course,
         date: sch.date,
         extraPayload: payload,
-      }).catch(() => {});
+      }).catch(() => { });
 
-      const okMsg = `Admin đã chấp thuận buổi ${payload.sessionNumber || '?'} — buổi được tính vào tiến độ và lương.`;
+      const okMsg = `Admin đã chấp thuận buổi ${payload.sessionNumber || '?'} - buổi được tính vào tiến độ và lương.`;
       if (tid) {
         await NotificationService.send(io, {
           type: 'SCHEDULE',
@@ -1888,7 +1888,7 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
           receivers: tid,
           payload: { kind: 'attendance_admin_approved', ...payload },
           link: '/teacher#students',
-        }).catch(() => {});
+        }).catch(() => { });
       }
       if (sid) {
         await NotificationService.send(io, {
@@ -1898,14 +1898,14 @@ router.post('/:scheduleId/resolve-dispute', [authMiddleware], async (req, res) =
           receivers: sid,
           payload: { kind: 'attendance_admin_approved', ...payload },
           link: '/student#schedule',
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       if (sch.teacherId) {
         const { maybeNotifyStarBonusEligibility } = require('../services/teacherAdminNotifier');
-        maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => {});
+        maybeNotifyStarBonusEligibility(io, sch.teacherId).catch(() => { });
       }
-      checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => {});
+      checkAndUnlockExam(String(sch.studentId._id || sch.studentId), io, sch.course).catch(() => { });
       await emitAttendanceConfirmEvents(io, sch, 'attendance:confirmed', {
         completedSessions: result.meta?.completedSessions ?? payload.sessionNumber,
         totalSessions: result.meta?.totalSessions ?? payload.totalSessions,
@@ -1959,7 +1959,7 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy lịch học' });
     }
     if (String(req.user.role).toLowerCase() === 'teacher'
-        && String(schedule.teacherId) !== String(req.user.id)) {
+      && String(schedule.teacherId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Bạn chỉ được hủy lịch của chính mình' });
     }
 
@@ -1967,7 +1967,7 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       return res.status(400).json({ success: false, message: 'Lịch này đã bị hủy rồi' });
     }
     if (schedule.status === 'completed') {
-      return res.status(400).json({ success: false, message: 'Không thể hủy lịch đã hoàn thành — dùng Hủy điểm danh' });
+      return res.status(400).json({ success: false, message: 'Không thể hủy lịch đã hoàn thành - dùng Hủy điểm danh' });
     }
     // Cho phép hủy ca scheduled kể cả ngày đã qua (điểm danh bù / HV không học)
 
@@ -1984,7 +1984,7 @@ router.patch('/:scheduleId/cancel', [authMiddleware, ...schedulesGuard('cancel')
       try {
         const d = new Date(schedule.date).toLocaleDateString('vi-VN');
         const timeRange = [schedule.startTime, schedule.endTime].filter(Boolean).join('–');
-        const reasonBit = (typeof reason === 'string' && reason.trim()) ? ` — ${reason.trim()}` : '';
+        const reasonBit = (typeof reason === 'string' && reason.trim()) ? ` - ${reason.trim()}` : '';
         const cancelCaNote = timeRange
           ? `Hủy ca ngày ${d} · ${timeRange}${reasonBit}`
           : `Hủy ca ngày ${d}${reasonBit}`;

@@ -1,4 +1,4 @@
-# MESSAGING BUSINESS DECISIONS — Phase 3
+# MESSAGING BUSINESS DECISIONS - Phase 3
 
 **Status:** Conflict resolution / freeze for owner approval  
 **Date:** 2026-08-10  
@@ -24,7 +24,7 @@ Pairing send ACL remains Phase 8.24.
 Contacts only control discovery.
 ```
 
-Therefore **discover ≠ send is an intentional dual-layer**, not an accidental bug — until the owner chooses to converge them.
+Therefore **discover ≠ send is an intentional dual-layer**, not an accidental bug - until the owner chooses to converge them.
 
 **Interim freeze for Phase 4 (if approved without further owner input):**
 
@@ -38,18 +38,18 @@ Anything that would **change** either matrix (expand discover, tighten send, inv
 
 ---
 
-# C1 — STUDENT → SUPER_ADMIN
+# C1 - STUDENT → SUPER_ADMIN
 
 ```text
 Decision ID: C1
 Current behavior:
-  Discover: NO — contact-visibility-824b: Student does not see SUPER in danh bạ.
-  Send:     YES — pairing-matrix-824: STUDENT → SUPER/HIGH allow.
+  Discover: NO - contact-visibility-824b: Student does not see SUPER in danh bạ.
+  Send:     YES - pairing-matrix-824: STUDENT → SUPER/HIGH allow.
   Receive:  YES if message targeted at student (user room) or legacy paths involving admin mailbox.
   Start from danh bạ: NO (not discoverable).
   Start via known id / deep link / legacy thread: possible if canSend succeeds.
 
-Business rule (DOCUMENTED INTENT — FREEZE):
+Business rule (DOCUMENTED INTENT - FREEZE):
   SUPER is not a student directory contact.
   Send ACL still allows STUDENT → elevated admin if recipient is resolved.
   Do not invent a new rule that forces discover==send without owner approval.
@@ -84,25 +84,25 @@ Affected frontend:
 
 Migration risk: LOW if freeze; HIGH if converging (tighten send or expand discover).
 
-STATUS: RESOLVED — FREEZE DOCUMENTED DUAL-LAYER
+STATUS: RESOLVED - FREEZE DOCUMENTED DUAL-LAYER
 OWNER FOLLOW-UP (optional): converge discover↔send? STATUS = REQUIRES OWNER DECISION
 ```
 
 ---
 
-# C2 — STUDENT → HIGH_ADMIN
+# C2 - STUDENT → HIGH_ADMIN
 
 ```text
 Decision ID: C2
 Current behavior:
-  Discover: NO — student contacts row lists STAFF (same branch), SUPPORT, assigned teachers only.
+  Discover: NO - student contacts row lists STAFF (same branch), SUPPORT, assigned teachers only.
               HIGH is not in the student contacts table (8.24B).
-  Send:     YES — pairing STUDENT → SUPER/HIGH allow.
+  Send:     YES - pairing STUDENT → SUPER/HIGH allow.
   Receive:  YES on targeted threads.
   Start from danh bạ: NO.
-  Note: TEACHER does discover HIGH; STUDENT does not — asymmetric by design in 8.24B table.
+  Note: TEACHER does discover HIGH; STUDENT does not - asymmetric by design in 8.24B table.
 
-Business rule (DOCUMENTED INTENT — FREEZE):
+Business rule (DOCUMENTED INTENT - FREEZE):
   HIGH_ADMIN is not a student directory contact under 8.24B.
   Pairing still allows send to elevated product roles.
 
@@ -119,20 +119,20 @@ Affected Socket events: message:send / message:receive (user room / elevated del
 Affected frontend: no student HIGH seed; do not invent HIGH tab for students
 Migration risk: LOW if freeze; MEDIUM if owner wants students to discover HIGH
 
-STATUS: RESOLVED — FREEZE DOCUMENTED DUAL-LAYER
+STATUS: RESOLVED - FREEZE DOCUMENTED DUAL-LAYER
 OWNER FOLLOW-UP: Should students discover HIGH_ADMIN? STATUS = REQUIRES OWNER DECISION
 ```
 
 ---
 
-# C3 — SUPPORT SCOPE (GLOBAL vs BRANCH)
+# C3 - SUPPORT SCOPE (GLOBAL vs BRANCH)
 
 ```text
 Decision ID: C3
 Current behavior:
   Product code does NOT define distinct types “GLOBAL SUPPORT” vs “BRANCH SUPPORT”.
   Pairing: SUPPORT sender has no branch scope (assertPairScope early-allow).
-  Contacts (SUPPORT caller): loads ALL students, ALL teachers, ALL STAFF, HIGH — no branch filter.
+  Contacts (SUPPORT caller): loads ALL students, ALL teachers, ALL STAFF, HIGH - no branch filter.
   Contacts (other callers discovering SUPPORT): often soft-include SUPPORT with
     same branch OR null/missing branchId.
   Transport: SUPPORT → staff (compatibility; unchanged).
@@ -175,7 +175,7 @@ STATUS: PARTIAL FREEZE (live = global SUPPORT)
 
 ---
 
-# C4 — STAFF ↔ SUPPORT
+# C4 - STAFF ↔ SUPPORT
 
 ```text
 Decision ID: C4
@@ -191,7 +191,7 @@ Current behavior:
   Branch scope: discover soft for STAFF→SUPPORT; send unrestricted both ways
   Tenant scope: n/a (not enforced)
 
-Business rule (DOCUMENTED / LIVE ALIGNED — FREEZE):
+Business rule (DOCUMENTED / LIVE ALIGNED - FREEZE):
   STAFF and SUPPORT may discover and message each other.
   Private threads are per-user (staff_<id>), not ALL_STAFF / ALL_SUPPORT.
 
@@ -212,14 +212,14 @@ Affected Socket events: message:send/receive via notifyUser(userId)
 Affected frontend: Staff / Support tabs (display only)
 Migration risk: LOW
 
-STATUS: RESOLVED — FREEZE LIVE ALIGNED RULES
+STATUS: RESOLVED - FREEZE LIVE ALIGNED RULES
 OWNER FOLLOW-UP: Must STAFF only see SUPPORT in same branch (exclude null)? 
                  STATUS = REQUIRES OWNER DECISION (tighten discover only)
 ```
 
 ---
 
-# C5 — LEGACY `admin_admin` vs PER-USER ELEVATED ADMIN
+# C5 - LEGACY `admin_admin` vs PER-USER ELEVATED ADMIN
 
 ```text
 Decision ID: C5
@@ -233,7 +233,7 @@ Current behavior:
     into shared admin_admin mailbox (compatibility surface).
   Phase 8.24 goal: one conversation per real peer pair for non-legacy cases.
 
-Business rule (DOCUMENTED — FREEZE COMPATIBILITY):
+Business rule (DOCUMENTED - FREEZE COMPATIBILITY):
   KEEP legacy admin_admin for SUPER/HIGH shared student mailbox.
   KEEP per-user elevated threads for real MongoId HIGH/SUPER peers.
   DO NOT delete legacy compatibility until replacement proven.
@@ -258,7 +258,7 @@ Affected Socket events: typing/read peer rooms → admin + ALL_ADMIN for legacy 
 Affected frontend: must not map STAFF/SUPPORT into admin_admin
 Migration risk: CRITICAL if removed early
 
-STATUS: RESOLVED — KEEP LEGACY + PER-USER SIDE BY SIDE
+STATUS: RESOLVED - KEEP LEGACY + PER-USER SIDE BY SIDE
 OWNER FOLLOW-UP: Should student↔admin special-case in buildConversationId eventually
                  route only to per-user HIGH, never shared mailbox?
                  STATUS = REQUIRES OWNER DECISION (future cleanup only)
@@ -266,7 +266,7 @@ OWNER FOLLOW-UP: Should student↔admin special-case in buildConversationId even
 
 ---
 
-# C6 — JWT `role=admin` + `adminRole` undefined
+# C6 - JWT `role=admin` + `adminRole` undefined
 
 ```text
 Decision ID: C6
@@ -275,9 +275,9 @@ Current behavior:
     role=admin && !adminRole → treated as SUPER_ADMIN product hint.
   messagingIdentity: role=admin without adminRole and id≠admin → display UNKNOWN
     (does not elevate to SUPER by transport alone when id is MongoId).
-  Authentication / JWT issuance: OUT OF SCOPE — do not change.
+  Authentication / JWT issuance: OUT OF SCOPE - do not change.
 
-Business rule (MESSAGING INTERPRETATION ONLY — FREEZE):
+Business rule (MESSAGING INTERPRETATION ONLY - FREEZE):
   For messaging productRole resolution: keep current pairing interpretation
   (admin without adminRole ≈ SUPER_ADMIN hint) until owner changes messaging policy.
   Do not change auth middleware or JWT claims in messaging phases.
@@ -292,24 +292,24 @@ Reason: documented in pairing code + architecture plan conflict C6; auth frozen.
 
 Affected APIs: any path calling resolveProductRole / getMessagingRole
 Affected Socket events: register room joins if user hits this shape
-Affected frontend: displayRole may show UNKNOWN while productRole elevates — known tension
+Affected frontend: displayRole may show UNKNOWN while productRole elevates - known tension
 Migration risk: MEDIUM (ambiguous accounts)
 
-STATUS: RESOLVED — FREEZE CURRENT MESSAGING INTERPRETATION (NO AUTH CHANGE)
+STATUS: RESOLVED - FREEZE CURRENT MESSAGING INTERPRETATION (NO AUTH CHANGE)
 OWNER FOLLOW-UP: Prefer DENY / UNKNOWN productRole when adminRole missing?
                  STATUS = REQUIRES OWNER DECISION
 ```
 
 ---
 
-# C7 — GROUP UNREAD (per-user read state)
+# C7 - GROUP UNREAD (per-user read state)
 
 ```text
 Decision ID: C7
 Current behavior:
-  Message.isRead / readAt / receiverId — message-level global flag.
+  Message.isRead / readAt / receiverId - message-level global flag.
   Acceptable for strict 1:1 DM (single receiverId).
-  Groups: marking read can affect shared message state — NOT independent per participant.
+  Groups: marking read can affect shared message state - NOT independent per participant.
   Architecture plan: design ConversationParticipant; do NOT migrate yet.
 
 Business rule:
@@ -318,7 +318,7 @@ Business rule:
     ConversationParticipant { conversationId, userId, role, lastReadAt, unreadCount }
   but DO NOT implement migration until owner confirms need and Phase 10 approved.
 
-Required acceptance intent (from master plan — design target, not live):
+Required acceptance intent (from master plan - design target, not live):
   Support A read ≠ Support B read when both are participants.
   Non-participants must stay unreadCount 0.
 
@@ -335,13 +335,13 @@ Affected Socket events (future): message:read / read_ack
 Affected frontend (future): badges from participant unread
 Migration risk: HIGH
 
-STATUS: DESIGN HOLD — NO MIGRATION
+STATUS: DESIGN HOLD - NO MIGRATION
          Product requirement “groups need per-user unread” = REQUIRES OWNER DECISION
 ```
 
 ---
 
-# C8 — SUPPORT joins ALL_STAFF (broadcast coupling)
+# C8 - SUPPORT joins ALL_STAFF (broadcast coupling)
 
 *(Related conflict from matrix §6; not private DM leakage by design.)*
 
@@ -365,7 +365,7 @@ STATUS: REQUIRES OWNER DECISION (product broadcast exclusivity)
 
 ---
 
-# C9 — SUPER discover asymmetry (non-student callers)
+# C9 - SUPER discover asymmetry (non-student callers)
 
 ```text
 Decision ID: C9
@@ -374,10 +374,10 @@ Current behavior:
   SUPER contacts: only HIGH_ADMIN (cannot discover STAFF/SUPPORT/TEACHER/STUDENT in danh bạ)
     while pairing allows SUPER → all.
 
-Business rule (DOCUMENTED DUAL-LAYER — FREEZE):
+Business rule (DOCUMENTED DUAL-LAYER - FREEZE):
   Same principle as C1: contacts stricter than send; intentional per 8.24B notes.
 
-STATUS: RESOLVED — FREEZE DOCUMENTED DUAL-LAYER
+STATUS: RESOLVED - FREEZE DOCUMENTED DUAL-LAYER
 OWNER FOLLOW-UP: Should SUPER danh bạ expand, or send tighten to match contacts?
                  STATUS = REQUIRES OWNER DECISION
 ```

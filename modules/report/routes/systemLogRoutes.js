@@ -12,13 +12,13 @@ const {
   isVisibleSystemLogAction,
 } = require('../../../constants/systemLogActions');
 
-// GET /api/system-logs — chỉ các hành động trong allowlist
-router.get('/', authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE),systemLogController.get_root);
+// GET /api/system-logs - chỉ các hành động trong allowlist
+router.get('/', authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE), systemLogController.get_root);
 
-// POST /api/system-logs — ghi tay (xuất báo cáo client-side, …)
-router.post('/', authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE),systemLogController.post_root);
+// POST /api/system-logs - ghi tay (xuất báo cáo client-side, …)
+router.post('/', authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE), systemLogController.post_root);
 
 // DELETE /api/system-logs/:id
-router.delete('/:id', authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE),systemLogController.delete_id);
+router.delete('/:id', authMiddleware, authorize(NEW_PERMISSIONS.SETTINGS_UPDATE), systemLogController.delete_id);
 
 module.exports = router;

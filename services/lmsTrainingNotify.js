@@ -106,7 +106,7 @@ function diffTrainingContent(oldData, newData) {
     if ((contentChanged || metaChanged) && !added.length) {
       events.push({ kind: 'course_updated', courseId: id, courseTitle: title });
     } else if ((contentChanged || metaChanged) && added.length) {
-      // đã có lessons_added — vẫn ghi cập nhật nhẹ nếu meta đổi rõ
+      // đã có lessons_added - vẫn ghi cập nhật nhẹ nếu meta đổi rõ
       if (metaChanged) {
         events.push({ kind: 'course_updated', courseId: id, courseTitle: title });
       }
@@ -180,10 +180,11 @@ function notifCopy(ev, audience) {
       };
     case 'lessons_added': {
       const names = (ev.lessonTitles || []).slice(0, 3).join(', ');
-      const more = ev.addedCount > 3 ? ` (+${ev.addedCount - 3} bài)` : '';
+      const more = ev.addedCount > 3 ? ` (+${ev.addedCount - 3
+        } bài)` : '';
       return {
         title: isTeacher ? 'Có bài học mới trong khóa đào tạo' : 'Có bài học video mới',
-        content: `${ev.courseTitle}: thêm ${ev.addedCount || 0} bài${names ? ` — ${names}` : ''}${more}. Bấm để xem.`,
+        content: `${ev.courseTitle}: thêm ${ev.addedCount || 0} bài${names ? ` - ${names}` : ''}${more}. Bấm để xem.`,
       };
     }
     case 'course_updated':
@@ -304,7 +305,7 @@ async function notifyTrainingVideoChanges(io, opts = {}) {
     const receivers = audience === 'teacher' ? ['ALL_TEACHER'] : ['ALL_STUDENT'];
     const results = [];
 
-    // Chỉ chuông HV/GV cho thêm/sửa — xóa chỉ ghi nhật ký admin
+    // Chỉ chuông HV/GV cho thêm/sửa - xóa chỉ ghi nhật ký admin
     const notifyKinds = new Set([
       'course_added',
       'software_link_added',

@@ -1,9 +1,9 @@
 /**
- * Phase 7.26 — Controlled cutover + production activation for /api/bi
+ * Phase 7.26 - Controlled cutover + production activation for /api/bi
  *
  * LIVE: auth → branchFilter → policyShadowBI → biCutoverGate → handler.
  * Legacy checkAnyPermission retained inside biCutoverGate.
- * modules/finance BiController is unmounted — not migrated.
+ * modules/finance BiController is unmounted - not migrated.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -61,10 +61,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student' || role === 'teacher'
       ? { role, adminRole: null, permissions: [] }
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [PERMISSIONS.VIEW_BRANCH_REVENUE],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [PERMISSIONS.VIEW_BRANCH_REVENUE],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -130,7 +130,7 @@ function runGate(action, { user, policyShadow }, env) {
       status(c) { statusCode = c; return this; },
       json(b) { bodyOut = b; finish(); return this; },
     };
-    // Legacy path may be async (checkAnyPermission) — finish via next or json
+    // Legacy path may be async (checkAnyPermission) - finish via next or json
     Promise.resolve(mw(req, res, () => { nextCount += 1; finish(); })).catch(() => finish());
   }));
 }
@@ -305,7 +305,7 @@ test('Phase7.26 rollback: remove bi → LEGACY; prior stay POLICY; restore → P
 test('Phase7.26 cross-family isolation', () => {
   for (const fam of [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees',  'analytics', 'staff',
+    'employees', 'analytics', 'staff',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
   }
@@ -374,8 +374,8 @@ test('Phase7.26 functional smoke: overview/export authz; biService NOT EXECUTED'
   assert.equal(parity('overview', sub({ permissions: [PERMISSIONS.VIEW_BRANCH_REVENUE] })).policy.decision, 'ALLOW');
   assert.equal(parity('export', sub({ permissions: [PERMISSIONS.MANAGE_FINANCE] })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — biService.getOverview / CSV production read',
-    'NOT EXECUTED — biService.getOverview / CSV production read',
+    'NOT EXECUTED - biService.getOverview / CSV production read',
+    'NOT EXECUTED - biService.getOverview / CSV production read',
   );
 });
 

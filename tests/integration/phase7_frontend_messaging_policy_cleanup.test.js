@@ -1,5 +1,5 @@
 /**
- * Phase 7 — Frontend messaging policy cleanup & deep-link hardening.
+ * Phase 7 - Frontend messaging policy cleanup & deep-link hardening.
  */
 'use strict';
 

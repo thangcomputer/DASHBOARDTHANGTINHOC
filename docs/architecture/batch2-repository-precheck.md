@@ -1,4 +1,4 @@
-# Sprint 4.2 Batch 2 — Core Domain Repository Precheck
+# Sprint 4.2 Batch 2 - Core Domain Repository Precheck
 
 ## 1. Domain Inventory and Scope
 The Core Domains for Batch 2 are:

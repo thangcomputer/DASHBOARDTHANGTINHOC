@@ -1,4 +1,4 @@
-# Service Boundary — Batch 3
+# Service Boundary - Batch 3
 
 ## Architecture After Batch 3
 Transactional logic is highly complex, but the flow remains strictly constrained:

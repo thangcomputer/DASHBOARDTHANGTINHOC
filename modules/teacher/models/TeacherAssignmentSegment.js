@@ -1,5 +1,5 @@
 /**
- * TeacherAssignmentSegment — lịch sử phân công GV theo enrollment (Phase 7).
+ * TeacherAssignmentSegment - lịch sử phân công GV theo enrollment (Phase 7).
  * Buổi completed giữ teacherId trên Schedule; segment ghi khoảng thời gian phụ trách.
  */
 const mongoose = require('mongoose');

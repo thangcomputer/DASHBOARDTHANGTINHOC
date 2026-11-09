@@ -1,5 +1,5 @@
 /**
- * Phase 8.20C — Export LIVE RUNTIME evidence from the application process (READ-ONLY).
+ * Phase 8.20C - Export LIVE RUNTIME evidence from the application process (READ-ONLY).
  *
  * Does NOT authorize.
  * Does NOT promote Enterprise.
@@ -25,12 +25,12 @@ const {
   resolveEvidenceEnvironment,
 } = require('./runtimeEvidence820');
 
-/** Alias — reuse existing soak snapshot (same process memory). */
+/** Alias - reuse existing soak snapshot (same process memory). */
 function snapshotRuntimeEvidence() {
   return snapshotSoakWindow();
 }
 
-/** Alias — reuse existing soak delta. */
+/** Alias - reuse existing soak delta. */
 function deltaRuntimeEvidence(before, after) {
   return deltaSoakWindow(before, after);
 }
@@ -93,8 +93,8 @@ function resolveMultiProcessStatus(env = process.env) {
     pid: process.pid,
     aggregationComplete,
     note: aggregationComplete
-      ? 'Single configured PM2 instance — this process holds the in-memory counter set for the app.'
-      : 'Multi-process or unknown instance count — payload is PER-PROCESS only; do not claim cluster-wide aggregate COMPLETE.',
+      ? 'Single configured PM2 instance - this process holds the in-memory counter set for the app.'
+      : 'Multi-process or unknown instance count - payload is PER-PROCESS only; do not claim cluster-wide aggregate COMPLETE.',
   };
 }
 

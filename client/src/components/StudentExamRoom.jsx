@@ -150,7 +150,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
   const awaitingGrade =
     subject.thucHanh === 'da_nop' &&
     (subject.essayScore === null || subject.essayScore === undefined);
-  const canStart  = allowStartExam && isApproved && canEnterCertificationExam(subject) && (subject.status === 'chua_thi' || !subject.status);
+  const canStart = allowStartExam && isApproved && canEnterCertificationExam(subject) && (subject.status === 'chua_thi' || !subject.status);
   // Chỉ "Tiếp tục thi" khi đã có điểm trắc nghiệm và còn phần thực hành.
   // Trắc nghiệm chưa nộp mà thoát/tải lại trang => lượt thi bị hủy, không cho vào lại.
   const isOngoing =
@@ -160,18 +160,17 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
     subject.status === 'dang_thi' &&
     !awaitingGrade &&
     subject.attemptStatus !== 'active';
-  // Không tự "Thi lại" khi khong_dat — phải admin mở khóa (reset status)
+  // Không tự "Thi lại" khi khong_dat - phải admin mở khóa (reset status)
   const canRetry = false;
-  const isPassed  = subject.status === 'dat';
+  const isPassed = subject.status === 'dat';
   const isAwaitingGrade = awaitingGrade && !isPassed && subject.status !== 'khong_dat';
   const wouldBeAbleToStart =
     isApproved && canEnterCertificationExam(subject) &&
     (subject.status === 'chua_thi' || !subject.status || (subject.status === 'dang_thi' && !awaitingGrade));
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm transition-all duration-200 overflow-hidden ${
-      !isApproved || failedLocked ? 'opacity-80 border-gray-200 bg-gray-50' : 'hover:shadow-md'
-    }`}>
+    <div className={`bg-white rounded-2xl border shadow-sm transition-all duration-200 overflow-hidden ${!isApproved || failedLocked ? 'opacity-80 border-gray-200 bg-gray-50' : 'hover:shadow-md'
+      }`}>
       {/* Card header */}
       <div className="p-5 pb-4">
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -188,7 +187,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
           <div className="shrink-0">{statusBadge()}</div>
         </div>
 
-        {/* Stats — luôn xem được trên mọi thiết bị */}
+        {/* Stats - luôn xem được trên mọi thiết bị */}
         <div className="space-y-2">
           <div className="flex items-center justify-between py-2 border-b border-gray-50">
             <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -229,7 +228,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
             disabled
             className="w-full py-2.5 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed"
           >
-            <Lock size={15} /> Đã rớt — chờ admin mở khóa
+            <Lock size={15} /> Đã rớt - chờ admin mở khóa
           </button>
         ) : isAwaitingGrade ? (
           <button
@@ -256,13 +255,13 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
               </button>
             )}
             {canRetry && (
-               <button
-                 type="button"
-                 onClick={() => onStart(subject.id)}
-                 className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
-               >
-                 <Play size={15} /> Thi lại
-               </button>
+              <button
+                type="button"
+                onClick={() => onStart(subject.id)}
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-100"
+              >
+                <Play size={15} /> Thi lại
+              </button>
             )}
             {isOngoing && (
               <button
@@ -288,7 +287,7 @@ const SubjectCard = ({ subject, onStart, isGlobalApproved, examSubjectsCatalog, 
                 disabled
                 className="w-full py-2.5 bg-red-50 border border-red-200 text-red-600 font-bold rounded-xl text-[13px] flex items-center justify-center gap-2 cursor-not-allowed"
               >
-                <Lock size={15} /> Lượt thi đã kết thúc — chờ admin mở khóa
+                <Lock size={15} /> Lượt thi đã kết thúc - chờ admin mở khóa
               </button>
             )}
           </>
@@ -311,155 +310,151 @@ const ScoreModal = ({ subjects, onClose, inline = false }) => {
         .then((res) => {
           if (res.success) setQuizzes(res.data || []);
         })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => setLoadingQuizzes(false));
     }
   }, [activeTab]);
 
   const panel = (
-      <div
-        className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${
-          inline ? 'w-full' : 'w-full max-w-lg shadow-2xl'
+    <div
+      className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${inline ? 'w-full' : 'w-full max-w-lg shadow-2xl'
         }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-4 sm:px-5 pt-4 pb-2 flex items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-600 text-white shadow-sm">
-            <Trophy size={15} className="shrink-0" aria-hidden="true" />
-            <h2 className="font-black text-xs sm:text-sm whitespace-nowrap">Nhật ký điểm số</h2>
-          </div>
-          {!inline && onClose ? (
-            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">×</button>
-          ) : null}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="px-4 sm:px-5 pt-4 pb-2 flex items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-600 text-white shadow-sm">
+          <Trophy size={15} className="shrink-0" aria-hidden="true" />
+          <h2 className="font-black text-xs sm:text-sm whitespace-nowrap">Nhật ký điểm số</h2>
         </div>
+        {!inline && onClose ? (
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">×</button>
+        ) : null}
+      </div>
 
-        {/* Tab: Trắc nghiệm trước · Chứng nhận sau */}
-        <div className="flex gap-1 bg-slate-100 p-1.5 border-b border-slate-200">
-          <button
-            type="button"
-            onClick={() => setActiveTab('quizzes')}
-            className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${
-              activeTab === 'quizzes' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+      {/* Tab: Trắc nghiệm trước · Chứng nhận sau */}
+      <div className="flex gap-1 bg-slate-100 p-1.5 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab('quizzes')}
+          className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${activeTab === 'quizzes' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
-          >
-            Trắc nghiệm GV
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('cert')}
-            className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${
-              activeTab === 'cert' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+        >
+          Trắc nghiệm GV
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('cert')}
+          className={`flex-1 py-2 px-2 text-[11px] font-black  tracking-wide rounded-xl transition ${activeTab === 'cert' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
-          >
-            Thi chứng nhận
-          </button>
-        </div>
+        >
+          Thi chứng nhận
+        </button>
+      </div>
 
-        <div className="p-4 sm:p-5 space-y-2.5 max-h-[65vh] overflow-y-auto">
-          {activeTab === 'cert' ? (
-            subjects.map(s => {
-              const meta = getExamSubjectMeta(s.id);
-              const tn = s.tracNghiem;
-              const tnPct = tn ? Math.round((tn.score / tn.total) * 100) : null;
-              const hasEssay = s.thucHanh === 'da_nop';
-              const essayScore = s.essayScore;
-              const attempt = s.attemptCount || 0;
-              return (
-                <div key={s.id} className="rounded-xl bg-gray-50 border border-gray-100 overflow-hidden">
-                  <div className="flex items-center justify-between px-3.5 py-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-8 h-8 ${meta.bg} rounded-lg flex items-center justify-center shrink-0`}>
-                        <span className="text-white font-black text-xs">{meta.short}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="font-bold text-gray-800 text-sm truncate block">{meta.label}</span>
-                        {attempt > 0 && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">Lần {attempt + 1}</span>}
-                      </div>
+      <div className="p-4 sm:p-5 space-y-2.5 max-h-[65vh] overflow-y-auto">
+        {activeTab === 'cert' ? (
+          subjects.map(s => {
+            const meta = getExamSubjectMeta(s.id);
+            const tn = s.tracNghiem;
+            const tnPct = tn ? Math.round((tn.score / tn.total) * 100) : null;
+            const hasEssay = s.thucHanh === 'da_nop';
+            const essayScore = s.essayScore;
+            const attempt = s.attemptCount || 0;
+            return (
+              <div key={s.id} className="rounded-xl bg-gray-50 border border-gray-100 overflow-hidden">
+                <div className="flex items-center justify-between px-3.5 py-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 ${meta.bg} rounded-lg flex items-center justify-center shrink-0`}>
+                      <span className="text-white font-black text-xs">{meta.short}</span>
                     </div>
-                    {s.status === 'dat' && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 shrink-0">Đạt</span>}
-                    {s.status === 'khong_dat' && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200 shrink-0">Chưa đạt</span>}
-                    {(!s.status || s.status === 'chua_thi') && <span className="text-[10px] font-bold text-gray-400 shrink-0">Chưa thi</span>}
+                    <div className="min-w-0">
+                      <span className="font-bold text-gray-800 text-sm truncate block">{meta.label}</span>
+                      {attempt > 0 && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">Lần {attempt + 1}</span>}
+                    </div>
                   </div>
-                  {(tn || hasEssay) && (
-                    <div className="flex border-t border-gray-100 divide-x divide-gray-100">
-                      <div className="flex-1 px-3 py-2.5 text-center">
-                        <p className="text-[9px] font-bold text-gray-400  tracking-wider mb-1">Trắc nghiệm</p>
-                        {tn ? (
-                          <>
-                            <p className={`text-lg font-black ${tnPct >= 50 ? 'text-green-600' : 'text-red-500'}`}>{tn.score}/{tn.total}</p>
-                            <p className="text-[10px] text-gray-400 font-semibold">{tnPct}%</p>
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-300 font-bold">--</p>
-                        )}
-                      </div>
-                      <div className="flex-1 px-3 py-2.5 text-center">
-                        <p className="text-[9px] font-bold text-gray-400  tracking-wider mb-1">Thực hành</p>
-                        {essayScore !== null && essayScore !== undefined ? (
-                          <>
-                            <p className={`text-lg font-black ${essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>{essayScore}/10</p>
-                            <p className="text-[10px] text-gray-400 font-semibold">Đã chấm</p>
-                          </>
-                        ) : hasEssay ? (
-                          <>
-                            <p className="text-sm font-bold text-amber-500">⏳</p>
-                            <p className="text-[10px] text-amber-500 font-semibold">Chờ chấm</p>
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-300 font-bold">--</p>
-                        )}
-                      </div>
+                  {s.status === 'dat' && <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 shrink-0">Đạt</span>}
+                  {s.status === 'khong_dat' && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200 shrink-0">Chưa đạt</span>}
+                  {(!s.status || s.status === 'chua_thi') && <span className="text-[10px] font-bold text-gray-400 shrink-0">Chưa thi</span>}
+                </div>
+                {(tn || hasEssay) && (
+                  <div className="flex border-t border-gray-100 divide-x divide-gray-100">
+                    <div className="flex-1 px-3 py-2.5 text-center">
+                      <p className="text-[9px] font-bold text-gray-400  tracking-wider mb-1">Trắc nghiệm</p>
+                      {tn ? (
+                        <>
+                          <p className={`text-lg font-black ${tnPct >= 50 ? 'text-green-600' : 'text-red-500'}`}>{tn.score}/{tn.total}</p>
+                          <p className="text-[10px] text-gray-400 font-semibold">{tnPct}%</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-300 font-bold">--</p>
+                      )}
+                    </div>
+                    <div className="flex-1 px-3 py-2.5 text-center">
+                      <p className="text-[9px] font-bold text-gray-400  tracking-wider mb-1">Thực hành</p>
+                      {essayScore !== null && essayScore !== undefined ? (
+                        <>
+                          <p className={`text-lg font-black ${essayScore >= 5 ? 'text-green-600' : 'text-red-500'}`}>{essayScore}/10</p>
+                          <p className="text-[10px] text-gray-400 font-semibold">Đã chấm</p>
+                        </>
+                      ) : hasEssay ? (
+                        <>
+                          <p className="text-sm font-bold text-amber-500">⏳</p>
+                          <p className="text-[10px] text-amber-500 font-semibold">Chờ chấm</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-gray-300 font-bold">--</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          loadingQuizzes ? (
+            <div className="py-8 text-center text-slate-400 text-xs font-bold">Đang tải nhật ký điểm số...</div>
+          ) : quizzes.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">Chưa có nhật ký bài trắc nghiệm nào từ Giảng viên.</div>
+          ) : (
+            quizzes.map((q) => {
+              const sub = q.mySubmission;
+              const isPassed = sub?.status === 'passed' || (sub?.score != null && sub.score >= 70);
+              return (
+                <div key={q._id} className="rounded-xl bg-gray-50 border border-gray-100 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black  text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 truncate">
+                      {q.courseName || 'Bài thi bài học'}
+                    </span>
+                    {sub ? (
+                      <span className={`text-[10px] font-black  px-2 py-0.5 rounded border shrink-0 ${isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                        {isPassed ? 'Đạt' : 'Chưa đạt'}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded shrink-0">Chưa làm</span>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{q.title}</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">Giảng viên: {q.teacherName || 'GV'}</p>
+                  </div>
+                  {sub && (
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs gap-2">
+                      <span className="text-slate-500 font-medium truncate">
+                        Nộp lúc: {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('vi-VN') : '---'}
+                      </span>
+                      <span className={`font-black text-sm shrink-0 ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {sub.correctCount ?? 0}/{sub.totalQuestions ?? 0} ({sub.score ?? 0}%)
+                      </span>
                     </div>
                   )}
                 </div>
               );
             })
-          ) : (
-            loadingQuizzes ? (
-              <div className="py-8 text-center text-slate-400 text-xs font-bold">Đang tải nhật ký điểm số...</div>
-            ) : quizzes.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">Chưa có nhật ký bài trắc nghiệm nào từ Giảng viên.</div>
-            ) : (
-              quizzes.map((q) => {
-                const sub = q.mySubmission;
-                const isPassed = sub?.status === 'passed' || (sub?.score != null && sub.score >= 70);
-                return (
-                  <div key={q._id} className="rounded-xl bg-gray-50 border border-gray-100 p-3.5 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-black  text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 truncate">
-                        {q.courseName || 'Bài thi bài học'}
-                      </span>
-                      {sub ? (
-                        <span className={`text-[10px] font-black  px-2 py-0.5 rounded border shrink-0 ${
-                          isPassed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'
-                        }`}>
-                          {isPassed ? 'Đạt' : 'Chưa đạt'}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded shrink-0">Chưa làm</span>
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{q.title}</h4>
-                      <p className="text-[11px] text-slate-500 font-medium">Giảng viên: {q.teacherName || 'GV'}</p>
-                    </div>
-                    {sub && (
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs gap-2">
-                        <span className="text-slate-500 font-medium truncate">
-                          Nộp lúc: {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('vi-VN') : '---'}
-                        </span>
-                        <span className={`font-black text-sm shrink-0 ${isPassed ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {sub.correctCount ?? 0}/{sub.totalQuestions ?? 0} ({sub.score ?? 0}%)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )
-          )}
-        </div>
+          )
+        )}
       </div>
+    </div>
   );
 
   if (inline) return panel;
@@ -666,11 +661,10 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('quiz')}
-            className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
-              roomTab === 'quiz'
+            className={`group order-2 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'quiz'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
-            }`}
+              }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
               <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 via-rose-600 to-red-800 text-white shadow-lg shadow-red-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
@@ -686,11 +680,10 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('cert')}
-            className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
-              roomTab === 'cert'
+            className={`group order-3 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'cert'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
-            }`}
+              }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
               <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-800 text-white shadow-lg shadow-blue-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-2">
@@ -706,11 +699,10 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('scores')}
-            className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
-              roomTab === 'scores'
+            className={`group order-4 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'scores'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
-            }`}
+              }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
               <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-red-700 text-white shadow-lg shadow-orange-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2">
@@ -726,11 +718,10 @@ const StudentExamRoom = ({
           <button
             type="button"
             onClick={() => setRoomTab('mos-ic3')}
-            className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${
-              roomTab === 'mos-ic3'
+            className={`group order-1 min-h-[7.5rem] p-5 rounded-2xl text-left shadow-md transition-all duration-200 border-2 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 active:translate-y-0 ${roomTab === 'mos-ic3'
                 ? 'bg-white border-red-500 ring-2 ring-red-100 shadow-red-100/70'
                 : 'bg-white border-slate-100 hover:border-red-300'
-            }`}
+              }`}
           >
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-4">
               <span className="relative flex h-14 w-14 shrink-0 items-center justify-center justify-self-center overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-800 text-white shadow-lg shadow-violet-300/50 ring-1 ring-white/80 transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-2">
@@ -757,117 +748,116 @@ const StudentExamRoom = ({
           </div>
         ) : (
           <>
-            
-        {!allowStartExam && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-amber-900">
-            <Monitor size={18} className="shrink-0 mt-0.5 text-amber-700" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="text-sm font-bold">Thi chỉ dành cho máy tính (laptop/desktop)</p>
-              <p className="text-xs mt-1 leading-relaxed text-amber-800/90">
-                Trên điện thoại và máy tính bảng bạn vẫn xem được điểm, trạng thái môn thi. Để làm bài thi, vui lòng dùng laptop hoặc máy tính để bàn.
+
+            {!allowStartExam && (
+              <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-amber-900">
+                <Monitor size={18} className="shrink-0 mt-0.5 text-amber-700" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold">Thi chỉ dành cho máy tính (laptop/desktop)</p>
+                  <p className="text-xs mt-1 leading-relaxed text-amber-800/90">
+                    Trên điện thoại và máy tính bảng bạn vẫn xem được điểm, trạng thái môn thi. Để làm bài thi, vui lòng dùng laptop hoặc máy tính để bàn.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Bộ lọc */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 mb-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 text-sm font-black text-gray-700  tracking-wide">
+                <Filter size={16} className="text-blue-600" />
+                Lọc danh sách
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Khóa học</label>
+                  <CmsSelect
+                    value={filterCourse}
+                    onChange={(e) => setFilterCourse(e.target.value)}
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
+                  >
+                    {courseOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </CmsSelect>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Môn thi</label>
+                  <CmsSelect
+                    value={filterSubject}
+                    onChange={(e) => setFilterSubject(e.target.value)}
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
+                  >
+                    <option value="all">Tất cả môn thi</option>
+                    {subjectFilterOptions.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </CmsSelect>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Trạng thái</label>
+                  <CmsSelect
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
+                  >
+                    {STATUS_FILTERS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </CmsSelect>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {STATUS_FILTERS.filter((f) => f.value !== 'all').map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setFilterStatus(filterStatus === f.value ? 'all' : f.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-black  tracking-wide border transition-all ${filterStatus === f.value
+                        ? f.value === 'rot'
+                          ? 'bg-red-600 text-white border-red-600'
+                          : f.value === 'da_thi'
+                            ? 'bg-green-600 text-white border-green-600'
+                            : 'bg-red-600 text-white border-blue-600'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                      }`}
+                  >
+                    {f.label} ({statusCounts[f.value] || 0})
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 font-medium">
+                Hiển thị <span className="font-black text-gray-800">{filteredSubjects.length}</span>
+                {' / '}
+                <span className="font-black text-gray-800">{allowedSubjectIds.length}</span> môn thi
+                {filterCourse !== 'all' ? ` · Khóa: ${filterCourse}` : ''}
               </p>
             </div>
-          </div>
-        )}
 
-        {/* Bộ lọc */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 mb-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-sm font-black text-gray-700  tracking-wide">
-            <Filter size={16} className="text-blue-600" />
-            Lọc danh sách
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Khóa học</label>
-              <CmsSelect
-                value={filterCourse}
-                onChange={(e) => setFilterCourse(e.target.value)}
-                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
-              >
-                {courseOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+            {/* Subject Cards Grid */}
+            {filteredSubjects.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+                {filteredSubjects.map(s => (
+                  <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={!!isSubjectCourseUnlocked[s.id]} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
                 ))}
-              </CmsSelect>
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Môn thi</label>
-              <CmsSelect
-                value={filterSubject}
-                onChange={(e) => setFilterSubject(e.target.value)}
-                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
-              >
-                <option value="all">Tất cả môn thi</option>
-                {subjectFilterOptions.map((s) => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
-              </CmsSelect>
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-gray-400  tracking-widest block mb-1.5">Trạng thái</label>
-              <CmsSelect
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 focus:border-blue-400 outline-none"
-              >
-                {STATUS_FILTERS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </CmsSelect>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 pt-1">
-            {STATUS_FILTERS.filter((f) => f.value !== 'all').map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setFilterStatus(filterStatus === f.value ? 'all' : f.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-black  tracking-wide border transition-all ${
-                  filterStatus === f.value
-                    ? f.value === 'rot'
-                      ? 'bg-red-600 text-white border-red-600'
-                      : f.value === 'da_thi'
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-red-600 text-white border-blue-600'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                {f.label} ({statusCounts[f.value] || 0})
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 font-medium">
-            Hiển thị <span className="font-black text-gray-800">{filteredSubjects.length}</span>
-            {' / '}
-            <span className="font-black text-gray-800">{allowedSubjectIds.length}</span> môn thi
-            {filterCourse !== 'all' ? ` · Khóa: ${filterCourse}` : ''}
-          </p>
-        </div>
-
-        {/* Subject Cards Grid */}
-        {filteredSubjects.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-          {filteredSubjects.map(s => (
-            <SubjectCard key={s.id} subject={s} onStart={handleStart} isGlobalApproved={!!isSubjectCourseUnlocked[s.id]} examSubjectsCatalog={examSubjectsCatalog} allowStartExam={allowStartExam} />
-          ))}
-        </div>
-        ) : (
-        <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
-          <BookOpen size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="font-bold text-gray-600">Không có môn thi phù hợp bộ lọc</p>
-          <p className="text-sm text-gray-400 mt-1">
-            {filterCourse !== 'all' && allowedSubjectIds.length === 0
-              ? 'Khóa học này chưa có bài thi trên hệ thống.'
-              : 'Thử đổi khóa học, môn thi hoặc trạng thái lọc.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => { setFilterCourse('all'); setFilterSubject('all'); setFilterStatus('all'); }}
-            className="mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black  tracking-wide hover:bg-blue-100"
-          >
-            Xóa bộ lọc
-          </button>
-        </div>
-        )}
+              </div>
+            ) : (
+              <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
+                <BookOpen size={40} className="mx-auto text-gray-300 mb-3" />
+                <p className="font-bold text-gray-600">Không có môn thi phù hợp bộ lọc</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {filterCourse !== 'all' && allowedSubjectIds.length === 0
+                    ? 'Khóa học này chưa có bài thi trên hệ thống.'
+                    : 'Thử đổi khóa học, môn thi hoặc trạng thái lọc.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setFilterCourse('all'); setFilterSubject('all'); setFilterStatus('all'); }}
+                  className="mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black  tracking-wide hover:bg-blue-100"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            )}
 
             {/* Info Banner */}
             <div className="mt-8 bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex items-start gap-3">

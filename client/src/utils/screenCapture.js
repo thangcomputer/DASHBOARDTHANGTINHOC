@@ -37,7 +37,7 @@ function canvasFromBitmap(bitmap) {
 
 /** Lấy 1 frame ngay khi track đã live (ImageCapture ưu tiên). */
 async function grabCanvasFromTrack(track, stream) {
-  // 1) ImageCapture — nhanh, đúng surface user vừa chọn
+  // 1) ImageCapture - nhanh, đúng surface user vừa chọn
   if (typeof ImageCapture !== 'undefined') {
     try {
       const ic = new ImageCapture(track);
@@ -51,7 +51,7 @@ async function grabCanvasFromTrack(track, stream) {
         const done = () => { clearTimeout(t); resolve(); };
         track.addEventListener('unmute', done, { once: true });
         if (!track.muted) done();
-      }).catch(() => {});
+      }).catch(() => { });
       const bitmap = await ic.grabFrame();
       return canvasFromBitmap(bitmap);
     } catch {
@@ -113,7 +113,7 @@ async function requestDisplayStream({ preferMonitor = false } = {}) {
       return await navigator.mediaDevices.getDisplayMedia(opts);
     } catch (e) {
       lastErr = e;
-      // User cancel — không thử tiếp
+      // User cancel - không thử tiếp
       if (e?.name === 'NotAllowedError' || e?.name === 'AbortError') throw e;
     }
   }
@@ -121,7 +121,7 @@ async function requestDisplayStream({ preferMonitor = false } = {}) {
 }
 
 /**
- * Mở picker trình duyệt — user chọn màn/cửa sổ nào thì chụp đúng surface đó ngay.
+ * Mở picker trình duyệt - user chọn màn/cửa sổ nào thì chụp đúng surface đó ngay.
  * @returns {Promise<{ canvas: HTMLCanvasElement, width: number, height: number }>}
  */
 export async function captureDisplayFrame(options = {}) {
@@ -156,7 +156,7 @@ export async function captureDisplayFrame(options = {}) {
   }
 
   // Khi user đổi / dừng share giữa chừng
-  const onEnded = () => {};
+  const onEnded = () => { };
   track.addEventListener('ended', onEnded);
 
   try {

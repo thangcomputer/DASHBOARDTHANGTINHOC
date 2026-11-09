@@ -44,7 +44,7 @@ export default function LearningGoalModal({ open, currentGoal, onClose, onSaved 
   currentGoalRef.current = currentGoal;
   onSavedRef.current = onSaved;
 
-  // Chỉ khởi tạo lại khi popup vừa mở — lưu xong currentGoal đổi nhưng phải giữ màn chúc mừng.
+  // Chỉ khởi tạo lại khi popup vừa mở - lưu xong currentGoal đổi nhưng phải giữ màn chúc mừng.
   useEffect(() => {
     if (!open) return;
     const goal = currentGoalRef.current;

@@ -1,5 +1,5 @@
 /**
- * Phase 8.23B — Messaging contact/conversation discovery (updated Phase 6).
+ * Phase 8.23B - Messaging contact/conversation discovery (updated Phase 6).
  * Contacts authority moved to MessagingPolicy + messagingContactsService.
  * FE must not seed unauthorized peers; conversation ID rules unchanged.
  */

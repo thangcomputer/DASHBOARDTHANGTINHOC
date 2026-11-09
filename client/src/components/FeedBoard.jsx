@@ -1,5 +1,5 @@
 /**
- * Bang tin chung — HV / GV / Admin hoi bai, binh luan, thich, anh, sua bai, quyen rieng tu.
+ * Bang tin chung - HV / GV / Admin hoi bai, binh luan, thich, anh, sua bai, quyen rieng tu.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -981,124 +981,124 @@ export default function FeedBoard({ session, role }) {
       <div className="space-y-3 md:space-y-4 min-w-0">
         {/* Post Composer */}
         <div className="cms-feed-composer bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-        {postLocked ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
-            <Lock size={18} className="shrink-0 text-slate-700" aria-hidden="true" />
-            <p className="text-sm font-semibold text-slate-700">Tài khoản miễn phí chỉ xem bảng tin. Đăng ký gói Meet để được đăng bài.</p>
-          </div>
-        ) : (
-          <>
-          <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <img
-                src={resolveAvatarUrl({ ...session, role: meRole })}
-                alt=""
-                width={36}
-                height={36}
-                className="w-9 h-9 rounded-full object-cover border border-slate-200"
-              />
-              <div>
-                <p className="text-xs font-bold text-slate-800 leading-tight">{session?.name || 'Tôi'}</p>
-                <span className={'text-[10px] font-semibold px-1.5 py-0.2 rounded-full inline-block mt-0.5 ' + (ROLE_BADGE[meRole] || ROLE_BADGE.student)}>
-                  {ROLE_LABEL[meRole] || meRole}
-                </span>
-              </div>
+          {postLocked ? (
+            <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+              <Lock size={18} className="shrink-0 text-slate-700" aria-hidden="true" />
+              <p className="text-sm font-semibold text-slate-700">Tài khoản miễn phí chỉ xem bảng tin. Đăng ký gói Meet để được đăng bài.</p>
             </div>
-
-            {/* Privacy Selector Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowVisibilityMenu((v) => !v)}
-                className={'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all ' + currentPrivacyOpt.badgeClass}
-                title="Chọn quyền riêng tư / Đối tượng xem"
-              >
-                <CurrentPrivacyIcon size={13} />
-                <span>{currentPrivacyOpt.label}</span>
-                <ChevronDown size={12} className="opacity-70" />
-              </button>
-
-              {showVisibilityMenu && (
-                <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                  <p className="text-[11px] font-bold text-slate-400 px-2 py-1  tracking-wider">Ai có thể xem bài viết?</p>
-                  {availablePrivacyOptions.map((opt) => {
-                    const Icon = opt.icon;
-                    const isSelected = postVisibility === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => { setPostVisibility(opt.value); setShowVisibilityMenu(false); }}
-                        className={'w-full text-left flex items-start gap-2.5 p-2 rounded-lg text-xs transition-colors ' + (isSelected ? 'bg-indigo-50/80 text-indigo-700 font-semibold' : 'hover:bg-slate-50 text-slate-700')}
-                      >
-                        <Icon size={16} className={'shrink-0 mt-0.5 ' + (isSelected ? 'text-indigo-600' : 'text-slate-400')} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span>{opt.label}</span>
-                            {isSelected && <Check size={14} className="text-indigo-600 shrink-0" />}
-                          </div>
-                          <p className="text-[10px] text-slate-400 font-normal leading-tight mt-0.5">{opt.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <img
+                    src={resolveAvatarUrl({ ...session, role: meRole })}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 leading-tight">{session?.name || 'Tôi'}</p>
+                    <span className={'text-[10px] font-semibold px-1.5 py-0.2 rounded-full inline-block mt-0.5 ' + (ROLE_BADGE[meRole] || ROLE_BADGE.student)}>
+                      {ROLE_LABEL[meRole] || meRole}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
 
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onPaste={handlePastePost}
-            rows={3}
-            maxLength={5000}
-            placeholder="Bạn muốn hỏi gì hoặc chia sẻ điều gì?"
-            className="w-full text-sm text-slate-800 placeholder:text-slate-400 border-0 focus:ring-0 focus:outline-none resize-none p-1"
-          />
-
-          {previews.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
-              {previews.map((src, i) => (
-                <div key={src} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 group shadow-xs">
-                  <img src={src} alt="" className="w-full h-full object-cover" />
+                {/* Privacy Selector Dropdown */}
+                <div className="relative">
                   <button
                     type="button"
-                    onClick={() => removePending(i)}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                    onClick={() => setShowVisibilityMenu((v) => !v)}
+                    className={'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all ' + currentPrivacyOpt.badgeClass}
+                    title="Chọn quyền riêng tư / Đối tượng xem"
                   >
-                    <X size={12} />
+                    <CurrentPrivacyIcon size={13} />
+                    <span>{currentPrivacyOpt.label}</span>
+                    <ChevronDown size={12} className="opacity-70" />
+                  </button>
+
+                  {showVisibilityMenu && (
+                    <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                      <p className="text-[11px] font-bold text-slate-400 px-2 py-1  tracking-wider">Ai có thể xem bài viết?</p>
+                      {availablePrivacyOptions.map((opt) => {
+                        const Icon = opt.icon;
+                        const isSelected = postVisibility === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => { setPostVisibility(opt.value); setShowVisibilityMenu(false); }}
+                            className={'w-full text-left flex items-start gap-2.5 p-2 rounded-lg text-xs transition-colors ' + (isSelected ? 'bg-indigo-50/80 text-indigo-700 font-semibold' : 'hover:bg-slate-50 text-slate-700')}
+                          >
+                            <Icon size={16} className={'shrink-0 mt-0.5 ' + (isSelected ? 'text-indigo-600' : 'text-slate-400')} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span>{opt.label}</span>
+                                {isSelected && <Check size={14} className="text-indigo-600 shrink-0" />}
+                              </div>
+                              <p className="text-[10px] text-slate-400 font-normal leading-tight mt-0.5">{opt.desc}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onPaste={handlePastePost}
+                rows={3}
+                maxLength={5000}
+                placeholder="Bạn muốn hỏi gì hoặc chia sẻ điều gì?"
+                className="w-full text-sm text-slate-800 placeholder:text-slate-400 border-0 focus:ring-0 focus:outline-none resize-none p-1"
+              />
+
+              {previews.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
+                  {previews.map((src, i) => (
+                    <div key={src} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 group shadow-xs">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePending(i)}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <div>
+                  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={pendingFiles.length >= 6}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors disabled:opacity-50"
+                  >
+                    <ImagePlus size={15} className="text-emerald-600" />
+                    Thêm ảnh ({pendingFiles.length}/6)
                   </button>
                 </div>
-              ))}
-            </div>
+                <button
+                  type="button"
+                  onClick={handlePost}
+                  disabled={posting}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {posting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  Đăng bài
+                </button>
+              </div>
+            </>
           )}
-
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-            <div>
-              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={pendingFiles.length >= 6}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors disabled:opacity-50"
-              >
-                <ImagePlus size={15} className="text-emerald-600" />
-                Thêm ảnh ({pendingFiles.length}/6)
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={handlePost}
-              disabled={posting}
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors disabled:opacity-50"
-            >
-              {posting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-              Đăng bài
-            </button>
-          </div>
-          </>
-        )}
         </div>
         {/* Post Feed List */}
         {!loading && (
@@ -1156,10 +1156,10 @@ export default function FeedBoard({ session, role }) {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-sm text-slate-900 truncate">{post.authorName || 'Người dùng'}</span>
-                          <span className="text-xs text-slate-500">
-                            {ROLE_LABEL[post.authorRole] || post.authorRole} · {formatTime(post.createdAt)}
-                          </span>
+                        <span className="font-bold text-sm text-slate-900 truncate">{post.authorName || 'Người dùng'}</span>
+                        <span className="text-xs text-slate-500">
+                          {ROLE_LABEL[post.authorRole] || post.authorRole} · {formatTime(post.createdAt)}
+                        </span>
                         {post.isEdited && (
                           <span
                             className="text-[11px] text-slate-400 italic font-medium cursor-help"

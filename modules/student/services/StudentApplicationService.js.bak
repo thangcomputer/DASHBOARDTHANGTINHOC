@@ -81,7 +81,7 @@ async function createTuitionInvoice({ student, courseName, amount, note = '' }) 
   }
 }
 // ─── GET /api/students ─────────────────────────────────────────────────────────
-// Lấy danh sách học viên (Admin / Teacher) — hỗ trợ Server-side Pagination
+// Lấy danh sách học viên (Admin / Teacher) - hỗ trợ Server-side Pagination
 
 class StudentApplicationService {
   async get_root(data) {
@@ -480,7 +480,7 @@ class StudentApplicationService {
 
   async post_root(data) {
   try {
-    // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) — random + isFirstLogin
+    // Không dùng Zalo/SĐT làm mật khẩu mặc định (dễ đoán) - random + isFirstLogin
     const plainPassword = data.password != null && String(data.password).trim() !== ''
       ? String(data.password).trim()
       : generateTempPassword(8);
@@ -519,7 +519,7 @@ class StudentApplicationService {
       data.status = 'Đang học';
     }
 
-    // 1 SĐT / 1 email duy nhất — không trùng HV khác hoặc GV
+    // 1 SĐT / 1 email duy nhất - không trùng HV khác hoặc GV
     try {
       const { assertUniqueContact } = require('../../../utils/uniqueContact');
       await assertUniqueContact({
@@ -606,7 +606,7 @@ class StudentApplicationService {
         student,
         courseName,
         amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
-        note: `Thanh toán khi thêm học viên — ${courseName}`,
+        note: `Thanh toán khi thêm học viên - ${courseName}`,
       });
       try {
         const primaryEnr = student.enrollments?.[0];
@@ -625,7 +625,7 @@ class StudentApplicationService {
         });
         bustFinanceCaches();
       } catch (ledgerErr) {
-        logger.error('[STUDENTS] ledger settle on create FAILED — rollback paid: %s', ledgerErr.message);
+        logger.error('[STUDENTS] ledger settle on create FAILED - rollback paid: %s', ledgerErr.message);
         // Rollback cache + void invoice (không để paid không có Ledger)
         if (Array.isArray(student.enrollments)) {
           student.enrollments.forEach((e) => {
@@ -726,7 +726,7 @@ class StudentApplicationService {
     }
 
     const safeBody = { ...data.body };
-    // H12: cấm set paid/paidAmount/paymentMethod qua PUT generic — phải qua /pay hoặc /refund
+    // H12: cấm set paid/paidAmount/paymentMethod qua PUT generic - phải qua /pay hoặc /refund
     delete safeBody.paid;
     delete safeBody.paidAmount;
     delete safeBody.paidAt;
@@ -879,7 +879,7 @@ class StudentApplicationService {
       }
     }
 
-    // Đồng bộ enrollment chính — applyEnrollmentStats lấy totalSessions từ đây
+    // Đồng bộ enrollment chính - applyEnrollmentStats lấy totalSessions từ đây
     if (isStaffOrAdmin) {
       const touchCourse =
         safeBody.totalSessions != null
@@ -1128,7 +1128,7 @@ class StudentApplicationService {
       ? Number(existing.paidAmount)
       : (Number(existing.price) || 0);
 
-    // Atomic claim — tránh race double-pay (admin×admin / admin×SePay)
+    // Atomic claim - tránh race double-pay (admin×admin / admin×SePay)
     const claimed = await studentRepository.updateOne(
       { _id: data.id, paid: false },
       {
@@ -1186,7 +1186,7 @@ class StudentApplicationService {
         courseName: student.course,
         source: 'admin_pay',
         sourceRef: maHD || `pay:${student._id}`,
-        // Key theo HV + enrollment primary — idempotent rematch cùng lần thu
+        // Key theo HV + enrollment primary - idempotent rematch cùng lần thu
         idempotencyKey: (() => {
           const list = student.enrollments || [];
           const primary = list.find((e) => e.isPrimary) || list[0];
@@ -1199,7 +1199,7 @@ class StudentApplicationService {
       });
       bustFinanceCaches();
     } catch (ledgerErr) {
-      logger.error('[STUDENTS] ledger settle pay FAILED — rollback: %s', ledgerErr.message);
+      logger.error('[STUDENTS] ledger settle pay FAILED - rollback: %s', ledgerErr.message);
       try {
         if (student.enrollments?.length) {
           student.enrollments.forEach((e) => {
@@ -1293,7 +1293,7 @@ class StudentApplicationService {
       ? Math.round((available - refundAmt) * 100) / 100
       : 0;
 
-    // Ledger trước — fail-closed: không clear cache nếu sổ cái lỗi
+    // Ledger trước - fail-closed: không clear cache nếu sổ cái lỗi
     let ledgerEntry = null;
     try {
       const posted = await postRefund({
@@ -1312,7 +1312,7 @@ class StudentApplicationService {
       logger.error('[STUDENTS] ledger refund FAILED: %s', ledgerErr.message);
       return res.status(ledgerErr.status || 500).json({
         success: false,
-        message: ledgerErr.message || 'Ghi sổ hoàn thất bại — chưa đổi trạng thái học viên',
+        message: ledgerErr.message || 'Ghi sổ hoàn thất bại - chưa đổi trạng thái học viên',
       });
     }
 
@@ -1390,7 +1390,7 @@ class StudentApplicationService {
       student.enrollments[0].isPrimary = true;
     }
 
-    // Chuẩn hóa status lệch enum (seed/legacy) trước khi markModified — tránh ValidationError 500
+    // Chuẩn hóa status lệch enum (seed/legacy) trước khi markModified - tránh ValidationError 500
     (student.enrollments || []).forEach((e) => {
       if (e.status && !ALLOWED_ENR_STATUS.has(String(e.status))) {
         e.status = e.paid ? 'active' : 'pending_payment';
@@ -1419,7 +1419,7 @@ class StudentApplicationService {
     if (student.enrollments?.length) student.markModified('enrollments');
     await student.save({ validateModifiedOnly: true });
 
-    // Thông báo — không để lỗi kênh làm fail API sau khi đã mở khóa trong DB
+    // Thông báo - không để lỗi kênh làm fail API sau khi đã mở khóa trong DB
     const io = data.app.get('io');
     if (io) {
       try {
@@ -1648,7 +1648,7 @@ class StudentApplicationService {
       teacherName = t.name || 'Giảng viên';
     }
 
-    // Khớp môn: khóa học HV ↔ chuyên môn GV — lệch môn thì từ chối phân công
+    // Khớp môn: khóa học HV ↔ chuyên môn GV - lệch môn thì từ chối phân công
     let targetCourse = student.course;
     let targetExamSubjects = [];
     if (enrollmentId && student.enrollments?.length) {

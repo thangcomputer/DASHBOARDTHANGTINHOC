@@ -105,7 +105,7 @@ export default function TeacherQuestionBankPanel() {
     updateTeacherExamMinutes,
     teacherEssayExamMinutes,
     updateTeacherEssayExamMinutes,
-        addQuestion,
+    addQuestion,
     updateQuestion,
     removeQuestion,
   } = useData();
@@ -401,7 +401,7 @@ export default function TeacherQuestionBankPanel() {
       toast.success(qForm.id ? 'Đã cập nhật!' : 'Đã thêm câu hỏi!');
       setQForm(null);
     } catch (err) {
-      toast.error(err.message || 'Lưu server thất bại — thử lại');
+      toast.error(err.message || 'Lưu server thất bại - thử lại');
     }
   };
 
@@ -525,29 +525,29 @@ export default function TeacherQuestionBankPanel() {
           <div className="flex w-full flex-col min-[400px]:flex-row min-[400px]:items-center gap-2">
             <span className="text-xs font-bold text-slate-500">{mcQuestions.length} TN · {essayQuestions.length} TL</span>
             <div className="flex flex-col min-[400px]:flex-row gap-2 min-[400px]:ml-auto">
-            <button
-              type="button"
-              onClick={() => persistExamMinutes(teacherExamMinutesRef.current, teacherEssayExamMinutesRef.current)}
-              className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100"
-            >
-              Lưu thời gian
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                showGlobalModal({
-                  title: 'Xóa toàn bộ ngân hàng?',
-                  content: 'Xóa mọi câu trắc nghiệm và tự luận của tất cả môn. Không thể hoàn tác.',
-                  type: 'warning',
-                  confirmText: 'Xóa toàn bộ',
-                  cancelText: 'Huỷ',
-                  onConfirm: () => resetQuestions(),
-                });
-              }}
-              className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-1.5"
-            >
-              <Trash2 size={14} /> Xóa toàn bộ
-            </button>
+              <button
+                type="button"
+                onClick={() => persistExamMinutes(teacherExamMinutesRef.current, teacherEssayExamMinutesRef.current)}
+                className="px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 bg-emerald-50 text-xs font-bold hover:bg-emerald-100"
+              >
+                Lưu thời gian
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  showGlobalModal({
+                    title: 'Xóa toàn bộ ngân hàng?',
+                    content: 'Xóa mọi câu trắc nghiệm và tự luận của tất cả môn. Không thể hoàn tác.',
+                    type: 'warning',
+                    confirmText: 'Xóa toàn bộ',
+                    cancelText: 'Huỷ',
+                    onConfirm: () => resetQuestions(),
+                  });
+                }}
+                className="px-3 py-2 rounded-xl border border-red-200 text-red-600 bg-red-50 text-xs font-bold hover:bg-red-100 flex items-center justify-center gap-1.5"
+              >
+                <Trash2 size={14} /> Xóa toàn bộ
+              </button>
             </div>
           </div>
         </div>
@@ -768,7 +768,7 @@ export default function TeacherQuestionBankPanel() {
                   </div>
                   <div>
                     <label className="text-[11px] font-bold  text-slate-500 block mb-2">
-                      Đáp án — bấm chữ cái để chọn đúng
+                      Đáp án - bấm chữ cái để chọn đúng
                     </label>
                     <div className="space-y-2">
                       {(qForm.options || ['', '', '', '']).map((opt, i) => (
@@ -805,7 +805,7 @@ export default function TeacherQuestionBankPanel() {
                 <>
                   <div>
                     <label className="text-[11px] font-bold  text-slate-500 block mb-2">
-                      File đề riêng (PDF / Excel) <span className="text-slate-400 font-normal normal-case">— chỉ gắn với câu này</span>
+                      File đề riêng (PDF / Excel) <span className="text-slate-400 font-normal normal-case">- chỉ gắn với câu này</span>
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
                       {qForm.attachedFileUrl ? (

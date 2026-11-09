@@ -180,7 +180,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
     };
   };
 
-  /** Lưu ngay files lên server (không đóng builder) — tránh mất sau F5. */
+  /** Lưu ngay files lên server (không đóng builder) - tránh mất sau F5. */
   const persistFilesNow = async (nextFiles) => {
     if (typeof onPatch !== 'function' && typeof onSave !== 'function') return;
     const payload = buildCoursePayload(nextFiles);
@@ -591,14 +591,12 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
                                 <span>{lesson.videoUrl || lesson.url || 'Chưa thiết lập URL'}</span>
                                 <span className="text-slate-300"> · </span>
                                 <span>{Number(lesson.duration) > 0 ? `${lesson.duration}s` : 'Chưa có thời lượng'}</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${
-                                  lesson.antiSeek !== false ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                }`}>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${lesson.antiSeek !== false ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  }`}>
                                   {lesson.antiSeek !== false ? 'Chống tua: BẬT' : 'Tua tự do'}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${
-                                  lesson.allowEarlyAccess === true ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-50 text-slate-500 border border-slate-200'
-                                }`}>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black  ${lesson.allowEarlyAccess === true ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                  }`}>
                                   {lesson.allowEarlyAccess === true ? 'Mở sớm: BẬT' : 'Mở sớm: TẮT'}
                                 </span>
                                 {lesson.isPreview === true && (
@@ -661,7 +659,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
             <Plus size={18} /> Thêm Phần/Chương mới
           </button>
 
-          {/* Tài liệu đính kèm khóa — hiện ở tab Tài liệu trong player video */}
+          {/* Tài liệu đính kèm khóa - hiện ở tab Tài liệu trong player video */}
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden min-w-0">
             <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-5 py-3 sm:py-4">
               <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
@@ -720,7 +718,7 @@ const AdminCourseBuilder = ({ course, onBack, onSave, onPatch }) => {
 
               {files.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-sm font-semibold border-2 border-dashed border-slate-200 rounded-xl bg-white">
-                  Chưa có tài liệu — tải tệp hoặc dán link phía trên
+                  Chưa có tài liệu - tải tệp hoặc dán link phía trên
                 </div>
               ) : (
                 <ul className="space-y-2">

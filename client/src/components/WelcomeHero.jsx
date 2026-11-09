@@ -17,7 +17,7 @@ const VARIANTS = {
       'Kiến thức là hành trang theo bạn suốt đời.',
       'Chăm chỉ hôm nay là tự tin ngày mai.',
       'Không có gì là khó nếu bạn bắt đầu.',
-      'Thành thạo tin học — mở rộng cơ hội.',
+      'Thành thạo tin học - mở rộng cơ hội.',
       'Kiên trì là chìa khóa của thành công.',
     ],
   },
@@ -60,10 +60,10 @@ function greetingFor(hour) {
 
 /**
  * Thẻ chào mừng trang Tổng quan (học viên / giảng viên): tên đầy đủ, hình hoạt hình theo vai trò,
- * nút vào lớp trên đầu nhân vật — sáng khi có link, mờ khi chưa.
+ * nút vào lớp trên đầu nhân vật - sáng khi có link, mờ khi chưa.
  * chips: [{ icon, label, tone?: 'live' }]
  */
-export default function WelcomeHero({ role = 'student', name, chips = [], joinUrl = '', joinHint = 'Chưa có link học', onJoin }) {
+export default function WelcomeHero({ role = 'student', name, chips = [], joinUrl = '', joinHint = 'Chưa có link học', onJoin, showJoin = true }) {
   const variant = VARIANTS[role] || VARIANTS.student;
   const { hour, date, dayIndex } = vnNow();
   const quote = variant.quotes[dayIndex % variant.quotes.length];
@@ -114,7 +114,7 @@ export default function WelcomeHero({ role = 'student', name, chips = [], joinUr
       </div>
 
       <div className="absolute bottom-0 right-3 flex flex-col items-center sm:right-6">
-        {(onJoin || joinUrl || joinHint) && <div className="mb-1.5">
+        {showJoin && (onJoin || joinUrl || joinHint) && <div className="mb-1.5">
           {onJoin || joinUrl ? (
             onJoin ? (
               <button
@@ -126,15 +126,15 @@ export default function WelcomeHero({ role = 'student', name, chips = [], joinUr
                 <Video size={15} aria-hidden="true" /> {variant.joinLabel}
               </button>
             ) : (
-            <a
-              href={joinUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="relative isolate flex items-center gap-1.5 whitespace-nowrap rounded-full bg-gradient-to-b from-red-500 to-red-700 px-3.5 py-2 text-xs font-black text-white shadow-[0_8px_18px_rgba(185,28,28,0.45),inset_0_1px_2px_rgba(255,255,255,0.45)] ring-2 ring-white transition hover:scale-105 sm:text-sm"
-            >
-              <span className="absolute inset-0 -z-10 animate-ping rounded-full bg-red-400/60" aria-hidden="true" />
-              <Video size={15} aria-hidden="true" /> {variant.joinLabel}
-            </a>
+              <a
+                href={joinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative isolate flex items-center gap-1.5 whitespace-nowrap rounded-full bg-gradient-to-b from-red-500 to-red-700 px-3.5 py-2 text-xs font-black text-white shadow-[0_8px_18px_rgba(185,28,28,0.45),inset_0_1px_2px_rgba(255,255,255,0.45)] ring-2 ring-white transition hover:scale-105 sm:text-sm"
+              >
+                <span className="absolute inset-0 -z-10 animate-ping rounded-full bg-red-400/60" aria-hidden="true" />
+                <Video size={15} aria-hidden="true" /> {variant.joinLabel}
+              </a>
             )
           ) : (
             <span
@@ -147,9 +147,11 @@ export default function WelcomeHero({ role = 'student', name, chips = [], joinUr
           )}
         </div>}
         <div className="relative">
-          <span aria-hidden="true" className="pointer-events-none absolute right-[88%] top-12 hidden whitespace-nowrap rounded-2xl rounded-br-sm bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-md ring-1 ring-slate-100 lg:block">
-            {onJoin || joinUrl ? variant.bubbleLive : variant.bubbleIdle}
-          </span>
+          {showJoin ? (
+            <span aria-hidden="true" className="pointer-events-none absolute right-[88%] top-12 hidden whitespace-nowrap rounded-2xl rounded-br-sm bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-md ring-1 ring-slate-100 lg:block">
+              {onJoin || joinUrl ? variant.bubbleLive : variant.bubbleIdle}
+            </span>
+          ) : null}
           <span aria-hidden="true" className="pointer-events-none absolute bottom-1 left-1/2 h-3 w-20 -translate-x-1/2 rounded-full bg-slate-900/15 blur-[3px]" />
           <img src={variant.image} alt="" aria-hidden="true" className="pointer-events-none relative h-[168px] w-auto drop-shadow-[0_10px_14px_rgba(15,23,42,0.18)] sm:h-[192px]" />
         </div>

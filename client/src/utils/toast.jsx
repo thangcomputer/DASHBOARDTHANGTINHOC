@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { ToastContext } from './toastContext';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TOAST CONTEXT — Thông báo nổi toàn cục (không icon, card + typography + shadow)
+// TOAST CONTEXT - Thông báo nổi toàn cục (không icon, card + typography + shadow)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Mỗi loại: thanh accent trái + nền + màu chữ (thiết kế SaaS, không emoji) */
@@ -82,11 +82,11 @@ export const ToastProvider = ({ children }) => {
   }, [dismiss]);
 
   const toast = useMemo(() => ({
-    success: (msg, d)  => show(msg, 'success', d),
-    error:   (msg, d)  => show(msg, 'error',   d ?? 6000),
-    warning: (msg, d)  => show(msg, 'warning', d),
-    info:    (msg, d)  => show(msg, 'info',     d),
-    loading: (msg)     => show(msg, 'loading',  0),
+    success: (msg, d) => show(msg, 'success', d),
+    error: (msg, d) => show(msg, 'error', d ?? 6000),
+    warning: (msg, d) => show(msg, 'warning', d),
+    info: (msg, d) => show(msg, 'info', d),
+    loading: (msg) => show(msg, 'loading', 0),
     dismiss,
   }), [show, dismiss]);
 

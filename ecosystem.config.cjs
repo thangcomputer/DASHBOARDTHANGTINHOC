@@ -1,5 +1,5 @@
 /**
- * PM2 production config — tránh crash loop OOM / restart bão.
+ * PM2 production config - tránh crash loop OOM / restart bão.
  * Deploy: pm2 startOrReload ecosystem.config.cjs --env production && pm2 save
  */
 module.exports = {

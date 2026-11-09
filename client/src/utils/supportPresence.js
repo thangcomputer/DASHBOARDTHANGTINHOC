@@ -7,7 +7,7 @@ import { normalizeChatRole } from './chatConversationId';
 
 /**
  * Elevated admins who may browse online presence as a directory.
- * STAFF/SUPPORT must NOT inherit this — they use server contacts.
+ * STAFF/SUPPORT must NOT inherit this - they use server contacts.
  */
 export function isElevatedPresenceDirectoryViewer(session) {
   if (!session) return false;
@@ -63,7 +63,7 @@ function personFromAuthorizedContact(st, online) {
 }
 
 /**
- * @param {{ supportAgentsOnly?: boolean }} opts — true = chỉ SUPPORT org-wide (bỏ STAFF chi nhánh)
+ * @param {{ supportAgentsOnly?: boolean }} opts - true = chỉ SUPPORT org-wide (bỏ STAFF chi nhánh)
  * @returns {{ mode: 'directory'|'support_only', groups: Array<{ key: string, label: string, people: object[] }> }}
  */
 export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [], supportAgentsOnly = false }) {
@@ -73,7 +73,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [],
   // Phase 7: only SUPER/HIGH use presence directory. Everyone else = server contacts.
   if (!isElevatedPresenceDirectoryViewer(session)) {
     // Phase 6: directory people come ONLY from server contacts (staffs arg).
-    // Presence may mark online — must NOT invent unauthorized peers.
+    // Presence may mark online - must NOT invent unauthorized peers.
     const onlineIds = new Set();
     users.forEach((u) => {
       // Contacts remain the authorization source; presence only supplies online state.
@@ -91,7 +91,7 @@ export function buildSupportDirectory({ session, onlineUsers, meId, staffs = [],
         const r = String(st.role || '').toLowerCase();
         const ar = String(st.adminRole || '').toUpperCase();
         // Presentation filter on already-authorized contacts (from /contacts).
-        // Prefer productRole when present — never map transport staff → product STAFF.
+        // Prefer productRole when present - never map transport staff → product STAFF.
         const product = String(st.productRole || '').toUpperCase();
         const isSupportAgent = product === 'SUPPORT' || ar === 'SUPPORT' || r === 'support';
         const isOps = supportAgentsOnly

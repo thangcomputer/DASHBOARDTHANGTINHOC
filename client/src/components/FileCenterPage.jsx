@@ -64,7 +64,7 @@ export default function FileCenterPage() {
   useEffect(() => {
     filesAPI.categories().then((res) => {
       if (res.success) setCategories(res.data || []);
-    }).catch(() => {});
+    }).catch(() => { });
     loadStats();
   }, [loadStats]);
 
@@ -138,7 +138,7 @@ export default function FileCenterPage() {
             <HardDrive className="text-indigo-600 flex-shrink-0" size={22} /> Quản lý file
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
-            {stats?.totals?.count ?? total} file · {stats?.totals?.totalSizeLabel || '—'}
+            {stats?.totals?.count ?? total} file · {stats?.totals?.totalSizeLabel || '-'}
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -158,9 +158,8 @@ export default function FileCenterPage() {
               key={c.category}
               type="button"
               onClick={() => setCategory(c.category === category ? '' : c.category)}
-              className={`text-left p-3 rounded-xl border text-xs min-w-0 ${
-                category === c.category ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100 bg-white'
-              }`}
+              className={`text-left p-3 rounded-xl border text-xs min-w-0 ${category === c.category ? 'border-indigo-400 bg-indigo-50' : 'border-gray-100 bg-white'
+                }`}
             >
               <p className="font-black text-gray-800 uppercase truncate">{c.category}</p>
               <p className="text-gray-500 font-bold mt-0.5">{c.count} file · {c.totalSizeLabel}</p>

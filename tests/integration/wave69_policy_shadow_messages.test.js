@@ -1,5 +1,5 @@
 /**
- * Wave 6.9 — Policy SHADOW for LIVE /api/messages authorization.
+ * Wave 6.9 - Policy SHADOW for LIVE /api/messages authorization.
  * Equivalence only; Legacy remains HTTP authority. Socket path documented, not redesigned.
  */
 const test = require('node:test');
@@ -92,7 +92,7 @@ test('Wave6.9 MESSAGE: unread self-only (stricter)', async () => {
   );
 });
 
-test('Wave6.9 MESSAGE: VIEW/MANAGE_MESSAGES unused — missing perm still ALLOW contacts', async () => {
+test('Wave6.9 MESSAGE: VIEW/MANAGE_MESSAGES unused - missing perm still ALLOW contacts', async () => {
   const staff = subjectOf({ permissions: [PERMISSIONS.VIEW_TEACHERS] });
   assert.equal((await assertMatch('no-msg-perm', staff, 'contacts')).legacy.decision, 'ALLOW');
   assert.ok(PERMISSIONS.MANAGE_MESSAGES);

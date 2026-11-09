@@ -16,7 +16,7 @@ import CertPrepExitDialog from './CertPrepExitDialog';
 import CertPrepSessionExpired from './CertPrepSessionExpired';
 import CertPrepPlayerError from './CertPrepPlayerError';
 
-/** Lớp phủ toàn app — che sidebar/header/messenger (giống trắc nghiệm buổi học) */
+/** Lớp phủ toàn app - che sidebar/header/messenger (giống trắc nghiệm buổi học) */
 function ExamOverlay({ children, label = 'Phòng thi ôn MOS/IC3' }) {
   if (typeof document === 'undefined') return children;
   return createPortal(

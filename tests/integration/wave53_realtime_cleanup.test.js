@@ -1,5 +1,5 @@
 /**
- * Wave 5.3 — remaining data:refresh / SYSTEM_RESET scoping.
+ * Wave 5.3 - remaining data:refresh / SYSTEM_RESET scoping.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

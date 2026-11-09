@@ -1,5 +1,5 @@
 /**
- * Phase 7.2 — Controlled Policy-primary cutover for /api/monitoring ONLY.
+ * Phase 7.2 - Controlled Policy-primary cutover for /api/monitoring ONLY.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -36,10 +36,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : (role === 'teacher' ? null : 'STAFF'),
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : (role === 'teacher' ? null : 'STAFF'),
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -114,7 +114,7 @@ function shadowFromSubject(action, subject, untrusted = {}) {
 
 // ── Legacy mode ──────────────────────────────────────────────────────────────
 
-test('Phase7.2 Legacy mode: toggle OFF — admin/staff ALLOW; teacher/student DENY; missing auth DENY', async () => {
+test('Phase7.2 Legacy mode: toggle OFF - admin/staff ALLOW; teacher/student DENY; missing auth DENY', async () => {
   assert.equal(withEnv(ENV_OFF, () => getAuthorizationAuthority('monitoring')), AUTHORITY.LEGACY);
 
   for (const action of ['health', 'metrics', 'overview']) {
@@ -146,7 +146,7 @@ test('Phase7.2 Legacy mode: toggle OFF — admin/staff ALLOW; teacher/student DE
 
 // ── Policy mode ──────────────────────────────────────────────────────────────
 
-test('Phase7.2 Policy mode: monitoring ON — admin/staff ALLOW; teacher/student/missing DENY', async () => {
+test('Phase7.2 Policy mode: monitoring ON - admin/staff ALLOW; teacher/student/missing DENY', async () => {
   assert.equal(withEnv(ENV_ON, () => getAuthorizationAuthority('monitoring')), AUTHORITY.POLICY);
   assert.equal(withEnv(ENV_ON, () => getAuthorizationAuthority('backups')), AUTHORITY.LEGACY);
 
@@ -351,7 +351,7 @@ test('Phase7.2 static: only monitoring cutover-wired; handlers/side-effects unch
   assert.ok(!/app\.use\(\s*['"]\/api\/.*policy/i.test(server));
   if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   // Phase 7.5 may allowlist monitoring with backups; never wildcard
-  const routesLine = (env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1].trim();
+  const routesLine = (env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1].trim();
   assert.ok(!routesLine.includes('*'));
   assert.ok(!perms.includes('MANAGE_MONITORING'));
   assert.ok(!perms.includes('VIEW_MONITORING'));

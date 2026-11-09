@@ -140,7 +140,7 @@ async function initPresenceBus() {
       try {
         const msg = JSON.parse(message);
         if (msg.op === 'upsert' && msg.key && msg.user) {
-          // Bo qua echo cung instance neu muon — van merge de dong bo
+          // Bo qua echo cung instance neu muon - van merge de dong bo
           local.set(msg.key, msg.user);
           notify();
         } else if (msg.op === 'remove' && msg.key) {
@@ -152,7 +152,7 @@ async function initPresenceBus() {
     logger.info('Presence: redis pub/sub');
     return { mode: 'redis' };
   } catch (err) {
-    logger.warn({ err: err.message }, 'Presence bus failed — memory only');
+    logger.warn({ err: err.message }, 'Presence bus failed - memory only');
     return { mode: 'memory', error: err.message };
   }
 }

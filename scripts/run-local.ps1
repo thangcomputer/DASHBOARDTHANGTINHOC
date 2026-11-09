@@ -38,9 +38,10 @@ Start-Sleep -Seconds 1
 if (-not (Test-Path ".env")) {
     if (Test-Path ".env.example") {
         Copy-Item ".env.example" ".env"
-        Write-Host "Da tao .env tu .env.example — hay sua MONGODB_URI neu can." -ForegroundColor Yellow
-    } else {
-        Write-Host "Thieu file .env — tao tu .env.example hoac dat MONGODB_URI thu cong." -ForegroundColor Red
+        Write-Host "Da tao .env tu .env.example - hay sua MONGODB_URI neu can." -ForegroundColor Yellow
+    }
+    else {
+        Write-Host "Thieu file .env - tao tu .env.example hoac dat MONGODB_URI thu cong." -ForegroundColor Red
         exit 1
     }
 }
@@ -69,11 +70,13 @@ for ($i = 0; $i -lt 30; $i++) {
     try {
         $r = Invoke-WebRequest -Uri "http://localhost:5000/api/settings/web" -UseBasicParsing -TimeoutSec 2
         if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { $ready = $true; break }
-    } catch { Start-Sleep -Seconds 1 }
+    }
+    catch { Start-Sleep -Seconds 1 }
 }
 if (-not $ready) {
     Write-Host "Backend chua san sang - kiem tra cua so PowerShell backend (MongoDB, JWT_SECRET trong .env)." -ForegroundColor Red
-} else {
+}
+else {
     Write-Host "Backend OK." -ForegroundColor Green
 }
 

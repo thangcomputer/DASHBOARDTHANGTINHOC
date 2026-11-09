@@ -1,5 +1,5 @@
 /**
- * Cooldown / prompt helpers — window via getAttendanceAction (grace 60m).
+ * Cooldown / prompt helpers - window via getAttendanceAction (grace 60m).
  */
 
 import { getAttendanceAction } from './attendanceAction';

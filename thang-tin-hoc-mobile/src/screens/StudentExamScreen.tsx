@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Alert, BackHandler, DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import {
-  AlertCircle, Award, CheckCircle, ChevronLeft, ChevronRight, Clock, GraduationCap, HelpCircle,
+  AlertCircle, Award, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, GraduationCap, HelpCircle,
   LayoutGrid, Lock, Monitor, Play, RefreshCw, Trophy, User,
 } from 'lucide-react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -47,6 +47,16 @@ function formatDate(value: string) {
     : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+function shuffleList<T>(list: T[]): T[] {
+  if (!Array.isArray(list)) return [];
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 export function StudentExamScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<Navigation>();
@@ -69,6 +79,7 @@ export function StudentExamScreen() {
   const handledQuizId = useRef('');
   const screenScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [notificationQuizId, setNotificationQuizId] = useState<string | null>(null);
+  const [showDetailedReview, setShowDetailedReview] = useState(false);
   const [scoreTab, setScoreTab] = useState<'quiz' | 'cert'>('quiz');
   const [certScores, setCertScores] = useState<{ loading: boolean; error: string; data: CertExamScore[] }>({ loading: false, error: '', data: [] });
   const isPreview = Boolean(user?.previewMode)
@@ -115,6 +126,7 @@ export function StudentExamScreen() {
   const closeQuiz = useCallback(() => {
     setQuizDetail(null);
     setResult(null);
+    setShowDetailedReview(false);
     setAnswers({});
     setCurrentQuestion(0);
     setSubmitting(false);
@@ -127,9 +139,11 @@ export function StudentExamScreen() {
     submitLock.current = true;
     setSubmitting(true);
     try {
-      const payload = quizDetail.questions.map((_, index) => (
-        forfeit ? null : answers[index] ?? null
-      ));
+      const payload = new Array(quizDetail.questions.length).fill(null);
+      quizDetail.questions.forEach((q, displayIdx) => {
+        const origIdx = (q as { originalIndex?: number }).originalIndex ?? displayIdx;
+        payload[origIdx] = forfeit ? null : answers[displayIdx] ?? null;
+      });
       setResult(await submitStudentQuiz(user, quizDetail.id, payload, { forfeit, exitReason }));
     } catch (submitError) {
       Alert.alert('Không thể nộp bài', submitError instanceof Error ? submitError.message : 'Vui lòng thử lại.');
@@ -162,7 +176,9 @@ export function StudentExamScreen() {
     }
     try {
       const detail = await getStudentQuizForExam(user, quiz.id);
-      setQuizDetail(detail);
+      const questionsWithIndex = (detail.questions || []).map((q, idx) => ({ ...q, originalIndex: idx }));
+      const shuffledQuestions = detail.mySubmission ? questionsWithIndex : shuffleList(questionsWithIndex);
+      setQuizDetail({ ...detail, questions: shuffledQuestions });
       setAnswers({});
       setCurrentQuestion(0);
       if (detail.mySubmission) {
@@ -274,7 +290,7 @@ export function StudentExamScreen() {
                   <Text style={[styles.resultScore, isPassed ? styles.passText : styles.failText]}>{result.score}%</Text>
                   <View style={[styles.resultStatusBadge, isPassed ? styles.resultPassed : styles.resultFailed]}>
                     <Text style={[styles.resultStatus, isPassed ? styles.passText : styles.failText]}>
-                    {result.forfeit ? 'Rớt · thoát giữa giờ' : isPassed ? 'Đạt yêu cầu' : 'Chưa đạt'}
+                      {result.forfeit ? 'Rớt · thoát giữa giờ' : isPassed ? 'Đạt yêu cầu' : 'Chưa đạt'}
                     </Text>
                   </View>
                 </View>
@@ -304,29 +320,53 @@ export function StudentExamScreen() {
             </Card>
             {!result.forfeit && result.detailedReview.length ? (
               <View style={styles.reviewList}>
-                <Text style={styles.sectionTitle}>Xem lại đáp án</Text>
-                {result.detailedReview.map((item, index) => (
-                  <Card key={item.id} style={styles.reviewCard}>
-                    <View style={styles.reviewHeader}>
-                      <Text style={styles.reviewQuestionNumber}>Câu {index + 1}</Text>
-                      <View style={[styles.reviewStatusBadge, item.isCorrect ? styles.reviewCorrectBadge : styles.reviewIncorrectBadge]}>
-                        <Text style={[styles.reviewStatusText, item.isCorrect ? styles.reviewCorrect : styles.reviewIncorrect]}>
-                          {item.isCorrect ? 'Đúng' : 'Chưa đúng'}
-                        </Text>
+                <Pressable
+                  onPress={() => setShowDetailedReview((prev) => !prev)}
+                  style={styles.reviewToggleBtn}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showDetailedReview }}
+                >
+                  <View style={styles.reviewToggleLeft}>
+                    <HelpCircle size={18} color={colors.brand} />
+                    <View style={styles.reviewToggleTitleWrap}>
+                      <Text style={styles.sectionTitle}>Xem lại đáp án</Text>
+                      <Text style={styles.reviewToggleSub}>
+                        {showDetailedReview
+                          ? `Đang hiện ${result.detailedReview.length} câu hỏi`
+                          : `Nhấn để xem chi tiết đáp án (${result.detailedReview.length} câu)`}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.reviewToggleBadge}>
+                    <Text style={styles.reviewToggleBadgeText}>{showDetailedReview ? 'Thu gọn' : 'Xem lại'}</Text>
+                    {showDetailedReview ? <ChevronUp size={16} color={colors.brandDark} /> : <ChevronDown size={16} color={colors.brandDark} />}
+                  </View>
+                </Pressable>
+
+                {showDetailedReview ? (
+                  result.detailedReview.map((item, index) => (
+                    <Card key={item.id} style={styles.reviewCard}>
+                      <View style={styles.reviewHeader}>
+                        <Text style={styles.reviewQuestionNumber}>Câu {index + 1}</Text>
+                        <View style={[styles.reviewStatusBadge, item.isCorrect ? styles.reviewCorrectBadge : styles.reviewIncorrectBadge]}>
+                          <Text style={[styles.reviewStatusText, item.isCorrect ? styles.reviewCorrect : styles.reviewIncorrect]}>
+                            {item.isCorrect ? 'Đúng' : 'Chưa đúng'}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                    <Text style={styles.reviewQuestionText}>{item.questionText}</Text>
-                    <View style={[styles.reviewAnswerBox, !item.isCorrect && styles.reviewAnswerWrong]}>
-                      <Text style={styles.reviewAnswerLabel}>Câu trả lời của bạn</Text>
-                      <Text style={styles.reviewAnswer}>{item.userAnswer == null ? 'Chưa trả lời' : item.options[item.userAnswer] || '—'}</Text>
-                    </View>
-                    <View style={styles.reviewAnswerBox}>
-                      <Text style={styles.reviewAnswerLabel}>Đáp án đúng</Text>
-                      <Text style={styles.reviewCorrect}>{item.options[item.correctAnswer] || '—'}</Text>
-                    </View>
-                    {item.explanation ? <Text style={styles.examMuted}>{item.explanation}</Text> : null}
-                  </Card>
-                ))}
+                      <Text style={styles.reviewQuestionText}>{item.questionText}</Text>
+                      <View style={[styles.reviewAnswerBox, !item.isCorrect && styles.reviewAnswerWrong]}>
+                        <Text style={styles.reviewAnswerLabel}>Câu trả lời của bạn</Text>
+                        <Text style={styles.reviewAnswer}>{item.userAnswer == null ? 'Chưa trả lời' : item.options[item.userAnswer] || '-'}</Text>
+                      </View>
+                      <View style={styles.reviewAnswerBox}>
+                        <Text style={styles.reviewAnswerLabel}>Đáp án đúng</Text>
+                        <Text style={styles.reviewCorrect}>{item.options[item.correctAnswer] || '-'}</Text>
+                      </View>
+                      {item.explanation ? <Text style={styles.examMuted}>{item.explanation}</Text> : null}
+                    </Card>
+                  ))
+                ) : null}
               </View>
             ) : null}
           </ScrollView>
@@ -770,6 +810,48 @@ const styles = StyleSheet.create({
   resultExitReason: { color: '#B91C1C', fontSize: typography.caption, fontWeight: '700' },
   resultBackButton: { minHeight: 40, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, backgroundColor: colors.brand, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   reviewList: { gap: spacing.sm },
+  reviewToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  reviewToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+    minWidth: 0,
+  },
+  reviewToggleTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  reviewToggleSub: {
+    fontSize: typography.micro,
+    color: colors.muted,
+  },
+  reviewToggleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brandSoft,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  reviewToggleBadgeText: {
+    fontSize: typography.micro,
+    fontWeight: '600',
+    color: colors.brandDark,
+  },
   reviewCard: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', padding: spacing.md, gap: spacing.sm },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   reviewQuestionNumber: { color: '#0F172A', fontSize: typography.caption, fontWeight: '900' },

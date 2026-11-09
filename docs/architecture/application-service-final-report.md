@@ -1,4 +1,4 @@
-# Application Service Layer — Final Migration Report
+# Application Service Layer - Final Migration Report
 
 ## Executive Summary
 The Sprint 4.3 goal to construct a robust Application Service Layer across all domains is **COMPLETE**.

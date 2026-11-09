@@ -6,9 +6,9 @@ import { backupsAPI } from '../services/api';
 import { useToast } from '../utils/useToast';
 
 function formatTime(t) {
-  if (!t) return '—';
+  if (!t) return '-';
   const d = new Date(t);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleString('vi-VN');
 }
 
@@ -102,7 +102,7 @@ export default function BackupCenterPage() {
             <Archive className="text-red-600" size={22} /> Sao lưu dữ liệu
           </h1>
           <p className="text-xs text-gray-500 font-medium mt-1">
-            Chỉ Super Admin · Giữ tối đa {stats?.keep ?? 7} bản · {stats?.diskLabel || '—'} trên disk
+            Chỉ Super Admin · Giữ tối đa {stats?.keep ?? 7} bản · {stats?.diskLabel || '-'} trên disk
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -123,9 +123,9 @@ export default function BackupCenterPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
         {[
-          { label: 'Tổng job', value: stats?.total ?? '—' },
-          { label: 'Thành công', value: stats?.completed ?? '—' },
-          { label: 'Thất bại', value: stats?.failed ?? '—' },
+          { label: 'Tổng job', value: stats?.total ?? '-' },
+          { label: 'Thành công', value: stats?.completed ?? '-' },
+          { label: 'Thất bại', value: stats?.failed ?? '-' },
           { label: 'Lần gần nhất', value: formatTime(stats?.lastBackupAt) },
         ].map((c) => (
           <div key={c.label} className="bg-white border border-gray-100 rounded-xl p-3">
@@ -138,7 +138,7 @@ export default function BackupCenterPage() {
       <div className="bg-red-50 border border-violet-100 rounded-xl p-3 text-xs text-violet-800 font-medium shrink-0">
         Backup xuất toàn bộ collection MongoDB ra file <code className="font-mono">.json.gz</code>.
         Lịch tự động 03:00 hàng ngày (tắt bằng <code className="font-mono">Backup_schedule=0</code>).
-        Restore thủ công từ file tải về — không ghi đè DB qua UI.
+        Restore thủ công từ file tải về - không ghi đè DB qua UI.
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden cms-viewport-scroll">

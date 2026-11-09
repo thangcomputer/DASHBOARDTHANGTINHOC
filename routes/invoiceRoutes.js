@@ -1,5 +1,5 @@
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const Invoice = require('../models/Invoice');
 const Student = require('../models/Student');
 const { generateInvoicePDF } = require('../modules/pdfInvoice');
@@ -32,13 +32,13 @@ router.get('/', [authMiddleware, branchFilter, policyShadowFinance('inv_list'), 
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);
-      if (to)   filter.createdAt.$lte = new Date(to);
+      if (to) filter.createdAt.$lte = new Date(to);
     }
     if (search) {
       const safeSearch = sanitizeRegex(search);
       filter.$or = [
-        { hoTen:    { $regex: safeSearch, $options: 'i' } },
-        { khoaHoc:  { $regex: safeSearch, $options: 'i' } },
+        { hoTen: { $regex: safeSearch, $options: 'i' } },
+        { khoaHoc: { $regex: safeSearch, $options: 'i' } },
         { maHoaDon: { $regex: safeSearch, $options: 'i' } },
       ];
     }
@@ -106,14 +106,14 @@ router.get('/:id', authMiddleware, policyShadowFinance('inv_get'), async (req, r
   try {
     const invoice = await Invoice.findById(req.params.id)
       .populate('hocVien', 'name course phone zalo address');
-    
+
     if (!invoice) {
-        return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
     }
 
     // Bảo vệ: Chỉ Admin hoặc chính Student sở hữu hóa đơn mới được xem
     if (req.user.role !== 'admin' && req.user.id !== invoice.hocVien?._id?.toString()) {
-       return res.status(403).json({ success: false, message: 'Bạn không có quyền xem hóa đơn này' });
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem hóa đơn này' });
     }
     res.json({ success: true, data: invoice });
   } catch (error) {
@@ -122,7 +122,7 @@ router.get('/:id', authMiddleware, policyShadowFinance('inv_get'), async (req, r
 });
 
 // ─── POST /api/invoices ────────────────────────────────────────────────────────
-// Tạo hóa đơn thủ công (Admin) — dùng field names từ Student schema mới
+// Tạo hóa đơn thủ công (Admin) - dùng field names từ Student schema mới
 // Strangler Facade: route to CQRS controller when ENABLE_CQRS_INVOICE=true
 router.post('/', authMiddleware, policyShadowFinance('inv_create'), checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res, next) => {
   // CQRS path: InvoiceController -> CommandBus -> Post_rootHandler -> Repository -> Outbox
@@ -140,22 +140,22 @@ router.post('/', authMiddleware, policyShadowFinance('inv_create'), checkPermiss
 
     // Tạo mã hóa đơn
     const count = await Invoice.countDocuments();
-    const now   = new Date();
-    const maHD  = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
+    const now = new Date();
+    const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
 
     const invoice = await Invoice.create({
       maHoaDon: maHD,
-      hocVien:  student._id,
-      hoTen:    student.name,     // Student schema: name (không phải hoTen)
-      khoaHoc:  student.course,   // Student schema: course (không phải khoaHoc)
-      hocPhi:   student.price,    // Student schema: price (không phải hocPhi)
-      ghiChu:   ghiChu || '',
-      status:   'issued',
+      hocVien: student._id,
+      hoTen: student.name,     // Student schema: name (không phải hoTen)
+      khoaHoc: student.course,   // Student schema: course (không phải khoaHoc)
+      hocPhi: student.price,    // Student schema: price (không phải hocPhi)
+      ghiChu: ghiChu || '',
+      status: 'issued',
     });
 
-    // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid — dùng PUT /students/:id/pay.
+    // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid - dùng PUT /students/:id/pay.
 
-    // Sinh PDF nền (uploads/invoices) — không chặn response
+    // Sinh PDF nền (uploads/invoices) - không chặn response
     enqueueInvoicePdf({ invoiceId: invoice._id.toString() }).catch((err) => {
       logger.warn('[INVOICE] enqueue pdf on create:', err.message);
     });
@@ -170,7 +170,7 @@ router.post('/', authMiddleware, policyShadowFinance('inv_create'), checkPermiss
 });
 
 // ─── GET /api/invoices/:id/pdf ─────────────────────────────────────────────────
-// Xuất hóa đơn PDF (đồng bộ — tải ngay)
+// Xuất hóa đơn PDF (đồng bộ - tải ngay)
 router.get('/:id/pdf', authMiddleware, policyShadowFinance('inv_pdf'), async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
@@ -181,16 +181,16 @@ router.get('/:id/pdf', authMiddleware, policyShadowFinance('inv_pdf'), async (re
     }
 
     if (req.user.role !== 'admin' && req.user.id !== invoice.hocVien?._id?.toString()) {
-        return res.status(403).json({ success: false, message: 'Bạn không có quyền xuất hóa đơn này' });
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xuất hóa đơn này' });
     }
 
     const pdfBuffer = generateInvoicePDF({
       maHoaDon: invoice.maHoaDon,
-      hoTen:    invoice.hoTen,
-      khoaHoc:  invoice.khoaHoc,
-      hocPhi:   invoice.hocPhi,
+      hoTen: invoice.hoTen,
+      khoaHoc: invoice.khoaHoc,
+      hocPhi: invoice.hocPhi,
       ngayXuat: invoice.ngayXuat || invoice.createdAt,
-      ghiChu:   invoice.ghiChu,
+      ghiChu: invoice.ghiChu,
     });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -254,7 +254,7 @@ router.post('/:id/email', authMiddleware, policyShadowFinance('inv_email'), chec
 });
 
 // ─── DELETE /api/invoices/:id ──────────────────────────────────────────────────
-// P3: cấm hard-delete HĐ — chỉ void (status=void) trừ khi FINANCE_ALLOW_HARD_DELETE=true
+// P3: cấm hard-delete HĐ - chỉ void (status=void) trừ khi FINANCE_ALLOW_HARD_DELETE=true
 router.delete('/:id', authMiddleware, policyShadowFinance('inv_delete'), checkPermission(PERMISSIONS.MANAGE_FINANCE), async (req, res) => {
   try {
     const { allowHardDeleteFinance } = require('../utils/financeFlags');

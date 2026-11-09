@@ -1,4 +1,4 @@
-# Technical Debt Review — Sprint 4.4 (DTO & Mapping)
+# Technical Debt Review - Sprint 4.4 (DTO & Mapping)
 
 ## 1. Fat DTO Candidates
 Currently, the Application Services accept a monolithic `data` object containing `body`, `query`, `params`, `file`, and `user`. 

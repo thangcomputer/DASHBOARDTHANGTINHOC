@@ -13,7 +13,7 @@ Sau khi học viên **không còn enrollment `active`** (ví dụ hoàn khóa cu
 
 | Bề mặt | Hành vi |
 |--------|---------|
-| Login / account | **Vẫn mở** — không khóa tài khoản |
+| Login / account | **Vẫn mở** - không khóa tài khoản |
 | Inbox / feed / news / notifications / hồ sơ | **Vẫn mở** |
 | Learning dashboard (`/student` trừ `#profile`) | **BLOCK** → `StudentNoActiveCoursePage` |
 | Phòng thi (`/student/exam*`) | **BLOCK** |
@@ -80,7 +80,7 @@ hasLearningAccessEnrollment(student) =
 
 Khi `hasLearningAccessEnrollment === false`:
 
-- Badge: «Đã hoàn» (có tín hiệu hoàn) / «Đã hủy khóa» — **không** «Chưa đóng phí» từ `student.paid`
+- Badge: «Đã hoàn» (có tín hiệu hoàn) / «Đã hủy khóa» - **không** «Chưa đóng phí» từ `student.paid`
 - `statusLabel`: «Không còn học»
 - `sourceRef` bắt đầu `cancel:` → **invalid** display → fallback `HOÀN-####`
 - Tabs **Bài tập** / **Sửa thông tin** disabled; Tổng quan + Tài chính vẫn xem
@@ -89,11 +89,11 @@ Không đổi Ledger / Invoice DB / `postRefund`.
 
 ---
 
-## 6. Backend learning APIs — AUDIT ONLY (phase này không RBAC)
+## 6. Backend learning APIs - AUDIT ONLY (phase này không RBAC)
 
 | API area | Enrollment `active` check? | Status |
 |----------|----------------------------|--------|
-| `routes/quizRoutes.js` `GET /student` | Lấy courses từ enrollments **không** filter `status === 'active'` | **REPORT** — FE gate only |
+| `routes/quizRoutes.js` `GET /student` | Lấy courses từ enrollments **không** filter `status === 'active'` | **REPORT** - FE gate only |
 | `routes/assignmentRoutes.js` student GET/submit | Auth + ownership; **không** gate theo active enrollment | **REPORT** |
 | `routes/studentRoutes.js` schedules by student | Auth; **không** active-enrollment gate riêng cho learning | **REPORT** |
 

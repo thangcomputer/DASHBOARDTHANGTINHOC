@@ -1,9 +1,9 @@
-const express  = require('express');
-const router   = express.Router();
+const express = require('express');
+const router = express.Router();
 const { scheduleRepository } = require('../repositories');
 const Schedule = require('../models/Schedule'); // Temp for new Schedule
-const Student  = require('../../student/models/Student');
-const Teacher  = require('../../teacher/models/Teacher');
+const Student = require('../../student/models/Student');
+const Teacher = require('../../teacher/models/Teacher');
 const { scheduleHistoryRepository } = require('../repositories');
 const ScheduleHistory = require('../models/ScheduleHistory'); // Temp for new ScheduleHistory
 const attendanceController = require('../controllers/AttendanceController');
@@ -48,7 +48,7 @@ function addMinutesToTimeHHmm(time, addMins) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-/** Buổi học cố định 1h30 — luôn suy ra end từ start */
+/** Buổi học cố định 1h30 - luôn suy ra end từ start */
 function endTimeFromStartOrDefault(startTime, endTime) {
   const fromStart = addMinutesToTimeHHmm(startTime, SESSION_DURATION_MINS);
   if (!fromStart) return String(endTime || '').trim();
@@ -148,7 +148,7 @@ async function notifyAttendanceTaken(io, {
   await NotificationService.notifyAdmins(
     io,
     '📋 Điểm danh buổi học',
-    `GV ${gv} điểm danh HV ${name} — ${courseLabel}: buổi ${progress}.`,
+    `GV ${gv} điểm danh HV ${name} - ${courseLabel}: buổi ${progress}.`,
     {
       studentId: String(studentId),
       teacherName: gv,
@@ -347,35 +347,35 @@ async function checkAndUnlockExam(studentId, io, courseNameHint) {
 
 // ─── GET /api/schedules ────────────────────────────────────────────────────────
 // Admin/Staff: Lấy lịch học (STAFF chỉ thấy chi nhánh của mình)
-router.get('/', [authMiddleware, branchFilter],attendanceController.get_root);
+router.get('/', [authMiddleware, branchFilter], attendanceController.get_root);
 
 // ─── GET /api/schedules/stats (branch-aware, secured) ────────────────────────
-router.get('/stats', [authMiddleware, branchFilter],attendanceController.get_stats);
+router.get('/stats', [authMiddleware, branchFilter], attendanceController.get_stats);
 
 // ─── GET /api/schedules/teacher/:teacherId ─────────────────────────────────────
 // Giảng viên xem lịch dạy của mình
-router.get('/teacher/:teacherId', authMiddleware,attendanceController.get_teacher_teacherId);
+router.get('/teacher/:teacherId', authMiddleware, attendanceController.get_teacher_teacherId);
 
 // ─── GET /api/schedules/student/:studentId ─────────────────────────────────────
 // Học viên xem lịch học của mình
-router.get('/student/:studentId', authMiddleware,attendanceController.get_student_studentId);
+router.get('/student/:studentId', authMiddleware, attendanceController.get_student_studentId);
 
 // ─── POST /api/schedules ───────────────────────────────────────────────────────
 // Giảng viên / Admin tạo lịch học mới
-router.post('/', authMiddleware,attendanceController.post_root);
+router.post('/', authMiddleware, attendanceController.post_root);
 
 // ─── PUT /api/schedules/:scheduleId ───────────────────────────────────────────
 // Cập nhật lịch học (hoàn thành, huỷ, điểm danh...)
-router.put('/:scheduleId', authMiddleware,attendanceController.put_scheduleId);
+router.put('/:scheduleId', authMiddleware, attendanceController.put_scheduleId);
 
 // ─── DELETE /api/schedules/:scheduleId ────────────────────────────────────────
-router.delete('/:scheduleId', authMiddleware,attendanceController.delete_scheduleId);
+router.delete('/:scheduleId', authMiddleware, attendanceController.delete_scheduleId);
 
 // ─── PATCH /api/schedules/:scheduleId/cancel ─────────────────────────────────
-router.patch('/:scheduleId/cancel', authMiddleware,attendanceController.patch_scheduleId_cancel);
+router.patch('/:scheduleId/cancel', authMiddleware, attendanceController.patch_scheduleId_cancel);
 
 // ─── GET /api/schedules/history/:teacherId ───────────────────────────────
 // Trả về lịch sử sắp lịch của 1 giảng viên (cho Admin xem)
-router.get('/history/:teacherId', authMiddleware,attendanceController.get_history_teacherId);
+router.get('/history/:teacherId', authMiddleware, attendanceController.get_history_teacherId);
 
 module.exports = router;

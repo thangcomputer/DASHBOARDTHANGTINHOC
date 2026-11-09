@@ -21,7 +21,7 @@ function addResult(module, func, result, severity, description) {
 
 async function runApiTests() {
   console.log('🚀 Bắt đầu API Testing cho Student Portal...');
-  
+
   let tokenStudentA = '';
   // 1. Đăng nhập Student A qua /api/auth/login/public
   try {

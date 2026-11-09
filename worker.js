@@ -1,5 +1,5 @@
 /**
- * BullMQ + (optional) Outbox worker process — tach khoi API.
+ * BullMQ + (optional) Outbox worker process - tach khoi API.
  * Usage:
  *   RUN_QUEUE_WORKERS=1 node worker.js
  * Multi-instance API: set RUN_OUTBOX_WORKER=0 on API, RUN_OUTBOX_WORKER=1 here.

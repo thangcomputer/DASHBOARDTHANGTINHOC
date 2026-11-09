@@ -139,7 +139,7 @@ export default function EditableAvatar({
         const isNet = !!err?.isNetworkError || err?.name === 'NetworkOfflineError';
         toast.error(
           isNet
-            ? 'Không tải được ảnh đại diện — mất kết nối máy chủ. Thử lại hoặc chọn ảnh nhỏ hơn (tối đa 5MB).'
+            ? 'Không tải được ảnh đại diện - mất kết nối máy chủ. Thử lại hoặc chọn ảnh nhỏ hơn (tối đa 5MB).'
             : (err.message || 'Thay đổi ảnh đại diện thất bại'),
         );
       } finally {

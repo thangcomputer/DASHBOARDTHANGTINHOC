@@ -217,7 +217,7 @@ describe('getMetrics()', () => {
   });
 });
 
-// ─── Compatibility mode — PermissionService integration ──────────────────────
+// ─── Compatibility mode - PermissionService integration ──────────────────────
 describe('PermissionService cache integration (compatibility mode)', () => {
   test('hasPermission uses cache on second call', async () => {
     const PermissionService = require('../../../modules/rbac/permission.service');

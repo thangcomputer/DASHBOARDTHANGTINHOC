@@ -1,11 +1,11 @@
 /**
- * staffRoutes.js — Quản lý tài khoản nội bộ (Admin / Staff) CRUD
+ * staffRoutes.js - Quản lý tài khoản nội bộ (Admin / Staff) CRUD
  * Thêm: validate branchId tồn tại trong Branches, auto-fill branchCode
  */
 const express = require('express');
 const { teacherRepository } = require('../repositories');
 const Teacher = require('../models/Teacher'); // Temp for new Teacher
-const Branch  = require('../../branch/models/Branch');
+const Branch = require('../../branch/models/Branch');
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
 const { authorize, authorizeAny, authorizeAll } = require('../../../shared/middleware/authorize');
 const legacyMapping = require('../../../shared/constants/legacyPermissionMapping');
@@ -13,7 +13,7 @@ const NEW_PERMISSIONS = require('../../../shared/constants/permissions');
 
 const router = express.Router();
 const staffController = require('../controllers/StaffController');
-const guard  = [authMiddleware, authorize(NEW_PERMISSIONS.USER_MANAGE)];
+const guard = [authMiddleware, authorize(NEW_PERMISSIONS.USER_MANAGE)];
 
 function actorIsRootSuperAdmin(req) {
   return req.currentUser?.id === 'admin';
@@ -36,15 +36,15 @@ async function sanitizeAssignedPermissions(req, permissions) {
 }
 
 // ── GET /api/staff ─────────────────────────────────────────────────────────────
-router.get('/', guard,staffController.get_root);
+router.get('/', guard, staffController.get_root);
 
 // ── POST /api/staff ────────────────────────────────────────────────────────────
-router.post('/', guard,staffController.post_root);
+router.post('/', guard, staffController.post_root);
 
 // ── PUT /api/staff/:id ─────────────────────────────────────────────────────────
-router.put('/:id', guard,staffController.put_id);
+router.put('/:id', guard, staffController.put_id);
 
 // ── DELETE /api/staff/:id ──────────────────────────────────────────────────────
-router.delete('/:id', guard,staffController.delete_id);
+router.delete('/:id', guard, staffController.delete_id);
 
 module.exports = router;

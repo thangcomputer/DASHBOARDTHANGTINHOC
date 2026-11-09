@@ -1,6 +1,6 @@
 # BUSINESS CODE DB AUDIT
 
-**Phase:** B — Design  
+**Phase:** B - Design  
 **Date:** 2026-08-11  
 **Mode:** READ-ONLY (no writes, no indexes, no schema changes)  
 **Script:** `scripts/_tmp_audit_business_codes_readonly.cjs`  
@@ -130,7 +130,7 @@ counters                     : MISSING collection
 | Condition | Result |
 |-----------|--------|
 | duplicate studentCode | **CLEAR** (this env) |
-| payment ambiguity from audit alone | Not measurable without live unpaid+code collisions — see COMPATIBILITY |
+| payment ambiguity from audit alone | Not measurable without live unpaid+code collisions - see COMPATIBILITY |
 | Messaging references business codes | Per PHASE A: **NONE** (code review; not re-scanned here) |
 | Would migration need `_id` change? | **NO** (design forbids) |
 
@@ -165,5 +165,5 @@ counters                     : MISSING collection
 Use results in [`BUSINESS_CODE_MIGRATION_PLAN.md`](./BUSINESS_CODE_MIGRATION_PLAN.md) and [`BUSINESS_CODE_COMPATIBILITY.md`](./BUSINESS_CODE_COMPATIBILITY.md).
 
 ```
-STOP — await owner approval for PHASE C
+STOP - await owner approval for PHASE C
 ```

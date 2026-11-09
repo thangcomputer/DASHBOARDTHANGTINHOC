@@ -1,7 +1,7 @@
 # Student certification exam randomization
 
 **Date:** 2026-08-13  
-**Scope:** Học viên thi chứng nhận môn (`StudentTest`) — xáo câu hỏi + đáp án một lần / attempt.
+**Scope:** Học viên thi chứng nhận môn (`StudentTest`) - xáo câu hỏi + đáp án một lần / attempt.
 
 ## Before
 
@@ -26,9 +26,9 @@
 
 | File | Change |
 |------|--------|
-| `client/src/utils/studentCertificationExam.js` | **NEW** — shuffle, remap, attempt resolve/load/save |
+| `client/src/utils/studentCertificationExam.js` | **NEW** - shuffle, remap, attempt resolve/load/save |
 | `client/src/components/StudentTest.jsx` | Wire start/resume + persist; no shuffle in JSX |
-| `tests/unit/student_certification_exam.test.js` | **NEW** — A–H coverage |
+| `tests/unit/student_certification_exam.test.js` | **NEW** - A–H coverage |
 | `docs/exam/STUDENT_CERTIFICATION_RANDOMIZATION_2026-08-13.md` | This report |
 
 ## Tests

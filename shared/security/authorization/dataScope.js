@@ -1,7 +1,7 @@
 /**
  * Design Data Scope resolver (RBAC-S2).
  *
- * NOT LIVE authorization authority — observe / dual-check only until S3 gates.
+ * NOT LIVE authorization authority - observe / dual-check only until S3 gates.
  * Scope codes match docs/rbac/role-crud-scope-matrix.md.
  *
  * Never trust client body/query for scope authority.
@@ -33,7 +33,7 @@ function resolveDataScope(actor = {}) {
   if (adminRole === 'SUPPORT') return DATA_SCOPES.SUPPORT_RELATED;
   if (role === 'teacher') return DATA_SCOPES.OWN_AND_ASSIGNED_CLASS;
   if (role === 'student') return DATA_SCOPES.OWN_AND_AUTHORIZED;
-  // JWT role=admin without adminRole — unresolved; do not invent ALL
+  // JWT role=admin without adminRole - unresolved; do not invent ALL
   if (role === 'admin') return DATA_SCOPES.NONE;
   return DATA_SCOPES.NONE;
 }

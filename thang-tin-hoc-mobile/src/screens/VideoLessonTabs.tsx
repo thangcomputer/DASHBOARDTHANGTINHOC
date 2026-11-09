@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, DeviceEventEmitter, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Clock3, Download, FileBox, MessageSquare, Plus, Search, Star, Trash2 } from 'lucide-react-native';
@@ -267,7 +267,7 @@ export function VideoLessonTabs({
       await submitCourseReview({ courseId, courseTitle, rating: reviewRating, comment });
       setReviewDraft('');
       setReviewRating(5);
-      setReviewSuccess('Đã gửi đánh giá — Admin sẽ nhận thông báo.');
+      setReviewSuccess('Đã gửi đánh giá - Admin sẽ nhận thông báo.');
       await loadReviews();
     } catch (error) {
       setReviewError(messageFromError(error, 'Gửi đánh giá thất bại.'));
@@ -503,7 +503,7 @@ export function VideoLessonTabs({
     return (
       <View style={[styles.panel, styles.reviewsPanel]}>
         <View style={styles.ratingSummary}>
-          <Text style={styles.ratingValue}>{averageRating ? averageRating.toFixed(1) : '—'}</Text>
+          <Text style={styles.ratingValue}>{averageRating ? averageRating.toFixed(1) : '-'}</Text>
           <View style={styles.reviewStars}>
             {[1, 2, 3, 4, 5].map((star) => (
               <Star key={star} size={17} color={averageRating >= star - 0.25 ? '#F59E0B' : '#CBD5E1'} fill={averageRating >= star - 0.25 ? '#F59E0B' : 'transparent'} />

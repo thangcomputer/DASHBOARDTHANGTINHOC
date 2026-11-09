@@ -1,4 +1,4 @@
-# Service Boundary — Batch 4 (Final Phase)
+# Service Boundary - Batch 4 (Final Phase)
 
 ## Architecture Finalization
 With Batch 4 complete, 100% of the platform's domains strictly adhere to the layered pattern:

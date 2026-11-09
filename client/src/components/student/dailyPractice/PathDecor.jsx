@@ -2,7 +2,7 @@ import { Cpu, Monitor } from 'lucide-react';
 import { resolveMediaUrl } from '../../../services/api';
 import Mascot from './Mascot';
 
-/** Giọt nước Thắng Tin Học — mốc nối / trang trí. */
+/** Giọt nước Thắng Tin Học - mốc nối / trang trí. */
 export function DropletMark({ size = 14, fill = '#EF4444', className = '', style }) {
   return (
     <svg width={size} height={size * 1.15} viewBox="0 0 24 28" className={className} style={style} aria-hidden="true">
@@ -55,7 +55,7 @@ export function PathITBackdrop({ accentSoft = '#EFF6FF' }) {
   );
 }
 
-/** Linh vật đứng cạnh nút «Bắt đầu» — lệch về phía đối diện đường cong. */
+/** Linh vật đứng cạnh nút «Bắt đầu» - lệch về phía đối diện đường cong. */
 export function PathMascotBuddy({ side = 'left', mood = 'idle', size = 62 }) {
   const pos = side === 'left' ? '-left-[5.25rem] sm:-left-[6rem]' : '-right-[5.25rem] sm:-right-[6rem]';
   return (
@@ -65,7 +65,7 @@ export function PathMascotBuddy({ side = 'left', mood = 'idle', size = 62 }) {
   );
 }
 
-/** Ảnh minh họa chặng (admin) hoặc linh vật cảm xúc — cạnh nút đang học. */
+/** Ảnh minh họa chặng (admin) hoặc linh vật cảm xúc - cạnh nút đang học. */
 export function PathStageArt({ side = 'left', imageUrl = '', mood = 'determinedSoft', size = 72 }) {
   const pos = side === 'left' ? '-left-[5.5rem] sm:-left-[6.5rem]' : '-right-[5.5rem] sm:-right-[6.5rem]';
   if (imageUrl) {

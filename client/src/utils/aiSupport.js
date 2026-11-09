@@ -1,7 +1,7 @@
-/** Peer ảo — trợ lý AI hỗ trợ HV/GV (không đụng contacts thật). */
+/** Peer ảo - trợ lý AI hỗ trợ HV/GV (không đụng contacts thật). */
 export const AI_SUPPORT_PEER = Object.freeze({
   id: 'ai_support',
-  name: 'Trợ lý Thắng Tin Học',
+  name: 'Trợ lý AI',
   role: 'system',
   online: true,
 });
@@ -55,7 +55,7 @@ export function isAiBusyReply(m) {
     && String(m?.content || '').includes(AI_BUSY_MARKER);
 }
 
-/** User gõ ý muốn chuyển thẳng sang nhân viên — không gọi AI. */
+/** User gõ ý muốn chuyển thẳng sang nhân viên - không gọi AI. */
 export const AI_SUPPORT_STATUS = Object.freeze({
   AI_ACTIVE: 'AI_ACTIVE',
   WAITING_FOR_SUPPORT: 'WAITING_FOR_SUPPORT',
@@ -152,7 +152,7 @@ export function hasMeaningfulAiReply(messages) {
   ));
 }
 
-/** Hiện Có/Không chỉ sau khi học viên hỏi thật và AI đã trả lời — không hiện sau lời chào. */
+/** Hiện Có/Không chỉ sau khi học viên hỏi thật và AI đã trả lời - không hiện sau lời chào. */
 export function canOfferHumanEscalation(messages, meId) {
   return Boolean(lastMeaningfulAiReplyId(messages, meId));
 }

@@ -1,4 +1,4 @@
-# QA Báo cáo — Nhóm 2: Admin ↔ Học viên
+# QA Báo cáo - Nhóm 2: Admin ↔ Học viên
 
 **Ngày:** 2026-07-28 · Script `scripts/_qa_group2_admin_student.cjs`
 

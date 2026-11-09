@@ -1,9 +1,9 @@
 /**
- * Phase 7.27 — Controlled cutover + production activation for /api/analytics
+ * Phase 7.27 - Controlled cutover + production activation for /api/analytics
  *
  * LIVE: auth → branchFilter → policyShadowAnalytics → analyticsCutoverGate → handler.
  * Legacy checkAnyPermission retained inside analyticsCutoverGate.
- * modules/analytics twin is unmounted — not migrated.
+ * modules/analytics twin is unmounted - not migrated.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -61,10 +61,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student' || role === 'teacher'
       ? { role, adminRole: null, permissions: [] }
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [PERMISSIONS.VIEW_BRANCH_REVENUE],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [PERMISSIONS.VIEW_BRANCH_REVENUE],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -305,7 +305,7 @@ test('Phase7.27 rollback: remove analytics → LEGACY; prior stay POLICY; restor
 test('Phase7.27 cross-family isolation', () => {
   for (const fam of [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees',  'staff',
+    'employees', 'staff',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
   }
@@ -375,8 +375,8 @@ test('Phase7.27 functional smoke: revenue/enrollment/branches authz; aggregates 
   assert.equal(parity('enrollment', sub({ permissions: [PERMISSIONS.MANAGE_FINANCE] })).policy.decision, 'ALLOW');
   assert.equal(parity('branches', sub({ permissions: [PERMISSIONS.VIEW_BRANCH_REVENUE] })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — analytics revenue/enrollment/branches production reads',
-    'NOT EXECUTED — analytics revenue/enrollment/branches production reads',
+    'NOT EXECUTED - analytics revenue/enrollment/branches production reads',
+    'NOT EXECUTED - analytics revenue/enrollment/branches production reads',
   );
 });
 

@@ -1,4 +1,4 @@
-# SUPER_ADMIN — sửa SĐT mọi tài khoản nội bộ
+# SUPER_ADMIN - sửa SĐT mọi tài khoản nội bộ
 
 Date: 2026-08-11
 
@@ -6,8 +6,8 @@ Date: 2026-08-11
 
 Super Admin không sửa được SĐT (kể cả Admin cấp cao) do:
 
-1. **Frontend** — `StaffManagementTab.jsx`: `readOnly={isEdit}` khóa SĐT khi edit **mọi** tài khoản staff.
-2. **Backend** — `PUT /api/staff/:id` không ghi `phone` vào `updates`.
+1. **Frontend** - `StaffManagementTab.jsx`: `readOnly={isEdit}` khóa SĐT khi edit **mọi** tài khoản staff.
+2. **Backend** - `PUT /api/staff/:id` không ghi `phone` vào `updates`.
 
 Không phải RBAC chặn riêng HIGH_ADMIN; SUPER đã được sửa name/permissions/status.
 
@@ -27,7 +27,7 @@ Không mở bypass finance/ledger/messaging/student gate.
 
 ## Backend
 
-`routes/staffRoutes.js` — PUT `/:id`:
+`routes/staffRoutes.js` - PUT `/:id`:
 
 - `phone` từ body, chỉ khi `actorIsSuperAdmin(req)`
 - Unique: `Teacher.findOne({ phone, _id: { $ne: id } })` → 409

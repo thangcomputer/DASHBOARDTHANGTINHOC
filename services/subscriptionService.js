@@ -100,7 +100,7 @@ function isExpired(student, now = new Date()) {
 }
 
 /**
- * Gói Meet còn hiệu lực — chỉ tài khoản miễn phí (freePortal) đã mua gói Meet.
+ * Gói Meet còn hiệu lực - chỉ tài khoản miễn phí (freePortal) đã mua gói Meet.
  * HV đăng ký khóa học truyền thống (không freePortal) không thuộc nhóm Meet online.
  */
 function hasMeetAccess(student, now = new Date()) {
@@ -411,7 +411,7 @@ async function checkout(studentId, plan) {
     throw httpError(409, 'Tài khoản đang ở gói Vĩnh viễn, không cần gia hạn', 'SUBSCRIPTION_LIFETIME');
   }
   const amount = (await getPrices())[plan];
-  if (!(amount > 0)) throw httpError(400, 'Gói này chưa mở thanh toán — vui lòng dùng mã kích hoạt hoặc liên hệ trung tâm');
+  if (!(amount > 0)) throw httpError(400, 'Gói này chưa mở thanh toán - vui lòng dùng mã kích hoạt hoặc liên hệ trung tâm');
 
   const pending = await PaymentSession.findOne({ studentId, kind: 'subscription_renewal', status: 'pending' }).sort({ createdAt: -1 });
   if (pending && pending.plan === plan && Number(pending.amount) === amount) {

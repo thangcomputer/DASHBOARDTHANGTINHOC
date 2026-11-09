@@ -112,8 +112,8 @@ export function localizeScheduleNote(raw) {
       const name = localizeActorName(who);
       const when = formatActedAtLabel(iso);
       return when
-        ? `Admin từ chối điểm danh — ${name} · ${when}`
-        : `Admin từ chối điểm danh — ${name}`;
+        ? `Admin từ chối điểm danh - ${name} · ${when}`
+        : `Admin từ chối điểm danh - ${name}`;
     },
   );
   s = s.replace(/\[ADMIN_REJECT_ATTENDANCE\]/gi, 'Admin từ chối điểm danh');
@@ -125,7 +125,7 @@ export function localizeScheduleNote(raw) {
       const buoi = ordinal
         ? (total ? ` buổi ${ordinal}/${total}` : ` buổi ${ordinal}`)
         : '';
-      const whoBit = name && name !== 'Admin' ? ` — ${name}` : '';
+      const whoBit = name && name !== 'Admin' ? ` - ${name}` : '';
       return when
         ? `Admin điểm danh bù${buoi}${whoBit} · ${when}`
         : `Admin điểm danh bù${buoi}${whoBit}`;
@@ -211,7 +211,7 @@ export function isStudentScheduleLog(item) {
   return SCHEDULE_LOG_TYPES.has(item.type);
 }
 
-/** Bài nộp / trắc nghiệm / điểm / đánh giá — mọi thứ không thuộc nhật ký lịch. */
+/** Bài nộp / trắc nghiệm / điểm / đánh giá - mọi thứ không thuộc nhật ký lịch. */
 export function isStudentScoreLog(item) {
   if (!item) return false;
   return !isStudentScheduleLog(item);
@@ -292,7 +292,7 @@ export function buildStudentActivityLogs({
     let note = localizeScheduleNote(ev.note || '');
     if (type === 'attendance') note = normalizeAttendanceNote(note, sessionNumber);
     else if (type === 'attendance_cancel' && sessionNumber && !/buổi\s*\d+/i.test(note)) {
-      note = `Hủy điểm danh buổi ${sessionNumber}${note ? ` — ${note}` : ''}`;
+      note = `Hủy điểm danh buổi ${sessionNumber}${note ? ` - ${note}` : ''}`;
     }
     push({
       id: `alog_${ev._id || ''}_${type}_${parseDateToMs(at)}_${idx}`,
@@ -330,7 +330,7 @@ export function buildStudentActivityLogs({
     });
   });
 
-  // 1b) Lịch đã hủy (Schedule) — chỉ bổ sung nếu chưa có trong activityLog
+  // 1b) Lịch đã hủy (Schedule) - chỉ bổ sung nếu chưa có trong activityLog
   (schedules || []).forEach((sch, idx) => {
     if (!sch || String(sch.status || '').toLowerCase() !== 'cancelled') return;
     const schSid = String(sch.studentId?._id || sch.studentId || '');
@@ -340,7 +340,7 @@ export function buildStudentActivityLogs({
     const at = sch.updatedAt || sch.cancelledAt || sch.date;
     const d = formatDateVi(sch.date);
     const timeRange = [sch.startTime, sch.endTime].filter(Boolean).join('–');
-    const reasonBit = sch.note ? ` — ${localizeScheduleNote(sch.note)}` : '';
+    const reasonBit = sch.note ? ` - ${localizeScheduleNote(sch.note)}` : '';
     const note = timeRange
       ? `Hủy ca ngày ${d} · ${timeRange}${reasonBit}`
       : `Hủy ca ngày ${d}${reasonBit}`;
@@ -440,7 +440,7 @@ export function buildStudentActivityLogs({
       date: formatDateVi(at),
       time: formatTimeVi(at),
       note: forfeit
-        ? `Trắc nghiệm: ${q.title || 'Bài TN'} — Rớt (thoát giữa giờ)`
+        ? `Trắc nghiệm: ${q.title || 'Bài TN'} - Rớt (thoát giữa giờ)`
         : `Trắc nghiệm: ${q.title || 'Bài TN'} (${sub.correctCount ?? 0}/${sub.totalQuestions ?? 0} câu)`,
       grade: score10,
       rawScore: scorePct,
@@ -459,17 +459,17 @@ export function buildStudentActivityLogs({
       : (ev.milestone ? `Cột mốc: ${milestoneLabelVi(ev.milestone)}` : 'Đánh giá');
     const score = ev.criteria && typeof ev.criteria === 'object'
       ? (() => {
-          const vals = Object.values(ev.criteria).map(Number).filter((n) => Number.isFinite(n));
-          if (!vals.length) return null;
-          return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
-        })()
+        const vals = Object.values(ev.criteria).map(Number).filter((n) => Number.isFinite(n));
+        if (!vals.length) return null;
+        return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+      })()
       : null;
     push({
       id: `eval_${ev._id || ev.id || eIdx}_${parseDateToMs(at)}`,
       type: 'evaluation',
       date: formatDateVi(at),
       time: formatTimeVi(at),
-      note: `${kind}${ev.content ? ` — ${ev.content}` : ''}${ev.courseName ? ` (${ev.courseName})` : ''}`,
+      note: `${kind}${ev.content ? ` - ${ev.content}` : ''}${ev.courseName ? ` (${ev.courseName})` : ''}`,
       grade: score,
       timestamp: parseDateToMs(at) || Date.now() - eIdx * 1000,
       actedAt: at,

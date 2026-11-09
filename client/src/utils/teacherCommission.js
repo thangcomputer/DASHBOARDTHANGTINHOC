@@ -2,7 +2,7 @@
  * Lương cứng GV = baseSalaryPerSession × số buổi completed.
  * Thưởng sao tách riêng: ≥5 HV đạt 5★ trong tháng
  * → +customStarBonusAmount (mặc định 200.000đ)/tháng.
- * (Điểm TB uy tín vẫn cộng dồn toàn thời gian — không chặn thưởng.)
+ * (Điểm TB uy tín vẫn cộng dồn toàn thời gian - không chặn thưởng.)
  */
 
 export const STAR_BONUS_MIN_STUDENTS = 5;

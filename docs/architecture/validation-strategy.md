@@ -1,4 +1,4 @@
-# Validation Strategy — Phase 3
+# Validation Strategy - Phase 3
 
 ## Requirements
 The ARB dictates that validation must **NOT** exist inside Controllers, Repositories, or Routes. Validation belongs exclusively to the DTO layer, ensuring that Application Services only ever receive guaranteed valid objects.

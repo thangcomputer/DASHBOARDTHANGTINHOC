@@ -1,5 +1,5 @@
 /**
- * Phase 8.18 — Controlled RUNTIME soak evidence acceptance gate.
+ * Phase 8.18 - Controlled RUNTIME soak evidence acceptance gate.
  *
  * LIVE remains PRIMARY. Enterprise observe/dual-check only.
  * Does NOT enable flags. Does NOT promote Enterprise.

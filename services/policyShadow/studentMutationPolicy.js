@@ -1,6 +1,6 @@
 /**
  * Policy shadow for live student MUTATION routes (Wave 6.4).
- * Mirrors routes/studentRoutes.js exactly — does not improve authz.
+ * Mirrors routes/studentRoutes.js exactly - does not improve authz.
  *
  * Permission families (from live code):
  * - MANAGE_STUDENTS via checkPermission / userHasPermission
@@ -115,7 +115,7 @@ function evaluateUpdateHybrid(subject, resourceStudent, resourceId) {
     return { decision: 'ALLOW', reason: 'has_manage_students', statusHint: 200 };
   }
   if (role === 'teacher') {
-    // LEGACY: no ownership check on PUT /:id — preserve (security gap reported separately)
+    // LEGACY: no ownership check on PUT /:id - preserve (security gap reported separately)
     return { decision: 'ALLOW', reason: 'teacher_put_no_ownership_check', statusHint: 200 };
   }
   if (role === 'student') {
@@ -153,7 +153,7 @@ function evaluateLockExam(subject, resourceStudent) {
   }
   if (role === 'teacher') {
     // Missing resource: middleware assertStudentBranchAccess only 404s when userBranchId set.
-    // Unbound teacher reaches handler 404 — authz layer must not DENY early.
+    // Unbound teacher reaches handler 404 - authz layer must not DENY early.
     if (!resourceStudent) {
       return { decision: 'ALLOW', reason: 'teacher_ownership_pending_resource', statusHint: 200 };
     }

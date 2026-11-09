@@ -56,9 +56,8 @@ export default function AdminAttendanceDisputeModal({
   const node = (
     <div className="fixed inset-0 z-[220] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-slate-950/60" onClick={() => !submitting && onClose?.()} aria-hidden="true" />
-      <div className={`relative z-10 w-full max-w-md overflow-hidden rounded-2xl border bg-white shadow-2xl ${
-        resolved ? (rejected ? 'border-slate-200' : 'border-emerald-200') : 'border-amber-200'
-      }`}>
+      <div className={`relative z-10 w-full max-w-md overflow-hidden rounded-2xl border bg-white shadow-2xl ${resolved ? (rejected ? 'border-slate-200' : 'border-emerald-200') : 'border-amber-200'
+        }`}>
         <div className={`${headerTone} px-5 py-4 border-b flex items-start gap-3`}>
           {resolved ? (
             rejected
@@ -82,14 +81,14 @@ export default function AdminAttendanceDisputeModal({
           </button>
         </div>
         <div className="px-5 py-4 space-y-2 text-sm text-slate-700">
-          <p><span className="font-semibold text-slate-500">HV:</span> {payload.studentName || '—'}</p>
-          <p><span className="font-semibold text-slate-500">GV:</span> {payload.teacherName || '—'}</p>
-          <p><span className="font-semibold text-slate-500">Ca:</span> {[payload.weekday, payload.dateLabel, payload.timeRange].filter(Boolean).join(' · ') || '—'}</p>
+          <p><span className="font-semibold text-slate-500">HV:</span> {payload.studentName || '-'}</p>
+          <p><span className="font-semibold text-slate-500">GV:</span> {payload.teacherName || '-'}</p>
+          <p><span className="font-semibold text-slate-500">Ca:</span> {[payload.weekday, payload.dateLabel, payload.timeRange].filter(Boolean).join(' · ') || '-'}</p>
           {resolved ? (
             <p className="text-sm text-slate-600 pt-2 leading-relaxed">
               {rejected
-                ? 'Đã không chấp thuận — buổi không tính vào tiến độ và lương. GV + HV đã được thông báo.'
-                : 'Đã chấp thuận — buổi được tính vào tiến độ và lương.'}
+                ? 'Đã không chấp thuận - buổi không tính vào tiến độ và lương. GV + HV đã được thông báo.'
+                : 'Đã chấp thuận - buổi được tính vào tiến độ và lương.'}
             </p>
           ) : (
             <p className="text-xs text-slate-500 pt-2">

@@ -83,7 +83,7 @@ const ROLE_PAGE_TITLES = {
     dashboard: 'Tổng quan',
     schedule: 'Lịch học',
     'lesson-practice': 'Bài giảng',
-    'daily-practice': 'Luyện tập hằng ngày',
+    'daily-practice': 'Luyện tập',
     'materials-files': 'Bài tập và tài nguyên',
     'materials-software': 'Bài tập và tài nguyên',
     exam: 'Phòng thi',
@@ -752,14 +752,18 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     return () => { socket.off('teacher:star-bonus-celebration', onStarBonus); };
   }, [socket, role, queueStarBonusCelebration]);
 
-  // HV: chỉ tự mở popup đặt mục tiêu lần đầu; mục tiêu hết hạn không tự bật lại.
-  const learningGoalLaterKey = myId ? `cms_learning_goal_later:${myId}` : '';
+  // HV: chỉ tự động mở popup khi HẾT THỜI GIAN MỤC TIÊU (goal?.expired === true).
+  // Khi chưa có mục tiêu hoặc đang trong kỳ mục tiêu: không tự bật (học viên muốn đổi thì tự vào đổi).
+  const learningGoalDismissedKey = React.useCallback(
+    (endsAt) => (myId ? `cms_goal_expired_dismissed:${myId}:${endsAt || ''}` : ''),
+    [myId]
+  );
   useEffect(() => {
     if (role !== 'student' || !myId) return undefined;
     let cancelled = false;
     lessonPracticeApi.student.learningGoal()
       .then((res) => { if (!cancelled) setLearningGoalData(res?.data || { goal: null }); })
-      .catch(() => {});
+      .catch(() => { });
     const onOpen = () => setLearningGoalOpen(true);
     const onChanged = (event) => { if (event.detail) setLearningGoalData(event.detail); };
     window.addEventListener(OPEN_LEARNING_GOAL_EVENT, onOpen);
@@ -775,22 +779,33 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (role !== 'student' || !learningGoalData || learningGoalOpen) return;
     if (showWelcomeCelebration || courseCelebration) return;
     const goal = learningGoalData.goal;
-    if (goal) return;
+    // CHỈ HIỂN THỊ KHI HẾT THỜI GIAN MỤC TIÊU:
+    if (!goal || !goal.expired) return;
     try {
-      if (learningGoalLaterKey && sessionStorage.getItem(learningGoalLaterKey) === '1') return;
+      const dismissKey = learningGoalDismissedKey(goal.endsAt);
+      if (dismissKey && (sessionStorage.getItem(dismissKey) === '1' || localStorage.getItem(dismissKey) === '1')) {
+        return;
+      }
     } catch { /* ignore */ }
     setLearningGoalOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- tự mở một lần khi đủ điều kiện
-  }, [role, learningGoalData, showWelcomeCelebration, courseCelebration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tự mở một lần khi hết hạn mục tiêu
+  }, [role, learningGoalData, showWelcomeCelebration, courseCelebration, learningGoalDismissedKey]);
 
   const closeLearningGoal = React.useCallback(() => {
     setLearningGoalOpen(false);
     try {
-      if (learningGoalLaterKey) sessionStorage.setItem(learningGoalLaterKey, '1');
+      const goal = learningGoalData?.goal;
+      if (goal?.expired) {
+        const dismissKey = learningGoalDismissedKey(goal.endsAt);
+        if (dismissKey) {
+          sessionStorage.setItem(dismissKey, '1');
+          localStorage.setItem(dismissKey, '1');
+        }
+      }
     } catch { /* ignore */ }
-  }, [learningGoalLaterKey]);
+  }, [learningGoalData, learningGoalDismissedKey]);
 
-  // HV: nhắc luyện tập hằng ngày — một lần mỗi ngày, sau popup chào mừng / mục tiêu học, khi hôm nay chưa luyện.
+  // HV: nhắc luyện tập hằng ngày - một lần mỗi ngày, sau popup chào mừng / mục tiêu học, khi hôm nay chưa luyện.
   const [dailyReminder, setDailyReminder] = useState(null);
   const [dailyReminderOpen, setDailyReminderOpen] = useState(false);
   const dailyReminderKey = myId ? `cms_daily_practice_reminder:${myId}` : '';
@@ -800,7 +815,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     let cancelled = false;
     dailyPracticeApi.student.overview()
       .then((data) => { if (!cancelled) setDailyReminder(data || null); })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [role, myId]);
 
@@ -811,16 +826,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     if (location.pathname.startsWith('/student/daily-practice')) return;
     const goal = learningGoalData.goal;
     try {
-      const goalPromptPending = !goal && sessionStorage.getItem(learningGoalLaterKey) !== '1';
+      const dismissKey = learningGoalDismissedKey(goal?.endsAt);
+      const goalPromptPending = Boolean(goal?.expired && (!dismissKey || !localStorage.getItem(dismissKey)));
       if (goalPromptPending) return;
       if (localStorage.getItem(dailyReminderKey) === vnTodayKey()) return;
       localStorage.setItem(dailyReminderKey, vnTodayKey());
     } catch { return; }
     setDailyReminderOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ xét lại khi các popup khác đóng / dữ liệu về
-  }, [role, dailyReminder, learningGoalOpen, learningGoalData, showWelcomeCelebration, courseCelebration]);
+  }, [role, dailyReminder, learningGoalOpen, learningGoalData, showWelcomeCelebration, courseCelebration, learningGoalDismissedKey]);
 
-  // GV: mỗi phiếu lương đã chi hiện popup đúng một lần — kể cả khi GV offline lúc Admin chi.
+  // GV: mỗi phiếu lương đã chi hiện popup đúng một lần - kể cả khi GV offline lúc Admin chi.
   const enqueueTeacherPaymentNotices = React.useCallback((notices) => {
     const incoming = (Array.isArray(notices) ? notices : [notices]).filter((notice) => notice?.id);
     if (!incoming.length) return;
@@ -834,7 +850,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const dismissTeacherPaymentNotice = React.useCallback(() => {
     const currentId = teacherPaymentCelebration?.id;
     if (!currentId) return;
-    api.transactions.markPaymentNoticeSeen(currentId).catch(() => {});
+    api.transactions.markPaymentNoticeSeen(currentId).catch(() => { });
     setTeacherPaymentNotices((queue) => queue.filter((notice) => notice.id !== currentId));
   }, [teacherPaymentCelebration?.id]);
 
@@ -843,7 +859,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     let cancelled = false;
     api.transactions.getPaymentNotices()
       .then((res) => { if (!cancelled && Array.isArray(res?.data)) enqueueTeacherPaymentNotices(res.data); })
-      .catch(() => {});
+      .catch(() => { });
     if (!socket) return () => { cancelled = true; };
     const onTeacherPayment = (notice) => {
       if (!notice?.id) return;
@@ -1008,7 +1024,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
     const onDispute = (payload) => {
       if (!payload?.scheduleId) return;
       toast.info(
-        `Tranh chấp điểm danh: ${payload.studentName || 'HV'} — buổi ${payload.sessionNumber || '?'}. Bấm chuông để xử lý.`,
+        `Tranh chấp điểm danh: ${payload.studentName || 'HV'} - buổi ${payload.sessionNumber || '?'}. Bấm chuông để xử lý.`,
       );
     };
     socket.on('attendance:disputed', onDispute);
@@ -1036,9 +1052,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       }
       setAttendanceConfirm(null);
       if (res.disputed) {
-        toast.info('Đã gửi tranh chấp — chờ Admin giải quyết. Buổi chưa được tính.');
+        toast.info('Đã gửi tranh chấp - chờ Admin giải quyết. Buổi chưa được tính.');
       } else {
-        toast.success('Đã xác nhận điểm danh — buổi học được tính.');
+        toast.success('Đã xác nhận điểm danh - buổi học được tính.');
       }
       if (typeof triggerBackgroundSync === 'function') {
         Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
@@ -1153,9 +1169,9 @@ const DashboardLayout = ({ role, session, onLogout }) => {
       }
       setAttendanceDispute(null);
       if (res.rejected) {
-        toast.success('Đã từ chối — buổi không tính. Đã báo GV và HV.');
+        toast.success('Đã từ chối - buổi không tính. Đã báo GV và HV.');
       } else {
-        toast.success('Đã chấp thuận — buổi được tính.');
+        toast.success('Đã chấp thuận - buổi được tính.');
       }
       if (typeof triggerBackgroundSync === 'function') {
         Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
@@ -1665,7 +1681,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const pageTitle = resolvePageTitle(role, location.pathname, location.hash);
   const activeHash = (location.hash || '').replace('#', '').split('?')[0];
   const adminHash = activeHash || (location.pathname === '/admin' ? 'dashboard' : '');
-  // GV Tổng quan = /teacher (không hash) — KHÔNG immersive; chỉ #students mới khóa scroll như split-pane.
+  // GV Tổng quan = /teacher (không hash) - KHÔNG immersive; chỉ #students mới khóa scroll như split-pane.
   const isTeacherStudentsTab =
     role === 'teacher' && location.pathname === '/teacher' && activeHash === 'students';
   const isStudentsTab = adminHash === 'students' || isTeacherStudentsTab;
@@ -1839,7 +1855,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
               </div>
             </div>
 
-            {/* Mobile: branch full-width row (not students — students keeps prior lg-only behavior) */}
+            {/* Mobile: branch full-width row (not students - students keeps prior lg-only behavior) */}
             {showAdminBranch && !isStudentsTab && (
               <div className="md:hidden w-full cms-page-gutter pb-2.5">
                 <BranchFilterDropdown fullWidth />
@@ -2546,7 +2562,7 @@ const DashboardLayout = ({ role, session, onLogout }) => {
         )}
 
 
-        {/* Chat nổi toàn site — mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
+        {/* Chat nổi toàn site - mặc định hỗ trợ online, nhiều tab kiểu Facebook */}
         <FloatingMessenger session={session} role={role} />
         {lmsPlayerOpen && lmsAttentionVisible && (newUnreadNotificationCount > 0 || newUnreadMessageCount > 0) ? (
           <div className="cms-lms-attention" role="status" aria-live="polite">

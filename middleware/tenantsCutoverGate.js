@@ -1,5 +1,5 @@
 /**
- * Phase 7.6 — Controlled cutover gate for /api/tenants ONLY.
+ * Phase 7.6 - Controlled cutover gate for /api/tenants ONLY.
  *
  * LEGACY (default): existing isSuperAdmin remains HTTP authority.
  * POLICY (env opt-in): Policy decision is HTTP authority; Legacy isSuperAdmin skipped.
@@ -49,7 +49,7 @@ function tenantsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] tenants authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] tenants authority helper failed - Legacy gate',
       );
     }
 
@@ -94,7 +94,7 @@ function tenantsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] tenants Policy unsafe — fallback Legacy isSuperAdmin',
+        '[POLICY_CUTOVER] tenants Policy unsafe - fallback Legacy isSuperAdmin',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -114,7 +114,7 @@ function tenantsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] tenants Policy ALLOW — Legacy isSuperAdmin skipped',
+        '[POLICY_CUTOVER] tenants Policy ALLOW - Legacy isSuperAdmin skipped',
       );
       return next();
     }

@@ -19,13 +19,13 @@ function observabilityMiddleware(req, res, next) {
   RequestContext.run(initialContext, () => {
     Metrics.inc('http_requests_total', { method: req.method, path: req.path });
     const start = process.hrtime.bigint();
-    
+
     // Attach listener to capture finish
     res.on('finish', () => {
       const end = process.hrtime.bigint();
       const duration = Number(end - start) / 1000000;
       Metrics.observe('http_request_duration_ms', { method: req.method, path: req.path, status: res.statusCode }, duration);
-      
+
       if (res.statusCode >= 500) {
         Logger.error('HTTP Request Failed', null, { method: req.method, path: req.path, status: res.statusCode, duration });
       } else {

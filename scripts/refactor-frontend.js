@@ -16,7 +16,7 @@ let modifiedCount = 0;
 
 walkDir(clientSrcPath, (filePath) => {
   if (!filePath.endsWith('.js') && !filePath.endsWith('.jsx')) return;
-  
+
   let content = fs.readFileSync(filePath, 'utf-8');
   let originalContent = content;
 

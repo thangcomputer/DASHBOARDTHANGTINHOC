@@ -1,5 +1,5 @@
 /**
- * Branch.js — Chi nhánh / Cơ sở đào tạo
+ * Branch.js - Chi nhánh / Cơ sở đào tạo
  */
 const mongoose = require('mongoose');
 
@@ -20,7 +20,7 @@ const BranchSchema = new mongoose.Schema({
     maxlength: 8,
   },
   address: { type: String, default: '' },
-  phone:   { type: String, default: '' },
+  phone: { type: String, default: '' },
   isActive: { type: Boolean, default: true },
   // Multi-tenant (Phase 15–16): chi nhánh thuộc tổ chức
   tenantId: {

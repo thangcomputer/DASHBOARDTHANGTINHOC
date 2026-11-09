@@ -1,6 +1,6 @@
 /**
  * Policy shadow for LIVE finance authorization (Wave 6.6).
- * AUTHORIZATION ONLY — does not touch money/ledger/SePay/idempotency logic.
+ * AUTHORIZATION ONLY - does not touch money/ledger/SePay/idempotency logic.
  *
  * Covers: /api/finance, /api/transactions, /api/invoices, JWT webhook payment-status.
  * Already shadowed elsewhere (documented, not re-wired): student pay/refund/price,
@@ -14,11 +14,11 @@ const {
 } = require('./livePermissionAdapter');
 
 const ACTIONS = {
-  // /api/finance — read (MANAGE_FINANCE OR VIEW_BRANCH_REVENUE)
+  // /api/finance - read (MANAGE_FINANCE OR VIEW_BRANCH_REVENUE)
   summary: { family: 'any_finance_read', resource: null },
   ledger_list: { family: 'any_finance_read', resource: null },
   student_card: { family: 'any_finance_read', resource: 'student', branch: true },
-  // /api/finance — manage
+  // /api/finance - manage
   heal_orphans: { family: 'manage_finance', resource: 'student', branch: true },
   ledger_void: { family: 'manage_finance', resource: null },
   discount: { family: 'manage_finance', resource: null },

@@ -12,7 +12,7 @@ Conditions: single-node or Redis-backed Socket.IO adapter + Redis presence; HIGH
 
 1. `sendCanonicalMessage` (`services/directMessageService.js`)
 2. `assertCanDirectMessage` / `canSendMessage` (`services/messagingPolicy.js`)
-3. `app.notifyUser` (`server.js`) — now logs `presenceKey` / `selectedSocketId` / `room` / `mode`
+3. `app.notifyUser` (`server.js`) - now logs `presenceKey` / `selectedSocketId` / `room` / `mode`
 4. Structured logs: `messaging.policy.*`, `messaging.persist.ok`, `messaging.delivery.emit` (filter by `correlationId`)
 
 ---
@@ -130,7 +130,7 @@ Wrong client `receiverRole` cannot redirect (Phase 8 proven). Deny codes include
 
 Log: `messaging.persist.ok` with `messageId` + `conversationId` (no body).
 
-Schema has **no** `tenantId` column — tenant enforced at policy time only.
+Schema has **no** `tenantId` column - tenant enforced at policy time only.
 
 ---
 
@@ -175,7 +175,7 @@ Reuses `shared/context/correlationContext` (AsyncLocalStorage).
 - Socket DM: minted `sock_*` id wrapping the send path
 - Nested DMS call reuses existing store
 
-**PARTIAL historically** (Socket lost context); **bridged for DM send** in Phase 9. Typing/read/presence still do not mint correlation (by design — avoid log storms).
+**PARTIAL historically** (Socket lost context); **bridged for DM send** in Phase 9. Typing/read/presence still do not mint correlation (by design - avoid log storms).
 
 ---
 
@@ -185,7 +185,7 @@ Pino via `config/logger.js` with redaction of tokens/passwords.
 
 Messaging events: `msgDomain=messaging`, never message body.
 
-High-frequency `typing:*` / presence still use console/pino sparingly (connect/disconnect console remains noisy — P3).
+High-frequency `typing:*` / presence still use console/pino sparingly (connect/disconnect console remains noisy - P3).
 
 ---
 
@@ -203,7 +203,7 @@ Stable `MESSAGING_*` in `POLICY_CODES`:
 - `MESSAGING_TENANT_MISMATCH`
 - `MESSAGING_ALLOWED`
 
-Many route-level 403s remain **Vietnamese text only** (hide/group/unread) — **PARTIAL** outside canonical DM path. HTTP DM deny now returns `code` + `policy` when present.
+Many route-level 403s remain **Vietnamese text only** (hide/group/unread) - **PARTIAL** outside canonical DM path. HTTP DM deny now returns `code` + `policy` when present.
 
 ---
 
@@ -219,7 +219,7 @@ Many route-level 403s remain **Vietnamese text only** (hide/group/unread) — **
 
 ## Multi-tab Behavior
 
-CURRENT DESIGNED BEHAVIOR — not changed. Latest presence socket receives private DM when online; offline falls back to `userId` room.
+CURRENT DESIGNED BEHAVIOR - not changed. Latest presence socket receives private DM when online; offline falls back to `userId` room.
 
 ---
 
@@ -233,7 +233,7 @@ CURRENT DESIGNED BEHAVIOR — not changed. Latest presence socket receives priva
 - `receiverId + createdAt`
 - `messageType + fileExpired + createdAt`
 
-No `tenantId` index (no field). Unread query is index-supported. Contacts use Teacher/Student finds by `adminRole` / `branchId` / `_id` — generally selective; HIGH_ADMIN “everyone” path is the hotspot.
+No `tenantId` index (no field). Unread query is index-supported. Contacts use Teacher/Student finds by `adminRole` / `branchId` / `_id` - generally selective; HIGH_ADMIN “everyone” path is the hotspot.
 
 ---
 
@@ -254,7 +254,7 @@ Uses `receiverId + isRead` index. **Global `isRead`** remains product design (no
 | 100 contacts | Fine |
 | 500 | Fine |
 | 1,000 | Acceptable for typical roles |
-| 5,000+ / HIGH_ADMIN full org | Risk — large payload, no pagination |
+| 5,000+ / HIGH_ADMIN full org | Risk - large payload, no pagination |
 
 No pagination added (UI/business not approved).
 
@@ -292,7 +292,7 @@ Redis does **not** automatically fix app-level “latest socketId” multi-tab s
 |---|---|
 | Socket.IO room fan-out across nodes | READY **if** Redis adapter attached |
 | Presence shared | READY **if** Redis presence enabled |
-| Private DM targeting | LIMITED — prefers local presence `socketId`; cross-node relies on adapter + shared presence |
+| Private DM targeting | LIMITED - prefers local presence `socketId`; cross-node relies on adapter + shared presence |
 | Without Redis | **MULTI-INSTANCE LIMITATION** (memory adapter + local Map) |
 
 **Verdict: LIMITED** (conditional on Redis).
@@ -315,7 +315,7 @@ Gaps are P2/P3, not P0 isolation bugs.
 
 ## Load Test
 
-**NOT LOAD TESTED** — no safe 1,000-client run in this environment.
+**NOT LOAD TESTED** - no safe 1,000-client run in this environment.
 
 Architecture assessment substitutes for PASS/FAIL load evidence.
 
@@ -335,7 +335,7 @@ Architecture assessment substitutes for PASS/FAIL load evidence.
 | Contacts API | READY WITH CONDITIONS (HIGH_ADMIN unbounded) |
 | Unread | READY WITH CONDITIONS (global isRead semantics) |
 | Broadcasts | READY WITH CONDITIONS (O(targets)) |
-| Logging | READY WITH CONDITIONS (trim connect console at scale — P3) |
+| Logging | READY WITH CONDITIONS (trim connect console at scale - P3) |
 | Metrics | READY (new messaging counters) |
 | Frontend | READY WITH CONDITIONS (client list sizes) |
 
@@ -347,27 +347,27 @@ Approximate presence memory: ~0.3–1 KB/row → 1,000 sockets ≈ **0.5–1 MB*
 
 ## Findings by Severity
 
-### P0 — security/data isolation
+### P0 - security/data isolation
 
 None found in Phase 9.
 
-### P1 — production correctness
+### P1 - production correctness
 
 None found. Multi-tab latest-socket is designed behavior.
 
-### P2 — scalability
+### P2 - scalability
 
 1. HIGH_ADMIN / large contacts responses without pagination.
 2. HTTP `/broadcast` O(targets) insert + notify.
 3. Multi-instance requires Redis adapter + Redis presence.
 
-### P3 — observability/debugging
+### P3 - observability/debugging
 
-1. Pre-Phase-9 Socket DM deny was silent — mitigated with structured logs + HTTP `code`.
+1. Pre-Phase-9 Socket DM deny was silent - mitigated with structured logs + HTTP `code`.
 2. Connect/disconnect `console.log` volume at 1k users.
 3. Many non-DM route errors still text-only.
 
-### P4 — cleanup
+### P4 - cleanup
 
 1. Dual console + pino for socket lifecycle.
 2. `MessagesContext` legacy file still present (unmounted).
@@ -379,7 +379,7 @@ None found. Multi-tab latest-socket is designed behavior.
 1. Keep Redis adapter + presence enabled for any multi-instance deploy.
 2. Add contacts pagination **after** product/UI approval if HIGH_ADMIN lists grow.
 3. Replace socket connect `console.log` with sampled pino debug.
-4. Optional: emit `message:send_denied` to sender socket with `code` (UX) — not done this phase.
+4. Optional: emit `message:send_denied` to sender socket with `code` (UX) - not done this phase.
 
 ## Not recommended yet
 
@@ -394,7 +394,7 @@ None found. Multi-tab latest-socket is designed behavior.
 
 | File | Change |
 |---|---|
-| `services/messagingObservability.js` | **NEW** — correlation, structured logs, counters |
+| `services/messagingObservability.js` | **NEW** - correlation, structured logs, counters |
 | `services/directMessageService.js` | Policy/persist logs; return `code`/`policy` on deny |
 | `server.js` | ALS on `message:send`; `notifyUser` delivery trace |
 | `routes/messageRoutes.js` | HTTP correlation + deny `code` |
@@ -434,4 +434,4 @@ None found. Multi-tab latest-socket is designed behavior.
 
 ## Next Phase
 
-**STOP** — await approval for Phase 10.
+**STOP** - await approval for Phase 10.

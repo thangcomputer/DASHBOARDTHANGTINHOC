@@ -1,4 +1,4 @@
-# MOBILE AUTH MULTI-DEVICE — PHASE 1 HARDENING
+# MOBILE AUTH MULTI-DEVICE - PHASE 1 HARDENING
 
 **Kết luận:** Hardening code-path đã hoàn tất ở mức có thể kiểm thử cô lập; **chưa đủ điều kiện staging/production** vì MongoDB integration và Socket.IO multi-instance chưa được xác minh. Feature flag vẫn OFF.
 
@@ -25,7 +25,7 @@
 |---|---|---|
 | HIGH | `revokeAllSessions()` chưa được nối với đổi/reset mật khẩu, khóa tài khoản, suspend/inactive hoặc xóa user; socket mobile đang mở có thể tiếp tục hoạt động. | Đã nối thu hồi session và ngắt room `session:<sid>` cho các security event Student/Teacher được hỗ trợ. Thất bại sau khi thay đổi tài khoản được trả `503 MOBILE_SESSION_REVOCATION_FAILED`, không báo thành công giả. |
 | HIGH | Lockout Teacher sau số lần đăng nhập sai không thu hồi session mobile đang hoạt động. | Đã nối sự kiện khóa do đăng nhập sai vào các luồng đăng nhập Teacher web/mobile hiện có; chỉ phát sinh revoke khi sắp chạm ngưỡng lock và feature flag bật. |
-| HIGH | Hành vi Mongo thực tế — unique/index, casting, ownership và CAS đồng thời — chưa được xác minh. | Đã thêm [Mongo integration test](./tests/integration/mobile_auth_session_mongo.test.js), nhưng chưa chạy. Không tuyên bố Mongo/index đã PASS. |
+| HIGH | Hành vi Mongo thực tế - unique/index, casting, ownership và CAS đồng thời - chưa được xác minh. | Đã thêm [Mongo integration test](./tests/integration/mobile_auth_session_mongo.test.js), nhưng chưa chạy. Không tuyên bố Mongo/index đã PASS. |
 | HIGH | `disconnectSockets(true)` qua các instance phụ thuộc Redis adapter hoạt động; khi adapter fallback sang memory, disconnect có thể chỉ tới process hiện tại. | Chưa có Redis test instance; **chưa xác minh multi-instance**. Session đã revoke vẫn bị từ chối ở request/handshake mới. |
 | MEDIUM | Presence hiện có mô hình một socket/user, chưa tổng hợp trạng thái đa thiết bị. | Giữ nguyên presence web; mobile không ghi đè presence web. Mobile-only online và tổng hợp đa thiết bị vẫn là giới hạn đã biết. |
 | MEDIUM | Nếu response refresh bị mất sau khi CAS thành công, lần retry dùng token cũ sẽ bị từ chối. | Chưa đổi giao thức; ứng dụng mobile cần single-flight refresh. Có thể phải đăng nhập lại nếu mất response sau rotation. |
@@ -54,11 +54,11 @@
 
 | Kiểm thử | Trạng thái | Ghi chú |
 |---|---|---|
-| Session service, ownership, expiry, CAS fake model | PASS — 6 tests | Không dùng MongoDB. |
-| Session security helper: flag OFF, disconnect rooms, lỗi revoke | PASS — 3 tests | Fake service/Socket.IO. |
-| Mobile auth route: flag OFF, chặn Admin/Staff, từ chối token khi OFF | PASS — 3 tests | Dùng `--test-force-exit` vì module auth có timer nền không unref. |
-| CSRF regression | PASS — 3 tests | Express test server cục bộ, không database. |
-| Presence/null-payload regression | PASS — 6 tests | Kiểm tra source/UI helper hiện hành. |
+| Session service, ownership, expiry, CAS fake model | PASS - 6 tests | Không dùng MongoDB. |
+| Session security helper: flag OFF, disconnect rooms, lỗi revoke | PASS - 3 tests | Fake service/Socket.IO. |
+| Mobile auth route: flag OFF, chặn Admin/Staff, từ chối token khi OFF | PASS - 3 tests | Dùng `--test-force-exit` vì module auth có timer nền không unref. |
+| CSRF regression | PASS - 3 tests | Express test server cục bộ, không database. |
+| Presence/null-payload regression | PASS - 6 tests | Kiểm tra source/UI helper hiện hành. |
 | JavaScript syntax checks | PASS | Các route, service và Mongo integration test mới. |
 | ESLint cho service/test mới | PASS | Chạy `eslint --no-ignore` cho các file mới liên quan. |
 | ESLint cho toàn bộ route lớn đã chạm | Có lỗi baseline | Có nhiều diagnostic ở các phần route khác; kiểm tra diagnostic tập trung không thấy lỗi tại các đoạn hardening đã thêm. |

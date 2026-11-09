@@ -1,5 +1,5 @@
 /**
- * Phase 8.17 — Production soak orchestrator tests.
+ * Phase 8.17 - Production soak orchestrator tests.
  * Does NOT enable production flags permanently.
  * Does NOT claim fake production evidence from LOCAL/SYNTHETIC/STATIC.
  */
@@ -340,7 +340,7 @@ describe('Phase 8.17 production soak orchestrator', { concurrency: false }, () =
       const delta = deltaSoakWindow(before, after);
       const result = await runProductionSoakOrchestrator({
         writeArtifact: false,
-        waitFn: async () => {},
+        waitFn: async () => { },
         snapshotFn: (() => {
           let n = 0;
           return () => {
@@ -391,7 +391,7 @@ describe('Phase 8.17 production soak orchestrator', { concurrency: false }, () =
     }, async () => {
       const result = await runProductionSoakOrchestrator({
         writeArtifact: false,
-        waitFn: async () => {},
+        waitFn: async () => { },
       });
       assert.equal(result.ok, false);
       assert.equal(result.ENTERPRISE_PRIMARY_READY, 'NO');

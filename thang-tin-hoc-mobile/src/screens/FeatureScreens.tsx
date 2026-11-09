@@ -322,7 +322,7 @@ export function ScheduleScreen() {
     ? studentsResource.data?.find((student) => student.id === makeupTarget.studentId)
     : undefined;
   const makeupStudentName = makeupStudent?.name || makeupTarget?.studentName || 'Học viên';
-  const makeupCourseName = makeupTarget?.courseName || makeupStudent?.course || '—';
+  const makeupCourseName = makeupTarget?.courseName || makeupStudent?.course || '-';
   const makeupCompletedSessions = makeupStudent?.completedSessions || 0;
   const makeupTotalSessions = makeupStudent?.totalSessions || 0;
   const makeupAlreadyRequested = Boolean(
@@ -524,13 +524,13 @@ export function ScheduleScreen() {
       return;
     }
     if (currentSlot?.status === 'completed') {
-      Alert.alert('Không thể đổi ca', 'Buổi đã điểm danh — không đổi giờ từ bảng này.');
+      Alert.alert('Không thể đổi ca', 'Buổi đã điểm danh - không đổi giờ từ bảng này.');
       return;
     }
     const startMinutes = Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3, 5));
     const endMinutes = startMinutes + 90;
     if (classDate === todayKey && endMinutes <= now.getHours() * 60 + now.getMinutes()) {
-      Alert.alert('Không thể xếp lịch', 'Ca này đã kết thúc — chỉ xếp khung giờ hiện tại trở đi.');
+      Alert.alert('Không thể xếp lịch', 'Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
       return;
     }
     const conflicts = current.filter((item) => item.id !== selectedId && item.date === classDate && item.status === 'upcoming').some((item) => {
@@ -569,7 +569,7 @@ export function ScheduleScreen() {
           dateLabel,
           date: classDate,
           time,
-          location: '—',
+          location: '-',
           studentId: selectedStudent.id,
           studentName: selectedStudent.name,
           status: 'upcoming',
@@ -691,7 +691,7 @@ export function ScheduleScreen() {
         '- Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa.',
         '- Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.',
         '',
-        'Lý do: Quá hạn cửa sổ điểm danh 1 giờ của giảng viên — nhờ Admin xử lý điểm danh bù.',
+        'Lý do: Quá hạn cửa sổ điểm danh 1 giờ của giảng viên - nhờ Admin xử lý điểm danh bù.',
       ].join('\n');
       await messageService.send(admin, content, user);
       mobileMakeupRequestsSent.add(`${user.id}:${makeupTarget.id}`);
@@ -862,7 +862,7 @@ export function ScheduleScreen() {
                       </Pressable>
                     ) : (
                       <View key={day.dateKey} style={[styles.teacherCompactDayCell, styles.compactWeekSlotCell, day.dateKey === todayKey && styles.weekGridTodayColumn]}>
-                        <Text style={styles.teacherCompactTime}>—</Text>
+                        <Text style={styles.teacherCompactTime}>-</Text>
                       </View>
                     );
                   })}
@@ -871,821 +871,834 @@ export function ScheduleScreen() {
             </ScrollView>
           </Card>
         </>
-      ) : null}
-      {isTeacher && resource.data && !resource.error ? (
-        <>
-          <View style={styles.scheduleViewToggle} accessibilityRole="tablist">
-            {([
-              { key: 'week', label: 'Xếp lịch học viên', icon: Table2 },
-              { key: 'month', label: 'Lịch tháng', icon: CalendarDays },
-            ] as const).map((view) => {
-              const selected = teacherScheduleView === view.key;
-              return (
-                <Pressable
-                  key={view.key}
-                  onPress={() => setTeacherScheduleView(view.key)}
-                  style={[styles.scheduleViewTab, selected && styles.scheduleViewTabActive]}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                >
-                  <view.icon size={16} color={selected ? '#FFFFFF' : colors.muted} />
-                  <Text style={[styles.scheduleViewTabText, selected && styles.scheduleViewTabTextActive]}>{view.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {teacherScheduleView === 'month' ? (
-            <View style={styles.scheduleStats}>
-              {[
-                { label: 'Đã dạy', value: calendarMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: colors.green },
-                { label: 'Sắp tới', value: calendarMonthItems.filter(isUpcomingSchedule).length, icon: Clock3, color: '#D97706' },
-                { label: 'Đã hủy', value: calendarMonthItems.filter((item) => item.status === 'cancelled').length, icon: Ban, color: colors.red },
-              ].map((stat) => (
-                <Card key={stat.label} style={styles.scheduleStat}>
-                  <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft }]}>
-                    <stat.icon size={17} color={stat.color} />
-                  </View>
-                  <Text style={styles.scheduleStatLabel}>{stat.label}</Text>
-                  <Text style={[styles.scheduleStatValue, { color: stat.color }]}>
-                    {stat.value} <Text style={styles.scheduleStatUnit}>buổi</Text>
-                  </Text>
-                </Card>
-              ))}
-            </View>
-          ) : null}
-          {teacherScheduleView === 'month' ? (
-            <>
-              <Card style={styles.monthCalendarCard}>
-                <View style={styles.monthCalendarHeader}>
-                  <View style={styles.weeklyGridHeading}>
-                    <View style={styles.scheduleOverviewIcon}><CalendarDays size={18} color={colors.brand} /></View>
-                    <Text style={styles.weeklyGridTitle}>Lịch theo tháng</Text>
-                  </View>
-                  <View style={styles.monthCalendarControls}>
-                    <Pressable onPress={() => changeCalendarMonth(-1)} style={styles.monthCalendarArrow} accessibilityRole="button" accessibilityLabel="Tháng trước">
-                      <ChevronLeft size={19} color={colors.ink} />
-                    </Pressable>
-                    <Text style={styles.monthCalendarTitle}>{calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</Text>
-                    <Pressable onPress={() => changeCalendarMonth(1)} style={styles.monthCalendarArrow} accessibilityRole="button" accessibilityLabel="Tháng sau">
-                      <ChevronRight size={19} color={colors.ink} />
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={styles.monthCalendarWeekdays}>
-                  {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day, index) => (
-                    <Text key={day} style={[styles.monthCalendarWeekday, index === 0 && styles.monthCalendarSunday]}>{day}</Text>
-                  ))}
-                </View>
-                <View style={styles.monthCalendarGrid}>
-                  {Array.from({ length: calendarDays.length / 7 }, (_, weekIndex) => (
-                    <View key={`week-${weekIndex}`} style={styles.monthCalendarWeek}>
-                      {calendarDays.slice(weekIndex * 7, weekIndex * 7 + 7).map((day, dayIndex) => {
-                        if (!day) return <View key={`empty-${weekIndex}-${dayIndex}`} style={styles.monthCalendarCell} />;
-                        const dateKey = `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const daySchedules = calendarMonthItems.filter((item) => item.date === dateKey);
-                        const selected = dateKey === selectedCalendarDate;
-                        const isToday = dateKey === todayKey;
-                        const dotColors = daySchedules.slice(0, 3).map((item) => (
-                          item.status === 'completed'
-                            ? colors.green
-                            : item.status === 'cancelled'
-                              ? colors.red
-                              : getStudentDiaryStatus(item).tone === 'ongoing' ? '#16A34A' : '#F59E0B'
-                        ));
-                        return (
-                          <Pressable
-                            key={dateKey}
-                            onPress={() => setSelectedCalendarDate(dateKey)}
-                            style={[styles.monthCalendarCell, styles.monthCalendarDay, isToday && styles.monthCalendarToday, selected && styles.monthCalendarDaySelected]}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected }}
-                            accessibilityLabel={`${day} ${calendarMonth.toLocaleDateString('vi-VN', { month: 'long' })}${daySchedules.length ? `, ${daySchedules.length} buổi` : ', không có lịch'}`}
-                          >
-                            <Text style={[styles.monthCalendarDayText, dayIndex === 0 && !selected && styles.monthCalendarSunday, isToday && !selected && styles.monthCalendarTodayText, selected && styles.monthCalendarDayTextSelected]}>{day}</Text>
-                            <View style={styles.monthCalendarDots}>
-                              {dotColors.map((color, dotIndex) => <View key={`${dateKey}-${dotIndex}`} style={[styles.monthCalendarDot, { backgroundColor: selected ? '#FFFFFF' : color }]} />)}
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.monthCalendarLegend}>
-                  {[
-                    { label: 'Đã dạy', color: colors.green },
-                    { label: 'Sắp tới', color: '#F59E0B' },
-                    { label: 'Đã hủy', color: colors.red },
-                  ].map((item) => (
-                    <View key={item.label} style={styles.monthCalendarLegendItem}>
-                      <View style={[styles.monthCalendarDot, { backgroundColor: item.color }]} />
-                      <Text style={styles.monthCalendarLegendText}>{item.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </Card>
-              <Card style={styles.calendarDayCard}>
-                <View style={styles.calendarDayHeader}>
-                  <View style={styles.diaryHeadingIcon}><CalendarDays size={16} color={colors.brand} /></View>
-                  <View style={styles.weeklyGridHeadingCopy}>
-                    <Text style={styles.calendarDayTitle}>
-                      {new Date(`${selectedCalendarDate}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                    </Text>
-                    <Text style={styles.calendarDaySubtitle}>Lịch trong ngày đã chọn</Text>
-                  </View>
-                  <Text style={styles.calendarDayCount}>{selectedCalendarItems.length} buổi</Text>
-                </View>
-                <View style={styles.calendarAppointments}>
-                  {selectedCalendarItems.map((item) => {
-                    const canEdit = item.status === 'upcoming'
-                      && !isScheduleRescheduleLocked(item)
-                      && Boolean(item.date && item.date >= todayKey);
-                    const attendancePending = isTeacherAttendanceActionPending(item);
-                    const attendanceAwaitingConfirmation = isAttendanceAwaitingStudentConfirmation(item);
-                    const attendanceAvailable = canTeacherMarkAttendance(item, scheduleNow);
-                    const makeupOverdue = canTeacherRequestMakeup(item, scheduleNow);
-                    const makeupRequestSent = Boolean(user && mobileMakeupRequestsSent.has(`${user.id}:${item.id}`));
-                    return (
-                      <View key={item.id} style={styles.calendarAppointment}>
-                        <View style={styles.rowBetween}>
-                          <Text numberOfLines={2} style={styles.calendarAppointmentTitle}>{item.studentName || item.person || 'Học viên'}</Text>
-                          {!attendanceAwaitingConfirmation ? <StatusBadge label={attendanceStatusLabel(item, scheduleNow)} compact /> : null}
-                        </View>
-                        <View style={styles.calendarAppointmentInfo}>
-                          <Clock3 size={13} color="#FCD34D" />
-                          <Text style={styles.calendarAppointmentTime}>{item.time || 'Chưa có giờ'}</Text>
-                        </View>
-                        <Text style={styles.calendarAppointmentCourse}>{item.courseName || item.subject || item.title}</Text>
-                        {item.note ? <Text style={styles.calendarAppointmentNote} numberOfLines={2}>Ghi chú lịch: {item.note}</Text> : null}
-                        {item.studentNote ? <Text style={styles.calendarStudentNote} numberOfLines={2}>Học viên nhắn: {item.studentNote}</Text> : null}
-                        {canEdit || attendancePending || attendanceAwaitingConfirmation ? (
-                          <View style={[styles.calendarActions, attendanceAwaitingConfirmation && styles.calendarActionsSubmitted]}>
-                            {attendanceAwaitingConfirmation ? (
-                              <>
-                                <StatusBadge label={attendanceStatusLabel(item, scheduleNow)} compact />
-                                <Pressable
-                                  disabled
-                                  style={[styles.calendarAttendanceAction, styles.calendarAttendanceActionSubmitted]}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
-                                  accessibilityState={{ disabled: true }}
-                                >
-                                  <CheckCircle size={14} color="#B91C1C" />
-                                  <Text style={[styles.calendarAttendanceActionText, styles.calendarAttendanceActionTextSubmitted]}>Điểm danh</Text>
-                                </Pressable>
-                              </>
-                            ) : attendancePending ? (
-                              <Pressable
-                                disabled={makeupOverdue ? makeupRequestSent : !attendanceAvailable}
-                                onPress={() => {
-                                  if (makeupOverdue) {
-                                    if (!makeupRequestSent) setMakeupTarget(item);
-                                    return;
-                                  }
-                                  navigation.navigate('Attendance', { scheduleId: item.id });
-                                }}
-                                style={[
-                                  styles.calendarAttendanceAction,
-                                  makeupOverdue && (makeupRequestSent ? styles.calendarMakeupActionSent : styles.calendarMakeupAction),
-                                  !attendanceAvailable && !makeupOverdue && styles.calendarAttendanceActionDisabled,
-                                ]}
-                                accessibilityRole="button"
-                                accessibilityLabel={makeupOverdue
-                                  ? `${makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù'} ${item.studentName || item.title}`
-                                  : attendanceAvailable
-                                    ? `Điểm danh ${item.studentName || item.title}`
-                                    : `${teacherAttendanceActionLabel(item, scheduleNow)}: ${item.studentName || item.title}`}
-                                accessibilityState={{ disabled: makeupOverdue ? makeupRequestSent : !attendanceAvailable }}
-                              >
-                                <CheckCircle size={14} color={makeupOverdue && makeupRequestSent ? '#64748B' : attendanceAvailable || makeupOverdue ? '#FFFFFF' : '#94A3B8'} />
-                                <Text style={[
-                                  styles.calendarAttendanceActionText,
-                                  makeupOverdue && (makeupRequestSent ? styles.calendarMakeupActionTextSent : styles.calendarMakeupActionText),
-                                  !attendanceAvailable && !makeupOverdue && styles.calendarAttendanceActionTextDisabled,
-                                ]}>{makeupOverdue ? makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù' : teacherAttendanceActionLabel(item, scheduleNow)}</Text>
-                              </Pressable>
-                            ) : null}
-                            {canEdit && !makeupOverdue ? (
-                              <Pressable onPress={() => openScheduleEditor(item)} style={styles.calendarEditAction} accessibilityRole="button">
-                                <Text style={styles.calendarEditActionText}>Sửa ca dạy</Text>
-                              </Pressable>
-                            ) : null}
-                            {attendanceAvailable || makeupOverdue ? (
-                              <Pressable
-                                onPress={() => {
-                                  setCancelTarget(item);
-                                  setCancelReason('');
-                                }}
-                                style={styles.calendarCancelAction}
-                                accessibilityRole="button"
-                              >
-                                <Text style={styles.calendarCancelActionText}>Hủy ca</Text>
-                              </Pressable>
-                            ) : null}
-                          </View>
-                        ) : null}
-                      </View>
-                    );
-                  })}
-                </View>
-                {!selectedCalendarItems.length ? (
-                  <View style={styles.calendarDayEmpty}>
-                    <Text style={styles.calendarDayEmptyText}>Ngày này chưa có ca dạy.</Text>
-                    {selectedCalendarDate >= todayKey ? (
-                      <Pressable onPress={() => openWeekForCalendarDate(selectedCalendarDate)} style={styles.calendarAddAction} accessibilityRole="button">
-                        <Plus size={16} color="#FFFFFF" />
-                        <Text style={styles.calendarAddActionText}>Xếp lịch ngày này</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ) : null}
-              </Card>
-            </>
-          ) : null}
-          {teacherScheduleView === 'week' ? (
-            <Card style={styles.weeklyGridCard}>
-              <View style={styles.weeklyGridHeading}>
-                <View style={styles.scheduleOverviewIcon}><Table2 size={18} color={colors.brand} /></View>
-                <View style={styles.weeklyGridHeadingCopy}>
-                  <Text style={styles.weeklyGridTitle}>Xếp lịch học viên theo tuần</Text>
-                </View>
-              </View>
-              <View style={styles.scheduleFilterSection}>
-                <View style={styles.scheduleFilterHeading}>
-                  <Users size={14} color={colors.muted} />
-                  <Text style={styles.scheduleFilterLabel}>Lọc học viên</Text>
-                  <Text style={styles.scheduleFilterCount}>{teacherRoster.length} học viên</Text>
-                </View>
-                <View style={styles.rosterStatusFilters}>
-                  {['Đang học', 'Học xong', 'Tất cả'].map((status) => {
-                    const selected = rosterFilter === status;
-                    const count = status === 'Tất cả'
-                      ? eligibleTeacherStudents.length
-                      : eligibleTeacherStudents.filter((student) => status === 'Học xong'
-                        ? student.enrollmentStatus === 'completed'
-                        : student.enrollmentStatus !== 'completed').length;
-                    return (
-                      <Pressable
-                        key={status}
-                        onPress={() => setRosterFilter(status)}
-                        style={[styles.rosterStatusChip, selected && styles.rosterStatusChipActive]}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                      >
-                        <Text numberOfLines={1} style={[styles.rosterStatusText, selected && styles.rosterStatusTextActive]}>{status}</Text>
-                        <Text style={[styles.rosterStatusCount, selected && styles.rosterStatusCountActive]}>{count}</Text>
-                      </Pressable>
-                    );
-                  })}
+      ) : null
+      }
+      {
+        isTeacher && resource.data && !resource.error ? (
+          <>
+            <View style={styles.scheduleViewToggle} accessibilityRole="tablist">
+              {([
+                { key: 'week', label: 'Xếp lịch học viên', icon: Table2 },
+                { key: 'month', label: 'Lịch tháng', icon: CalendarDays },
+              ] as const).map((view) => {
+                const selected = teacherScheduleView === view.key;
+                return (
                   <Pressable
-                    onPress={() => {
-                      if (showTeacherSearch) setTeacherQuery('');
-                      setShowTeacherSearch((visible) => !visible);
-                    }}
-                    style={[styles.rosterSearchIconButton, showTeacherSearch && styles.rosterSearchIconButtonActive]}
-                    accessibilityRole="button"
-                    accessibilityLabel={showTeacherSearch ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
-                    accessibilityState={{ expanded: showTeacherSearch }}
+                    key={view.key}
+                    onPress={() => setTeacherScheduleView(view.key)}
+                    style={[styles.scheduleViewTab, selected && styles.scheduleViewTabActive]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
                   >
-                    {showTeacherSearch ? <X size={15} color={colors.brand} /> : <Search size={15} color={colors.brand} />}
+                    <view.icon size={16} color={selected ? '#FFFFFF' : colors.muted} />
+                    <Text style={[styles.scheduleViewTabText, selected && styles.scheduleViewTabTextActive]}>{view.label}</Text>
                   </Pressable>
-                </View>
-                <Pressable
-                  onPress={() => setShowCoursePicker(true)}
-                  style={styles.courseFilterSelect}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Chọn khóa học, hiện tại ${teacherCourseFilter}`}
-                  accessibilityState={{ expanded: showCoursePicker }}
-                >
-                  <Text style={styles.courseFilterSelectLabel}>Khóa học</Text>
-                  <Text numberOfLines={1} style={styles.courseFilterSelectValue}>
-                    {teacherCourseFilter === 'Tất cả khóa' ? 'Tất cả khóa học' : teacherCourseFilter}
-                  </Text>
-                  <ChevronDown size={16} color={colors.brand} />
-                </Pressable>
-                {showTeacherSearch ? (
-                  <View style={styles.compactRosterSearch}>
-                    <Search size={15} color={colors.muted} />
-                    <TextInput
-                      value={teacherQuery}
-                      onChangeText={setTeacherQuery}
-                      placeholder="Lọc tên học viên"
-                      placeholderTextColor={colors.muted}
-                      style={styles.compactRosterSearchInput}
-                      accessibilityLabel="Lọc tên học viên"
-                      returnKeyType="search"
-                    />
-                    {teacherQuery ? (
-                      <Pressable onPress={() => setTeacherQuery('')} accessibilityRole="button" accessibilityLabel="Xóa từ khóa tìm kiếm">
-                        <X size={15} color={colors.muted} />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ) : null}
+                );
+              })}
+            </View>
+            {teacherScheduleView === 'month' ? (
+              <View style={styles.scheduleStats}>
+                {[
+                  { label: 'Đã dạy', value: calendarMonthItems.filter((item) => item.status === 'completed').length, icon: CheckCircle, color: colors.green },
+                  { label: 'Sắp tới', value: calendarMonthItems.filter(isUpcomingSchedule).length, icon: Clock3, color: '#D97706' },
+                  { label: 'Đã hủy', value: calendarMonthItems.filter((item) => item.status === 'cancelled').length, icon: Ban, color: colors.red },
+                ].map((stat) => (
+                  <Card key={stat.label} style={styles.scheduleStat}>
+                    <View style={[styles.scheduleStatIcon, { backgroundColor: stat.color === colors.green ? colors.greenSoft : stat.color === '#D97706' ? colors.goldSoft : colors.redSoft }]}>
+                      <stat.icon size={17} color={stat.color} />
+                    </View>
+                    <Text style={styles.scheduleStatLabel}>{stat.label}</Text>
+                    <Text style={[styles.scheduleStatValue, { color: stat.color }]}>
+                      {stat.value} <Text style={styles.scheduleStatUnit}>buổi</Text>
+                    </Text>
+                  </Card>
+                ))}
               </View>
-              {studentsResource.loading ? <LoadingSkeleton rows={1} /> : null}
-              {studentsResource.error ? <ErrorState onRetry={studentsResource.reload} /> : null}
-              {!studentsResource.loading && !studentsResource.error && !teacherRoster.length ? (
-                <EmptyState
-                  title={teacherQuery.trim() ? 'Không tìm thấy học viên khớp tên' : rosterFilter === 'Học xong' ? 'Không có học viên học xong trên bảng này' : rosterFilter === 'Tất cả' ? 'Chưa có học viên để xếp trên bảng này' : 'Chưa có học viên đang học để xếp trên bảng này'}
-                  message="Học viên đủ điều kiện sẽ xuất hiện trong bảng xếp lịch."
-                />
-              ) : null}
-              {!studentsResource.loading && !studentsResource.error && teacherRoster.length ? (
-                <View style={styles.compactWeekGrid}>
-                  <View style={styles.teacherWeekRange}>
-                    <Pressable
-                      onPress={() => setWeekOffset((value) => value - 1)}
-                      style={styles.teacherWeekRangeArrow}
-                      accessibilityRole="button"
-                      accessibilityLabel="Tuần trước"
-                    >
-                      <ChevronLeft size={16} color={colors.brand} />
-                    </Pressable>
-                    <Pressable onPress={() => setWeekOffset(0)} accessibilityRole="button" accessibilityLabel="Về tuần hiện tại">
-                      <Text style={styles.teacherWeekRangeLabel}>{weekLabel}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setWeekOffset((value) => value + 1)}
-                      style={styles.teacherWeekRangeArrow}
-                      accessibilityRole="button"
-                      accessibilityLabel="Tuần sau"
-                    >
-                      <ChevronRight size={16} color={colors.brand} />
-                    </Pressable>
+            ) : null}
+            {teacherScheduleView === 'month' ? (
+              <>
+                <Card style={styles.monthCalendarCard}>
+                  <View style={styles.monthCalendarHeader}>
+                    <View style={styles.weeklyGridHeading}>
+                      <View style={styles.scheduleOverviewIcon}><CalendarDays size={18} color={colors.brand} /></View>
+                      <Text style={styles.weeklyGridTitle}>Lịch theo tháng</Text>
+                    </View>
+                    <View style={styles.monthCalendarControls}>
+                      <Pressable onPress={() => changeCalendarMonth(-1)} style={styles.monthCalendarArrow} accessibilityRole="button" accessibilityLabel="Tháng trước">
+                        <ChevronLeft size={19} color={colors.ink} />
+                      </Pressable>
+                      <Text style={styles.monthCalendarTitle}>{calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</Text>
+                      <Pressable onPress={() => changeCalendarMonth(1)} style={styles.monthCalendarArrow} accessibilityRole="button" accessibilityLabel="Tháng sau">
+                        <ChevronRight size={19} color={colors.ink} />
+                      </Pressable>
+                    </View>
                   </View>
-                  <ScrollView
-                    style={styles.teacherCompactScroll}
-                    horizontal
-                    nestedScrollEnabled
-                    showsHorizontalScrollIndicator
-                  >
-                    <View style={{ width: TEACHER_WEEK_NAME_CELL_WIDTH + weekDays.length * STUDENT_WEEK_CELL_WIDTH }}>
-                      <View style={styles.teacherCompactWeekRow}>
-                        <View style={[styles.teacherCompactNameCell, styles.compactWeekHeaderCell]}>
-                          <Text style={styles.teacherCompactHeaderText}>Học viên</Text>
-                        </View>
-                        {weekDays.map((day, index) => {
-                          const active = gridSort.kind === 'day' && gridSort.dayIndex === index;
+                  <View style={styles.monthCalendarWeekdays}>
+                    {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day, index) => (
+                      <Text key={day} style={[styles.monthCalendarWeekday, index === 0 && styles.monthCalendarSunday]}>{day}</Text>
+                    ))}
+                  </View>
+                  <View style={styles.monthCalendarGrid}>
+                    {Array.from({ length: calendarDays.length / 7 }, (_, weekIndex) => (
+                      <View key={`week-${weekIndex}`} style={styles.monthCalendarWeek}>
+                        {calendarDays.slice(weekIndex * 7, weekIndex * 7 + 7).map((day, dayIndex) => {
+                          if (!day) return <View key={`empty-${weekIndex}-${dayIndex}`} style={styles.monthCalendarCell} />;
+                          const dateKey = `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          const daySchedules = calendarMonthItems.filter((item) => item.date === dateKey);
+                          const selected = dateKey === selectedCalendarDate;
+                          const isToday = dateKey === todayKey;
+                          const dotColors = daySchedules.slice(0, 3).map((item) => (
+                            item.status === 'completed'
+                              ? colors.green
+                              : item.status === 'cancelled'
+                                ? colors.red
+                                : getStudentDiaryStatus(item).tone === 'ongoing' ? '#16A34A' : '#F59E0B'
+                          ));
                           return (
-                            <View key={day.dateKey} style={[styles.teacherCompactDayCell, styles.compactWeekHeaderCell, active && styles.weekGridSortedCell]}>
-                              <Text style={[styles.teacherCompactDayText, active && styles.weekGridTodayText]}>{index === 6 ? 'CN' : `T${index + 2}`}</Text>
-                              <Text style={styles.teacherCompactDateText}>{day.day}</Text>
-                              <Pressable
-                                onPress={() => setSortMenu({ kind: 'day', dayIndex: index })}
-                                style={[styles.teacherCompactSort, active && styles.weekGridSortActive]}
-                                accessibilityRole="button"
-                                accessibilityLabel={`Chọn sắp xếp lịch theo giờ ${day.weekday}`}
-                              >
-                                <Text style={[styles.teacherCompactSortText, active && styles.weekGridSortTextActive]}>
-                                  {active ? gridSort.dir === 'asc' ? '↑' : '↓' : 'Giờ'}
-                                </Text>
-                                {!active ? <ChevronDown size={9} color={colors.muted} /> : null}
-                              </Pressable>
-                            </View>
+                            <Pressable
+                              key={dateKey}
+                              onPress={() => setSelectedCalendarDate(dateKey)}
+                              style={[styles.monthCalendarCell, styles.monthCalendarDay, isToday && styles.monthCalendarToday, selected && styles.monthCalendarDaySelected]}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected }}
+                              accessibilityLabel={`${day} ${calendarMonth.toLocaleDateString('vi-VN', { month: 'long' })}${daySchedules.length ? `, ${daySchedules.length} buổi` : ', không có lịch'}`}
+                            >
+                              <Text style={[styles.monthCalendarDayText, dayIndex === 0 && !selected && styles.monthCalendarSunday, isToday && !selected && styles.monthCalendarTodayText, selected && styles.monthCalendarDayTextSelected]}>{day}</Text>
+                              <View style={styles.monthCalendarDots}>
+                                {dotColors.map((color, dotIndex) => <View key={`${dateKey}-${dotIndex}`} style={[styles.monthCalendarDot, { backgroundColor: selected ? '#FFFFFF' : color }]} />)}
+                              </View>
+                            </Pressable>
                           );
                         })}
                       </View>
-                      {teacherRoster.map((student) => (
-                        <View key={student.id} style={styles.teacherCompactWeekRow}>
-                          <View style={styles.teacherCompactNameCell}>
-                            <Text numberOfLines={1} style={styles.teacherCompactStudentName}>{formatScheduleLabel(student.name)}</Text>
-                            <Text numberOfLines={2} style={styles.teacherCompactCourse}>{formatScheduleLabel(student.course || '—')}</Text>
-                            <Text style={styles.teacherCompactSessions}>{student.completedSessions ?? '—'}/{student.totalSessions ?? '—'} buổi</Text>
-                          </View>
-                          {weekDays.map((day) => {
-                            const scheduled = allScheduleItems.find((item) => (
-                              item.date === day.dateKey
-                              && (item.studentId === student.id || (!item.studentId && item.studentName === student.name))
-                              && item.status !== 'cancelled'
-                            ));
-                            const start = scheduled?.time.match(/\d{2}:\d{2}/)?.[0];
-                            const past = day.dateKey < todayKey;
-                            const locked = past || scheduled?.status === 'completed';
-                            const statusLabel = scheduled?.status === 'completed'
-                              ? 'Dạy'
-                              : scheduled && isOverdueAttendance(scheduled)
-                                ? 'Trễ'
-                                : scheduled ? 'Đã xếp' : '';
-                            return (
-                              <Pressable
-                                key={day.dateKey}
-                                disabled={locked}
-                                onPress={() => {
-                                  setSelectedId(scheduled?.id || null);
-                                  setSelectedStudentId(student.id);
-                                  const matchingEnrollment = (student.enrollments || []).find((enrollment) => (
-                                    enrollment.id === scheduled?.enrollmentId
-                                    || (scheduled?.courseName && normalizeScheduleCourseName(enrollment.courseName) === normalizeScheduleCourseName(scheduled.courseName))
-                                  ));
-                                  setSelectedEnrollmentId(matchingEnrollment?.id || student.enrollments?.find((enrollment) => enrollment.status === 'Đang học')?.id || '');
-                                  setClassDate(day.dateKey);
-                                  setClassTime(start || '');
-                                  setShowCreate(true);
-                                }}
-                                style={[
-                                  styles.teacherCompactDayCell,
-                                  styles.compactWeekSlotCell,
-                                  scheduled?.status === 'completed' ? styles.weekGridCompletedCell : scheduled ? styles.weekGridBookedCell : undefined,
-                                  locked && styles.weekGridLockedCell,
-                                  day.dateKey === todayKey && styles.weekGridTodayColumn,
-                                ]}
-                                accessibilityRole="button"
-                                accessibilityLabel={`${student.name}, ${day.weekday} ${day.day}, ${scheduled?.time || 'chưa xếp ca'}${locked ? ', đã khóa' : ''}`}
-                              >
-                                <Text numberOfLines={1} style={[styles.teacherCompactTime, scheduled && styles.weekGridBookedText]}>{start || '—'}</Text>
-                                {statusLabel ? <Text numberOfLines={1} style={styles.teacherCompactStatus}>{statusLabel}</Text> : null}
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
-              ) : null}
-            </Card>
-          ) : null}
-        </>
-      ) : null}
-      {resource.loading ? <LoadingSkeleton /> : null}
-      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-      {!isTeacher && !resource.loading && !resource.error ? (
-        <Card style={styles.studentDiaryCard}>
-          <View style={styles.studentDiaryHeading}>
-            <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
-            <View style={styles.weeklyGridHeadingCopy}>
-              <Text style={styles.weeklyGridTitle}>Nhật ký học tập</Text>
-            </View>
-          </View>
-          <View style={styles.studentDiaryFilterContainer}>
-            <View style={styles.studentDiaryFilterRow} accessibilityRole="tablist">
-              {[
-                { value: 'Ngày', label: 'Ngày', dateFilter: true },
-                { value: 'Tuần', label: 'Tuần', dateFilter: true },
-                { value: 'Tháng', label: 'Tháng', dateFilter: true },
-                { value: 'Lịch hủy', label: 'Hủy', dateFilter: true },
-                { value: 'Chưa điểm danh', label: 'Chưa điểm danh', dateFilter: false },
-              ].map(({ value, label, dateFilter }) => {
-                const selected = studentDiaryFilter === value;
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => setStudentDiaryFilter(value)}
-                    style={[
-                      styles.studentDiaryFilter,
-                      dateFilter ? styles.studentDiaryDateFilter : styles.studentDiaryStatusFilter,
-                      selected && styles.studentDiaryFilterActive,
-                    ]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text style={[styles.studentDiaryFilterText, selected && styles.studentDiaryFilterTextActive]} numberOfLines={1}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-          {studentDiaryItems.map((item) => {
-            const diaryStatus = getStudentDiaryStatus(item);
-            return (
-              <Card key={`log-${item.id}`} style={styles.studentDiaryLogRow}>
-                <Pressable onPress={() => setSelectedId(item.id)} accessibilityRole="button" accessibilityLabel={`Mở chi tiết ${item.title}`}>
-                  <Text numberOfLines={1} style={styles.studentDiaryLogTitle}>
-                    {item.courseName || item.subject || item.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.studentDiaryLogMeta}>
-                    {item.person || item.teacherName || 'Giảng viên'} · {item.dateLabel || item.date || '—'} · {item.time || '—'}
-                  </Text>
-                </Pressable>
-                <View style={styles.studentDiaryFooter}>
-                  <View style={[
-                    styles.studentDiaryStatus,
-                    diaryStatus.tone === 'completed' ? styles.studentDiaryStatusCompleted
-                      : diaryStatus.tone === 'cancelled' ? styles.studentDiaryStatusCancelled
-                        : diaryStatus.tone === 'ongoing' ? styles.studentDiaryStatusOngoing
-                          : diaryStatus.tone === 'pending' ? styles.studentDiaryStatusPending
-                            : diaryStatus.tone === 'overdue' ? styles.studentDiaryStatusOverdue
-                              : styles.studentDiaryStatusUpcoming,
-                  ]}>
-                    <Text style={[
-                      styles.studentDiaryStatusText,
-                      diaryStatus.tone === 'completed' ? styles.studentDiaryStatusTextCompleted
-                        : diaryStatus.tone === 'cancelled' ? styles.studentDiaryStatusTextCancelled
-                          : diaryStatus.tone === 'ongoing' ? styles.studentDiaryStatusTextOngoing
-                            : diaryStatus.tone === 'pending' ? styles.studentDiaryStatusTextPending
-                              : diaryStatus.tone === 'overdue' ? styles.studentDiaryStatusTextOverdue
-                                : styles.studentDiaryStatusTextUpcoming,
-                    ]}>{diaryStatus.label}</Text>
+                    ))}
                   </View>
-                  {item.status === 'upcoming' ? (
-                    <View style={styles.studentDiaryActions}>
-                      {item.meetingUrl ? (
-                        <Pressable onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }} style={styles.studentDiaryJoinButton} accessibilityRole="button">
-                          <Text style={styles.studentDiaryJoinButtonText}>Vào lớp</Text>
+                  <View style={styles.monthCalendarLegend}>
+                    {[
+                      { label: 'Đã dạy', color: colors.green },
+                      { label: 'Sắp tới', color: '#F59E0B' },
+                      { label: 'Đã hủy', color: colors.red },
+                    ].map((item) => (
+                      <View key={item.label} style={styles.monthCalendarLegendItem}>
+                        <View style={[styles.monthCalendarDot, { backgroundColor: item.color }]} />
+                        <Text style={styles.monthCalendarLegendText}>{item.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </Card>
+                <Card style={styles.calendarDayCard}>
+                  <View style={styles.calendarDayHeader}>
+                    <View style={styles.diaryHeadingIcon}><CalendarDays size={16} color={colors.brand} /></View>
+                    <View style={styles.weeklyGridHeadingCopy}>
+                      <Text style={styles.calendarDayTitle}>
+                        {new Date(`${selectedCalendarDate}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </Text>
+                      <Text style={styles.calendarDaySubtitle}>Lịch trong ngày đã chọn</Text>
+                    </View>
+                    <Text style={styles.calendarDayCount}>{selectedCalendarItems.length} buổi</Text>
+                  </View>
+                  <View style={styles.calendarAppointments}>
+                    {selectedCalendarItems.map((item) => {
+                      const canEdit = item.status === 'upcoming'
+                        && !isScheduleRescheduleLocked(item)
+                        && Boolean(item.date && item.date >= todayKey);
+                      const attendancePending = isTeacherAttendanceActionPending(item);
+                      const attendanceAwaitingConfirmation = isAttendanceAwaitingStudentConfirmation(item);
+                      const attendanceAvailable = canTeacherMarkAttendance(item, scheduleNow);
+                      const makeupOverdue = canTeacherRequestMakeup(item, scheduleNow);
+                      const makeupRequestSent = Boolean(user && mobileMakeupRequestsSent.has(`${user.id}:${item.id}`));
+                      return (
+                        <View key={item.id} style={styles.calendarAppointment}>
+                          <View style={styles.rowBetween}>
+                            <Text numberOfLines={2} style={styles.calendarAppointmentTitle}>{item.studentName || item.person || 'Học viên'}</Text>
+                            {!attendanceAwaitingConfirmation ? <StatusBadge label={attendanceStatusLabel(item, scheduleNow)} compact /> : null}
+                          </View>
+                          <View style={styles.calendarAppointmentInfo}>
+                            <Clock3 size={13} color="#FCD34D" />
+                            <Text style={styles.calendarAppointmentTime}>{item.time || 'Chưa có giờ'}</Text>
+                          </View>
+                          <Text style={styles.calendarAppointmentCourse}>{item.courseName || item.subject || item.title}</Text>
+                          {item.note ? <Text style={styles.calendarAppointmentNote} numberOfLines={2}>Ghi chú lịch: {item.note}</Text> : null}
+                          {item.studentNote ? <Text style={styles.calendarStudentNote} numberOfLines={2}>Học viên nhắn: {item.studentNote}</Text> : null}
+                          {canEdit || attendancePending || attendanceAwaitingConfirmation ? (
+                            <View style={[styles.calendarActions, attendanceAwaitingConfirmation && styles.calendarActionsSubmitted]}>
+                              {attendanceAwaitingConfirmation ? (
+                                <>
+                                  <StatusBadge label={attendanceStatusLabel(item, scheduleNow)} compact />
+                                  <Pressable
+                                    disabled
+                                    style={[styles.calendarAttendanceAction, styles.calendarAttendanceActionSubmitted]}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
+                                    accessibilityState={{ disabled: true }}
+                                  >
+                                    <CheckCircle size={14} color="#B91C1C" />
+                                    <Text style={[styles.calendarAttendanceActionText, styles.calendarAttendanceActionTextSubmitted]}>Điểm danh</Text>
+                                  </Pressable>
+                                </>
+                              ) : attendancePending ? (
+                                <Pressable
+                                  disabled={makeupOverdue ? makeupRequestSent : !attendanceAvailable}
+                                  onPress={() => {
+                                    if (makeupOverdue) {
+                                      if (!makeupRequestSent) setMakeupTarget(item);
+                                      return;
+                                    }
+                                    navigation.navigate('Attendance', { scheduleId: item.id });
+                                  }}
+                                  style={[
+                                    styles.calendarAttendanceAction,
+                                    makeupOverdue && (makeupRequestSent ? styles.calendarMakeupActionSent : styles.calendarMakeupAction),
+                                    !attendanceAvailable && !makeupOverdue && styles.calendarAttendanceActionDisabled,
+                                  ]}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={makeupOverdue
+                                    ? `${makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù'} ${item.studentName || item.title}`
+                                    : attendanceAvailable
+                                      ? `Điểm danh ${item.studentName || item.title}`
+                                      : `${teacherAttendanceActionLabel(item, scheduleNow)}: ${item.studentName || item.title}`}
+                                  accessibilityState={{ disabled: makeupOverdue ? makeupRequestSent : !attendanceAvailable }}
+                                >
+                                  <CheckCircle size={14} color={makeupOverdue && makeupRequestSent ? '#64748B' : attendanceAvailable || makeupOverdue ? '#FFFFFF' : '#94A3B8'} />
+                                  <Text style={[
+                                    styles.calendarAttendanceActionText,
+                                    makeupOverdue && (makeupRequestSent ? styles.calendarMakeupActionTextSent : styles.calendarMakeupActionText),
+                                    !attendanceAvailable && !makeupOverdue && styles.calendarAttendanceActionTextDisabled,
+                                  ]}>{makeupOverdue ? makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù' : teacherAttendanceActionLabel(item, scheduleNow)}</Text>
+                                </Pressable>
+                              ) : null}
+                              {canEdit && !makeupOverdue ? (
+                                <Pressable onPress={() => openScheduleEditor(item)} style={styles.calendarEditAction} accessibilityRole="button">
+                                  <Text style={styles.calendarEditActionText}>Sửa ca dạy</Text>
+                                </Pressable>
+                              ) : null}
+                              {attendanceAvailable || makeupOverdue ? (
+                                <Pressable
+                                  onPress={() => {
+                                    setCancelTarget(item);
+                                    setCancelReason('');
+                                  }}
+                                  style={styles.calendarCancelAction}
+                                  accessibilityRole="button"
+                                >
+                                  <Text style={styles.calendarCancelActionText}>Hủy ca</Text>
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                  {!selectedCalendarItems.length ? (
+                    <View style={styles.calendarDayEmpty}>
+                      <Text style={styles.calendarDayEmptyText}>Ngày này chưa có ca dạy.</Text>
+                      {selectedCalendarDate >= todayKey ? (
+                        <Pressable onPress={() => openWeekForCalendarDate(selectedCalendarDate)} style={styles.calendarAddAction} accessibilityRole="button">
+                          <Plus size={16} color="#FFFFFF" />
+                          <Text style={styles.calendarAddActionText}>Xếp lịch ngày này</Text>
                         </Pressable>
                       ) : null}
+                    </View>
+                  ) : null}
+                </Card>
+              </>
+            ) : null
+            }
+            {
+              teacherScheduleView === 'week' ? (
+                <Card style={styles.weeklyGridCard}>
+                  <View style={styles.weeklyGridHeading}>
+                    <View style={styles.scheduleOverviewIcon}><Table2 size={18} color={colors.brand} /></View>
+                    <View style={styles.weeklyGridHeadingCopy}>
+                      <Text style={styles.weeklyGridTitle}>Xếp lịch học viên theo tuần</Text>
+                    </View>
+                  </View>
+                  <View style={styles.scheduleFilterSection}>
+                    <View style={styles.scheduleFilterHeading}>
+                      <Users size={14} color={colors.muted} />
+                      <Text style={styles.scheduleFilterLabel}>Lọc học viên</Text>
+                      <Text style={styles.scheduleFilterCount}>{teacherRoster.length} học viên</Text>
+                    </View>
+                    <View style={styles.rosterStatusFilters}>
+                      {['Đang học', 'Học xong', 'Tất cả'].map((status) => {
+                        const selected = rosterFilter === status;
+                        const count = status === 'Tất cả'
+                          ? eligibleTeacherStudents.length
+                          : eligibleTeacherStudents.filter((student) => status === 'Học xong'
+                            ? student.enrollmentStatus === 'completed'
+                            : student.enrollmentStatus !== 'completed').length;
+                        return (
+                          <Pressable
+                            key={status}
+                            onPress={() => setRosterFilter(status)}
+                            style={[styles.rosterStatusChip, selected && styles.rosterStatusChipActive]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                          >
+                            <Text numberOfLines={1} style={[styles.rosterStatusText, selected && styles.rosterStatusTextActive]}>{status}</Text>
+                            <Text style={[styles.rosterStatusCount, selected && styles.rosterStatusCountActive]}>{count}</Text>
+                          </Pressable>
+                        );
+                      })}
                       <Pressable
                         onPress={() => {
-                          setSelectedId(item.id);
-                          setStudentNote(item.studentNote || '');
-                          setShowStudentNote(true);
+                          if (showTeacherSearch) setTeacherQuery('');
+                          setShowTeacherSearch((visible) => !visible);
                         }}
-                        style={styles.studentDiaryNoteButton}
+                        style={[styles.rosterSearchIconButton, showTeacherSearch && styles.rosterSearchIconButtonActive]}
                         accessibilityRole="button"
+                        accessibilityLabel={showTeacherSearch ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
+                        accessibilityState={{ expanded: showTeacherSearch }}
                       >
-                        <Text style={styles.studentDiaryNoteButtonText}>Ghi chú / Đổi lịch</Text>
+                        {showTeacherSearch ? <X size={15} color={colors.brand} /> : <Search size={15} color={colors.brand} />}
                       </Pressable>
                     </View>
-                  ) : null}
-                </View>
-                {item.note ? <Text style={styles.studentDiaryNote} numberOfLines={2}>Ghi chú từ giảng viên: {item.note}</Text> : null}
-                {item.studentNote ? <Text style={styles.studentDiaryNote} numberOfLines={2}>Ghi chú của bạn: {item.studentNote}</Text> : null}
-                {item.grade != null ? <Text style={styles.metaText}>Điểm: {item.grade}/10</Text> : null}
-              </Card>
-            );
-          })}
-          {!studentDiaryItems.length ? (
-            <Text style={styles.diaryEmpty}>
-              {studentDiaryFilter === 'Ngày' ? 'Không có ca học trong ngày hôm nay.'
-                : studentDiaryFilter === 'Tuần' ? 'Không có ca học trong tuần này.'
-                  : studentDiaryFilter === 'Tháng' ? 'Không có ca học trong tháng này.'
-                    : studentDiaryFilter === 'Chưa điểm danh' ? 'Không có ca chưa điểm danh.'
-                      : studentDiaryFilter === 'Lịch hủy' ? 'Không có lịch hủy.'
-                        : 'Chưa có ca học.'}
-            </Text>
-          ) : null}
-        </Card>
-      ) : null}
-      {isTeacher && teacherScheduleView === 'week' && !resource.loading && !resource.error ? (
-        <Card style={styles.studentDiaryCard}>
-          <View style={styles.studentDiaryHeading}>
-            <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
-            <View style={styles.weeklyGridHeadingCopy}>
-              <Text style={styles.weeklyGridTitle}>Nhật ký giảng dạy</Text>
-            </View>
-            <View style={styles.teacherDiaryCount}>
-              <Text style={styles.teacherDiaryCountText}>{diaryItems.length}</Text>
-              <Text style={styles.teacherDiaryCountLabel}>ca</Text>
-            </View>
-          </View>
-          <View style={styles.teacherDiaryFilters}>
-            <View style={styles.teacherDiaryDateFilters} accessibilityRole="tablist">
-              {[
-                { label: 'Ngày' },
-                { label: 'Tuần' },
-                { label: 'Tháng' },
-                { label: 'Hủy', count: allScheduleItems.filter((item) => item.status === 'cancelled').length },
-              ].map(({ label: filterOption, count }) => {
-                const selected = diaryFilter === filterOption;
-                const cancelled = filterOption === 'Hủy';
-                return (
-                  <Pressable
-                    key={filterOption}
-                    onPress={() => setDiaryFilter(selected ? 'Tất cả' : filterOption)}
-                    style={[
-                      styles.teacherDiaryDateFilter,
-                      cancelled && styles.teacherDiaryDateFilterCancelled,
-                      selected && (cancelled ? styles.teacherDiaryDateFilterCancelledActive : styles.teacherDiaryDateFilterActive),
-                    ]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.teacherDiaryDateFilterText,
-                        cancelled && styles.teacherDiaryDateFilterCancelledText,
-                        selected && styles.teacherDiaryDateFilterTextActive,
-                      ]}
-                    >{filterOption}</Text>
-                    {count !== undefined ? (
-                      <Text style={[styles.teacherDiaryDateFilterCount, selected && styles.teacherDiaryDateFilterCountActive]}>{count}</Text>
+                    <Pressable
+                      onPress={() => setShowCoursePicker(true)}
+                      style={styles.courseFilterSelect}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Chọn khóa học, hiện tại ${teacherCourseFilter}`}
+                      accessibilityState={{ expanded: showCoursePicker }}
+                    >
+                      <Text style={styles.courseFilterSelectLabel}>Khóa học</Text>
+                      <Text numberOfLines={1} style={styles.courseFilterSelectValue}>
+                        {teacherCourseFilter === 'Tất cả khóa' ? 'Tất cả khóa học' : teacherCourseFilter}
+                      </Text>
+                      <ChevronDown size={16} color={colors.brand} />
+                    </Pressable>
+                    {showTeacherSearch ? (
+                      <View style={styles.compactRosterSearch}>
+                        <Search size={15} color={colors.muted} />
+                        <TextInput
+                          value={teacherQuery}
+                          onChangeText={setTeacherQuery}
+                          placeholder="Lọc tên học viên"
+                          placeholderTextColor={colors.muted}
+                          style={styles.compactRosterSearchInput}
+                          accessibilityLabel="Lọc tên học viên"
+                          returnKeyType="search"
+                        />
+                        {teacherQuery ? (
+                          <Pressable onPress={() => setTeacherQuery('')} accessibilityRole="button" accessibilityLabel="Xóa từ khóa tìm kiếm">
+                            <X size={15} color={colors.muted} />
+                          </Pressable>
+                        ) : null}
+                      </View>
                     ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={styles.teacherDiaryStatusFilters} accessibilityRole="tablist">
-              {[
-                { label: 'Chưa điểm danh', count: allScheduleItems.filter(isTeacherAttendanceActionPending).length },
-                { label: 'Chờ xác nhận', count: allScheduleItems.filter(isAttendanceAwaitingStudentConfirmation).length },
-              ].map(({ label, count }) => {
-                const selected = diaryFilter === label;
-                const awaitingConfirmation = label === 'Chờ xác nhận';
-                return (
-                  <Pressable
-                    key={label}
-                    onPress={() => setDiaryFilter(selected ? 'Tất cả' : label)}
-                    style={[
-                      styles.teacherDiaryStatusFilter,
-                      awaitingConfirmation && styles.teacherDiaryConfirmationFilter,
-                      selected && (awaitingConfirmation
-                        ? styles.teacherDiaryConfirmationFilterActive
-                        : styles.teacherDiaryPendingFilterActive),
-                    ]}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.teacherDiaryStatusFilterText,
-                        awaitingConfirmation && styles.teacherDiaryConfirmationFilterText,
-                        selected && styles.teacherDiaryStatusFilterTextActive,
-                      ]}
-                    >{label}</Text>
-                    <Text style={[
-                      styles.teacherDiaryStatusCount,
-                      awaitingConfirmation && styles.teacherDiaryConfirmationCount,
-                      selected && styles.teacherDiaryStatusCountActive,
-                    ]}>{count}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-          {diaryItems.map((item) => {
-            const date = item.date ? new Date(`${item.date}T00:00:00`) : null;
-            const validDate = date && Number.isFinite(date.getTime()) ? date : null;
-            const cancelled = item.status === 'cancelled';
-            const attendancePending = isTeacherAttendanceActionPending(item);
-            const attendanceAwaitingConfirmation = isAttendanceAwaitingStudentConfirmation(item);
-            const attendanceAvailable = canTeacherMarkAttendance(item, scheduleNow);
-            const makeupOverdue = canTeacherRequestMakeup(item, scheduleNow);
-            const makeupRequestSent = Boolean(user && mobileMakeupRequestsSent.has(`${user.id}:${item.id}`));
-            return (
-              <Card
-                key={`teacher-log-${item.id}`}
-                style={cancelled ? { ...styles.teacherDiarySession, ...styles.teacherDiarySessionCancelled } : styles.teacherDiarySession}
-              >
-                <View style={styles.teacherDiarySessionMain}>
-                  <View style={[styles.teacherDiaryDateTile, cancelled && styles.teacherDiaryDateTileCancelled]}>
-                    {validDate ? (
-                      <>
-                        <Text style={[styles.teacherDiaryDateMonth, cancelled && styles.teacherDiaryDateMonthCancelled]}>T{validDate.getMonth() + 1}</Text>
-                        <Text style={[styles.teacherDiaryDateDay, cancelled && styles.teacherDiaryDateDayCancelled]}>{validDate.getDate()}</Text>
-                      </>
-                    ) : <CalendarDays size={19} color={cancelled ? colors.red : colors.brand} />}
                   </View>
-                  <View style={styles.teacherDiarySessionCopy}>
-                    <Text style={styles.teacherDiarySessionTitle}>{item.title}</Text>
-                    <View style={styles.teacherDiaryMetaRow}>
-                      <Clock3 size={13} color={colors.muted} />
-                      <Text style={styles.teacherDiaryMetaText}>{item.dateLabel || item.date || '—'} · {item.time || '—'}</Text>
-                    </View>
-                    <View style={styles.teacherDiaryMetaRow}>
-                      <Users size={13} color={colors.muted} />
-                      <Text style={styles.teacherDiaryMetaText}>Học viên: {item.studentName || '—'}</Text>
-                    </View>
-                    {item.subject ? <Text numberOfLines={1} style={styles.teacherDiarySubject}>{item.subject}</Text> : null}
-                  </View>
-                </View>
-                <View style={styles.teacherDiarySessionFooter}>
-                  <StatusBadge label={attendanceStatusLabel(item, scheduleNow)} compact />
-                  {attendancePending || attendanceAwaitingConfirmation ? (
-                    <View style={styles.teacherDiaryActions}>
-                      {attendanceAwaitingConfirmation ? (
-                        <Pressable
-                          disabled
-                          style={[styles.teacherDiaryAttendanceButton, styles.teacherDiaryAttendanceButtonSubmitted]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
-                          accessibilityState={{ disabled: true }}
-                        >
-                          <CheckCircle size={15} color="#B91C1C" />
-                          <Text style={[styles.teacherDiaryAttendanceButtonText, styles.teacherDiaryAttendanceButtonTextSubmitted]}>Điểm danh</Text>
-                        </Pressable>
-                      ) : (
-                        <Pressable
-                          disabled={makeupOverdue ? makeupRequestSent : !attendanceAvailable}
-                          onPress={() => {
-                            if (makeupOverdue) {
-                              if (!makeupRequestSent) setMakeupTarget(item);
-                              return;
-                            }
-                            navigation.navigate('Attendance', { scheduleId: item.id });
-                          }}
-                          style={[
-                            styles.teacherDiaryAttendanceButton,
-                            makeupOverdue && (makeupRequestSent ? styles.teacherDiaryMakeupButtonSent : styles.teacherDiaryMakeupButton),
-                            !attendanceAvailable && !makeupOverdue && styles.teacherDiaryAttendanceButtonDisabled,
-                          ]}
-                          accessibilityRole="button"
-                          accessibilityLabel={makeupOverdue
-                            ? `${makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù'} ${item.studentName || item.title}`
-                            : attendanceAvailable
-                              ? `Điểm danh ${item.studentName || item.title}`
-                              : `${teacherAttendanceActionLabel(item, scheduleNow)}: ${item.studentName || item.title}`}
-                          accessibilityState={{ disabled: makeupOverdue ? makeupRequestSent : !attendanceAvailable }}
-                        >
-                          <CheckCircle size={15} color={makeupOverdue && makeupRequestSent ? '#64748B' : attendanceAvailable || makeupOverdue ? '#FFFFFF' : '#94A3B8'} />
-                          <Text style={[
-                            styles.teacherDiaryAttendanceButtonText,
-                            makeupOverdue && (makeupRequestSent ? styles.teacherDiaryMakeupButtonTextSent : styles.teacherDiaryMakeupButtonText),
-                            !attendanceAvailable && !makeupOverdue && styles.teacherDiaryAttendanceButtonTextDisabled,
-                          ]}>{makeupOverdue ? makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù' : teacherAttendanceActionLabel(item, scheduleNow)}</Text>
-                        </Pressable>
-                      )}
-                      {makeupOverdue && !attendanceAwaitingConfirmation ? (
-                        <Pressable
-                          onPress={() => {
-                            setCancelTarget(item);
-                            setCancelReason('');
-                          }}
-                          style={styles.teacherDiaryCancelButton}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Hủy ca ${item.studentName || item.title}`}
-                        >
-                          <Ban size={14} color="#FFFFFF" />
-                          <Text style={styles.teacherDiaryCancelButtonText}>Hủy ca</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
+                  {studentsResource.loading ? <LoadingSkeleton rows={1} /> : null}
+                  {studentsResource.error ? <ErrorState onRetry={studentsResource.reload} /> : null}
+                  {!studentsResource.loading && !studentsResource.error && !teacherRoster.length ? (
+                    <EmptyState
+                      title={teacherQuery.trim() ? 'Không tìm thấy học viên khớp tên' : rosterFilter === 'Học xong' ? 'Không có học viên học xong trên bảng này' : rosterFilter === 'Tất cả' ? 'Chưa có học viên để xếp trên bảng này' : 'Chưa có học viên đang học để xếp trên bảng này'}
+                      message="Học viên đủ điều kiện sẽ xuất hiện trong bảng xếp lịch."
+                    />
                   ) : null}
-                </View>
-              </Card>
-            );
-          })}
-          {!diaryItems.length ? (
-            <EmptyState
-              title={diaryFilter === 'Hủy' ? 'Chưa có lịch bị hủy' : diaryFilter === 'Chờ xác nhận' ? 'Không có ca chờ xác nhận' : diaryFilter === 'Chưa điểm danh' ? 'Không có ca đang chờ điểm danh' : 'Chưa có ca dạy'}
-              message={diaryFilter === 'Ngày' ? 'Không có ca dạy trong ngày hôm nay.' : diaryFilter === 'Tuần' ? 'Không có ca dạy trong tuần này.' : diaryFilter === 'Tháng' ? 'Không có ca dạy trong tháng này.' : 'Các buổi dạy sẽ xuất hiện tại đây.'}
-            />
-          ) : null}
-        </Card>
-      ) : null}
-      {selectedItem && !isTeacher ? (
-        <Card style={styles.studentDetail}>
-          <View style={styles.rowBetween}>
+                  {!studentsResource.loading && !studentsResource.error && teacherRoster.length ? (
+                    <View style={styles.compactWeekGrid}>
+                      <View style={styles.teacherWeekRange}>
+                        <Pressable
+                          onPress={() => setWeekOffset((value) => value - 1)}
+                          style={styles.teacherWeekRangeArrow}
+                          accessibilityRole="button"
+                          accessibilityLabel="Tuần trước"
+                        >
+                          <ChevronLeft size={16} color={colors.brand} />
+                        </Pressable>
+                        <Pressable onPress={() => setWeekOffset(0)} accessibilityRole="button" accessibilityLabel="Về tuần hiện tại">
+                          <Text style={styles.teacherWeekRangeLabel}>{weekLabel}</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => setWeekOffset((value) => value + 1)}
+                          style={styles.teacherWeekRangeArrow}
+                          accessibilityRole="button"
+                          accessibilityLabel="Tuần sau"
+                        >
+                          <ChevronRight size={16} color={colors.brand} />
+                        </Pressable>
+                      </View>
+                      <ScrollView
+                        style={styles.teacherCompactScroll}
+                        horizontal
+                        nestedScrollEnabled
+                        showsHorizontalScrollIndicator
+                      >
+                        <View style={{ width: TEACHER_WEEK_NAME_CELL_WIDTH + weekDays.length * STUDENT_WEEK_CELL_WIDTH }}>
+                          <View style={styles.teacherCompactWeekRow}>
+                            <View style={[styles.teacherCompactNameCell, styles.compactWeekHeaderCell]}>
+                              <Text style={styles.teacherCompactHeaderText}>Học viên</Text>
+                            </View>
+                            {weekDays.map((day, index) => {
+                              const active = gridSort.kind === 'day' && gridSort.dayIndex === index;
+                              return (
+                                <View key={day.dateKey} style={[styles.teacherCompactDayCell, styles.compactWeekHeaderCell, active && styles.weekGridSortedCell]}>
+                                  <Text style={[styles.teacherCompactDayText, active && styles.weekGridTodayText]}>{index === 6 ? 'CN' : `T${index + 2}`}</Text>
+                                  <Text style={styles.teacherCompactDateText}>{day.day}</Text>
+                                  <Pressable
+                                    onPress={() => setSortMenu({ kind: 'day', dayIndex: index })}
+                                    style={[styles.teacherCompactSort, active && styles.weekGridSortActive]}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Chọn sắp xếp lịch theo giờ ${day.weekday}`}
+                                  >
+                                    <Text style={[styles.teacherCompactSortText, active && styles.weekGridSortTextActive]}>
+                                      {active ? gridSort.dir === 'asc' ? '↑' : '↓' : 'Giờ'}
+                                    </Text>
+                                    {!active ? <ChevronDown size={9} color={colors.muted} /> : null}
+                                  </Pressable>
+                                </View>
+                              );
+                            })}
+                          </View>
+                          {teacherRoster.map((student) => (
+                            <View key={student.id} style={styles.teacherCompactWeekRow}>
+                              <View style={styles.teacherCompactNameCell}>
+                                <Text numberOfLines={1} style={styles.teacherCompactStudentName}>{formatScheduleLabel(student.name)}</Text>
+                                <Text numberOfLines={2} style={styles.teacherCompactCourse}>{formatScheduleLabel(student.course || '-')}</Text>
+                                <Text style={styles.teacherCompactSessions}>{student.completedSessions ?? '-'}/{student.totalSessions ?? '-'} buổi</Text>
+                              </View>
+                              {weekDays.map((day) => {
+                                const scheduled = allScheduleItems.find((item) => (
+                                  item.date === day.dateKey
+                                  && (item.studentId === student.id || (!item.studentId && item.studentName === student.name))
+                                  && item.status !== 'cancelled'
+                                ));
+                                const start = scheduled?.time.match(/\d{2}:\d{2}/)?.[0];
+                                const past = day.dateKey < todayKey;
+                                const locked = past || scheduled?.status === 'completed';
+                                const statusLabel = scheduled?.status === 'completed'
+                                  ? 'Dạy'
+                                  : scheduled && isOverdueAttendance(scheduled)
+                                    ? 'Trễ'
+                                    : scheduled ? 'Đã xếp' : '';
+                                return (
+                                  <Pressable
+                                    key={day.dateKey}
+                                    disabled={locked}
+                                    onPress={() => {
+                                      setSelectedId(scheduled?.id || null);
+                                      setSelectedStudentId(student.id);
+                                      const matchingEnrollment = (student.enrollments || []).find((enrollment) => (
+                                        enrollment.id === scheduled?.enrollmentId
+                                        || (scheduled?.courseName && normalizeScheduleCourseName(enrollment.courseName) === normalizeScheduleCourseName(scheduled.courseName))
+                                      ));
+                                      setSelectedEnrollmentId(matchingEnrollment?.id || student.enrollments?.find((enrollment) => enrollment.status === 'Đang học')?.id || '');
+                                      setClassDate(day.dateKey);
+                                      setClassTime(start || '');
+                                      setShowCreate(true);
+                                    }}
+                                    style={[
+                                      styles.teacherCompactDayCell,
+                                      styles.compactWeekSlotCell,
+                                      scheduled?.status === 'completed' ? styles.weekGridCompletedCell : scheduled ? styles.weekGridBookedCell : undefined,
+                                      locked && styles.weekGridLockedCell,
+                                      day.dateKey === todayKey && styles.weekGridTodayColumn,
+                                    ]}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`${student.name}, ${day.weekday} ${day.day}, ${scheduled?.time || 'chưa xếp ca'}${locked ? ', đã khóa' : ''}`}
+                                  >
+                                    <Text numberOfLines={1} style={[styles.teacherCompactTime, scheduled && styles.weekGridBookedText]}>{start || '-'}</Text>
+                                    {statusLabel ? <Text numberOfLines={1} style={styles.teacherCompactStatus}>{statusLabel}</Text> : null}
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </View>
+                  ) : null
+                  }
+                </Card >
+              ) : null}
+          </>
+        ) : null}
+      {resource.loading ? <LoadingSkeleton /> : null}
+      {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+      {
+        !isTeacher && !resource.loading && !resource.error ? (
+          <Card style={styles.studentDiaryCard}>
+            <View style={styles.studentDiaryHeading}>
+              <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
+              <View style={styles.weeklyGridHeadingCopy}>
+                <Text style={styles.weeklyGridTitle}>Nhật ký học tập</Text>
+              </View>
+            </View>
+            <View style={styles.studentDiaryFilterContainer}>
+              <View style={styles.studentDiaryFilterRow} accessibilityRole="tablist">
+                {[
+                  { value: 'Ngày', label: 'Ngày', dateFilter: true },
+                  { value: 'Tuần', label: 'Tuần', dateFilter: true },
+                  { value: 'Tháng', label: 'Tháng', dateFilter: true },
+                  { value: 'Lịch hủy', label: 'Hủy', dateFilter: true },
+                  { value: 'Chưa điểm danh', label: 'Chưa điểm danh', dateFilter: false },
+                ].map(({ value, label, dateFilter }) => {
+                  const selected = studentDiaryFilter === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => setStudentDiaryFilter(value)}
+                      style={[
+                        styles.studentDiaryFilter,
+                        dateFilter ? styles.studentDiaryDateFilter : styles.studentDiaryStatusFilter,
+                        selected && styles.studentDiaryFilterActive,
+                      ]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[styles.studentDiaryFilterText, selected && styles.studentDiaryFilterTextActive]} numberOfLines={1}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            {studentDiaryItems.map((item) => {
+              const diaryStatus = getStudentDiaryStatus(item);
+              return (
+                <Card key={`log-${item.id}`} style={styles.studentDiaryLogRow}>
+                  <Pressable onPress={() => setSelectedId(item.id)} accessibilityRole="button" accessibilityLabel={`Mở chi tiết ${item.title}`}>
+                    <Text numberOfLines={1} style={styles.studentDiaryLogTitle}>
+                      {item.courseName || item.subject || item.title}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.studentDiaryLogMeta}>
+                      {item.person || item.teacherName || 'Giảng viên'} · {item.dateLabel || item.date || '-'} · {item.time || '-'}
+                    </Text>
+                  </Pressable>
+                  <View style={styles.studentDiaryFooter}>
+                    <View style={[
+                      styles.studentDiaryStatus,
+                      diaryStatus.tone === 'completed' ? styles.studentDiaryStatusCompleted
+                        : diaryStatus.tone === 'cancelled' ? styles.studentDiaryStatusCancelled
+                          : diaryStatus.tone === 'ongoing' ? styles.studentDiaryStatusOngoing
+                            : diaryStatus.tone === 'pending' ? styles.studentDiaryStatusPending
+                              : diaryStatus.tone === 'overdue' ? styles.studentDiaryStatusOverdue
+                                : styles.studentDiaryStatusUpcoming,
+                    ]}>
+                      <Text style={[
+                        styles.studentDiaryStatusText,
+                        diaryStatus.tone === 'completed' ? styles.studentDiaryStatusTextCompleted
+                          : diaryStatus.tone === 'cancelled' ? styles.studentDiaryStatusTextCancelled
+                            : diaryStatus.tone === 'ongoing' ? styles.studentDiaryStatusTextOngoing
+                              : diaryStatus.tone === 'pending' ? styles.studentDiaryStatusTextPending
+                                : diaryStatus.tone === 'overdue' ? styles.studentDiaryStatusTextOverdue
+                                  : styles.studentDiaryStatusTextUpcoming,
+                      ]}>{diaryStatus.label}</Text>
+                    </View>
+                    {item.status === 'upcoming' ? (
+                      <View style={styles.studentDiaryActions}>
+                        {item.meetingUrl ? (
+                          <Pressable onPress={() => { void openAssignmentLink(item.meetingUrl, 'Lớp học'); }} style={styles.studentDiaryJoinButton} accessibilityRole="button">
+                            <Text style={styles.studentDiaryJoinButtonText}>Vào lớp</Text>
+                          </Pressable>
+                        ) : null}
+                        <Pressable
+                          onPress={() => {
+                            setSelectedId(item.id);
+                            setStudentNote(item.studentNote || '');
+                            setShowStudentNote(true);
+                          }}
+                          style={styles.studentDiaryNoteButton}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.studentDiaryNoteButtonText}>Ghi chú / Đổi lịch</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                  {item.note ? <Text style={styles.studentDiaryNote} numberOfLines={2}>Ghi chú từ giảng viên: {item.note}</Text> : null}
+                  {item.studentNote ? <Text style={styles.studentDiaryNote} numberOfLines={2}>Ghi chú của bạn: {item.studentNote}</Text> : null}
+                  {item.grade != null ? <Text style={styles.metaText}>Điểm: {item.grade}/10</Text> : null}
+                </Card>
+              );
+            })}
+            {!studentDiaryItems.length ? (
+              <Text style={styles.diaryEmpty}>
+                {studentDiaryFilter === 'Ngày' ? 'Không có ca học trong ngày hôm nay.'
+                  : studentDiaryFilter === 'Tuần' ? 'Không có ca học trong tuần này.'
+                    : studentDiaryFilter === 'Tháng' ? 'Không có ca học trong tháng này.'
+                      : studentDiaryFilter === 'Chưa điểm danh' ? 'Không có ca chưa điểm danh.'
+                        : studentDiaryFilter === 'Lịch hủy' ? 'Không có lịch hủy.'
+                          : 'Chưa có ca học.'}
+              </Text>
+            ) : null}
+          </Card>
+        ) : null
+      }
+      {
+        isTeacher && teacherScheduleView === 'week' && !resource.loading && !resource.error ? (
+          <Card style={styles.studentDiaryCard}>
+            <View style={styles.studentDiaryHeading}>
+              <View style={styles.diaryHeadingIcon}><BookText size={16} color={colors.brand} /></View>
+              <View style={styles.weeklyGridHeadingCopy}>
+                <Text style={styles.weeklyGridTitle}>Nhật ký giảng dạy</Text>
+              </View>
+              <View style={styles.teacherDiaryCount}>
+                <Text style={styles.teacherDiaryCountText}>{diaryItems.length}</Text>
+                <Text style={styles.teacherDiaryCountLabel}>ca</Text>
+              </View>
+            </View>
+            <View style={styles.teacherDiaryFilters}>
+              <View style={styles.teacherDiaryDateFilters} accessibilityRole="tablist">
+                {[
+                  { label: 'Ngày' },
+                  { label: 'Tuần' },
+                  { label: 'Tháng' },
+                  { label: 'Hủy', count: allScheduleItems.filter((item) => item.status === 'cancelled').length },
+                ].map(({ label: filterOption, count }) => {
+                  const selected = diaryFilter === filterOption;
+                  const cancelled = filterOption === 'Hủy';
+                  return (
+                    <Pressable
+                      key={filterOption}
+                      onPress={() => setDiaryFilter(selected ? 'Tất cả' : filterOption)}
+                      style={[
+                        styles.teacherDiaryDateFilter,
+                        cancelled && styles.teacherDiaryDateFilterCancelled,
+                        selected && (cancelled ? styles.teacherDiaryDateFilterCancelledActive : styles.teacherDiaryDateFilterActive),
+                      ]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.teacherDiaryDateFilterText,
+                          cancelled && styles.teacherDiaryDateFilterCancelledText,
+                          selected && styles.teacherDiaryDateFilterTextActive,
+                        ]}
+                      >{filterOption}</Text>
+                      {count !== undefined ? (
+                        <Text style={[styles.teacherDiaryDateFilterCount, selected && styles.teacherDiaryDateFilterCountActive]}>{count}</Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.teacherDiaryStatusFilters} accessibilityRole="tablist">
+                {[
+                  { label: 'Chưa điểm danh', count: allScheduleItems.filter(isTeacherAttendanceActionPending).length },
+                  { label: 'Chờ xác nhận', count: allScheduleItems.filter(isAttendanceAwaitingStudentConfirmation).length },
+                ].map(({ label, count }) => {
+                  const selected = diaryFilter === label;
+                  const awaitingConfirmation = label === 'Chờ xác nhận';
+                  return (
+                    <Pressable
+                      key={label}
+                      onPress={() => setDiaryFilter(selected ? 'Tất cả' : label)}
+                      style={[
+                        styles.teacherDiaryStatusFilter,
+                        awaitingConfirmation && styles.teacherDiaryConfirmationFilter,
+                        selected && (awaitingConfirmation
+                          ? styles.teacherDiaryConfirmationFilterActive
+                          : styles.teacherDiaryPendingFilterActive),
+                      ]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.teacherDiaryStatusFilterText,
+                          awaitingConfirmation && styles.teacherDiaryConfirmationFilterText,
+                          selected && styles.teacherDiaryStatusFilterTextActive,
+                        ]}
+                      >{label}</Text>
+                      <Text style={[
+                        styles.teacherDiaryStatusCount,
+                        awaitingConfirmation && styles.teacherDiaryConfirmationCount,
+                        selected && styles.teacherDiaryStatusCountActive,
+                      ]}>{count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            {diaryItems.map((item) => {
+              const date = item.date ? new Date(`${item.date}T00:00:00`) : null;
+              const validDate = date && Number.isFinite(date.getTime()) ? date : null;
+              const cancelled = item.status === 'cancelled';
+              const attendancePending = isTeacherAttendanceActionPending(item);
+              const attendanceAwaitingConfirmation = isAttendanceAwaitingStudentConfirmation(item);
+              const attendanceAvailable = canTeacherMarkAttendance(item, scheduleNow);
+              const makeupOverdue = canTeacherRequestMakeup(item, scheduleNow);
+              const makeupRequestSent = Boolean(user && mobileMakeupRequestsSent.has(`${user.id}:${item.id}`));
+              return (
+                <Card
+                  key={`teacher-log-${item.id}`}
+                  style={cancelled ? { ...styles.teacherDiarySession, ...styles.teacherDiarySessionCancelled } : styles.teacherDiarySession}
+                >
+                  <View style={styles.teacherDiarySessionMain}>
+                    <View style={[styles.teacherDiaryDateTile, cancelled && styles.teacherDiaryDateTileCancelled]}>
+                      {validDate ? (
+                        <>
+                          <Text style={[styles.teacherDiaryDateMonth, cancelled && styles.teacherDiaryDateMonthCancelled]}>T{validDate.getMonth() + 1}</Text>
+                          <Text style={[styles.teacherDiaryDateDay, cancelled && styles.teacherDiaryDateDayCancelled]}>{validDate.getDate()}</Text>
+                        </>
+                      ) : <CalendarDays size={19} color={cancelled ? colors.red : colors.brand} />}
+                    </View>
+                    <View style={styles.teacherDiarySessionCopy}>
+                      <Text style={styles.teacherDiarySessionTitle}>{item.title}</Text>
+                      <View style={styles.teacherDiaryMetaRow}>
+                        <Clock3 size={13} color={colors.muted} />
+                        <Text style={styles.teacherDiaryMetaText}>{item.dateLabel || item.date || '-'} · {item.time || '-'}</Text>
+                      </View>
+                      <View style={styles.teacherDiaryMetaRow}>
+                        <Users size={13} color={colors.muted} />
+                        <Text style={styles.teacherDiaryMetaText}>Học viên: {item.studentName || '-'}</Text>
+                      </View>
+                      {item.subject ? <Text numberOfLines={1} style={styles.teacherDiarySubject}>{item.subject}</Text> : null}
+                    </View>
+                  </View>
+                  <View style={styles.teacherDiarySessionFooter}>
+                    <StatusBadge label={attendanceStatusLabel(item, scheduleNow)} compact />
+                    {attendancePending || attendanceAwaitingConfirmation ? (
+                      <View style={styles.teacherDiaryActions}>
+                        {attendanceAwaitingConfirmation ? (
+                          <Pressable
+                            disabled
+                            style={[styles.teacherDiaryAttendanceButton, styles.teacherDiaryAttendanceButtonSubmitted]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Điểm danh đã gửi, chờ xác nhận ${item.studentName || item.title}`}
+                            accessibilityState={{ disabled: true }}
+                          >
+                            <CheckCircle size={15} color="#B91C1C" />
+                            <Text style={[styles.teacherDiaryAttendanceButtonText, styles.teacherDiaryAttendanceButtonTextSubmitted]}>Điểm danh</Text>
+                          </Pressable>
+                        ) : (
+                          <Pressable
+                            disabled={makeupOverdue ? makeupRequestSent : !attendanceAvailable}
+                            onPress={() => {
+                              if (makeupOverdue) {
+                                if (!makeupRequestSent) setMakeupTarget(item);
+                                return;
+                              }
+                              navigation.navigate('Attendance', { scheduleId: item.id });
+                            }}
+                            style={[
+                              styles.teacherDiaryAttendanceButton,
+                              makeupOverdue && (makeupRequestSent ? styles.teacherDiaryMakeupButtonSent : styles.teacherDiaryMakeupButton),
+                              !attendanceAvailable && !makeupOverdue && styles.teacherDiaryAttendanceButtonDisabled,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={makeupOverdue
+                              ? `${makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù'} ${item.studentName || item.title}`
+                              : attendanceAvailable
+                                ? `Điểm danh ${item.studentName || item.title}`
+                                : `${teacherAttendanceActionLabel(item, scheduleNow)}: ${item.studentName || item.title}`}
+                            accessibilityState={{ disabled: makeupOverdue ? makeupRequestSent : !attendanceAvailable }}
+                          >
+                            <CheckCircle size={15} color={makeupOverdue && makeupRequestSent ? '#64748B' : attendanceAvailable || makeupOverdue ? '#FFFFFF' : '#94A3B8'} />
+                            <Text style={[
+                              styles.teacherDiaryAttendanceButtonText,
+                              makeupOverdue && (makeupRequestSent ? styles.teacherDiaryMakeupButtonTextSent : styles.teacherDiaryMakeupButtonText),
+                              !attendanceAvailable && !makeupOverdue && styles.teacherDiaryAttendanceButtonTextDisabled,
+                            ]}>{makeupOverdue ? makeupRequestSent ? 'Đã gửi Admin' : 'Điểm danh bù' : teacherAttendanceActionLabel(item, scheduleNow)}</Text>
+                          </Pressable>
+                        )}
+                        {makeupOverdue && !attendanceAwaitingConfirmation ? (
+                          <Pressable
+                            onPress={() => {
+                              setCancelTarget(item);
+                              setCancelReason('');
+                            }}
+                            style={styles.teacherDiaryCancelButton}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Hủy ca ${item.studentName || item.title}`}
+                          >
+                            <Ban size={14} color="#FFFFFF" />
+                            <Text style={styles.teacherDiaryCancelButtonText}>Hủy ca</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ) : null}
+                  </View>
+                </Card>
+              );
+            })}
+            {!diaryItems.length ? (
+              <EmptyState
+                title={diaryFilter === 'Hủy' ? 'Chưa có lịch bị hủy' : diaryFilter === 'Chờ xác nhận' ? 'Không có ca chờ xác nhận' : diaryFilter === 'Chưa điểm danh' ? 'Không có ca đang chờ điểm danh' : 'Chưa có ca dạy'}
+                message={diaryFilter === 'Ngày' ? 'Không có ca dạy trong ngày hôm nay.' : diaryFilter === 'Tuần' ? 'Không có ca dạy trong tuần này.' : diaryFilter === 'Tháng' ? 'Không có ca dạy trong tháng này.' : 'Các buổi dạy sẽ xuất hiện tại đây.'}
+              />
+            ) : null}
+          </Card>
+        ) : null
+      }
+      {
+        selectedItem && !isTeacher ? (
+          <Card style={styles.studentDetail}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>{selectedItem.title}</Text>
+              <Pressable onPress={() => setSelectedId(null)} accessibilityRole="button"><Text style={styles.closeText}>Đóng</Text></Pressable>
+            </View>
+            <Text style={styles.muted}>{selectedItem.dateLabel} · {selectedItem.time}</Text>
+            <Text style={styles.muted}>{selectedItem.location} · {selectedItem.person}</Text>
+            <StatusBadge label={selectedItem.status} />
+            {selectedItem.note ? <Text style={styles.metaText}>Ghi chú từ giảng viên: {selectedItem.note}</Text> : null}
+            {selectedItem.studentNote ? <Text style={styles.metaText}>Ghi chú của bạn: {selectedItem.studentNote}</Text> : null}
+            {selectedItem.attendanceConfirmPending ? (
+              <>
+                <Text style={styles.metaText}>Giảng viên đang chờ bạn xác nhận điểm danh buổi học.</Text>
+                <PrimaryButton
+                  title={respondingAttendance ? 'Đang gửi…' : 'Đồng ý điểm danh'}
+                  variant="secondary"
+                  disabled={respondingAttendance}
+                  onPress={() => { void respondToAttendance('accept'); }}
+                />
+                <PrimaryButton
+                  title="Không đồng ý"
+                  variant="quiet"
+                  disabled={respondingAttendance}
+                  onPress={() => Alert.alert(
+                    'Gửi phản hồi không đồng ý?',
+                    'Buổi học sẽ được chuyển cho trung tâm xử lý và chưa tính vào tiến độ.',
+                    [
+                      { text: 'Quay lại', style: 'cancel' },
+                      { text: 'Gửi phản hồi', style: 'destructive', onPress: () => { void respondToAttendance('dispute'); } },
+                    ],
+                  )}
+                />
+              </>
+            ) : selectedItem.attendanceDisputed ? (
+              <Text style={styles.metaText}>Bạn đã gửi phản hồi không đồng ý. Trung tâm đang xử lý.</Text>
+            ) : selectedItem.attendanceRejected ? (
+              <Text style={styles.metaText}>Admin đã không chấp thuận điểm danh. Buổi này không được tính vào tiến độ.</Text>
+            ) : selectedItem.confirmedByStudent ? (
+              <Text style={styles.metaText}>Bạn đã xác nhận điểm danh buổi học.</Text>
+            ) : null}
+            <PrimaryButton title="Ghi chú / Đổi lịch" variant="quiet" onPress={() => {
+              setStudentNote(selectedItem.studentNote || '');
+              setShowStudentNote(true);
+            }} />
+          </Card>
+        ) : null
+      }
+      {
+        isTeacher && notificationScheduleId && selectedItem?.id === notificationScheduleId ? (
+          <Card style={styles.studentDetail}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>Buổi học trong thông báo</Text>
+              <Pressable
+                onPress={() => {
+                  setNotificationScheduleId(null);
+                  setSelectedId(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng chi tiết buổi học"
+              >
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
             <Text style={styles.cardTitle}>{selectedItem.title}</Text>
-            <Pressable onPress={() => setSelectedId(null)} accessibilityRole="button"><Text style={styles.closeText}>Đóng</Text></Pressable>
-          </View>
-          <Text style={styles.muted}>{selectedItem.dateLabel} · {selectedItem.time}</Text>
-          <Text style={styles.muted}>{selectedItem.location} · {selectedItem.person}</Text>
-          <StatusBadge label={selectedItem.status} />
-          {selectedItem.note ? <Text style={styles.metaText}>Ghi chú từ giảng viên: {selectedItem.note}</Text> : null}
-          {selectedItem.studentNote ? <Text style={styles.metaText}>Ghi chú của bạn: {selectedItem.studentNote}</Text> : null}
-          {selectedItem.attendanceConfirmPending ? (
-            <>
-              <Text style={styles.metaText}>Giảng viên đang chờ bạn xác nhận điểm danh buổi học.</Text>
-              <PrimaryButton
-                title={respondingAttendance ? 'Đang gửi…' : 'Đồng ý điểm danh'}
-                variant="secondary"
-                disabled={respondingAttendance}
-                onPress={() => { void respondToAttendance('accept'); }}
-              />
-              <PrimaryButton
-                title="Không đồng ý"
-                variant="quiet"
-                disabled={respondingAttendance}
-                onPress={() => Alert.alert(
-                  'Gửi phản hồi không đồng ý?',
-                  'Buổi học sẽ được chuyển cho trung tâm xử lý và chưa tính vào tiến độ.',
-                  [
-                    { text: 'Quay lại', style: 'cancel' },
-                    { text: 'Gửi phản hồi', style: 'destructive', onPress: () => { void respondToAttendance('dispute'); } },
-                  ],
-                )}
-              />
-            </>
-          ) : selectedItem.attendanceDisputed ? (
-            <Text style={styles.metaText}>Bạn đã gửi phản hồi không đồng ý. Trung tâm đang xử lý.</Text>
-          ) : selectedItem.attendanceRejected ? (
-            <Text style={styles.metaText}>Admin đã không chấp thuận điểm danh. Buổi này không được tính vào tiến độ.</Text>
-          ) : selectedItem.confirmedByStudent ? (
-            <Text style={styles.metaText}>Bạn đã xác nhận điểm danh buổi học.</Text>
-          ) : null}
-          <PrimaryButton title="Ghi chú / Đổi lịch" variant="quiet" onPress={() => {
-            setStudentNote(selectedItem.studentNote || '');
-            setShowStudentNote(true);
-          }} />
-        </Card>
-      ) : null}
-      {isTeacher && notificationScheduleId && selectedItem?.id === notificationScheduleId ? (
-        <Card style={styles.studentDetail}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.cardTitle}>Buổi học trong thông báo</Text>
-            <Pressable
-              onPress={() => {
-                setNotificationScheduleId(null);
-                setSelectedId(null);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Đóng chi tiết buổi học"
-            >
-              <Text style={styles.closeText}>Đóng</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.cardTitle}>{selectedItem.title}</Text>
-          <Text style={styles.muted}>{selectedItem.dateLabel} · {selectedItem.time}</Text>
-          <Text style={styles.muted}>Học viên: {selectedItem.studentName || selectedItem.person}</Text>
-          {selectedItem.courseName || selectedItem.subject ? (
-            <Text style={styles.metaText}>{selectedItem.courseName || selectedItem.subject}</Text>
-          ) : null}
-          <StatusBadge label={attendanceStatusLabel(selectedItem, scheduleNow)} />
-        </Card>
-      ) : null}
+            <Text style={styles.muted}>{selectedItem.dateLabel} · {selectedItem.time}</Text>
+            <Text style={styles.muted}>Học viên: {selectedItem.studentName || selectedItem.person}</Text>
+            {selectedItem.courseName || selectedItem.subject ? (
+              <Text style={styles.metaText}>{selectedItem.courseName || selectedItem.subject}</Text>
+            ) : null}
+            <StatusBadge label={attendanceStatusLabel(selectedItem, scheduleNow)} />
+          </Card>
+        ) : null
+      }
       <Modal visible={showStudentNote} transparent animationType="slide" onRequestClose={() => setShowStudentNote(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -1802,7 +1815,7 @@ export function ScheduleScreen() {
                 </Text>
               </View>
               {makeupAlreadyRequested ? (
-                <Text style={styles.makeupModalAlreadySent}>Đã gửi yêu cầu — chờ Admin xét duyệt điểm danh bù.</Text>
+                <Text style={styles.makeupModalAlreadySent}>Đã gửi yêu cầu - chờ Admin xét duyệt điểm danh bù.</Text>
               ) : null}
             </ScrollView>
             <View style={styles.makeupModalActions}>
@@ -1968,7 +1981,7 @@ export function ScheduleScreen() {
             <View style={styles.rowBetween}>
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>Chọn khung giờ</Text>
-                <Text style={styles.metaText}>{selectedStudent?.name || 'Học viên'} · {selectedScheduleEnrollment?.courseName || selectedStudent?.course || '—'} · {classDate}</Text>
+                <Text style={styles.metaText}>{selectedStudent?.name || 'Học viên'} · {selectedScheduleEnrollment?.courseName || selectedStudent?.course || '-'} · {classDate}</Text>
                 <Text style={styles.metaText}>Ca 90 phút · lịch sẽ được lưu và đồng bộ với hệ thống.</Text>
               </View>
               <Pressable onPress={() => setShowCreate(false)} accessibilityRole="button" accessibilityLabel="Đóng chọn khung giờ">
@@ -2022,7 +2035,7 @@ export function ScheduleScreen() {
           </View>
         </View>
       </Modal>
-    </AppScreen>
+    </AppScreen >
   );
 }
 
@@ -2460,7 +2473,7 @@ export function AssignmentsScreen({
       ) : null}
       <Modal visible={coursePickerOpen} transparent animationType="fade" onRequestClose={() => setCoursePickerOpen(false)}>
         <Pressable style={styles.assignSheetBackdrop} onPress={() => setCoursePickerOpen(false)} accessibilityLabel="Đóng">
-          <Pressable style={styles.assignSheet} onPress={() => {}}>
+          <Pressable style={styles.assignSheet} onPress={() => { }}>
             <View style={styles.rowBetween}>
               <Text style={styles.cardTitle}>Chọn khóa học</Text>
               <Pressable onPress={() => setCoursePickerOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng"><X size={20} color={colors.muted} /></Pressable>
@@ -2617,23 +2630,23 @@ export function AssignmentsScreen({
               {attachedFileUrl.trim() ? <Pressable onPress={() => { void openAssignmentLink(attachedFileUrl.trim(), 'Tệp đề bài'); }} style={styles.fileLinkRow} accessibilityRole="button"><Link2 size={17} color={colors.brand} /><Text numberOfLines={1} style={styles.fileLinkText}>Xem trước liên kết</Text></Pressable> : null}
               {editingAssignmentId ? <Text style={styles.metaText}>Khóa học: {course}</Text> : null}
               {!editingAssignmentId ? (<>
-              <Text style={styles.fieldLabel}>Khóa học</Text>
-              {studentsResource.loading ? <Text style={styles.note}>Đang tải khóa học…</Text> : null}
-              {studentsResource.error ? <Text style={styles.note}>Không tải được khóa học: {studentsResource.error}</Text> : null}
-              {courses.length ? (
+                <Text style={styles.fieldLabel}>Khóa học</Text>
+                {studentsResource.loading ? <Text style={styles.note}>Đang tải khóa học…</Text> : null}
+                {studentsResource.error ? <Text style={styles.note}>Không tải được khóa học: {studentsResource.error}</Text> : null}
+                {courses.length ? (
+                  <View style={styles.choiceWrap}>
+                    {courses.map((courseOption) => <Pressable key={courseOption} onPress={() => { setCourse(courseOption); setAssignedStudentIds([]); }} style={[styles.choice, course === courseOption && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: course === courseOption }}><Text style={[styles.choiceText, course === courseOption && styles.choiceTextActive]}>{courseOption}</Text></Pressable>)}
+                  </View>
+                ) : <Text style={styles.note}>Chưa có khóa học được phân công.</Text>}
+                <Text style={styles.fieldLabel}>Đối tượng giao</Text>
                 <View style={styles.choiceWrap}>
-                  {courses.map((courseOption) => <Pressable key={courseOption} onPress={() => { setCourse(courseOption); setAssignedStudentIds([]); }} style={[styles.choice, course === courseOption && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: course === courseOption }}><Text style={[styles.choiceText, course === courseOption && styles.choiceTextActive]}>{courseOption}</Text></Pressable>)}
+                  <Pressable onPress={() => setAssignToAll(true)} style={[styles.choice, assignToAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: assignToAll }}><Text style={[styles.choiceText, assignToAll && styles.choiceTextActive]}>Cả lớp ({courseStudents.length || '-'})</Text></Pressable>
+                  <Pressable onPress={() => setAssignToAll(false)} style={[styles.choice, !assignToAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: !assignToAll }}><Text style={[styles.choiceText, !assignToAll && styles.choiceTextActive]}>Chọn học viên</Text></Pressable>
                 </View>
-              ) : <Text style={styles.note}>Chưa có khóa học được phân công.</Text>}
-              <Text style={styles.fieldLabel}>Đối tượng giao</Text>
-              <View style={styles.choiceWrap}>
-                <Pressable onPress={() => setAssignToAll(true)} style={[styles.choice, assignToAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: assignToAll }}><Text style={[styles.choiceText, assignToAll && styles.choiceTextActive]}>Cả lớp ({courseStudents.length || '—'})</Text></Pressable>
-                <Pressable onPress={() => setAssignToAll(false)} style={[styles.choice, !assignToAll && styles.choiceActive]} accessibilityRole="button" accessibilityState={{ selected: !assignToAll }}><Text style={[styles.choiceText, !assignToAll && styles.choiceTextActive]}>Chọn học viên</Text></Pressable>
-              </View>
-              {!assignToAll ? courseStudents.map((student) => {
-                const selectedStudent = assignedStudentIds.includes(student.id);
-                return <Pressable key={student.id} onPress={() => setAssignedStudentIds((current) => selectedStudent ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.choice, selectedStudent && styles.choiceActive]} accessibilityRole="checkbox" accessibilityState={{ checked: selectedStudent }}><Text style={[styles.choiceText, selectedStudent && styles.choiceTextActive]}>{selectedStudent ? '✓  ' : ''}{student.name} · {student.course}</Text></Pressable>;
-              }) : null}
+                {!assignToAll ? courseStudents.map((student) => {
+                  const selectedStudent = assignedStudentIds.includes(student.id);
+                  return <Pressable key={student.id} onPress={() => setAssignedStudentIds((current) => selectedStudent ? current.filter((id) => id !== student.id) : [...current, student.id])} style={[styles.choice, selectedStudent && styles.choiceActive]} accessibilityRole="checkbox" accessibilityState={{ checked: selectedStudent }}><Text style={[styles.choiceText, selectedStudent && styles.choiceTextActive]}>{selectedStudent ? '✓  ' : ''}{student.name} · {student.course}</Text></Pressable>;
+                }) : null}
               </>) : null}
               <Pressable
                 onPress={() => setShowDeadlineCalendar((visible) => !visible)}
@@ -2724,8 +2737,9 @@ export function AssignmentsScreen({
             </View>
           </View>
         </View>
-      </Modal>
-      {isTeacher && user?.previewMode ? <Text style={styles.footnote}>Bản xem trước không gửi dữ liệu lên hệ thống.</Text> : null}
+      </Modal >
+      {isTeacher && user?.previewMode ? <Text style={styles.footnote}>Bản xem trước không gửi dữ liệu lên hệ thống.</Text> : null
+      }
     </>
   );
   return (
@@ -3139,7 +3153,8 @@ export function NotificationsScreen({ overlay = false, onClose }: { overlay?: bo
             <Text style={styles.readAllText}>Tiếp</Text>
           </Pressable>
         </View>
-      ) : null}
+      ) : null
+      }
     </>
   );
   if (overlay) {
@@ -3481,7 +3496,7 @@ export function StudentsScreen() {
               <View style={styles.studentMetricGrid}>
                 <View style={styles.studentMetric}><Text style={styles.studentMetricValue}>{selectedStudent.completedSessions ?? 0}/{selectedStudent.totalSessions ?? 0}</Text><Text style={styles.studentMetricLabel}>Buổi đã học</Text></View>
                 <View style={styles.studentMetric}><Text style={styles.studentMetricValue}>{selectedStudent.remainingSessions ?? 0}</Text><Text style={styles.studentMetricLabel}>Buổi còn lại</Text></View>
-                <View style={styles.studentMetric}><Text style={styles.studentMetricValue}>{selectedStudent.avgGrade == null ? '—' : `${selectedStudent.avgGrade}/10`}</Text><Text style={styles.studentMetricLabel}>Điểm trung bình</Text></View>
+                <View style={styles.studentMetric}><Text style={styles.studentMetricValue}>{selectedStudent.avgGrade == null ? '-' : `${selectedStudent.avgGrade}/10`}</Text><Text style={styles.studentMetricLabel}>Điểm trung bình</Text></View>
               </View>
               <ProgressBar value={selectedStudent.progress} />
               <Text style={styles.metaText}>Tiến độ khóa đang chọn: {selectedStudent.progress}% · {selectedStudent.lastClass}</Text>
@@ -3742,7 +3757,7 @@ export function AttendanceScreen() {
         '- Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa.',
         '- Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.',
         '',
-        'Lý do: Quá hạn cửa sổ điểm danh 1 giờ của giảng viên — nhờ Admin xử lý điểm danh bù.',
+        'Lý do: Quá hạn cửa sổ điểm danh 1 giờ của giảng viên - nhờ Admin xử lý điểm danh bù.',
       ].join('\n');
       await messageService.send(admin, content, user);
       mobileMakeupRequestsSent.add(`${user.id}:${selectedSession.id}`);
@@ -3837,7 +3852,7 @@ export function AttendanceScreen() {
         <ScrollView contentContainerStyle={styles.attendanceOverview} showsVerticalScrollIndicator={false}>
           {pendingAttendance && !attendanceNoticeDismissed ? (
             <View style={styles.attendancePendingNotice}>
-              <Text style={styles.attendancePendingText}>Đã ghi nhận — còn {confirmRemaining} giây để hủy điểm danh trước khi tính buổi.</Text>
+              <Text style={styles.attendancePendingText}>Đã ghi nhận - còn {confirmRemaining} giây để hủy điểm danh trước khi tính buổi.</Text>
               <Pressable onPress={() => setAttendanceNoticeDismissed(true)} accessibilityRole="button" accessibilityLabel="Ẩn thông báo" style={styles.attendanceNoticeClose}>
                 <X size={16} color="#64748B" />
               </Pressable>
@@ -3849,7 +3864,7 @@ export function AttendanceScreen() {
               <View style={styles.attendanceStudentCopy}>
                 <Text numberOfLines={2} style={styles.attendanceStudentName}>{selectedStudent.name}</Text>
                 <Text numberOfLines={2} style={styles.attendanceStudentMeta}>{selectedSession.courseName || selectedStudent.course}</Text>
-                <Text numberOfLines={2} style={styles.attendanceStudentMeta}>{selectedSession.dateLabel || selectedSession.date || '—'} · {selectedSession.time || '—'}</Text>
+                <Text numberOfLines={2} style={styles.attendanceStudentMeta}>{selectedSession.dateLabel || selectedSession.date || '-'} · {selectedSession.time || '-'}</Text>
               </View>
               <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Đóng điểm danh" style={styles.attendanceBackButton}>
                 <X size={18} color={colors.muted} />
@@ -3893,7 +3908,7 @@ export function AttendanceScreen() {
                 title={makeupRequestBusy
                   ? 'Đang gửi yêu cầu…'
                   : makeupRequestedScheduleId === selectedSession.id
-                    ? 'Đã gửi — chờ Admin'
+                    ? 'Đã gửi - chờ Admin'
                     : 'Yêu cầu điểm danh bù'}
                 disabled={makeupRequestBusy || makeupRequestedScheduleId === selectedSession.id}
                 onPress={confirmAttendanceMakeupRequest}
@@ -4010,8 +4025,8 @@ export function AttendanceScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
-    </AppScreen>
+      </Modal >
+    </AppScreen >
   );
 }
 
@@ -4028,11 +4043,11 @@ export function GradesScreen() {
         <View style={styles.summaryIcon}><WalletCards size={20} color={colors.brand} /></View>
         <View style={styles.rowCopy}>
           <Text style={styles.cardTitle}>Lịch sử kết quả</Text>
-          <Text style={styles.metaText}>{courses.length || '—'} khóa học · {records.length || '—'} kết quả</Text>
+          <Text style={styles.metaText}>{courses.length || '-'} khóa học · {records.length || '-'} kết quả</Text>
         </View>
         <GraduationCap size={22} color={colors.brand} />
       </Card>
-      {records.some((record) => record.qaFixture) ? <Text style={styles.note}>QA fixture — điểm minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
+      {records.some((record) => record.qaFixture) ? <Text style={styles.note}>QA fixture - điểm minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
       {resource.loading ? <LoadingSkeleton /> : null}
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {courses.map((course) => (
@@ -4042,7 +4057,7 @@ export function GradesScreen() {
             <View key={record.id} style={styles.gradeHistoryRow}>
               <View style={styles.rowCopy}>
                 <Text style={styles.cardTitle}>{record.assessment}</Text>
-                <Text style={styles.metaText}>{record.date || '—'}</Text>
+                <Text style={styles.metaText}>{record.date || '-'}</Text>
                 {record.feedback ? <Text style={styles.metaText}>Nhận xét: {record.feedback}</Text> : null}
               </View>
               <View style={styles.gradeResult}>
@@ -4055,7 +4070,7 @@ export function GradesScreen() {
       ))}
       <Card style={styles.examNotice}>
         <Text style={styles.cardTitle}>Phòng thi / Điểm thi</Text>
-        <Text style={styles.muted}>WEB-ONLY TẠM THỜI — vui lòng thực hiện bài thi và xem kết quả thi trên website.</Text>
+        <Text style={styles.muted}>WEB-ONLY TẠM THỜI - vui lòng thực hiện bài thi và xem kết quả thi trên website.</Text>
       </Card>
       {!resource.loading && !resource.error && !records.length ? <EmptyState title="Chưa có dữ liệu điểm số" message="Bài nộp, trắc nghiệm và điểm sẽ hiển thị tại đây." /> : null}
     </AppScreen>
@@ -4096,11 +4111,11 @@ export function ProfileScreen() {
   const studentProfile = studentProfileResource.data;
   const profileStudent = studentProfile?.student;
   const profileTeacher = studentProfile?.teacher;
-  const studentText = (key: string, fallback = '—') => {
+  const studentText = (key: string, fallback = '-') => {
     const value = previewStudentUpdates[key] ?? profileStudent?.[key];
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
   };
-  const teacherText = (key: string, fallback = '—') => {
+  const teacherText = (key: string, fallback = '-') => {
     const value = profileTeacher?.[key];
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
   };
@@ -4110,7 +4125,7 @@ export function ProfileScreen() {
     if (['pending', 'chờ duyệt'].includes(status)) return 'Chờ duyệt';
     if (['suspended', 'tạm khóa'].includes(status)) return 'Tạm khóa';
     if (['inactive', 'ngừng hoạt động'].includes(status)) return 'Ngừng hoạt động';
-    return status || '—';
+    return status || '-';
   })();
   const enrollments = studentProfile?.enrollments || [];
   const toggleStudentSection = (section: keyof typeof openStudentSections) => {
@@ -4198,7 +4213,7 @@ export function ProfileScreen() {
               color={user?.avatarColor}
             />
             <Text style={styles.teacherProfileEyebrow}>Hồ sơ cá nhân</Text>
-            <Text style={styles.teacherProfileName}>{teacherText('name', user?.name || '—')}</Text>
+            <Text style={styles.teacherProfileName}>{teacherText('name', user?.name || '-')}</Text>
             <Text style={styles.teacherProfileSubtitle}>
               {[user?.branch, user?.phone].filter(Boolean).join(' · ') || 'Thông tin giảng viên'}
             </Text>
@@ -4213,9 +4228,9 @@ export function ProfileScreen() {
             <Card style={styles.teacherDetails}>
               <SectionHeading title="Thông tin giảng dạy" />
               {[
-                ['Điểm test', typeof profileTeacher?.testScore === 'number' ? `${profileTeacher.testScore}` : '—'],
-                ['Lương/buổi', typeof profileTeacher?.baseSalaryPerSession === 'number' ? formatCurrency(profileTeacher.baseSalaryPerSession) : '—'],
-              ].filter(([, value]) => value !== '—').map(([label, value]) => (
+                ['Điểm test', typeof profileTeacher?.testScore === 'number' ? `${profileTeacher.testScore}` : '-'],
+                ['Lương/buổi', typeof profileTeacher?.baseSalaryPerSession === 'number' ? formatCurrency(profileTeacher.baseSalaryPerSession) : '-'],
+              ].filter(([, value]) => value !== '-').map(([label, value]) => (
                 <View key={label} style={styles.teacherProfileField}>
                   <Text style={styles.teacherProfileLabel}>{label}</Text>
                   <Text style={styles.teacherProfileValue}>{value}</Text>
@@ -5140,13 +5155,13 @@ const styles = StyleSheet.create({
   assignToolbar: { flexDirection: 'row', alignItems: 'stretch', gap: spacing.sm, marginBottom: spacing.sm },
   assignCoursePill: {
     flex: 1, minWidth: 0, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md,
-    borderWidth: 2, borderColor: '#FECACA', borderRadius: radius.md, backgroundColor: '#FEF2F2',
+    borderWidth: 2, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.brandSoft,
   },
   assignCourseCaption: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
-  assignCourseName: { color: '#B91C1C', fontSize: 14, fontWeight: '900' },
+  assignCourseName: { color: colors.brandDark, fontSize: 14, fontWeight: '900' },
   assignCreateButton: {
     flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.md,
-    backgroundColor: colors.brand, boxShadow: '0px 6px 14px rgba(220, 38, 38, 0.28)',
+    backgroundColor: colors.brand, boxShadow: '0px 6px 14px rgba(4, 120, 87, 0.28)',
   } as never,
   assignCreateText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 16 },
   assignSheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2, 6, 23, 0.5)' },
@@ -5159,9 +5174,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md,
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md,
   },
-  assignSheetOptionActive: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  assignSheetOptionActive: { borderColor: '#A7F3D0', backgroundColor: colors.brandSoft },
   assignSheetOptionText: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '800' },
-  assignSheetOptionTextActive: { color: '#B91C1C' },
+  assignSheetOptionTextActive: { color: colors.brandDark },
   teacherAssignmentCard: { gap: spacing.sm, padding: spacing.md },
   teacherAssignmentHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
   teacherAssignmentTitleWrap: { flex: 1, minWidth: 0, gap: 3 },
@@ -5339,10 +5354,10 @@ const styles = StyleSheet.create({
   teacherDiaryMakeupButtonText: { color: colors.surface },
   teacherDiaryMakeupButtonTextSent: { color: '#64748B' },
   teacherDiaryAttendanceButtonDisabled: { backgroundColor: '#E2E8F0' },
-  teacherDiaryAttendanceButtonSubmitted: { backgroundColor: '#FEE2E2' },
+  teacherDiaryAttendanceButtonSubmitted: { backgroundColor: colors.brandSoft },
   teacherDiaryAttendanceButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '800' },
   teacherDiaryAttendanceButtonTextDisabled: { color: '#64748B' },
-  teacherDiaryAttendanceButtonTextSubmitted: { color: '#B91C1C' },
+  teacherDiaryAttendanceButtonTextSubmitted: { color: colors.brandDark },
   teacherDiaryCancelButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#B91C1C' },
   teacherDiaryCancelButtonText: { color: colors.surface, fontSize: typography.micro, fontWeight: '800' },
   studentDiaryFilterContainer: { borderBottomWidth: 1, borderBottomColor: colors.line },

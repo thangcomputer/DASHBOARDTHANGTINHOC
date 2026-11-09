@@ -24,10 +24,11 @@ function formatWeekDay(key: string) {
 
 function gapMessage(me: LearningLeaderboard['me']) {
   if (!me.rank) return '';
-  if (me.rank === 1) return 'Bạn đang dẫn đầu bảng — giữ vững phong độ nhé!';
+  if (me.rank === 1) return 'Bạn đang dẫn đầu bảng - giữ vững phong độ nhé!';
   const ahead = me.ahead;
   if (!ahead) return '';
-  if (ahead.goalDays > me.goalDays) return `Đạt thêm ${ahead.goalDays - me.goalDays} ngày mục tiêu để vượt hạng #${ahead.rank}.`;
+  if (ahead.goalDays > me.goalDays) return `Đạt thêm ${ahead.goalDays - me.goalDays
+    } ngày mục tiêu để vượt hạng #${ahead.rank}.`;
   return `Học thêm ${formatStudyMinutes(ahead.minutes - me.minutes + 1)} để vượt hạng #${ahead.rank}.`;
 }
 
@@ -90,10 +91,10 @@ export function LearningLeaderboardCard() {
 
       <View style={styles.list}>
         {data && !top.length ? (
-          <Text style={styles.empty}>Tuần này chưa có ai trên bảng — hãy là người đầu tiên!</Text>
+          <Text style={styles.empty}>Tuần này chưa có ai trên bảng - hãy là người đầu tiên!</Text>
         ) : null}
         {top.map((row) => (
-          <View key={`${row.rank}-${row.name}`} style={[styles.row, row.isMe ? styles.rowMe : row.rank <= 3 ? styles.rowPodium : null]}>
+          <View key={`${row.rank}-${row.name} `} style={[styles.row, row.isMe ? styles.rowMe : row.rank <= 3 ? styles.rowPodium : null]}>
             <RankBadge rank={row.rank} />
             <Avatar name={row.name} avatar={row.avatar} />
             <View style={styles.flex}>
@@ -101,28 +102,28 @@ export function LearningLeaderboardCard() {
                 <Text numberOfLines={1} style={styles.name}>{row.name}</Text>
                 {row.isMe ? <View style={styles.meTag}><Text style={styles.meTagText}>Bạn</Text></View> : null}
               </View>
-              <Text style={styles.sub}>{`Mục tiêu ${row.hoursPerDay} giờ/ngày`}</Text>
+              <Text style={styles.sub}>{`Mục tiêu ${row.hoursPerDay} giờ / ngày`}</Text>
             </View>
             <View style={styles.right}>
               <View style={styles.daysRow}>
                 <CheckCircle2 size={12} color="#059669" />
-                <Text style={styles.days}>{`${row.goalDays}/${data?.daysSoFar || 7} ngày`}</Text>
-              </View>
+                <Text style={styles.days}>{`${row.goalDays} /${data?.daysSoFar || 7} ngày`}</Text >
+              </View >
               <Text style={styles.minutes}>
                 {formatStudyMinutes(row.minutes)}
                 {row.xp > 0 ? <Text style={styles.xp}>{` · ${row.xp} XP`}</Text> : null}
               </Text>
-            </View>
-          </View>
+            </View >
+          </View >
         ))}
-      </View>
+      </View >
 
       {data && me ? (
         <View style={styles.footer}>
           {!me.hasGoal ? (
             <Text style={styles.footerText}>Đặt mục tiêu ở thẻ Mục tiêu học để có tên trên bảng xếp hạng.</Text>
           ) : !me.rank ? (
-            <Text style={styles.footerText}>Tuần này bạn chưa học phút nào — vào bài học ngay để lên bảng!</Text>
+            <Text style={styles.footerText}>Tuần này bạn chưa học phút nào - vào bài học ngay để lên bảng!</Text>
           ) : (
             <View style={[styles.mine, { backgroundColor: meInTop ? '#ECFDF5' : '#FEF2F2' }]}>
               <Text style={[styles.mineRank, { color: meInTop ? '#047857' : '#B91C1C' }]}>{`#${me.rank}`}</Text>
@@ -136,7 +137,7 @@ export function LearningLeaderboardCard() {
           )}
         </View>
       ) : null}
-    </View>
+    </View >
   );
 }
 
@@ -154,18 +155,18 @@ const styles = StyleSheet.create({
   list: { gap: 6 },
   empty: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: spacing.md, backgroundColor: '#F8FAFC', borderRadius: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12 },
-  rowMe: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FEE2E2' },
+  rowMe: { backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: colors.line },
   rowPodium: { backgroundColor: 'rgba(255, 251, 235, 0.6)' },
   rank: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rankPlain: { backgroundColor: '#F1F5F9' },
   rankPlainText: { color: '#64748B', fontSize: 12, fontWeight: '900' },
   rankText: { fontSize: 12, fontWeight: '900' },
   avatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: '#FFFFFF' },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2' },
-  avatarText: { color: '#B91C1C', fontSize: 14, fontWeight: '900' },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
+  avatarText: { color: colors.brandDark, fontSize: 14, fontWeight: '900' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flexShrink: 1, color: colors.ink, fontSize: 14, fontWeight: '800' },
-  meTag: { backgroundColor: '#DC2626', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  meTag: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
   meTagText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   sub: { color: '#94A3B8', fontSize: 12 },
   right: { alignItems: 'flex-end' },

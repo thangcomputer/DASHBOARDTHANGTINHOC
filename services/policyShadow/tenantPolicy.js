@@ -1,7 +1,7 @@
 /**
  * Policy shadow for LIVE /api/tenants (Wave 6.13).
  * Legacy gate: authMiddleware + isSuperAdmin ONLY.
- * No permission from constants/permissions.js — do not invent manage_tenants.
+ * No permission from constants/permissions.js - do not invent manage_tenants.
  * No branchFilter on these routes. No per-tenant ownership.
  * Cross-tenant: SUPER can access any tenant (list/get/stats/update/assign).
  * Missing resource → handler 404 after authz ALLOW.

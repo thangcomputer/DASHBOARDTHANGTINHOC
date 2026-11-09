@@ -60,7 +60,7 @@ function classifyStudentPaidBucket(student) {
 
 /**
  * Mongo Schema: enrollments.paid / student.paid are Boolean.
- * Only use true / { $ne: true } — strings like 'Đã đóng phí' cause CastError.
+ * Only use true / { $ne: true } - strings like 'Đã đóng phí' cause CastError.
  */
 const elemPaidLearning = {
   status: { $nin: ['cancelled', 'refunded'] },

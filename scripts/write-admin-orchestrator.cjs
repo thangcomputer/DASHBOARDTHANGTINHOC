@@ -273,7 +273,7 @@ export function useAdminDashboardState() {
     };
 
     const onStudentNew = (data) => {
-      toast.success(\`Học viên mới: \${data?.name || 'N/A'} — \${data?.course || ''}\`);
+      toast.success(\`Học viên mới: \${data?.name || 'N/A'} - \${data?.course || ''}\`);
       bumpAdminViews();
     };
 

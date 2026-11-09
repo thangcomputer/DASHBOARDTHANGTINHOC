@@ -1,5 +1,5 @@
 /**
- * Phase 7.22 — Controlled cutover + production activation for /api/quizzes
+ * Phase 7.22 - Controlled cutover + production activation for /api/quizzes
  *
  * LIVE:
  *   auth → policyShadowQuiz → quizzesCutoverGate → handler (auth-only actions)
@@ -7,7 +7,7 @@
  *     → Legacy checkPermission(MANAGE_TRAINING) when not Policy-primary
  *
  * Delete ownership / submit / list scoping remain handler-owned.
- * modules/exam/routes/quizRoutes.js is unmounted — not migrated.
+ * modules/exam/routes/quizRoutes.js is unmounted - not migrated.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -75,10 +75,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -174,7 +174,7 @@ function runGate(action, { user, policyShadow }, env) {
       status(c) { statusCode = c; return this; },
       json(b) { bodyOut = b; finish(); return this; },
     };
-    // Legacy admin_read invokes async checkPermission — stub Teacher via next-only path when POLICY
+    // Legacy admin_read invokes async checkPermission - stub Teacher via next-only path when POLICY
     Promise.resolve(mw(req, res, () => { nextCount += 1; finish(); })).catch((err) => {
       statusCode = 500;
       bodyOut = { message: err.message };
@@ -407,7 +407,7 @@ test('Phase7.22 rollback: remove quizzes → LEGACY; prior stay POLICY; restore 
 test('Phase7.22 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'assignments', 'evaluations', 
+    'employees', 'assignments', 'evaluations',
     'proctor',
   ];
   for (const fam of legacyFamilies) {
@@ -491,8 +491,8 @@ test('Phase7.22 functional smoke: list/admin authz; mutations NOT EXECUTED', () 
     'ALLOW',
   );
   assert.equal(
-    'NOT EXECUTED — create/delete/submit production mutation',
-    'NOT EXECUTED — create/delete/submit production mutation',
+    'NOT EXECUTED - create/delete/submit production mutation',
+    'NOT EXECUTED - create/delete/submit production mutation',
   );
 });
 

@@ -1,5 +1,5 @@
 /**
- * Phase 7.29 — Controlled cutover + production activation for /api/employees
+ * Phase 7.29 - Controlled cutover + production activation for /api/employees
  *
  * LIVE: auth → branchFilter → policyShadowEmployee → employeesCutoverGate → handler.
  * Legacy checkPermission(MANAGE_HR) retained inside employeesCutoverGate.
@@ -62,10 +62,10 @@ function sub(opts = {}) {
     actorDoc: role === 'teacher' || role === 'student'
       ? { role, adminRole: null, permissions: [] }
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [PERMISSIONS.MANAGE_HR],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [PERMISSIONS.MANAGE_HR],
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -362,7 +362,7 @@ test('Phase7.29 rollback A/B/C: remove employees → LEGACY; global OFF; restore
 
 test('Phase7.29 cross-family isolation', () => {
   for (const fam of [
-    'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers', 
+    'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
   }
@@ -370,7 +370,7 @@ test('Phase7.29 cross-family isolation', () => {
     'backups', 'monitoring', 'tenants', 'system-logs', 'ai', 'workflows',
     'builder', 'courses', 'training', 'training-lms', 'branches', 'notifications',
     'blog', 'feed', 'files', 'settings', 'messages', 'schedules', 'quizzes',
-    'assignments', 'proctor', 'evaluations', 'bi', 'analytics', 'staff', 'employees', 
+    'assignments', 'proctor', 'evaluations', 'bi', 'analytics', 'staff', 'employees',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.POLICY, fam);
   }
@@ -433,8 +433,8 @@ test('Phase7.29 functional smoke: list/stats authz; mutations NOT EXECUTED', () 
   assert.equal(parity('list', sub({ permissions: [PERMISSIONS.MANAGE_HR] })).policy.decision, 'ALLOW');
   assert.equal(parity('stats', sub({ permissions: [PERMISSIONS.MANAGE_HR] })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — employees create/update/delete/pay production mutations',
-    'NOT EXECUTED — employees create/update/delete/pay production mutations',
+    'NOT EXECUTED - employees create/update/delete/pay production mutations',
+    'NOT EXECUTED - employees create/update/delete/pay production mutations',
   );
 });
 

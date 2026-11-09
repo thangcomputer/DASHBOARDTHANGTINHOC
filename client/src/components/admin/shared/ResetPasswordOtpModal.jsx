@@ -274,11 +274,10 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
                 <p className="text-sm text-slate-500 text-center py-8">Đang tạo OTP…</p>
               ) : (
                 <div className="space-y-3">
-                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
-                    otpCountdown > 30 ? 'bg-emerald-50 text-emerald-600'
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${otpCountdown > 30 ? 'bg-emerald-50 text-emerald-600'
                       : otpCountdown > 0 ? 'bg-amber-50 text-amber-600'
                         : 'bg-red-50 text-red-600'
-                  }`}
+                    }`}
                   >
                     <Clock size={14} />
                     {otpCountdown > 0
@@ -289,7 +288,7 @@ export default function ResetPasswordOtpModal({ modal, onClose }) {
                   {otpResult && (
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3.5 space-y-2">
                       <p className="flex items-center gap-2 font-semibold text-emerald-800 text-sm">
-                        <CheckCircle2 size={16} /> OTP đã tạo — không hiện mã trên màn hình
+                        <CheckCircle2 size={16} /> OTP đã tạo - không hiện mã trên màn hình
                       </p>
                       <p className="text-xs text-slate-700">
                         Người nhận: <strong>{otpResult.name}</strong>

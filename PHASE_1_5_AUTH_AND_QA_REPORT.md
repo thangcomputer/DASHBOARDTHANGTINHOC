@@ -1,4 +1,4 @@
-# Báo cáo Giai đoạn 1.5 — Phone Auth và QA
+# Báo cáo Giai đoạn 1.5 - Phone Auth và QA
 
 Ngày kiểm chứng: 31/08/2026
 
@@ -106,7 +106,7 @@ Ma trận này **chưa tạo bằng chứng PASS** vì Docker health gate không
 
 Production bắt buộc cấu hình:
 
-- `MASTER_ADMIN_PHONE` — số Việt Nam hợp lệ, không hardcode;
+- `MASTER_ADMIN_PHONE` - số Việt Nam hợp lệ, không hardcode;
 - `MASTER_ADMIN_PASSWORD` hoặc `SystemSettings.adminPasswordHash`;
 - các JWT/Redis/SMTP/SePay variables đã có trong validator.
 

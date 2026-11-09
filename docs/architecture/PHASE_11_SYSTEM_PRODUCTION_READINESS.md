@@ -1,4 +1,4 @@
-# PHASE 11 — SYSTEM PRODUCTION READINESS
+# PHASE 11 - SYSTEM PRODUCTION READINESS
 
 ## Executive Verdict
 
@@ -8,11 +8,11 @@
 
 | Claim | Status |
 |---|---|
-| Messaging 1,000 concurrent sockets (single-node) | **PROVEN** — Phase 10 |
-| Full ERP/LMS 1,000 *active* users (HTTP + Socket + dashboards + LMS + finance) | **NOT PROVEN** — no full-journey load test |
+| Messaging 1,000 concurrent sockets (single-node) | **PROVEN** - Phase 10 |
+| Full ERP/LMS 1,000 *active* users (HTTP + Socket + dashboards + LMS + finance) | **NOT PROVEN** - no full-journey load test |
 | Single-node operational capacity (architecture) | **READY WITH CONDITIONS** |
 | Multi-instance horizontal scale | **NOT PROVEN** |
-| Enterprise RBAC as LIVE primary | **NOT READY** (shadow / BLOCKED — by design) |
+| Enterprise RBAC as LIVE primary | **NOT READY** (shadow / BLOCKED - by design) |
 
 Phase 11 is **read-only**. No application architecture was changed in this phase. Evidence reuses Phase 8–10 messaging results, `docs/SECURITY_CONTRACT_FREEZE.md`, `docs/TECHNICAL.md`, `docs/rbac/*`, live code paths under `server.js` / `middleware/auth.js` / finance & LMS routes, local artifacts (`artifacts/rbac-readiness-819.json`, `artifacts/phase10-load-evidence.json`), and deep follow-up code audits (auth/RBAC/tenant, Redis/Mongo/FE/obs, finance/LMS/scheduling).
 
@@ -24,7 +24,7 @@ Phase 11 is **read-only**. No application architecture was changed in this phase
 
 **Live authorization authority:** `middleware/auth.js` + `constants/permissions.js` + `branchFilter` (+ Policy Shadow / CutoverGate on selected modules).
 
-**Enterprise RBAC / `authorize()`:** present in `modules/*` stranglers and shadow catalogs — **not** LIVE primary (`docs/rbac/enterprise-rbac-contract.md`, `artifacts/rbac-readiness-819.json` → `ENTERPRISE_PRIMARY_READY=NO`).
+**Enterprise RBAC / `authorize()`:** present in `modules/*` stranglers and shadow catalogs - **not** LIVE primary (`docs/rbac/enterprise-rbac-contract.md`, `artifacts/rbac-readiness-819.json` → `ENTERPRISE_PRIMARY_READY=NO`).
 
 **Optional infrastructure:** Redis (`REDIS_URL`) for token blacklist, cache, Socket.IO adapter, presence, BullMQ. Without Redis: in-memory fallbacks + inline jobs.
 
@@ -71,10 +71,10 @@ Features that **exist** and matter under concurrency:
 | STUDENT | Y | Y (student) | Y | Y (policy) | Y training/exam | Y own | via schedule | Y | Y | Y |
 | TEACHER | Y | Y | Y | Y | Y training + teach | Y | mark/view | grade/submit paths | Y | Y |
 | STAFF | Y | Y admin | Y | Y | manage | Y branch | Y | manage | Y | Y |
-| SUPPORT | Y | Y | Y | Y (wide) | limited | limited | — | — | Y | Y |
+| SUPPORT | Y | Y | Y | Y (wide) | limited | limited | - | - | Y | Y |
 | ADMIN (HIGH/SUPER) | Y | Y | Y | elevated | Y | Y | Y | Y | Y | Y |
 
-Journey load mix for ~1,000 concurrent **connected** users is estimated in §1,000 Active User Model — **not** equal to 1,000 simultaneous writers.
+Journey load mix for ~1,000 concurrent **connected** users is estimated in §1,000 Active User Model - **not** equal to 1,000 simultaneous writers.
 
 ---
 
@@ -82,9 +82,9 @@ Journey load mix for ~1,000 concurrent **connected** users is estimated in §1,0
 
 | Concern | Evidence | Complexity |
 |---|---|---|
-| Login / JWT create | `routes/authRoutes.js` — signed access + refresh | O(1) crypto + 1 user lookup |
+| Login / JWT create | `routes/authRoutes.js` - signed access + refresh | O(1) crypto + 1 user lookup |
 | JWT validate | `middleware/auth.js` | O(1) verify + blacklist check |
-| Blacklist | `middleware/tokenBlacklist.js` — Redis if ready else Map | O(1) |
+| Blacklist | `middleware/tokenBlacklist.js` - Redis if ready else Map | O(1) |
 | Refresh / logout | auth routes + blacklist TTL | O(1) |
 | CAPTCHA | auth routes (login protection) | O(1) |
 | MFA | optional MFA token path in authRoutes | O(1) |
@@ -94,9 +94,9 @@ Journey load mix for ~1,000 concurrent **connected** users is estimated in §1,0
 
 **Additional conditions (deep audit):**
 
-- CAPTCHA store is in-memory (`authRoutes`) — multi-instance sticky/broken CAPTCHA without shared store.
+- CAPTCHA store is in-memory (`authRoutes`) - multi-instance sticky/broken CAPTCHA without shared store.
 - `checkPermission` may re-read `Teacher` on each check despite JWT permissions (P3 cost).
-- Dual middleware stacks: LIVE `middleware/auth.js` (`req.user`) vs `shared/middleware/authenticate.js` (`req.currentUser`) for `modules/*` — drift risk.
+- Dual middleware stacks: LIVE `middleware/auth.js` (`req.user`) vs `shared/middleware/authenticate.js` (`req.currentUser`) for `modules/*` - drift risk.
 - `requireInternalToken` (`aud=internal`) is **not** applied to most admin APIs (login portal separation exists; token `aud` not globally enforced on `authMiddleware`).
 
 **Classification: READY WITH CONDITIONS** (multi-instance logout/CAPTCHA need Redis or shared store).
@@ -109,7 +109,7 @@ Journey load mix for ~1,000 concurrent **connected** users is estimated in §1,0
 
 **Shadow/Enterprise:** Dual-check / parity ready locally, but production evidence gates **BLOCKED** (`artifacts/rbac-readiness-819.json`). `authorize()` count on live `routes/**` = **0**.
 
-Remaining role-centric checks are **contractual LIVE**, not accidental debt alone — do not treat as auto-bugs. Wave 5.1 golden suites remain the branch/authz proof baseline.
+Remaining role-centric checks are **contractual LIVE**, not accidental debt alone - do not treat as auto-bugs. Wave 5.1 golden suites remain the branch/authz proof baseline.
 
 **Classification: READY WITH CONDITIONS** (LIVE contract frozen; Enterprise PRIMARY not approved).
 
@@ -121,7 +121,7 @@ Remaining role-centric checks are **contractual LIVE**, not accidental debt alon
 |---|---|---|
 | Messaging private DM | Fail-closed tenant gate in `MessagingPolicy` | **PROVEN** (Phase 5.1 / 8) |
 | Students/Teachers/Schedules (LIVE) | Primary scope = **branch**; tenant via Super `X-Tenant-Id` optional narrow | **READY WITH CONDITIONS** |
-| Invalid `X-Tenant-Id` | Soft-ignore (does not 400 whole API) — `middleware/auth.js` | Architectural condition |
+| Invalid `X-Tenant-Id` | Soft-ignore (does not 400 whole API) - `middleware/auth.js` | Architectural condition |
 | Missing tenant on messaging | DENY | Fail-closed |
 
 Platform-wide “missing tenant → DENY everywhere” is **not** the LIVE ERP contract (SECURITY freeze: student/teacher tenant “Not used”).
@@ -134,7 +134,7 @@ Platform-wide “missing tenant → DENY everywhere” is **not** the LIVE ERP c
 
 `branchFilter` fail-closed for STAFF/SUPPORT; SUPER empty filter; HIGH requires branch query or account branch.
 
-Students list/stats/pay/refund use `branchFilter` + `assertStudentBranchAccess`. Schedules merge `req.branchFilter`. Messaging STAFF↔teacher/student same-branch (+ soft-allow empty — recent pairing fix outside this phase).
+Students list/stats/pay/refund use `branchFilter` + `assertStudentBranchAccess`. Schedules merge `req.branchFilter`. Messaging STAFF↔teacher/student same-branch (+ soft-allow empty - recent pairing fix outside this phase).
 
 **Condition:** `assertStudentBranchAccess` / `assertTeacherBranchAccess` **pass when resource `branchId` is null** (partial vs strict “missing branch → DENY”).
 
@@ -176,7 +176,7 @@ Branch-forced data scope; permissions[] array; messaging SUPPORT/STAFF transport
 
 ## LMS
 
-Exists: courses, training LMS, lessons, progress (`TrainingProgress` unique `userId+lessonId` upsert — strong), quizzes, assignments. Many Sprint `docs/architecture/*-review.md` files are **template stubs** — weak secondary evidence; code is primary.
+Exists: courses, training LMS, lessons, progress (`TrainingProgress` unique `userId+lessonId` upsert - strong), quizzes, assignments. Many Sprint `docs/architecture/*-review.md` files are **template stubs** - weak secondary evidence; code is primary.
 
 | Hotspot | Evidence |
 |---|---|
@@ -185,13 +185,13 @@ Exists: courses, training LMS, lessons, progress (`TrainingProgress` unique `use
 | Course / training catalogs | Unbounded `find` when uncached / active list |
 | Certificate | No dedicated live certificate route found in `routes/` |
 
-**Classification: READY WITH CONDITIONS** — **load UNKNOWN**
+**Classification: READY WITH CONDITIONS** - **load UNKNOWN**
 
 ---
 
 ## Scheduling
 
-`Schedule` indexes: teacher/student/date, branch+date/status. Live mount: `routes/scheduleRoutes.js` only (`modules/attendance` CQRS copy **not** mounted — drift risk P4). Teacher clash checks on create. Realtime `attendance:locked` scoped emit.
+`Schedule` indexes: teacher/student/date, branch+date/status. Live mount: `routes/scheduleRoutes.js` only (`modules/attendance` CQRS copy **not** mounted - drift risk P4). Teacher clash checks on create. Realtime `attendance:locked` scoped emit.
 
 **Classification: READY WITH CONDITIONS**
 
@@ -204,7 +204,7 @@ Attendance = schedule `status === 'completed'`.
 | Path | Behavior |
 |---|---|
 | POST create completed | 12h cooldown query (TOCTOU possible) |
-| PUT complete | **No cooldown** — duplicate session / unlock inflation risk (**P2**) |
+| PUT complete | **No cooldown** - duplicate session / unlock inflation risk (**P2**) |
 | `checkAndUnlockExam` | Read-modify-write without version lock (**P3**) |
 
 **Classification: READY WITH CONDITIONS**
@@ -222,7 +222,7 @@ Protections observed (code):
 - SePay: HMAC/API key fail-closed in prod; `SepayWebhookEvent` unique `gatewayTxnId`; session `pending→paid` claim
 - Teacher payout: partial unique `idempotencyKey` + schedule claim pattern
 - `manage_finance` + `assertStudentBranchAccess`
-- CQRS `withTransaction` **exists but not used** on live finance routes — multi-doc steps use manual rollback
+- CQRS `withTransaction` **exists but not used** on live finance routes - multi-doc steps use manual rollback
 
 **Open correctness conditions:**
 
@@ -250,7 +250,7 @@ Protections observed (code):
 
 ## Messaging
 
-**PROVEN — 1,000 concurrent single-node** (Phase 10):
+**PROVEN - 1,000 concurrent single-node** (Phase 10):
 
 - 100/250/500/1000 PASS (steady DM)
 - wrong recipient 0; DM p95 135ms @1k; RSS ~303 MB; CPU ~10.8% peak
@@ -263,7 +263,7 @@ Protections observed (code):
 
 ## File Upload
 
-Multer **diskStorage** (not full memory buffer) with limits: messages/teachers 50MB, assignments 3MB, settings 5MB, training 25MB. Uploads auth middleware on `/uploads`. Concurrent large uploads can stress **disk/network**, less heap than memoryStorage — still a capacity condition.
+Multer **diskStorage** (not full memory buffer) with limits: messages/teachers 50MB, assignments 3MB, settings 5MB, training 25MB. Uploads auth middleware on `/uploads`. Concurrent large uploads can stress **disk/network**, less heap than memoryStorage - still a capacity condition.
 
 **Classification: READY WITH CONDITIONS**
 
@@ -299,7 +299,7 @@ Phase 10 Message writes **STABLE** at low/medium DM rates.
 | Presence hash/pubsub | Yes |
 | BullMQ | Separate ioredis connections |
 | Permission cache | Via **`infrastructure/redis/redisService.js`** (second client stack) |
-| API rate limit | **In-process** (`apiRateLimit.js`) — not Redis-shared |
+| API rate limit | **In-process** (`apiRateLimit.js`) - not Redis-shared |
 | Distributed locks | **None** |
 
 **Single-node without Redis:** works (Phase 10 messaging).  
@@ -330,13 +330,13 @@ Likely hotspots (architecture):
 4. Analytics / BI aggregations
 5. Notification unread under polling
 
-**Classification: READY WITH CONDITIONS** — platform API p95 **UNKNOWN** at 1k active
+**Classification: READY WITH CONDITIONS** - platform API p95 **UNKNOWN** at 1k active
 
 ---
 
 ## Frontend Performance
 
-Built assets (sample): code-split vendors (pdf ~516KB, xlsx ~415KB, index ~304KB, react ~257KB). SWR used (teachers, admin dashboard) — admin dashboard comments note avoiding 5s poll (429). SocketContext uses polling+websocket. Training LMS autosave intervals. Legacy `MessagesContext` unmounted (Phase 7).
+Built assets (sample): code-split vendors (pdf ~516KB, xlsx ~415KB, index ~304KB, react ~257KB). SWR used (teachers, admin dashboard) - admin dashboard comments note avoiding 5s poll (429). SocketContext uses polling+websocket. Training LMS autosave intervals. Legacy `MessagesContext` unmounted (Phase 7).
 
 **Classification: READY WITH CONDITIONS** (no 1k-user FE RUM evidence)
 
@@ -344,7 +344,7 @@ Built assets (sample): code-split vendors (pdf ~516KB, xlsx ~415KB, index ~304KB
 
 ## Error Handling
 
-- Messaging DM: structured codes `MESSAGING_*` (Phase 9) — good
+- Messaging DM: structured codes `MESSAGING_*` (Phase 9) - good
 - Many routes: Vietnamese text-only 4xx/5xx
 - Pino + correlation headers on HTTP
 - Socket connect still `console.log` (Phase 9/10 P3)
@@ -437,10 +437,10 @@ Estimated safe envelope from evidence: **messaging + light HTTP** on one Node �
 | P0 | **None** that break single-node data isolation in this audit |
 | P2 | Multi-instance logout/CAPTCHA/rate-limit not globally consistent without Redis (architectural) |
 | P2 | `aud=internal` not globally enforced on `authMiddleware` (portal separation exists; residual token-scope condition) |
-| — | Enterprise PRIMARY blocked — correct safety posture |
-| — | SePay HMAC + webhook event dedupe present |
+| - | Enterprise PRIMARY blocked - correct safety posture |
+| - | SePay HMAC + webhook event dedupe present |
 
-*(Recent STAFF→TEACHER soft-allow asymmetry was fixed in a prior turn — corrected pairing bug, not open Phase 11 defect.)*
+*(Recent STAFF→TEACHER soft-allow asymmetry was fixed in a prior turn - corrected pairing bug, not open Phase 11 defect.)*
 
 ---
 
@@ -518,8 +518,8 @@ Estimated safe envelope from evidence: **messaging + light HTTP** on one Node �
 
 ## Proven Capabilities
 
-- Messaging isolation (tenant/branch/support) — Phases 8  
-- Messaging 1,000 concurrent sockets single-node — Phase 10  
+- Messaging isolation (tenant/branch/support) - Phases 8  
+- Messaging 1,000 concurrent sockets single-node - Phase 10  
 - Ledger idempotency keys + unique index  
 - SePay verification + idempotent settle paths (code review)  
 - Branch filter contract for staff-scoped APIs  
@@ -572,6 +572,6 @@ Do **not** promote Enterprise RBAC to PRIMARY without production evidence gates.
 
 ## Next Phase
 
-**STOP** — await approval for Phase 12.
+**STOP** - await approval for Phase 12.
 
-Suggested Phase 12 themes (only if approved): staging full-journey load, Redis multi-instance proof, or presence/reconnect hardening — pick one, evidence-first.
+Suggested Phase 12 themes (only if approved): staging full-journey load, Redis multi-instance proof, or presence/reconnect hardening - pick one, evidence-first.

@@ -1,5 +1,5 @@
 /**
- * QA — Concurrent password (+CAPTCHA for internal) login.
+ * QA - Concurrent password (+CAPTCHA for internal) login.
  * Requires server with NODE_ENV=test CAPTCHA_BYPASS=1 for admin/staff CAPTCHA path.
  * Public HV/GV login does not require CAPTCHA.
  *
@@ -24,7 +24,7 @@ const results = [];
 
 function record(tc) {
   results.push(tc);
-  console.log(`[${tc.result}] ${tc.id} — ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
+  console.log(`[${tc.result}] ${tc.id} - ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
 }
 
 function req(method, p, { body, cookie, csrf } = {}) {
@@ -87,7 +87,7 @@ async function main() {
     id: 'CAPTCHA-00',
     name: 'Server exposes captcha answer (NODE_ENV=test + CAPTCHA_BYPASS=1)',
     result: bypassLive ? 'PASS' : 'WARN',
-    actual: bypassLive ? 'answer present' : 'answer hidden — internal concurrent login may fail unless bypass on server',
+    actual: bypassLive ? 'answer present' : 'answer hidden - internal concurrent login may fail unless bypass on server',
   });
 
   const students = await Student.find({ phone: /^096/ }).select('phone name').limit(30).lean();
@@ -120,7 +120,8 @@ async function main() {
     id: 'AUTH-CONC-02a',
     name: `Concurrent public login (${publicActors.length} HV+GV)`,
     result: pubOk === publicActors.length && publicActors.length > 0 ? 'PASS' : 'FAIL',
-    actual: `ok=${pubOk}/${publicActors.length} wall=${Date.now() - pubStarted}ms`,
+    actual: `ok=${pubOk}/${publicActors.length} wall=${Date.now() - pubStarted
+      }ms`,
   });
 
   // Internal concurrent (needs captcha / bypass)
@@ -144,22 +145,22 @@ async function main() {
   const intOk = intSettled.filter((x) => x.ok).length;
   record({
     id: 'AUTH-CONC-02b',
-    name: `Concurrent internal login (${internalActors.length} Admin+Staff)`,
+    name: `Concurrent internal login(${internalActors.length} Admin + Staff)`,
     result: !internalActors.length
       ? 'WARN'
       : (intOk === internalActors.length ? 'PASS' : (bypassLive ? 'FAIL' : 'WARN')),
-    actual: `ok=${intOk}/${internalActors.length} wall=${Date.now() - intStarted}ms sample=${intSettled[0]?.status}:${intSettled[0]?.msg || ''}`,
+    actual: `ok = ${intOk} / ${internalActors.length} wall = ${Date.now() - intStarted}ms sample = ${intSettled[0]?.status}: ${intSettled[0]?.msg || ''}`,
   });
 
   const totalActors = publicActors.length + internalActors.length;
   const totalOk = pubOk + intOk;
   record({
     id: 'AUTH-CONC-02',
-    name: `Concurrent password(+CAPTCHA) login summary (${totalActors} users)`,
+    name: `Concurrent password(+CAPTCHA) login summary(${totalActors} users)`,
     result: totalOk >= Math.min(totalActors, publicActors.length) && pubOk === publicActors.length
       ? (intOk === internalActors.length || !bypassLive ? (bypassLive && intOk === internalActors.length ? 'PASS' : (bypassLive ? 'FAIL' : 'PASS')) : 'FAIL')
       : 'FAIL',
-    actual: `ok=${totalOk}/${totalActors} public=${pubOk} internal=${intOk} bypass=${bypassLive}`,
+    actual: `ok = ${totalOk} / ${totalActors} public = ${pubOk} internal = ${intOk} bypass = ${bypassLive}`,
   });
 
   const pass = results.filter((r) => r.result === 'PASS').length;
@@ -167,22 +168,23 @@ async function main() {
   const md = [
     '# QA CAPTCHA Concurrent Login Report',
     '',
-    `**Date:** ${new Date().toISOString()}`,
-    `**API:** ${BASE}`,
-    `**CAPTCHA bypass live:** ${bypassLive}`,
-    `**Result:** ${pass} PASS / ${fail} FAIL`,
+    `** Date:** ${new Date().toISOString()}`,
+    `** API:** ${BASE}`,
+    `** CAPTCHA bypass live:** ${bypassLive}`,
+    `** Result:** ${pass} PASS / ${fail} FAIL`,
     '',
     '| ID | Name | Result | Actual |',
     '|----|------|--------|--------|',
-    ...results.map((r) => `| ${r.id} | ${r.name} | ${r.result} | ${String(r.actual || '').replace(/\|/g, '/')} |`),
+    ...results.map((r) => `| ${r.id} | ${r.name} | ${r.result} | ${String(r.actual || '').replace(/\|/g, '/')
+      } | `),
     '',
     '## Note',
     '- Public login không CAPTCHA.',
-    '- Internal cần `NODE_ENV=test` + `CAPTCHA_BYPASS=1` trên **server**.',
+    '- Internal cần `NODE_ENV = test` + `CAPTCHA_BYPASS = 1` trên **server**.',
     '',
   ].join('\n');
   fs.writeFileSync(OUT, md, 'utf8');
-  console.log(`\nWrote ${OUT}`);
+  console.log(`\nWrote ${OUT} `);
   await mongoose.disconnect();
   process.exit(fail ? 1 : 0);
 }

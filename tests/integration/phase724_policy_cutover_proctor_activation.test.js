@@ -1,9 +1,9 @@
 /**
- * Phase 7.24 — Controlled cutover + production activation for /api/proctor
+ * Phase 7.24 - Controlled cutover + production activation for /api/proctor
  *
  * LIVE: auth → policyShadowProctor → proctorCutoverGate → handler
  * events_user Legacy fallback: isAdmin; ingest/list remain service-owned.
- * modules/exam/routes/proctorRoutes.js is unmounted — not migrated.
+ * modules/exam/routes/proctorRoutes.js is unmounted - not migrated.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -62,10 +62,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -289,7 +289,7 @@ test('Phase7.24 rollback: remove proctor → LEGACY; prior stay POLICY; restore 
 test('Phase7.24 cross-family isolation', () => {
   for (const fam of [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'evaluations',  'bi',
+    'employees', 'evaluations', 'bi',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
   }
@@ -350,8 +350,8 @@ test('Phase7.24 side-effect audit: gate/policy have no mutations', () => {
 test('Phase7.24 functional smoke: authz only; ingest NOT EXECUTED', () => {
   assert.equal(parity('events_me', sub({ role: 'teacher', adminRole: null })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — proctor ingest/list production mutation',
-    'NOT EXECUTED — proctor ingest/list production mutation',
+    'NOT EXECUTED - proctor ingest/list production mutation',
+    'NOT EXECUTED - proctor ingest/list production mutation',
   );
 });
 

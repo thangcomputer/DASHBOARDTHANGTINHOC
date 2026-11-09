@@ -231,7 +231,7 @@ async function run() {
     leakSockets: allKeys,
   });
 
-  // Privacy: HV nhắn staff — super admin không được nhận realtime
+  // Privacy: HV nhắn staff - super admin không được nhận realtime
   console.log('\n→ privacy: student->staff (super admin must NOT receive)');
   const privacyContent = `[socket:privacy-student-staff] ${Date.now()}`;
   const privacyReceive = waitForEvent(

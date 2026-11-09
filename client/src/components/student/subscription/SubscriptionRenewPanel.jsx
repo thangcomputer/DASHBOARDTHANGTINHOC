@@ -13,7 +13,7 @@ const PLAN_TONES = {
   lifetime: 'from-red-500 to-rose-700',
 };
 
-/** Chọn gói (thanh toán SePay) hoặc nhập mã kích hoạt — dùng ở màn khóa và popup gia hạn. */
+/** Chọn gói (thanh toán SePay) hoặc nhập mã kích hoạt - dùng ở màn khóa và popup gia hạn. */
 export default function SubscriptionRenewPanel({ overview, onRenewed }) {
   const toast = useToast();
   const [code, setCode] = useState('');

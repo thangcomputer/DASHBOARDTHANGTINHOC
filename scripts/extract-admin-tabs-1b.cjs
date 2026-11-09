@@ -71,27 +71,27 @@ ${body}
 const wireOnly = process.argv.includes('--wire-only');
 
 if (!wireOnly) {
-fs.mkdirSync(OUT, { recursive: true });
+  fs.mkdirSync(OUT, { recursive: true });
 
-fs.writeFileSync(
-  path.join(OUT, 'AdminStudentsTab.jsx'),
-  wrap('AdminStudentsTab', studentsImports, STUDENTS_BODY),
-  'utf8'
-);
+  fs.writeFileSync(
+    path.join(OUT, 'AdminStudentsTab.jsx'),
+    wrap('AdminStudentsTab', studentsImports, STUDENTS_BODY),
+    'utf8'
+  );
 
-fs.writeFileSync(
-  path.join(OUT, 'AdminTeachersTab.jsx'),
-  wrap('AdminTeachersTab', teachersImports, TEACHERS_BODY),
-  'utf8'
-);
+  fs.writeFileSync(
+    path.join(OUT, 'AdminTeachersTab.jsx'),
+    wrap('AdminTeachersTab', teachersImports, TEACHERS_BODY),
+    'utf8'
+  );
 
-fs.writeFileSync(
-  path.join(OUT, 'AdminTrainingTab.jsx'),
-  wrap('AdminTrainingTab', trainingImports, TRAINING_BODY, '  const RichTextEditor = t.RichTextEditor;'),
-  'utf8'
-);
+  fs.writeFileSync(
+    path.join(OUT, 'AdminTrainingTab.jsx'),
+    wrap('AdminTrainingTab', trainingImports, TRAINING_BODY, '  const RichTextEditor = t.RichTextEditor;'),
+    'utf8'
+  );
 
-console.log('Extracted AdminStudentsTab, AdminTeachersTab, AdminTrainingTab');
+  console.log('Extracted AdminStudentsTab, AdminTeachersTab, AdminTrainingTab');
 }
 
 // ── Phase 1b wire: shared utils, RichTextEditor, patch AdminDashboard ──

@@ -1,4 +1,4 @@
-# Thiết kế lại Module Tài chính — Ledger Accounting (ERP)
+# Thiết kế lại Module Tài chính - Ledger Accounting (ERP)
 
 **Ngày:** 2026-07-29  
 **Vai trò:** Senior ERP Financial Architect · Kế toán trưởng · Senior Fullstack  
@@ -48,7 +48,7 @@ Revenue_Net_Ledger    = Gross − Refund
 Nguồn: `services/ledgerService.js` → `sumFinancialRevenue`.  
 **Adjustments** có enum nhưng **không vào net**, hầu như không có writer nghiệp vụ.
 
-### 1.3 Học viên — UI gần đây
+### 1.3 Học viên - UI gần đây
 
 | Nhãn UI | Cách tính gần đúng hiện tại | Vấn đề |
 |---------|------------------------------|--------|
@@ -79,7 +79,7 @@ Chi lương = Transaction (pending/confirmed) × Schedule.is_paid_to_teacher
 
 ---
 
-## 2. Các công thức nên sửa (TO-BE — chuẩn ERP)
+## 2. Các công thức nên sửa (TO-BE - chuẩn ERP)
 
 ### 2.1 Định nghĩa tài khoản nghiệp vụ (logical)
 
@@ -96,9 +96,9 @@ Mọi dòng tiền = 1 dòng Ledger (không âm số dư trực tiếp):
 | `COUPON` | Áp mã giảm | tương tự DISCOUNT |
 | `ADJUSTMENT` | Điều chỉnh có kiểm soát (void/reverse kèm `reversesEntryId`) | ± |
 
-> **Khuyến nghị lưu `amount ≥ 0` + `type`** (như hiện tại) hoặc thêm `signedAmount` derived — không sửa dòng cũ.
+> **Khuyến nghị lưu `amount ≥ 0` + `type`** (như hiện tại) hoặc thêm `signedAmount` derived - không sửa dòng cũ.
 
-### 2.2 Học viên (Student Finance Card) — đúng brief
+### 2.2 Học viên (Student Finance Card) - đúng brief
 
 ```
 Tổng học phí đã đăng ký (Registered Fee)
@@ -158,7 +158,7 @@ Mỗi dòng Ledger một dòng UI:
 30/07  Hoàn tiền    −1.499.000   Excel
 ```
 
-Invoice (`HD…`) gắn `invoiceId` trên PAYMENT; REFUND có mã riêng (`R-…` hoặc `CN…` credit note) — **không xóa HĐ gốc**.
+Invoice (`HD…`) gắn `invoiceId` trên PAYMENT; REFUND có mã riêng (`R-…` hoặc `CN…` credit note) - **không xóa HĐ gốc**.
 
 ### 2.5 Trạng thái từng khóa
 
@@ -187,32 +187,32 @@ Trạng thái thanh toán/hoàn **derive từ Ledger theo `enrollmentId`**, khô
 
 | Thay đổi | Chi tiết |
 |----------|----------|
-| Giữ nguyên | Chứng từ thu — không xóa khi hoàn |
+| Giữ nguyên | Chứng từ thu - không xóa khi hoàn |
 | Thêm | `branchId`, `enrollmentId`, `ledgerEntryId`, `status: issued\|void` |
 | Credit note | Model mới `CreditNote` **hoặc** Invoice type=`credit` liên kết HĐ gốc |
 
-### 3.3 `Transaction` (lương GV) — giai đoạn chuyển tiếp
+### 3.3 `Transaction` (lương GV) - giai đoạn chuyển tiếp
 
 | Option A (khuyến nghị) | Mỗi phiếu lương confirmed → **post Ledger `salary`**; `Transaction` = voucher UI |
 | Option B | Migrate hẳn vào Ledger, deprecate `Transaction` |
 
 **Cấm** `DELETE` Transaction đã confirmed trên Production.
 
-### 3.4 `Student` / `Enrollment` — demote thành cache
+### 3.4 `Student` / `Enrollment` - demote thành cache
 
 | Field | Vai trò mới |
 |-------|-------------|
 | `paid`, `paidAmount` | **Derived** từ Ledger (hoặc bỏ dần khỏi KPI) |
 | `enrollments[].price` | Snapshot học phí đăng ký |
 | `enrollments[].status` | Trạng thái khóa (active/cancelled/…) |
-| `enrollments[].refundedAmount` | Cache Σ REFUND theo enrollment — **không** SoT |
-| `enrollments[].paid` | Cache “đã có PAYMENT đủ” — không SoT |
+| `enrollments[].refundedAmount` | Cache Σ REFUND theo enrollment - **không** SoT |
+| `enrollments[].paid` | Cache “đã có PAYMENT đủ” - không SoT |
 
 Mọi thay đổi tiền: **post Ledger trước** (hoặc atomic session), rồi sync cache.
 
-### 3.5 Bảng đối soát (mới — khuyến nghị)
+### 3.5 Bảng đối soát (mới - khuyến nghị)
 
-`FinanceDailySnapshot` (optional): pre-aggregate theo ngày/chi nhánh từ Ledger để BI nhanh — **rebuild được** từ Ledger, không SoT độc lập.
+`FinanceDailySnapshot` (optional): pre-aggregate theo ngày/chi nhánh từ Ledger để BI nhanh - **rebuild được** từ Ledger, không SoT độc lập.
 
 ---
 
@@ -220,7 +220,7 @@ Mọi thay đổi tiền: **post Ledger trước** (hoặc atomic session), rồ
 
 | API | Việc phải làm |
 |-----|----------------|
-| `POST /students` (paid) | Đã tạo Invoice+PAYMENT — chuẩn hóa idempotency; sync cache từ Ledger |
+| `POST /students` (paid) | Đã tạo Invoice+PAYMENT - chuẩn hóa idempotency; sync cache từ Ledger |
 | `PUT /students/:id/pay` | Atomic claim; PAYMENT; cấm chỉ set `paid=true` |
 | `PUT .../enrollments/:id/pay` | PAYMENT gắn `enrollmentId` |
 | `PUT /students/:id/refund` | Chỉ `postRefund`; cập nhật cache; **idempotency ổn định** |
@@ -240,7 +240,7 @@ Mọi thay đổi tiền: **post Ledger trước** (hoặc atomic session), rồ
 
 ## 5. Các Dashboard / UI cần chỉnh
 
-### 5.1 Student Detail — Tab Tài chính
+### 5.1 Student Detail - Tab Tài chính
 
 Thay cụm nhãn hiện tại bằng:
 
@@ -252,7 +252,7 @@ Thay cụm nhãn hiện tại bằng:
 
 Bảng dưới = **sổ cái** (PAYMENT +, REFUND −), không gộp; mỗi khóa block trạng thái riêng.
 
-### 5.2 Admin — Doanh thu học phí
+### 5.2 Admin - Doanh thu học phí
 
 Tách KPI:
 
@@ -270,7 +270,7 @@ Tách KPI:
 
 ### 5.4 Export Excel / PDF / Biểu đồ
 
-Cùng `GET /api/finance/summary` + ledger lines — **một nguồn**.
+Cùng `GET /api/finance/summary` + ledger lines - **một nguồn**.
 
 ---
 
@@ -382,11 +382,11 @@ Chỉ kết luận **“Module Tài chính đạt yêu cầu ERP”** khi:
 | Học phí đang theo | **Đang sử dụng** / Giá trị khóa còn hiệu lực |
 | Đã hoàn (đôi khi 0đ do DTO) | **Đã hoàn tiền** = Σ REFUND (đỏ) |
 | Doanh thu thực tế (Đã thu) | **Doanh thu thuần** = PAYMENT − REFUND |
-| — | **Tổng học phí đã đăng ký** (gross đăng ký, không phải cash) |
+| - | **Tổng học phí đã đăng ký** (gross đăng ký, không phải cash) |
 
 ---
 
-## Phụ lục — Trạng thái code nền (đã có sẵn để tận dụng)
+## Phụ lục - Trạng thái code nền (đã có sẵn để tận dụng)
 
 - `LedgerEntry` append-oriented + `settlePayment` / `postRefund`  
 - `sumFinancialRevenue` / `reconciliationReport` (chưa gắn Dashboard)  

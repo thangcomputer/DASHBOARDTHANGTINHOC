@@ -1,4 +1,4 @@
-# PHASE C3.1 — PRODUCTION READ-ONLY RE-AUDIT GATE
+# PHASE C3.1 - PRODUCTION READ-ONLY RE-AUDIT GATE
 
 **Date:** 2026-08-11  
 **Mode:** READ-ONLY / ZERO WRITE / ZERO MIGRATION / ZERO CODE CHANGE  
@@ -38,7 +38,7 @@ Decision:
 C3.1 = BLOCKED
 C4 = BLOCKED
 
-STOP — AWAIT OWNER APPROVAL
+STOP - AWAIT OWNER APPROVAL
 ```
 
 ---
@@ -64,17 +64,17 @@ No production MongoDB URI can be identified with confidence from this workspace.
 |--------|----------------|------------------------|-------|
 | [`.env`](../../.env) `MONGODB_URI` | **LOCAL / DEV** | `127.0.0.1:27018` / `dashboardthangtinhoc` / `replicaSet=rs0` | `NODE_ENV=development` |
 | [`.env.example`](../../.env.example) | LOCAL template | `127.0.0.1:27017` / `dashboardthangtinhoc` | Not production |
-| `.env.deploy` | **MISSING** | — | File not present in workspace |
+| `.env.deploy` | **MISSING** | - | File not present in workspace |
 | [`.env.deploy.example`](../../.env.deploy.example) | Deploy SSH only | No Mongo URI | Host/path placeholders only |
 | [`.env.production`](../../client/.env.production) (client) | FRONTEND | Same-origin API comment | No Mongo URI |
-| [`ecosystem.config.cjs`](../../ecosystem.config.cjs) | PM2 app config | Sets `NODE_ENV=production` only | **No** `MONGODB_URI` — expects remote `.env` |
+| [`ecosystem.config.cjs`](../../ecosystem.config.cjs) | PM2 app config | Sets `NODE_ENV=production` only | **No** `MONGODB_URI` - expects remote `.env` |
 | [`docker-compose.yml`](../../docker-compose.yml) | DEV / compose | `mongo:27017` / `dashboardthangtinhoc` | Container-local |
 | `docker-compose.prod.yml` | Present | No Mongo URI matched in file | Insufficient |
-| [`deployment/`](../../deployment/) | k8s/compose stubs | No production Mongo URI found | — |
+| [`deployment/`](../../deployment/) | k8s/compose stubs | No production Mongo URI found | - |
 | [`deploy_scripts/deploy_vps.cjs`](../../deploy_scripts/deploy_vps.cjs) | Deploy tooling | Fallback example `127.0.0.1:27017` | Not a live prod credential |
 | [`deploy_scripts/fix_pm2_boot.sh`](../../deploy_scripts/fix_pm2_boot.sh) | VPS ops | Reads **remote** `.env` on VPS | URI not available in this workspace |
 | CI [`.github/workflows/node.yml`](../../.github/workflows/node.yml) | **TEST** | `127.0.0.1:27017` / `dashboardthangtinhoc_ci` | CI only |
-| Secrets / Atlas / DocumentDB refs in repo | **NONE FOUND** | — | No `mongodb+srv` production credential in tree |
+| Secrets / Atlas / DocumentDB refs in repo | **NONE FOUND** | - | No `mongodb+srv` production credential in tree |
 
 ### Hard rule application
 
@@ -130,7 +130,7 @@ canonical GV######: UNKNOWN
 unexpected / duplicates: UNKNOWN
 ```
 
-**Independence (code):** Teacher counter `_id: "teacher"` separate from student. Assignment uses ObjectIds — no `HV###### ↔ GV######` coupling in source.
+**Independence (code):** Teacher counter `_id: "teacher"` separate from student. Assignment uses ObjectIds - no `HV###### ↔ GV######` coupling in source.
 
 **Result:** `Teacher audit = BLOCKED` (data); independence model `PASS` (code)
 
@@ -240,7 +240,7 @@ No messaging files modified in C3.1.
 Messaging isolation: PASS
 ```
 
-If future discovery finds business codes inside messaging: **REPORT ONLY** — do not auto-fix.
+If future discovery finds business codes inside messaging: **REPORT ONLY** - do not auto-fix.
 
 ---
 
@@ -306,8 +306,8 @@ PRODUCTION MIGRATION = BLOCKED
 ## 18. Non-blocking findings
 
 1. Application source already implements C2 generator + SePay fail-closed (code-level).  
-2. Deploy scripts imply production may store `MONGODB_URI` on VPS under deploy path — **must be provided by owner**, not scraped by this phase.  
-3. Local `127.0.0.1:27018` remains the only live connection in workspace `.env` — classified **LOCAL/DEV**.
+2. Deploy scripts imply production may store `MONGODB_URI` on VPS under deploy path - **must be provided by owner**, not scraped by this phase.  
+3. Local `127.0.0.1:27018` remains the only live connection in workspace `.env` - classified **LOCAL/DEV**.
 
 ---
 
@@ -352,6 +352,6 @@ NO COUNTER UPDATE
 ---
 
 ```text
-STOP — AWAIT OWNER APPROVAL
+STOP - AWAIT OWNER APPROVAL
 Do not start PHASE C4.
 ```

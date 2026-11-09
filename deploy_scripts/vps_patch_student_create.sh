@@ -18,7 +18,7 @@ curl -fsSL "$RAW/config/validateEnv.js" -o config/validateEnv.js
 curl -fsSL "$RAW/shared/cqrs/flags.js" -o shared/cqrs/flags.js
 curl -fsSL "$RAW/shared/cqrs/middleware.js" -o shared/cqrs/middleware.js
 curl -fsSL "$RAW/shared/cqrs/withTransaction.js" -o shared/cqrs/withTransaction.js
-# studentRoutes từ nhánh fix (legacy strangler) — file lớn
+# studentRoutes từ nhánh fix (legacy strangler) - file lớn
 curl -fsSL "$RAW/routes/studentRoutes.js" -o routes/studentRoutes.js
 # FE critical
 mkdir -p client/src/components/admin/shared client/src/components/admin/hooks client/src/context
@@ -34,4 +34,4 @@ sleep 2
 curl -sS -m 8 -w "\nHTTP %{http_code}\n" http://127.0.0.1:5000/healthz
 grep -n "isStudentCreateCqrs\|requireStudentCreateCqrs\|router.post('/'" routes/studentRoutes.js | head -12
 pm2 logs dashboardthangtinhoc --lines 15 --nostream || true
-echo "OK — F5 dashboard và thử Thêm học viên / Lưu chưa thanh toán"
+echo "OK - F5 dashboard và thử Thêm học viên / Lưu chưa thanh toán"

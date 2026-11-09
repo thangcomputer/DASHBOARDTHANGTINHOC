@@ -143,7 +143,7 @@ function studentDataRefresh(io, studentLike, payload) {
 
 /**
  * Chuông + sync danh bạ khi HV được gán GV lúc tạo / thêm khóa
- * (cùng nội dung với PUT assign-teacher — tránh lệch UX).
+ * (cùng nội dung với PUT assign-teacher - tránh lệch UX).
  * Lưu DB luôn; socket chỉ khi có io.
  */
 async function notifyTeacherAssignedOnEnroll(io, {
@@ -242,7 +242,7 @@ async function notifyTeacherAssignedOnEnroll(io, {
   }
 }
 
-/** Chuông HV — lỗi notify không làm fail API gốc. */
+/** Chuông HV - lỗi notify không làm fail API gốc. */
 function notifyStudentBell(io, studentId, { type, title, content, payload = {}, link = '/student#profile' }) {
   if (!studentId) return Promise.resolve();
   const NotificationService = require('../services/NotificationService');
@@ -259,7 +259,7 @@ function notifyStudentBell(io, studentId, { type, title, content, payload = {}, 
 }
 
 // ─── GET /api/students ─────────────────────────────────────────────────────────
-// Lấy danh sách học viên (Admin+MANAGE_STUDENTS / Teacher ownership) — pagination
+// Lấy danh sách học viên (Admin+MANAGE_STUDENTS / Teacher ownership) - pagination
 router.get('/', [authMiddleware, branchFilter, policyShadowStudentRead('list'), dataScopeObserve('student'), requireManageStudentsUnlessTeacher], async (req, res) => {
   try {
     const { teacherId, paid, status, course, search, page, limit, branch_id } = req.query;
@@ -525,7 +525,7 @@ router.get('/stats', [authMiddleware, branchFilter, policyShadowStudentRead('sta
 });
 
 // ─── GET /api/students/:id ─────────────────────────────────────────────────────────────────
-// Phase 7.35: policyShadowStudentRead('get_one') — evaluation-only; Legacy handler remains HTTP authority.
+// Phase 7.35: policyShadowStudentRead('get_one') - evaluation-only; Legacy handler remains HTTP authority.
 router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_one'), dataScopeObserve('student', { listMode: false })], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
@@ -565,12 +565,12 @@ router.get('/:id', [authMiddleware, branchFilter, policyShadowStudentRead('get_o
 
 // ─── GET /api/students/:id/full-detail (MEGA ENDPOINT) ───────────────────────
 // Tổng hợp toàn bộ hồ sơ học viên: Thông tin cá nhân, Lịch sử điểm danh, Hóa đơn, Điểm thi
-// Phase 7.35: policyShadowStudentRead('full_detail') — evaluation-only; Legacy handler remains HTTP authority.
+// Phase 7.35: policyShadowStudentRead('full_detail') - evaluation-only; Legacy handler remains HTTP authority.
 router.get('/:id/full-detail', [authMiddleware, branchFilter, policyShadowStudentRead('full_detail')], async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)
       .populate('teacherId', 'name phone specialty avatar')
-        .populate('branchId', 'name code');
+      .populate('branchId', 'name code');
 
     if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
 
@@ -597,10 +597,10 @@ router.get('/:id/full-detail', [authMiddleware, branchFilter, policyShadowStuden
     const invoicesRaw = await Invoice.find({ hocVien: studentOid }).sort({ createdAt: -1 }).lean();
     let invoices = Array.isArray(invoicesRaw) ? [...invoicesRaw] : [];
 
-    // H11: GET read-only — không backfill Invoice (tránh chứng từ orphan không Ledger).
+    // H11: GET read-only - không backfill Invoice (tránh chứng từ orphan không Ledger).
     // Heal thiếu HĐ bằng job reconcile / finance reconcile API.
 
-    // 2b) Ledger refund (không tạo Invoice gốc) — append để UI "Tài chính" hiển thị.
+    // 2b) Ledger refund (không tạo Invoice gốc) - append để UI "Tài chính" hiển thị.
     const LedgerEntry = require('../models/LedgerEntry');
     const refundEntries = await LedgerEntry.find({
       studentId: studentOid,
@@ -901,7 +901,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
 
     // Bảo mật: STAFF chỉ được tạo HV thuộc chi nhánh của mình
     // SUPER_ADMIN tự đặt branchId hoặc để trống
-    // HIGH_ADMIN: bắt buộc có branch (account hoặc body) — không tạo HV "lạc" rồi list không thấy
+    // HIGH_ADMIN: bắt buộc có branch (account hoặc body) - không tạo HV "lạc" rồi list không thấy
     if (req.userBranchId) {
       req.body.branchId = req.userBranchId;
       req.body.branchCode = req.userBranchCode || '';
@@ -940,7 +940,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
       req.body.status = 'Đang học';
     }
 
-    // 1 SĐT / 1 email duy nhất — không trùng HV khác hoặc GV
+    // 1 SĐT / 1 email duy nhất - không trùng HV khác hoặc GV
     try {
       const { assertUniqueContact } = require('../utils/uniqueContact');
       await assertUniqueContact({
@@ -957,7 +957,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
 
     delete req.body.ageAsOf;
     const student = new Student(req.body);
-    // Server is sole authority for business codes — ignore client studentCode / legacy arrays
+    // Server is sole authority for business codes - ignore client studentCode / legacy arrays
     delete student.legacyStudentCodes;
     const reserved = String(req.body.reservedStudentCode || '').trim().toUpperCase();
     if (isCanonical('student', reserved)) {
@@ -1040,7 +1040,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         student,
         courseName,
         amount: Number(student.paidAmount) > 0 ? student.paidAmount : price,
-        note: `Thanh toán khi thêm học viên — ${courseName}`,
+        note: `Thanh toán khi thêm học viên - ${courseName}`,
       });
       try {
         const primaryEnr = student.enrollments?.[0];
@@ -1060,7 +1060,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         });
         bustFinanceCaches();
       } catch (ledgerErr) {
-        logger.error('[STUDENTS] ledger settle on create FAILED — rollback paid: %s', ledgerErr.message);
+        logger.error('[STUDENTS] ledger settle on create FAILED - rollback paid: %s', ledgerErr.message);
         // Rollback cache + void invoice (không để paid không có Ledger)
         if (Array.isArray(student.enrollments)) {
           student.enrollments.forEach((e) => {
@@ -1081,7 +1081,7 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         }
         return res.status(500).json({
           success: false,
-          message: 'Đã tạo HV nhưng ghi sổ cái thất bại — trạng thái thu đã rollback. Thử thu lại.',
+          message: 'Đã tạo HV nhưng ghi sổ cái thất bại - trạng thái thu đã rollback. Thử thu lại.',
           data: { studentId: student._id },
         });
       }
@@ -1094,16 +1094,16 @@ router.post('/', [authMiddleware, branchFilter, policyShadowStudentMutation('cre
         branchId: student.branchId,
         title: '🆕 Học viên mới đăng ký',
         content: `Học viên ⟦student_detail:${student._id}:profile|${student.name}⟧ đã đăng ký khóa học ${student.course}.`,
-        payload: { 
+        payload: {
           studentId: student._id,
           creatorName: req.user?.name || 'Hệ thống',
-          creatorRole: req.user?.adminRole === 'SUPER_ADMIN' || req.user?.adminRole === 'HIGH_ADMIN' 
-            ? 'Admin' 
+          creatorRole: req.user?.adminRole === 'SUPER_ADMIN' || req.user?.adminRole === 'HIGH_ADMIN'
+            ? 'Admin'
             : (req.user?.role === 'staff' ? 'Nhân viên chi nhánh' : (req.user?.role === 'teacher' ? 'Giảng viên' : 'Hệ thống'))
         },
         link: '/admin/students',
       });
-      
+
       studentRealtime(io, student, 'student:new', {
         studentId: student._id,
         name: student.name,
@@ -1188,7 +1188,7 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
     }
 
     const safeBody = { ...req.body };
-    // H12: cấm set paid/paidAmount/paymentMethod qua PUT generic — phải qua /pay hoặc /refund
+    // H12: cấm set paid/paidAmount/paymentMethod qua PUT generic - phải qua /pay hoặc /refund
     delete safeBody.paid;
     delete safeBody.paidAmount;
     delete safeBody.paidAt;
@@ -1264,7 +1264,7 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
             await doc.save();
             const populated = await Student.findById(doc._id).populate('teacherId', 'name phone specialty');
             const io = req.app.get('io');
-            // Use populated (post-save) — never reference later `const student` (TDZ)
+            // Use populated (post-save) - never reference later `const student` (TDZ)
             if (io) studentRealtime(io, populated, 'student:updated', populated._id);
             if (prevLinkHoc !== null && prevLinkHoc !== String(safeBody.linkHoc || '').trim()) {
               const courseLabel = enrollmentCourse || doc.enrollments[idx]?.courseName || doc.course || 'khóa học';
@@ -1440,7 +1440,7 @@ router.put('/:id', [authMiddleware, branchFilter, policyShadowStudentMutation('u
       }
     }
 
-    // Đồng bộ enrollment chính — applyEnrollmentStats lấy totalSessions từ đây
+    // Đồng bộ enrollment chính - applyEnrollmentStats lấy totalSessions từ đây
     if (isStaffOrAdmin) {
       const touchCourse =
         safeBody.totalSessions != null
@@ -1822,7 +1822,7 @@ router.post('/:id/exam-attempt', studentExamGuard, async (req, res) => {
       return res.status(409).json({
         success: false,
         code: 'EXAM_ATTEMPT_ABANDONED',
-        message: 'Bài thi đã bị hủy do tải lại trang hoặc rời phòng thi. Môn này bị tính RỚT — liên hệ Admin để mở lại.',
+        message: 'Bài thi đã bị hủy do tải lại trang hoặc rời phòng thi. Môn này bị tính RỚT - liên hệ Admin để mở lại.',
       });
     }
 
@@ -2245,7 +2245,7 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
       ? Number(existing.paidAmount)
       : (Number(existing.price) || 0);
 
-    // Atomic claim — tránh race double-pay (admin×admin / admin×SePay)
+    // Atomic claim - tránh race double-pay (admin×admin / admin×SePay)
     const claimed = await Student.findOneAndUpdate(
       { _id: req.params.id, paid: false },
       {
@@ -2303,7 +2303,7 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
         courseName: student.course,
         source: 'admin_pay',
         sourceRef: maHD || `pay:${student._id}`,
-        // Key theo HV + enrollment primary — idempotent rematch cùng lần thu
+        // Key theo HV + enrollment primary - idempotent rematch cùng lần thu
         idempotencyKey: (() => {
           const list = student.enrollments || [];
           const primary = list.find((e) => e.isPrimary) || list[0];
@@ -2317,7 +2317,7 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
       });
       bustFinanceCaches();
     } catch (ledgerErr) {
-      logger.error('[STUDENTS] ledger settle pay FAILED — rollback: %s', ledgerErr.message);
+      logger.error('[STUDENTS] ledger settle pay FAILED - rollback: %s', ledgerErr.message);
       try {
         if (student.enrollments?.length) {
           student.enrollments.forEach((e) => {
@@ -2343,7 +2343,7 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
       }
       return res.status(500).json({
         success: false,
-        message: 'Ghi sổ cái thất bại — đã rollback trạng thái thu. Thử lại.',
+        message: 'Ghi sổ cái thất bại - đã rollback trạng thái thu. Thử lại.',
       });
     }
 
@@ -2351,10 +2351,10 @@ router.put('/:id/pay', [authMiddleware, branchFilter, policyShadowStudentMutatio
     const io = req.app.get('io');
     if (io) {
       const NotificationService = require('../services/NotificationService');
-      
+
       // Notify Admin: doanh thu mới
       NotificationService.notifyAdmins(io, '💰 Thu học phí', `Đã thu ${student.price.toLocaleString('vi-VN')}đ từ ${student.name}`, { studentId: student._id }, '/admin/invoices');
-      
+
       // Notify học viên: xác nhận đã thanh toán
       NotificationService.send(io, {
         type: 'FINANCE',
@@ -2415,7 +2415,7 @@ router.put('/:id/refund', [authMiddleware, branchFilter, policyShadowStudentMuta
         `Đã hoàn ${refundAmt.toLocaleString('vi-VN')}đ của ${student.name}${partial ? ` (còn ${Number(student.paidAmount).toLocaleString('vi-VN')}đ)` : ''}`,
         { studentId: student._id },
         '/admin/students',
-      ).catch(() => {});
+      ).catch(() => { });
       NotificationService.send(io, {
         type: 'FINANCE',
         title: partial ? 'Hoàn học phí một phần' : 'Hoàn học phí',
@@ -2424,7 +2424,7 @@ router.put('/:id/refund', [authMiddleware, branchFilter, policyShadowStudentMuta
           : `Trạng thái thanh toán của bạn đã được cập nhật (hoàn/hủy). ${note}`,
         receivers: String(student._id),
         link: '/student#profile',
-      }).catch(() => {});
+      }).catch(() => { });
       studentDataRefresh(io, student, { type: 'student', id: student._id });
       studentRealtime(io, student, 'revenue:updated', { amount: -refundAmt, studentName: student.name });
     }
@@ -2457,7 +2457,7 @@ router.put('/:id/refund', [authMiddleware, branchFilter, policyShadowStudentMuta
 
 // ─── PUT /api/students/:id/unlock-exam ────────────────────────────────────────
 // Workflow 2: Admin mở khóa phòng thi thủ công
-// Body optional: { enrollmentId } — chỉ mở 1 khóa; không có = mở tất cả enrollment
+// Body optional: { enrollmentId } - chỉ mở 1 khóa; không có = mở tất cả enrollment
 router.put('/:id/unlock-exam', [authMiddleware, branchFilter, policyShadowStudentMutation('unlock_exam'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const { enrollmentId } = req.body || {};
@@ -2473,7 +2473,7 @@ router.put('/:id/unlock-exam', [authMiddleware, branchFilter, policyShadowStuden
       student.enrollments[0].isPrimary = true;
     }
 
-    // Chuẩn hóa status lệch enum (seed/legacy) trước khi markModified — tránh ValidationError 500
+    // Chuẩn hóa status lệch enum (seed/legacy) trước khi markModified - tránh ValidationError 500
     (student.enrollments || []).forEach((e) => {
       if (e.status && !ALLOWED_ENR_STATUS.has(String(e.status))) {
         e.status = e.paid ? 'active' : 'pending_payment';
@@ -2502,7 +2502,7 @@ router.put('/:id/unlock-exam', [authMiddleware, branchFilter, policyShadowStuden
     if (student.enrollments?.length) student.markModified('enrollments');
     await student.save({ validateModifiedOnly: true });
 
-    // Thông báo — không để lỗi kênh làm fail API sau khi đã mở khóa trong DB
+    // Thông báo - không để lỗi kênh làm fail API sau khi đã mở khóa trong DB
     const io = req.app.get('io');
     if (io) {
       try {
@@ -2836,7 +2836,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
         });
         bustFinanceCaches();
       } catch (ledgerErr) {
-        logger.error('[STUDENTS] ledger add enrollment FAILED — rollback: %s', ledgerErr.message);
+        logger.error('[STUDENTS] ledger add enrollment FAILED - rollback: %s', ledgerErr.message);
         lastEnr.paid = false;
         lastEnr.paidAt = undefined;
         lastEnr.learningAccess = false;
@@ -2851,7 +2851,7 @@ router.post('/:id/enrollments', [authMiddleware, branchFilter, policyShadowStude
         }
         return res.status(500).json({
           success: false,
-          message: 'Đã thêm khóa nhưng ghi sổ cái thất bại — trạng thái thu đã rollback.',
+          message: 'Đã thêm khóa nhưng ghi sổ cái thất bại - trạng thái thu đã rollback.',
           data: student.toObject(),
         });
       }
@@ -3120,7 +3120,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
         });
         bustFinanceCaches();
       } catch (ledgerErr) {
-        logger.error('[STUDENTS] ledger enrollment pay FAILED — rollback: %s', ledgerErr.message);
+        logger.error('[STUDENTS] ledger enrollment pay FAILED - rollback: %s', ledgerErr.message);
         claimedEnr.paid = false;
         claimedEnr.paidAt = undefined;
         claimedEnr.learningAccess = false;
@@ -3134,7 +3134,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
         }
         return res.status(500).json({
           success: false,
-          message: 'Ghi sổ cái thất bại — đã rollback trạng thái thu khóa.',
+          message: 'Ghi sổ cái thất bại - đã rollback trạng thái thu khóa.',
         });
       }
     }
@@ -3158,7 +3158,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
     await syncCertPrepFromEnrollment(fresh, req);
     return res.json({
       success: true,
-      message: `Đã xác nhận thanh toán khóa "${claimedEnr.courseName}"${amount ? ` — ${amount.toLocaleString('vi-VN')}đ` : ''}`,
+      message: `Đã xác nhận thanh toán khóa "${claimedEnr.courseName}"${amount ? ` - ${amount.toLocaleString('vi-VN')}đ` : ''}`,
       data: { student: doc, invoice },
     });
   } catch (error) {
@@ -3167,7 +3167,7 @@ router.put('/:id/enrollments/:enrollmentId/pay', [authMiddleware, branchFilter, 
 });
 
 // ─── DELETE /api/students/:id/enrollments/:enrollmentId ───────────────────────
-// Hủy (soft-cancel) 1 khóa học — không xóa cứng; hoàn tiền chỉ khi có quyền finance + refundAmount > 0
+// Hủy (soft-cancel) 1 khóa học - không xóa cứng; hoàn tiền chỉ khi có quyền finance + refundAmount > 0
 // Body (optional): { cancelReason: string, refundAmount: number }
 router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, policyShadowStudentMutation('enrollment_delete'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
@@ -3189,7 +3189,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
       return res.status(400).json({ success: false, message: 'Khóa học này đã bị hủy trước đó.' });
     }
 
-    // Cho phép hủy cả khóa active cuối cùng — HV vẫn giữ hồ sơ (dòng danh sách mờ)
+    // Cho phép hủy cả khóa active cuối cùng - HV vẫn giữ hồ sơ (dòng danh sách mờ)
 
     const actorRole = String(req.user?.role || '').toLowerCase();
     const submittedCancelReason = String(req.body?.cancelReason || '').trim();
@@ -3250,7 +3250,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
         logger.error('[STUDENTS] cancel enrollment refund FAILED: %s', ledgerErr.message);
         return res.status(ledgerErr.status || 500).json({
           success: false,
-          message: ledgerErr.message || 'Ghi sổ hoàn thất bại — khóa chưa hủy.',
+          message: ledgerErr.message || 'Ghi sổ hoàn thất bại - khóa chưa hủy.',
         });
       }
     }
@@ -3301,7 +3301,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
     }
     if (refundAmt > 0) bustFinanceCaches();
 
-    // Hủy lịch chưa học (scheduled) của khóa này — giữ completed để Admin trả lương GV
+    // Hủy lịch chưa học (scheduled) của khóa này - giữ completed để Admin trả lương GV
     try {
       const cancelSch = await Schedule.updateMany(
         {
@@ -3374,7 +3374,7 @@ router.delete('/:id/enrollments/:enrollmentId', [authMiddleware, branchFilter, p
 });
 
 // ─── PUT /api/students/:id/assign-teacher ─────────────────────────────────────
-// Admin/Staff gán (hoặc bỏ gán) giảng viên — theo khóa (enrollmentId) hoặc khóa chính
+// Admin/Staff gán (hoặc bỏ gán) giảng viên - theo khóa (enrollmentId) hoặc khóa chính
 router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStudentMutation('assign_teacher'), checkPermission(PERMISSIONS.MANAGE_STUDENTS), assertStudentBranchAccess], async (req, res) => {
   try {
     const { teacherId, enrollmentId, reason = '' } = req.body;
@@ -3439,7 +3439,7 @@ router.put('/:id/assign-teacher', [authMiddleware, branchFilter, policyShadowStu
       teacherName = t.name || 'Giảng viên';
     }
 
-    // Khớp môn: khóa học HV ↔ chuyên môn GV — lệch môn thì từ chối phân công
+    // Khớp môn: khóa học HV ↔ chuyên môn GV - lệch môn thì từ chối phân công
     let targetCourse = student.course;
     let targetExamSubjects = [];
     if (enrollmentId && student.enrollments?.length) {
@@ -3952,7 +3952,7 @@ router.post('/:id/unlock-account', [
 });
 
 // ─── POST /api/students/:id/reset-today-attendance ─────────────────────────────
-// Xóa điểm danh HÔM NAY (= hủy ca đã hoàn thành) — Admin/Staff hoặc GV phụ trách (không giới hạn 1 tiếng)
+// Xóa điểm danh HÔM NAY (= hủy ca đã hoàn thành) - Admin/Staff hoặc GV phụ trách (không giới hạn 1 tiếng)
 router.post('/:id/reset-today-attendance', [
   authMiddleware,
   branchFilter,
@@ -4027,7 +4027,7 @@ router.post('/:id/reset-today-attendance', [
       course: student.course || '',
     }));
 
-    // Xóa record hôm nay khỏi grades (root + từng enrollment — FE đọc grades enrollment)
+    // Xóa record hôm nay khỏi grades (root + từng enrollment - FE đọc grades enrollment)
     const newGrades = scrubToday(oldGrades);
     const newCompleted = newGrades.length;
     const newRemaining = Math.max(0, (student.totalSessions || 12) - newCompleted);
@@ -4084,7 +4084,7 @@ router.post('/:id/reset-today-attendance', [
 });
 
 // ─── POST /api/students/:id/reset-history ──────────────────────────────────────
-// Reset lịch sử học (xóa buổi học, điểm danh, điểm số) — giữ thông tin cá nhân & học phí
+// Reset lịch sử học (xóa buổi học, điểm danh, điểm số) - giữ thông tin cá nhân & học phí
 router.post('/:id/reset-history', [
   authMiddleware,
   branchFilter,
@@ -4119,7 +4119,7 @@ router.post('/:id/reset-history', [
 
     res.json({
       success: true,
-      message: `✅ Đã reset lịch sử học viên "${student.name}" — Xóa ${deletedSchedules.deletedCount} buổi học`,
+      message: `✅ Đã reset lịch sử học viên "${student.name}" - Xóa ${deletedSchedules.deletedCount} buổi học`,
       data: { deletedSchedules: deletedSchedules.deletedCount },
     });
   } catch (error) {

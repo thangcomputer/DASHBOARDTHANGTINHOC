@@ -96,7 +96,8 @@ export function getClientEnrollments(student) {
   if (student.course && String(student.course).trim()) {
     const tid = teacherIdStr(student.teacherId);
     const completed = student.completedSessions ?? Math.max(0, (student.totalSessions || 12) - (student.remainingSessions ?? 0));
-    return [{ id: 'main', enrollmentId: 'main', name: student.course, courseName: student.course,
+    return [{
+      id: 'main', enrollmentId: 'main', name: student.course, courseName: student.course,
       courseId: '', examSubjects: [], teacherId: tid,
       deliveryMode: student.deliveryMode === 'video' || student.deliveryMode === 'instructor' ? student.deliveryMode : '',
       teacherName: teacherNameFromRef(student.teacherId, student.teacherName),
@@ -143,14 +144,14 @@ export function isEnrollmentCompleted(enrollment) {
   return total > 0 && completed >= total;
 }
 
-/** Placeholder root course — không tính là đang đăng ký khóa. */
+/** Placeholder root course - không tính là đang đăng ký khóa. */
 export function isPlaceholderCourseName(name) {
   const n = String(name || '').trim().toLowerCase();
   return !n || n === '(đã hủy)' || n === 'chưa xếp lớp';
 }
 
 /**
- * Chỉ lấy enrollments/courses có cấu trúc — KHÔNG invent từ root student.course.
+ * Chỉ lấy enrollments/courses có cấu trúc - KHÔNG invent từ root student.course.
  * (Root course sau hủy = "(Đã hủy)" vẫn bị getClientEnrollments coi là active nếu fallback.)
  */
 function getStructuredClientEnrollments(student) {
@@ -173,7 +174,7 @@ function getStructuredClientEnrollments(student) {
 export function getLearningAccessEnrollments(student) {
   if (!student) return [];
   let list = getStructuredClientEnrollments(student);
-  // Legacy: chỉ có root course (không enrollments/courses[]) — vẫn xét, nhưng không mở cho placeholder hủy.
+  // Legacy: chỉ có root course (không enrollments/courses[]) - vẫn xét, nhưng không mở cho placeholder hủy.
   if (!list.length) {
     const hasStruct = (Array.isArray(student.enrollments) && student.enrollments.length > 0)
       || (Array.isArray(student.courses) && student.courses.length > 0);
@@ -294,7 +295,8 @@ export function scopeStudentToEnrollment(student, enrollment) {
   const teacherLabel = name
     ? (name.startsWith('Thầy ') || name.startsWith('Cô ') ? name : `Thầy ${name}`)
     : 'Chưa phân công';
-  return { ...student, course: enrollment.courseName || enrollment.name, teacherId: enrollment.teacherId || '',
+  return {
+    ...student, course: enrollment.courseName || enrollment.name, teacherId: enrollment.teacherId || '',
     courseId: enrollment.courseId ? String(enrollment.courseId) : '',
     deliveryMode: enrollment.deliveryMode || '',
     teacher: teacherLabel, teacherName: name,
@@ -308,10 +310,11 @@ export function scopeStudentToEnrollment(student, enrollment) {
     nextClassTime: enrollment.nextClassTime || student.nextClassTime,
     teacherAlert: enrollment.teacherAlert || student.teacherAlert || '',
     paid: enrollment.paid ?? student.paid, price: enrollment.price ?? student.price,
-    activeEnrollmentId: enrollment.enrollmentId || enrollment.id };
+    activeEnrollmentId: enrollment.enrollmentId || enrollment.id
+  };
 }
 
-/** SUM học phí đã thu của mọi khóa — đồng bộ BI / báo cáo doanh thu. */
+/** SUM học phí đã thu của mọi khóa - đồng bộ BI / báo cáo doanh thu. */
 export function sumClientPaidTuition(student) {
   if (!student) return 0;
   const list = getClientEnrollments(student);
@@ -361,8 +364,8 @@ export function expandFinanceEnrollmentRows(students) {
         key: String(sid),
         studentId: sid,
         studentCode,
-        studentName: student.name || '—',
-        courseName: student.course || '—',
+        studentName: student.name || '-',
+        courseName: student.course || '-',
         price: Number(student.price) || 0,
         paid: !!student.paid,
         paymentMethod: student.paymentMethod || 'transfer',
@@ -373,15 +376,15 @@ export function expandFinanceEnrollmentRows(students) {
       return;
     }
 
-    // Chỉ khóa còn hiệu lực — khóa đã hủy không còn hiện "Đã nộp"
+    // Chỉ khóa còn hiệu lực - khóa đã hủy không còn hiện "Đã nộp"
     active.forEach((enr, idx) => {
       const enrId = enr.enrollmentId || enr.id;
       rows.push({
         key: `${sid}-${enrId || idx}`,
         studentId: sid,
         studentCode,
-        studentName: student.name || '—',
-        courseName: enr.courseName || enr.name || student.course || '—',
+        studentName: student.name || '-',
+        courseName: enr.courseName || enr.name || student.course || '-',
         price: Number(enr.price) || 0,
         paid: isPaidEnr(enr),
         paymentMethod: student.paymentMethod || 'transfer',
@@ -402,8 +405,8 @@ export function expandFinanceEnrollmentRows(students) {
         key: `${sid}-refund-${enrId || idx}`,
         studentId: sid,
         studentCode,
-        studentName: student.name || '—',
-        courseName: `${courseName} — Hoàn học phí`,
+        studentName: student.name || '-',
+        courseName: `${courseName} - Hoàn học phí`,
         price: -refundAmt,
         paid: false,
         paymentMethod: student.paymentMethod || 'transfer',

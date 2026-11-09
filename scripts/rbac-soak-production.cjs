@@ -1,5 +1,5 @@
 /**
- * Phase 8.17 — Production soak orchestrator (LIVE PRIMARY).
+ * Phase 8.17 - Production soak orchestrator (LIVE PRIMARY).
  *
  * Does NOT enable RBAC flags.
  * Does NOT promote Enterprise.

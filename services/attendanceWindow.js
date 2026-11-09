@@ -12,8 +12,8 @@
 const ATTENDANCE_GRACE_MINUTES = Math.max(
   0,
   Number(process.env.ATTENDANCE_LATE_GRACE_MINUTES)
-    || Number(process.env.ATTENDANCE_GRACE_MINUTES)
-    || 60,
+  || Number(process.env.ATTENDANCE_GRACE_MINUTES)
+  || 60,
 );
 
 /** GV điểm danh được sau giờ bắt đầu + N phút (không cho bấm ngay lúc vào ca). */
@@ -22,7 +22,7 @@ const ATTENDANCE_UNLOCK_DELAY_MINUTES = 15;
 /** HV có 1 giờ để xác nhận sau khi GV gửi điểm danh. Quá hạn thì thành điểm danh bù. */
 const STUDENT_CONFIRM_MS = 60 * 60 * 1000;
 
-/** @deprecated alias — keep exports stable */
+/** @deprecated alias - keep exports stable */
 const ATTENDANCE_LATE_GRACE_MINUTES = ATTENDANCE_GRACE_MINUTES;
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -270,7 +270,7 @@ function assertTeacherAttendanceAllowed(schedule, { lateReason, now } = {}) {
     throw err;
   }
   if (win.state === 'CANCELLED') {
-    const err = new Error('Buổi học đã hủy — không thể điểm danh.');
+    const err = new Error('Buổi học đã hủy - không thể điểm danh.');
     err.status = 409;
     err.code = win.code;
     throw err;
@@ -299,7 +299,7 @@ function assertTeacherAttendanceAllowed(schedule, { lateReason, now } = {}) {
     err.code = win.code;
     throw err;
   }
-  // IN_PROGRESS / PENDING — allow (lateReason optional)
+  // IN_PROGRESS / PENDING - allow (lateReason optional)
   void lateReason;
   return win;
 }

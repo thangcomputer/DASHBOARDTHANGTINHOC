@@ -1,7 +1,7 @@
-# SCHEDULING SESSION LIMIT — AUDIT
+# SCHEDULING SESSION LIMIT - AUDIT
 
 Date: 2026-08-13  
-Status: AUDIT COMPLETE — ready for minimal patch
+Status: AUDIT COMPLETE - ready for minimal patch
 
 ## 1. Current flow
 
@@ -44,12 +44,12 @@ CQRS mirror `modules/attendance/*` exists but is not mounted live.
 
 | Rule | Today |
 |------|-------|
-| Student time overlap | Yes — `findStudentScheduleClash` |
+| Student time overlap | Yes - `findStudentScheduleClash` |
 | Student max sessions/day | **No** (only overlap; 08:00 + 14:00 same day allowed) |
 | Enrollment session cap | **No** on create |
 | Enrollment must be active | **No** |
 | Teacher conflict | Exact startTime only; missing on PUT reschedule |
-| Teacher daily HV count limit | **None** (good — not wrongly keyed) |
+| Teacher daily HV count limit | **None** (good - not wrongly keyed) |
 
 ## 5. Bugs / gaps
 

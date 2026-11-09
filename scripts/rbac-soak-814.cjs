@@ -1,5 +1,5 @@
 /**
- * Phase 8.14 — LOCAL RBAC soak (branch/ownership + known-legacy bare-admin).
+ * Phase 8.14 - LOCAL RBAC soak (branch/ownership + known-legacy bare-admin).
  * LIVE PRIMARY. Enterprise observe/dual-check only. Does not change .env defaults.
  *
  * Usage: node scripts/rbac-soak-814.cjs
@@ -144,7 +144,7 @@ function liveScopeDenyThenShadow(permission) {
   return async (req, res, next) => {
     const ctx = applySoakContext(req);
     if (ctx.scopeOk && ctx.ownershipOk) return next();
-    // LIVE DENY for scope/ownership — still run shadow hooks (same as checkPermission)
+    // LIVE DENY for scope/ownership - still run shadow hooks (same as checkPermission)
     const opts = {
       liveDecision: 'DENY',
       livePermission: permission,
@@ -297,7 +297,7 @@ async function runMatrix(server) {
   await hit('STAFF_TEACHER_MANAGE', 'POST', '/soak/teachers/score');
   await hit('STAFF_TEACHER_MANAGE', 'POST', '/soak/teachers/approve');
   await hit('STAFF_TEACHER_MANAGE', 'POST', '/soak/teachers/reject');
-  // create/delete remain SUPER authority in LIVE product semantics — exercise SUPER only
+  // create/delete remain SUPER authority in LIVE product semantics - exercise SUPER only
   await hit('SUPER', 'POST', '/soak/teachers/create', { action: 'create' });
   await hit('SUPER', 'DELETE', '/soak/teachers/delete', { action: 'delete' });
 
@@ -373,7 +373,7 @@ async function main() {
         classification: 'LEGACY_COMPATIBILITY',
         knownAs: 'KNOWN_LEGACY_MISMATCH',
         live: 'JWT admin|staff + permissions without adminRole → ALLOW (assertStaffPermissions fallthrough)',
-        enterprise: 'CONDITIONAL DENY (role_unresolved_adminRole) — no admin→SUPER/STAFF flatten',
+        enterprise: 'CONDITIONAL DENY (role_unresolved_adminRole) - no admin→SUPER/STAFF flatten',
         action: 'Keep MISMATCH; do not promote; future architectural approval required',
       },
       ENTERPRISE_PRIMARY_READY: 'NO',

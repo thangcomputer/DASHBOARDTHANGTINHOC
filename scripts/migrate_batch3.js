@@ -8,7 +8,7 @@ const ROUTES_DIR = path.join(__dirname, '../routes');
   const filePath = path.join(ROUTES_DIR, 'blogRoutes.js');
   if (fs.existsSync(filePath)) {
     let content = fs.readFileSync(filePath, 'utf8');
-    
+
     // Update imports
     content = content.replace(
       /const\s*\{\s*authMiddleware,\s*checkPermission,\s*userHasPermission\s*\}\s*=\s*require\('\.\.\/shared\/middleware\/authMiddleware'\);/g,
@@ -31,7 +31,7 @@ const ROUTES_DIR = path.join(__dirname, '../routes');
   const filePath = path.join(ROUTES_DIR, 'builderRoutes.js');
   if (fs.existsSync(filePath)) {
     let content = fs.readFileSync(filePath, 'utf8');
-    
+
     // Update imports
     content = content.replace(
       /const\s*\{\s*authMiddleware,\s*isAdmin\s*\}\s*=\s*require\('\.\.\/shared\/middleware\/authMiddleware'\);/g,
@@ -54,7 +54,7 @@ const ROUTES_DIR = path.join(__dirname, '../routes');
   const filePath = path.join(ROUTES_DIR, 'notificationRoutes.js');
   if (fs.existsSync(filePath)) {
     let content = fs.readFileSync(filePath, 'utf8');
-    
+
     // Update imports
     content = content.replace(
       /const\s*\{\s*authMiddleware,\s*isAdmin\s*\}\s*=\s*require\('\.\.\/shared\/middleware\/authMiddleware'\);/g,
@@ -77,7 +77,7 @@ const ROUTES_DIR = path.join(__dirname, '../routes');
   const filePath = path.join(ROUTES_DIR, 'fileRoutes.js');
   if (fs.existsSync(filePath)) {
     let content = fs.readFileSync(filePath, 'utf8');
-    
+
     // Update imports
     content = content.replace(
       /const\s*\{\s*authMiddleware,\s*checkPermission,\s*checkAnyPermission\s*\}\s*=\s*require\('\.\.\/shared\/middleware\/authMiddleware'\);/g,
@@ -87,7 +87,7 @@ const ROUTES_DIR = path.join(__dirname, '../routes');
     // This file uses checkPermission dynamically:
     // return checkPermission(PERMISSIONS.SYSTEM_SETTINGS)(req, res, next);
     // return checkAnyPermission(PERMISSIONS.MANAGE_BLOG, PERMISSIONS.MANAGE_FINANCE)(req, res, next);
-    
+
     content = content.replace(
       /checkAnyPermission\(([^)]+)\)\(req, res, next\)/g,
       (match, args) => {

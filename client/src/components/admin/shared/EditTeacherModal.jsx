@@ -218,7 +218,7 @@ export default function EditTeacherModal({
                         onChange={(e) => setEditTeacher((p) => ({ ...p, voiceRegion: e.target.value }))}
                         className="cms-input cursor-pointer"
                       >
-                        <option value="">— Chưa chọn —</option>
+                        <option value="">- Chưa chọn -</option>
                         {VOICE_REGION_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
@@ -293,7 +293,7 @@ export default function EditTeacherModal({
                             }}
                             className="cms-input"
                           >
-                            <option value="">— Chưa phân chi nhánh —</option>
+                            <option value="">- Chưa phân chi nhánh -</option>
                             {currentBranchId && !hasCurrentBranchOption && (
                               <option value={currentBranchId}>
                                 {currentBranchObject?.name || editTeacher.branchCode || `Chi nhánh ${currentBranchId}`}
@@ -359,11 +359,10 @@ export default function EditTeacherModal({
                             key={amt}
                             type="button"
                             onClick={() => setEditTeacher((p) => ({ ...p, baseSalaryPerSession: amt }))}
-                            className={`text-xs font-semibold px-2 py-1 rounded-md border transition ${
-                              salary === amt
+                            className={`text-xs font-semibold px-2 py-1 rounded-md border transition ${salary === amt
                                 ? 'border-sky-400 bg-sky-50 text-sky-800'
                                 : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
+                              }`}
                           >
                             {formatHoaHong(amt)}
                           </button>
@@ -391,11 +390,10 @@ export default function EditTeacherModal({
                             key={amt}
                             type="button"
                             onClick={() => setEditTeacher((p) => ({ ...p, customStarBonusAmount: amt }))}
-                            className={`text-xs font-semibold px-2 py-1 rounded-md border transition ${
-                              (editTeacher.customStarBonusAmount ?? 200000) === amt
+                            className={`text-xs font-semibold px-2 py-1 rounded-md border transition ${(editTeacher.customStarBonusAmount ?? 200000) === amt
                                 ? 'border-amber-400 bg-amber-50 text-amber-800'
                                 : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
+                              }`}
                           >
                             {formatHoaHong(amt)}
                           </button>

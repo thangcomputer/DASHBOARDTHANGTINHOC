@@ -153,31 +153,31 @@ export default function AddTeacherModal({
                 </div>
               </div>
 
-                  <div className="cms-form-row">
-                    <div>
-                      <label className="cms-label">Địa chỉ</label>
-                      <input
-                        type="text"
-                        value={teacherForm.address}
-                        onChange={(e) => setTeacherForm((p) => ({ ...p, address: e.target.value }))}
-                        className="cms-input"
-                        placeholder="123 Đường ABC, Quận X..."
-                      />
-                    </div>
-                    <div>
-                      <label className="cms-label">Giọng (vùng miền)</label>
-                      <CmsSelect
-                        value={teacherForm.voiceRegion || ''}
-                        onChange={(e) => setTeacherForm((p) => ({ ...p, voiceRegion: e.target.value }))}
-                        className="cms-input cursor-pointer"
-                      >
-                        <option value="">— Chưa chọn —</option>
-                        {VOICE_REGION_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </CmsSelect>
-                    </div>
-                  </div>
+              <div className="cms-form-row">
+                <div>
+                  <label className="cms-label">Địa chỉ</label>
+                  <input
+                    type="text"
+                    value={teacherForm.address}
+                    onChange={(e) => setTeacherForm((p) => ({ ...p, address: e.target.value }))}
+                    className="cms-input"
+                    placeholder="123 Đường ABC, Quận X..."
+                  />
+                </div>
+                <div>
+                  <label className="cms-label">Giọng (vùng miền)</label>
+                  <CmsSelect
+                    value={teacherForm.voiceRegion || ''}
+                    onChange={(e) => setTeacherForm((p) => ({ ...p, voiceRegion: e.target.value }))}
+                    className="cms-input cursor-pointer"
+                  >
+                    <option value="">- Chưa chọn -</option>
+                    {VOICE_REGION_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </CmsSelect>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -189,17 +189,17 @@ export default function AddTeacherModal({
             </div>
             <div className="cms-form space-y-3">
               <div>
-              <CourseSubjectSelector
-                catalog={examSubjectsCatalog}
-                value={teacherForm.subjectIds || []}
-                accent="blue"
-                onChange={(ids) => setTeacherForm((p) => ({
-                  ...p,
-                  subjectIds: ids,
-                  specialty: formatSubjectIdsAsSpecialty(ids, examSubjectsCatalog),
-                }))}
-              />
-              {teacherForm.specialty ? (
+                <CourseSubjectSelector
+                  catalog={examSubjectsCatalog}
+                  value={teacherForm.subjectIds || []}
+                  accent="blue"
+                  onChange={(ids) => setTeacherForm((p) => ({
+                    ...p,
+                    subjectIds: ids,
+                    specialty: formatSubjectIdsAsSpecialty(ids, examSubjectsCatalog),
+                  }))}
+                />
+                {teacherForm.specialty ? (
                   <p className="text-xs text-sky-700 mt-1.5 font-semibold">
                     Chuyên môn: {teacherForm.specialty}
                   </p>
@@ -226,7 +226,7 @@ export default function AddTeacherModal({
                     }}
                     className="cms-input cursor-pointer"
                   >
-                    <option value="">— Chọn chi nhánh —</option>
+                    <option value="">- Chọn chi nhánh -</option>
                     {branches.map((b) => (
                       <option key={b._id || b.id} value={b._id || b.id}>
                         {b.name}{b.code ? ` (${b.code})` : ''}
@@ -284,18 +284,17 @@ export default function AddTeacherModal({
                       key={amt}
                       type="button"
                       onClick={() => setTeacherForm((p) => ({ ...p, baseSalaryPerSession: amt }))}
-                      className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition ${
-                        salary === amt
+                      className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition ${salary === amt
                           ? 'border-sky-400 bg-sky-50 text-sky-800'
                           : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       {formatHoaHong(amt)}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-slate-500 mt-1.5">
-                  Mức cố định theo buổi dạy — không đổi theo sao. Có thể chỉnh lại khi thanh toán.
+                  Mức cố định theo buổi dạy - không đổi theo sao. Có thể chỉnh lại khi thanh toán.
                 </p>
               </div>
 

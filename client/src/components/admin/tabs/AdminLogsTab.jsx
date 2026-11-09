@@ -5,9 +5,9 @@ import { Lock, RefreshCw, MoreVertical, Trash2 } from 'lucide-react';
 import api from '../../../services/api';
 
 function formatDate(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
@@ -20,7 +20,7 @@ function formatDate(value) {
 
 function formatMoney(amount) {
   const n = Number(amount);
-  if (!Number.isFinite(n) || n === 0) return '—';
+  if (!Number.isFinite(n) || n === 0) return '-';
   const abs = Math.abs(n).toLocaleString('vi-VN') + 'đ';
   return n < 0 ? `−${abs}` : abs;
 }
@@ -103,74 +103,74 @@ export default function AdminLogsTab() {
   return (
     <div className="cms-viewport-module bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-500">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white shrink-0">
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Lock size={20} className="text-slate-600" />
-            Nhật Ký Hệ Thống
-          </h2>
-          <button
-            type="button"
-            onClick={refresh}
-            className="text-xs font-bold text-blue-600 flex items-center gap-1.5 hover:underline decoration-2 underline-offset-4"
-          >
-            <RefreshCw size={14} className={isLoadingLogs ? 'animate-spin' : ''} /> Làm mới
-          </button>
-        </div>
+        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <Lock size={20} className="text-slate-600" />
+          Nhật Ký Hệ Thống
+        </h2>
+        <button
+          type="button"
+          onClick={refresh}
+          className="text-xs font-bold text-blue-600 flex items-center gap-1.5 hover:underline decoration-2 underline-offset-4"
+        >
+          <RefreshCw size={14} className={isLoadingLogs ? 'animate-spin' : ''} /> Làm mới
+        </button>
+      </div>
 
-        <div className="cms-viewport-scroll overflow-x-auto">
-          {isLoadingLogs ? (
-            <div className="p-12 text-center text-gray-400">
-              <RefreshCw size={40} className="mx-auto mb-3 text-gray-300 animate-spin" />
-              <p className="text-sm">Đang tải nhật ký...</p>
-            </div>
-          ) : rows.length > 0 ? (
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-left text-[11px] font-black  tracking-wider text-slate-500">
-                  <th className="px-4 py-3 w-14">STT</th>
-                  <th className="px-4 py-3 w-44">Ngày tháng</th>
-                  <th className="px-4 py-3">Nội dung</th>
-                  <th className="px-4 py-3 w-44">Ai làm</th>
-                  <th className="px-4 py-3 w-36 text-right">Tiền</th>
-                  <th className="px-4 py-3 w-12" aria-label="Thao tác" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {rows.map((log, idx) => {
-                  const id = log._id || log.id;
-                  const amount = Number(log.amount) || 0;
-                  return (
-                    <tr key={id || idx} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-4 py-3 text-slate-400 font-semibold tabular-nums">{idx + 1}</td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{formatDate(log.createdAt)}</td>
-                      <td className="px-4 py-3 text-slate-800">
-                        <div className="font-medium leading-snug">{log.message || log.action || '—'}</div>
-                        {log.action && log.message && log.message !== log.action && (
-                          <div className="text-[11px] text-slate-400 mt-0.5 font-semibold  tracking-wide">
-                            {log.action}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 font-semibold whitespace-nowrap">
-                        {log.name || 'Hệ thống'}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-bold tabular-nums whitespace-nowrap ${amount < 0 ? 'text-red-600' : amount > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                        {formatMoney(amount)}
-                      </td>
-                      <td className="px-2 py-3">
-                        <RowMenu logId={id} onDeleted={onDeleted} toast={toast} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-12 text-center text-gray-400">
-              <Lock size={40} className="mx-auto mb-3 text-gray-300" />
-              <p className="text-sm">Chưa có hoạt động nào được ghi nhận</p>
-            </div>
-          )}
-        </div>
+      <div className="cms-viewport-scroll overflow-x-auto">
+        {isLoadingLogs ? (
+          <div className="p-12 text-center text-gray-400">
+            <RefreshCw size={40} className="mx-auto mb-3 text-gray-300 animate-spin" />
+            <p className="text-sm">Đang tải nhật ký...</p>
+          </div>
+        ) : rows.length > 0 ? (
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100 text-left text-[11px] font-black  tracking-wider text-slate-500">
+                <th className="px-4 py-3 w-14">STT</th>
+                <th className="px-4 py-3 w-44">Ngày tháng</th>
+                <th className="px-4 py-3">Nội dung</th>
+                <th className="px-4 py-3 w-44">Ai làm</th>
+                <th className="px-4 py-3 w-36 text-right">Tiền</th>
+                <th className="px-4 py-3 w-12" aria-label="Thao tác" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {rows.map((log, idx) => {
+                const id = log._id || log.id;
+                const amount = Number(log.amount) || 0;
+                return (
+                  <tr key={id || idx} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3 text-slate-400 font-semibold tabular-nums">{idx + 1}</td>
+                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{formatDate(log.createdAt)}</td>
+                    <td className="px-4 py-3 text-slate-800">
+                      <div className="font-medium leading-snug">{log.message || log.action || '-'}</div>
+                      {log.action && log.message && log.message !== log.action && (
+                        <div className="text-[11px] text-slate-400 mt-0.5 font-semibold  tracking-wide">
+                          {log.action}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 font-semibold whitespace-nowrap">
+                      {log.name || 'Hệ thống'}
+                    </td>
+                    <td className={`px-4 py-3 text-right font-bold tabular-nums whitespace-nowrap ${amount < 0 ? 'text-red-600' : amount > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {formatMoney(amount)}
+                    </td>
+                    <td className="px-2 py-3">
+                      <RowMenu logId={id} onDeleted={onDeleted} toast={toast} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div className="p-12 text-center text-gray-400">
+            <Lock size={40} className="mx-auto mb-3 text-gray-300" />
+            <p className="text-sm">Chưa có hoạt động nào được ghi nhận</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

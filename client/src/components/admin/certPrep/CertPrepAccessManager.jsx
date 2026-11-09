@@ -7,7 +7,7 @@ import CertPrepConfirmDialog from './CertPrepConfirmDialog';
 
 function studentLabel(row) {
   const s = row.studentId && typeof row.studentId === 'object' ? row.studentId : null;
-  if (!s) return String(row.studentId || '—');
+  if (!s) return String(row.studentId || '-');
   return `${s.name || 'Học viên'}${s.studentCode ? ` · ${s.studentCode}` : ''}${s.phone ? ` · ${s.phone}` : ''}`;
 }
 
@@ -15,7 +15,7 @@ function courseLabel(row, courses) {
   const c = row.courseId && typeof row.courseId === 'object' ? row.courseId : null;
   if (c?.name) return c.name;
   const found = courses.find((x) => String(x._id || x.id) === String(row.courseId));
-  return found?.name || '—';
+  return found?.name || '-';
 }
 
 export default function CertPrepAccessManager({ courses, rows, loading, onRefresh, toast }) {
@@ -202,14 +202,14 @@ export default function CertPrepAccessManager({ courses, rows, loading, onRefres
                 <tr key={row._id || row.id} className="border-t border-slate-100">
                   <td className="px-4 py-3">{studentLabel(row)}</td>
                   <td className="px-4 py-3">{courseLabel(row, courses)}</td>
-                  <td className="px-4 py-3">{row.grantedAt ? new Date(row.grantedAt).toLocaleString('vi-VN') : '—'}</td>
+                  <td className="px-4 py-3">{row.grantedAt ? new Date(row.grantedAt).toLocaleString('vi-VN') : '-'}</td>
                   <td className="px-4 py-3">{row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('vi-VN') : 'Không hết hạn'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-bold ${row.isActive === false ? 'text-slate-400' : 'text-emerald-600'}`}>
                       {row.isActive === false ? 'Tắt' : 'Bật'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{row.grantedBy || '—'}</td>
+                  <td className="px-4 py-3 text-slate-500">{row.grantedBy || '-'}</td>
                   <td className="px-4 py-3 text-right space-x-2">
                     <button type="button" onClick={() => openExtend(row, false)} className="text-xs font-bold text-slate-600 hover:text-red-600">Gia hạn</button>
                     {row.isActive === false ? (

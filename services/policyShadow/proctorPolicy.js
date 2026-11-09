@@ -2,7 +2,7 @@
  * Policy shadow for LIVE /api/proctor (Wave 6.15).
  * events/ingest + events/me: auth-only.
  * events/:userId: isAdmin (role admin|staff).
- * ingest binds userId from JWT actor — not client spoof.
+ * ingest binds userId from JWT actor - not client spoof.
  */
 const ACTIONS = new Set(['events_ingest', 'events_me', 'events_user']);
 
@@ -25,7 +25,7 @@ function evaluateAuthOnly(subject) {
   return { decision: 'ALLOW', reason: 'authenticated', statusHint: 200 };
 }
 
-/** Mirrors isAdmin — role admin OR staff. */
+/** Mirrors isAdmin - role admin OR staff. */
 function evaluateIsAdmin(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };

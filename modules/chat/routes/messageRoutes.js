@@ -19,7 +19,7 @@ const { normalizeMulterFile } = require('../../../utils/escapeRegex');
 const isStaffAccount = (u = {}) => u.role === 'staff' || u.adminRole === 'STAFF' || u.adminRole === 'SUPPORT' || u.adminRole === 'SUPPORT_AGENT';
 const isSuperAdminAccount = (u = {}) => u.id === 'admin' || u.adminRole === 'SUPER_ADMIN';
 const isHighAdminAccount = (u = {}) => u.adminRole === 'HIGH_ADMIN';
-/** SUPER_ADMIN + HIGH_ADMIN — chia sẻ admin mailbox */
+/** SUPER_ADMIN + HIGH_ADMIN - chia sẻ admin mailbox */
 const isAdminLevelAccount = (u = {}) => isSuperAdminAccount(u) || isHighAdminAccount(u);
 
 function toClientMessage(doc) {

@@ -1,4 +1,4 @@
-# Upload & Media Service Review — Sprint 4.3 Batch 4
+# Upload & Media Service Review - Sprint 4.3 Batch 4
 
 ## Domains: `file`, `media`, `upload`
 

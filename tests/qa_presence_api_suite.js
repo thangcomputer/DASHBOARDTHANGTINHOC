@@ -99,9 +99,9 @@ async function runTests() {
       return;
     }
   }
-  
+
   console.log('✅ Đã đăng nhập 6 users.');
-  
+
   // 1. Connect all sockets except Teacher
   const sockets = {};
   for (const role of ['superAdmin', 'branchAdmin', 'student']) {
@@ -118,15 +118,15 @@ async function runTests() {
 
   // Wait a moment for initial sync
   await new Promise(r => setTimeout(r, 2000));
-  
+
   // 2. Teacher connects (Logs in)
   console.log('\n--- Kiểm tra Real-time Login (Teacher) ---');
   let teacherOnlinePromise = waitForEvent(sockets.student, 'users:online');
   sockets.teacher = await connectSocket(auths.teacher, 'teacher');
-  
+
   let newList = await teacherOnlinePromise;
   if (!newList) newList = currentOnlineList;
-  
+
   const teacherId = auths.teacher.user.user._id || auths.teacher.user._id || auths.teacher.user.id;
   const isTeacherOnline = newList.some(u => String(u.userId) === String(teacherId));
   if (isTeacherOnline) {
@@ -141,9 +141,9 @@ async function runTests() {
   console.log('\n--- Kiểm tra Real-time Logout (Teacher) ---');
   sockets.teacher.disconnect();
   await delay(1000);
-  
+
   let offlineList = currentOnlineList;
-  
+
   const isTeacherStillOnline = offlineList.some(u => String(u.userId) === String(teacherId));
   if (!isTeacherStillOnline) {
     addResult('Teacher', 'Log out (Student view)', 'See Teacher Offline immediately', 'Seen Offline', 'Passed', 'N/A');
@@ -155,7 +155,7 @@ async function runTests() {
   console.log('\n--- Kiểm tra Multi-device (Support) ---');
   let supportOnlinePromise1 = waitForEvent(sockets.student, 'users:online');
   const supportSocket1 = await connectSocket(auths.support, 'support1');
-  
+
   let listSupport1 = await supportOnlinePromise1 || currentOnlineList;
   const supportId = auths.support.user.user._id || auths.support.user._id || auths.support.user.id;
   const isSupportOnline1 = listSupport1.some(u => String(u.userId) === String(supportId));
@@ -169,13 +169,13 @@ async function runTests() {
   let supportOnlinePromise2 = waitForEvent(sockets.student, 'users:online');
   const supportSocket2 = await connectSocket(auths.support, 'support2');
   let listSupport2 = await supportOnlinePromise2 || currentOnlineList;
-  
+
   // Disconnect Device A
   supportSocket1.disconnect();
   await delay(1000);
   let listSupportAfterDevice1 = currentOnlineList;
   const isSupportStillOnline = listSupportAfterDevice1.some(u => String(u.userId) === String(supportId));
-  
+
   if (isSupportStillOnline) {
     addResult('Support', 'Logout Device 1 (Has Device 2)', 'Support still Online', 'Still Online', 'Passed', 'N/A');
   } else {
@@ -187,7 +187,7 @@ async function runTests() {
   await delay(1000);
   let listSupportAfterDevice2 = currentOnlineList;
   const isSupportFullyOffline = listSupportAfterDevice2.some(u => String(u.userId) === String(supportId)) === false;
-  
+
   if (isSupportFullyOffline) {
     addResult('Support', 'Logout Device 2', 'Support Offline', 'Seen Offline', 'Passed', 'N/A');
   } else {

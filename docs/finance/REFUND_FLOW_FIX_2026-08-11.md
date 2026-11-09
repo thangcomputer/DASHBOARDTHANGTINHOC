@@ -1,4 +1,4 @@
-# PHASE REFUND-FIX-1 — Refund/Cancel Consistency Fix
+# PHASE REFUND-FIX-1 - Refund/Cancel Consistency Fix
 
 **Date:** 2026-08-11  
 **Implements:** findings in `REFUND_FLOW_OUTSIDE_VS_DETAIL_2026-08-11.md`
@@ -29,7 +29,7 @@ Both AdminStudentsTab and StudentDetailModal call the same API.
 
 | File | Change |
 |------|--------|
-| `services/enrollmentService.js` | Canonical `syncStudentFromPrimaryEnrollment` — last enrollment → `course = '(Đã hủy)'` |
+| `services/enrollmentService.js` | Canonical `syncStudentFromPrimaryEnrollment` - last enrollment → `course = '(Đã hủy)'` |
 | `routes/studentRoutes.js` | Use shared sync; clearer save-after-refund error; keep `postRefund` before save |
 | `tests/unit/refund_cancel_enrollment_sync.test.js` | Targeted unit tests (A–F) |
 | `client/src/components/StudentDetailModal.jsx` | Remove debug `#region agent log` only (display mapping from prior phase kept) |
@@ -211,4 +211,4 @@ Legacy enrollment handling: PASS
 Regression tests: PASS (targeted unit suite)
 ```
 
-**STOP** — C4 not started. REVIEW on consistency = residual non-TX boundary documented; last-enrollment validation fix is PASS.
+**STOP** - C4 not started. REVIEW on consistency = residual non-TX boundary documented; last-enrollment validation fix is PASS.

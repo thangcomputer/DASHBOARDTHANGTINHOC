@@ -10,7 +10,7 @@ const TrainingProgress = require('../models/TrainingProgress'); // Temp for new 
 const { authMiddleware } = require('../../../shared/middleware/authMiddleware');
 
 // Lấy danh sách khóa đào tạo
-router.get('/courses', authMiddleware,trainingController.get_courses);
+router.get('/courses', authMiddleware, trainingController.get_courses);
 
 function findCourseInSettings(settings, courseId) {
   const id = String(courseId);
@@ -24,10 +24,10 @@ function findCourseInSettings(settings, courseId) {
 }
 
 // Lấy danh sách bài học của 1 khóa (Kèm trạng thái khóa/mở)
-router.get('/courses/:id/lessons', authMiddleware,trainingController.get_courses_id_lessons);
+router.get('/courses/:id/lessons', authMiddleware, trainingController.get_courses_id_lessons);
 
 // Hoàn thành bài học
-router.post('/complete-lesson', authMiddleware,trainingController.post_complete_lesson);
+router.post('/complete-lesson', authMiddleware, trainingController.post_complete_lesson);
 
 function collectCourseLessons(course) {
   let courseLessons = course.lessons || course.videos || [];
@@ -58,7 +58,7 @@ function mapLessonForTeacherUi(lesson, index) {
   return {
     title: lesson.title || `Bài ${index + 1}`,
     url,
-    duration: duration || '—',
+    duration: duration || '-',
   };
 }
 
@@ -72,15 +72,15 @@ function mapFileForTeacherUi(file) {
 }
 
 // Lấy tổng quan phần trăm hoàn thành của TẤT CẢ khóa học của người dùng hiện tại
-router.get('/progress/me', authMiddleware,trainingController.get_progress_me);
+router.get('/progress/me', authMiddleware, trainingController.get_progress_me);
 
 // Tổng quan đào tạo GV: khóa học + tiến độ + quy trình + tài liệu (1 request)
-router.get('/teacher/overview', authMiddleware,trainingController.get_teacher_overview);
+router.get('/teacher/overview', authMiddleware, trainingController.get_teacher_overview);
 
-// ⏱ Lưu tiến độ xem tạm thời (auto-save mỗi 30s — chống F5 reset bộ đếm)
-router.post('/save-watch-progress', authMiddleware,trainingController.post_save_watch_progress);
+// ⏱ Lưu tiến độ xem tạm thời (auto-save mỗi 30s - chống F5 reset bộ đếm)
+router.post('/save-watch-progress', authMiddleware, trainingController.post_save_watch_progress);
 
 // [ADMIN] Theo dõi tiến độ đào tạo của tất cả giảng viên
-router.get('/admin/progress/:courseId', authMiddleware,trainingController.get_admin_progress_courseId);
+router.get('/admin/progress/:courseId', authMiddleware, trainingController.get_admin_progress_courseId);
 
 module.exports = router;

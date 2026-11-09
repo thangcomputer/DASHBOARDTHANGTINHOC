@@ -12,7 +12,7 @@ function writeReport(filename, content) {
 const domains = ['finance', 'payment', 'invoice', 'transaction', 'exam', 'certificate', 'analytics', 'report'];
 
 domains.forEach(domain => {
-  writeReport(`${domain}-dto-review.md`, `# ${domain.charAt(0).toUpperCase() + domain.slice(1)} DTO Review — Sprint 4.4 Batch 3
+  writeReport(`${domain}-dto-review.md`, `# ${domain.charAt(0).toUpperCase() + domain.slice(1)} DTO Review - Sprint 4.4 Batch 3
 
 ## DTO & Validation Extraction Complete
 - **Zod Validators**: Generated inside \`dto/validators/\` with \`passthrough()\` for zero-regression backward compatibility.
@@ -28,7 +28,7 @@ ${domain === 'certificate' ? 'Note: certificate domain currently contains no app
 `);
 });
 
-writeReport('mapper-boundary-review-batch3.md', `# Mapper Boundary Review — Sprint 4.4 Batch 3
+writeReport('mapper-boundary-review-batch3.md', `# Mapper Boundary Review - Sprint 4.4 Batch 3
 
 ## Compliance
 - Mappers successfully generated for transactional domains.
@@ -38,7 +38,7 @@ writeReport('mapper-boundary-review-batch3.md', `# Mapper Boundary Review — Sp
 - **Isolation**: Mappers contain 0 database/repository logic.
 `);
 
-writeReport('validation-boundary-review-batch3.md', `# Validation Boundary Review — Sprint 4.4 Batch 3
+writeReport('validation-boundary-review-batch3.md', `# Validation Boundary Review - Sprint 4.4 Batch 3
 
 ## Compliance
 - **Exception Wrapping**: \`ValidationException\` actively wrapping Zod errors.

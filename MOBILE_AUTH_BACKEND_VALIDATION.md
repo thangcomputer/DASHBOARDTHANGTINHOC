@@ -44,7 +44,7 @@ Readiness này chỉ áp dụng cho backend mobile multi-session auth trong môi
 | Flag OFF và legacy Web | **PASS** | Mobile login bị tắt; Web login/refresh/logout vẫn hoạt động và access token legacy không có `sid` vẫn qua auth |
 | Student mobile login | **PASS** | Hai lần đăng nhập tạo hai session riêng; cả hai token đều hợp lệ |
 | Teacher active login | **PASS** | Token role vẫn là `teacher` |
-| Teacher pending/locked | **PASS — theo behavior hiện tại** | Pending được phép login theo cùng rule của legacy public login; locked bị chặn 403 |
+| Teacher pending/locked | **PASS - theo behavior hiện tại** | Pending được phép login theo cùng rule của legacy public login; locked bị chặn 403 |
 | Admin/Staff mobile login | **PASS** | Bị chặn với `MOBILE_ROLE_NOT_ALLOWED` |
 | Claims `sid`, `jti`, `aud=mobile` | **PASS** | Đã kiểm tra access/refresh claims; không ghi token ra report |
 | Hai thiết bị cùng user | **PASS** | Login thiết bị B không làm mất hiệu lực session A |
@@ -53,7 +53,7 @@ Readiness này chỉ áp dụng cho backend mobile multi-session auth trong môi
 | Session list/revoke | **PASS** | Chỉ trả session của owner; revoke một session không ảnh hưởng session gọi API; user khác không thể list/revoke |
 | Session expiry | **PASS** | Mongo-backed validation/rotation từ chối session quá hạn; API list biểu diễn trạng thái `expired` |
 | CSRF | **PASS** | POST thiếu double-submit cookie/header nhận 403 `CSRF_INVALID`; flow cookie + header hợp lệ hoạt động |
-| Security-event revoke | **PASS — helper** | Helper revoke trên Mongo thật và ngắt session room qua Redis adapter; không chạy riêng từng route đổi mật khẩu/lock/suspend |
+| Security-event revoke | **PASS - helper** | Helper revoke trên Mongo thật và ngắt session room qua Redis adapter; không chạy riêng từng route đổi mật khẩu/lock/suspend |
 | Redis unavailable/memory fallback | **NOT RUN** | Không dùng fallback để tuyên bố Redis integration PASS |
 | Presence đa thiết bị | **KNOWN LIMITATION** | Mobile socket hiện không ghi vào presence store một-socket/user; không có trạng thái online tổng hợp cho mobile-only. Không mở rộng scope vì đây không phải auth POC gate. |
 | Revoke all other sessions API | **NOT APPLICABLE** | Không có API này; không tự thêm |

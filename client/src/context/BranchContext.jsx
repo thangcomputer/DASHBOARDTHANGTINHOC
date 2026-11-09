@@ -1,5 +1,5 @@
 /**
- * BranchContext.jsx — Global Branch Filter Context
+ * BranchContext.jsx - Global Branch Filter Context
  *
  * SUPER_ADMIN / HIGH_ADMIN: mặc định "Tất cả chi nhánh"; có thể chọn 1 CN.
  * STAFF: khóa theo branchId tài khoản.
@@ -10,7 +10,7 @@ const BranchContext = createContext({
   selectedBranchId: 'all',
   selectedBranchName: 'Tất cả chi nhánh',
   branches: [],
-  setSelectedBranch: () => {},
+  setSelectedBranch: () => { },
   branchQueryParam: '',        // '?branch_id=xxx' hoặc ''
   isLoadingBranches: false,
 });
@@ -35,18 +35,18 @@ function getToken() {
 }
 
 export function BranchProvider({ session, children }) {
-  const [selectedBranchId,   setSelectedBranchId]   = useState('all');
+  const [selectedBranchId, setSelectedBranchId] = useState('all');
   const [selectedBranchName, setSelectedBranchName] = useState('Tất cả chi nhánh');
-  const [branches,           setBranches]            = useState([]);
-  const [isLoadingBranches,  setIsLoadingBranches]   = useState(false);
+  const [branches, setBranches] = useState([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState(() => {
     try { return localStorage.getItem('selected_tenant_id') || 'all'; } catch { return 'all'; }
   });
   const [tenants, setTenants] = useState([]);
 
   const isSuperAdmin = session?.id === 'admin' || session?.adminRole === 'SUPER_ADMIN';
-  const isHighAdmin  = session?.adminRole === 'HIGH_ADMIN';
-  const isStaff      = session?.adminRole === 'STAFF';
+  const isHighAdmin = session?.adminRole === 'HIGH_ADMIN';
+  const isStaff = session?.adminRole === 'STAFF';
   const staffBranchId = session?.branchId;
 
   // 🛡️ ARCHITECTURAL LOCK: STAFF luôn bị khóa tại chi nhánh của họ
@@ -60,7 +60,7 @@ export function BranchProvider({ session, children }) {
   }, [isStaff, staffBranchId, branches]);
 
   // HIGH_ADMIN: giữ mặc định "Tất cả chi nhánh" (state init).
-  // Không auto-ép về chi nhánh nhà / branches[0] — user chọn CN cụ thể khi cần.
+  // Không auto-ép về chi nhánh nhà / branches[0] - user chọn CN cụ thể khi cần.
 
   const setSelectedTenant = useCallback((id) => {
     const next = id || 'all';
@@ -90,7 +90,7 @@ export function BranchProvider({ session, children }) {
           if (!ok) setSelectedTenant('all');
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isSuperAdmin, selectedTenantId, setSelectedTenant]);
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export function BranchProvider({ session, children }) {
           setSelectedTenant('all');
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setIsLoadingBranches(false));
   }, [selectedTenantId, setSelectedTenant]);
 

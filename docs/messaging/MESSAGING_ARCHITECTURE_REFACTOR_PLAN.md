@@ -1,6 +1,6 @@
 # MESSAGING ARCHITECTURE REFACTOR PLAN
 
-**Status:** Design / freeze — **NO CODE CHANGES IN THIS STEP**  
+**Status:** Design / freeze - **NO CODE CHANGES IN THIS STEP**  
 **Date:** 2026-08-10  
 **Companion docs:**
 
@@ -11,7 +11,7 @@
 - [`pairing-matrix-824.md`](./pairing-matrix-824.md)
 - [`contact-visibility-824b.md`](./contact-visibility-824b.md)
 
-**Objective:** One source of truth for messaging policy, conversation membership, unread state, and inbox ordering — **without** rewriting working private DM delivery.
+**Objective:** One source of truth for messaging policy, conversation membership, unread state, and inbox ordering - **without** rewriting working private DM delivery.
 
 ---
 
@@ -72,7 +72,7 @@
 productRole (business):
   STUDENT | TEACHER | SUPPORT | STAFF | HIGH_ADMIN | SUPER_ADMIN
 
-transportRole (compatibility — keep):
+transportRole (compatibility - keep):
   student | teacher | staff | admin
   SUPPORT → staff   until dependency map + ID migration approved
 
@@ -88,7 +88,7 @@ displayRole (UI):
 
 See [`MESSAGING_MATRIX.md`](./MESSAGING_MATRIX.md).
 
-Unresolved items marked **CONFLICT — REQUIRES BUSINESS DECISION** (especially SUPER visibility for non-HIGH callers, and SUPPORT sitting on `ALL_STAFF`).
+Unresolved items marked **CONFLICT - REQUIRES BUSINESS DECISION** (especially SUPER visibility for non-HIGH callers, and SUPPORT sitting on `ALL_STAFF`).
 
 ---
 
@@ -159,7 +159,7 @@ Message.isRead / readAt / receiverId
 
 Global flag cannot be per-participant.
 
-### Target design (analyze only — Phase 10)
+### Target design (analyze only - Phase 10)
 
 ```text
 ConversationParticipant
@@ -220,7 +220,7 @@ ConversationParticipant
 | TYPING_EVENT | `typing:*` |
 | READ_EVENT | `message:read`, `message:read_ack` |
 
-No event may ambiguously behave as both DM and broadcast: **room + authorization** disambiguate; prefer splitting event names in a later cleanup if needed (`dm:receive` vs `broadcast:receive`) — optional, not required for correctness if rooms stay strict.
+No event may ambiguously behave as both DM and broadcast: **room + authorization** disambiguate; prefer splitting event names in a later cleanup if needed (`dm:receive` vs `broadcast:receive`) - optional, not required for correctness if rooms stay strict.
 
 ---
 
@@ -231,7 +231,7 @@ No event may ambiguously behave as both DM and broadcast: **room + authorization
 | Option | Product need? | Action |
 |---|---|---|
 | Realtime chat badge only | Likely current | Keep; derive from unread |
-| Persistent in-app notification history | Unknown | Decide separately — do not auto-add |
+| Persistent in-app notification history | Unknown | Decide separately - do not auto-add |
 | Email / push | Unknown | Decide separately |
 
 Document product decision before any NotificationService wiring on DM send.
@@ -248,7 +248,7 @@ Document product decision before any NotificationService wiring on DM send.
 | Unread counts | ✅ (target) | Display / optimistic UI |
 | Inbox order | ✅ `lastMessageAt` | Sort helper only |
 | Transport role helpers | Shared util OK | No policy branching |
-| Tabs / search / grouping | — | ✅ |
+| Tabs / search / grouping | - | ✅ |
 
 ---
 
@@ -260,7 +260,7 @@ Document product decision before any NotificationService wiring on DM send.
 |---|---|
 | Mounted in App? | **No** (`DataContext` uses `useDataMessaging`; comment says not mounted) |
 | Imported elsewhere? | Self + `messaging_hardening` static read |
-| Classification | **Legacy / partially retained for migration** — treat as **(2) legacy code**, reachable as module but **not** live UI path |
+| Classification | **Legacy / partially retained for migration** - treat as **(2) legacy code**, reachable as module but **not** live UI path |
 | Delete now? | **No** |
 | Next steps | Prove unused import graph → mark `@deprecated` → remove in separate phase after build/test |
 
@@ -330,7 +330,7 @@ Document product decision before any NotificationService wiring on DM send.
 
 ### Existing gates (baseline)
 
-- phase821 identity, phase822 locks, phase822 typing/read, phase823b contacts, phase824 pairing, messaging_isolation_fix — **PASS**
+- phase821 identity, phase822 locks, phase822 typing/read, phase823b contacts, phase824 pairing, messaging_isolation_fix - **PASS**
 - Fix/replace stale hardening assertion (`assertMessagingPairAllowed` vs `assertCanDirectMessage`)
 - Repair `messaging-isolation` auth/env before relying on it
 
@@ -338,7 +338,7 @@ Document product decision before any NotificationService wiring on DM send.
 
 **DM:** Student↔Teacher, Student↔Support, Teacher↔Support, Support↔Student/Teacher  
 
-**Support isolation:** Support A vs B same student — correct recipient; B does not receive; unread; inbox order; reconnect  
+**Support isolation:** Support A vs B same student - correct recipient; B does not receive; unread; inbox order; reconnect  
 
 **Branch:** Student A → Support A vs Support B per approved matrix  
 

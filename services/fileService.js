@@ -1,5 +1,5 @@
 /**
- * File service — upload theo category, registry FileAsset, xoa / purge het han.
+ * File service - upload theo category, registry FileAsset, xoa / purge het han.
  */
 const path = require('path');
 const fs = require('fs');
@@ -65,7 +65,7 @@ const CATEGORIES = {
     exts: ['.jpg', '.jpeg', '.png', '.webp', '.svg'],
     retentionDays: null,
   },
-  /** Avatar người dùng — FE gọi ?category=avatars; phải khớp OPEN_UPLOAD_CATEGORIES */
+  /** Avatar người dùng - FE gọi ?category=avatars; phải khớp OPEN_UPLOAD_CATEGORIES */
   avatars: {
     dir: 'avatars',
     maxBytes: 5 * 1024 * 1024,

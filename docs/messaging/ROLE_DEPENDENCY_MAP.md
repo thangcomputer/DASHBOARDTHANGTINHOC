@@ -1,8 +1,8 @@
-# ROLE DEPENDENCY MAP — Phase 1
+# ROLE DEPENDENCY MAP - Phase 1
 
-**Status:** Audit only — do **not** remove `messagingRole` / `transportRole=staff` yet.  
+**Status:** Audit only - do **not** remove `messagingRole` / `transportRole=staff` yet.  
 **Question:** Can `transportRole=staff` safely remain as an internal compatibility layer for SUPPORT?  
-**Answer (provisional):** **Yes, for now** — until every consumer listed below is migrated and conversationId aliases are proven. Migrating SUPPORT → `support` transport would rewrite conversation IDs and is explicitly **out of scope** in Phase 8.24.
+**Answer (provisional):** **Yes, for now** - until every consumer listed below is migrated and conversationId aliases are proven. Migrating SUPPORT → `support` transport would rewrite conversation IDs and is explicitly **out of scope** in Phase 8.24.
 
 ---
 
@@ -38,14 +38,14 @@ transportRole (compatibility layer):
 | `client/.../useDataMessaging.js` | Seeds conv IDs with transport roles |
 | `client/.../Inbox.jsx` | Tabs filter by transport `role` + `adminRole` |
 | `client/.../messagingIdentity.js` | Display vs transport |
-| `modules/chat/**` | Enterprise/shadow copies (unmounted live) — still contain role assumptions |
+| `modules/chat/**` | Enterprise/shadow copies (unmounted live) - still contain role assumptions |
 | Tests `phase821`–`phase824`, `messaging_isolation_fix`, `messaging_hardening` | Lock transport behavior |
 
 ### 2.2 `messagingRole` (runtime variable name)
 
 | Location | Usage |
 |---|---|
-| `server.js` `register` | `const messagingRole = getMessagingRole(socket.user)` — presence key + room joins |
+| `server.js` `register` | `const messagingRole = getMessagingRole(socket.user)` - presence key + room joins |
 | Comments / docs | Synonym for transport role |
 
 ### 2.3 `adminRole`
@@ -73,7 +73,7 @@ transportRole (compatibility layer):
 | `server.js` register / presence / lastSeen / broadcast branch | Presence + SYSTEM_BROADCAST |
 | `app.notifyUser` | Explicitly **must not** fan private DM to ALL_STAFF/SUPPORT; admin legacy uses ALL_ADMIN |
 | `utils/realtimeEmit.js` | Non-chat realtime; fail-closed to ALL_ADMIN |
-| `services/NotificationService.js` | Exam etc. — not live chat DM |
+| `services/NotificationService.js` | Exam etc. - not live chat DM |
 
 ---
 
@@ -120,7 +120,7 @@ Inbox tabs ──► display grouping only (must not redefine allow-list)
 |---|---|---|
 | `getMessagingRole` SUPPORT→staff | ✅ | Only with ID migration plan |
 | `Message.senderRole` enum without support | ✅ | If transport expands |
-| Pairing product roles | ✅ evolve policy module | — |
+| Pairing product roles | ✅ evolve policy module | - |
 | FE `messagingRoles.js` | ✅ keep in sync | Eventually delete local policy; keep transport helper if needed |
 | `MessagesContext` role assumptions | Document only | Deprecate after unused proof |
 | Role broadcast rooms | Keep for broadcast/presence | Ensure DM never uses them |

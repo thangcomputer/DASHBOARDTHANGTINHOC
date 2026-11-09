@@ -108,19 +108,17 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit }) {
             type="button"
             disabled={locked || out}
             onClick={() => { gameSounds.tap(); onSubmit({ index }); }}
-            className={`${CHIP} group flex items-center gap-3.5 !rounded-2xl !px-4 !py-4 text-left text-[15px] sm:!px-5 ${
-              isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop'
+            className={`${CHIP} group flex items-center gap-3.5 !rounded-2xl !px-4 !py-4 text-left text-[15px] sm:!px-5 ${isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800 !shadow-[0_3px_0_#6EE7B7] dp-pop'
                 : isWrongPick ? 'border-red-400 bg-red-50 text-red-700 !shadow-[0_3px_0_#FCA5A5] dp-shake'
                   : out ? 'border-slate-100 bg-slate-50 text-slate-300 line-through opacity-60'
                     : 'border-slate-200/90 hover:border-sky-400 hover:bg-sky-50/40'
-            }`}
+              }`}
           >
-            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${
-              isCorrect ? 'bg-emerald-500 text-white'
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors ${isCorrect ? 'bg-emerald-500 text-white'
                 : isWrongPick ? 'bg-red-500 text-white'
                   : out ? 'bg-slate-100 text-slate-300'
                     : 'bg-slate-100 text-slate-600 group-hover:bg-sky-500 group-hover:text-white'
-            }`}
+              }`}
             >
               {String.fromCharCode(65 + index)}
             </span>
@@ -150,9 +148,8 @@ export function TrueFalseQuestion({ result, chosen, onSubmit }) {
             type="button"
             disabled={locked}
             onClick={() => { gameSounds.tap(); onSubmit({ value }); }}
-            className={`${CHIP} flex flex-col items-center gap-2 !py-6 text-lg ${
-              isCorrect ? 'border-emerald-500 bg-emerald-50 dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 dp-shake' : CHIP_IDLE
-            }`}
+            className={`${CHIP} flex flex-col items-center gap-2 !py-6 text-lg ${isCorrect ? 'border-emerald-500 bg-emerald-50 dp-pop' : isWrongPick ? 'border-red-400 bg-red-50 dp-shake' : CHIP_IDLE
+              }`}
           >
             <span className={`flex h-12 w-12 items-center justify-center rounded-full text-white ${tone === 'emerald' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600' : 'bg-gradient-to-b from-red-400 to-red-600'}`}>
               <Icon size={26} strokeWidth={3} aria-hidden="true" />
@@ -216,11 +213,10 @@ export function OrderQuestion({ question, reveal, result, onChange }) {
               type="button"
               disabled={locked || isLocked}
               {...(isLocked ? {} : bind(item, item))}
-              className={`${CHIP} flex flex-1 items-center gap-2 text-left ${
-                locked ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50')
+              className={`${CHIP} flex flex-1 items-center gap-2 text-left ${locked ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50')
                   : isLocked ? 'border-amber-300 bg-amber-50'
                     : selected === item ? CHIP_SELECTED : CHIP_IDLE
-              } ${draggingId === item ? 'opacity-30' : ''}`}
+                } ${draggingId === item ? 'opacity-30' : ''}`}
             >
               {isLocked ? <Lock size={15} className="shrink-0 text-amber-500" /> : <GripVertical size={16} className="shrink-0 text-slate-300" />}
               <span className="flex-1">{item}</span>
@@ -296,12 +292,11 @@ export function MatchQuestion({ question, reveal, result, onChange }) {
                     setAssign((prev) => prev.map((v, i) => (i === index ? null : v)));
                   }
                 }}
-                className={`${ZONE} flex min-h-[44px] items-center gap-2 px-3 py-2 text-left text-sm font-bold !shadow-none ${
-                  locked ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-solid border-red-300 bg-red-50 text-red-700')
+                className={`${ZONE} flex min-h-[44px] items-center gap-2 px-3 py-2 text-left text-sm font-bold !shadow-none ${locked ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-solid border-red-300 bg-red-50 text-red-700')
                     : index === lockedIndex ? 'border-solid border-amber-300 bg-amber-50 text-amber-800'
                       : value ? 'border-solid border-sky-300 bg-sky-50 text-sky-800'
                         : selected ? 'border-sky-400 bg-sky-50/50 text-slate-400' : 'border-slate-300 bg-slate-50 text-slate-400'
-                }`}
+                  }`}
               >
                 {index === lockedIndex && <Lock size={14} className="shrink-0 text-amber-500" />}
                 <span className="flex-1">{value || 'Thả thẻ vào đây'}</span>
@@ -393,12 +388,11 @@ export function FillQuestion({ question, reveal, result, onChange }) {
                   setBlanks((prev) => prev.map((v, i) => (i === slot ? null : v)));
                 }
               }}
-              className={`${ZONE} mx-1 inline-flex min-w-[84px] items-center justify-center px-3 py-0.5 align-middle text-[15px] font-black leading-8 !shadow-none ${
-                locked ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-solid border-red-300 bg-red-50 text-red-600')
+              className={`${ZONE} mx-1 inline-flex min-w-[84px] items-center justify-center px-3 py-0.5 align-middle text-[15px] font-black leading-8 !shadow-none ${locked ? (ok ? 'border-solid border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-solid border-red-300 bg-red-50 text-red-600')
                   : isLocked ? 'border-solid border-amber-300 bg-amber-50 text-amber-700'
                     : chip !== null ? 'border-solid border-sky-300 bg-sky-50 text-sky-700'
                       : selected !== null ? 'border-sky-400 bg-sky-50/50' : 'border-slate-300 bg-slate-50'
-              }`}
+                }`}
             >
               {word || '\u00A0'}
               {locked && !ok && <span className="ml-1 text-xs text-emerald-600">({answers[slot]})</span>}
@@ -492,9 +486,8 @@ export function SortQuestion({ question, reveal, result, onChange }) {
                         gameSounds.tap();
                         setPlaced((prev) => { const next = { ...prev }; delete next[item]; return next; });
                       }}
-                      className={`${CHIP} flex items-center gap-1 !px-2.5 !py-1.5 text-xs ${
-                        locked ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50') : isLocked ? 'border-amber-300 bg-amber-50' : CHIP_IDLE
-                      }`}
+                      className={`${CHIP} flex items-center gap-1 !px-2.5 !py-1.5 text-xs ${locked ? (ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50') : isLocked ? 'border-amber-300 bg-amber-50' : CHIP_IDLE
+                        }`}
                     >
                       {isLocked && <Lock size={12} className="text-amber-500" />}
                       {item}
@@ -518,7 +511,7 @@ export function SortQuestion({ question, reveal, result, onChange }) {
             >
               {item}
             </button>
-          )) : <span className="px-2 py-2 text-xs font-semibold text-slate-400">Đã phân loại hết — bấm Kiểm tra nhé!</span>}
+          )) : <span className="px-2 py-2 text-xs font-semibold text-slate-400">Đã phân loại hết - bấm Kiểm tra nhé!</span>}
         </div>
       )}
       {ghostEl}

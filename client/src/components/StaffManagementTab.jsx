@@ -18,7 +18,7 @@ import { ALL_PERMISSIONS, HIGH_ADMIN_DEFAULT_PERMISSIONS, SUPPORT_DEFAULT_PERMIS
 import { resolveAvatarUrl } from '../utils/defaultAvatars';
 import { staffAPI, apiFetch } from '../services/api';
 
-/** Nhóm quyền để Accordion UI — không đổi key/API */
+/** Nhóm quyền để Accordion UI - không đổi key/API */
 const PERMISSION_GROUPS = [
   { id: 'messages', title: 'Hộp thư & Support', icon: '💬', keys: ['manage_messages'] },
   { id: 'students', title: 'Học viên', icon: '📚', keys: ['manage_students'] },
@@ -83,17 +83,17 @@ function StatusBadge({ status }) {
 
 // ── Modal Thêm/Sửa ────────────────────────────────────────────────────────────
 function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin }) {
-  const toast  = useToast();
+  const toast = useToast();
   const isEdit = !!staff?._id;
 
-  const [branches, setBranches]   = useState([]);
+  const [branches, setBranches] = useState([]);
   const [branchLoading, setBranchLoading] = useState(true);
 
   const [form, setForm] = useState({
-    name:        staff?.name || '',
-    phone:       staff?.phone || '',
-    password:    '',
-    adminRole:   staff?.adminRole || 'STAFF',
+    name: staff?.name || '',
+    phone: staff?.phone || '',
+    password: '',
+    adminRole: staff?.adminRole || 'STAFF',
     permissions: staff?.permissions?.length
       ? staff.permissions
       : (staff?.adminRole === 'HIGH_ADMIN'
@@ -101,9 +101,9 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
         : staff?.adminRole === 'SUPPORT'
           ? SUPPORT_DEFAULT_PERMISSIONS
           : (isEdit ? [] : DEFAULT_STAFF_PERMISSIONS)),
-    branchId:    staff?.branchId || '',
-    status:      staff?.status || 'active',
-    gender:      staff?.gender || 'male',
+    branchId: staff?.branchId || '',
+    status: staff?.status || 'active',
+    gender: staff?.gender || 'male',
   });
   const [saving, setSaving] = useState(false);
   const [permQuery, setPermQuery] = useState('');
@@ -113,7 +113,7 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
     apiFetch('/branches/all')
       .then((r) => r.json())
       .then((res) => { if (res.success) setBranches(res.data || []); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setBranchLoading(false));
   }, []);
 
@@ -273,22 +273,20 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
                 <button
                   type="button"
                   onClick={() => setForm(f => ({ ...f, gender: 'male' }))}
-                  className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
-                    form.gender === 'male' || form.gender === 'Nam'
+                  className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${form.gender === 'male' || form.gender === 'Nam'
                       ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <span>👨 Nam (Ảnh Cartoon Nam)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm(f => ({ ...f, gender: 'female' }))}
-                  className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
-                    form.gender === 'female' || form.gender === 'Nữ'
+                  className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${form.gender === 'female' || form.gender === 'Nữ'
                       ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
                       : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   <span>👩 Nữ (Ảnh Cartoon Nữ)</span>
                 </button>
@@ -336,7 +334,7 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
               {isSuperRole ? (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-900 flex items-center gap-2">
                   <Crown size={14} className="text-amber-600 flex-shrink-0" aria-hidden="true" />
-                  <span><strong>Super Admin</strong> — tài khoản hệ thống, không đổi vai trò / không tạo thêm từ form này.</span>
+                  <span><strong>Super Admin</strong> - tài khoản hệ thống, không đổi vai trò / không tạo thêm từ form này.</span>
                 </div>
               ) : (
                 <div
@@ -377,19 +375,19 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
             {isSuperRole && (
               <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
                 <Crown size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Super Admin — <strong>toàn quyền hệ thống</strong>, không cần gán chi nhánh / tick quyền module.</span>
+                <span>Super Admin - <strong>toàn quyền hệ thống</strong>, không cần gán chi nhánh / tick quyền module.</span>
               </div>
             )}
             {isHighAdmin && (
               <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-[13px] text-amber-800 flex items-start gap-2">
                 <ShieldCheck size={14} className="text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Admin cấp cao — không gán chi nhánh cố định; <strong>quyền theo danh sách bên dưới</strong> (không bypass toàn hệ thống).</span>
+                <span>Admin cấp cao - không gán chi nhánh cố định; <strong>quyền theo danh sách bên dưới</strong> (không bypass toàn hệ thống).</span>
               </div>
             )}
             {isSupport && (
               <div className="rounded-xl bg-sky-50 border border-sky-100 p-3 text-[13px] text-sky-800 flex items-start gap-2">
                 <Headset size={14} className="text-sky-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <span>Chuyên viên Hỗ trợ — phạm vi org-wide; mặc định quyền hộp thư (có thể chỉnh bên dưới).</span>
+                <span>Chuyên viên Hỗ trợ - phạm vi org-wide; mặc định quyền hộp thư (có thể chỉnh bên dưới).</span>
               </div>
             )}
 
@@ -428,11 +426,10 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
                     <CmsSelect
                       value={form.branchId}
                       onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))}
-                      className={`cms-input cursor-pointer ${
-                        !form.branchId
+                      className={`cms-input cursor-pointer ${!form.branchId
                           ? 'border-amber-400 bg-amber-50'
                           : 'border-emerald-300 bg-emerald-50/50 text-emerald-900'
-                      }`}
+                        }`}
                       aria-invalid={!form.branchId}
                     >
                       <option value="">-- Chọn chi nhánh (bắt buộc) --</option>
@@ -492,22 +489,20 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
                         <button
                           type="button"
                           onClick={() => setForm(f => ({ ...f, permissions: DEFAULT_STAFF_PERMISSIONS }))}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                            !isOnlyMessages && form.permissions.length > 1
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${!isOnlyMessages && form.permissions.length > 1
                               ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           🛡️ Mặc định: Admin-Staff
                         </button>
                         <button
                           type="button"
                           onClick={() => setForm(f => ({ ...f, permissions: ['manage_messages'] }))}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
-                            isOnlyMessages
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${isOnlyMessages
                               ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           💬 Chỉ Hỗ trợ viên
                         </button>
@@ -573,7 +568,7 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
 
                 {form.permissions.length === 0 && (
                   <p className="text-[12px] text-amber-700 flex items-center gap-1 font-medium">
-                    <AlertTriangle size={12} /> Chưa có quyền nào — tài khoản sẽ không thấy menu sau khi đăng nhập
+                    <AlertTriangle size={12} /> Chưa có quyền nào - tài khoản sẽ không thấy menu sau khi đăng nhập
                   </p>
                 )}
               </div>
@@ -581,7 +576,7 @@ function StaffModal({ staff, onClose, onSaved, isRootSuperAdmin, isSuperAdmin })
 
             {isSuperRole && (
               <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-[13px] text-slate-500 leading-relaxed">
-                Super Admin không cần gán chi nhánh hay tick quyền module — mặc định toàn quyền.
+                Super Admin không cần gán chi nhánh hay tick quyền module - mặc định toàn quyền.
               </div>
             )}
           </section>
@@ -710,7 +705,7 @@ function StaffCard({ s, deleting, isRootSuperAdmin, isSuperAdmin, onEdit, onRese
               </div>
             </div>
 
-            {/* Action menu — details */}
+            {/* Action menu - details */}
             <details className="cms-rbac-menu relative flex-shrink-0">
               <summary
                 className="cms-rbac-menu-trigger"
@@ -789,7 +784,7 @@ function StaffCard({ s, deleting, isRootSuperAdmin, isSuperAdmin, onEdit, onRese
             <p className="text-[13px] text-sky-700 flex items-center gap-1.5 font-medium">
               <Building2 size={12} aria-hidden="true" />
               {s.branchCode || 'Chi nhánh'}
-              {s.branchCode ? <span className="text-slate-400 font-normal">— mã QR prefix</span> : null}
+              {s.branchCode ? <span className="text-slate-400 font-normal">- mã QR prefix</span> : null}
             </p>
           )}
           {s.adminRole === 'STAFF' && !s.branchId && (
@@ -862,10 +857,10 @@ export default function StaffManagementTab() {
   const toast = useToast();
   const { showModal } = useModal();
   const [staffList, setStaffList] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [modal, setModal]         = useState(undefined); // undefined=hidden, null=add, obj=edit
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(undefined); // undefined=hidden, null=add, obj=edit
   const [resetPwStaff, setResetPwStaff] = useState(null);
-  const [deleting, setDeleting]   = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   const sessionMeta = useMemo(() => {
     try {
@@ -890,7 +885,7 @@ export default function StaffManagementTab() {
 
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
 
-  // Ẩn chính mình — đổi tên/MK đã có ở Cài đặt hệ thống
+  // Ẩn chính mình - đổi tên/MK đã có ở Cài đặt hệ thống
   const visibleStaff = useMemo(() => {
     if (!selfId || selfId === 'admin') return staffList;
     return (staffList || []).filter((s) => String(s?._id || s?.id || '') !== selfId);
@@ -963,10 +958,10 @@ export default function StaffManagementTab() {
           </h3>
           <p className="text-[12px] text-slate-500 mt-1 md:pl-11 leading-relaxed">
             {isRootSuperAdmin
-              ? 'Admin Super — Toàn quyền quản lý toàn bộ hệ thống'
+              ? 'Admin Super - Toàn quyền quản lý toàn bộ hệ thống'
               : isSuperAdmin
-                ? 'Super Admin — Quản lý nhân viên (có thể sửa Admin cấp cao)'
-                : 'Admin Cấp Cao — Quản lý nhân viên theo quyền được cấp (không sửa/xóa Admin cấp cao)'}
+                ? 'Super Admin - Quản lý nhân viên (có thể sửa Admin cấp cao)'
+                : 'Admin Cấp Cao - Quản lý nhân viên theo quyền được cấp (không sửa/xóa Admin cấp cao)'}
           </p>
         </div>
         <button
@@ -978,7 +973,7 @@ export default function StaffManagementTab() {
         </button>
       </div>
 
-      {/* RBAC policy accordion — native details, no React state */}
+      {/* RBAC policy accordion - native details, no React state */}
       <details className="cms-rbac-policy shrink-0">
         <summary className="cms-rbac-policy-summary">
           <span className="flex items-center gap-2 font-semibold text-sky-900">
@@ -1001,7 +996,7 @@ export default function StaffManagementTab() {
         <div className="cms-viewport-scroll text-center py-14 text-slate-400">
           <Users size={36} className="mx-auto mb-3 opacity-25" />
           <p className="text-sm font-medium">Chưa có tài khoản nội bộ nào.</p>
-          <p className="text-xs mt-1 text-slate-400">Tài khoản đang đăng nhập không hiện ở đây — sửa ở Cài đặt hệ thống.</p>
+          <p className="text-xs mt-1 text-slate-400">Tài khoản đang đăng nhập không hiện ở đây - sửa ở Cài đặt hệ thống.</p>
         </div>
       ) : (
         <div className="cms-viewport-scroll space-y-3 pr-0.5">

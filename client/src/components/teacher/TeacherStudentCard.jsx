@@ -118,11 +118,10 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
         title={hint}
         aria-label="Đánh trượt"
         onClick={openConfirm}
-        className={`inline-flex justify-center items-center w-9 h-9 sm:w-8 sm:h-8 rounded-lg transition-all shrink-0 ${
-          canFail
+        className={`inline-flex justify-center items-center w-9 h-9 sm:w-8 sm:h-8 rounded-lg transition-all shrink-0 ${canFail
             ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
             : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
-        }`}
+          }`}
       >
         <XCircle size={14} />
       </button>
@@ -135,11 +134,10 @@ const FailExamButton = ({ student, onLockExam, compact = false }) => {
       disabled={!canFail}
       title={hint}
       onClick={openConfirm}
-      className={`flex flex-1 min-[360px]:flex-initial justify-center items-center gap-2 text-xs font-black px-4 py-3 sm:px-5 rounded-2xl transition-all  tracking-widest ${
-        canFail
+      className={`flex flex-1 min-[360px]:flex-initial justify-center items-center gap-2 text-xs font-black px-4 py-3 sm:px-5 rounded-2xl transition-all  tracking-widest ${canFail
           ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/40'
           : 'bg-slate-100 text-slate-400 border-2 border-slate-200 cursor-not-allowed opacity-60'
-      }`}
+        }`}
     >
       <XCircle size={16} />  Đánh trượt
     </button>
@@ -185,7 +183,7 @@ export const StudentCard = ({
     if (Number.isNaN(d.getTime())) return 'Chưa có dữ liệu truy cập';
     return `Truy cập lần cuối: ${d.toLocaleString('vi-VN')}`;
   })();
-  /** Chờ 10s sau "Xác nhận Điểm danh" — persist sessionStorage để đổi tab không mất */
+  /** Chờ 10s sau "Xác nhận Điểm danh" - persist sessionStorage để đổi tab không mất */
   const [pendingAttendance, setPendingAttendance] = useState(() => {
     const stored = getAttendanceConfirm(confirmKey);
     if (!stored) return null;
@@ -364,7 +362,7 @@ export const StudentCard = ({
     ? false
     : (student.can_check_in !== undefined ? student.can_check_in : !hasAttendedToday);
 
-  // Hoàn tất lịch hôm nay (SoT) — tránh UI "ĐIỂM DANH + HỦY CA" khi cooldown đã bật nhưng gate/grades lệch
+  // Hoàn tất lịch hôm nay (SoT) - tránh UI "ĐIỂM DANH + HỦY CA" khi cooldown đã bật nhưng gate/grades lệch
   const hasCompletedScheduleToday = useMemo(() => {
     const sid = String(student._id || student.id || '');
     const course = String(student.course || '').trim();
@@ -407,7 +405,7 @@ export const StudentCard = ({
     return formatLocalDateKey(d) === formatLocalDateKey(new Date());
   }, [student.last_attendance_at, attendanceTick]);
 
-  // Đã điểm danh hôm nay — KHÔNG dùng !canCheckIn (cooldown 12h có thể từ hôm trước)
+  // Đã điểm danh hôm nay - KHÔNG dùng !canCheckIn (cooldown 12h có thể từ hôm trước)
   // pending/disputed: coi như đã thao tác điểm danh (không cho bấm lại)
   const alreadyAttendedToday = Boolean(
     hasAttendedToday
@@ -495,7 +493,7 @@ export const StudentCard = ({
     ),
   );
 
-  // Khôi phục đếm ngược khi đổi HV / quay lại tab — không xóa pending của HV khác
+  // Khôi phục đếm ngược khi đổi HV / quay lại tab - không xóa pending của HV khác
   useEffect(() => {
     const apply = (map) => {
       const stored = map ? (map[confirmKey] || null) : getAttendanceConfirm(confirmKey);
@@ -532,7 +530,7 @@ export const StudentCard = ({
 
   const beginAttendanceConfirm = useCallback(() => {
     if (isDroppedOut) {
-      toast.info('Học viên đã thôi học — không điểm danh được.');
+      toast.info('Học viên đã thôi học - không điểm danh được.');
       return;
     }
     if (alreadyAttendedToday || isPendingConfirm || isCompleted) return;
@@ -559,7 +557,7 @@ export const StudentCard = ({
       endsAt: payload.endsAt,
       committing: false,
     });
-    toast.info(`Đã ghi nhận — còn ${Math.round(ATTENDANCE_CONFIRM_MS / 1000)} giây để hủy điểm danh trước khi tính buổi.`);
+    toast.info(`Đã ghi nhận - còn ${Math.round(ATTENDANCE_CONFIRM_MS / 1000)} giây để hủy điểm danh trước khi tính buổi.`);
   }, [
     isDroppedOut,
     alreadyAttendedToday,
@@ -582,12 +580,12 @@ export const StudentCard = ({
 
   const cancelPendingAttendance = useCallback(() => {
     if (getAttendanceConfirm(confirmKey)?.committing) {
-      toast.info('Đang ghi nhận điểm danh — không thể hủy lúc này.');
+      toast.info('Đang ghi nhận điểm danh - không thể hủy lúc này.');
       return;
     }
     removeAttendanceConfirm(confirmKey);
     setPendingAttendance(null);
-    toast.success('Đã hủy điểm danh — buổi chưa được tính.');
+    toast.success('Đã hủy điểm danh - buổi chưa được tính.');
   }, [toast, confirmKey]);
 
   const makeupSummary = useMemo(
@@ -602,7 +600,7 @@ export const StudentCard = ({
 
   const openAttendanceModal = useCallback(() => {
     if (isDroppedOut) {
-      toast.info('Học viên đã thôi học — không điểm danh được.');
+      toast.info('Học viên đã thôi học - không điểm danh được.');
       return;
     }
     if (makeupPending) return;
@@ -706,9 +704,9 @@ export const StudentCard = ({
   const cancelButtonTitle = isCommittingAttendance
     ? 'Đang ghi nhận điểm danh lên hệ thống'
     : cancelIsUndoAttendance
-      ? `Hủy điểm danh trong ${confirmRemainSec}s — buổi chưa tính`
+      ? `Hủy điểm danh trong ${confirmRemainSec}s - buổi chưa tính`
       : alreadyAttendedToday
-        ? 'Đã điểm danh — không thể hủy sau khi hết thời gian chờ'
+        ? 'Đã điểm danh - không thể hủy sau khi hết thời gian chờ'
         : 'Hủy ca lịch học hôm nay';
   const cancelButtonClassActive =
     'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-sm shadow-red-600/25 active:scale-[0.98] cursor-pointer';
@@ -836,7 +834,7 @@ export const StudentCard = ({
   const handleCreateAssign = async () => {
     if (!newAssign.title || !newAssign.deadline) return;
     if (isDeadlineInPast(newAssign.deadline)) {
-      showGlossyAlert('Hạn nộp phải sau thời điểm hiện tại — không chọn ngày cũ.');
+      showGlossyAlert('Hạn nộp phải sau thời điểm hiện tại - không chọn ngày cũ.');
       return;
     }
     try {
@@ -864,13 +862,13 @@ export const StudentCard = ({
 
   const handleEditAssign = (assign) => {
     if (isAssignmentGraded(assign)) {
-      showGlossyAlert('Bài đã chấm điểm — không thể sửa. Chỉ có thể chỉnh sửa điểm.');
+      showGlossyAlert('Bài đã chấm điểm - không thể sửa. Chỉ có thể chỉnh sửa điểm.');
       return;
     }
     setEditingAssignmentId(assign._id);
     setEditingAssign({
       title: assign.title,
-      deadline: assign.deadline ? new Date(assign.deadline).toISOString().slice(0,16) : '',
+      deadline: assign.deadline ? new Date(assign.deadline).toISOString().slice(0, 16) : '',
       fileUrl: assign.fileUrl || '',
       description: assign.description || ''
     });
@@ -879,7 +877,7 @@ export const StudentCard = ({
   const handleUpdateAssign = async () => {
     if (!editingAssign.title || !editingAssign.deadline) return;
     if (isDeadlineInPast(editingAssign.deadline)) {
-      showGlossyAlert('Hạn nộp phải sau thời điểm hiện tại — không chọn ngày cũ.');
+      showGlossyAlert('Hạn nộp phải sau thời điểm hiện tại - không chọn ngày cũ.');
       return;
     }
     try {
@@ -896,7 +894,7 @@ export const StudentCard = ({
   const handleDeleteAssign = async (id) => {
     const assign = courseAssignments.find(a => String(a._id) === String(id));
     if (assign && isAssignmentGraded(assign)) {
-      showGlossyAlert('Bài đã chấm điểm — không thể xóa.');
+      showGlossyAlert('Bài đã chấm điểm - không thể xóa.');
       return;
     }
     if (!(await window.cmsConfirm("Bạn có chắc muốn xóa bài tập này?"))) return;
@@ -921,8 +919,8 @@ export const StudentCard = ({
     try {
       const res = await api.assignments.uploadFile(file);
       if (res.success) {
-        if (type === 'new') setNewAssign(prev => ({...prev, fileUrl: res.fileUrl}));
-        else setEditingAssign(prev => ({...prev, fileUrl: res.fileUrl}));
+        if (type === 'new') setNewAssign(prev => ({ ...prev, fileUrl: res.fileUrl }));
+        else setEditingAssign(prev => ({ ...prev, fileUrl: res.fileUrl }));
       } else {
         showGlossyAlert(res.message || "Lỗi khi tải file lên");
       }
@@ -935,7 +933,7 @@ export const StudentCard = ({
   const handleCancelSession = async () => {
     if (!canCancelSession) return;
 
-    // Trong cửa sổ 10s: hủy pending local — chưa cộng buổi
+    // Trong cửa sổ 10s: hủy pending local - chưa cộng buổi
     if (isPendingConfirm) {
       cancelPendingAttendance();
       return;
@@ -967,14 +965,14 @@ export const StudentCard = ({
             showModal({ title: 'Lỗi', content: res.message || 'Không hủy được ca', type: 'error', confirmText: 'Đóng' });
             return;
           }
-          // Realtime: cập nhật SWR schedules — không reload, không gọi API lần 2
+          // Realtime: cập nhật SWR schedules - không reload, không gọi API lần 2
           setSchedulesLocal((prev) => (prev || []).map((sch) => {
             if (String(sch._id || sch.id) !== String(scheduleId)) return sch;
             return { ...sch, status: 'cancelled', note: reason };
           }));
           toast.success('Đã hủy ca.');
           if (typeof triggerBackgroundSync === 'function') {
-            Promise.resolve(triggerBackgroundSync()).catch(() => {});
+            Promise.resolve(triggerBackgroundSync()).catch(() => { });
           }
         } catch (e) {
           showModal({ title: 'Lỗi', content: e?.message || 'Lỗi kết nối server', type: 'error', confirmText: 'Đóng' });
@@ -985,7 +983,7 @@ export const StudentCard = ({
 
   const handleLinkSave = () => {
     if (isDroppedOut) {
-      toast.info('Học viên đã thôi học — không cập nhật được.');
+      toast.info('Học viên đã thôi học - không cập nhật được.');
       return;
     }
     onUpdateLink(student._id || student.id, linkInput, student.course || '');
@@ -994,7 +992,7 @@ export const StudentCard = ({
 
   const handleGradeSave = () => {
     if (isDroppedOut) {
-      toast.info('Học viên đã thôi học — không cập nhật được.');
+      toast.info('Học viên đã thôi học - không cập nhật được.');
       return;
     }
     onSaveGrade(student._id || student.id, Number(gradeInput), student.course);
@@ -1026,127 +1024,123 @@ export const StudentCard = ({
       <div className={`bg-white rounded-2xl sm:rounded-[40px] shadow-md sm:shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 min-w-0 w-full max-w-full ${isDroppedOut ? 'opacity-85' : ''}`}>
         {isDroppedOut && (
           <div className="bg-slate-700 text-white text-center text-[11px] sm:text-xs font-bold  tracking-wide px-3 py-2.5">
-            Học viên đã thôi học / hoàn phí — chỉ xem lịch sử · không thao tác
+            Học viên đã thôi học / hoàn phí - chỉ xem lịch sử · không thao tác
           </div>
         )}
         {/* Header */}
         <div className="bg-slate-50/80 px-3 py-3 sm:px-8 sm:py-6 md:px-10 md:py-8 border-b border-slate-100">
           <div className="bg-white border border-slate-100 shadow-sm rounded-2xl sm:rounded-[28px] p-3 sm:p-6 min-w-0">
             <div className="flex items-start gap-3 sm:gap-6 min-w-0">
-            <div className="relative w-11 h-11 sm:w-20 sm:h-20 shrink-0">
-            <div className="w-full h-full rounded-xl sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white">
-              <img
-                src={resolveAvatarUrl({
-                  avatar: student.avatarUrl || student.avatar || student.photo,
-                  role: 'student',
-                  gender: student.gender,
-                })}
-                alt={getDisplayName(student)}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {isStudentOnline ? (
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 border-2 border-white rounded-full" title="Trực tuyến" />
-            ) : null}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2 min-w-0">
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <h2 className="text-base sm:text-2xl font-bold tracking-tight text-slate-800 break-words line-clamp-2 leading-snug">
-                    {getDisplayName(student)}
-                  </h2>
-                  <p className="text-slate-500 text-[11px] sm:text-sm font-semibold mt-0.5 break-words line-clamp-2 leading-snug">
-                    {student.course}{student.age ? ` · ${student.age} tuổi` : ''}
-                  </p>
+              <div className="relative w-11 h-11 sm:w-20 sm:h-20 shrink-0">
+                <div className="w-full h-full rounded-xl sm:rounded-[28px] overflow-hidden shadow-sm border border-slate-200 bg-white">
+                  <img
+                    src={resolveAvatarUrl({
+                      avatar: student.avatarUrl || student.avatar || student.photo,
+                      role: 'student',
+                      gender: student.gender,
+                    })}
+                    alt={getDisplayName(student)}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`hidden min-[420px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold  tracking-wide whitespace-nowrap ${
-                    isDroppedOut
+                {isStudentOnline ? (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 border-2 border-white rounded-full" title="Trực tuyến" />
+                ) : null}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-2 min-w-0">
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <h2 className="text-base sm:text-2xl font-bold tracking-tight text-slate-800 break-words line-clamp-2 leading-snug">
+                      {getDisplayName(student)}
+                    </h2>
+                    <p className="text-slate-500 text-[11px] sm:text-sm font-semibold mt-0.5 break-words line-clamp-2 leading-snug">
+                      {student.course}{student.age ? ` · ${student.age} tuổi` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`hidden min-[420px]:inline-flex px-2 py-1 rounded-lg text-[10px] font-bold  tracking-wide whitespace-nowrap ${isDroppedOut
+                        ? 'bg-slate-100 text-slate-500'
+                        : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
+                      }`}>
+                      {isDroppedOut ? 'Thôi học' : isCompleted ? 'Hoàn thành' : 'Đang học'}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isDroppedOut}
+                      onClick={() => {
+                        if (isDroppedOut) return;
+                        const id = String(student.id || student._id || '');
+                        if (!navigate || !id) return;
+                        navigate('/teacher/inbox', {
+                          state: {
+                            selectUserId: id,
+                            selectUser: {
+                              id,
+                              name: student.name || 'Học viên',
+                              role: 'student',
+                              avatar: student.avatar,
+                              trusted: true,
+                            },
+                          },
+                        });
+                      }}
+                      className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all border shrink-0 ${isDroppedOut
+                          ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed'
+                          : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-100'
+                        }`}
+                      title={isDroppedOut ? 'HV đã thôi học' : 'Nhắn tin với học viên'}
+                      aria-label="Nhắn tin với học viên"
+                    >
+                      <MessageSquare size={14} />
+                    </button>
+                    {onLockExam && !isDroppedOut && (
+                      <FailExamButton student={student} onLockExam={onLockExam} compact />
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className={`min-[420px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide  whitespace-nowrap ${isDroppedOut
                       ? 'bg-slate-100 text-slate-500'
                       : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-                  }`}>
+                    }`}>
                     {isDroppedOut ? 'Thôi học' : isCompleted ? 'Hoàn thành' : 'Đang học'}
                   </span>
-                  <button
-                    type="button"
-                    disabled={isDroppedOut}
-                    onClick={() => {
-                      if (isDroppedOut) return;
-                      const id = String(student.id || student._id || '');
-                      if (!navigate || !id) return;
-                      navigate('/teacher/inbox', {
-                        state: {
-                          selectUserId: id,
-                          selectUser: {
-                            id,
-                            name: student.name || 'Học viên',
-                            role: 'student',
-                            avatar: student.avatar,
-                            trusted: true,
-                          },
-                        },
-                      });
-                    }}
-                    className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all border shrink-0 ${
-                      isDroppedOut
-                        ? 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed'
-                        : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-100'
-                    }`}
-                    title={isDroppedOut ? 'HV đã thôi học' : 'Nhắn tin với học viên'}
-                    aria-label="Nhắn tin với học viên"
-                  >
-                    <MessageSquare size={14} />
-                  </button>
-                  {onLockExam && !isDroppedOut && (
-                    <FailExamButton student={student} onLockExam={onLockExam} compact />
-                  )}
+                  <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide  whitespace-nowrap border ${isStudentOnline
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                    }`}>
+                    {isStudentOnline ? 'Trực tuyến' : 'Offline'}
+                  </span>
+                  {!isStudentOnline && lastSeenAt ? (
+                    <span className="text-[10px] font-medium text-slate-400">{lastSeenLabel}</span>
+                  ) : null}
+                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide bg-white text-slate-400 border border-slate-100 whitespace-nowrap">
+                    {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
+                  </span>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className={`min-[420px]:hidden px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide  whitespace-nowrap ${
-                  isDroppedOut
-                    ? 'bg-slate-100 text-slate-500'
-                    : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'
-                }`}>
-                  {isDroppedOut ? 'Thôi học' : isCompleted ? 'Hoàn thành' : 'Đang học'}
-                </span>
-                <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide  whitespace-nowrap border ${
-                  isStudentOnline
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                }`}>
-                  {isStudentOnline ? 'Trực tuyến' : 'Offline'}
-                </span>
-                {!isStudentOnline && lastSeenAt ? (
-                  <span className="text-[10px] font-medium text-slate-400">{lastSeenLabel}</span>
-                ) : null}
-                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide bg-white text-slate-400 border border-slate-100 whitespace-nowrap">
-                  {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
-                </span>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100">
+              <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs lg:text-sm font-bold  tracking-wide text-slate-400">
+                <span>Tiến độ khóa học</span>
+                <span className="text-slate-700 tabular-nums">{done}/{sessionTotal} buổi ({progressPct}%)</span>
               </div>
+              <div className="h-1.5 sm:h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-700 ease-out"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+              {priorCredit > 0 ? (
+                <p className="text-[10px] sm:text-[11px] lg:text-sm text-slate-500 mt-1.5 leading-snug">
+                  Trên lịch: <span className="font-semibold text-slate-700">{onCalendarDone}</span>
+                  {' · '}
+                  Ghi nhận trước: <span className="font-semibold text-slate-700">{priorCredit}</span>
+                </p>
+              ) : null}
             </div>
           </div>
-          
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <div className="flex justify-between items-center mb-1.5 text-[10px] sm:text-xs lg:text-sm font-bold  tracking-wide text-slate-400">
-              <span>Tiến độ khóa học</span>
-              <span className="text-slate-700 tabular-nums">{done}/{sessionTotal} buổi ({progressPct}%)</span>
-            </div>
-            <div className="h-1.5 sm:h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-700 ease-out"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            {priorCredit > 0 ? (
-              <p className="text-[10px] sm:text-[11px] lg:text-sm text-slate-500 mt-1.5 leading-snug">
-                Trên lịch: <span className="font-semibold text-slate-700">{onCalendarDone}</span>
-                {' · '}
-                Ghi nhận trước: <span className="font-semibold text-slate-700">{priorCredit}</span>
-              </p>
-            ) : null}
-          </div>
-        </div>
         </div>
 
         {String(student.teacherAlert || '').trim() ? (
@@ -1161,7 +1155,7 @@ export const StudentCard = ({
           </div>
         ) : null}
 
-        {/* Tabs — Tiến độ, Bài tập, Tạo TN, Link học, Đánh giá, Nhật ký */}
+        {/* Tabs - Tiến độ, Bài tập, Tạo TN, Link học, Đánh giá, Nhật ký */}
         <div className="flex w-full px-3 sm:px-6 md:px-10 bg-white border-b border-slate-100 min-w-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {panels.map(({ key, icon: Icon, label }) => (
             <button
@@ -1169,7 +1163,7 @@ export const StudentCard = ({
               type="button"
               onClick={() => {
                 if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
-                  toast.info('Học viên đã thôi học — không thao tác được.');
+                  toast.info('Học viên đã thôi học - không thao tác được.');
                   if (key === 'schedule') {
                     // Cho xem nhật ký lịch qua panel logs; không mở xếp lịch mới
                     setActivePanel('logs');
@@ -1183,7 +1177,7 @@ export const StudentCard = ({
                 }
                 if (key === 'schedule') {
                   if (isDroppedOut) {
-                    toast.info('Học viên đã thôi học — không xếp lịch mới.');
+                    toast.info('Học viên đã thôi học - không xếp lịch mới.');
                     return;
                   }
                   setShowQuickSchedule(true);
@@ -1194,15 +1188,13 @@ export const StudentCard = ({
               title={key === 'quiz' ? 'Tạo trắc nghiệm' : label}
               aria-label={key === 'quiz' ? 'Tạo trắc nghiệm' : label}
               aria-current={activePanel === key ? 'page' : undefined}
-              className={`group relative flex-1 min-w-[76px] sm:min-w-0 flex flex-col items-center justify-center gap-1 px-1 sm:px-1 min-h-11 sm:min-h-0 py-2 sm:py-3.5 text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide transition-all ${
-                activePanel === key ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              className={`group relative flex-1 min-w-[76px] sm:min-w-0 flex flex-col items-center justify-center gap-1 px-1 sm:px-1 min-h-11 sm:min-h-0 py-2 sm:py-3.5 text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide transition-all ${activePanel === key ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+                }`}
             >
-              <span className={`relative flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 group-hover:-translate-y-0.5 group-hover:scale-105 ${
-                activePanel === key
+              <span className={`relative flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 group-hover:-translate-y-0.5 group-hover:scale-105 ${activePanel === key
                   ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-200 ring-2 ring-blue-100'
                   : 'bg-slate-100 text-slate-500 shadow-sm group-hover:bg-blue-50 group-hover:text-blue-600'
-              }`}>
+                }`}>
                 <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-white/70 blur-[3px]" aria-hidden="true" />
                 <Icon size={16} strokeWidth={2.4} className="relative drop-shadow-sm" aria-hidden="true" />
               </span>
@@ -1216,582 +1208,574 @@ export const StudentCard = ({
 
         {/* Action Content */}
         <div className="p-3 sm:p-6 md:p-10 space-y-4 sm:space-y-8">
-           {activePanel === 'progress' && (
-              <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-500">
-                 {/* Stat Boxes — 3 cột trên mobile */}
-                 <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2 sm:gap-4 md:gap-6 min-w-0">
-                    <div className="group bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
-                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-blue-600  tracking-wide mb-1 truncate max-w-full">Đã học</p>
-                       <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-white shadow-md shadow-blue-200 transition-transform group-hover:scale-105">
-                         <CheckCircle size={18} strokeWidth={2.4} />
-                       </div>
-                       <h4 className="text-lg sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
-                       <p className="text-[10px] sm:text-xs font-bold text-blue-400 mt-1 ">buổi</p>
-                    </div>
-                    <div className="group bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
-                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold  tracking-wide mb-1 text-amber-600 truncate max-w-full">Còn lại</p>
-                       <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-200 transition-transform group-hover:scale-105">
-                         <Clock size={18} strokeWidth={2.4} />
-                       </div>
-                       <h4 className="text-lg sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{remainingSessions}</h4>
-                       <p className="text-[10px] sm:text-xs font-bold mt-1  text-amber-400">buổi</p>
-                    </div>
-                    <div className="group bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
-                       <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-purple-600  tracking-wide mb-1 truncate max-w-full">Điểm TB</p>
-                       <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500 text-white shadow-md shadow-purple-200 transition-transform group-hover:scale-105">
-                         <Star size={18} strokeWidth={2.4} />
-                       </div>
-                       <div className="flex items-baseline justify-center gap-0.5 min-w-0">
-                          <h4 className="text-lg sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
-                          <span className="text-[10px] sm:text-lg font-bold text-purple-400">/10</span>
-                       </div>
-                       <p className="text-xs font-bold text-purple-400 mt-1  hidden sm:block">Đánh giá chung</p>
-                    </div>
-                 </div>
-                 {priorCredit > 0 ? (
-                   <p className="text-[11px] sm:text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 leading-snug">
-                     Đã học gồm <span className="font-semibold text-slate-700">{onCalendarDone} buổi trên lịch</span>
-                     {' + '}
-                     <span className="font-semibold text-slate-700">{priorCredit} buổi ghi nhận trước</span>
-                     {' '}(Admin / chuyển khóa) — khớp số hệ thống.
-                   </p>
-                 ) : null}
-
-                 {/* Actions: Điểm danh | Hủy ca / Hủy điểm danh — ẩn khi không còn lịch */}
-                 {showSessionActionRow ? (
-                 <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 mt-4 sm:gap-4 min-w-0">
-                     <button 
-                       type="button"
-                       onClick={openAttendanceModal} 
-                       disabled={leftAttendanceDisabled}
-                       title={
-                         isCompleted ? 'Khóa học đã hoàn thành' :
-                         makeupPending ? 'Đã gửi yêu cầu — chờ Admin xét duyệt điểm danh bù' :
-                         isOverdueMakeup ? 'Quá hạn điểm danh — gửi yêu cầu điểm danh bù tới Admin' :
-                         isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
-                         isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
-                         attendanceDisputed ? 'Học viên không đồng ý — đang giải quyết (chờ Admin)' :
-                         awaitingStudentConfirm ? 'Đã gửi điểm danh — đang chờ học viên xác nhận' :
-                         alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` :
-                         waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
-                         'Bấm để điểm danh buổi học hôm nay'
-                       }
-                       className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${
-                         isCompleted 
-                           ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                         : makeupPending
-                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
-                         : isOverdueMakeup
-                           ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
-                         : attendanceDisputed
-                           ? 'bg-amber-100 text-amber-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
-                         : awaitingStudentConfirm
-                           ? 'bg-blue-100 text-blue-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
-                         : leftAttendanceLocked
-                           ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
-                         : waitingAttendanceUnlock
-                           ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60'
-                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
-                       }`}
-                     >
-                       <CheckCircle size={14} className="shrink-0" aria-hidden="true" />
-                       <span className="min-w-0 text-center leading-tight whitespace-normal">
-                         {isCompleted 
-                           ? 'Hoàn thành'
-                           : makeupPending
-                             ? 'Đã gửi Admin'
-                           : isOverdueMakeup
-                             ? 'Điểm danh bù'
-                             : isCommittingAttendance
-                               ? 'Đang ghi nhận'
-                             : isPendingConfirm
-                               ? 'Đang xác nhận'
-                               : attendanceDisputed
-                                 ? 'Đang giải quyết'
-                               : awaitingStudentConfirm
-                                 ? 'Chờ HV xác nhận'
-                               : alreadyAttendedToday
-                                 ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
-                                 : 'Điểm danh'}
-                       </span>
-                     </button>
-
-                   <button
-                     type="button"
-                     onClick={() => { if (canCancelSession) handleCancelSession(); }}
-                     disabled={!canCancelSession}
-                     aria-disabled={!canCancelSession}
-                     title={cancelButtonTitle}
-                     className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 border ${
-                       canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
-                     }`}
-                   >
-                     <X size={14} className="shrink-0" aria-hidden="true" />
-                     <span className="min-w-0 text-center leading-tight whitespace-normal">
-                       {cancelButtonLabel}
-                     </span>
-                   </button>
-                 </div>
-                 ) : null}
-
-                 {/* Notes */}
-                 <div className="mt-4 sm:mt-0">
-                    <label className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide flex items-center gap-1.5 mb-2">
-                       <FileText size={12} aria-hidden="true" /> Ghi chú học viên
-                    </label>
-                    <div className="border border-slate-200 rounded-xl p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
-                    <textarea 
-                       value={notesInput} onChange={e => setNotesInput(e.target.value)}
-                       onBlur={() => {
-                         if (isDroppedOut) return;
-                         onUpdateNotes((student._id || student.id), notesInput);
-                       }}
-                       readOnly={isDroppedOut}
-                       placeholder="Nhận xét cá nhân, ghi nhận đặc biệt về học viên này..."
-                       className={`w-full bg-transparent border-0 rounded-none p-0 text-xs sm:text-sm font-medium outline-none resize-none ${isDroppedOut ? 'opacity-60 cursor-not-allowed' : ''}`}
-                       rows={3}
-                    />
-                    <span className="text-[11px] text-slate-400 ml-auto block mt-2">Tự động lưu khi rời ô nhập</span>
-                    </div>
-                 </div>
+          {activePanel === 'progress' && (
+            <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-500">
+              {/* Stat Boxes - 3 cột trên mobile */}
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2 sm:gap-4 md:gap-6 min-w-0">
+                <div className="group bg-blue-50/60 border border-blue-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
+                  <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-blue-600  tracking-wide mb-1 truncate max-w-full">Đã học</p>
+                  <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-white shadow-md shadow-blue-200 transition-transform group-hover:scale-105">
+                    <CheckCircle size={18} strokeWidth={2.4} />
+                  </div>
+                  <h4 className="text-lg sm:text-4xl font-extrabold text-blue-600 leading-none tabular-nums">{done}</h4>
+                  <p className="text-[10px] sm:text-xs font-bold text-blue-400 mt-1 ">buổi</p>
+                </div>
+                <div className="group bg-amber-50/60 border border-amber-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
+                  <p className="text-[10px] sm:text-xs lg:text-sm font-bold  tracking-wide mb-1 text-amber-600 truncate max-w-full">Còn lại</p>
+                  <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-200 transition-transform group-hover:scale-105">
+                    <Clock size={18} strokeWidth={2.4} />
+                  </div>
+                  <h4 className="text-lg sm:text-4xl font-extrabold leading-none tabular-nums text-amber-600">{remainingSessions}</h4>
+                  <p className="text-[10px] sm:text-xs font-bold mt-1  text-amber-400">buổi</p>
+                </div>
+                <div className="group bg-purple-50/60 border border-purple-100 rounded-xl sm:rounded-2xl text-center flex flex-col items-center justify-center p-2.5 sm:p-6 min-w-0 overflow-hidden">
+                  <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-purple-600  tracking-wide mb-1 truncate max-w-full">Điểm TB</p>
+                  <div className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500 text-white shadow-md shadow-purple-200 transition-transform group-hover:scale-105">
+                    <Star size={18} strokeWidth={2.4} />
+                  </div>
+                  <div className="flex items-baseline justify-center gap-0.5 min-w-0">
+                    <h4 className="text-lg sm:text-4xl font-extrabold text-purple-600 leading-none tabular-nums">{student.lastGrade || 0}</h4>
+                    <span className="text-[10px] sm:text-lg font-bold text-purple-400">/10</span>
+                  </div>
+                  <p className="text-xs font-bold text-purple-400 mt-1  hidden sm:block">Đánh giá chung</p>
+                </div>
               </div>
-           )}
+              {priorCredit > 0 ? (
+                <p className="text-[11px] sm:text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 leading-snug">
+                  Đã học gồm <span className="font-semibold text-slate-700">{onCalendarDone} buổi trên lịch</span>
+                  {' + '}
+                  <span className="font-semibold text-slate-700">{priorCredit} buổi ghi nhận trước</span>
+                  {' '}(Admin / chuyển khóa) - khớp số hệ thống.
+                </p>
+              ) : null}
 
-           {activePanel === 'link' && (
-              <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
-                 <div className="bg-indigo-50 border border-indigo-100 rounded-2xl sm:rounded-[40px] p-4 sm:p-6 md:p-10 relative overflow-hidden min-w-0">
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-200/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
-                    <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 min-w-0">
-                       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
-                          <Video size={22} />
-                       </div>
-                       <div className="min-w-0">
-                          <h3 className="text-base sm:text-xl font-black text-indigo-900 truncate">Link học trực tuyến</h3>
-                          <p className="text-xs font-bold text-indigo-400 leading-snug">Tự động đồng bộ hóa với Dashboard của học viên</p>
-                       </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3 min-w-0">
-                       <div className="flex-1 relative min-w-0">
-                          <input 
-                            type="text" value={linkInput} onChange={e => setLinkInput(e.target.value)}
-                            className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-4 sm:px-6 py-3 sm:py-4 text-sm font-bold text-indigo-700 focus:border-indigo-500 outline-none transition-all shadow-sm min-w-0"
-                            placeholder="Nhập link Google Meet / Zoom..."
-                          />
-                       </div>
-                       <button 
-                         type="button"
-                         onClick={handleLinkSave}
-                         className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs  tracking-widest transition-all shadow-lg whitespace-nowrap ${
-                            linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-100'
-                         }`}
-                       >
-                         {linkSaved ? 'Đã lưu ✓' : 'Cập nhật'}
-                       </button>
-                    </div>
-                 </div>
-              </div>
-           )}
-
-            {activePanel === 'assignments' && (
-              <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs sm:text-sm font-semibold text-slate-600 truncate min-w-0">
-                    Danh sách bài tập
-                  </h4>
+              {/* Actions: Điểm danh | Hủy ca / Hủy điểm danh - ẩn khi không còn lịch */}
+              {showSessionActionRow ? (
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 mt-4 sm:gap-4 min-w-0">
                   <button
                     type="button"
-                    onClick={() => setShowAddAssign(!showAddAssign)}
-                    className={`shrink-0 text-xs px-3 min-h-9 rounded-lg font-medium transition-all inline-flex items-center gap-1 whitespace-nowrap ${
-                      showAddAssign
-                        ? 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
-                        : 'bg-red-600 hover:bg-red-700 text-white'
-                    }`}
+                    onClick={openAttendanceModal}
+                    disabled={leftAttendanceDisabled}
+                    title={
+                      isCompleted ? 'Khóa học đã hoàn thành' :
+                        makeupPending ? 'Đã gửi yêu cầu - chờ Admin xét duyệt điểm danh bù' :
+                          isOverdueMakeup ? 'Quá hạn điểm danh - gửi yêu cầu điểm danh bù tới Admin' :
+                            isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
+                              isPendingConfirm ? `Đang chờ xác nhận - còn ${confirmRemainSec}s để hủy` :
+                                attendanceDisputed ? 'Học viên không đồng ý - đang giải quyết (chờ Admin)' :
+                                  awaitingStudentConfirm ? 'Đã gửi điểm danh - đang chờ học viên xác nhận' :
+                                    alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` :
+                                      waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
+                                        'Bấm để điểm danh buổi học hôm nay'
+                    }
+                    className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 ${isCompleted
+                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                        : makeupPending
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
+                          : isOverdueMakeup
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] shadow-sm'
+                            : attendanceDisputed
+                              ? 'bg-amber-100 text-amber-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
+                              : awaitingStudentConfirm
+                                ? 'bg-blue-100 text-blue-800 cursor-not-allowed opacity-90 pointer-events-none select-none'
+                                : leftAttendanceLocked
+                                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-60 pointer-events-none select-none'
+                                  : waitingAttendanceUnlock
+                                    ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]'
+                      }`}
                   >
-                    {showAddAssign ? <X size={14} /> : <Plus size={14} />}
-                    {showAddAssign ? 'Hủy' : 'Giao bài'}
+                    <CheckCircle size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 text-center leading-tight whitespace-normal">
+                      {isCompleted
+                        ? 'Hoàn thành'
+                        : makeupPending
+                          ? 'Đã gửi Admin'
+                          : isOverdueMakeup
+                            ? 'Điểm danh bù'
+                            : isCommittingAttendance
+                              ? 'Đang ghi nhận'
+                              : isPendingConfirm
+                                ? 'Đang xác nhận'
+                                : attendanceDisputed
+                                  ? 'Đang giải quyết'
+                                  : awaitingStudentConfirm
+                                    ? 'Chờ HV xác nhận'
+                                    : alreadyAttendedToday
+                                      ? (cooldownHours > 0 ? `Chờ ${cooldownHours}h` : 'Đã điểm danh')
+                                      : 'Điểm danh'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { if (canCancelSession) handleCancelSession(); }}
+                    disabled={!canCancelSession}
+                    aria-disabled={!canCancelSession}
+                    title={cancelButtonTitle}
+                    className={`min-h-10 sm:min-h-[3.25rem] px-2 py-2 rounded-xl font-medium text-[10px] sm:text-sm  tracking-wide flex items-center justify-center gap-1.5 transition-all min-w-0 border ${canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
+                      }`}
+                  >
+                    <X size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 text-center leading-tight whitespace-normal">
+                      {cancelButtonLabel}
+                    </span>
                   </button>
                 </div>
+              ) : null}
 
-                {showAddAssign && (
-                  <div className="bg-indigo-50 border border-indigo-100 rounded-[32px] p-6 space-y-4 shadow-inner animate-in zoom-in-95">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tiêu đề bài tập</label>
-                        <input type="text" value={newAssign.title} onChange={e => setNewAssign({...newAssign, title: e.target.value})}
-                          className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="VD: Homework Buổi 1" />
-                      </div>
-                      <div>
-                        <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Hạn nộp (Deadline)</label>
-                        <input
-                          type="datetime-local"
-                          min={assignmentDeadlineMin()}
-                          value={newAssign.deadline}
-                          onChange={e => setNewAssign({...newAssign, deadline: e.target.value})}
-                          className="w-full max-w-full min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"
-                        />
-                        <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <input type="text" value={newAssign.fileUrl} onChange={e => setNewAssign({...newAssign, fileUrl: e.target.value})}
-                            className="flex-1 min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
-                          <label className="shrink-0 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 w-11 h-11 rounded-2xl cursor-pointer transition inline-flex items-center justify-center" title="Tải file lên (Tối đa 3MB)">
-                            <Upload size={18} />
-                            <input type="file" className="hidden" onChange={(e) => handleAssignmentUpload(e, 'new')} accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" />
-                          </label>
-                        </div>
-                        <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
-                      </div>
-                      <button onClick={handleCreateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Gửi bài tập cho học viên</button>
-                    </div>
+              {/* Notes */}
+              <div className="mt-4 sm:mt-0">
+                <label className="text-[10px] sm:text-xs font-bold text-slate-400  tracking-wide flex items-center gap-1.5 mb-2">
+                  <FileText size={12} aria-hidden="true" /> Ghi chú học viên
+                </label>
+                <div className="border border-slate-200 rounded-xl p-3 bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                  <textarea
+                    value={notesInput} onChange={e => setNotesInput(e.target.value)}
+                    onBlur={() => {
+                      if (isDroppedOut) return;
+                      onUpdateNotes((student._id || student.id), notesInput);
+                    }}
+                    readOnly={isDroppedOut}
+                    placeholder="Nhận xét cá nhân, ghi nhận đặc biệt về học viên này..."
+                    className={`w-full bg-transparent border-0 rounded-none p-0 text-xs sm:text-sm font-medium outline-none resize-none ${isDroppedOut ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    rows={3}
+                  />
+                  <span className="text-[11px] text-slate-400 ml-auto block mt-2">Tự động lưu khi rời ô nhập</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePanel === 'link' && (
+            <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl sm:rounded-[40px] p-4 sm:p-6 md:p-10 relative overflow-hidden min-w-0">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-200/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+                <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                    <Video size={22} />
                   </div>
-                )}
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-xl font-black text-indigo-900 truncate">Link học trực tuyến</h3>
+                    <p className="text-xs font-bold text-indigo-400 leading-snug">Tự động đồng bộ hóa với Dashboard của học viên</p>
+                  </div>
+                </div>
 
-                {loadingAssign ? (
-                   <div className="py-20 text-center animate-pulse text-xs font-black text-slate-300  tracking-[4px]">Đang tải dữ liệu...</div>
-                ) : (
-                  <div className="space-y-4">
-                    {courseAssignments.map(assign => {
-                      const submission = assign.submissions?.find(s => String(s.studentId?._id || s.studentId) === String(student.id || student._id));
-                      const isSubmitted = !!submission;
-                      const isGraded = submission?.status === 'graded';
-                      
-                      return editingAssignmentId === assign._id ? (
-                        <div key={`edit-${assign._id}`} className="bg-indigo-50 border border-indigo-200 rounded-[32px] p-6 space-y-4 shadow-inner animate-in zoom-in-95 relative z-10 transition-all">
-                          <div className="flex items-center justify-between">
-                             <h4 className="text-xs font-black text-indigo-500  tracking-widest flex items-center gap-2">Chỉnh sửa Bài tập</h4>
-                             <button onClick={() => setEditingAssignmentId(null)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={16}/></button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tiêu đề bài tập</label>
-                              <input type="text" value={editingAssign.title} onChange={e => setEditingAssign({...editingAssign, title: e.target.value})}
-                                className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"/>
-                            </div>
-                            <div>
-                              <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Hạn nộp (Deadline)</label>
-                              <input
-                                type="datetime-local"
-                                min={assignmentDeadlineMin()}
-                                value={editingAssign.deadline}
-                                onChange={e => setEditingAssign({...editingAssign, deadline: e.target.value})}
-                                className="w-full max-w-full min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"
-                              />
-                              <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
-                            </div>
-                            <div className="md:col-span-2">
-                              <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
-                              <div className="flex items-center gap-2">
-                                <input type="text" value={editingAssign.fileUrl} onChange={e => setEditingAssign({...editingAssign, fileUrl: e.target.value})}
-                                  className="flex-1 bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
-                                <label className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-4 py-3 rounded-2xl cursor-pointer transition flex items-center justify-center" title="Tải file lên (Tối đa 3MB)">
-                                  <Upload size={18} />
-                                  <input type="file" className="hidden" onChange={(e) => handleAssignmentUpload(e, 'edit')} accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" />
-                                </label>
-                              </div>
-                              <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
-                            </div>
-                            <button onClick={handleUpdateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Cập nhật bài tập</button>
-                          </div>
+                <div className="flex flex-col sm:flex-row gap-3 min-w-0">
+                  <div className="flex-1 relative min-w-0">
+                    <input
+                      type="text" value={linkInput} onChange={e => setLinkInput(e.target.value)}
+                      className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-4 sm:px-6 py-3 sm:py-4 text-sm font-bold text-indigo-700 focus:border-indigo-500 outline-none transition-all shadow-sm min-w-0"
+                      placeholder="Nhập link Google Meet / Zoom..."
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLinkSave}
+                    className={`shrink-0 w-full sm:w-auto min-h-11 px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-black text-xs  tracking-widest transition-all shadow-lg whitespace-nowrap ${linkSaved ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-100'
+                      }`}
+                  >
+                    {linkSaved ? 'Đã lưu ✓' : 'Cập nhật'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePanel === 'assignments' && (
+            <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs sm:text-sm font-semibold text-slate-600 truncate min-w-0">
+                  Danh sách bài tập
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAssign(!showAddAssign)}
+                  className={`shrink-0 text-xs px-3 min-h-9 rounded-lg font-medium transition-all inline-flex items-center gap-1 whitespace-nowrap ${showAddAssign
+                      ? 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
+                >
+                  {showAddAssign ? <X size={14} /> : <Plus size={14} />}
+                  {showAddAssign ? 'Hủy' : 'Giao bài'}
+                </button>
+              </div>
+
+              {showAddAssign && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-[32px] p-6 space-y-4 shadow-inner animate-in zoom-in-95">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tiêu đề bài tập</label>
+                      <input type="text" value={newAssign.title} onChange={e => setNewAssign({ ...newAssign, title: e.target.value })}
+                        className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="VD: Homework Buổi 1" />
+                    </div>
+                    <div>
+                      <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Hạn nộp (Deadline)</label>
+                      <input
+                        type="datetime-local"
+                        min={assignmentDeadlineMin()}
+                        value={newAssign.deadline}
+                        onChange={e => setNewAssign({ ...newAssign, deadline: e.target.value })}
+                        className="w-full max-w-full min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"
+                      />
+                      <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input type="text" value={newAssign.fileUrl} onChange={e => setNewAssign({ ...newAssign, fileUrl: e.target.value })}
+                          className="flex-1 min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
+                        <label className="shrink-0 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 w-11 h-11 rounded-2xl cursor-pointer transition inline-flex items-center justify-center" title="Tải file lên (Tối đa 3MB)">
+                          <Upload size={18} />
+                          <input type="file" className="hidden" onChange={(e) => handleAssignmentUpload(e, 'new')} accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" />
+                        </label>
+                      </div>
+                      <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
+                    </div>
+                    <button onClick={handleCreateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Gửi bài tập cho học viên</button>
+                  </div>
+                </div>
+              )}
+
+              {loadingAssign ? (
+                <div className="py-20 text-center animate-pulse text-xs font-black text-slate-300  tracking-[4px]">Đang tải dữ liệu...</div>
+              ) : (
+                <div className="space-y-4">
+                  {courseAssignments.map(assign => {
+                    const submission = assign.submissions?.find(s => String(s.studentId?._id || s.studentId) === String(student.id || student._id));
+                    const isSubmitted = !!submission;
+                    const isGraded = submission?.status === 'graded';
+
+                    return editingAssignmentId === assign._id ? (
+                      <div key={`edit-${assign._id}`} className="bg-indigo-50 border border-indigo-200 rounded-[32px] p-6 space-y-4 shadow-inner animate-in zoom-in-95 relative z-10 transition-all">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black text-indigo-500  tracking-widest flex items-center gap-2">Chỉnh sửa Bài tập</h4>
+                          <button onClick={() => setEditingAssignmentId(null)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={16} /></button>
                         </div>
-                      ) : (
-                        <div key={assign._id} className="bg-white rounded-2xl sm:rounded-[40px] p-4 sm:p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg transition-all group relative overflow-hidden">
-                          {isGraded && <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full translate-x-12 -translate-y-12 pointer-events-none" />}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tiêu đề bài tập</label>
+                            <input type="text" value={editingAssign.title} onChange={e => setEditingAssign({ ...editingAssign, title: e.target.value })}
+                              className="w-full bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Hạn nộp (Deadline)</label>
+                            <input
+                              type="datetime-local"
+                              min={assignmentDeadlineMin()}
+                              value={editingAssign.deadline}
+                              onChange={e => setEditingAssign({ ...editingAssign, deadline: e.target.value })}
+                              className="w-full max-w-full min-w-0 bg-white border border-indigo-200 rounded-2xl px-3 sm:px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none"
+                            />
+                            <p className="text-[10px] text-indigo-300 font-medium mt-1">Chỉ chọn từ hiện tại trở đi.</p>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="text-xs cms-min-text-xs font-black text-indigo-400  mb-1 block">Tài liệu đính kèm (Link Drive/File hoặc Tải lên)</label>
+                            <div className="flex items-center gap-2">
+                              <input type="text" value={editingAssign.fileUrl} onChange={e => setEditingAssign({ ...editingAssign, fileUrl: e.target.value })}
+                                className="flex-1 bg-white border border-indigo-200 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-900 focus:border-indigo-500 outline-none" placeholder="Dán link Drive/File..." />
+                              <label className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-4 py-3 rounded-2xl cursor-pointer transition flex items-center justify-center" title="Tải file lên (Tối đa 3MB)">
+                                <Upload size={18} />
+                                <input type="file" className="hidden" onChange={(e) => handleAssignmentUpload(e, 'edit')} accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" />
+                              </label>
+                            </div>
+                            <p className="text-xs cms-min-text-xs text-gray-400 font-medium italic mt-1.5 ml-1">* Cho phép: PDF, Word, Excel, ZIP, RAR. Tối đa 3MB.</p>
+                          </div>
+                          <button onClick={handleUpdateAssign} className="md:col-span-2 bg-red-600 text-white font-black py-4 rounded-2xl text-xs  tracking-widest hover:bg-red-700 transition shadow-lg shadow-red-100">Cập nhật bài tập</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={assign._id} className="bg-white rounded-2xl sm:rounded-[40px] p-4 sm:p-6 border border-slate-100 hover:border-indigo-200 hover:shadow-lg transition-all group relative overflow-hidden">
+                        {isGraded && <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full translate-x-12 -translate-y-12 pointer-events-none" />}
 
-                          {/* Dòng 1: tên + badge */}
-                          <div className="flex items-start justify-between gap-2 relative z-10">
-                            <h5 className="line-clamp-2 font-semibold text-slate-800 text-sm sm:text-base leading-snug break-words flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-                              <span className="min-w-0">{assign.title}</span>
-                              {(() => {
-                                const role = String(assign.assignedByRole || '').toLowerCase();
-                                const isAdmin = role === 'admin' || role === 'staff';
-                                const label = isAdmin ? 'Admin giao' : 'Giáo viên';
-                                return (
-                                  <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-black  tracking-wide border ${
-                                    isAdmin
-                                      ? 'bg-violet-100 text-violet-700 border-violet-200'
-                                      : 'bg-sky-100 text-sky-700 border-sky-200'
+                        {/* Dòng 1: tên + badge */}
+                        <div className="flex items-start justify-between gap-2 relative z-10">
+                          <h5 className="line-clamp-2 font-semibold text-slate-800 text-sm sm:text-base leading-snug break-words flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                            <span className="min-w-0">{assign.title}</span>
+                            {(() => {
+                              const role = String(assign.assignedByRole || '').toLowerCase();
+                              const isAdmin = role === 'admin' || role === 'staff';
+                              const label = isAdmin ? 'Admin giao' : 'Giáo viên';
+                              return (
+                                <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-black  tracking-wide border ${isAdmin
+                                    ? 'bg-violet-100 text-violet-700 border-violet-200'
+                                    : 'bg-sky-100 text-sky-700 border-sky-200'
                                   }`}>
-                                    {label}
-                                  </span>
-                                );
-                              })()}
-                            </h5>
-                            {isSubmitted ? (
-                              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold  tracking-wide flex items-center gap-1 border ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
-                                {isGraded ? <Check size={11} /> : <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
-                                {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'Đã nộp'}
-                              </span>
-                            ) : (
-                              <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold  tracking-wide bg-slate-50 text-slate-400">
-                                Chưa nộp
-                              </span>
-                            )}
-                          </div>
+                                  {label}
+                                </span>
+                              );
+                            })()}
+                          </h5>
+                          {isSubmitted ? (
+                            <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold  tracking-wide flex items-center gap-1 border ${isGraded ? getGradeBadgeClasses(submission.grade) : 'bg-blue-100 text-blue-700 border-transparent'}`}>
+                              {isGraded ? <Check size={11} /> : <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
+                              {isGraded ? `${getGradeLabel(submission.grade)}: ${submission.grade}/10` : 'Đã nộp'}
+                            </span>
+                          ) : (
+                            <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-bold  tracking-wide bg-slate-50 text-slate-400">
+                              Chưa nộp
+                            </span>
+                          )}
+                        </div>
 
-                          {/* Dòng 2: hạn + tải bài + sửa/xóa */}
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5 relative z-10">
-                            <p className="text-[11px] sm:text-xs font-medium text-slate-500 flex items-center gap-1">
-                              <Clock size={12} className="text-orange-400 shrink-0" />
-                              Hạn: {new Date(assign.deadline).toLocaleDateString('vi-VN')}
-                            </p>
-                            {isSubmitted && submission.submittedFileUrl && (
-                              <a
-                                href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[11px] sm:text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                                title="Tải bài làm của học viên"
-                              >
-                                <Download size={12} /> Tải bài làm
-                              </a>
-                            )}
-                            {!isGraded && (
-                              <div className="flex items-center gap-1 ml-auto">
-                                <button type="button" onClick={() => handleEditAssign(assign)} title="Sửa bài tập" className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50">
-                                  <Edit3 size={14} />
-                                </button>
-                                <button type="button" onClick={() => handleDeleteAssign(assign._id)} title="Xóa bài tập" className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50">
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Dòng 3: chấm điểm */}
-                          {isSubmitted && (
-                            <div className="grid grid-cols-2 gap-2 mt-3 relative z-10">
-                              <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                placeholder={isGraded ? 'Sửa điểm' : 'Điểm 0-10'}
-                                value={gradingInputs[submission._id] ?? (isGraded ? (submission.grade ?? '') : '')}
-                                onChange={(e) => setGradingInputs({ ...gradingInputs, [submission._id]: e.target.value })}
-                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500 text-center"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleGradeSubmit(submission._id)}
-                                className={`w-full py-2 rounded-lg text-xs font-medium text-white transition-all ${
-                                  isGraded ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
-                                }`}
-                              >
-                                {isGraded ? 'Sửa điểm' : 'Lưu điểm'}
+                        {/* Dòng 2: hạn + tải bài + sửa/xóa */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5 relative z-10">
+                          <p className="text-[11px] sm:text-xs font-medium text-slate-500 flex items-center gap-1">
+                            <Clock size={12} className="text-orange-400 shrink-0" />
+                            Hạn: {new Date(assign.deadline).toLocaleDateString('vi-VN')}
+                          </p>
+                          {isSubmitted && submission.submittedFileUrl && (
+                            <a
+                              href={buildMediaDownloadUrl(submission.submittedFileUrl, submission.submittedFileUrl.split('/').pop())}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] sm:text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                              title="Tải bài làm của học viên"
+                            >
+                              <Download size={12} /> Tải bài làm
+                            </a>
+                          )}
+                          {!isGraded && (
+                            <div className="flex items-center gap-1 ml-auto">
+                              <button type="button" onClick={() => handleEditAssign(assign)} title="Sửa bài tập" className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50">
+                                <Edit3 size={14} />
+                              </button>
+                              <button type="button" onClick={() => handleDeleteAssign(assign._id)} title="Xóa bài tập" className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50">
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           )}
+                        </div>
 
-                          {isGraded && submission.teacherFeedback && (
-                            <p className="text-[11px] text-slate-400 italic mt-2 line-clamp-2 relative z-10">*{submission.teacherFeedback}</p>
-                          )}
-                          {isGraded && !submission.teacherFeedback && (
-                            <p className="text-[11px] text-slate-400 italic mt-2 relative z-10">*Giảng viên đã sửa điểm</p>
-                          )}
-
-                          {/* Link phụ: xem đề bài */}
-                          {assign.fileUrl && (
-                            <a
-                              href={resolveMediaUrl(assign.fileUrl)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 mt-2.5 text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-800 relative z-10"
+                        {/* Dòng 3: chấm điểm */}
+                        {isSubmitted && (
+                          <div className="grid grid-cols-2 gap-2 mt-3 relative z-10">
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              placeholder={isGraded ? 'Sửa điểm' : 'Điểm 0-10'}
+                              value={gradingInputs[submission._id] ?? (isGraded ? (submission.grade ?? '') : '')}
+                              onChange={(e) => setGradingInputs({ ...gradingInputs, [submission._id]: e.target.value })}
+                              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500 text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleGradeSubmit(submission._id)}
+                              className={`w-full py-2 rounded-lg text-xs font-medium text-white transition-all ${isGraded ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
                             >
-                              <Link2 size={12} /> Xem đề bài
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {courseAssignments.length === 0 && !showAddAssign && (
-                      <div className="py-24 text-center bg-gray-50/50 rounded-[40px] border-4 border-dashed border-white">
-                        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-200 shadow-sm">
-                           <BookOpen size={28} />
-                        </div>
-                        <p className="text-xs font-black text-slate-400  tracking-widest px-10 leading-relaxed">Chưa có bài tập nào được giao<br/>cho lộ trình này</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activePanel === 'quiz' && (
-              <div className="animate-in fade-in duration-300 py-8 sm:py-12 text-center space-y-4">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
-                  <ListChecks size={28} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">Tạo trắc nghiệm</h3>
-                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                    Soạn đề giao cho <strong>{getDisplayName(student)}</strong>
-                    {student.course ? ` · ${student.course}` : ''}.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={openQuizCreate}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm"
-                >
-                  <Plus size={14} /> Mở form tạo trắc nghiệm
-                </button>
-              </div>
-            )}
-
-            {activePanel === 'grade' && (
-              <div className="space-y-6 sm:space-y-8 animate-in slide-in-from-right-10 duration-500">
-                 <div className="bg-amber-50 border border-amber-100 rounded-2xl sm:rounded-[40px] p-5 sm:p-10 text-center flex flex-col items-center gap-4 sm:gap-6">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm">
-                        <Award size={22} />
-                      </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-amber-900">Đánh giá quá trình</h3>
-                      <p className="text-[11px] sm:text-xs font-medium text-amber-600 max-w-sm leading-relaxed">
-                        Môn {student.course} · Cập nhật điểm trung bình dựa trên bài tập
-                      </p>
-                    </div>
-
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.5"
-                      value={gradeInput}
-                      onChange={e => setGradeInput(e.target.value)}
-                      className="w-28 sm:w-32 bg-white border-2 border-amber-200 rounded-xl p-3 text-2xl font-bold text-amber-700 text-center focus:border-amber-500 outline-none"
-                    />
-
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-full border-4 border-amber-100 flex flex-col items-center justify-center shadow-md">
-                      <span className="text-[10px] font-bold text-amber-400  tracking-wide">Xếp loại</span>
-                      <span className="text-4xl sm:text-5xl font-bold text-amber-600 leading-none mt-0.5">{gradeLetter}</span>
-                    </div>
-
-                    <p className="text-[11px] font-medium text-amber-500 italic">* Điểm số sẽ được hiển thị công khai trên học bạ</p>
-
-                    <button
-                      type="button"
-                      onClick={handleGradeSave}
-                      className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium text-sm transition-all"
-                    >
-                      {gradeSaved ? 'Đã lưu ✓' : 'Lưu kết quả đánh giá'}
-                    </button>
-                 </div>
-              </div>
-           )}
-
-           {activePanel === 'logs' && (
-              <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
-                <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 min-w-0">
-                  <div className="flex items-start sm:items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                      <History size={18} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-black text-slate-800 leading-snug">
-                        Nhật ký Hoạt động &amp; Lịch sử Học viên
-                      </h3>
-                      <p className="text-[11px] text-slate-400 font-medium leading-snug">
-                        Trái: ngày buổi học · Phải: giờ thao tác thực tế (điểm danh / hủy / nộp bài…)
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0 whitespace-nowrap">
-                    {activityLogs.length} lượt
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                  {loadingLogs || (activePanel === 'logs' && loadingAssign && activityLogs.length === 0) ? (
-                    <div className="py-16 text-center animate-pulse text-xs font-black text-slate-300  tracking-[4px]">
-                      Đang tải nhật ký...
-                    </div>
-                  ) : activityLogs.length > 0 ? (
-                    activityLogs.map((log) => {
-                      const meta = ACTIVITY_LOG_META[log.type] || ACTIVITY_LOG_META.attendance;
-                      const Icon =
-                        log.type === 'quiz' ? Award
-                          : log.type === 'homework' ? Clipboard
-                            : log.type === 'grade_update' ? Edit3
-                              : log.type === 'evaluation' ? Star
-                                : log.type === 'schedule_change' ? Calendar
-                                : log.type === 'attendance_cancel' || log.type === 'schedule_cancel' ? X
-                                  : CheckCircle;
-                      return (
-                        <div
-                          key={log.id}
-                          className="bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 transition flex items-center justify-between gap-3"
-                        >
-                          <div className="flex items-start gap-3 min-w-0">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${meta.iconWrap}`}>
-                              <Icon size={16} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-black text-slate-900 font-mono">
-                                  {log.time ? `${log.time} — ${log.date}` : log.date}
-                                </span>
-                                <span className={`text-[11px] font-black  px-2 py-0.5 rounded-md border ${meta.badge}`}>
-                                  {meta.label}
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-600 font-medium mt-1 leading-snug">
-                                {log.note}
-                              </p>
-                            </div>
+                              {isGraded ? 'Sửa điểm' : 'Lưu điểm'}
+                            </button>
                           </div>
+                        )}
 
-                          <div className="text-right shrink-0 flex flex-col items-end gap-1 min-w-[7.5rem]">
-                            {log.actedAtLabel ? (
-                              <span
-                                className="text-[10px] sm:text-[11px] font-bold text-slate-500 tabular-nums whitespace-nowrap"
-                                title="Thời điểm thao tác"
-                              >
-                                {log.actedAtLabel}
-                              </span>
-                            ) : null}
-                            {(log.type === 'quiz' && log.rawScore != null) ? (
-                              <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
-                                <span className={`text-sm font-black tabular-nums ${
-                                  log.rawScore >= 70 ? 'text-emerald-600' : 'text-rose-600'
-                                }`}>
-                                  {log.rawScore}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-bold">%</span>
-                              </div>
-                            ) : log.grade != null && Number(log.grade) >= 0 ? (
-                              <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
-                                <span className={`text-sm font-black tabular-nums ${
-                                  log.grade >= 8 ? 'text-emerald-600' : log.grade >= 6.5 ? 'text-blue-600' : log.grade >= 5 ? 'text-amber-600' : 'text-rose-600'
-                                }`}>
-                                  {log.grade}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-bold">/10</span>
-                              </div>
-                            ) : !log.actedAtLabel ? (
-                              <span className="text-xs text-slate-400 font-bold italic">--</span>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-2">
-                      <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
-                        <History size={20} />
+                        {isGraded && submission.teacherFeedback && (
+                          <p className="text-[11px] text-slate-400 italic mt-2 line-clamp-2 relative z-10">*{submission.teacherFeedback}</p>
+                        )}
+                        {isGraded && !submission.teacherFeedback && (
+                          <p className="text-[11px] text-slate-400 italic mt-2 relative z-10">*Giảng viên đã sửa điểm</p>
+                        )}
+
+                        {/* Link phụ: xem đề bài */}
+                        {assign.fileUrl && (
+                          <a
+                            href={resolveMediaUrl(assign.fileUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 mt-2.5 text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-800 relative z-10"
+                          >
+                            <Link2 size={12} /> Xem đề bài
+                          </a>
+                        )}
                       </div>
-                      <p className="font-bold text-slate-600">Chưa có nhật ký hoạt động nào</p>
-                      <p className="text-[11px] text-slate-400">
-                        Điểm danh, hủy điểm danh (buổi mấy), hủy ca, nộp bài, chấm điểm, thi trắc nghiệm và đánh giá sẽ hiện tại đây.
-                      </p>
+                    );
+                  })}
+                  {courseAssignments.length === 0 && !showAddAssign && (
+                    <div className="py-24 text-center bg-gray-50/50 rounded-[40px] border-4 border-dashed border-white">
+                      <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-200 shadow-sm">
+                        <BookOpen size={28} />
+                      </div>
+                      <p className="text-xs font-black text-slate-400  tracking-widest px-10 leading-relaxed">Chưa có bài tập nào được giao<br />cho lộ trình này</p>
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {activePanel === 'quiz' && (
+            <div className="animate-in fade-in duration-300 py-8 sm:py-12 text-center space-y-4">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
+                <ListChecks size={28} />
               </div>
-           )}
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Tạo trắc nghiệm</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  Soạn đề giao cho <strong>{getDisplayName(student)}</strong>
+                  {student.course ? ` · ${student.course}` : ''}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openQuizCreate}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm"
+              >
+                <Plus size={14} /> Mở form tạo trắc nghiệm
+              </button>
+            </div>
+          )}
+
+          {activePanel === 'grade' && (
+            <div className="space-y-6 sm:space-y-8 animate-in slide-in-from-right-10 duration-500">
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl sm:rounded-[40px] p-5 sm:p-10 text-center flex flex-col items-center gap-4 sm:gap-6">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm">
+                    <Award size={22} />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-amber-900">Đánh giá quá trình</h3>
+                  <p className="text-[11px] sm:text-xs font-medium text-amber-600 max-w-sm leading-relaxed">
+                    Môn {student.course} · Cập nhật điểm trung bình dựa trên bài tập
+                  </p>
+                </div>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={gradeInput}
+                  onChange={e => setGradeInput(e.target.value)}
+                  className="w-28 sm:w-32 bg-white border-2 border-amber-200 rounded-xl p-3 text-2xl font-bold text-amber-700 text-center focus:border-amber-500 outline-none"
+                />
+
+                <div className="w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-full border-4 border-amber-100 flex flex-col items-center justify-center shadow-md">
+                  <span className="text-[10px] font-bold text-amber-400  tracking-wide">Xếp loại</span>
+                  <span className="text-4xl sm:text-5xl font-bold text-amber-600 leading-none mt-0.5">{gradeLetter}</span>
+                </div>
+
+                <p className="text-[11px] font-medium text-amber-500 italic">* Điểm số sẽ được hiển thị công khai trên học bạ</p>
+
+                <button
+                  type="button"
+                  onClick={handleGradeSave}
+                  className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium text-sm transition-all"
+                >
+                  {gradeSaved ? 'Đã lưu ✓' : 'Lưu kết quả đánh giá'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activePanel === 'logs' && (
+            <div className="space-y-4 sm:space-y-6 animate-in slide-in-from-right-10 duration-500">
+              <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 min-w-0">
+                <div className="flex items-start sm:items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <History size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-800 leading-snug">
+                      Nhật ký Hoạt động &amp; Lịch sử Học viên
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium leading-snug">
+                      Trái: ngày buổi học · Phải: giờ thao tác thực tế (điểm danh / hủy / nộp bài…)
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600 shrink-0 whitespace-nowrap">
+                  {activityLogs.length} lượt
+                </span>
+              </div>
+
+              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {loadingLogs || (activePanel === 'logs' && loadingAssign && activityLogs.length === 0) ? (
+                  <div className="py-16 text-center animate-pulse text-xs font-black text-slate-300  tracking-[4px]">
+                    Đang tải nhật ký...
+                  </div>
+                ) : activityLogs.length > 0 ? (
+                  activityLogs.map((log) => {
+                    const meta = ACTIVITY_LOG_META[log.type] || ACTIVITY_LOG_META.attendance;
+                    const Icon =
+                      log.type === 'quiz' ? Award
+                        : log.type === 'homework' ? Clipboard
+                          : log.type === 'grade_update' ? Edit3
+                            : log.type === 'evaluation' ? Star
+                              : log.type === 'schedule_change' ? Calendar
+                                : log.type === 'attendance_cancel' || log.type === 'schedule_cancel' ? X
+                                  : CheckCircle;
+                    return (
+                      <div
+                        key={log.id}
+                        className="bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 transition flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${meta.iconWrap}`}>
+                            <Icon size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black text-slate-900 font-mono">
+                                {log.time ? `${log.time} - ${log.date}` : log.date}
+                              </span>
+                              <span className={`text-[11px] font-black  px-2 py-0.5 rounded-md border ${meta.badge}`}>
+                                {meta.label}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium mt-1 leading-snug">
+                              {log.note}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1 min-w-[7.5rem]">
+                          {log.actedAtLabel ? (
+                            <span
+                              className="text-[10px] sm:text-[11px] font-bold text-slate-500 tabular-nums whitespace-nowrap"
+                              title="Thời điểm thao tác"
+                            >
+                              {log.actedAtLabel}
+                            </span>
+                          ) : null}
+                          {(log.type === 'quiz' && log.rawScore != null) ? (
+                            <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
+                              <span className={`text-sm font-black tabular-nums ${log.rawScore >= 70 ? 'text-emerald-600' : 'text-rose-600'
+                                }`}>
+                                {log.rawScore}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold">%</span>
+                            </div>
+                          ) : log.grade != null && Number(log.grade) >= 0 ? (
+                            <div className="bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs inline-flex items-baseline gap-0.5">
+                              <span className={`text-sm font-black tabular-nums ${log.grade >= 8 ? 'text-emerald-600' : log.grade >= 6.5 ? 'text-blue-600' : log.grade >= 5 ? 'text-amber-600' : 'text-rose-600'
+                                }`}>
+                                {log.grade}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold">/10</span>
+                            </div>
+                          ) : !log.actedAtLabel ? (
+                            <span className="text-xs text-slate-400 font-bold italic">--</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-2">
+                    <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                      <History size={20} />
+                    </div>
+                    <p className="font-bold text-slate-600">Chưa có nhật ký hoạt động nào</p>
+                    <p className="text-[11px] text-slate-400">
+                      Điểm danh, hủy điểm danh (buổi mấy), hủy ca, nộp bài, chấm điểm, thi trắc nghiệm và đánh giá sẽ hiện tại đây.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        
+
         {showQuizCreate && (
           <TeacherQuizManager
             myStudents={quizStudents}
@@ -1803,7 +1787,7 @@ export const StudentCard = ({
           />
         )}
 
-        {/* Makeup modal — phải có trong isDetailed (tab Học viên) */}
+        {/* Makeup modal - phải có trong isDetailed (tab Học viên) */}
         {showMakeupModal && (
           <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-[200] p-3 sm:p-4 animate-in fade-in duration-300"
@@ -1905,7 +1889,7 @@ export const StudentCard = ({
                   <p className="text-lg font-black text-emerald-600">{getDisplayName(student)}</p>
                   <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{sessionTotal} buổi</p>
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
                   <AttendanceGradeInput
@@ -1916,25 +1900,25 @@ export const StudentCard = ({
                 </div>
 
                 <div>
-                   <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Ghi chú nhanh</label>
-                   <textarea 
-                     value={attForm.note}
-                     onChange={(e) => setAttForm({ ...attForm, note: e.target.value })}
-                     placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
-                     className="w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 outline-none transition-all resize-none"
-                     rows={3}
-                   />
+                  <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Ghi chú nhanh</label>
+                  <textarea
+                    value={attForm.note}
+                    onChange={(e) => setAttForm({ ...attForm, note: e.target.value })}
+                    placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
+                    className="w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 outline-none transition-all resize-none"
+                    rows={3}
+                  />
                 </div>
 
                 <div className="flex flex-col-reverse min-[380px]:flex-row gap-2 sm:gap-4 pt-4 min-w-0">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setShowAttendanceModal(false)}
                     className="flex-1 min-h-11 py-3 sm:py-4 text-slate-400 font-black text-xs  tracking-widest bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all whitespace-nowrap"
                   >
                     Hủy
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={beginAttendanceConfirm}
                     className="flex-[2] min-h-11 py-3 sm:py-4 px-2 text-white font-black text-xs  tracking-widest bg-gradient-to-r from-emerald-600 to-green-500 rounded-2xl shadow-lg shadow-green-100 hover:shadow-green-200 transition-all active:scale-95 text-center leading-tight"
@@ -1966,255 +1950,249 @@ export const StudentCard = ({
   // STANDARD COMPACT VIEW (For Dashboard/List)
   return (
     <React.Fragment>
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${isDroppedOut ? 'opacity-70' : ''}`}>
-      {isDroppedOut && (
-        <div className="bg-slate-600 text-white text-center text-[10px] font-bold  tracking-wide px-3 py-1.5">
-          Thôi học — chỉ xem
-        </div>
-      )}
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-4 sm:px-6">
-        <div className="flex flex-col gap-4 min-[440px]:flex-row min-[440px]:items-start min-[440px]:justify-between min-w-0">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shrink-0 bg-white">
-              <img src={resolveAvatarUrl({ avatar: student.avatarUrl || student.avatar || student.photo, role: 'student', gender: student.gender })} alt="" className="w-full h-full object-cover" />
+      <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${isDroppedOut ? 'opacity-70' : ''}`}>
+        {isDroppedOut && (
+          <div className="bg-slate-600 text-white text-center text-[10px] font-bold  tracking-wide px-3 py-1.5">
+            Thôi học - chỉ xem
+          </div>
+        )}
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 min-[440px]:flex-row min-[440px]:items-start min-[440px]:justify-between min-w-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shrink-0 bg-white">
+                <img src={resolveAvatarUrl({ avatar: student.avatarUrl || student.avatar || student.photo, role: 'student', gender: student.gender })} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
+                <p className="text-slate-300 text-xs mt-0.5 flex flex-wrap items-center gap-2">
+                  {student.course} · {student.age} tuổi
+                  <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider  ${isStudentOnline ? 'bg-emerald-500/25 text-emerald-200' : 'bg-white/10 text-slate-300'
+                    }`}>
+                    {isStudentOnline ? 'Trực tuyến' : 'Offline'}
+                  </span>
+                  <span className="inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-semibold tracking-wider  bg-white/10 text-slate-400">
+                    {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
+                  </span>
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-white font-bold text-lg tracking-wide truncate">{getDisplayName(student)}</p>
-              <p className="text-slate-300 text-xs mt-0.5 flex flex-wrap items-center gap-2">
-                {student.course} · {student.age} tuổi
-                <span className={`inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-black tracking-wider  ${
-                  isStudentOnline ? 'bg-emerald-500/25 text-emerald-200' : 'bg-white/10 text-slate-300'
-                }`}>
-                  {isStudentOnline ? 'Trực tuyến' : 'Offline'}
-                </span>
-                <span className="inline-block px-1.5 py-0.5 rounded text-xs cms-min-text-xs font-semibold tracking-wider  bg-white/10 text-slate-400">
-                  {student.learningMode === 'ONLINE' ? 'Học online' : 'Học tại trung tâm'}
-                </span>
-              </p>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-[440px]:w-auto min-[440px]:justify-end">
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-blue-400'
+                }`}>{isDroppedOut ? 'Thôi học' : isCompleted ? '✓ Hoàn thành' : student.status}</span>
+              <a href={`https://zalo.me/${student.zalo}`} target="_blank" rel="noreferrer"
+                className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
+                <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{maskPhone(student.zalo)}</span>
+              </a>
+              {onLockExam && (
+                <FailExamButton student={student} onLockExam={onLockExam} compact />
+              )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-[440px]:w-auto min-[440px]:justify-end">
-            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-              isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-blue-400'
-            }`}>{isDroppedOut ? 'Thôi học' : isCompleted ? '✓ Hoàn thành' : student.status}</span>
-            <a href={`https://zalo.me/${student.zalo}`} target="_blank" rel="noreferrer"
-              className="inline-flex flex-1 min-[440px]:flex-initial justify-center items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all min-w-0 max-w-full">
-              <MessageSquare size={14} className="shrink-0" /> <span className="truncate">{maskPhone(student.zalo)}</span>
-            </a>
-            {onLockExam && (
-              <FailExamButton student={student} onLockExam={onLockExam} compact />
-            )}
-          </div>
-        </div>
-        <div className="mt-4">
-          <div className="flex justify-between items-center mb-1.5 text-xs">
-            <span className="text-slate-400">Tiến độ khóa học</span>
-            <span className="text-white font-bold">{done}/{sessionTotal} buổi ({progressPct}%)</span>
-          </div>
-          <div className="h-2 bg-slate-600 rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-700 ${
-              progressPct >= 70 ? 'bg-green-400' : progressPct >= 40 ? 'bg-yellow-400' : 'bg-blue-400'
-            }`} style={{ width: `${progressPct}%` }} />
-          </div>
-          {priorCredit > 0 ? (
-            <p className="text-[10px] text-slate-400 mt-1.5">
-              Trên lịch: {onCalendarDone} · Ghi nhận trước: {priorCredit}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100 min-w-0 overflow-hidden">
-        {panels.map(({ key, icon: Icon, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => {
-              if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
-                toast.info('Học viên đã thôi học — không thao tác được.');
-                return;
-              }
-              if (key === 'quiz') {
-                openQuizCreate();
-                return;
-              }
-              if (key === 'schedule') {
-                setShowQuickSchedule(true);
-                return;
-              }
-              setActivePanel(key);
-            }}
-            title={label}
-            aria-label={label}
-            className={`flex-1 min-w-0 min-h-11 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-0.5 py-2 sm:py-3.5 text-[10px] sm:text-sm font-semibold transition-all ${
-              activePanel === key ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Icon size={15} className="shrink-0" aria-hidden="true" />
-            <span className="hidden min-[400px]:inline truncate max-w-full leading-tight">{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Panel Content (Standard View) */}
-      <div className="p-6">
-        {activePanel === 'progress' && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-blue-50 rounded-2xl p-4 text-center border border-blue-100">
-                <p className="text-xs text-blue-500 font-semibold  tracking-wide mb-1">Đã học</p>
-                <p className="text-3xl font-black text-blue-700">{done}</p>
-                <p className="text-xs text-blue-400">buổi</p>
-              </div>
-              <div className={`rounded-2xl p-4 text-center border ${isCompleted ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
-                <p className={`text-xs font-semibold  tracking-wide mb-1 ${isCompleted ? 'text-green-500' : 'text-orange-500'}`}>Còn lại</p>
-                <p className={`text-3xl font-black ${isCompleted ? 'text-green-700' : 'text-orange-700'}`}>{remainingSessions}</p>
-                <p className={`text-xs ${isCompleted ? 'text-green-400' : 'text-orange-400'}`}>buổi</p>
-              </div>
-              <div className="bg-purple-50 rounded-2xl p-4 text-center border border-purple-100">
-                <p className="text-xs text-purple-500 font-semibold  tracking-wide mb-1">Điểm TB</p>
-                <p className="text-3xl font-black text-purple-700">{student.lastGrade}</p>
-                <p className="text-xs text-purple-400">/ 10</p>
-              </div>
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-1.5 text-xs">
+              <span className="text-slate-400">Tiến độ khóa học</span>
+              <span className="text-white font-bold">{done}/{sessionTotal} buổi ({progressPct}%)</span>
+            </div>
+            <div className="h-2 bg-slate-600 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-700 ${progressPct >= 70 ? 'bg-green-400' : progressPct >= 40 ? 'bg-yellow-400' : 'bg-blue-400'
+                }`} style={{ width: `${progressPct}%` }} />
             </div>
             {priorCredit > 0 ? (
-              <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 leading-snug">
-                Đã học gồm <span className="font-semibold text-slate-700">{onCalendarDone} buổi trên lịch</span>
-                {' + '}
-                <span className="font-semibold text-slate-700">{priorCredit} buổi ghi nhận trước</span>
-                {' '}(Admin / chuyển khóa).
+              <p className="text-[10px] text-slate-400 mt-1.5">
+                Trên lịch: {onCalendarDone} · Ghi nhận trước: {priorCredit}
               </p>
             ) : null}
-            {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy ca / Hủy điểm danh === */}
-            {showSessionActionRow ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button onClick={openAttendanceModal} 
-                  disabled={leftAttendanceDisabled}
-                  title={
-                    isCompleted ? 'Hoàn thành' :
-                    makeupPending ? 'Đã gửi yêu cầu — chờ Admin xét duyệt điểm danh bù' :
-                    isOverdueMakeup ? 'Quá hạn — gửi yêu cầu điểm danh bù tới Admin' :
-                    isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
-                    isPendingConfirm ? `Đang chờ xác nhận — còn ${confirmRemainSec}s để hủy` :
-                    attendanceDisputed ? 'Học viên không đồng ý — đang giải quyết (chờ Admin)' :
-                    awaitingStudentConfirm ? 'Đã gửi điểm danh — đang chờ học viên xác nhận' :
-                    alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` :
-                    waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
-                    'Bấm để điểm danh'
-                  }
-                  className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${
-                    isCompleted 
-                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
-                    : makeupPending
-                      ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
-                    : isOverdueMakeup
-                      ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
-                    : attendanceDisputed
-                      ? 'bg-amber-100 text-amber-800 cursor-not-allowed pointer-events-none select-none border-2 border-amber-200'
-                    : awaitingStudentConfirm
-                      ? 'bg-blue-100 text-blue-800 cursor-not-allowed pointer-events-none select-none border-2 border-blue-200'
-                    : leftAttendanceLocked
-                      ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
-                    : waitingAttendanceUnlock
-                      ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60 border-2 border-slate-200'
-                      : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
-                  }`}>
-                  <CheckCircle size={18} />
-                  <span className="text-xs text-center leading-tight">
-                    {isCompleted 
-                      ? 'Hoàn thành'
-                      : makeupPending
-                        ? <>Đã gửi<br/>Admin</>
-                      : isOverdueMakeup
-                        ? <>Điểm danh<br/>Bù</>
-                        : isCommittingAttendance
-                          ? <>Đang<br/>Ghi nhận</>
-                        : isPendingConfirm
-                          ? <>Đang<br/>Xác nhận</>
-                          : attendanceDisputed
-                            ? <>Đang<br/>Giải quyết</>
-                          : awaitingStudentConfirm
-                            ? <>Chờ HV<br/>Xác nhận</>
-                          : alreadyAttendedToday
-                            ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
-                            : 'Điểm danh'}
-                  </span>
-                </button>
+          </div>
+        </div>
 
-              <button
-                type="button"
-                onClick={() => { if (canCancelSession) handleCancelSession(); }}
-                disabled={!canCancelSession}
-                aria-disabled={!canCancelSession}
-                title={cancelButtonTitle}
-                className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all border-2 ${
-                  canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 min-w-0 overflow-hidden">
+          {panels.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                if (isDroppedOut && (key === 'quiz' || key === 'schedule' || key === 'assignments' || key === 'link')) {
+                  toast.info('Học viên đã thôi học - không thao tác được.');
+                  return;
+                }
+                if (key === 'quiz') {
+                  openQuizCreate();
+                  return;
+                }
+                if (key === 'schedule') {
+                  setShowQuickSchedule(true);
+                  return;
+                }
+                setActivePanel(key);
+              }}
+              title={label}
+              aria-label={label}
+              className={`flex-1 min-w-0 min-h-11 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-0.5 py-2 sm:py-3.5 text-[10px] sm:text-sm font-semibold transition-all ${activePanel === key ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'
                 }`}
-              >
-                <X size={18} />
-                <span className="text-xs text-center leading-tight">
-                  {isCommittingAttendance
-                    ? <>Đang<br/>Ghi nhận</>
-                    : cancelIsUndoAttendance
-                      ? <>Hủy điểm danh{confirmRemainSec > 0 ? <><br/>{confirmRemainSec}s</> : null}</>
-                      : alreadyAttendedToday
-                        ? <>Đã khóa</>
-                        : <>Hủy ca</>}
-                </span>
-              </button>
-            </div>
-            ) : null}
-            <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2 font-black  text-xs text-gray-400 tracking-widest">📝 Ghi chú học viên</label>
-              <textarea value={notesInput} onChange={e => setNotesInput(e.target.value)}
-                onBlur={() => {
-                  if (isDroppedOut) return;
-                  onUpdateNotes(student._id || student.id, notesInput);
-                }}
-                readOnly={isDroppedOut}
-                rows={3}
-                placeholder="Nhận xét, ghi chú về học viên..."
-                className={`w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:border-blue-400 outline-none ${isDroppedOut ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`} />
-            </div>
-          </div>
-        )}
+            >
+              <Icon size={15} className="shrink-0" aria-hidden="true" />
+              <span className="hidden min-[400px]:inline truncate max-w-full leading-tight">{label}</span>
+            </button>
+          ))}
+        </div>
 
-        {activePanel === 'link' && (
-          <div className="space-y-5">
-            <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
-               <div className="flex items-center gap-2 mb-3">
-                 <Video size={18} className="text-blue-600" />
-                 <h3 className="font-bold text-blue-800 text-sm">Link học trực tuyến</h3>
-               </div>
-               <p className="text-xs text-blue-500 mb-4 font-bold ">Cập nhật link buổi học mới tại đây</p>
-               <div className="flex gap-2">
-                 <input type="text" value={linkInput} onChange={e => setLinkInput(e.target.value)}
-                   className="flex-1 border-2 border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
-                   placeholder="Dán link họp..." />
-                 <button onClick={handleLinkSave}
-                   className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${linkSaved ? 'bg-green-500 text-white' : 'bg-slate-800 text-white'}`}>
-                   Lưu
-                 </button>
-               </div>
-            </div>
-          </div>
-        )}
+        {/* Panel Content (Standard View) */}
+        <div className="p-6">
+          {activePanel === 'progress' && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-blue-50 rounded-2xl p-4 text-center border border-blue-100">
+                  <p className="text-xs text-blue-500 font-semibold  tracking-wide mb-1">Đã học</p>
+                  <p className="text-3xl font-black text-blue-700">{done}</p>
+                  <p className="text-xs text-blue-400">buổi</p>
+                </div>
+                <div className={`rounded-2xl p-4 text-center border ${isCompleted ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
+                  <p className={`text-xs font-semibold  tracking-wide mb-1 ${isCompleted ? 'text-green-500' : 'text-orange-500'}`}>Còn lại</p>
+                  <p className={`text-3xl font-black ${isCompleted ? 'text-green-700' : 'text-orange-700'}`}>{remainingSessions}</p>
+                  <p className={`text-xs ${isCompleted ? 'text-green-400' : 'text-orange-400'}`}>buổi</p>
+                </div>
+                <div className="bg-purple-50 rounded-2xl p-4 text-center border border-purple-100">
+                  <p className="text-xs text-purple-500 font-semibold  tracking-wide mb-1">Điểm TB</p>
+                  <p className="text-3xl font-black text-purple-700">{student.lastGrade}</p>
+                  <p className="text-xs text-purple-400">/ 10</p>
+                </div>
+              </div>
+              {priorCredit > 0 ? (
+                <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 leading-snug">
+                  Đã học gồm <span className="font-semibold text-slate-700">{onCalendarDone} buổi trên lịch</span>
+                  {' + '}
+                  <span className="font-semibold text-slate-700">{priorCredit} buổi ghi nhận trước</span>
+                  {' '}(Admin / chuyển khóa).
+                </p>
+              ) : null}
+              {/* === 2-COLUMN LAYOUT: Điểm danh | Hủy ca / Hủy điểm danh === */}
+              {showSessionActionRow ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button onClick={openAttendanceModal}
+                    disabled={leftAttendanceDisabled}
+                    title={
+                      isCompleted ? 'Hoàn thành' :
+                        makeupPending ? 'Đã gửi yêu cầu - chờ Admin xét duyệt điểm danh bù' :
+                          isOverdueMakeup ? 'Quá hạn - gửi yêu cầu điểm danh bù tới Admin' :
+                            isCommittingAttendance ? 'Đang ghi nhận điểm danh lên hệ thống' :
+                              isPendingConfirm ? `Đang chờ xác nhận - còn ${confirmRemainSec}s để hủy` :
+                                attendanceDisputed ? 'Học viên không đồng ý - đang giải quyết (chờ Admin)' :
+                                  awaitingStudentConfirm ? 'Đã gửi điểm danh - đang chờ học viên xác nhận' :
+                                    alreadyAttendedToday ? `Đã điểm danh. Mở khóa sau ${cooldownHours} tiếng.` :
+                                      waitingAttendanceUnlock ? (liveAttendance?.reason || 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học') :
+                                        'Bấm để điểm danh'
+                    }
+                    className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all shadow-md ${isCompleted
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-2 border-gray-300'
+                        : makeupPending
+                          ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
+                          : isOverdueMakeup
+                            ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-amber-200 shadow-amber-100 active:scale-[0.97] border-2 border-transparent'
+                            : attendanceDisputed
+                              ? 'bg-amber-100 text-amber-800 cursor-not-allowed pointer-events-none select-none border-2 border-amber-200'
+                              : awaitingStudentConfirm
+                                ? 'bg-blue-100 text-blue-800 cursor-not-allowed pointer-events-none select-none border-2 border-blue-200'
+                                : leftAttendanceLocked
+                                  ? 'bg-slate-50 text-slate-400 cursor-not-allowed pointer-events-none select-none border-2 border-slate-200 opacity-60'
+                                  : waitingAttendanceUnlock
+                                    ? 'bg-slate-100 text-slate-600 cursor-not-allowed opacity-60 border-2 border-slate-200'
+                                    : 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-green-200 shadow-green-100 active:scale-[0.97] border-2 border-transparent'
+                      }`}>
+                    <CheckCircle size={18} />
+                    <span className="text-xs text-center leading-tight">
+                      {isCompleted
+                        ? 'Hoàn thành'
+                        : makeupPending
+                          ? <>Đã gửi<br />Admin</>
+                          : isOverdueMakeup
+                            ? <>Điểm danh<br />Bù</>
+                            : isCommittingAttendance
+                              ? <>Đang<br />Ghi nhận</>
+                              : isPendingConfirm
+                                ? <>Đang<br />Xác nhận</>
+                                : attendanceDisputed
+                                  ? <>Đang<br />Giải quyết</>
+                                  : awaitingStudentConfirm
+                                    ? <>Chờ HV<br />Xác nhận</>
+                                    : alreadyAttendedToday
+                                      ? (cooldownHours > 0 ? `CHỜ ${cooldownHours}H` : 'ĐÃ ĐIỂM DANH')
+                                      : 'Điểm danh'}
+                    </span>
+                  </button>
 
-        {activePanel === 'grade' && (
-          <div className="space-y-5">
-             <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => { if (canCancelSession) handleCancelSession(); }}
+                    disabled={!canCancelSession}
+                    aria-disabled={!canCancelSession}
+                    title={cancelButtonTitle}
+                    className={`py-4 rounded-2xl font-black text-sm  tracking-tight flex items-center justify-center gap-2 transition-all border-2 ${canCancelSession ? cancelButtonClassActive : cancelButtonClassDisabled
+                      }`}
+                  >
+                    <X size={18} />
+                    <span className="text-xs text-center leading-tight">
+                      {isCommittingAttendance
+                        ? <>Đang<br />Ghi nhận</>
+                        : cancelIsUndoAttendance
+                          ? <>Hủy điểm danh{confirmRemainSec > 0 ? <><br />{confirmRemainSec}s</> : null}</>
+                          : alreadyAttendedToday
+                            ? <>Đã khóa</>
+                            : <>Hủy ca</>}
+                    </span>
+                  </button>
+                </div>
+              ) : null}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2 font-black  text-xs text-gray-400 tracking-widest">📝 Ghi chú học viên</label>
+                <textarea value={notesInput} onChange={e => setNotesInput(e.target.value)}
+                  onBlur={() => {
+                    if (isDroppedOut) return;
+                    onUpdateNotes(student._id || student.id, notesInput);
+                  }}
+                  readOnly={isDroppedOut}
+                  rows={3}
+                  placeholder="Nhận xét, ghi chú về học viên..."
+                  className={`w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:border-blue-400 outline-none ${isDroppedOut ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`} />
+              </div>
+            </div>
+          )}
+
+          {activePanel === 'link' && (
+            <div className="space-y-5">
+              <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <Video size={18} className="text-blue-600" />
+                  <h3 className="font-bold text-blue-800 text-sm">Link học trực tuyến</h3>
+                </div>
+                <p className="text-xs text-blue-500 mb-4 font-bold ">Cập nhật link buổi học mới tại đây</p>
+                <div className="flex gap-2">
+                  <input type="text" value={linkInput} onChange={e => setLinkInput(e.target.value)}
+                    className="flex-1 border-2 border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:border-blue-500 outline-none"
+                    placeholder="Dán link họp..." />
+                  <button onClick={handleLinkSave}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${linkSaved ? 'bg-green-500 text-white' : 'bg-slate-800 text-white'}`}>
+                    Lưu
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePanel === 'grade' && (
+            <div className="space-y-5">
+              <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black text-orange-400  tracking-widest mb-1">Điểm trung bình</p>
                   <h4 className="text-3xl font-black text-orange-700">{student.lastGrade || 0}</h4>
                 </div>
                 <button onClick={() => setActivePanel('grade')} className="bg-orange-500 text-white px-4 py-2 rounded-xl text-xs font-bold">Cập nhật điểm</button>
-             </div>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
 
       {/* === MODAL ĐIỂM DANH BÙ → gửi thẳng Admin === */}
       {showMakeupModal && (
@@ -2316,7 +2294,7 @@ export const StudentCard = ({
                 <p className="text-lg font-black text-emerald-600">{getDisplayName(student)}</p>
                 <p className="text-xs font-bold text-emerald-400 mt-2">Tiến độ hiện tại: {done}/{sessionTotal} buổi</p>
               </div>
-              
+
               <div>
                 <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Đánh giá buổi học (0-10)</label>
                 <AttendanceGradeInput
@@ -2327,26 +2305,26 @@ export const StudentCard = ({
               </div>
 
               <div>
-                 <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Ghi chú nhanh</label>
-                 <textarea 
-                   value={attForm.note}
-                   onChange={(e) => setAttForm({ ...attForm, note: e.target.value })}
-                   placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
-                   className="w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-semibold text-slate-700 outline-none transition-all resize-none h-24"
-                 />
+                <label className="text-xs font-black text-slate-400  tracking-widest block mb-3">Ghi chú nhanh</label>
+                <textarea
+                  value={attForm.note}
+                  onChange={(e) => setAttForm({ ...attForm, note: e.target.value })}
+                  placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
+                  className="w-full bg-slate-50 border-2 border-slate-100 focus:border-emerald-500 focus:bg-white rounded-2xl px-6 py-4 text-sm font-semibold text-slate-700 outline-none transition-all resize-none h-24"
+                />
               </div>
 
             </div>
 
             <div className="bg-slate-50 px-8 py-6 flex gap-4 flex-shrink-0">
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowAttendanceModal(false)}
                 className="flex-[1] py-4 bg-white border-2 border-slate-200 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition"
               >
                 Hủy bỏ
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={beginAttendanceConfirm}
                 className="flex-[2] py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2"

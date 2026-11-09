@@ -18,7 +18,7 @@ const STEP_ICONS = { learn: BookOpen, practice: Dumbbell, challenge: Flame };
 const STEP_LABELS = { learn: 'Dễ', practice: 'Vừa', challenge: 'Khó' };
 
 
-/** Nút học trên snake — không xen video (video nằm panel bên cạnh). */
+/** Nút học trên snake - không xen video (video nằm panel bên cạnh). */
 function buildUnitPathItems(unit) {
   return (unit.pathNodes || []).map((node) => ({
     kind: 'hub',
@@ -77,7 +77,7 @@ function stageBuddyPair(index, colored) {
   const right = STAGE_BUDDIES[(index * 2 + 1) % total];
   return [left[colored ? 0 : 1], right[colored ? 0 : 1]];
 }
-/** Lệch ngang nút — lộ trình uốn lượn giữa màn hình (Duolingo). */
+/** Lệch ngang nút - lộ trình uốn lượn giữa màn hình (Duolingo). */
 const NODE_OFFSETS = [0, 58, 0, -58];
 
 /** Màu tối hơn cho "đế" nút 3D. */
@@ -167,7 +167,7 @@ function ProgressRing({ size, progress, color }) {
   );
 }
 
-/** Một nút trên lộ trình — bên trong popover có 3 nấc Dễ / Vừa / Khó. */
+/** Một nút trên lộ trình - bên trong popover có 3 nấc Dễ / Vừa / Khó. */
 function PracticeHubNode({ node, color, isNext, selected, onClick }) {
   const locked = node.state === 'locked';
   const done = node.state === 'completed';
@@ -223,7 +223,7 @@ function PracticeHubNode({ node, color, isNext, selected, onClick }) {
   );
 }
 
-/** Popover cố định theo nút — vừa viewport, không cuộn, không bị che. */
+/** Popover cố định theo nút - vừa viewport, không cuộn, không bị che. */
 function PathHubPopoverPortal({ anchorRef, anchorKey = '', children }) {
   const popRef = useRef(null);
   const [box, setBox] = useState({
@@ -247,7 +247,7 @@ function PathHubPopoverPortal({ anchorRef, anchorKey = '', children }) {
       let left = r.left + r.width / 2 - width / 2;
       left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
 
-      // Chiều cao thật — không maxHeight / overflow để tránh thanh cuộn và cắt nấc.
+      // Chiều cao thật - không maxHeight / overflow để tránh thanh cuộn và cắt nấc.
       const h = pop?.offsetHeight || 240;
       const spaceBelow = window.innerHeight - r.bottom - gap - pad;
       const spaceAbove = r.top - gap - pad;
@@ -294,7 +294,7 @@ function PathHubPopoverPortal({ anchorRef, anchorKey = '', children }) {
   );
 }
 
-/** Popover nút Học bài — Bài 1, Bài 2… (nội dung / video). */
+/** Popover nút Học bài - Bài 1, Bài 2… (nội dung / video). */
 function StudyHubPopover({ node, color, onClose, onOpenLesson }) {
   const lessons = node.levels || [];
   return (
@@ -409,7 +409,7 @@ function StepPopover({ unit, step, testOut, canTestOut, color, starting, onClose
           ? (!canTestOut
             ? 'Đặc quyền chỉ dành cho học viên mua khóa / gói Google Meet (+300 XP/ngày). Học viên miễn phí không thể thi vượt chặng.'
             : `Đạt thì được ${TEST_OUT_XP} XP và vượt chặng. Không đạt hoặc thoát thì mất ${TEST_OUT_XP} XP.`)
-          : `${QUESTION_STAKE_XP} XP/câu — sai trừ ngay; đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`}
+          : `${QUESTION_STAKE_XP} XP/câu - sai trừ ngay; đạt % mới nhận +${QUESTION_STAKE_XP}/câu đúng.`}
       </p>
       {testOut && !canTestOut ? (
         <button
@@ -493,63 +493,54 @@ function CourseTrophyCeremonyModal({ topicName, completedUnits, totalUnits, isCo
           <X size={18} />
         </button>
 
-        <div className="relative inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-3.5 py-1 text-[11px] font-black uppercase tracking-widest text-amber-900 shadow-sm">
-          <Crown size={14} className="fill-amber-400 text-amber-600" aria-hidden="true" />
-          Vinh Danh Hoàn Thành Khóa Học
+        <div className="relative inline-flex items-center gap-1.5 rounded-full bg-[#D97706] px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
+          <Award size={14} className="fill-[#FEF08A] text-[#FEF08A]" aria-hidden="true" />
+          <span>CHỨNG NHẬN CHINH PHỤC LỘ TRÌNH</span>
         </div>
 
-        <div className="relative mt-6 flex items-center justify-center gap-3 sm:gap-6">
-          <div className="dp-fly-in">
-            <Mascot mood="graduate" size={110} />
+        <div className="relative mt-6 flex items-end justify-center gap-4 sm:gap-7">
+          <div className="shrink-0">
+            <Mascot mood="graduate" size={88} />
           </div>
           <div className="relative flex flex-col items-center">
-            <div className="mb-2 flex items-center gap-1">
+            <div className="relative -mb-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#EA580C] shadow-sm">
+              <Crown size={18} className="fill-[#FEF08A] text-white" aria-hidden="true" />
+            </div>
+            <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-[#FEF3C7] bg-[#F59E0B] text-white shadow-[0_12px_28px_rgba(217,119,6,0.36)]">
+              <Trophy size={54} strokeWidth={2} className="drop-shadow-sm text-white" aria-hidden="true" />
+            </div>
+            <div className="relative -mt-3 z-10 inline-flex items-center gap-1 rounded-full border border-[#FDE68A] bg-white px-3.5 py-1 shadow-xs">
               {[1, 2, 3].map((n) => (
-                <Star
-                  key={n}
-                  size={n === 2 ? 26 : 19}
-                  className="dp-star-in fill-amber-400 text-amber-500 drop-shadow-sm"
-                  style={{ animationDelay: `${n * 130}ms` }}
-                />
+                <Star key={n} size={15} className="fill-[#FBBF24] text-[#F59E0B]" />
               ))}
             </div>
-            <div className="dp-bounce relative flex h-28 w-28 items-center justify-center rounded-[28px] bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 text-white shadow-[0_10px_0_#B45309,0_18px_36px_rgba(245,158,11,0.5)] ring-4 ring-amber-200">
-              <Trophy size={58} strokeWidth={2.2} className="drop-shadow-md" aria-hidden="true" />
-              <Sparkles size={20} className="absolute -right-2 -top-2 fill-yellow-200 text-amber-500" aria-hidden="true" />
-            </div>
-            <span className="mt-3 rounded-lg bg-amber-900 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100 shadow-sm">
-              Cúp Vàng Toàn Khóa
-            </span>
           </div>
-          <div className="dp-fly-in">
-            <Mascot mood="celebrate" size={102} />
+          <div className="shrink-0">
+            <Mascot mood="celebrate" size={88} />
           </div>
         </div>
 
-        <h3 className="mt-6 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-          Chúc mừng hoàn thành khóa học!
+        <h3 className="mt-6 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          {`Cúp Vàng Danh Dự - ${topicName}`}
         </h3>
-        <p className="mt-1 text-sm font-black uppercase tracking-wide text-amber-700">
-          {topicName}
-        </p>
-        <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-600">
+        <p className="mx-auto mt-2 max-w-md text-sm font-normal leading-relaxed text-[#475569]">
           {isCompleted
-            ? `Xuất sắc! Bạn đã chinh phục trọn vẹn ${completedUnits}/${totalUnits} chặng học và chính thức rước Cúp Vàng Vinh Danh của khóa học.`
-            : `Chinh phục trọn vẹn ${totalUnits} chặng của lộ trình ${topicName} để rước Cúp Vàng Vinh Danh. Hiện bạn đã hoàn thành ${completedUnits}/${totalUnits} chặng — cố lên nhé!`}
+            ? 'Chứng nhận bạn đã hoàn thành xuất sắc tất cả chặng thử thách của lộ trình. Hãy tự hào về hành trình kiên trì mỗi ngày của bạn!'
+            : `Bạn đang trên chặng đường rước Cúp (${completedUnits}/${totalUnits} chặng đã xong). Cố gắng hoàn thành nốt các chặng còn lại nhé!`}
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2.5">
           <div className="rounded-2xl border border-amber-200 bg-white/90 p-3 shadow-sm">
-            <p className="text-lg font-black text-amber-600 tabular-nums">{completedUnits}/{totalUnits}</p>
-            <p className="text-[11px] font-bold text-slate-500">Chặng vượt qua</p>
+            <p className="text-lg font-bold text-slate-900 tabular-nums">{completedUnits}/{totalUnits}</p>
+            <p className="text-[11px] font-medium text-slate-500">Chặng đạt</p>
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-white/90 p-3 shadow-sm">
-            <p className="text-lg font-black text-emerald-600">Cúp Vàng</p>
-            <p className="text-[11px] font-bold text-slate-500">Danh hiệu</p>
+            <p className="text-lg font-bold text-emerald-600">Cúp Vàng</p>
+            <p className="text-[11px] font-medium text-slate-500">Danh hiệu</p>
           </div>
-          <div className="rounded-2xl border border-sky-200 bg-white/90 p-3 shadow-sm">
-            <p className="text-lg font-black text-sky-600">Xuất sắc</p>
-            <p className="text-[11px] font-bold text-slate-500">Hạng tốt nghiệp</p>
+          <div className="rounded-2xl border border-amber-200 bg-white/90 p-3 shadow-sm">
+            <p className="text-lg font-bold text-amber-600">{isCompleted ? '100%' : `${Math.round((completedUnits / (totalUnits || 1)) * 100)}%`}</p>
+            <p className="text-[11px] font-medium text-slate-500">Khóa học</p>
           </div>
         </div>
 
@@ -586,66 +577,61 @@ function CourseFinaleMonument({ topicName, completedUnits, totalUnits, lastNodeO
         active={isCompleted}
         color="#F59E0B"
       />
-      <div className="relative mx-auto max-w-xl overflow-hidden rounded-[28px] border-2 border-amber-300/90 bg-gradient-to-b from-amber-50/95 via-white to-amber-50/60 p-5 text-center shadow-[0_16px_40px_-14px_rgba(245,158,11,0.3)] sm:p-7">
+      <div className="relative mx-auto max-w-xl overflow-hidden rounded-[28px] border-2 border-[#FCD34D] bg-gradient-to-b from-[#FFFDF7] via-white to-[#FEF9EE] p-6 text-center shadow-[0_12px_36px_rgba(245,158,11,0.18)] sm:p-8">
         {isCompleted && <PathConfettiBurst count={32} spread={200} />}
         <div className="pointer-events-none absolute -top-20 left-1/2 h-44 w-44 -translate-x-1/2 rounded-full bg-amber-300/30 blur-2xl" />
 
-        <div className="relative inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-3.5 py-1 text-[11px] font-black uppercase tracking-widest text-amber-900 shadow-sm">
-          <Crown size={14} className="fill-amber-400 text-amber-600" aria-hidden="true" />
-          {isCompleted ? 'Đã chinh phục trọn khóa học' : 'Đích đến hoàn thành khóa học'}
+        <div className="relative inline-flex items-center gap-1.5 rounded-full bg-[#D97706] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm">
+          <Sparkles size={14} className="fill-[#FEF08A] text-[#FEF08A]" aria-hidden="true" />
+          <span>{isCompleted ? 'ĐÃ CHINH PHỤC TOÀN BỘ KHÓA HỌC' : `ĐÍCH ĐẾN CUỐI KHÓA · ${completedUnits}/${totalUnits} CHẶNG`}</span>
         </div>
 
-        <div className="relative mt-4 flex items-center justify-center gap-3 sm:gap-6">
-          <div className="dp-float">
-            <Mascot mood="graduate" size={92} />
+        <div className="relative mt-5 flex items-end justify-center gap-4 sm:gap-7">
+          <div className="shrink-0">
+            <Mascot mood="graduate" size={82} />
           </div>
 
-          <button
-            type="button"
-            onClick={onCelebrate}
-            aria-label="Xem hiệu ứng chúc mừng hoàn thành khóa học"
-            className="group relative flex flex-col items-center focus:outline-none !shadow-none"
-          >
-            <div className="mb-1.5 flex items-center gap-1">
+          <div className="relative flex flex-col items-center">
+            {/* Crown badge on top of circle */}
+            <div className="relative -mb-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#EA580C] shadow-sm">
+              <Crown size={16} className="fill-[#FEF08A] text-white" aria-hidden="true" />
+            </div>
+
+            {/* Trophy circle */}
+            <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-4 border-[#FEF3C7] bg-[#F59E0B] text-white shadow-[0_10px_24px_rgba(217,119,6,0.32)]">
+              <Trophy size={48} strokeWidth={2} className="drop-shadow-sm text-white" aria-hidden="true" />
+            </div>
+
+            {/* 3 stars badge below circle */}
+            <div className="relative -mt-3 z-10 inline-flex items-center gap-1 rounded-full border border-[#FDE68A] bg-white px-3 py-0.5 shadow-xs">
               {[1, 2, 3].map((n) => (
-                <Star
-                  key={n}
-                  size={n === 2 ? 22 : 16}
-                  className="fill-amber-400 text-amber-500 drop-shadow-sm transition-transform group-hover:scale-110"
-                />
+                <Star key={n} size={14} className="fill-[#FBBF24] text-[#F59E0B]" />
               ))}
             </div>
-            <div className="dp-bounce relative flex h-24 w-24 items-center justify-center rounded-[26px] bg-gradient-to-b from-yellow-300 via-amber-400 to-amber-600 text-white shadow-[0_8px_0_#B45309,0_14px_28px_rgba(245,158,11,0.42)] ring-4 ring-amber-200 transition-transform group-hover:scale-105">
-              <Trophy size={48} strokeWidth={2.2} className="drop-shadow-md" aria-hidden="true" />
-              <Sparkles size={18} className="absolute -right-1.5 -top-1.5 fill-yellow-200 text-amber-500" aria-hidden="true" />
-            </div>
-            <span className="mt-2.5 rounded-lg bg-amber-900 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-100 shadow-sm">
-              Cúp Vinh Danh
-            </span>
-          </button>
+          </div>
 
-          <div className="dp-float">
-            <Mascot mood="celebrate" size={86} />
+          <div className="shrink-0">
+            <Mascot mood="celebrate" size={82} />
           </div>
         </div>
 
-        <h4 className="mt-4 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
-          {isCompleted ? `Chúc mừng tốt nghiệp ${topicName}!` : `Cúp Vàng Khóa Học · ${topicName}`}
+        <h4 className="mt-5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          {isCompleted ? `Chúc mừng hoàn thành khóa học ${topicName}!` : `Cúp Vàng Vinh Danh - ${topicName}`}
         </h4>
-        <p className="mx-auto mt-1.5 max-w-md text-xs font-semibold leading-relaxed text-slate-600 sm:text-sm">
+        <p className="mx-auto mt-2 max-w-md text-xs font-normal leading-relaxed text-[#475569] sm:text-sm">
           {isCompleted
-            ? `Tuyệt vời! Bạn đã hoàn thành toàn bộ ${completedUnits}/${totalUnits} chặng và xuất sắc nhận Cúp Vàng Vinh Danh.`
-            : `Hoàn thành hết ${totalUnits} chặng (${completedUnits}/${totalUnits} chặng đã vượt) để mở khóa Cúp Vàng và linh vật vinh danh tốt nghiệp!`}
+            ? `Tuyệt vời! Bạn đã vượt qua trọn vẹn ${totalUnits}/${totalUnits} chặng học và chính thức rước Cúp Vàng Vinh Danh cùng linh vật Thắng Tin Học!`
+            : `Hoàn thành hết ${totalUnits} chặng học (${completedUnits}/${totalUnits} đã xong) để chính thức mở khóa lễ trao Cúp Vàng Vinh Danh cùng linh vật chúc mừng!`}
         </p>
 
-        <div className="mt-4 flex justify-center">
+        <div className="mt-5 flex justify-center">
           <button
             type="button"
             onClick={onCelebrate}
-            className="dp-3d-btn inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-xs font-black uppercase tracking-wide text-white shadow-md hover:from-amber-600 hover:to-orange-600 sm:text-sm"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-[#9A3412] bg-gradient-to-b from-[#EA580C] to-[#C2410C] px-6 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(194,65,12,0.35)] transition-all hover:brightness-105 active:scale-98"
           >
-            <Trophy size={16} aria-hidden="true" />
-            {isCompleted ? 'Nhận Cúp & Xem Vinh Danh' : 'Xem Hiệu Ứng Chúc Mừng Nhận Cúp'}
+            <Trophy size={18} className="text-white" aria-hidden="true" />
+            <span>{isCompleted ? 'Nhận Cúp & Xem Vinh Danh' : 'Xem Hiệu Ứng Chúc Mừng Nhận Cúp'}</span>
           </button>
         </div>
       </div>
@@ -1041,74 +1027,74 @@ export default function PathView({
                     style={leftHigh ? { top: '42%', right: edge } : { top: '0.35rem', right: edge }}
                   />
                   <div className="relative px-3 py-2 sm:px-4">
-                  <div className="relative z-20">
-                    <UnitStageHeader
-                      unit={unit}
-                      color={tone}
-                      highlight={isNextUnit}
-                      hasVideo={hasVideo}
-                      onTestOut={() => toggle(unit, 'challenge', true)}
-                      onWatch={() => openUnitVideo('')}
-                      testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
-                    />
-                  </div>
-                  <div className="relative z-30 px-1 pb-4 pt-14 sm:px-2">
-                    <div className="relative flex flex-col items-center gap-5">
-                      <div className={`relative mx-auto flex flex-col items-center gap-7 ${laneInner}`}>
-                        {pathItems.map((item, index) => {
-                          const hubSelected = popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === item.node.key;
-                          const offset = (NODE_OFFSETS[index % NODE_OFFSETS.length] / 58) * offsetScale;
-                          const previous = index > 0 ? NODE_OFFSETS[(index - 1) % NODE_OFFSETS.length] : null;
-                          const hubNext = nextIdx === index;
-                          const linkActive = item.state !== 'locked';
-                          const artSide = offset >= 0 ? 'left' : 'right';
-                          return (
-                            <div
-                              key={item.key}
-                              ref={hubSelected ? hubAnchorRef : undefined}
-                              data-path-current={hubNext ? '1' : undefined}
-                              className={`relative flex w-full flex-col items-center gap-2 ${hubSelected || hubNext ? 'z-30' : 'z-0'}`}
-                              style={{ transform: `translateX(${offset}px)` }}
-                            >
-                              {index === artAt && !hasVideo && unit.imageUrl ? (
-                                <PathStageArt
-                                  side={artSide}
-                                  imageUrl={unit.imageUrl}
-                                  mood={locked ? 'thinking' : hubNext ? 'determinedSoft' : 'studying'}
-                                  size={80}
-                                />
-                              ) : null}
-                              {previous !== null && (
-                                <PathSnakeConnector
-                                  previousOffset={(previous / 58) * offsetScale}
-                                  offset={offset}
-                                  active={linkActive}
-                                  color={tone.from}
-                                />
-                              )}
-                              <PracticeHubNode
-                                node={item.node}
-                                color={tone}
-                                isNext={hubNext}
-                                selected={Boolean(hubSelected)}
-                                onClick={() => toggleHub(unit, item.node.key)}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {unit.imageUrl ? (
-                        <div className="relative z-[2] flex w-full flex-col items-center lg:w-auto lg:pt-6">
-                          <img
-                            src={resolveMediaUrl(unit.imageUrl) || unit.imageUrl}
-                            alt=""
-                            className="dp-float hidden h-20 w-20 object-contain drop-shadow-md lg:block"
-                            draggable={false}
-                          />
-                        </div>
-                      ) : null}
+                    <div className="relative z-20">
+                      <UnitStageHeader
+                        unit={unit}
+                        color={tone}
+                        highlight={isNextUnit}
+                        hasVideo={hasVideo}
+                        onTestOut={() => toggle(unit, 'challenge', true)}
+                        onWatch={() => openUnitVideo('')}
+                        testOutButtonRef={testOutOpen ? testOutAnchorRef : undefined}
+                      />
                     </div>
-                  </div>
+                    <div className="relative z-30 px-1 pb-4 pt-14 sm:px-2">
+                      <div className="relative flex flex-col items-center gap-5">
+                        <div className={`relative mx-auto flex flex-col items-center gap-7 ${laneInner}`}>
+                          {pathItems.map((item, index) => {
+                            const hubSelected = popover && !popover.testOut && popover.unitId === unit.id && popover.nodeKey === item.node.key;
+                            const offset = (NODE_OFFSETS[index % NODE_OFFSETS.length] / 58) * offsetScale;
+                            const previous = index > 0 ? NODE_OFFSETS[(index - 1) % NODE_OFFSETS.length] : null;
+                            const hubNext = nextIdx === index;
+                            const linkActive = item.state !== 'locked';
+                            const artSide = offset >= 0 ? 'left' : 'right';
+                            return (
+                              <div
+                                key={item.key}
+                                ref={hubSelected ? hubAnchorRef : undefined}
+                                data-path-current={hubNext ? '1' : undefined}
+                                className={`relative flex w-full flex-col items-center gap-2 ${hubSelected || hubNext ? 'z-30' : 'z-0'}`}
+                                style={{ transform: `translateX(${offset}px)` }}
+                              >
+                                {index === artAt && !hasVideo && unit.imageUrl ? (
+                                  <PathStageArt
+                                    side={artSide}
+                                    imageUrl={unit.imageUrl}
+                                    mood={locked ? 'thinking' : hubNext ? 'determinedSoft' : 'studying'}
+                                    size={80}
+                                  />
+                                ) : null}
+                                {previous !== null && (
+                                  <PathSnakeConnector
+                                    previousOffset={(previous / 58) * offsetScale}
+                                    offset={offset}
+                                    active={linkActive}
+                                    color={tone.from}
+                                  />
+                                )}
+                                <PracticeHubNode
+                                  node={item.node}
+                                  color={tone}
+                                  isNext={hubNext}
+                                  selected={Boolean(hubSelected)}
+                                  onClick={() => toggleHub(unit, item.node.key)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {unit.imageUrl ? (
+                          <div className="relative z-[2] flex w-full flex-col items-center lg:w-auto lg:pt-6">
+                            <img
+                              src={resolveMediaUrl(unit.imageUrl) || unit.imageUrl}
+                              alt=""
+                              className="dp-float hidden h-20 w-20 object-contain drop-shadow-md lg:block"
+                              draggable={false}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 </article>
               );

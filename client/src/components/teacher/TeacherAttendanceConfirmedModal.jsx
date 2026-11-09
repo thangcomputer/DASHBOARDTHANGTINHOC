@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
 
 function formatConfirmedAt(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleString('vi-VN', {
@@ -102,10 +102,10 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
             <div>
               <p className="text-[11px] font-bold  tracking-wide text-slate-400">Ca</p>
               <p className="text-sm font-semibold text-slate-800">
-                {timeRange || '—'}
+                {timeRange || '-'}
               </p>
               <p className="text-sm text-slate-600">
-                {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
+                {[weekday, dateLabel].filter(Boolean).join(' · ') || '-'}
               </p>
             </div>
             {!rejected && (
@@ -118,20 +118,19 @@ export default function TeacherAttendanceConfirmedModal({ open, payload, onClose
 
           <p className="text-sm text-slate-500 leading-relaxed text-center">
             {rejected
-              ? 'Admin không chấp thuận buổi này — không tính vào tiến độ và lương buổi. Bạn có thể xếp thêm ca cho học viên.'
+              ? 'Admin không chấp thuận buổi này - không tính vào tiến độ và lương buổi. Bạn có thể xếp thêm ca cho học viên.'
               : (adminMakeup
-                ? 'Admin đã điểm danh bù — buổi này đã được tính vào tiến độ và lương buổi.'
-                : 'Học viên đã đồng ý điểm danh — buổi này đã được tính vào tiến độ.')}
+                ? 'Admin đã điểm danh bù - buổi này đã được tính vào tiến độ và lương buổi.'
+                : 'Học viên đã đồng ý điểm danh - buổi này đã được tính vào tiến độ.')}
           </p>
 
           <button
             type="button"
             onClick={onClose}
-            className={`w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-2xl text-white text-sm font-bold shadow-lg transition ${
-              rejected
+            className={`w-full min-h-12 inline-flex items-center justify-center gap-2 rounded-2xl text-white text-sm font-bold shadow-lg transition ${rejected
                 ? 'bg-slate-800 hover:bg-slate-900 shadow-slate-800/20'
                 : 'bg-slate-800 hover:bg-slate-900 shadow-slate-800/20'
-            }`}
+              }`}
           >
             <Check size={18} aria-hidden="true" />
             Đóng

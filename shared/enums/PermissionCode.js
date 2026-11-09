@@ -1,9 +1,9 @@
 /**
- * @deprecated Phase 8.8 — Third / dormant permission taxonomy.
+ * @deprecated Phase 8.8 - Third / dormant permission taxonomy.
  * DO NOT use for LIVE authorization or future Enterprise dual-read.
  * Future canonical: shared/constants/permissions.js (domain:action).
  * LIVE canonical: constants/permissions.js (lowercase manage_*).
- * Kept for dormant modules/support references only — do not delete in this phase.
+ * Kept for dormant modules/support references only - do not delete in this phase.
  */
 const PermissionCode = Object.freeze({
   // User Management

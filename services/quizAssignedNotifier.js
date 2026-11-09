@@ -59,7 +59,7 @@ function scheduleQuizAssignedNotify({ quiz, notifyUser, io }) {
             logger.warn({ err: err.message, studentId: id, quizId: payload.quizId }, '[QUIZ] quiz:assigned emit failed');
           }
         });
-        
+
         // Tạo notification database để học viên có thể bấm vào trong tương lai
         if (ids.length && io) {
           try {

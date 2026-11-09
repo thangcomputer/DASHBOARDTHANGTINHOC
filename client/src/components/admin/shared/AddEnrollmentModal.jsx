@@ -78,7 +78,7 @@ export default function AddEnrollmentModal({
           setForm((f) => ({ ...f, ...applyCourseToForm(first) }));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [API]);
 
   const handleCourseChange = (courseId) => {
@@ -157,38 +157,38 @@ export default function AddEnrollmentModal({
     })();
 
     fetch(`${API}/api/webhooks/create-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          amount: Number(form.price) || 0,
-          kind: 'admin_enrollment',
-          studentName: student?.name || '',
-          courseName: form.courseName,
-          courseId: form.courseId,
-          teacherId: form.teacherId || null,
-          totalSessions: Number(form.totalSessions) || 12,
-          teacherAlert: String(form.teacherAlert || '').trim(),
-          branchCode: student?.branchCode || '',
-          branchId: student?.branchId || null,
-          studentId: student?.id || student?._id,
-        }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        amount: Number(form.price) || 0,
+        kind: 'admin_enrollment',
+        studentName: student?.name || '',
+        courseName: form.courseName,
+        courseId: form.courseId,
+        teacherId: form.teacherId || null,
+        totalSessions: Number(form.totalSessions) || 12,
+        teacherAlert: String(form.teacherAlert || '').trim(),
+        branchCode: student?.branchCode || '',
+        branchId: student?.branchId || null,
+        studentId: student?.id || student?._id,
+      }),
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (!res.success || !res.sessionId || !res.ref) {
+          throw new Error(res.message || 'Không thể tạo phiên thanh toán');
+        }
+        if (!cancelled) {
+          setSessionId(res.sessionId);
+          setSessionRef(res.ref);
+        }
       })
-        .then((r) => r.json())
-        .then((res) => {
-          if (!res.success || !res.sessionId || !res.ref) {
-            throw new Error(res.message || 'Không thể tạo phiên thanh toán');
-          }
-          if (!cancelled) {
-            setSessionId(res.sessionId);
-            setSessionRef(res.ref);
-          }
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            setPaymentSetupError(error.message || 'Không thể tạo phiên thanh toán');
-            toast.error(error.message || 'Không thể tạo phiên thanh toán');
-          }
-        });
+      .catch((error) => {
+        if (!cancelled) {
+          setPaymentSetupError(error.message || 'Không thể tạo phiên thanh toán');
+          toast.error(error.message || 'Không thể tạo phiên thanh toán');
+        }
+      });
 
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
@@ -387,8 +387,8 @@ export default function AddEnrollmentModal({
             <TransferPaymentHeader title="Thanh toán mua khóa học" onClose={handleClosePayment} />
 
             <div className="overflow-y-auto p-3 sm:p-4">
-                {expired ? (
-                  <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-8 text-center">
+              {expired ? (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-8 text-center">
                   <Clock3 className="mx-auto text-rose-500" size={34} />
                   <p className="mt-2 text-lg font-black text-rose-700">Phiên thanh toán đã hết hạn</p>
                   <p className="mt-1 text-sm text-slate-600">Tạo phiên mới để tiếp tục thanh toán an toàn.</p>
@@ -430,7 +430,7 @@ export default function AddEnrollmentModal({
                     onClick={handlePayLater}
                     className="cms-btn cms-btn-outline w-full sm:w-auto"
                   >
-                    {loading ? 'Đang lưu...' : 'Thêm khóa — thanh toán sau'}
+                    {loading ? 'Đang lưu...' : 'Thêm khóa - thanh toán sau'}
                   </button>
                   <button type="button" onClick={handleBackToForm} className="cms-btn cms-btn-outline w-full text-slate-500 sm:w-auto">
                     Quay lại form
@@ -490,7 +490,7 @@ export default function AddEnrollmentModal({
                     const sessions = courseDefaultSessions(c);
                     return (
                       <option key={c._id} value={c._id}>
-                        {c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
+                        {c.name} - {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
                       </option>
                     );
                   })}
@@ -598,7 +598,7 @@ export default function AddEnrollmentModal({
               {loading ? (
                 <><Loader2 size={16} className="animate-spin" /> Đang lưu...</>
               ) : form.paid ? (
-                <><CheckCircle2 size={16} /> Thêm khóa — đã thu tiền</>
+                <><CheckCircle2 size={16} /> Thêm khóa - đã thu tiền</>
               ) : (
                 <><CreditCard size={16} /> Quét QR &amp; thêm khóa</>
               )}

@@ -1,5 +1,5 @@
 /**
- * AI service — cong cu admin: quiz, notification draft, summarize, complete.
+ * AI service - cong cu admin: quiz, notification draft, summarize, complete.
  */
 const { isAiConfigured, getConfig, chatCompletion } = require('./ai/llmClient');
 const logger = require('../config/logger');
@@ -45,7 +45,7 @@ function localDraftFromPrompt(prompt) {
     '- Than bai: 3 diem noi bat (thuc hanh, giao vien, chung chi)',
     '- Ket: loi keu goi hanh dong (dang ky / lien he)',
     '',
-    '(Ban nhap local — ket noi Gemini de sinh noi dung chi tiet hon)',
+    '(Ban nhap local - ket noi Gemini de sinh noi dung chi tiet hon)',
   ].join('\n');
 }
 
@@ -126,13 +126,13 @@ async function probeHealth() {
   }
 }
 
-/** Fallback quiz khi chua co API key — demo co cau truc dung */
+/** Fallback quiz khi chua co API key - demo co cau truc dung */
 function fallbackQuiz({ topic, count, subject }) {
   const n = Math.min(15, Math.max(1, Number(count) || 10));
   const questions = [];
   for (let i = 1; i <= n; i++) {
     questions.push({
-      question: '[' + (subject || 'Tin hoc') + '] ' + (topic || 'Kien thuc co ban') + ' — cau ' + i + '?',
+      question: '[' + (subject || 'Tin hoc') + '] ' + (topic || 'Kien thuc co ban') + ' - cau ' + i + '?',
       options: ['Dap an A', 'Dap an B', 'Dap an C', 'Dap an D'],
       correct: 0,
       explanation: 'Cau hoi mau (AI chua cau hinh). Hay dat AI_API_KEY de sinh that.',
@@ -249,16 +249,16 @@ async function summarizeText({ text, maxWords = 120 } = {}) {
   }
   try {
     const result = await chatCompletion({
-    messages: [
-      {
-        role: 'system',
-        content: 'Tom tat van ban tieng Viet, toi da ' + maxWords + ' tu. Chi tra ve doan tom tat, khong tieu de.',
-      },
-      { role: 'user', content: t },
-    ],
-    temperature: 0.2,
-    maxTokens: 400,
-  });
+      messages: [
+        {
+          role: 'system',
+          content: 'Tom tat van ban tieng Viet, toi da ' + maxWords + ' tu. Chi tra ve doan tom tat, khong tieu de.',
+        },
+        { role: 'user', content: t },
+      ],
+      temperature: 0.2,
+      maxTokens: 400,
+    });
     return {
       summary: String(result.content || '').trim().slice(0, 2000),
       source: 'llm',

@@ -4,7 +4,7 @@ import {
   Trophy, FileText, Download, Video, Bell, LogOut, ChevronDown, ChevronUp,
   GraduationCap, Users, DollarSign, ClipboardList, Pin, PinOff,
   Settings, User, Star, AlertTriangle, Lock, Volume2, VolumeX, BarChart3, HardDrive, Archive, Activity, Sparkles, GitBranch, FormInput, Building2,
-  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket,
+  Newspaper, Award, FileBox, Headphones, Link2, WalletCards, KeyRound, Gamepad2, CalendarClock, Ticket, Crown,
 } from 'lucide-react';
 import { PIN_SETTINGS_EVENT } from '../utils/pinLock';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -15,7 +15,7 @@ import { hasLearningAccessEnrollment, isUnpaidTuitionAlertStudent } from '../uti
 import { visibleInboxUnread } from '../lib/inboxUnread';
 import { useStudentSubscription } from './student/subscription/subscriptionContext';
 import FreeFeatureLock, { useFreePortalLock, useFreePortalMenu, FREE_HIDDEN_KEYS } from './student/dailyPractice/FreeFeatureLock';
-import { subscriptionShortLabel } from '../utils/subscription';
+import { subscriptionShortLabel, formatExpiryDate } from '../utils/subscription';
 import EditableAvatar from './EditableAvatar';
 import api from '../services/api';
 
@@ -27,6 +27,7 @@ const MOBILE_NAV_ICON_TONES = {
   feed: 'border-amber-100/80 from-amber-50 to-white text-amber-600',
   dashboard: 'border-red-100/80 from-red-50 to-white text-red-600',
   finance: 'border-emerald-100/80 from-emerald-50 to-white text-emerald-600',
+  'daily-practice': 'border-emerald-100/80 from-emerald-50 to-white text-emerald-600',
   support: 'border-cyan-100/80 from-cyan-50 to-white text-cyan-600',
   profile: 'border-indigo-100/80 from-indigo-50 to-white text-indigo-600',
 };
@@ -37,7 +38,7 @@ const MENU_CONFIG = {
     brand: { label: 'Học viên', color: 'from-[#0D1524] to-[#0D1524]' },
     items: [
       { key: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', sectionLabel: 'KHÔNG GIAN HỌC TẬP', path: '/student', requiresLearningAccess: true },
-      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', requiresLearningAccess: true },
+      { key: 'daily-practice', icon: Gamepad2, label: 'Luyện tập hằng ngày', path: '/student/daily-practice', mobileLabel: 'Luyện tập', requiresLearningAccess: true },
       { key: 'inbox', icon: MessageSquare, label: 'Hộp thư', path: '/student/inbox' },
       { key: 'lesson-practice', icon: BookOpen, label: 'Bài giảng', path: '/student/lesson-practice', altHashes: ['materials-videos'], requiresLearningAccess: true },
       { key: 'schedule', icon: Calendar, label: 'Lịch học', path: '/student', hash: 'schedule', requiresLearningAccess: true },
@@ -342,7 +343,7 @@ const AppSidebar = ({
           } catch { /* ignore */ }
         }
 
-        // Teacher không có quyền /api/staff — chỉ thử khi admin/staff (tránh 403 ồn console)
+        // Teacher không có quyền /api/staff - chỉ thử khi admin/staff (tránh 403 ồn console)
         if (!g && role !== 'student' && role !== 'teacher') {
           try {
             const sRes = await api.staff.getAll();
@@ -424,7 +425,7 @@ const AppSidebar = ({
     ? ['schedule', 'inbox', 'feed', 'dashboard', 'finance', 'support', 'profile']
     : role === 'admin' || role === 'staff'
       ? ['students', 'finance', 'dashboard', 'inbox', 'feed']
-      : ['schedule', 'inbox', 'dashboard', 'feed', 'support', 'lesson-practice', 'profile'];
+      : ['schedule', 'inbox', 'daily-practice', 'dashboard', 'feed', 'lesson-practice', 'profile'];
 
   const studentHasLearningAccess = (() => {
     if (role !== 'student') return true;
@@ -465,7 +466,7 @@ const AppSidebar = ({
     return userPermissions.includes(item.permission);
   };
 
-  // ── Filter menu theo permissions (RBAC) — đệ quy nhóm 3 cấp ─────────────────
+  // ── Filter menu theo permissions (RBAC) - đệ quy nhóm 3 cấp ─────────────────
   const filterItems = (items) => {
     return (items || [])
       .map((item) => {
@@ -617,7 +618,7 @@ const AppSidebar = ({
       && location.pathname === '/teacher'
       && currentHash === 'software-links'
     ) return true;
-    // Base dashboard (Tổng quan) — chỉ active đúng path gốc, không active trên /student/feed, /teacher/finance…
+    // Base dashboard (Tổng quan) - chỉ active đúng path gốc, không active trên /student/feed, /teacher/finance…
     const basePaths = ['/student', '/teacher', '/admin'];
     if (basePaths.includes(item.path)) {
       return location.pathname === item.path && !currentHash;
@@ -679,7 +680,7 @@ const AppSidebar = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.hash, role]);
 
-  // Trả về element (không khai báo component con) — tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
+  // Trả về element (không khai báo component con) - tránh unmount/remount mỗi lần data refresh → sidebar nhảy cuộn
   const renderSidebarContent = () => (
     <div className="cms-sidebar-glass__content flex flex-col h-full text-white overflow-x-hidden">
 
@@ -712,27 +713,75 @@ const AppSidebar = ({
             </p>
           </div>
         </div>
-        {role === 'student' && studentSubscription?.subscription && (
-          <div
-            className={`mt-2.5 flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-[11px] font-bold ${
-              studentSubscription.subscription.state === 'expiring'
-                ? 'bg-amber-400/15 text-amber-200'
-                : 'bg-white/5 text-slate-300'
-            }`}
-          >
-            <CalendarClock size={13} className="shrink-0" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">{subscriptionShortLabel(studentSubscription.subscription)}</span>
-            {studentSubscription.subscription.state !== 'lifetime' && (
+        {role === 'student' && studentSubscription?.subscription && (() => {
+          const sub = studentSubscription.subscription;
+          const isLifetime = sub.state === 'lifetime';
+          const expiring = sub.state === 'expiring';
+
+          if (isLifetime) {
+            return (
+              <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-2.5 py-1.5 transition">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/20 text-amber-300">
+                  <Crown size={12} />
+                </div>
+                <span className="min-w-0 flex-1 truncate text-xs font-extrabold text-amber-100">
+                  {subscriptionShortLabel(sub)}
+                </span>
+                <span className="shrink-0 rounded bg-amber-400/25 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-amber-200">
+                  VĨNH VIỄN
+                </span>
+              </div>
+            );
+          }
+
+          if (expiring) {
+            return (
+              <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-orange-400/30 bg-orange-500/15 px-2.5 py-1.5 transition">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-orange-400/25 text-orange-300">
+                  <CalendarClock size={12} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-extrabold text-orange-200 leading-tight">
+                    Còn {sub.daysLeft} ngày
+                  </p>
+                  <p className="text-[10px] font-semibold text-orange-300/80 leading-tight">
+                    Hạn: {formatExpiryDate(sub.expiresAt)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={studentSubscription.openRenew}
+                  className="shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-2.5 py-1 text-[10px] font-black text-white shadow-xs transition hover:brightness-110 active:scale-95 !shadow-none"
+                >
+                  Gia hạn
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 py-1.5 transition hover:border-white/15">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                <CalendarClock size={12} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-bold text-slate-200 leading-tight">
+                  Hạn: {formatExpiryDate(sub.expiresAt)}
+                </p>
+                <p className="text-[10px] font-semibold text-emerald-400 leading-tight">
+                  Còn {sub.daysLeft} ngày
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={studentSubscription.openRenew}
-                className="shrink-0 rounded-lg bg-red-600 px-2 py-0.5 text-[10px] font-black text-white transition hover:bg-red-500 !shadow-none"
+                className="shrink-0 rounded-lg bg-red-600/90 hover:bg-red-500 px-2.5 py-1 text-[10px] font-black text-white shadow-xs transition active:scale-95 !shadow-none"
               >
                 Gia hạn
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })()}
       </div>
 
       <nav className="flex-1 px-4 py-1.5 space-y-0 overflow-y-auto overflow-x-hidden overscroll-contain" aria-label="Menu chính" style={{ overflowAnchor: 'none' }}>
@@ -1037,18 +1086,18 @@ const AppSidebar = ({
                   aria-label={item.label}
                   tabIndex={footerShown ? 0 : -1}
                   className={`group relative flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1 rounded-2xl border px-1.5 py-1 text-[10px] font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-500 ${isHome
-                      ? 'border-transparent bg-transparent text-red-600'
-                      : active
-                        ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
-                        : 'border-white/70 bg-white/45 text-slate-500 hover:border-white/90 hover:bg-white/60 hover:text-slate-800'
+                    ? 'border-transparent bg-transparent text-red-600'
+                    : active
+                      ? 'border-red-300/80 bg-gradient-to-b from-white/90 to-red-50/80 text-red-600 shadow-[inset_2px_2px_6px_rgba(220,38,38,0.12),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]'
+                      : 'border-white/70 bg-white/45 text-slate-500 hover:border-white/90 hover:bg-white/60 hover:text-slate-800'
                     }`}
                 >
                   <span className={`relative flex items-center justify-center transition-all duration-200 ${isHome
-                      ? 'h-14 w-14 rounded-full border-[3px] border-white bg-gradient-to-b from-red-400 via-red-600 to-red-800 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32),0_0_0_3px_rgba(254,202,202,0.6),inset_0_3px_5px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(127,29,29,0.5)] group-hover:scale-105 group-active:scale-95'
-                      : `h-10 w-10 rounded-xl border ${active
-                        ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'
-                        : `${iconTone} bg-gradient-to-br shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]`
-                      }`
+                    ? 'h-14 w-14 rounded-full border-[3px] border-white bg-gradient-to-b from-red-400 via-red-600 to-red-800 text-white shadow-[0_5px_16px_rgba(185,28,28,0.32),0_0_0_3px_rgba(254,202,202,0.6),inset_0_3px_5px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(127,29,29,0.5)] group-hover:scale-105 group-active:scale-95'
+                    : `h-10 w-10 rounded-xl border ${active
+                      ? 'border-red-500/20 bg-gradient-to-br from-red-500 to-red-600 text-white shadow-[inset_2px_2px_5px_rgba(127,29,29,0.32),inset_-2px_-2px_5px_rgba(255,255,255,0.18)]'
+                      : `${iconTone} bg-gradient-to-br shadow-[inset_2px_2px_5px_rgba(71,85,105,0.14),inset_-2px_-2px_5px_rgba(255,255,255,0.96)]`
+                    }`
                     }`}>
                     <Icon size={isHome ? 28 : 20} strokeWidth={isHome || active ? 2.5 : 2} aria-hidden="true" />
                     {badgeCount > 0 && (

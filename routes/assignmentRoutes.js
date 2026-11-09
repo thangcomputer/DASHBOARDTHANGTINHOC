@@ -187,7 +187,7 @@ router.use((err, req, res, next) => {
 router.get('/course/:courseId', [authMiddleware, ...assignmentsGuard('get_course')], async (req, res) => {
   try {
     const assignments = await Assignment.find({ courseId: req.params.courseId }).sort({ createdAt: -1 });
-    
+
     // Dành cho giáo viên: kèm theo submissions của bài đó
     const data = await Promise.all(assignments.map(async (a) => {
       const subs = await Submission.find({ assignmentId: a._id }).populate('studentId', 'name email avatar');
@@ -209,7 +209,7 @@ router.get('/student/:studentId/course/:courseId', [authMiddleware, ...assignmen
     }
 
     // Khớp đúng tên khóa (không phân biệt hoa thường / khoảng trắng thừa).
-    // Không dùng token substring (vd. "TIN") — sẽ làm CB và NC trùng nhau.
+    // Không dùng token substring (vd. "TIN") - sẽ làm CB và NC trùng nhau.
     const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rawCourse = String(req.params.courseId || '');
     const normalizedCourse = rawCourse.trim().replace(/\s+/g, ' ');
@@ -283,7 +283,7 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
       payload.studentId = null;
     }
 
-    // Teacher luôn gán chính mình — không tin teacherId client
+    // Teacher luôn gán chính mình - không tin teacherId client
     if (role === 'teacher') {
       payload.teacherId = userId;
     } else if (payload.teacherId === 'admin' || payload.teacherId === '') {
@@ -302,7 +302,7 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
         return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
       }
       if (req.userBranchId && targetStudent.branchId
-          && String(targetStudent.branchId) !== String(req.userBranchId)) {
+        && String(targetStudent.branchId) !== String(req.userBranchId)) {
         return res.status(403).json({
           success: false,
           message: 'Không có quyền giao bài cho học viên chi nhánh khác',
@@ -316,7 +316,7 @@ router.post('/', [authMiddleware, branchFilter, ...assignmentsGuard('create')], 
       }
     }
 
-    // Server-owned attribution — never from client
+    // Server-owned attribution - never from client
     payload.assignedById = userId;
     payload.assignedByRole = role;
     payload.assignedByName = userName || (role === 'teacher' ? 'Giảng viên' : 'Admin');
@@ -453,7 +453,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...assignmentsGuard('update')]
     if (await assignmentHasGradedSubmission(req.params.id)) {
       return res.status(403).json({
         success: false,
-        message: 'Bài tập đã được chấm điểm — không thể chỉnh sửa. Chỉ có thể sửa điểm.',
+        message: 'Bài tập đã được chấm điểm - không thể chỉnh sửa. Chỉ có thể sửa điểm.',
       });
     }
 
@@ -475,7 +475,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...assignmentsGuard('update')]
         return res.status(404).json({ success: false, message: 'Không tìm thấy học viên' });
       }
       if (req.userBranchId && targetStudent.branchId
-          && String(targetStudent.branchId) !== String(req.userBranchId)) {
+        && String(targetStudent.branchId) !== String(req.userBranchId)) {
         return res.status(403).json({
           success: false,
           message: 'Không có quyền gán học viên chi nhánh khác',
@@ -517,18 +517,18 @@ router.delete('/:id', [authMiddleware, ...assignmentsGuard('delete')], async (re
     if (await assignmentHasGradedSubmission(req.params.id)) {
       return res.status(403).json({
         success: false,
-        message: 'Bài tập đã được chấm điểm — không thể xóa.',
+        message: 'Bài tập đã được chấm điểm - không thể xóa.',
       });
     }
 
     const deleted = await Assignment.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ success: false, message: 'Không tìm thấy bài tập' });
-    
+
     await Submission.deleteMany({ assignmentId: req.params.id });
-    
+
     const io = req.app.get('io');
     if (io) await emitAssignmentRealtime(io, deleted, 'assignment:deleted', deleted._id);
-    
+
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server' });
@@ -727,7 +727,7 @@ router.put('/submissions/:submissionId/grade', [authMiddleware, ...assignmentsGu
     if (io) {
       // Emit to student
       io.to(`student_${submission.studentId}`).emit('submission:graded', submission);
-      
+
       try {
         const NotificationService = require('../services/NotificationService');
         await NotificationService.send(io, {

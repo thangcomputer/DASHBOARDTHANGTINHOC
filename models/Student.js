@@ -70,7 +70,7 @@ const StudentSchema = new mongoose.Schema(
         date: String,
         note: String,
         grade: Number,
-        /** Giờ thao tác (HH:mm) — khi điểm danh / cập nhật */
+        /** Giờ thao tác (HH:mm) - khi điểm danh / cập nhật */
         time: { type: String, default: '' },
         /** Timestamp thao tác thực tế */
         at: { type: Date },
@@ -86,12 +86,12 @@ const StudentSchema = new mongoose.Schema(
       },
       isPrimary: { type: Boolean, default: false },
       registeredAt: { type: Date, default: Date.now },
-      /** Quyền học theo enrollment — thu hồi khi hoàn 100% (undefined/true = được học) */
+      /** Quyền học theo enrollment - thu hồi khi hoàn 100% (undefined/true = được học) */
       learningAccess: { type: Boolean, default: true },
       // Quyền theo từng khóa (môn cần camera / mở khóa thi riêng)
       requireWebcam: { type: Boolean, default: false },
       examUnlocked: { type: Boolean, default: false },
-      /** Lưu ý Admin gửi GV khi đăng ký khóa — hiện banner trên hồ sơ HV */
+      /** Lưu ý Admin gửi GV khi đăng ký khóa - hiện banner trên hồ sơ HV */
       teacherAlert: { type: String, default: '', maxlength: 500 },
       paymentSessionId: { type: String, default: '' },
       /** Đã xem pháo hoa hoàn thành khóa. false = vừa hoàn thành chưa xem. thiếu field = đã cũ, không hiện. */
@@ -124,7 +124,7 @@ const StudentSchema = new mongoose.Schema(
     paidAmount: { type: Number, default: 0 },  // Số tiền thực nhận qua SePay
     paidNote: { type: String, default: '' },    // Nội dung CK ghi nhận
     studentCode: { type: String, default: '' }, // Canonical HV###### (server-generated)
-    /** Historical codes for payment/search compatibility — never rewrite finance history */
+    /** Historical codes for payment/search compatibility - never rewrite finance history */
     legacyStudentCodes: {
       type: [String],
       default: undefined,
@@ -155,9 +155,9 @@ const StudentSchema = new mongoose.Schema(
     branchCode: { type: String, default: '' }, // Cached: CS1, CS2... dùng trong QR
     // Lịch sử điều chỉnh học phí bởi Admin
     priceHistory: [{
-      oldPrice:  { type: Number },
-      newPrice:  { type: Number },
-      reason:    { type: String, default: '' },
+      oldPrice: { type: Number },
+      newPrice: { type: Number },
+      reason: { type: String, default: '' },
       changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       changedAt: { type: Date, default: Date.now },
     }],
@@ -194,13 +194,13 @@ const StudentSchema = new mongoose.Schema(
       date: String,
       note: String,
       grade: Number,
-      /** Giờ thao tác (HH:mm) — khi điểm danh / cập nhật */
+      /** Giờ thao tác (HH:mm) - khi điểm danh / cập nhật */
       time: { type: String, default: '' },
       /** Timestamp thao tác thực tế */
       at: { type: Date },
       assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assignment' },
     }],
-    /** Nhật ký điểm danh / hủy điểm danh / hủy ca — không tính buổi học */
+    /** Nhật ký điểm danh / hủy điểm danh / hủy ca - không tính buổi học */
     activityLog: [{
       type: { type: String, default: 'attendance' },
       date: { type: String, default: '' },
@@ -219,13 +219,13 @@ const StudentSchema = new mongoose.Schema(
     attendanceDates: [{ type: Date }],
     notes: { type: String, default: '' },
     linkHoc: { type: String, default: '' },
-    
+
     // ── Lớp học Trực tuyến / Virtual Class ───────────────────────
     online_meeting_url: { type: String, default: '' },
-    platform_type: { 
-      type: String, 
-      enum: ['GOOGLE_MEET', 'ZOOM', 'OTHER'], 
-      default: 'OTHER' 
+    platform_type: {
+      type: String,
+      enum: ['GOOGLE_MEET', 'ZOOM', 'OTHER'],
+      default: 'OTHER'
     },
 
     // ── Nợ lương Giảng viên ──────────────────────────────────────
@@ -245,7 +245,7 @@ const StudentSchema = new mongoose.Schema(
       default: false,
       // Chỉ được set = true khi đã hoàn thành đủ totalSessions buổi học
     },
-    /** Alias nghiệp vụ / workflow — đồng bộ với studentExamUnlocked khi mở khóa */
+    /** Alias nghiệp vụ / workflow - đồng bộ với studentExamUnlocked khi mở khóa */
     examApproved: {
       type: Boolean,
       default: false,
@@ -253,21 +253,21 @@ const StudentSchema = new mongoose.Schema(
     requireWebcam: {
       type: Boolean,
       default: false,
-      // true: Bắt buộc bật webcam khi thi; false (mặc định): không bắt buộc — admin bật từng HV/khóa
+      // true: Bắt buộc bật webcam khi thi; false (mặc định): không bắt buộc - admin bật từng HV/khóa
     },
 
     // ── Tiến độ thi tốt nghiệp (per-subject) ────────────────────
     examProgress: [{
-      id:         { type: String },                        // Configured exam subject ID
-      status:     { type: String, default: 'chua_thi' },   // 'chua_thi' | 'dang_thi' | 'dat' | 'khong_dat'
+      id: { type: String },                        // Configured exam subject ID
+      status: { type: String, default: 'chua_thi' },   // 'chua_thi' | 'dang_thi' | 'dat' | 'khong_dat'
       tracNghiem: {
         score: { type: Number, default: 0 },
         total: { type: Number, default: 15 }
       },
-      thucHanh:   { type: String, default: 'chua_nop' },   // 'chua_nop' | 'da_nop'
-      essayFile:  { type: String, default: '' },            // URL file bài tự luận đã upload
+      thucHanh: { type: String, default: 'chua_nop' },   // 'chua_nop' | 'da_nop'
+      essayFile: { type: String, default: '' },            // URL file bài tự luận đã upload
       essayScore: { type: Number, default: null },          // Điểm chấm bởi admin (0-10)
-      lockUntil:  { type: Number, default: null },          // Timestamp: khóa thi lại trong 7 ngày
+      lockUntil: { type: Number, default: null },          // Timestamp: khóa thi lại trong 7 ngày
       /** Optional fields for server-issued, idempotent exam attempts. */
       attemptId: { type: String, default: null },
       attemptStatus: {
@@ -327,7 +327,7 @@ const StudentSchema = new mongoose.Schema(
       select: false,
     },
     knownDeviceCount: { type: Number, default: 0 },
-    /** Khóa đăng nhập HV — tách khỏi status học vụ (Đang học / Chờ xếp lớp). */
+    /** Khóa đăng nhập HV - tách khỏi status học vụ (Đang học / Chờ xếp lớp). */
     accountLocked: { type: Boolean, default: false },
     /**
      * Gói tài khoản theo thời hạn. Thiếu trường (HV cũ) = vĩnh viễn.
@@ -340,7 +340,7 @@ const StudentSchema = new mongoose.Schema(
       /** Mốc nhắc đã gửi cho kỳ hạn hiện tại, ví dụ "2026-12-01:7". */
       remindedFor: { type: [String], default: [] },
     },
-    
+
     // ── Audit: Ai là người thêm học viên này ──────────────────────
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -416,7 +416,7 @@ StudentSchema.index({ status: 1 });                    // Lọc "Chờ xếp l�
 StudentSchema.index({ studentExamUnlocked: 1 });       // Kiểm tra phòng thi
 StudentSchema.index({ teacherId: 1, status: 1 });      // Bộ đôi hay dùng nhất
 StudentSchema.index({ 'enrollments.teacherId': 1 });    // GV xem HV qua enrollments
-StudentSchema.index({ paid: 1, updatedAt: -1 });     // SePay webhook — HV chưa TT gần đây
+StudentSchema.index({ paid: 1, updatedAt: -1 });     // SePay webhook - HV chưa TT gần đây
 StudentSchema.index({ studentCode: 1 }, { sparse: true }); // Match mã HV trong nội dung CK
 StudentSchema.index({ branchId: 1, status: 1 });
 

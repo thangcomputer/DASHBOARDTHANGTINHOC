@@ -62,7 +62,7 @@ function evaluateLmsLessons(subject, ctx) {
   return { decision: 'ALLOW', reason: 'lms_lessons_ok', statusHint: 200 };
 }
 
-/** teacher/overview: specialty is DATA FILTER — HTTP auth only. */
+/** teacher/overview: specialty is DATA FILTER - HTTP auth only. */
 function evaluateTeacherOverview(subject) {
   return evaluateAuthOnly(subject);
 }

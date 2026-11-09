@@ -7,7 +7,7 @@ const workflowService = require('../services/workflowService');
 const logger = require('../config/logger');
 
 /**
- * Phase 7.9 — Controlled cutover for /api/workflows ONLY.
+ * Phase 7.9 - Controlled cutover for /api/workflows ONLY.
  *
  * Default / not allowlisted:
  *   auth → policyShadowWorkflow → Legacy isAdmin (via workflowsCutoverGate) → handler

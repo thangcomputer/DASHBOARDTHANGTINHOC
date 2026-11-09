@@ -181,7 +181,7 @@ async function fulfillVideoCoursePurchase({ session, amount, io }) {
       await NotificationService.send(io, {
         type: 'FINANCE',
         title: 'Thanh toán khóa video thành công',
-        content: `Đã thanh toán đơn mua «${orderLabel}» — ${amountText}đ${orderRef ? ` · Mã CK: ${orderRef}` : ''}. Bấm để vào học ngay.`,
+        content: `Đã thanh toán đơn mua «${orderLabel}» - ${amountText}đ${orderRef ? ` · Mã CK: ${orderRef}` : ''}. Bấm để vào học ngay.`,
         receivers: studentId,
         payload: {
           kind: 'video_course_paid',
@@ -198,7 +198,7 @@ async function fulfillVideoCoursePurchase({ session, amount, io }) {
       await NotificationService.notifyAdmins(
         io,
         'HV thanh toán khóa video',
-        `${session.studentName || 'Học viên'} đã thanh toán đơn «${orderLabel}» — ${amountText}đ${orderRef ? ` (${orderRef})` : ''}.`,
+        `${session.studentName || 'Học viên'} đã thanh toán đơn «${orderLabel}» - ${amountText}đ${orderRef ? ` (${orderRef})` : ''}.`,
         {
           kind: 'video_course_paid',
           studentId,

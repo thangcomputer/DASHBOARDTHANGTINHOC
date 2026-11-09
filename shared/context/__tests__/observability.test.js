@@ -39,7 +39,7 @@ describe('Sprint 2 Observability & Infrastructure Tests', () => {
     // Mock the Mongoose AuditLog model create call to verify payload
     const AuditLog = require('../../../modules/report/models/AuditLog');
     const originalCreate = AuditLog.create;
-    
+
     let createdPayload = null;
     AuditLog.create = jest.fn().mockImplementation((payload) => {
       createdPayload = payload;

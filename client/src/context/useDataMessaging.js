@@ -8,7 +8,7 @@ import { sortConversationsByLastMessageAt } from '../lib/conversationList';
 import { isAiSupportConversationId } from '../utils/aiSupport';
 import { isFreePortalLocked } from '../components/student/dailyPractice/FreeFeatureLock';
 
-/** Tin người thật chưa đọc — bỏ hệ thống / AI / thu hồi (khớp badge “cần xử lý”). */
+/** Tin người thật chưa đọc - bỏ hệ thống / AI / thu hồi (khớp badge “cần xử lý”). */
 function countsAsHumanUnread(msg, viewerId) {
   if (!msg) return false;
   if (msg.read === true) return false;
@@ -61,7 +61,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
 
     setMessages((prev) => {
       if (prev.some((m) => String(m.id) === serverId)) {
-        // Already present (other tab / prior HTTP) — drop matching temp only
+        // Already present (other tab / prior HTTP) - drop matching temp only
         return prev.filter((m) => !(String(m.id).startsWith('temp_')
           && String(m.convId) === String(data.conversationId)
           && String(m.content || '') === String(data.content || '')
@@ -122,15 +122,15 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
       setGroups((prev) => prev.map((group) => (
         String(group?._id || group?.id) === gId
           ? {
-              ...group,
-              updatedAt: messageTime,
-              lastMessage: {
-                ...(group.lastMessage || {}),
-                content: n.content || (n.fileUrl ? '[Tệp tin]' : ''),
-                senderName: n.senderName || '',
-                sentAt: messageTime,
-              },
-            }
+            ...group,
+            updatedAt: messageTime,
+            lastMessage: {
+              ...(group.lastMessage || {}),
+              content: n.content || (n.fileUrl ? '[Tệp tin]' : ''),
+              senderName: n.senderName || '',
+              sentAt: messageTime,
+            },
+          }
           : group
       )));
     }
@@ -242,7 +242,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
     try {
       const capped = messages.length > 2000 ? messages.slice(-2000) : messages;
       localStorage.setItem('thvp_messages', JSON.stringify(capped));
-    } catch { /* localStorage quota exceeded — ignore */ }
+    } catch { /* localStorage quota exceeded - ignore */ }
   }, [messages]);
   useEffect(() => { localStorage.setItem('thvp_groups', JSON.stringify(groups)); }, [groups]);
 
@@ -328,32 +328,32 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
           const merged = prev.map((m) =>
             m.id === tempId
               ? {
-                  ...m,
-                  id: n.id,
-                  convId: savedConvId,
-                  conversationId: savedConvId,
-                  isGroup: savedIsGroup,
-                  groupId: savedIsGroup ? savedGroupId : null,
-                  senderId: n.senderId,
-                  senderName: n.senderName,
-                  senderRole: n.senderRole,
-                  senderAvatar: n.senderAvatar,
-                  sender: n.sender,
-                  receiverId: n.receiverId,
-                  receiverName: n.receiverName,
-                  receiverRole: n.receiverRole,
-                  receiverAvatar: n.receiverAvatar,
-                  receiver: n.receiver,
-                  content: n.content,
-                  messageType: n.messageType || m.messageType,
-                  fileUrl: n.fileUrl || m.fileUrl,
-                  fileName: n.fileName || m.fileName,
-                  payload: n.payload != null ? n.payload : m.payload,
-                  recipientRejected: n.recipientRejected,
-                  aiImageRemaining: n.aiImageRemaining ?? m.aiImageRemaining,
-                  time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
-                  read: n.read ?? m.read,
-                }
+                ...m,
+                id: n.id,
+                convId: savedConvId,
+                conversationId: savedConvId,
+                isGroup: savedIsGroup,
+                groupId: savedIsGroup ? savedGroupId : null,
+                senderId: n.senderId,
+                senderName: n.senderName,
+                senderRole: n.senderRole,
+                senderAvatar: n.senderAvatar,
+                sender: n.sender,
+                receiverId: n.receiverId,
+                receiverName: n.receiverName,
+                receiverRole: n.receiverRole,
+                receiverAvatar: n.receiverAvatar,
+                receiver: n.receiver,
+                content: n.content,
+                messageType: n.messageType || m.messageType,
+                fileUrl: n.fileUrl || m.fileUrl,
+                fileName: n.fileName || m.fileName,
+                payload: n.payload != null ? n.payload : m.payload,
+                recipientRejected: n.recipientRejected,
+                aiImageRemaining: n.aiImageRemaining ?? m.aiImageRemaining,
+                time: n.time instanceof Date ? n.time : new Date(n.time || m.time),
+                read: n.read ?? m.read,
+              }
               : m
           );
           const seen = new Set();
@@ -558,7 +558,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
     }));
 
     // 2. Gọi API đánh dấu đã đọc trên server
-    api.messages.markRead(convId, userId).catch(() => {});
+    api.messages.markRead(convId, userId).catch(() => { });
     emitMessageRead?.(convId);
   }, [emitMessageRead]);
 
@@ -580,7 +580,7 @@ export function useDataMessaging({ currentUser, students, teachers, staffs }) {
 
     const convMap = {};
 
-    // 1. Nhóm tin nhắn theo hội thoại (bỏ qua tin nhóm — xử lý riêng ở mục 3)
+    // 1. Nhóm tin nhắn theo hội thoại (bỏ qua tin nhóm - xử lý riêng ở mục 3)
     userMsgs.forEach(m => {
       if (m.isGroup) return;
       const convId = m.convId;

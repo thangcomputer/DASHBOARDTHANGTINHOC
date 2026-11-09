@@ -1,5 +1,5 @@
 /**
- * Wave 6.4 — Policy SHADOW for student mutations.
+ * Wave 6.4 - Policy SHADOW for student mutations.
  * Reproduces live legacy authz; does not fix gaps.
  */
 const test = require('node:test');
@@ -220,7 +220,7 @@ test('Wave6.4 UPDATE: STAFF without permission DENY', () => {
   );
 });
 
-test('Wave6.4 UPDATE: TEACHER ALLOW any student (legacy — no ownership)', () => {
+test('Wave6.4 UPDATE: TEACHER ALLOW any student (legacy - no ownership)', () => {
   const subject = subjectOf({
     id: TEACHER_A,
     role: 'teacher',
@@ -335,7 +335,7 @@ test('Wave6.4 EXAM_PROGRESS: student self ALLOW; teacher DENY; staff ALLOW witho
 
 // ── Spoof / missing ──────────────────────────────────────────────────────────
 
-test('Wave6.4 spoof: client branch/tenant/teacher/owner ignored — cross-branch still DENY', () => {
+test('Wave6.4 spoof: client branch/tenant/teacher/owner ignored - cross-branch still DENY', () => {
   const subject = subjectOf({ permissions: [PERMISSIONS.MANAGE_STUDENTS] });
   const { legacy } = assertMatch(
     'spoof',

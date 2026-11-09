@@ -1,5 +1,5 @@
 /**
- * Phase 6 — Canonical contact discovery consolidation.
+ * Phase 6 - Canonical contact discovery consolidation.
  * Authority: MessagingPolicy.canDiscoverContacts via messagingContactsService.
  * DISCOVER ≠ SEND preserved (C1/C2).
  */

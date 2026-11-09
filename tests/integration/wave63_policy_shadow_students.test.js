@@ -1,5 +1,5 @@
 /**
- * Wave 6.3 — Policy SHADOW for GET /api/students and GET /api/students/stats.
+ * Wave 6.3 - Policy SHADOW for GET /api/students and GET /api/students/stats.
  * Legacy remains HTTP authority. BRANCH ≠ OWNERSHIP.
  */
 const test = require('node:test');
@@ -254,7 +254,7 @@ test('Wave6.3 ownership: same branch wrong teacher → excluded (BRANCH ≠ OWNE
     enrollments: [],
   };
   assert.equal(scopeIncludesStudent(legacy.scope, sameBranchWrongTeacher), false);
-  // Staff with MANAGE_STUDENTS WOULD see same-branch student — ownership is separate
+  // Staff with MANAGE_STUDENTS WOULD see same-branch student - ownership is separate
   const staff = subjectOf({ permissions: [PERMISSIONS.MANAGE_STUDENTS] });
   const staffEval = evaluateLegacyStudentRead(staff, 'list', staffCtx(BRANCH_A));
   assert.equal(scopeIncludesStudent(staffEval.scope, sameBranchWrongTeacher), true);
@@ -315,7 +315,7 @@ test('Wave6.3 ownership: list query includes cancelled enrollment teacherId (leg
   assert.equal(scopeIncludesStudent(legacy.scope, student), true);
 });
 
-test('Wave6.3 ownership: multiple enrollments — match if any enrollment has teacher', () => {
+test('Wave6.3 ownership: multiple enrollments - match if any enrollment has teacher', () => {
   const subject = subjectOf({
     id: TEACHER_A,
     role: 'teacher',
@@ -345,7 +345,7 @@ test('Wave6.3 stats: Branch A actor excludes Branch B students from aggregate sc
   assert.equal(scopeIncludesStudent(legacy.scope, { branchId: BRANCH_B }), false);
 });
 
-test('Wave6.3 stats: Teacher ALLOW HTTP but unscoped stats (legacy — no ownership filter)', () => {
+test('Wave6.3 stats: Teacher ALLOW HTTP but unscoped stats (legacy - no ownership filter)', () => {
   const subject = subjectOf({
     id: TEACHER_A,
     role: 'teacher',

@@ -61,7 +61,7 @@ function bootServer() {
     env: childEnv,
   });
   let attempts = 0;
-  
+
   const checkHealth = () => {
     http.get(`http://127.0.0.1:${testPort}/healthz`, (res) => {
       if (res.statusCode === 200) {

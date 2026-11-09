@@ -58,7 +58,7 @@ export default function TeacherPaymentCelebration({ payment, remaining = 0, onCl
           </p>
           {remaining > 0 && (
             <p className="relative z-10 mt-2 text-xs font-bold text-emerald-700">
-              Còn {remaining} lần thanh toán khác — đóng để xem tiếp.
+              Còn {remaining} lần thanh toán khác - đóng để xem tiếp.
             </p>
           )}
 

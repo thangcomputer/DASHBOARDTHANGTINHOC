@@ -125,13 +125,12 @@ export default function MonitoringPage({ session }) {
               {alerts.map((a) => (
                 <div
                   key={a.code}
-                  className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${
-                    a.level === 'critical'
+                  className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${a.level === 'critical'
                       ? 'bg-red-50 border-red-200 text-red-800'
                       : a.level === 'warning'
                         ? 'bg-amber-50 border-amber-200 text-amber-900'
                         : 'bg-sky-50 border-sky-200 text-sky-900'
-                  }`}
+                    }`}
                 >
                   <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
                   <span>{a.message}</span>
@@ -144,7 +143,7 @@ export default function MonitoringPage({ session }) {
             <StatCard
               icon={Database}
               label="MongoDB"
-              value={health?.db?.status || '—'}
+              value={health?.db?.status || '-'}
               sub={health?.db?.host || ''}
               color="text-emerald-600"
               bg="bg-emerald-50"
@@ -152,16 +151,16 @@ export default function MonitoringPage({ session }) {
             <StatCard
               icon={Server}
               label="Redis"
-              value={health?.redis?.status || '—'}
-              sub={`Queue: ${health?.queue?.mode || '—'}`}
+              value={health?.redis?.status || '-'}
+              sub={`Queue: ${health?.queue?.mode || '-'}`}
               color="text-rose-600"
               bg="bg-rose-50"
             />
             <StatCard
               icon={HardDrive}
               label="Memory"
-              value={`${health?.memory?.heapUsedMb ?? '—'} MB`}
-              sub={`RSS ${health?.memory?.rssMb ?? '—'} MB`}
+              value={`${health?.memory?.heapUsedMb ?? '-'} MB`}
+              sub={`RSS ${health?.memory?.rssMb ?? '-'} MB`}
               color="text-red-600"
               bg="bg-red-50"
             />

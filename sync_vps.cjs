@@ -1,5 +1,5 @@
 /**
- * Deploy script — KHÔNG lưu credentials trong file này.
+ * Deploy script - KHÔNG lưu credentials trong file này.
  * Cấu hình qua biến môi trường trước khi chạy:
  *
  *   VPS_HOST, VPS_USER, VPS_PASSWORD (hoặc VPS_SSH_KEY_PATH)

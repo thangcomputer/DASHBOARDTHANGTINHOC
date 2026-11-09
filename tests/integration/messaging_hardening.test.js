@@ -1,5 +1,5 @@
 /**
- * Messaging hardening — listener cleanup, dedupe by _id, legacy admin_admin safety.
+ * Messaging hardening - listener cleanup, dedupe by _id, legacy admin_admin safety.
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

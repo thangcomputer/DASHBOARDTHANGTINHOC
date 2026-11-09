@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarX2, Flame, Gamepad2, Play, Trophy, Users, X, Zap } from 'lucide-react-native';
@@ -17,7 +17,7 @@ function vnTodayKey(date = new Date()) {
 
 /**
  * Nhắc luyện tập hằng ngày: tối đa một lần mỗi ngày, chỉ khi hôm nay chưa luyện tập.
- * `ready` do LearningGoalHost quyết định — sau popup mục tiêu học và không khi đang khóa PIN.
+ * `ready` do LearningGoalHost quyết định - sau popup mục tiêu học và không khi đang khóa PIN.
  */
 export function DailyPracticeReminder({ userId, ready }: { userId: string; ready: boolean }) {
   const play = useGameSounds();
@@ -106,7 +106,7 @@ export function DailyPracticeReminder({ userId, ready }: { userId: string; ready
           {players > 0 ? (
             <View style={styles.social}>
               <Users size={14} color="#047857" />
-              <Text style={styles.socialText}>{`${players} học viên đã luyện tập hôm nay — đừng để bị bỏ lại!`}</Text>
+              <Text style={styles.socialText}>{`${players} học viên đã luyện tập hôm nay - đừng để bị bỏ lại!`}</Text>
             </View>
           ) : null}
 

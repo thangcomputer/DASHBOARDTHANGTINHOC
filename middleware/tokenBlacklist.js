@@ -1,5 +1,5 @@
 /**
- * Token blacklist — TTL-based revocation (logout / refresh rotation).
+ * Token blacklist - TTL-based revocation (logout / refresh rotation).
  * Optional Redis (REDIS_URL) for multi-instance; otherwise in-memory Map.
  */
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Clapperboard, Clock3, Eye, FileText, Gamepad2, GraduationCap, Layers3, Lightbulb, Lock, Menu, MessageSquare, Play, RotateCcw, Sparkles, Star, StickyNote, Trophy, Volume2, VolumeX } from 'lucide-react-native';
 import { createAudioPlayer, useAudioPlayer } from 'expo-audio';
@@ -660,7 +660,7 @@ export function CourseVideosScreen() {
     </View>
   ) : null;
   const openRelatedTopic = (topicId: string) => {
-    // Modal bài học nằm trên mọi màn hình — đóng trước khi chuyển sang luyện tập.
+    // Modal bài học nằm trên mọi màn hình - đóng trước khi chuyển sang luyện tập.
     setSelectedCourse(null);
     setSelectedSubject(null);
     setSelectedUnit(null);
@@ -2023,7 +2023,7 @@ function VideoLessonPane({
               <Play size={25} color="#FFFFFF" fill="#FFFFFF" />
             </Pressable>
             <Text style={styles.videoStartLabel}>
-              {url ? 'Nhấn để bắt đầu học' : invalidLink ? 'Liên kết video chưa đúng — trung tâm sẽ cập nhật sớm' : 'Video chưa có liên kết'}
+              {url ? 'Nhấn để bắt đầu học' : invalidLink ? 'Liên kết video chưa đúng - trung tâm sẽ cập nhật sớm' : 'Video chưa có liên kết'}
             </Text>
           </View>
         )}

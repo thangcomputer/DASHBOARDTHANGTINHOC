@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 
-/** Fullscreen exam surface (không sidebar) — Quay lại luôn bên trái */
+/** Fullscreen exam surface (không sidebar) - Quay lại luôn bên trái */
 export default function StudentExamFullscreenShell({ title, onBack, children }) {
   return (
     <div className="min-h-[100dvh] w-full bg-slate-900 flex flex-col text-white">

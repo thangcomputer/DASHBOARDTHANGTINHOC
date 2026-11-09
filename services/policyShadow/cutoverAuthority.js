@@ -1,5 +1,5 @@
 /**
- * Phase 7.1 — Controlled Policy cutover infrastructure (LEGACY-RESTORE TOGGLE).
+ * Phase 7.1 - Controlled Policy cutover infrastructure (LEGACY-RESTORE TOGGLE).
  *
  * Default / fail-safe: LEGACY authority for every family.
  * Policy authority is ONLY possible when BOTH:
@@ -10,7 +10,7 @@
  * No route may call this for primary deny/allow until an explicit cutover wave.
  *
  * Recommended first future candidate: monitoring (/api/monitoring)
- * — NOT enabled in this phase.
+ * - NOT enabled in this phase.
  */
 
 const AUTHORITY = Object.freeze({
@@ -56,7 +56,7 @@ const KNOWN_FAMILIES = Object.freeze(new Set([
   'blog',
 ]));
 
-/** Documented first future cutover candidate — must stay OFF until explicit wave. */
+/** Documented first future cutover candidate - must stay OFF until explicit wave. */
 const RECOMMENDED_FIRST_CUTOVER_FAMILY = 'monitoring';
 
 const FAMILY_ALIASES = Object.freeze({
@@ -135,11 +135,11 @@ function readCutoverConfigFromEnv(env = process.env) {
 
 /**
  * Deterministic authority selector. Side-effect free.
- * Ignores any request/user/role/header/query/body — second arg is intentionally unused
+ * Ignores any request/user/role/header/query/body - second arg is intentionally unused
  * so future call sites cannot accidentally pass client trust.
  *
  * @param {string} routeFamily
- * @param {unknown} [_ignoredRequestContext] — MUST NOT influence decision
+ * @param {unknown} [_ignoredRequestContext] - MUST NOT influence decision
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {'LEGACY'|'POLICY'}
  */

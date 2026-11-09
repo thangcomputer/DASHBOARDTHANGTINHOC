@@ -1,5 +1,5 @@
 /**
- * Phase 7.20 — Controlled cutover gate for LIVE /api/messages ONLY.
+ * Phase 7.20 - Controlled cutover gate for LIVE /api/messages ONLY.
  *
  * LEGACY (default):
  *   All actions → auth already applied (router.use); pass-through.
@@ -165,7 +165,7 @@ function messagesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] messages authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] messages authority helper failed - Legacy gate',
       );
     }
 
@@ -210,7 +210,7 @@ function messagesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] messages Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] messages Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

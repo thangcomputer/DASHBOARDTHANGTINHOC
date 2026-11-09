@@ -1,5 +1,5 @@
 /**
- * Phase 7.18 — Controlled cutover + production activation for /api/files
+ * Phase 7.18 - Controlled cutover + production activation for /api/files
  *
  * LIVE: auth → policyShadowFile → filesCutoverGate → handler/uploadMiddleware.
  * upload: open cats auth-only; training any-perm; else SYSTEM_SETTINGS.
@@ -68,10 +68,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -382,7 +382,7 @@ test('Phase7.18 rollback: remove files → LEGACY; prior stay POLICY; restore �
 test('Phase7.18 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'schedules', 'messages', 'settings',
   ];
   for (const fam of legacyFamilies) {
@@ -451,8 +451,8 @@ test('Phase7.18 functional smoke: categories authz; mutations NOT EXECUTED', () 
   const student = sub({ id: 's1', role: 'student', adminRole: null, permissions: [] });
   assert.equal(parity('categories', student).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — upload/delete/purge production storage mutation',
-    'NOT EXECUTED — upload/delete/purge production storage mutation',
+    'NOT EXECUTED - upload/delete/purge production storage mutation',
+    'NOT EXECUTED - upload/delete/purge production storage mutation',
   );
 });
 

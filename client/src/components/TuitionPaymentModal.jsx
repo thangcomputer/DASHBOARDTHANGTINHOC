@@ -1,7 +1,7 @@
 /**
  * TuitionPaymentModal.jsx
  *
- * Modal học viên đóng học phí — Luồng TỰ ĐỘNG qua SePay:
+ * Modal học viên đóng học phí - Luồng TỰ ĐỘNG qua SePay:
  *  1. Hiển thị mã QR lấy thông tin từ System_Settings (ngân hàng trung tâm)
  *  2. Polling mỗi 3 giây → GET /api/webhooks/payment-status/:studentId
  *  3. Khi SePay webhook xác nhận → socket event 'tuition:paid' → đóng modal, hiện thành công
@@ -22,11 +22,11 @@ import { setLoginOverlay } from '../utils/loginOverlayGate';
 const POLL_INTERVAL = 3000; // 3 giây
 
 export default function TuitionPaymentModal({ student, onClose, onPaid }) {
-  const [centerBank, setCenterBank]   = useState(null);
+  const [centerBank, setCenterBank] = useState(null);
   const [loadingBank, setLoadingBank] = useState(true);
-  const [paid, setPaid]               = useState(false);
-  const [polling, setPolling]         = useState(false);
-  const [seconds, setSeconds]         = useState(0);
+  const [paid, setPaid] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [seconds, setSeconds] = useState(0);
   const pollRef = useRef(null);
   const timerRef = useRef(null);
   const { socket } = useSocket() || {};
@@ -37,10 +37,10 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
     return () => setLoginOverlay('tuition-payment', false);
   }, []);
 
-  // Canonical studentCode from server only — never invent TTH / _id slice
+  // Canonical studentCode from server only - never invent TTH / _id slice
   const studentCode = String(student?.studentCode || '').trim();
-  const courseName  = student?.course || 'KHOA HOC';
-  const amount      = student?.price || 0;
+  const courseName = student?.course || 'KHOA HOC';
+  const amount = student?.price || 0;
   const description = studentCode
     ? `${studentCode} Nop hoc phi ${courseName}`
     : '';
@@ -141,12 +141,12 @@ export default function TuitionPaymentModal({ student, onClose, onPaid }) {
 
   const qrUrl = centerBank && description
     ? generateVietQRUrl(
-        centerBank.bankCode,
-        centerBank.accountNumber,
-        amount,
-        description,
-        centerBank.accountName
-      )
+      centerBank.bankCode,
+      centerBank.accountNumber,
+      amount,
+      description,
+      centerBank.accountName
+    )
     : null;
 
   if (!studentCode) {

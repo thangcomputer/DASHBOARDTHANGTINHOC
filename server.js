@@ -90,7 +90,7 @@ const LAST_SEEN_MAX = 5000;
 // ==========================================
 app.use(compression({ level: 6, threshold: 1024 }));
 
-// Static uploads — không gắn CSP Helmet (tránh header gây nhiễu khi tải file)
+// Static uploads - không gắn CSP Helmet (tránh header gây nhiễu khi tải file)
 function safeDownloadFilename(name) {
   const s = String(name || '').replace(/[/\\?\0\r\n]/g, '_').trim();
   if (!s || s === '.' || s === '..') return '';
@@ -197,7 +197,7 @@ app.use(mongoSanitize({ replaceWith: '_' }));
 app.use(hpp());
 
 app.get('/healthz', (req, res) => {
-  // Public probe — nhe, tuong thich cu; chi tiet o /api/monitoring/*
+  // Public probe - nhe, tuong thich cu; chi tiet o /api/monitoring/*
   const monitoring = require('./services/monitoringService');
   const h = monitoring.getHealth();
   res.status(h.ok ? 200 : 503).json({
@@ -211,7 +211,7 @@ app.get('/healthz', (req, res) => {
   });
 });
 
-// Phase 10 load-test probe — loopback only, gated by PHASE10_LOADTEST=1
+// Phase 10 load-test probe - loopback only, gated by PHASE10_LOADTEST=1
 if (process.env.PHASE10_LOADTEST === '1') {
   const { monitorEventLoopDelay } = require('perf_hooks');
   const elHistogram = monitorEventLoopDelay({ resolution: 20 });
@@ -256,10 +256,10 @@ if (process.env.PHASE10_LOADTEST === '1') {
   });
 }
 
-// Phase 8.20C — loopback-only RUNTIME evidence export (NOT under /api public proxy)
+// Phase 8.20C - loopback-only RUNTIME evidence export (NOT under /api public proxy)
 app.use('/internal/rbac', require('./routes/internalRbacRoutes'));
 
-// Request metrics (Phase 10) — truoc routes API
+// Request metrics (Phase 10) - truoc routes API
 app.use(require('./middleware/requestMetrics'));
 
 app.set('io', io);
@@ -321,7 +321,7 @@ function mapOnlineUser(u) {
   };
 }
 
-/** Presence theo chi nhánh — Super/High/Staff/Support nhận full list qua ALL_*.
+/** Presence theo chi nhánh - Super/High/Staff/Support nhận full list qua ALL_*.
  *  Teacher/Student nhận list scoped theo presence_<branchId> / presence_none.
  *  Ops roles must not join presence_* (see register) or the second emit overwrites. */
 function broadcastOnlinePresence() {
@@ -423,7 +423,7 @@ io.on('connection', (socket) => {
     }
   }
 
-  // Đăng ký user online — CHẶN SPOOFING: lấy ID/Role từ JWT thay vì tin client 100%
+  // Đăng ký user online - CHẶN SPOOFING: lấy ID/Role từ JWT thay vì tin client 100%
   socket.on('register', async ({ branchId: _clientBranchId, branchCode: _clientBranchCode } = {}) => {
     if (!socket.user) return;
 
@@ -431,7 +431,7 @@ io.on('connection', (socket) => {
     const messagingRole = getMessagingRole(socket.user);
     const name = socket.user.name || 'User';
     const key = `${messagingRole}_${userId}`;
-    // Branch chỉ từ JWT — không tin client (chống spoof room)
+    // Branch chỉ từ JWT - không tin client (chống spoof room)
     const resolvedBranchId = socket.user.branchId || null;
     const resolvedBranchCode = socket.user.branchCode || '';
 
@@ -452,7 +452,7 @@ io.on('connection', (socket) => {
 
     // Join rooms for Centralized Notification Service
     socket.join(userId);           // Unique user room
-    socket.join('feed_room');       // Bang tin (realtime) — không join GLOBAL data bus
+    socket.join('feed_room');       // Bang tin (realtime) - không join GLOBAL data bus
     // Explicit deny: never honor client-requested GLOBAL
     try { socket.leave('GLOBAL'); } catch { /* ignore */ }
 
@@ -471,7 +471,7 @@ io.on('connection', (socket) => {
       }
 
       // STAFF / SUPPORT / SUPER / HIGH already get the full presence list via ALL_*.
-      // Do NOT also join presence_* — the branch emit would overwrite FE state and drop
+      // Do NOT also join presence_* - the branch emit would overwrite FE state and drop
       // branchless / cross-branch peers (e.g. Staff cannot see online Teacher with no branchId).
       const getsFullPresence = (
         userId === 'admin'
@@ -527,7 +527,7 @@ io.on('connection', (socket) => {
     socket.emit('users:lastSeen', Object.fromEntries(lastSeenMap));
   });
 
-  // ── Nhắn tin 1-1 — luôn lấy người gửi từ JWT (socket.user), không tin client ──
+  // ── Nhắn tin 1-1 - luôn lấy người gửi từ JWT (socket.user), không tin client ──
   // BUG-13: Simple rate limiting cho socket events
   const socketRateMap = new Map();
   const SOCKET_MSG_LIMIT = 30; // max messages per window
@@ -880,7 +880,7 @@ io.on('connection', (socket) => {
       correlationId: newCorrelationId('sock'),
       channel: 'socket',
     }, async () => {
-      // Broadcast stays on role/global rooms (admin/staff only) — not private DM path
+      // Broadcast stays on role/global rooms (admin/staff only) - not private DM path
       if (isBroadcast) {
         if (!isAdminSocketUser(u)) return;
         const senderMessagingRole = getMessagingRole(u);
@@ -1136,7 +1136,7 @@ io.on('connection', (socket) => {
       logger.warn({ socketId: socket.id, userId: socketUserId(socket.user) }, '[socket] denied join GLOBAL');
       return;
     }
-    // Branch rooms only via trusted register() — never via raw join
+    // Branch rooms only via trusted register() - never via raw join
     if (r.startsWith('branch_') || r.startsWith('presence_') || r.startsWith('ALL_')) {
       logger.warn({ socketId: socket.id, room: r }, '[socket] denied raw join of privileged room');
       return;
@@ -1217,7 +1217,7 @@ io.on('connection', (socket) => {
     socketRateMap.clear();
     clearInterval(rateCleanup);
     broadcastOnlinePresence();
-    // Presence last-seen: role rooms only — không io.emit toàn cục
+    // Presence last-seen: role rooms only - không io.emit toàn cục
     io.to('ALL_ADMIN').to('ALL_STAFF').to('ALL_SUPPORT').to('ALL_TEACHER').to('ALL_STUDENT')
       .emit('users:lastSeen', Object.fromEntries(lastSeenMap));
     console.log(`❌ Socket disconnected: ${socket.id}`);
@@ -1387,7 +1387,7 @@ if (!isTest) {
   cron.schedule('0 */6 * * *', runMessageFileRetention);
 }
 
-// FileAsset registry — purge file hết hạn (Phase 8)
+// FileAsset registry - purge file hết hạn (Phase 8)
 const fileService = require('./services/fileService');
 const runFileAssetPurge = async () => {
   try {
@@ -1404,7 +1404,7 @@ if (!isTest) {
   cron.schedule('30 */6 * * *', runFileAssetPurge);
 }
 
-// Backup định kỳ (Phase 9) — mặc định 03:00 mỗi ngày; tắt bằng BACKUP_SCHEDULE=0
+// Backup định kỳ (Phase 9) - mặc định 03:00 mỗi ngày; tắt bằng BACKUP_SCHEDULE=0
 const backupService = require('./services/backupService');
 const { enqueueBackup } = require('./services/queue/jobQueue');
 const runScheduledBackup = async () => {

@@ -1,4 +1,4 @@
-# QA Báo cáo — Nhóm 1: Admin ↔ Giảng viên
+# QA Báo cáo - Nhóm 1: Admin ↔ Giảng viên
 
 **Ngày:** 2026-07-28  
 **Môi trường:** Local API `http://127.0.0.1:5000`  

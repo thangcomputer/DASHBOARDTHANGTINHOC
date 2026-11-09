@@ -1,5 +1,5 @@
 /**
- * studentFinanceService — extracted money mutations (keep route URLs stable).
+ * studentFinanceService - extracted money mutations (keep route URLs stable).
  * Live path helpers used by routes/studentRoutes.js
  */
 const Student = require('../models/Student');
@@ -29,7 +29,7 @@ async function refundStudentTuition({
   const available = prevPaidAmount > 0 ? prevPaidAmount : (student.paid ? fallbackPrice : 0);
 
   if (!student.paid || !(available > 0)) {
-    const err = new Error('Học viên chưa thanh toán — không thể hoàn');
+    const err = new Error('Học viên chưa thanh toán - không thể hoàn');
     err.status = 409;
     throw err;
   }
@@ -68,14 +68,14 @@ async function refundStudentTuition({
   const claimUpdate = partial
     ? { $inc: { paidAmount: -refundAmt }, $set: { paidNote: note } }
     : {
-        $set: {
-          paid: false,
-          paidAmount: 0,
-          paidAt: null,
-          paidNote: note,
-          paymentMethod: '',
-        },
-      };
+      $set: {
+        paid: false,
+        paidAmount: 0,
+        paidAt: null,
+        paidNote: note,
+        paymentMethod: '',
+      },
+    };
 
   const claimed = await Student.findOneAndUpdate(
     { _id: student._id, paid: true, paidAmount: { $gte: refundAmt } },
@@ -83,7 +83,7 @@ async function refundStudentTuition({
     { returnDocument: 'after' }
   );
   if (!claimed) {
-    const err = new Error('Không thể hoàn — số dư đã thay đổi hoặc đang được xử lý bởi request khác');
+    const err = new Error('Không thể hoàn - số dư đã thay đổi hoặc đang được xử lý bởi request khác');
     err.status = 409;
     throw err;
   }
@@ -137,7 +137,7 @@ async function refundStudentTuition({
       oldSnapshot,
     };
   } catch (ledgerErr) {
-    logger.error('[studentFinance] refund ledger FAILED — rollback: %s', ledgerErr.message);
+    logger.error('[studentFinance] refund ledger FAILED - rollback: %s', ledgerErr.message);
     await Student.findByIdAndUpdate(student._id, {
       $set: { paid: oldSnapshot.paid, paidAmount: oldSnapshot.paidAmount },
     });
@@ -220,7 +220,7 @@ async function payTeacherForStudent({
   const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
   const defaultDesc = action === 'PAID_IN_ADVANCE'
     ? `Trả trước / thanh toán theo HV ${student.name} (${actualCount} buổi)`
-    : `Thù lao ${actualCount} buổi — HV ${student.name}`;
+    : `Thù lao ${actualCount} buổi - HV ${student.name}`;
 
   let transaction = null;
   if (amount > 0 && actualCount > 0) {
@@ -259,7 +259,7 @@ async function payTeacherForStudent({
         },
       });
     } catch (finErr) {
-      logger.error('[studentFinance] pay-teacher FAILED — rollback: %s', finErr.message);
+      logger.error('[studentFinance] pay-teacher FAILED - rollback: %s', finErr.message);
       if (sessionIds.length > 0) {
         await Schedule.updateMany(
           { _id: { $in: sessionIds }, is_paid_to_teacher: true },
@@ -269,7 +269,7 @@ async function payTeacherForStudent({
       if (transaction?._id) {
         await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
       }
-      const err = new Error('Ghi sổ lương thất bại — đã rollback buổi dạy');
+      const err = new Error('Ghi sổ lương thất bại - đã rollback buổi dạy');
       err.status = 500;
       throw err;
     }

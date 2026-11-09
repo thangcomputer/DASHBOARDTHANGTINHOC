@@ -38,7 +38,11 @@ const palette = {
   text: '#E2E8F0',
   muted: '#94A3B8',
   subtle: '#64748B',
-  red: '#DC2626',
+  brand: '#059669',
+  brandSoft: 'rgba(5, 150, 105, 0.12)',
+  brandBorder: 'rgba(16, 185, 129, 0.28)',
+  brandText: '#34D399',
+  red: '#EF4444',
   redSoft: 'rgba(239, 68, 68, 0.1)',
   redBorder: 'rgba(239, 68, 68, 0.2)',
   redText: '#F87171',
@@ -99,7 +103,7 @@ export function LoginScreen() {
 
   useEffect(() => {
     let alive = true;
-    getWebLogoUrl().then((url) => { if (alive) setLogoUrl(url); }).catch(() => {});
+    getWebLogoUrl().then((url) => { if (alive) setLogoUrl(url); }).catch(() => { });
     return () => { alive = false; };
   }, []);
 
@@ -157,21 +161,23 @@ export function LoginScreen() {
                 source={{ uri: logoUrl }}
                 style={styles.logo}
                 resizeMode="contain"
-                accessibilityLabel="Thắng Tin Học"
+                accessibilityLabel="DewSkill"
                 onError={() => setLogoFailed(true)}
               />
             ) : (
-              <View style={styles.logoFallback}>
-                <View style={styles.logoMark}><BookOpen color={palette.white} size={20} strokeWidth={2.2} /></View>
-                <Text style={styles.logoText}>Thắng Tin Học</Text>
-              </View>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="DewSkill"
+              />
             )}
             <View style={styles.dropletShine} pointerEvents="none" />
           </View>
 
           <View style={styles.card}>
             <View style={styles.chip}>
-              <GraduationCap size={14} color="#FCA5A5" />
+              <GraduationCap size={14} color="#6EE7B7" />
               <Text style={styles.chipText}>Nền tảng học Tin học văn phòng</Text>
             </View>
             <Text style={styles.title}>Đăng nhập tài khoản</Text>
@@ -207,7 +213,7 @@ export function LoginScreen() {
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Số điện thoại</Text>
               <View style={[styles.inputWrap, focused === 'phone' && styles.inputWrapFocused]}>
-                <UserRound size={18} color={focused === 'phone' ? palette.red : palette.muted} />
+                <UserRound size={18} color={focused === 'phone' ? palette.brand : palette.muted} />
                 <TextInput
                   value={phone}
                   onChangeText={(value) => setPhone(limitPhoneInput(value))}
@@ -228,7 +234,7 @@ export function LoginScreen() {
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Mật khẩu</Text>
               <View style={[styles.inputWrap, focused === 'password' && styles.inputWrapFocused]}>
-                <Lock size={18} color={focused === 'password' ? palette.red : palette.muted} />
+                <Lock size={18} color={focused === 'password' ? palette.brand : palette.muted} />
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
@@ -284,7 +290,7 @@ export function LoginScreen() {
               { icon: Headphones, label: 'Hỗ trợ tận tâm' },
             ].map(({ icon: Icon, label }) => (
               <View key={label} style={styles.highlight}>
-                <View style={styles.highlightIcon}><Icon size={15} color="#FCA5A5" /></View>
+                <View style={styles.highlightIcon}><Icon size={15} color="#6EE7B7" /></View>
                 <Text style={styles.highlightText}>{label}</Text>
               </View>
             ))}
@@ -351,7 +357,7 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
             <View style={styles.modalHeaderIcon}><KeyRound size={20} color={palette.white} /></View>
             <View style={styles.flex}>
               <Text style={styles.modalTitle}>Quên mật khẩu</Text>
-              <Text style={styles.modalSubtitle}>{sentMessage ? 'Tin nhắn đã sẵn — chỉ việc gửi' : 'Nhập SĐT › xác nhận'}</Text>
+              <Text style={styles.modalSubtitle}>{sentMessage ? 'Tin nhắn đã sẵn - chỉ việc gửi' : 'Nhập SĐT › xác nhận'}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.modalClose} accessibilityRole="button" accessibilityLabel="Đóng">
               <X size={16} color={palette.white} />
@@ -399,7 +405,7 @@ function ForgotPasswordModal({ visible, initialRole, onClose }: { visible: boole
                   </View>
                 ) : (
                   <View style={styles.hintBox}>
-                    <Text style={styles.hintText}>Nhập SĐT đăng ký — sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.</Text>
+                    <Text style={styles.hintText}>Nhập SĐT đăng ký - sẽ hiện dòng xác nhận trước khi tạo tin nhắn gửi Admin.</Text>
                   </View>
                 )}
                 {error ? (
@@ -475,7 +481,7 @@ const styles = StyleSheet.create({
   auraRed: {
     top: -170,
     right: -170,
-    backgroundImage: 'radial-gradient(circle, rgba(220, 38, 38, 0.32) 0%, rgba(220, 38, 38, 0) 68%)',
+    backgroundImage: 'radial-gradient(circle, rgba(5, 150, 105, 0.35) 0%, rgba(5, 150, 105, 0) 68%)',
   } as never,
   auraBlue: {
     bottom: -190,
@@ -513,8 +519,8 @@ const styles = StyleSheet.create({
   } as never,
   logo: { width: 176, height: 46 },
   logoFallback: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoMark: { width: 38, height: 38, borderRadius: 12, backgroundColor: palette.red, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: '#B91C1C', fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  logoMark: { width: 38, height: 38, borderRadius: 12, backgroundColor: palette.brand, alignItems: 'center', justifyContent: 'center' },
+  logoText: { color: palette.brand, fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
   card: {
     borderRadius: 28,
     paddingHorizontal: 18,
@@ -533,12 +539,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    backgroundColor: 'rgba(5, 150, 105, 0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.25)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
     marginBottom: 12,
   },
-  chipText: { color: '#FECACA', fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  chipText: { color: '#6EE7B7', fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   roleTabs: {
     flexDirection: 'row',
     padding: 5,
@@ -559,9 +565,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   roleTabActive: {
-    backgroundColor: palette.red,
-    backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
-    boxShadow: '0px 8px 18px rgba(185, 28, 28, 0.45), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -3px 6px rgba(127, 29, 29, 0.55)',
+    backgroundColor: palette.brand,
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 55%, #047857 100%)',
+    boxShadow: '0px 8px 18px rgba(4, 120, 87, 0.45), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -3px 6px rgba(4, 120, 87, 0.55)',
   } as never,
   roleTabText: { color: palette.muted, fontSize: 13, fontWeight: '800', letterSpacing: 0.4 },
   roleTabTextActive: { color: palette.white },
@@ -594,9 +600,9 @@ const styles = StyleSheet.create({
     boxShadow: 'inset 0px 2px 6px rgba(0, 0, 0, 0.45), inset 0px -1px 0px rgba(255, 255, 255, 0.05)',
   },
   inputWrapFocused: {
-    borderColor: 'rgba(239, 68, 68, 0.75)',
+    borderColor: 'rgba(16, 185, 129, 0.75)',
     backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    boxShadow: '0px 0px 0px 4px rgba(239, 68, 68, 0.16), inset 0px 2px 6px rgba(0, 0, 0, 0.45)',
+    boxShadow: '0px 0px 0px 4px rgba(16, 185, 129, 0.16), inset 0px 2px 6px rgba(0, 0, 0, 0.45)',
   },
   input: { flex: 1, color: palette.white, fontSize: 16, fontWeight: '600', paddingVertical: 12, outlineStyle: 'none' } as never,
   forgotLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', paddingVertical: 4, marginBottom: 16 },
@@ -606,12 +612,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: palette.red,
-    backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
+    backgroundColor: palette.brand,
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 55%, #047857 100%)',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    boxShadow: '0px 14px 28px rgba(185, 28, 28, 0.45), inset 0px 2px 4px rgba(255, 255, 255, 0.4), inset 0px -4px 8px rgba(127, 29, 29, 0.55)',
+    boxShadow: '0px 14px 28px rgba(4, 120, 87, 0.45), inset 0px 2px 4px rgba(255, 255, 255, 0.4), inset 0px -4px 8px rgba(4, 120, 87, 0.55)',
   } as never,
   submitShine: {
     position: 'absolute',
@@ -642,7 +648,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(220, 38, 38, 0.16)',
+    backgroundColor: 'rgba(5, 150, 105, 0.18)',
     boxShadow: 'inset 0px 2px 3px rgba(255, 255, 255, 0.12), inset 0px -2px 4px rgba(0, 0, 0, 0.25)',
   },
   highlightText: { color: palette.text, fontSize: 11, fontWeight: '700' },
@@ -659,8 +665,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: palette.red,
-    backgroundImage: 'linear-gradient(90deg, #DC2626, #EA580C)',
+    backgroundColor: palette.brand,
+    backgroundImage: 'linear-gradient(90deg, #059669, #0D9488)',
   } as never,
   modalHeaderIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center' },
   modalTitle: { color: palette.white, fontSize: 18, fontWeight: '900' },
@@ -670,9 +676,9 @@ const styles = StyleSheet.create({
   modalLabel: { color: palette.muted, fontSize: 12, fontWeight: '700' },
   modalRoleRow: { flexDirection: 'row', gap: 8 },
   modalRole: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 2, borderColor: palette.border, alignItems: 'center' },
-  modalRoleActive: { borderColor: '#EF4444', backgroundColor: palette.redSoft },
+  modalRoleActive: { borderColor: '#10B981', backgroundColor: palette.brandSoft },
   modalRoleText: { color: palette.muted, fontSize: 14, fontWeight: '700' },
-  modalRoleTextActive: { color: palette.redText },
+  modalRoleTextActive: { color: palette.brandText },
   modalInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -696,8 +702,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: palette.red,
-    backgroundImage: 'linear-gradient(90deg, #DC2626, #EA580C)',
+    backgroundColor: palette.brand,
+    backgroundImage: 'linear-gradient(90deg, #059669, #0D9488)',
   } as never,
   modalPrimaryDisabled: { opacity: 0.5 },
   modalPrimaryText: { color: palette.white, fontSize: 14, fontWeight: '900' },

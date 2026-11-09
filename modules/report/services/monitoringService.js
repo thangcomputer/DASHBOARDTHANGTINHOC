@@ -1,5 +1,5 @@
 /**
- * Monitoring service — health snapshot + process metrics.
+ * Monitoring service - health snapshot + process metrics.
  */
 const mongoose = require('mongoose');
 const os = require('os');
@@ -59,7 +59,7 @@ function getHealth() {
   const socketAdapter = socketAdapterStatus();
   const mem = memSnapshot();
   const cpuUsage = process.cpuUsage();
-  
+
   const ok = db.status === 'up';
   return {
     ok,

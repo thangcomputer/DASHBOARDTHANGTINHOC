@@ -1,5 +1,5 @@
 /**
- * LedgerEntry — sổ cái tài chính append-only.
+ * LedgerEntry - sổ cái tài chính append-only.
  * Soft-delete course / hủy TT không được xóa dòng đã posted.
  */
 const mongoose = require('mongoose');

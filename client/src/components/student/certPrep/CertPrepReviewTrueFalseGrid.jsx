@@ -6,7 +6,7 @@ export default function CertPrepReviewTrueFalseGrid({ question }) {
   );
 
   const label = (v) => {
-    if (typeof v !== 'boolean') return '—';
+    if (typeof v !== 'boolean') return '-';
     return v ? 'Yes' : 'No';
   };
 
@@ -28,13 +28,12 @@ export default function CertPrepReviewTrueFalseGrid({ question }) {
             return (
               <tr
                 key={row.id}
-                className={`border-t border-slate-100 ${
-                  typeof chosen !== 'boolean'
+                className={`border-t border-slate-100 ${typeof chosen !== 'boolean'
                     ? 'bg-slate-50'
                     : ok
                       ? 'bg-emerald-50'
                       : 'bg-red-50'
-                }`}
+                  }`}
               >
                 <td className="px-3 py-2 font-medium text-slate-800 whitespace-pre-wrap">
                   {idx + 1}. {row.text || ''}

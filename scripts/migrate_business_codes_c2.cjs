@@ -1,5 +1,5 @@
 /**
- * Phase C2 — Idempotent business-code backfill.
+ * Phase C2 - Idempotent business-code backfill.
  *
  * Default: DRY-RUN (no writes).
  * Writes require: --execute AND PRODUCTION_MIGRATION_CONFIRMED=YES
@@ -102,7 +102,7 @@ function uniqLegacy(list, current) {
     .toArray();
   if (studentDup.length) {
     report.duplicates = studentDup;
-    report.blockers.push('Duplicate studentCode detected — STOP');
+    report.blockers.push('Duplicate studentCode detected - STOP');
     console.log(JSON.stringify(report, null, 2));
     await mongoose.disconnect();
     process.exit(3);
@@ -272,13 +272,13 @@ function uniqLegacy(list, current) {
   };
 
   if (!execute) {
-    report.after = { note: 'DRY_RUN — no writes' };
+    report.after = { note: 'DRY_RUN - no writes' };
     console.log(JSON.stringify(report, null, 2));
     await mongoose.disconnect();
     process.exit(0);
   }
 
-  // EXECUTE writes — per-document, resumable
+  // EXECUTE writes - per-document, resumable
   for (const op of studentOps) {
     try {
       await students.updateOne(
@@ -341,6 +341,6 @@ function uniqLegacy(list, current) {
   process.exit(report.failed.length ? 4 : 0);
 })().catch(async (e) => {
   console.error('C2_MIGRATION_FAIL', e);
-  try { await mongoose.disconnect(); } catch (_) {}
+  try { await mongoose.disconnect(); } catch (_) { }
   process.exit(1);
 });

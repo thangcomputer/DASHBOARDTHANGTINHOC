@@ -1,5 +1,5 @@
 /**
- * Master admin — không hardcode mật khẩu trong source.
+ * Master admin - không hardcode mật khẩu trong source.
  * Production: cần MASTER_ADMIN_PASSWORD hoặc adminPasswordHash trong DB.
  * Development: fallback admin123 nếu chưa cấu hình env.
  */

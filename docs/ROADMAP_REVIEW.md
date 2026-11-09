@@ -1,4 +1,4 @@
-# Phase 20 — Final Review
+# Phase 20 - Final Review
 
 Ngày review: 2026-07-04  
 Phạm vi: Roadmap Phase 1–20 (enterprise hardening DashboardThangTinHoc)
@@ -80,6 +80,6 @@ Phạm vi: Roadmap Phase 1–20 (enterprise hardening DashboardThangTinHoc)
 
 ## 7. Kết luận
 
-Roadmap enterprise Phase 1–20 **đã hoàn tất ở mức nền tảng vận hành được**. Các module lớn (AI, BI, Workflow, Multi-tenant) là phiên bản thực dụng, có thể mở rộng từng phần khi có nhu cầu nghiệp vụ cụ thể — không cần đập đi xây lại.
+Roadmap enterprise Phase 1–20 **đã hoàn tất ở mức nền tảng vận hành được**. Các module lớn (AI, BI, Workflow, Multi-tenant) là phiên bản thực dụng, có thể mở rộng từng phần khi có nhu cầu nghiệp vụ cụ thể - không cần đập đi xây lại.
 
 **Khuyến nghị bước tiếp:** commit theo nhóm phase (security / platform / features / devops-docs), deploy staging, bật MFA + Redis trên production.

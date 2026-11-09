@@ -2,7 +2,7 @@ const { io } = require('socket.io-client');
 
 async function testSocketAuth() {
   console.log('--- Testing Socket.IO Handshake Security ---');
-  
+
   const socket = io('http://localhost:5000', {
     transports: ['websocket'],
     auth: {} // Không gửi token

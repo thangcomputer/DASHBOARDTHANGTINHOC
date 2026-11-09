@@ -21,7 +21,7 @@ function addResult(module, func, result, severity, description) {
 
 async function runApiTests() {
   console.log('🚀 Bắt đầu API Testing cho Teacher Portal...');
-  
+
   let tokenTeacherA = '';
   // 1. Đăng nhập Teacher A qua /api/auth/login/public
   try {
@@ -77,7 +77,7 @@ async function runApiTests() {
       const students = res.data.data || [];
       const hasStudentA = students.some(s => s._id === testData.studentA.id || s.phone === testData.studentA.phone);
       const hasStudentB = students.some(s => s._id === testData.studentB.id || s.phone === testData.studentB.phone);
-      
+
       if (hasStudentA && !hasStudentB) {
         addResult('Students', 'Read API', 'Passed', 'Critical', 'Teacher chỉ lấy được học viên của mình');
       } else if (!hasStudentA) {

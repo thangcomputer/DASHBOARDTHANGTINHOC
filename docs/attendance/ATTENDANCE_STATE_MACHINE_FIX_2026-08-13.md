@@ -52,7 +52,7 @@ Constant: `ATTENDANCE_GRACE_MINUTES = 60` (`ATTENDANCE_LATE_GRACE_MINUTES` / `AT
 
 ## 6. Idempotency / concurrency
 
-- `findOneAndUpdate({ status: 'scheduled' })` — second call → `ATTENDANCE_ALREADY_COMPLETED`
+- `findOneAndUpdate({ status: 'scheduled' })` - second call → `ATTENDANCE_ALREADY_COMPLETED`
 - Progress = recount completed schedules (not blind +=1)
 - Residual: no multi-doc transaction; documented
 
@@ -89,7 +89,7 @@ Auth, JWT, RBAC matrix, Messaging, Finance, Ledger, Refund, SePay, C4, Branch ar
 
 ## 10. Remaining risks
 
-1. FE `markAttendance` still optimistically PUTs student counters — server recount should win on sync; prefer schedule-complete only.
+1. FE `markAttendance` still optimistically PUTs student counters - server recount should win on sync; prefer schedule-complete only.
 2. Overdue notify only triggered when teacher schedule list is fetched (not a cron).
 3. No full concurrent integration test against Mongo.
 4. `reminderSent` reused as soft skip flag for overdue notify (was unused/cron-commented).

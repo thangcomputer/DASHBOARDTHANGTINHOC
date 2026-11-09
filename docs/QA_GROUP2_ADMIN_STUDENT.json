@@ -56,7 +56,7 @@
       "id": "G2-04",
       "name": "Gửi SMS khi tạo HV",
       "expected": "SMS riêng hoặc Zalo OA thay SMS",
-      "actual": "Product không có SMS gateway — welcome queue gửi Zalo OA theo SĐT/Zalo",
+      "actual": "Product không có SMS gateway - welcome queue gửi Zalo OA theo SĐT/Zalo",
       "result": "PASS",
       "severity": "Medium",
       "fix": "SMS gateway ngoài scope; Zalo OA là kênh tin nhắn hiện có"

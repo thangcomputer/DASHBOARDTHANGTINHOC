@@ -85,7 +85,7 @@ function policyShadowSchedule(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] schedule evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] schedule evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `schedule_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -120,7 +120,7 @@ function policyShadowSchedule(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] schedule shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] schedule shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -132,7 +132,7 @@ function policyShadowSchedule(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected schedule error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected schedule error - fail closed to legacy only',
       );
     }
     return next();

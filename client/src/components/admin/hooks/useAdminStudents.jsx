@@ -52,7 +52,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
   const filterPaid = searchParams.get('filterPaid') || 'all';
   const filterCourse = searchParams.get('filterCourse') || 'all';
 
-  /** Giữ hash tab (#finance, #teachers…) — setSearchParams mặc định sẽ làm mất hash → về Tổng quan. */
+  /** Giữ hash tab (#finance, #teachers…) - setSearchParams mặc định sẽ làm mất hash → về Tổng quan. */
   const updateSearchParam = (key, value) => {
     const next = new URLSearchParams(searchParams);
     if (!value || (value === 'all' && key !== 'search')) next.delete(key);
@@ -122,7 +122,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
     }
   }, [activeTab, currentPage, search, filterPaid, filterCourse, fetchStudentsPaginated, selectedBranchId]);
 
-  // Chỉ reset page khi đang tab Học viên — tránh navigate làm mất hash tab khác (finance…)
+  // Chỉ reset page khi đang tab Học viên - tránh navigate làm mất hash tab khác (finance…)
   useEffect(() => {
     if (activeTab !== 'students') return;
     if (currentPage === 1) return;
@@ -425,7 +425,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sqSectionRef }) {
           `Đã nhập ${normalized.length} câu cho môn đã chọn (thay thế câu cũ cùng môn).${skipped ? ` (${skipped} dòng trống)` : ''}`,
         );
         if (errors.length) {
-          toast.error(`${errors.length} dòng lỗi: ${errors.slice(0, 2).join(' — ')}${errors.length > 2 ? '…' : ''}`);
+          toast.error(`${errors.length} dòng lỗi: ${errors.slice(0, 2).join(' - ')}${errors.length > 2 ? '…' : ''}`);
         }
       } catch {
         toast.error('Không đọc được file. Dùng mẫu .XLSX và thử lại.');

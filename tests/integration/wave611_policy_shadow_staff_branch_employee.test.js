@@ -1,5 +1,5 @@
 /**
- * Wave 6.11 — Policy SHADOW for LIVE staff / branches / employees.
+ * Wave 6.11 - Policy SHADOW for LIVE staff / branches / employees.
  * Legacy remains HTTP authority; Policy always next().
  */
 const test = require('node:test');
@@ -535,7 +535,7 @@ test('Wave6.11 static: legacy middleware remains; Policy shadow-only; CQRS OFF',
   const empGate = fs.readFileSync(path.join(ROOT, 'middleware/employeesCutoverGate.js'), 'utf8');
   assert.ok(empGate.includes('MANAGE_HR'));
   assert.ok(empGate.includes("getAuthorizationAuthority('employees')"));
-  // Mass-assignment preserved (P2) — do not fix in shadow wave
+  // Mass-assignment preserved (P2) - do not fix in shadow wave
   assert.ok(employees.includes('const updates = { ...req.body }'));
 
   assert.ok(server.includes("app.use('/api/staff'"));

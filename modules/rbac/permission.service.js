@@ -91,7 +91,7 @@ const PermissionService = {
 
   /**
    * @private
-   * Resolve user permissions — check cache first, populate on miss.
+   * Resolve user permissions - check cache first, populate on miss.
    *
    * @param {Object} user
    * @returns {Promise<string[]>}

@@ -1,4 +1,4 @@
-# PHASE C3.3 — PRODUCTION READ-ONLY BUSINESS CODE AUDIT
+# PHASE C3.3 - PRODUCTION READ-ONLY BUSINESS CODE AUDIT
 
 **Date:** 2026-08-11  
 **Mode:** IDENTIFY → VERIFY → READ → AUDIT → REPORT → STOP  
@@ -34,7 +34,7 @@ C4 = BLOCKED
 
 ---
 
-## CASE A — Production không xác định được
+## CASE A - Production không xác định được
 
 ```text
 PRODUCTION TARGET IDENTIFIED = NO
@@ -51,13 +51,13 @@ No production Mongo connection was opened. Local/dev was **not** used as product
 
 | Variable | Present in process env / workspace? | Notes |
 |----------|-------------------------------------|-------|
-| `MONGODB_URI_PRODUCTION` | NO | — |
-| `MONGODB_READONLY_URI` | NO | — |
-| `MONGODB_PRODUCTION_URI` | NO | — |
-| `PRODUCTION_MONGODB_URI` | NO | — |
-| `MONGO_PRODUCTION_URI` | NO | — |
-| `PHASE_C3_PRODUCTION_CONFIRMED` | NO | — |
-| `MONGODB_URI` (workspace `.env`) | YES | **LOCAL/DEV only** — rejected as production |
+| `MONGODB_URI_PRODUCTION` | NO | - |
+| `MONGODB_READONLY_URI` | NO | - |
+| `MONGODB_PRODUCTION_URI` | NO | - |
+| `PRODUCTION_MONGODB_URI` | NO | - |
+| `MONGO_PRODUCTION_URI` | NO | - |
+| `PHASE_C3_PRODUCTION_CONFIRMED` | NO | - |
+| `MONGODB_URI` (workspace `.env`) | YES | **LOCAL/DEV only** - rejected as production |
 
 Workspace `.env` (safe fields only):
 
@@ -80,10 +80,10 @@ Hard rule: `127.0.0.1:27018` **must not** be called production.
 | `.env.production` / `.env.prod` | **MISSING** |
 | `.env.deploy.example` | SSH deploy placeholders; **no** Mongo URI |
 | `ecosystem.config.cjs` | `NODE_ENV=production` only; **no** Mongo URI |
-| `docker-compose*.yml` | `mongo:27017` / local compose — **DEV** |
+| `docker-compose*.yml` | `mongo:27017` / local compose - **DEV** |
 | `deployment/` | No attested production Mongo URI |
 | `deploy_scripts/*` | Fallbacks to `127.0.0.1:27017` or remote VPS `.env` **not in workspace** |
-| CI `.github/` | `dashboardthangtinhoc_ci` — **TEST** |
+| CI `.github/` | `dashboardthangtinhoc_ci` - **TEST** |
 
 ```text
 DO NOT SSH
@@ -113,7 +113,7 @@ No production session ⇒ no `hello` / `connectionStatus` / role inspection. No 
 | Employee NV###### / dups | **BLOCKED** | Payroll uses ObjectId |
 | Course KH###### / slug independence | **BLOCKED** | `courseCode ≠ slug` in design |
 | Counters seq ≥ max suffix | **BLOCKED** | Local counters irrelevant |
-| Duplicate / cross-field collision | **BLOCKED** | — |
+| Duplicate / cross-field collision | **BLOCKED** | - |
 
 ---
 
@@ -135,7 +135,7 @@ No SePay call, webhook replay, or settlement.
 |-------|--------|---------------|
 | Multi-course one studentCode → N enrollments | **PASS** | CODE-LEVEL schema |
 | Teacher assignment ObjectId independence | **PASS** | CODE-LEVEL |
-| Messaging free of business-code identity | **PASS** | CODE-LEVEL (`messagingPolicy` etc. — no `studentCode`/`teacherCode` matches) |
+| Messaging free of business-code identity | **PASS** | CODE-LEVEL (`messagingPolicy` etc. - no `studentCode`/`teacherCode` matches) |
 
 ```text
 CODE-LEVEL ≠ PRODUCTION-DATA PASS
@@ -215,6 +215,6 @@ RBAC changed: NO
 ---
 
 ```text
-STOP — DO NOT START C4
+STOP - DO NOT START C4
 C4 = BLOCKED
 ```

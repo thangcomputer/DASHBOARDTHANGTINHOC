@@ -71,7 +71,7 @@ function policyShadowWorkflow(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] workflow evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] workflow evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `workflow_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -108,7 +108,7 @@ function policyShadowWorkflow(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] workflow shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] workflow shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -121,7 +121,7 @@ function policyShadowWorkflow(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected workflow error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected workflow error - fail closed to legacy only',
       );
     }
     return next();

@@ -1,6 +1,6 @@
 /**
- * Phase 7.12 — Controlled cutover gate for LIVE /api/training ONLY
- * (teachingGuideRoutes — NOT /api/training-lms).
+ * Phase 7.12 - Controlled cutover gate for LIVE /api/training ONLY
+ * (teachingGuideRoutes - NOT /api/training-lms).
  *
  * LIVE Legacy: authMiddleware only (any authenticated role ALLOW).
  * Fail-safe: Policy ERROR / UNKNOWN / malformed → Legacy pass-through after auth.
@@ -52,7 +52,7 @@ function trainingCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] training authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] training authority helper failed - Legacy gate',
       );
     }
 
@@ -97,7 +97,7 @@ function trainingCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] training Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] training Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

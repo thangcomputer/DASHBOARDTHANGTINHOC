@@ -1,5 +1,5 @@
 /**
- * StaffPopup.jsx — Popup thông báo nội bộ cho Nhân viên
+ * StaffPopup.jsx - Popup thông báo nội bộ cho Nhân viên
  * Chỉ hiện khi: role === 'staff' && staffPopup.isActive === true
  * Tránh spam: Lưu cờ sessionStorage khi đã đọc.
  * Hiện lại: Phiên mới hoặc Admin cập nhật nội dung (updatedAt thay đổi).
@@ -12,7 +12,7 @@ const STORAGE_KEY = 'staff_popup_seen';
 
 export default function StaffPopup({ session }) {
   const [popup, setPopup] = useState(null);
-  const [show, setShow]   = useState(false);
+  const [show, setShow] = useState(false);
 
   const isStaff = session?.role === 'staff' || session?.adminRole === 'STAFF';
 
@@ -32,7 +32,7 @@ export default function StaffPopup({ session }) {
         setPopup(sp);
         setShow(true);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isStaff]);
 
   const handleClose = () => {

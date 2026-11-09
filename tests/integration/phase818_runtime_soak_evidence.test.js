@@ -1,5 +1,5 @@
 /**
- * Phase 8.18 — RUNTIME soak evidence acceptance (no fake production traffic).
+ * Phase 8.18 - RUNTIME soak evidence acceptance (no fake production traffic).
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

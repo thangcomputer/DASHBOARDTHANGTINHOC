@@ -1,5 +1,5 @@
 /**
- * Phase 7.8 — Controlled cutover gate for /api/ai ONLY.
+ * Phase 7.8 - Controlled cutover gate for /api/ai ONLY.
  *
  * LEGACY (default): existing isAdmin remains HTTP authority.
  * POLICY (env opt-in): Policy decision is HTTP authority; Legacy isAdmin skipped.
@@ -50,7 +50,7 @@ function aiCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] ai authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] ai authority helper failed - Legacy gate',
       );
     }
 
@@ -95,7 +95,7 @@ function aiCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] ai Policy unsafe — fallback Legacy isAdmin',
+        '[POLICY_CUTOVER] ai Policy unsafe - fallback Legacy isAdmin',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -115,7 +115,7 @@ function aiCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] ai Policy ALLOW — Legacy isAdmin skipped',
+        '[POLICY_CUTOVER] ai Policy ALLOW - Legacy isAdmin skipped',
       );
       return next();
     }

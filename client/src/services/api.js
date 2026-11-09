@@ -86,7 +86,7 @@ function isMutatingMethod(method) {
   return m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS';
 }
 
-/** Parse JSON an toàn — tránh crash khi server trả body rỗng */
+/** Parse JSON an toàn - tránh crash khi server trả body rỗng */
 async function parseApiJson(res, fallbackMessage = 'Máy chủ không phản hồi') {
   const text = await res.text();
   let data = null;
@@ -96,13 +96,13 @@ async function parseApiJson(res, fallbackMessage = 'Máy chủ không phản h�
   if (!res.ok) {
     let msg = data?.message || `${fallbackMessage} (HTTP ${res.status})`;
     try {
-        window.dispatchEvent(new CustomEvent('cms:api-error', { detail: { message: msg, status: res.status } }));
-      } catch {
-        // CustomEvent is unavailable in non-browser consumers.
-      }
-      if ([502, 503, 504].includes(res.status) && !data?.message) {
-        msg = `${fallbackMessage}. Máy chủ đang khởi động lại — vui lòng đợi vài giây rồi tải lại.`;
-      }
+      window.dispatchEvent(new CustomEvent('cms:api-error', { detail: { message: msg, status: res.status } }));
+    } catch {
+      // CustomEvent is unavailable in non-browser consumers.
+    }
+    if ([502, 503, 504].includes(res.status) && !data?.message) {
+      msg = `${fallbackMessage}. Máy chủ đang khởi động lại - vui lòng đợi vài giây rồi tải lại.`;
+    }
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
@@ -157,8 +157,8 @@ export const getRolePrefix = (overrideRole = null) => {
 
   const pathRole = path.startsWith('/admin') ? 'admin'
     : path.startsWith('/teacher') ? 'teacher'
-    : path.startsWith('/student') ? 'student'
-    : null;
+      : path.startsWith('/student') ? 'student'
+        : null;
 
   const hasToken = (r) => {
     if (localStorage.getItem(`${r}_access_token`)) return true;
@@ -185,7 +185,7 @@ export const getRolePrefix = (overrideRole = null) => {
 /** Chuẩn hóa URL file upload (IP/http cũ → domain hiện tại) */
 const PUBLIC_UPLOAD_RE = /\/uploads\/(logo|favicon|popup|images|avatars|invoice_logo|feed|blog|center-info)(\/|$)/i;
 
-/** Origin API (VITE_API_URL) hoặc origin hiện tại — tránh /uploads/ trỏ nhầm SPA. */
+/** Origin API (VITE_API_URL) hoặc origin hiện tại - tránh /uploads/ trỏ nhầm SPA. */
 function mediaOrigin() {
   if (SOCKET_BASE) return String(SOCKET_BASE).replace(/\/$/, '');
   if (typeof window !== 'undefined') return window.location.origin;
@@ -296,7 +296,7 @@ export const buildMediaDownloadUrl = (url, displayName) => {
 };
 
 /**
- * Tải file upload — ưu tiên fetch + Bearer (ổn định hơn <a href> + access_token trên URL dài).
+ * Tải file upload - ưu tiên fetch + Bearer (ổn định hơn <a href> + access_token trên URL dài).
  * Fallback: mở buildMediaDownloadUrl nếu fetch thất bại do CORS/network.
  */
 export const downloadMediaFile = async (url, fileName) => {
@@ -306,7 +306,7 @@ export const downloadMediaFile = async (url, fileName) => {
   const displayName = ensureDownloadFileName(fileName, raw);
   const token = typeof window !== 'undefined' ? getAccessToken() : null;
 
-  // Absolute uploads URL (không nhét token vào query — dùng Bearer)
+  // Absolute uploads URL (không nhét token vào query - dùng Bearer)
   let absolute = '';
   try {
     const uploadsPath = raw.match(/\/uploads\/[^\s?#]+/i)?.[0]
@@ -334,7 +334,7 @@ export const downloadMediaFile = async (url, fileName) => {
       if (res.ok) {
         const blob = await res.blob();
         const ct = String(res.headers.get('content-type') || '');
-        // 401/404 đôi khi trả JSON nhưng status vẫn lạ — chặn tải nhầm JSON lỗi
+        // 401/404 đôi khi trả JSON nhưng status vẫn lạ - chặn tải nhầm JSON lỗi
         if (ct.includes('application/json')) {
           const text = await blob.text();
           let msg = 'Không tải được file';
@@ -354,10 +354,10 @@ export const downloadMediaFile = async (url, fileName) => {
         return true;
       }
       if (res.status === 401 || res.status === 403) {
-        throw new Error('Phiên đăng nhập hết hạn — hãy đăng nhập lại rồi tải xuống');
+        throw new Error('Phiên đăng nhập hết hạn - hãy đăng nhập lại rồi tải xuống');
       }
       if (res.status === 404) {
-        throw new Error('File không còn trên máy chủ — Admin cần upload lại');
+        throw new Error('File không còn trên máy chủ - Admin cần upload lại');
       }
       throw new Error(`Tải thất bại (HTTP ${res.status})`);
     } catch (err) {
@@ -408,12 +408,12 @@ export const getAccessToken = (role = null) => {
 export const setTokens = (access, refresh, role) => {
   if (!role) return;
   const prefix = role.toLowerCase();
-  
-  if (access)  localStorage.setItem(`${prefix}_access_token`, access);
-  else         localStorage.removeItem(`${prefix}_access_token`);
-  
+
+  if (access) localStorage.setItem(`${prefix}_access_token`, access);
+  else localStorage.removeItem(`${prefix}_access_token`);
+
   if (refresh) localStorage.setItem(`${prefix}_refresh_token`, refresh);
-  else         localStorage.removeItem(`${prefix}_refresh_token`);
+  else localStorage.removeItem(`${prefix}_refresh_token`);
 };
 
 /**
@@ -442,7 +442,7 @@ export const getRefreshToken = (role = null) => {
   const prefix = getRolePrefix(role);
   const directToken = localStorage.getItem(`${prefix}_refresh_token`);
   if (directToken) return directToken;
-  
+
   try {
     const session = JSON.parse(localStorage.getItem(`${prefix}_user`) || 'null');
     return session?.refreshToken || null;
@@ -549,8 +549,8 @@ export function clearSelectedTenantId() {
  * Tự động refresh token khi nhận 401/TOKEN_EXPIRED và retry 1 lần.
  */
 export const apiFetch = async (endpoint, options = {}) => {
-  const url     = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
-  const method  = options.method || 'GET';
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const method = options.method || 'GET';
   const buildHeaders = async (token) => {
     const headers = {
       'Content-Type': 'application/json',
@@ -625,9 +625,9 @@ export const apiFetch = async (endpoint, options = {}) => {
     });
   }
 
-  // Server tạm thời (502/503/504) — thường gặp lúc PM2 restart / deploy
+  // Server tạm thời (502/503/504) - thường gặp lúc PM2 restart / deploy
   // Retry dài hơn để tránh toast lỗi khi app đang warm-up (~3–8s)
-  // Không retry 503 nghiệp vụ (ngân hàng đề, khóa ký thi…) — retry chỉ làm kẹt UI.
+  // Không retry 503 nghiệp vụ (ngân hàng đề, khóa ký thi…) - retry chỉ làm kẹt UI.
   if ([502, 503, 504].includes(res.status) && (options._serverRetryCount || 0) < 4) {
     let peek = null;
     try { peek = await res.clone().json(); } catch { /* ignore */ }
@@ -756,7 +756,7 @@ export const authAPI = {
     });
     return res.json();
   },
-  
+
   me: async () => {
     const res = await apiFetch('/auth/me');
     return res.json();
@@ -766,7 +766,7 @@ export const authAPI = {
     const role = getRolePrefix();
     const access = getAccessToken(role);
     const refresh = getRefreshToken(role);
-    // Đọc token trước, gọi API xong mới xóa local — tránh race khiến server không dọn deviceFingerprint
+    // Đọc token trước, gọi API xong mới xóa local - tránh race khiến server không dọn deviceFingerprint
     try {
       const csrf = await ensureCsrfToken();
       await fetch(`${API_BASE}/auth/logout`, {
@@ -924,7 +924,7 @@ export const studentsAPI = {
         keepalive: true,
         headers,
         body: JSON.stringify({ subjectId, reason }),
-      }).catch(() => {});
+      }).catch(() => { });
     } catch { /* ignore */ }
   },
   submitExamAttempt: async (id, payload) => {
@@ -1323,17 +1323,17 @@ export const communicationPreferencesAPI = {
 };
 
 export const messagesAPI = {
-    getMessage: async (id) => {
-      const res = await apiFetch(`/messages/message/${id}`);
-      return res.json();
-    },
-    pinMessage: async (conversationId, messageId) => {
-      const res = await apiFetch('/messages/' + conversationId + '/pin', {
-        method: 'PUT',
-        body: JSON.stringify({ messageId })
-      });
-      return res.json();
-    },
+  getMessage: async (id) => {
+    const res = await apiFetch(`/messages/message/${id}`);
+    return res.json();
+  },
+  pinMessage: async (conversationId, messageId) => {
+    const res = await apiFetch('/messages/' + conversationId + '/pin', {
+      method: 'PUT',
+      body: JSON.stringify({ messageId })
+    });
+    return res.json();
+  },
   getContacts: async () => {
     const res = await apiFetch('/messages/contacts');
     return res.json();
@@ -2052,7 +2052,7 @@ export const biAPI = {
 // ─── AI API (Admin) ─────────────────────────────────────────────────────────
 const aiAuthHint = (res, body) => {
   if (res.status !== 401) return body?.message || 'AI thất bại';
-  return 'Phiên đăng nhập hết hạn — vui lòng đăng nhập lại tài khoản admin';
+  return 'Phiên đăng nhập hết hạn - vui lòng đăng nhập lại tài khoản admin';
 };
 
 export const aiAPI = {
@@ -2441,10 +2441,10 @@ export const feedAPI = {
     const body = typeof payload === 'string'
       ? { content: payload }
       : {
-          content: payload?.content || '',
-          images: payload?.images || [],
-          parentId: payload?.parentId || null,
-        };
+        content: payload?.content || '',
+        images: payload?.images || [],
+        parentId: payload?.parentId || null,
+      };
     const res = await apiFetch(`/feed/${id}/comments`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -2630,39 +2630,39 @@ export const quizzesAPI = {
         keepalive: true,
         headers,
         body: JSON.stringify({ answers: [], forfeit: true, exitReason }),
-      }).catch(() => {});
+      }).catch(() => { });
     } catch { /* ignore */ }
   },
 };
 
 export default {
-  auth:         authAPI,
-  students:     studentsAPI,
-  teachers:     teachersAPI,
-  invoices:     invoicesAPI,
+  auth: authAPI,
+  students: studentsAPI,
+  teachers: teachersAPI,
+  invoices: invoicesAPI,
   transactions: transactionsAPI,
-  messages:     messagesAPI,
-  schedules:    schedulesAPI,
-  evaluations:  evaluationsAPI,
-  assignments:  assignmentsAPI,
-  quizzes:      quizzesAPI,
-  examResults:  examResultsAPI,
-  settings:     settingsAPI,
-  systemLogs:   systemLogsAPI,
-  staff:        staffAPI,
+  messages: messagesAPI,
+  schedules: schedulesAPI,
+  evaluations: evaluationsAPI,
+  assignments: assignmentsAPI,
+  quizzes: quizzesAPI,
+  examResults: examResultsAPI,
+  settings: settingsAPI,
+  systemLogs: systemLogsAPI,
+  staff: staffAPI,
   notifications: notificationsAPI,
-  files:         filesAPI,
-  backups:       backupsAPI,
-  monitoring:    monitoringAPI,
-  ai:            aiAPI,
-  aiSupport:     aiSupportAPI,
-  bi:            biAPI,
-  finance:       financeAPI,
-  workflows:     workflowsAPI,
-  builder:       builderAPI,
-  tenants:       tenantsAPI,
-  trainingLms:   trainingLmsAPI,
-  feed:          feedAPI,
-  blog:          blogAPI,
-  centerInfo:    centerInfoAPI,
+  files: filesAPI,
+  backups: backupsAPI,
+  monitoring: monitoringAPI,
+  ai: aiAPI,
+  aiSupport: aiSupportAPI,
+  bi: biAPI,
+  finance: financeAPI,
+  workflows: workflowsAPI,
+  builder: builderAPI,
+  tenants: tenantsAPI,
+  trainingLms: trainingLmsAPI,
+  feed: feedAPI,
+  blog: blogAPI,
+  centerInfo: centerInfoAPI,
 };

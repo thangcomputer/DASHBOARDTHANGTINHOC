@@ -1,5 +1,5 @@
 /**
- * Wave 6.2 — Policy SHADOW for GET /api/quizzes/admin/all.
+ * Wave 6.2 - Policy SHADOW for GET /api/quizzes/admin/all.
  * Legacy remains HTTP authority. Branch isolation is data-scope, not HTTP DENY.
  */
 const test = require('node:test');
@@ -200,7 +200,7 @@ test('Wave6.2 scope: teacher.branchId null included under branch-bound actor', (
 
 // ── Spoof ────────────────────────────────────────────────────────────────────
 
-test('Wave6.2 spoof: query/body branchId + tenantId ignored — scope stays Branch A', () => {
+test('Wave6.2 spoof: query/body branchId + tenantId ignored - scope stays Branch A', () => {
   const subject = subjectOf({
     permissions: [PERMISSIONS.MANAGE_TRAINING],
     userBranchId: BRANCH_A,

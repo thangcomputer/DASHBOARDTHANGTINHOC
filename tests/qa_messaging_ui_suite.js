@@ -22,11 +22,11 @@ function addResult(module, func, result, severity, description) {
 async function runTests() {
   console.log('🚀 Bắt đầu Messaging UI Playwright Testing...');
   const browser = await chromium.launch({ headless: true });
-  
+
   // Context 1: Teacher
   const ctxTeacher = await browser.newContext();
   const pageTeacher = await ctxTeacher.newPage();
-  
+
   // Context 2: Student
   const ctxStudent = await browser.newContext();
   const pageStudent = await ctxStudent.newPage();

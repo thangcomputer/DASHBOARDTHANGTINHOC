@@ -1,4 +1,4 @@
-# Exam & Certificate Service Review — Sprint 4.3 Batch 3
+# Exam & Certificate Service Review - Sprint 4.3 Batch 3
 
 ## Domains: `exam`, `certificate`
 

@@ -1,4 +1,4 @@
-# Chat & Feed Service Review — Sprint 4.3 Batch 4
+# Chat & Feed Service Review - Sprint 4.3 Batch 4
 
 ## Domains: `chat`, `feed`
 

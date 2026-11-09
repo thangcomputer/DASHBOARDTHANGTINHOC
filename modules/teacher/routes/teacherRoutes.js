@@ -1,7 +1,7 @@
-const express  = require('express');
-const multer   = require('multer');
-const path     = require('path');
-const fs       = require('fs');
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const { teacherRepository } = require('../repositories');
 const Teacher = require('../models/Teacher'); // Temp for new Teacher
@@ -100,7 +100,7 @@ const superAdminOnlyTeacher = async (req, res, next) => {
   if (user?.adminRole === 'SUPER_ADMIN') return next();
   return res.status(403).json({
     success: false,
-    message: '403 Forbidden — Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin mới được thêm/sửa/xóa giảng viên.',
+    message: '403 Forbidden - Bạn không có quyền thực hiện thao tác này. Chỉ Super Admin mới được thêm/sửa/xóa giảng viên.',
   });
 };
 
@@ -109,52 +109,52 @@ const superAdminOnlyTeacher = async (req, res, next) => {
 router.post('/', [authMiddleware, authorizeAny(NEW_PERMISSIONS.USER_MANAGE, NEW_PERMISSIONS.STUDENT_CREATE, NEW_PERMISSIONS.TEACHER_UPDATE), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE), branchFilter], teacherStrangler.post_root);
 
 // ─── GET /api/teachers ────────────────────────────────────────────────────────
-// Lấy danh sách giảng viên (Admin/Staff only — Teacher bị chặn)
-router.get('/', [authMiddleware, branchFilter],teacherController.get_root);
+// Lấy danh sách giảng viên (Admin/Staff only - Teacher bị chặn)
+router.get('/', [authMiddleware, branchFilter], teacherController.get_root);
 
 // ─── GET /api/teachers/stats/summary ──────────────────────────────────────────
-router.get('/stats/summary', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)), branchFilter],teacherController.get_stats_summary);
+router.get('/stats/summary', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)), branchFilter], teacherController.get_stats_summary);
 
 // ─── GET /api/teachers/:id ────────────────────────────────────────────────────
-router.get('/:id', [authMiddleware, branchFilter],teacherController.get_id);
+router.get('/:id', [authMiddleware, branchFilter], teacherController.get_id);
 
 // ─── PUT /api/teachers/:id ────────────────────────────────────────────────────
 // Cập nhật thông tin cơ bản giảng viên (STAFF bị chặn, teacher tự sửa được)
-router.put('/:id', [authMiddleware, branchFilter],teacherController.put_id);
+router.put('/:id', [authMiddleware, branchFilter], teacherController.put_id);
 
 // ─── PUT /api/teachers/:id/score ──────────────────────────────────────────────
 // Admin nhập điểm bài test Onboarding cho giảng viên
-router.put('/:id/score', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)),teacherController.put_id_score);
+router.put('/:id/score', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)), teacherController.put_id_score);
 
 // ─── PUT /api/teachers/:id/approve ────────────────────────────────────────────
-// Admin duyệt giảng viên — STRICT: chỉ khi testScore >= 80
-router.put('/:id/approve', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)),teacherController.put_id_approve);
+// Admin duyệt giảng viên - STRICT: chỉ khi testScore >= 80
+router.put('/:id/approve', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)), teacherController.put_id_approve);
 
 // ─── POST /api/teachers/:id/submit-practical ──────────────────────────────────
 // Giảng viên nộp file thực hành (Workflow 1 Phase 2)
-router.post('/:id/submit-practical', authMiddleware, authorizeAny(...legacyMapping.resolve('view_teachers')),teacherController.post_id_submit_practical);
+router.post('/:id/submit-practical', authMiddleware, authorizeAny(...legacyMapping.resolve('view_teachers')), teacherController.post_id_submit_practical);
 
 // ─── PUT /api/teachers/:id/reject ─────────────────────────────────────────────
 // Admin từ chối / tạm dừng giảng viên
-router.put('/:id/reject', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)),teacherController.put_id_reject);
+router.put('/:id/reject', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.VIEW_TEACHERS)), teacherController.put_id_reject);
 
 // ─── DELETE /api/teachers/:id ─────────────────────────────────────────────────
 // Admin xóa giảng viên (STAFF bị chặn)
-router.delete('/:id', [authMiddleware, authorizeAny(NEW_PERMISSIONS.USER_MANAGE, NEW_PERMISSIONS.STUDENT_CREATE, NEW_PERMISSIONS.TEACHER_UPDATE), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE)],teacherController.delete_id);
+router.delete('/:id', [authMiddleware, authorizeAny(NEW_PERMISSIONS.USER_MANAGE, NEW_PERMISSIONS.STUDENT_CREATE, NEW_PERMISSIONS.TEACHER_UPDATE), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE)], teacherController.delete_id);
 
 // ─── GET /api/teachers/:id/finance ──────────────────────────────────────────────
-router.get('/:id/finance', authMiddleware,teacherController.get_id_finance);
+router.get('/:id/finance', authMiddleware, teacherController.get_id_finance);
 
 // ─── GET /api/teachers/:id/finance/pending ──────────────────────────────────────
 // Lấy số buổi còn nợ thanh toán + thưởng sao tích lũy (cho modal Step 1)
-router.get('/:id/finance/pending', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)),teacherController.get_id_finance_pending);
+router.get('/:id/finance/pending', authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)), teacherController.get_id_finance_pending);
 
 // ─── PUT /api/teachers/:id/finance/pay-flexible ──────────────────────────────────
 // Thanh toán linh hoạt: Admin tự chọn số buổi và số tiền, FIFO (cũ nhất trước)
 // Có thể cộng thưởng sao tích lũy (includeStarBonus)
-router.put('/:id/finance/pay-flexible', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE)],teacherController.put_id_finance_pay_flexible);
+router.put('/:id/finance/pay-flexible', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE)], teacherController.put_id_finance_pay_flexible);
 
 // ─── PUT /api/teachers/:id/finance/pay-all ──────────────────────────────────────
-router.put('/:id/finance/pay-all', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE)],teacherController.put_id_finance_pay_all);
+router.put('/:id/finance/pay-all', [authMiddleware, authorizeAny(...legacyMapping.resolve(PERMISSIONS.MANAGE_FINANCE)), authorizeAll(NEW_PERMISSIONS.TEACHER_UPDATE)], teacherController.put_id_finance_pay_all);
 
 module.exports = router;

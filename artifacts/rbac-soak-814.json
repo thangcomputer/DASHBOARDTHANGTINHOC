@@ -92,7 +92,7 @@
     "classification": "LEGACY_COMPATIBILITY",
     "knownAs": "KNOWN_LEGACY_MISMATCH",
     "live": "JWT admin|staff + permissions without adminRole → ALLOW (assertStaffPermissions fallthrough)",
-    "enterprise": "CONDITIONAL DENY (role_unresolved_adminRole) — no admin→SUPER/STAFF flatten",
+    "enterprise": "CONDITIONAL DENY (role_unresolved_adminRole) - no admin→SUPER/STAFF flatten",
     "action": "Keep MISMATCH; do not promote; future architectural approval required"
   },
   "ENTERPRISE_PRIMARY_READY": "NO",

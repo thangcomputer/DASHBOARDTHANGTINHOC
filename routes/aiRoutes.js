@@ -8,7 +8,7 @@ const logger = require('../config/logger');
 const { sensitiveFlowLimiter } = require('../middleware/authRateLimit');
 
 /**
- * Phase 7.8 — Controlled cutover for /api/ai ONLY.
+ * Phase 7.8 - Controlled cutover for /api/ai ONLY.
  *
  * Default / not allowlisted:
  *   auth → policyShadowAi → Legacy isAdmin (via aiCutoverGate) → sensitiveFlowLimiter → handler

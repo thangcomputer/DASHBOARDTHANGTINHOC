@@ -1,6 +1,6 @@
 /**
  * Policy shadow evaluator for teacher score / approve / reject.
- * READ-ONLY decision — does not authorize HTTP.
+ * READ-ONLY decision - does not authorize HTTP.
  *
  * Reproduces live legacy rules:
  * - MANAGE_TEACHERS (live constants)
@@ -96,7 +96,7 @@ function evaluateLegacyTeacherWrite(subject, resourceTeacher) {
 }
 
 /**
- * Policy shadow decision — must MATCH evaluateLegacyTeacherWrite for this family.
+ * Policy shadow decision - must MATCH evaluateLegacyTeacherWrite for this family.
  * Uses live MANAGE_TEACHERS via adapter; ignores client body/query branchId.
  */
 function evaluatePolicyTeacherWrite(subject, resourceTeacher, action, _untrusted = {}) {

@@ -1,5 +1,5 @@
 /**
- * Playwright — walk each role sidebar top-to-bottom, screenshots, console errors.
+ * Playwright - walk each role sidebar top-to-bottom, screenshots, console errors.
  * Usage: node scripts/_qa_ui_roles_playwright.cjs
  */
 require('dotenv').config();
@@ -77,7 +77,7 @@ async function loginAdmin(page, { identifier }) {
     await capInput.fill(cap.answer || '');
   }
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL(/\/admin(?!\/login)/, { timeout: 45000 }).catch(() => {});
+  await page.waitForURL(/\/admin(?!\/login)/, { timeout: 45000 }).catch(() => { });
 }
 
 async function loginPublic(page, { identifier, uiRole }) {
@@ -89,18 +89,18 @@ async function loginPublic(page, { identifier, uiRole }) {
   const pwd = page.locator('input[type="password"]').first();
   await pwd.fill(PASSWORD);
   await page.locator('button[type="submit"]').first().click();
-  await page.waitForURL(/\/(student|teacher)/, { timeout: 45000 }).catch(() => {});
+  await page.waitForURL(/\/(student|teacher)/, { timeout: 45000 }).catch(() => { });
 }
 
 async function dismissGuide(page) {
   const skip = page.getByRole('button', { name: 'Bỏ qua' });
   if (await skip.count()) {
-    await skip.first().click({ timeout: 3000 }).catch(() => {});
+    await skip.first().click({ timeout: 3000 }).catch(() => { });
     await page.waitForTimeout(400);
   }
   const dialog = page.locator('[aria-label="Hướng dẫn menu LMS"]');
   if (await dialog.count()) {
-    await page.getByRole('button', { name: 'Đóng' }).first().click({ timeout: 3000 }).catch(() => {});
+    await page.getByRole('button', { name: 'Đóng' }).first().click({ timeout: 3000 }).catch(() => { });
     await page.waitForTimeout(400);
   }
 }
@@ -117,13 +117,13 @@ async function walkSidebar(page, roleKey) {
   await dismissGuide(page);
   await expandSidebar(page);
   const nav = page.locator('nav[aria-label="Menu chính"]');
-  await nav.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await nav.waitFor({ state: 'visible', timeout: 15000 }).catch(() => { });
 
   const groupLabels = ['Quản lý', 'Đào tạo', 'Tài chính', 'Hệ thống'];
   for (const g of groupLabels) {
     const gb = nav.getByRole('button', { name: new RegExp(g) }).first();
     if (await gb.count()) {
-      await gb.click({ timeout: 4000, force: true }).catch(() => {});
+      await gb.click({ timeout: 4000, force: true }).catch(() => { });
       await page.waitForTimeout(300);
     }
   }
@@ -143,7 +143,7 @@ async function walkSidebar(page, roleKey) {
       await page.waitForTimeout(700);
       await dismissGuide(page);
       const shot = path.join(SHOTS, `${roleKey}-${slug(label)}.png`);
-      await page.screenshot({ path: shot, fullPage: false }).catch(() => {});
+      await page.screenshot({ path: shot, fullPage: false }).catch(() => { });
     } catch (e) {
       clicks.push({ label, ok: false, error: String(e.message || e).slice(0, 120) });
     }
@@ -169,7 +169,7 @@ async function runRole(browser, roleDef) {
     await page.waitForTimeout(1200);
     const menuClicks = await walkSidebar(page, roleDef.key);
     const homeShot = path.join(SHOTS, `${roleDef.key}-home.png`);
-    await page.screenshot({ path: homeShot, fullPage: false }).catch(() => {});
+    await page.screenshot({ path: homeShot, fullPage: false }).catch(() => { });
 
     const url = page.url();
     const loggedIn = !url.includes('/login') && url.includes(roleDef.home.split('/')[1] || roleDef.key);

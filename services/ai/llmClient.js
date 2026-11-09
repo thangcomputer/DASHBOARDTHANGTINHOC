@@ -1,6 +1,6 @@
 /**
  * OpenAI-compatible / Gemini chat client.
- * Gemini: hỗ trợ nhiều key (GEMINI_API_KEYS) — round-robin + cooldown khi 429.
+ * Gemini: hỗ trợ nhiều key (GEMINI_API_KEYS) - round-robin + cooldown khi 429.
  */
 const axios = require('axios');
 const logger = require('../../config/logger');
@@ -68,7 +68,7 @@ function pickGeminiKey() {
     }
   }
 
-  // All cooling — use the one that frees soonest
+  // All cooling - use the one that frees soonest
   let best = keys[0];
   let bestUntil = geminiKeyCooldownUntil.get(best) || 0;
   for (const k of keys) {
@@ -143,6 +143,65 @@ async function chatCompletionGeminiNative(cfg, opts) {
     .join('\n\n');
   const prompt = system ? `${system}\n\n${userParts}` : userParts;
 
+function normalizeGeminiContents(rawMessages, rawImages = []) {
+  const images = Array.isArray(rawImages) ? rawImages.filter((i) => i?.data && i?.mimeType) : [];
+
+  const turns = (rawMessages || [])
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant' || m.role === 'model'))
+    .map((m) => ({
+      role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
+      text: typeof m.content === 'string' ? m.content.trim() : (m.parts?.[0]?.text || ''),
+    }))
+    .filter((m) => m.text.length > 0);
+
+  const collapsed = [];
+  for (const item of turns) {
+    const prev = collapsed[collapsed.length - 1];
+    if (prev && prev.role === item.role) {
+      prev.text = `${prev.text}\n\n${item.text}`;
+    } else {
+      collapsed.push({ role: item.role, text: item.text });
+    }
+  }
+
+  while (collapsed.length > 0 && collapsed[0].role !== 'user') {
+    collapsed.shift();
+  }
+
+  while (collapsed.length > 0 && collapsed[collapsed.length - 1].role !== 'user') {
+    collapsed.pop();
+  }
+
+  if (collapsed.length === 0) {
+    collapsed.push({ role: 'user', text: 'Xin chào' });
+  }
+
+  const contents = collapsed.map((c) => ({
+    role: c.role,
+    parts: [{ text: c.text }],
+  }));
+
+  if (images.length) {
+    const lastUser = [...contents].reverse().find((c) => c.role === 'user');
+    if (lastUser) {
+      lastUser.parts = [
+        ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
+        ...lastUser.parts,
+      ];
+    } else {
+      contents.push({
+        role: 'user',
+        parts: [
+          ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
+          { text: 'Hãy xem ảnh này' },
+        ],
+      });
+    }
+  }
+
+  return contents;
+}
+
   if (GoogleGenAI) {
     const ai = new GoogleGenAI({
       apiKey: cfg.apiKey,
@@ -155,31 +214,8 @@ async function chatCompletionGeminiNative(cfg, opts) {
     if (opts.responseFormat === 'json') config.responseMimeType = 'application/json';
     if (system) config.systemInstruction = system;
 
-    const contents = opts.messages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: String(m.content || '') }],
-      }));
+    const contents = normalizeGeminiContents(opts.messages, opts.images);
 
-    const images = Array.isArray(opts.images) ? opts.images.filter((i) => i?.data && i?.mimeType) : [];
-    if (images.length) {
-      const lastUser = [...contents].reverse().find((c) => c.role === 'user');
-      if (lastUser) {
-        lastUser.parts = [
-          ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
-          ...lastUser.parts,
-        ];
-      } else {
-        contents.push({
-          role: 'user',
-          parts: [
-            ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
-            { text: 'Hãy xem ảnh này' },
-          ],
-        });
-      }
-    }
     const res = await Promise.race([
       ai.models.generateContent({ model, contents, config }),
       new Promise((_, reject) => {
@@ -194,22 +230,7 @@ async function chatCompletionGeminiNative(cfg, opts) {
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const contents = opts.messages
-    .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: String(m.content || '') }],
-    }));
-  const images = Array.isArray(opts.images) ? opts.images.filter((i) => i?.data && i?.mimeType) : [];
-  if (images.length) {
-    const lastUser = [...contents].reverse().find((c) => c.role === 'user');
-    if (lastUser) {
-      lastUser.parts = [
-        ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } })),
-        ...lastUser.parts,
-      ];
-    }
-  }
+  const contents = normalizeGeminiContents(opts.messages, opts.images);
   const body = {
     contents,
     generationConfig: {
@@ -250,7 +271,7 @@ function humanizeAiError(raw) {
     return 'Google chua chap nhan key. Tao key moi (AI Studio) va dam bao Generative Language API dang bat.';
   }
   if (/prepayment credits are depleted|prepay/i.test(blob)) {
-    return 'Project Gemini het credit tra truoc (AI Studio Billing). Key moi van dung chung credit project — nap tai ai.studio/projects.';
+    return 'Project Gemini het credit tra truoc (AI Studio Billing). Key moi van dung chung credit project - nap tai ai.studio/projects.';
   }
   if (/fetch failed|ECONNRESET|ETIMEDOUT|UND_ERR|network|socket hang up/i.test(blob)) {
     return 'Không gọi được AI. Hãy gửi lại ảnh.';
@@ -304,7 +325,7 @@ async function chatCompletionGeminiWithFailover(opts) {
       markGeminiKeyCooldown(apiKey, 5_000);
       logger.warn(
         { attempt: attempt + 1, keys: keys.length },
-        '[AI] gemini 429 — try next key',
+        '[AI] gemini 429 - try next key',
       );
     }
   }

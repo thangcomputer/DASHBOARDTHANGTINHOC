@@ -1,5 +1,5 @@
 /**
- * Phase 7.15 — Controlled cutover gate for LIVE /api/notifications ONLY.
+ * Phase 7.15 - Controlled cutover gate for LIVE /api/notifications ONLY.
  *
  * LEGACY (default):
  *   - list/count/unread/mark_read/dismiss → auth already applied; pass-through
@@ -64,7 +64,7 @@ function notificationsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] notifications authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] notifications authority helper failed - Legacy gate',
       );
     }
 
@@ -109,7 +109,7 @@ function notificationsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] notifications Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] notifications Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

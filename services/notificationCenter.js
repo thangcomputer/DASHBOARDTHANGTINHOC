@@ -1,5 +1,5 @@
 /**
- * Notification Center — list / count / mark-read / dismiss / broadcast.
+ * Notification Center - list / count / mark-read / dismiss / broadcast.
  */
 const Notification = require('../models/Notification');
 const logger = require('../config/logger');
@@ -32,7 +32,7 @@ function buildReceiverMatch(user) {
     role === 'admin' || role === 'staff' || adminRole === 'SUPER_ADMIN' || adminRole === 'STAFF'
   );
 
-  // Helper cho broad receivers — loại bỏ thông báo cũ trước ngày nhân viên được tạo
+  // Helper cho broad receivers - loại bỏ thông báo cũ trước ngày nhân viên được tạo
   const broadCond = (rec) => {
     if (!isSuperAdmin && userCreatedAt && !isNaN(userCreatedAt.getTime())) {
       return { receivers: rec, createdAt: { $gte: userCreatedAt } };
@@ -49,7 +49,7 @@ function buildReceiverMatch(user) {
     match.push(broadCond('ALL_ADMIN'));
     match.push(broadCond('ALL_SUPER_ADMIN'));
   } else if (isSupport) {
-    // Support chỉ nhận hộp ALL_SUPPORT — không lẫn ALL_ADMIN/ALL_STAFF
+    // Support chỉ nhận hộp ALL_SUPPORT - không lẫn ALL_ADMIN/ALL_STAFF
     match.push(broadCond('ALL_SUPPORT'));
     if (branchId) match.push(broadCond('ALL_SUPPORT_' + branchId));
   } else if (adminRole === 'HIGH_ADMIN') {
@@ -96,7 +96,7 @@ function mapForClient(doc, userId) {
 function isSupportStaffOnly(user) {
   if (!user) return false;
   if (user.id === 'admin' || user.adminRole === 'SUPER_ADMIN') return false;
-  // Tài khoản Support (adminRole SUPPORT) được xem hỏi đáp LMS — không coi là “support mailbox hẹp”
+  // Tài khoản Support (adminRole SUPPORT) được xem hỏi đáp LMS - không coi là “support mailbox hẹp”
   if (user.adminRole === 'SUPPORT') return false;
   const isStaff = user.role === 'staff' || user.adminRole === 'STAFF';
   if (!isStaff) return false;
@@ -111,7 +111,7 @@ function isSupportStaffOnly(user) {
   return false;
 }
 
-/** Bộ lọc hộp thư hẹp của staff chỉ chat — vẫn cho phép hỏi đáp LMS (payload.kind = lms_qa). */
+/** Bộ lọc hộp thư hẹp của staff chỉ chat - vẫn cho phép hỏi đáp LMS (payload.kind = lms_qa). */
 function supportMailboxRestrictAnd() {
   return {
     $or: [
@@ -268,7 +268,7 @@ async function dismiss(user, notificationId) {
 }
 
 /**
- * Broadcast / send — uy quyen goi tu route (admin) hoac service khac.
+ * Broadcast / send - uy quyen goi tu route (admin) hoac service khac.
  */
 async function createAndEmit(io, options) {
   const NotificationService = require('./NotificationService');

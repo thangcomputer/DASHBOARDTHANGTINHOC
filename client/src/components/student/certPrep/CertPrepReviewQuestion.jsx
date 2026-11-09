@@ -12,11 +12,11 @@ function studentChoiceLabel(question) {
   if (!question.answered) return 'Chưa trả lời';
   if (question.type === 'single_choice') {
     const i = Number(question.studentAnswer);
-    return Number.isInteger(i) ? optionLetter(i) : '—';
+    return Number.isInteger(i) ? optionLetter(i) : '-';
   }
   if (question.type === 'multiple_choice') {
     const arr = Array.isArray(question.studentAnswer) ? question.studentAnswer : [];
-    return arr.map((n) => optionLetter(Number(n))).join(', ') || '—';
+    return arr.map((n) => optionLetter(Number(n))).join(', ') || '-';
   }
   return 'Xem bên dưới';
 }
@@ -24,11 +24,11 @@ function studentChoiceLabel(question) {
 function correctChoiceLabel(question) {
   if (question.type === 'single_choice') {
     const i = Number(question.correctAnswer);
-    return Number.isInteger(i) ? optionLetter(i) : '—';
+    return Number.isInteger(i) ? optionLetter(i) : '-';
   }
   if (question.type === 'multiple_choice') {
     const arr = Array.isArray(question.correctIndices) ? question.correctIndices : [];
-    return arr.map((n) => optionLetter(Number(n))).join(', ') || '—';
+    return arr.map((n) => optionLetter(Number(n))).join(', ') || '-';
   }
   return 'Xem bên dưới';
 }
@@ -37,7 +37,7 @@ export default function CertPrepReviewQuestion({ question, total }) {
   if (!question) return null;
   const badge = question.answered
     ? (question.isCorrect ? '✓ ĐÚNG' : '✗ SAI')
-    : '— Chưa trả lời';
+    : '- Chưa trả lời';
   const badgeCls = question.answered
     ? (question.isCorrect ? 'text-emerald-700' : 'text-red-600')
     : 'text-slate-500';

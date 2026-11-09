@@ -154,7 +154,7 @@ export default function AttendanceMakeupRequestModal({
           </div>
           {alreadyPending ? (
             <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-              Đã gửi yêu cầu — chờ Admin xét duyệt điểm danh bù.
+              Đã gửi yêu cầu - chờ Admin xét duyệt điểm danh bù.
             </p>
           ) : null}
         </div>

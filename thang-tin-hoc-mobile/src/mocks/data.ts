@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AppNotification,
   Assignment,
   ChatMessage,
@@ -35,7 +35,7 @@ export const mockStudent: DemoUser = {
 
 export const mockStudentProfileQaEnrollments: NonNullable<DemoUser['enrollments']> = [
   { id: 'qa-enrollment-completed', courseName: 'Khóa học mẫu đã hoàn thành', teacherName: 'Giảng viên mẫu', registeredAt: 'QA fixture', progress: 100, completedSessions: 8, totalSessions: 8, avgGrade: 8.6, status: 'Hoàn thành', tuitionAmount: 2400000, paidAmount: 2400000 },
-  { id: 'qa-enrollment-active', courseName: 'Khóa học mẫu đang học', teacherName: '—', registeredAt: 'QA fixture', progress: 42, completedSessions: 5, totalSessions: 12, avgGrade: 7.8, status: 'Đang học', tuitionAmount: 1800000, paidAmount: 900000 },
+  { id: 'qa-enrollment-active', courseName: 'Khóa học mẫu đang học', teacherName: '-', registeredAt: 'QA fixture', progress: 42, completedSessions: 5, totalSessions: 12, avgGrade: 7.8, status: 'Đang học', tuitionAmount: 1800000, paidAmount: 900000 },
 ];
 
 export const mockStudentProfileQaVideoOrders: NonNullable<DemoUser['videoOrders']> = [

@@ -1,4 +1,4 @@
-# Service Precheck — Sprint 4.3 Batch 4
+# Service Precheck - Sprint 4.3 Batch 4
 
 ## Scope
 Batch 4 handles the remaining auxiliary and utility domains:

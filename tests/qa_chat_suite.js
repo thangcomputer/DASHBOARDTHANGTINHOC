@@ -14,7 +14,7 @@ function addResult(module, func, result, severity, description, steps) {
 // Hàm hỗ trợ đăng nhập
 async function loginContext(context, role, identifier, password, url) {
     const page = await context.newPage();
-    
+
     page.on('console', msg => console.log(`[${role}] ${msg.type()}: ${msg.text()}`));
     page.on('response', async res => {
         if (res.status() >= 400) {
@@ -24,24 +24,24 @@ async function loginContext(context, role, identifier, password, url) {
             try {
                 const body = await res.json();
                 console.log(`[${role}] CONTACTS:`, JSON.stringify(body).slice(0, 500));
-            } catch(e) {}
+            } catch (e) { }
         }
     });
-    
+
     let captchaAnswer = "";
-    
+
     page.on('response', async res => {
         if (res.url().includes('/auth/captcha') && res.status() === 200) {
             try {
                 const data = await res.json();
                 if (data.answer) captchaAnswer = data.answer;
-            } catch(e) {}
+            } catch (e) { }
         }
     });
 
     await page.goto(url);
     await page.waitForTimeout(2000);
-    
+
     // Tùy theo form đăng nhập
     if (role === 'admin') {
         await page.fill('input[type="text"]', identifier);
@@ -68,35 +68,35 @@ async function loginContext(context, role, identifier, password, url) {
             }
         }
     }
-    
+
     await Promise.all([
-        page.waitForNavigation({ timeout: 10000 }).catch(() => {}),
+        page.waitForNavigation({ timeout: 10000 }).catch(() => { }),
         page.click('button[type="submit"]')
     ]);
-    
+
     return page;
 }
 
 (async () => {
     console.log("🚀 Bắt đầu QA Chat Suite (Multi-context)...");
     const browser = await chromium.launch({ headless: true });
-    
+
     const contextSupport = await browser.newContext();
     const contextStudent = await browser.newContext();
-    
+
     try {
         console.log("👉 Đăng nhập Support...");
         const supportPage = await loginContext(contextSupport, 'admin', '0900000003', 'password123', 'http://localhost:5173/admin/login');
-        
+
         console.log("👉 Đăng nhập Student...");
         const studentPage = await loginContext(contextStudent, 'student', '0900000005', 'password123', 'http://localhost:5173/student/login');
-        
+
         addResult("Đăng nhập", "Authentication", "Passed", "Low", "Đăng nhập thành công cả 2 roles", "Support & Student Login");
 
         // 1. Support vào hộp thư
         await supportPage.goto('http://localhost:5173/admin/inbox');
         await supportPage.waitForTimeout(2000);
-        
+
         // Bỏ qua mọi popup quảng cáo hoặc đổi mật khẩu
         await supportPage.evaluate(() => {
             document.querySelectorAll('.fixed, [role="dialog"]').forEach(el => {
@@ -105,11 +105,11 @@ async function loginContext(context, role, identifier, password, url) {
             });
         });
         await supportPage.waitForTimeout(500);
-        
+
         // 2. Student vào hộp thư
         await studentPage.goto('http://localhost:5173/student/inbox');
         await studentPage.waitForTimeout(2000);
-        
+
         await studentPage.evaluate(() => {
             document.querySelectorAll('.fixed, [role="dialog"]').forEach(el => {
                 if (el.style) el.style.display = 'none';
@@ -123,25 +123,25 @@ async function loginContext(context, role, identifier, password, url) {
             await searchInput.fill('0900000005');
             await supportPage.waitForTimeout(2000); // Wait longer for API / re-render
         }
-        
+
         // Wait for contact to appear or fallback
         const studentContact = await supportPage.$('text=Học Viên Test') || await supportPage.$('text=HỌC VIÊN TEST');
         if (studentContact) {
             await studentContact.click();
             await supportPage.waitForTimeout(1000);
-            
+
             const chatInput = await supportPage.$('textarea, input[placeholder*="Nhập tin nhắn"]');
             const uniqueMsg = `Hello from Support [${Date.now()}] 🚀🌟`;
-            
+
             if (chatInput) {
                 await chatInput.fill(uniqueMsg);
                 await supportPage.keyboard.press('Enter');
                 addResult("Chat (Support -> Student)", "Send Message", "Passed", "High", "Gửi tin nhắn có Emoji từ Support", "Gõ tin nhắn -> Enter");
-                
+
                 // Realtime check on student side
                 await studentPage.waitForTimeout(2000);
                 let receivedMsg = await studentPage.$(`text="${uniqueMsg}"`);
-                
+
                 if (receivedMsg) {
                     addResult("Chat (Support -> Student)", "Realtime Receive", "Passed", "High", "Học viên nhận được tin nhắn tức thì không cần F5", "Check DOM Student");
                 } else {
@@ -150,9 +150,9 @@ async function loginContext(context, role, identifier, password, url) {
                     await studentPage.waitForTimeout(1000);
                     receivedMsg = await studentPage.$(`text="${uniqueMsg}"`);
                     if (receivedMsg) {
-                         addResult("Chat (Support -> Student)", "Realtime Receive", "Passed", "High", "Học viên nhận được tin nhắn (Sau click)", "Check DOM");
+                        addResult("Chat (Support -> Student)", "Realtime Receive", "Passed", "High", "Học viên nhận được tin nhắn (Sau click)", "Check DOM");
                     } else {
-                         addResult("Chat (Support -> Student)", "Realtime Receive", "Failed", "High", "KHÔNG nhận được tin nhắn", "Check DOM");
+                        addResult("Chat (Support -> Student)", "Realtime Receive", "Failed", "High", "KHÔNG nhận được tin nhắn", "Check DOM");
                     }
                 }
             } else {

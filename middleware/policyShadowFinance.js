@@ -54,7 +54,7 @@ function policyShadowFinance(action) {
         ctx.selfId = req.params?.studentId;
       }
       if (action === 'inv_get' || action === 'inv_pdf') {
-        // Avoid loading full invoice money fields — only owner id for authz compare
+        // Avoid loading full invoice money fields - only owner id for authz compare
         try {
           const Invoice = require('../models/Invoice');
           const inv = await Invoice.findById(req.params?.id).select('hocVien').lean();
@@ -102,7 +102,7 @@ function policyShadowFinance(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] finance evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] finance evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `finance_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -137,7 +137,7 @@ function policyShadowFinance(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] finance shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] finance shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -149,7 +149,7 @@ function policyShadowFinance(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected finance error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected finance error - fail closed to legacy only',
       );
     }
     return next();

@@ -1,5 +1,5 @@
 /**
- * Phase 8.11/8.12 — In-memory RBAC parity / dual-check metrics (low cardinality).
+ * Phase 8.11/8.12 - In-memory RBAC parity / dual-check metrics (low cardinality).
  * Not Prometheus; safe for soak. No userId / URL / email labels.
  */
 const totals = {

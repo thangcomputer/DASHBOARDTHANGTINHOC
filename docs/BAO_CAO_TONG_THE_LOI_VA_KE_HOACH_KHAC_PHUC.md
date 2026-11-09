@@ -1,4 +1,4 @@
-# Báo cáo tổng thể lỗi và kế hoạch khắc phục — DASHBOARDTHANGTINHOC
+# Báo cáo tổng thể lỗi và kế hoạch khắc phục - DASHBOARDTHANGTINHOC
 
 **Ngày lập:** 04/11/2026  
 **Repository:** `thangcomputer/DASHBOARDTHANGTINHOC`  
@@ -77,7 +77,7 @@ Các báo cáo gốc cũng ghi nhận chênh lệch số liệu test/lint theo t
 
 ## 5. Kế hoạch khắc phục đề xuất
 
-### Giai đoạn 0 — Baseline an toàn
+### Giai đoạn 0 - Baseline an toàn
 
 1. Chốt commit/branch được đánh giá và ghi lại phiên bản Node/npm, thời gian, cấu hình test.
 2. Xác nhận `TEST_DATABASE_URI` là database disposable; không chạy test với `.env` chứa URI dữ liệu thật.
@@ -86,7 +86,7 @@ Các báo cáo gốc cũng ghi nhận chênh lệch số liệu test/lint theo t
 
 **Điều kiện hoàn tất:** có log tái lập được và không có kết nối/ghi dữ liệu ngoài môi trường test.
 
-### Giai đoạn 1 — Authorization và tính toàn vẹn nghiệp vụ
+### Giai đoạn 1 - Authorization và tính toàn vẹn nghiệp vụ
 
 1. Tạo regression tests cho SEC-007/009/010/011 trước khi thay đổi handler.
 2. Bổ sung ownership/permission/branch checks ở backend; fail-closed khi không xác định được branch/owner.
@@ -96,7 +96,7 @@ Các báo cáo gốc cũng ghi nhận chênh lệch số liệu test/lint theo t
 
 **Điều kiện hoàn tất:** các ca trái quyền trả lỗi phù hợp, không thay đổi dữ liệu; các ca hợp lệ vẫn hoạt động; có audit cho thao tác nhạy cảm.
 
-### Giai đoạn 2 — Đóng QA tài chính, thi và file
+### Giai đoạn 2 - Đóng QA tài chính, thi và file
 
 1. Kiểm thử route/E2E các sửa đổi SEC-001/002/003/006/018 và FUN-002.
 2. Thêm E2E refund partial/full và đối chiếu sổ; kiểm idempotency khi retry.
@@ -105,14 +105,14 @@ Các báo cáo gốc cũng ghi nhận chênh lệch số liệu test/lint theo t
 
 **Điều kiện hoàn tất:** report QA có kết quả pass/fail, môi trường/commit, dữ liệu fixture và log; không dùng smoke test đơn lẻ để kết luận pass toàn module.
 
-### Giai đoạn 3 — CI, dependency và chất lượng
+### Giai đoạn 3 - CI, dependency và chất lượng
 
 1. Chuẩn hóa test runner; chuyển test Jest-style sang runner được hỗ trợ hoặc khai báo đúng dependency/config.
 2. Bổ sung frontend test job; sửa workflow gọi script không tồn tại; loại bỏ false-green.
 3. Đánh giá advisory từ lockfile mới; cập nhật package từng nhóm và chạy regression.
 4. Sửa lint theo nhóm nhỏ, không auto-fix hàng loạt trước khi review.
 
-### Giai đoạn 4 — Hiệu năng và trải nghiệm
+### Giai đoạn 4 - Hiệu năng và trải nghiệm
 
 1. Đo bundle, API payload/latency, query plan và thời gian render trước khi tối ưu.
 2. Áp dụng pagination có giới hạn; lazy-load phần export nặng; virtualize bảng lớn nếu đo đạc xác nhận cần thiết.
@@ -149,9 +149,9 @@ KPI doanh thu trên Dashboard, API, báo cáo và đối soát phải nhất qu�
 
 Danh sách pull request được truy vấn trong repository có các tiêu đề sau. Dựa trên tiêu đề, chúng tập trung vào giao diện/parity và local development; cần đọc diff trước khi kết luận phạm vi thực tế, và hiện không nên xem là bằng chứng đã đóng các finding P0 bên trên.
 
-- [#25 — Wip/student home parity transfer](https://github.com/thangcomputer/DASHBOARDTHANGTINHOC/pull/25)
-- [#24 — Feature/mobile UI parity](https://github.com/thangcomputer/DASHBOARDTHANGTINHOC/pull/24)
-- [#2 — feat: local:up + faster admin login (no Docker)](https://github.com/thangcomputer/DASHBOARDTHANGTINHOC/pull/2)
+- [#25 - Wip/student home parity transfer](https://github.com/thangcomputer/DASHBOARDTHANGTINHOC/pull/25)
+- [#24 - Feature/mobile UI parity](https://github.com/thangcomputer/DASHBOARDTHANGTINHOC/pull/24)
+- [#2 - feat: local:up + faster admin login (no Docker)](https://github.com/thangcomputer/DASHBOARDTHANGTINHOC/pull/2)
 
 ## 9. Tài liệu tham chiếu
 

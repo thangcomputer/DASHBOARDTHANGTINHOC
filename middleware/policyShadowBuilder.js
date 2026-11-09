@@ -1,6 +1,6 @@
 /**
  * Policy SHADOW for /api/builder. Always next(); never render/publish/submit/run.
- * Soft-decodes JWT for form_get evaluation only — does not mutate req.user.
+ * Soft-decodes JWT for form_get evaluation only - does not mutate req.user.
  */
 const jwt = require('jsonwebtoken');
 const Teacher = require('../models/Teacher');
@@ -102,7 +102,7 @@ function policyShadowBuilder(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] builder evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] builder evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `builder_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -139,7 +139,7 @@ function policyShadowBuilder(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] builder shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] builder shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -152,7 +152,7 @@ function policyShadowBuilder(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected builder error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected builder error - fail closed to legacy only',
       );
     }
     return next();

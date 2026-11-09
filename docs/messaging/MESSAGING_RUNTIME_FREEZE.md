@@ -1,8 +1,8 @@
-# MESSAGING RUNTIME FREEZE — LOCKED
+# MESSAGING RUNTIME FREEZE - LOCKED
 
-**Status:** LOCKED — do not change messaging code unless the owner explicitly unlocks  
+**Status:** LOCKED - do not change messaging code unless the owner explicitly unlocks  
 **Date:** 2026-08-11  
-**Owner instruction:** *「Hiện tại luồng tin nhắn ổn định — khóa lại không sửa nữa」*
+**Owner instruction:** *「Hiện tại luồng tin nhắn ổn định - khóa lại không sửa nữa」*
 
 ---
 
@@ -22,7 +22,7 @@ Frozen surfaces (no edits without unlock):
 | FE inbox / send / toast | `client/src/components/Inbox.jsx`, `useDataMessaging.js`, `api.js` messages |
 | Transport identity | SUPPORT remains `transportRole=staff` |
 
-Out of freeze (may continue elsewhere): Redis/cache, finance, RBAC enterprise shadow, Phase 12 ERP — **unless they touch the files above**.
+Out of freeze (may continue elsewhere): Redis/cache, finance, RBAC enterprise shadow, Phase 12 ERP - **unless they touch the files above**.
 
 ---
 
@@ -37,7 +37,7 @@ Out of freeze (may continue elsewhere): Redis/cache, finance, RBAC enterprise sh
 | Cross **real** Tenant ObjectId | DENY | Fail-closed; soft-align never coerces two real tenants |
 | STUDENT ↔ STUDENT / TEACHER ↔ TEACHER | DENY | Structural |
 
-\* Same-branch / soft-branch / assigned as per Phase 8.24 pairing — not a redesign.
+\* Same-branch / soft-branch / assigned as per Phase 8.24 pairing - not a redesign.
 
 **Presence:** STAFF / SUPPORT / SUPER / HIGH receive **full** `users:online` via `ALL_*` and must **not** join `presence_*` (avoids overwrite that hid branchless teachers from Staff).
 
@@ -48,7 +48,7 @@ Out of freeze (may continue elsewhere): Redis/cache, finance, RBAC enterprise sh
 ## 3. Known data caveats (ops, not code)
 
 - Teacher without `branchId` / `branchCode` is **supported** by soft-align; still recommended to assign a branch in admin.
-- `Challenge.exe` (or similar) may bind `127.0.0.1:5000`; Vite proxy uses `[::1]:5000` — do not “fix” by rewriting presence/messaging for that.
+- `Challenge.exe` (or similar) may bind `127.0.0.1:5000`; Vite proxy uses `[::1]:5000` - do not “fix” by rewriting presence/messaging for that.
 
 ---
 

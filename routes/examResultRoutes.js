@@ -17,7 +17,7 @@ const { policyShadowExamResult } = require('../middleware/policyShadowExamResult
 const { examResultsCutoverGate } = require('../middleware/examResultsCutoverGate');
 
 /**
- * Phase 7.30 — Controlled cutover for LIVE /api/exam-results ONLY.
+ * Phase 7.30 - Controlled cutover for LIVE /api/exam-results ONLY.
  *
  * Flow: auth → branchFilter → policyShadowExamResult → examResultsCutoverGate → handler
  * Legacy: list/create/update authz remains handler-owned (authorizeExamMutation / list gates);
@@ -236,7 +236,7 @@ router.post('/', examGuard('create'), async (req, res) => {
       await NotificationService.notifyAdmins(
         io,
         result.passed ? '🎉 Giảng viên thi đạt' : '❌ Giảng viên thi chưa đạt',
-        `GV ${name} — ${subject}: ${outcome}.`,
+        `GV ${name} - ${subject}: ${outcome}.`,
         {
           examResultId: String(result._id),
           teacherId: String(result.teacherId),
@@ -347,7 +347,7 @@ router.put('/:id', examGuard('update'), async (req, res) => {
       await NotificationService.send(io, {
         type: 'EXAM',
         title: `📊 Kết quả thi: ${outcome}`,
-        content: parts ? `${subject} — ${outcome}. ${parts}.` : `${subject} — ${outcome}.`,
+        content: parts ? `${subject} - ${outcome}. ${parts}.` : `${subject} - ${outcome}.`,
         receivers: String(notifyDoc.studentId),
         payload: {
           examResultId: String(notifyDoc._id),
@@ -368,7 +368,7 @@ router.put('/:id', examGuard('update'), async (req, res) => {
       await NotificationService.notifyAdmins(
         io,
         notifyDoc.passed ? '🎉 Giảng viên thi đạt' : '❌ Giảng viên thi chưa đạt',
-        `GV ${name} — ${subject}: ${outcome}.`,
+        `GV ${name} - ${subject}: ${outcome}.`,
         {
           examResultId: String(notifyDoc._id),
           teacherId: String(notifyDoc.teacherId),
@@ -379,7 +379,7 @@ router.put('/:id', examGuard('update'), async (req, res) => {
       await NotificationService.send(io, {
         type: 'EXAM',
         title: `📊 Kết quả thi: ${notifyDoc.passed ? '✅ ĐẠT' : '❌ CHƯA ĐẠT'}`,
-        content: `${subject} — ${outcome}.`,
+        content: `${subject} - ${outcome}.`,
         receivers: String(notifyDoc.teacherId),
         payload: {
           examResultId: String(notifyDoc._id),

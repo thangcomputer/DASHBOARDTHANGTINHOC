@@ -1,5 +1,5 @@
 /**
- * Wave 6.17 — Policy SHADOW for LIVE /api/blog + /api/feed.
+ * Wave 6.17 - Policy SHADOW for LIVE /api/blog + /api/feed.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -36,10 +36,10 @@ function blogSub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : defaultAdmin,
-          permissions: opts.permissions ?? [],
-          role,
-        },
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : defaultAdmin,
+        permissions: opts.permissions ?? [],
+        role,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -50,10 +50,10 @@ function feedSub(opts = {}) {
     actorDoc: opts.role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole ?? null,
-          permissions: opts.permissions ?? [],
-          role: opts.role ?? 'student',
-        },
+        adminRole: opts.adminRole ?? null,
+        permissions: opts.permissions ?? [],
+        role: opts.role ?? 'student',
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }

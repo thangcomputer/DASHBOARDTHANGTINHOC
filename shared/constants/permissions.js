@@ -10,7 +10,7 @@
  * Phase RBAC-S1: expand CRUD codes per role-crud-scope-matrix.md (shadow only)
  */
 const PERMISSIONS = Object.freeze({
-  // Global bypass wildcard (enterprise Super only — NEVER a Cutover family wildcard)
+  // Global bypass wildcard (enterprise Super only - NEVER a Cutover family wildcard)
   ALL: 'ALL',
 
   // Student capabilities
@@ -86,23 +86,23 @@ const PERMISSIONS = Object.freeze({
   FINANCE_PAYMENT_CREATE: 'finance:payment:create',
   FINANCE_REFUND_APPROVE: 'finance:refund:approve',
   /**
-   * LIVE view_branch_revenue — read-only revenue/analytics.
+   * LIVE view_branch_revenue - read-only revenue/analytics.
    * MUST NOT equal FINANCE_VIEW alone (privilege collision resolved Phase 8.7/8.8).
    */
   FINANCE_BRANCH_REVENUE_VIEW: 'finance:branch_revenue:view',
 
-  // HR (LIVE manage_hr — employee CRUD + pay + payroll)
+  // HR (LIVE manage_hr - employee CRUD + pay + payroll)
   HR_MANAGE: 'hr:manage',
 
   /**
-   * LIVE manage_student_training — student training module / settings / exam any-of.
+   * LIVE manage_student_training - student training module / settings / exam any-of.
    * Distinct from manage_training (teacher training / quizzes / LMS admin).
    * Phase 8.10: NOT course:update (would widen via manage_training overlap).
    */
   STUDENT_TRAINING_MANAGE: 'student_training:manage',
 
   /**
-   * LIVE manage_cert_prep — CertPrep MOS/IC3 module.
+   * LIVE manage_cert_prep - CertPrep MOS/IC3 module.
    * Distinct from exam:manage and student_training:manage.
    */
   CERT_PREP_MANAGE: 'cert_prep:manage',
@@ -115,7 +115,7 @@ const PERMISSIONS = Object.freeze({
   CHAT_MODERATE: 'chat:moderate',
   NOTIFICATION_BROADCAST: 'notification:broadcast',
 
-  // Ticket (Support track) — close/archive preferred over hard-delete for SUPPORT
+  // Ticket (Support track) - close/archive preferred over hard-delete for SUPPORT
   TICKET_VIEW: 'ticket:view',
   TICKET_CREATE: 'ticket:create',
   TICKET_UPDATE: 'ticket:update',

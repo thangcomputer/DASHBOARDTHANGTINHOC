@@ -23,7 +23,7 @@ const auditLogger = {
       const traceId = ctx?.traceId || '';
       const spanId = ctx?.spanId || '';
       const sessionId = ctx?.sessionId || '';
-      
+
       const ip = req?.ip || req?.headers?.['x-forwarded-for'] || req?.socket?.remoteAddress || '';
       const userAgent = req?.headers?.['user-agent'] || '';
 

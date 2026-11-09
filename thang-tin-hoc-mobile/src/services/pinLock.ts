@@ -1,9 +1,9 @@
-import { DeviceEventEmitter, Platform } from 'react-native';
+﻿import { DeviceEventEmitter, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
 /**
- * Khóa màn hình bằng mã PIN — cùng cách băm và mốc thời gian với client/src/utils/pinLock.js.
+ * Khóa màn hình bằng mã PIN - cùng cách băm và mốc thời gian với client/src/utils/pinLock.js.
  * Lưu riêng trên thiết bị: SecureStore trên điện thoại, localStorage khi chạy bản web.
  */
 
@@ -222,7 +222,7 @@ export function getMemoryActiveAt() {
   return memoryActiveAt;
 }
 
-/** Màn khóa PIN đang hiện — popup khác (vd. thông báo nhận lương) phải chờ mở khóa. */
+/** Màn khóa PIN đang hiện - popup khác (vd. thông báo nhận lương) phải chờ mở khóa. */
 export const PIN_LOCK_STATE_EVENT = 'mobile:pin-lock-state';
 let pinLockedNow = false;
 

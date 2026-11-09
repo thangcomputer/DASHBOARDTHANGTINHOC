@@ -42,7 +42,7 @@ async function fetchBankList() {
  *  - className    : optional extra className cho <select>
  *  - placeholder  : optional string
  */
-export function BankSelect({ value, onChange, className = '', placeholder = '— Chọn ngân hàng —' }) {
+export function BankSelect({ value, onChange, className = '', placeholder = '- Chọn ngân hàng -' }) {
   const [banks, setBanks] = useState(_banksCache || []);
   const [loading, setLoading] = useState(!_banksCache);
 
@@ -77,7 +77,7 @@ export function BankSelect({ value, onChange, className = '', placeholder = '—
         <option value="">{loading ? 'Đang tải danh sách ngân hàng...' : placeholder}</option>
         {banks.map(b => (
           <option key={b.bin} value={b.bin}>
-            {b.shortName} — {b.name}
+            {b.shortName} - {b.name}
           </option>
         ))}
       </CmsSelect>

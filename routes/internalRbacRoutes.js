@@ -1,6 +1,6 @@
 /**
- * Phase 8.20C — Internal RBAC evidence routes (READ-ONLY).
- * Mounted at /internal/rbac — not under /api public reverse-proxy paths.
+ * Phase 8.20C - Internal RBAC evidence routes (READ-ONLY).
+ * Mounted at /internal/rbac - not under /api public reverse-proxy paths.
  */
 const express = require('express');
 const router = express.Router();

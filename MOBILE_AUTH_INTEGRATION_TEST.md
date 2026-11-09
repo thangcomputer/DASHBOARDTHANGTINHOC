@@ -1,4 +1,4 @@
-# Mobile Auth Multi-Device — Historical Integration Precheck
+# Mobile Auth Multi-Device - Historical Integration Precheck
 
 > Historical snapshot: this report records the earlier blocked precheck on Redis port `6381`. The current isolated validation used Redis `6382` and is documented in [MOBILE_AUTH_BACKEND_VALIDATION.md](./MOBILE_AUTH_BACKEND_VALIDATION.md), with the client-facing contract in [MOBILE_AUTH_INTEGRATION_CONTRACT.md](./MOBILE_AUTH_INTEGRATION_CONTRACT.md).
 
@@ -15,8 +15,8 @@
 
 | Test | PASS | FAIL | NOT RUN | Severity | Notes |
 |---|:---:|:---:|:---:|---|---|
-| Docker daemon | ✓ |  |  | — | Docker Desktop was started; Docker server `29.8.1` responded. |
-| Test Compose syntax | ✓ |  |  | — | `docker compose -p thang-mobile-auth-test -f docker-compose.mobile-auth-test.yml config --quiet`. |
+| Docker daemon | ✓ |  |  | - | Docker Desktop was started; Docker server `29.8.1` responded. |
+| Test Compose syntax | ✓ |  |  | - | `docker compose -p thang-mobile-auth-test -f docker-compose.mobile-auth-test.yml config --quiet`. |
 | Mongo test container / version / port |  |  | ✓ | HIGH | Not started because Redis test port conflict gates stack startup. Candidate image is `mongo:7`; runtime production version remains unknown. |
 | Redis test container / version / port |  |  | ✓ | HIGH | Not started. Port `6381` was occupied; listener was left untouched. Candidate image is `redis:7-alpine`. |
 | Mongo indexes and duplicate rejection |  |  | ✓ | HIGH | Mongo integration test not run. |
@@ -28,7 +28,7 @@
 | CSRF integration |  |  | ✓ | MEDIUM | Prior isolated regression is not this requested database-backed test. |
 | Flag OFF web legacy regression |  |  | ✓ | HIGH | Full web login/refresh/logout/`/me`/Socket.IO matrix not run. |
 | Exam / presence live regression |  |  | ✓ | MEDIUM | No safe fixture or live test; exam code was not changed. |
-| Cleanup | ✓ |  |  | — | No test containers or test data were created; no unrelated resource was stopped. |
+| Cleanup | ✓ |  |  | - | No test containers or test data were created; no unrelated resource was stopped. |
 
 ## 1. Test infrastructure
 

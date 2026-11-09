@@ -12,7 +12,7 @@ import {
 } from '../../utils/loginOverlayGate';
 
 const DISMISS_KEY = 'quiz_invite_dismissed';
-/** sessionStorage key — StudentQuizList opens this quiz on mount */
+/** sessionStorage key - StudentQuizList opens this quiz on mount */
 export const PENDING_QUIZ_START_KEY = 'pending_quiz_start';
 const ASSIGN_DELAY_MS = 10_000;
 

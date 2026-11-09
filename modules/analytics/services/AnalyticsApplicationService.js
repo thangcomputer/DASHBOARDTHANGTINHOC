@@ -6,7 +6,7 @@ const logger = require('./../../../config/logger');
 const { sumFinancialRevenue } = require('./../../finance/services/ledgerService');
 
 /**
- * analyticsRoutes.js — Báo cáo Doanh thu & Thống kê đa chi nhánh
+ * analyticsRoutes.js - Báo cáo Doanh thu & Thống kê đa chi nhánh
  * P0: KPI doanh thu chính = Ledger sumFinancialRevenue (net = payment − refund).
  */
 const {
@@ -68,179 +68,183 @@ function buildBaseFilter(data, queryBranch) {
 
 class AnalyticsApplicationService {
   async get_revenue(data) {
-  try {
-    const { period = '1m', branchId: queryBranch } = data.query;
-    const { start, end } = getPeriodRange(period);
-    const baseFilter = buildBaseFilter(data, queryBranch);
-    const branchId = baseFilter.branchId || null;
-    const periodMs = end - start;
-    const prevStart = new Date(start.getTime() - periodMs);
-    const prevEnd = new Date(start);
+    try {
+      const { period = '1m', branchId: queryBranch } = data.query;
+      const { start, end } = getPeriodRange(period);
+      const baseFilter = buildBaseFilter(data, queryBranch);
+      const branchId = baseFilter.branchId || null;
+      const periodMs = end - start;
+      const prevStart = new Date(start.getTime() - periodMs);
+      const prevEnd = new Date(start);
 
-    const [current, previous, allTime, paidItems, newStudents] = await Promise.all([
-      sumFinancialRevenue({ branchId, from: start, to: end }),
-      sumFinancialRevenue({ branchId, from: prevStart, to: prevEnd }),
-      sumFinancialRevenue({ branchId }),
-      listPaidItems({ branchFilter: baseFilter, start, end }),
-      studentRepository.count({
-        ...baseFilter,
-        createdAt: { $gte: start, $lte: end },
-      }),
-    ]);
+      const [current, previous, allTime, paidItems, newStudents] = await Promise.all([
+        sumFinancialRevenue({ branchId, from: start, to: end }),
+        sumFinancialRevenue({ branchId, from: prevStart, to: prevEnd }),
+        sumFinancialRevenue({ branchId }),
+        listPaidItems({ branchFilter: baseFilter, start, end }),
+        studentRepository.count({
+          ...baseFilter,
+          createdAt: { $gte: start, $lte: end },
+        }),
+      ]);
 
-    const totalRevenue = current.net || 0;
-    const prevRevenue = previous.net || 0;
-    const growthPct = prevRevenue > 0
-      ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100)
-      : null;
+      const totalRevenue = current.net || 0;
+      const prevRevenue = previous.net || 0;
+      const growthPct = prevRevenue > 0
+        ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100)
+        : null;
 
-    const byBranch = await revenueByBranch({ branchFilter: baseFilter, start, end });
-    byBranch.forEach((b) => {
-      b.pct = totalRevenue > 0 ? Math.round((b.total / totalRevenue) * 100) : 0;
-    });
+      const byBranch = await revenueByBranch({ branchFilter: baseFilter, start, end });
+      byBranch.forEach((b) => {
+        b.pct = totalRevenue > 0 ? Math.round((b.total / totalRevenue) * 100) : 0;
+      });
 
-    const timeSeries = generateTimeSeries(paidItems, start, end, 'paidAt', 'amount');
+      const timeSeries = generateTimeSeries(paidItems, start, end, 'paidAt', 'amount');
 
-    return { _status: 200, _body: {
-      success: true,
-      data: {
-        period,
-        dateRange: { from: start, to: end },
-        source: 'ledger',
-        totalRevenue,
-        grossRevenue: current.payments || 0,
-        refunds: current.refunds || 0,
-        prevRevenue,
-        growthPct,
-        allTimeRevenue: allTime.net || 0,
-        newStudentsCount: newStudents,
-        paidStudentsCount: current.paymentCount || 0,
-        paymentCount: current.paymentCount || 0,
-        refundCount: current.refundCount || 0,
-        byBranch,
-        timeSeries,
-      },
-    } };
-  } catch (err) {
-    logger.error('[ANALYTICS] revenue error:', err);
-    return { _status: 500, _body: { success: false, message: err.message } };
+      return {
+        _status: 200, _body: {
+          success: true,
+          data: {
+            period,
+            dateRange: { from: start, to: end },
+            source: 'ledger',
+            totalRevenue,
+            grossRevenue: current.payments || 0,
+            refunds: current.refunds || 0,
+            prevRevenue,
+            growthPct,
+            allTimeRevenue: allTime.net || 0,
+            newStudentsCount: newStudents,
+            paidStudentsCount: current.paymentCount || 0,
+            paymentCount: current.paymentCount || 0,
+            refundCount: current.refundCount || 0,
+            byBranch,
+            timeSeries,
+          },
+        }
+      };
+    } catch (err) {
+      logger.error('[ANALYTICS] revenue error:', err);
+      return { _status: 500, _body: { success: false, message: err.message } };
+    }
   }
-}
 
   async get_enrollment(data) {
-  try {
-    const { period = '1m', branchId: queryBranch } = data.query;
-    const { start, end } = getPeriodRange(period);
-    const baseFilter = buildBaseFilter(data, queryBranch);
+    try {
+      const { period = '1m', branchId: queryBranch } = data.query;
+      const { start, end } = getPeriodRange(period);
+      const baseFilter = buildBaseFilter(data, queryBranch);
 
-    const students = await studentRepository.findMany({
-      ...baseFilter,
-      createdAt: { $gte: start, $lte: end },
-    }).select('name course branchId branchCode paid price paidAmount enrollments createdAt paidAt').lean();
+      const students = await studentRepository.findMany({
+        ...baseFilter,
+        createdAt: { $gte: start, $lte: end },
+      }).select('name course branchId branchCode paid price paidAmount enrollments createdAt paidAt').lean();
 
-    const total = students.length;
-    const paid = students.filter((s) => {
-      if (Array.isArray(s.enrollments) && s.enrollments.length) {
-        return s.enrollments.some((e) => e.paid === true);
-      }
-      return !!s.paid;
-    }).length;
-    const totalFee = students.reduce((sum, st) => sum + sumStudentPaidTuition(st), 0);
+      const total = students.length;
+      const paid = students.filter((s) => {
+        if (Array.isArray(s.enrollments) && s.enrollments.length) {
+          return s.enrollments.some((e) => e.paid === true);
+        }
+        return !!s.paid;
+      }).length;
+      const totalFee = students.reduce((sum, st) => sum + sumStudentPaidTuition(st), 0);
 
-    const branchMap = {};
-    students.forEach((st) => {
-      const key = st.branchId ? st.branchId.toString() : 'unknown';
-      if (!branchMap[key]) {
-        branchMap[key] = {
-          branchId: key,
-          branchCode: st.branchCode || 'Không xác định',
-          count: 0,
-          paid: 0,
-          revenue: 0,
-        };
-      }
-      branchMap[key].count += 1;
-      const rev = sumStudentPaidTuition(st);
-      if (rev > 0) {
-        branchMap[key].paid += 1;
-        branchMap[key].revenue += rev;
-      }
-    });
-
-    const courseMap = {};
-    students.forEach((st) => {
-      const enrollments = Array.isArray(st.enrollments) && st.enrollments.length
-        ? st.enrollments
-        : [{ courseName: st.course, paid: st.paid, price: st.price }];
-      enrollments.forEach((enr) => {
-        const key = enr.courseName || enr.name || st.course || 'Chưa xếp khóa';
-        if (!courseMap[key]) courseMap[key] = { course: key, count: 0, revenue: 0 };
-        courseMap[key].count += 1;
-        if (enr.paid) courseMap[key].revenue += Number(enr.price) || 0;
+      const branchMap = {};
+      students.forEach((st) => {
+        const key = st.branchId ? st.branchId.toString() : 'unknown';
+        if (!branchMap[key]) {
+          branchMap[key] = {
+            branchId: key,
+            branchCode: st.branchCode || 'Không xác định',
+            count: 0,
+            paid: 0,
+            revenue: 0,
+          };
+        }
+        branchMap[key].count += 1;
+        const rev = sumStudentPaidTuition(st);
+        if (rev > 0) {
+          branchMap[key].paid += 1;
+          branchMap[key].revenue += rev;
+        }
       });
-    });
 
-    // Time series đăng ký: mỗi HV 1 điểm; value = tổng học phí đã thu của HV đó
-    const seriesDocs = students.map((st) => ({
-      createdAt: st.createdAt,
-      amount: sumStudentPaidTuition(st),
-    }));
-    const timeSeries = generateTimeSeries(seriesDocs, start, end, 'createdAt', 'amount');
+      const courseMap = {};
+      students.forEach((st) => {
+        const enrollments = Array.isArray(st.enrollments) && st.enrollments.length
+          ? st.enrollments
+          : [{ courseName: st.course, paid: st.paid, price: st.price }];
+        enrollments.forEach((enr) => {
+          const key = enr.courseName || enr.name || st.course || 'Chưa xếp khóa';
+          if (!courseMap[key]) courseMap[key] = { course: key, count: 0, revenue: 0 };
+          courseMap[key].count += 1;
+          if (enr.paid) courseMap[key].revenue += Number(enr.price) || 0;
+        });
+      });
 
-    return { _status: 200, _body: {
-      success: true,
-      data: {
-        period,
-        dateRange: { from: start, to: end },
-        // H6: ops enrollment cache — KPI tiền dùng /analytics/revenue (Ledger)
-        source: 'enrollment_ops',
-        note: 'totalFee/byCourse.revenue từ enrollment.paid (ops). Doanh thu SoT: GET /analytics/revenue',
-        total,
-        paid,
-        totalFee,
-        byBranch: Object.values(branchMap).sort((a, b) => b.count - a.count),
-        byCourse: Object.values(courseMap).sort((a, b) => b.count - a.count),
-        timeSeries,
-      },
-    } };
-  } catch (err) {
-    return { _status: 500, _body: { success: false, message: err.message } };
+      // Time series đăng ký: mỗi HV 1 điểm; value = tổng học phí đã thu của HV đó
+      const seriesDocs = students.map((st) => ({
+        createdAt: st.createdAt,
+        amount: sumStudentPaidTuition(st),
+      }));
+      const timeSeries = generateTimeSeries(seriesDocs, start, end, 'createdAt', 'amount');
+
+      return {
+        _status: 200, _body: {
+          success: true,
+          data: {
+            period,
+            dateRange: { from: start, to: end },
+            // H6: ops enrollment cache - KPI tiền dùng /analytics/revenue (Ledger)
+            source: 'enrollment_ops',
+            note: 'totalFee/byCourse.revenue từ enrollment.paid (ops). Doanh thu SoT: GET /analytics/revenue',
+            total,
+            paid,
+            totalFee,
+            byBranch: Object.values(branchMap).sort((a, b) => b.count - a.count),
+            byCourse: Object.values(courseMap).sort((a, b) => b.count - a.count),
+            timeSeries,
+          },
+        }
+      };
+    } catch (err) {
+      return { _status: 500, _body: { success: false, message: err.message } };
+    }
   }
-}
 
   async get_branches(data) {
-  try {
-    const branches = await branchRepository.findMany({ isActive: { $ne: false } }).lean();
+    try {
+      const branches = await branchRepository.findMany({ isActive: { $ne: false } }).lean();
 
-    const result = await Promise.all(branches.map(async (br) => {
-      const [studentCount, paidCount, revenueRes, scheduleCount] = await Promise.all([
-        studentRepository.count({ branchId: br._id }),
-        studentRepository.count({ branchId: br._id, paid: true }),
-        sumFinancialRevenue({ branchId: br._id }),
-        scheduleRepository.count({ branchId: br._id }),
-      ]);
-      return {
-        _id: br._id,
-        name: br.name,
-        code: br.code,
-        address: br.address,
-        studentCount,
-        paidCount,
-        revenue: revenueRes.net || 0,
-        scheduleCount,
-      };
-    }));
+      const result = await Promise.all(branches.map(async (br) => {
+        const [studentCount, paidCount, revenueRes, scheduleCount] = await Promise.all([
+          studentRepository.count({ branchId: br._id }),
+          studentRepository.count({ branchId: br._id, paid: true }),
+          sumFinancialRevenue({ branchId: br._id }),
+          scheduleRepository.count({ branchId: br._id }),
+        ]);
+        return {
+          _id: br._id,
+          name: br.name,
+          code: br.code,
+          address: br.address,
+          studentCount,
+          paidCount,
+          revenue: revenueRes.net || 0,
+          scheduleCount,
+        };
+      }));
 
-    const grandTotal = result.reduce((s, b) => s + b.revenue, 0);
-    result.forEach((b) => {
-      b.pct = grandTotal > 0 ? Math.round((b.revenue / grandTotal) * 100) : 0;
-    });
+      const grandTotal = result.reduce((s, b) => s + b.revenue, 0);
+      result.forEach((b) => {
+        b.pct = grandTotal > 0 ? Math.round((b.revenue / grandTotal) * 100) : 0;
+      });
 
-    return { _status: 200, _body: { success: true, data: result.sort((a, b) => b.revenue - a.revenue) } };
-  } catch (err) {
-    return { _status: 500, _body: { success: false, message: err.message } };
+      return { _status: 200, _body: { success: true, data: result.sort((a, b) => b.revenue - a.revenue) } };
+    } catch (err) {
+      return { _status: 500, _body: { success: false, message: err.message } };
+    }
   }
-}
 
 }
 

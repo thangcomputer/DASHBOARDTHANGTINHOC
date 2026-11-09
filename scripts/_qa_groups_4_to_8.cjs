@@ -11,7 +11,7 @@ const BASE = process.env.QA_API_BASE || 'http://127.0.0.1:5000';
 const results = [];
 const record = (tc) => {
   results.push(tc);
-  console.log(`[${tc.result}] ${tc.id} — ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
+  console.log(`[${tc.result}] ${tc.id} - ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
 };
 
 function req(method, path, { token, body, cookie, csrfToken } = {}) {
@@ -42,7 +42,7 @@ function req(method, path, { token, body, cookie, csrfToken } = {}) {
   });
 }
 
-/** Multipart upload (PNG) — không cần package form-data */
+/** Multipart upload (PNG) - không cần package form-data */
 function uploadFile(path, { token, cookie, csrfToken, fieldName = 'file', filename = 'qa.png', buffer, mime = 'image/png' } = {}) {
   return new Promise((resolve) => {
     const url = new URL(path, BASE);
@@ -337,7 +337,7 @@ async function main() {
   });
   record({
     id: 'G7-02', name: 'Email/SMS/Push channels',
-    actual: 'PASS partial — welcome + OTP + password + invoice email/Zalo queue; SMS gateway riêng không có (Zalo OA thay); push FCM chưa',
+    actual: 'PASS partial - welcome + OTP + password + invoice email/Zalo queue; SMS gateway riêng không có (Zalo OA thay); push FCM chưa',
     result: 'PASS',
     severity: 'Medium',
   });
@@ -359,7 +359,7 @@ async function main() {
   });
   record({
     id: 'G8-03', name: 'API SoT sau thao tác (paid + role isolation)',
-    actual: 'PASS — G8-01 paid sync + G8-02 JWT isolation đã verify (localStorage không còn SoT LMS/exam)',
+    actual: 'PASS - G8-01 paid sync + G8-02 JWT isolation đã verify (localStorage không còn SoT LMS/exam)',
     result: 'PASS',
     severity: 'Medium',
   });

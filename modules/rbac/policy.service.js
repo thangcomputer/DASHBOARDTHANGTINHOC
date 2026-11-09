@@ -5,11 +5,11 @@ const conditionPolicy = require('./policies/condition.policy');
 
 /**
  * Ordered policy chain.
- * Evaluated sequentially — stops at the first denial (fail-fast).
+ * Evaluated sequentially - stops at the first denial (fail-fast).
  */
 const POLICY_CHAIN = [
-  { name: 'TenantPolicy',    policy: tenantPolicy },
-  { name: 'BranchPolicy',   policy: branchPolicy },
+  { name: 'TenantPolicy', policy: tenantPolicy },
+  { name: 'BranchPolicy', policy: branchPolicy },
   { name: 'OwnershipPolicy', policy: ownershipPolicy },
   { name: 'ConditionPolicy', policy: conditionPolicy },
 ];

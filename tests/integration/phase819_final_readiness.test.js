@@ -1,5 +1,5 @@
 /**
- * Phase 8.19 — Final Enterprise readiness gate tests (hardened semantics).
+ * Phase 8.19 - Final Enterprise readiness gate tests (hardened semantics).
  * Does NOT promote Enterprise. Does NOT invent production evidence.
  */
 const { describe, it } = require('node:test');

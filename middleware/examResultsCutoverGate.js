@@ -1,5 +1,5 @@
 /**
- * Phase 7.30 — Controlled cutover gate for LIVE /api/exam-results ONLY.
+ * Phase 7.30 - Controlled cutover gate for LIVE /api/exam-results ONLY.
  *
  * LEGACY (default):
  *   list/create/update → pass-through (authorizeExamMutation / list gates remain handler-owned).
@@ -120,7 +120,7 @@ function examResultsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] exam-results authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] exam-results authority helper failed - Legacy gate',
       );
     }
 
@@ -165,7 +165,7 @@ function examResultsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] exam-results Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] exam-results Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

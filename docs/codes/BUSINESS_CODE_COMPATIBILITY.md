@@ -1,6 +1,6 @@
 # BUSINESS CODE COMPATIBILITY
 
-**Phase:** B — Design  
+**Phase:** B - Design  
 **Date:** 2026-08-11  
 **Status:** DESIGN ONLY  
 
@@ -29,7 +29,7 @@ studentCode         →  fallback (strict)
 
 ## 2. Student legacy model (recommended)
 
-Add (PHASE C schema — not applied in B):
+Add (PHASE C schema - not applied in B):
 
 ```text
 studentCode: String          // canonical HV###### only after backfill
@@ -49,7 +49,7 @@ Rules:
 - Never put canonical into legacy array as duplicate of itself unless needed for transition tooling.
 - Search / admin UI may show: primary `studentCode` + “mã cũ” list.
 
-Alternative (if owner rejects array on Student): collection `student_code_aliases { code, studentId, retiredAt }` — same matching rules.
+Alternative (if owner rejects array on Student): collection `student_code_aliases { code, studentId, retiredAt }` - same matching rules.
 
 ---
 
@@ -138,7 +138,7 @@ Unchanged relational model:
 1 studentCode ↔ 1 Student._id ↔ N enrollments (courseId, teacherId)
 ```
 
-No per-course student codes. Payment sessions remain tied to student / invoice / session — not to `courseCode` as FK.
+No per-course student codes. Payment sessions remain tied to student / invoice / session - not to `courseCode` as FK.
 
 ---
 
@@ -207,5 +207,5 @@ JWT / RBAC
 ## Next
 
 ```
-STOP — await owner approval for PHASE C
+STOP - await owner approval for PHASE C
 ```

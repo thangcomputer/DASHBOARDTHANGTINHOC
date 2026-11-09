@@ -1,12 +1,12 @@
 # Enterprise RBAC Contract (Phase 8.8)
 
-**Status:** FUTURE TARGET — NON-AUTHORITATIVE on LIVE  
+**Status:** FUTURE TARGET - NON-AUTHORITATIVE on LIVE  
 **LIVE authority:** `constants/permissions.js` + `middleware/auth.js` + Policy adapter + CutoverGate
 
 ## Design matrix (CRUD × Data Scope)
 
 Product role matrix and scope model: **[role-crud-scope-matrix.md](./role-crud-scope-matrix.md)**  
-(ADMIN SUPER / HIGH / STAFF / SUPPORT / TEACHER / STUDENT — design only; does not change LIVE.)
+(ADMIN SUPER / HIGH / STAFF / SUPPORT / TEACHER / STUDENT - design only; does not change LIVE.)
 
 ## New enterprise permissions (Phase 8.8)
 
@@ -27,7 +27,7 @@ Added (non-LIVE) CRUD codes aligned to [role-crud-scope-matrix.md](./role-crud-s
 - `report:view`, `audit:view`, `settings:view`
 
 `manage_schedule` / `manage_messages` / `view_logs` moved from LEGACY_ONLY → PARTIAL mapping.  
-Still **shadow only** — do not mount `authorize()` on LIVE from these codes.
+Still **shadow only** - do not mount `authorize()` on LIVE from these codes.
 
 ## Role aliases
 
@@ -39,7 +39,7 @@ Still **shadow only** — do not mount `authorize()` on LIVE from these codes.
 | SUPPORT | SUPPORT_AGENT |
 | teacher | TEACHER |
 | student | STUDENT |
-| JWT admin / staff | NOT a role — resolve via `adminRole` |
+| JWT admin / staff | NOT a role - resolve via `adminRole` |
 | id=admin | LEGACY root ≅ SUPER_ADMIN (comparison only) |
 
 Contract helper (non-runtime): `shared/constants/roleAliasContract.js`
@@ -52,7 +52,7 @@ Finance safety: revenue view ≠ payment/refund/ledger mutate.
 
 ## Deprecate
 
-`shared/enums/PermissionCode.js` — third taxonomy; do not use for migration.
+`shared/enums/PermissionCode.js` - third taxonomy; do not use for migration.
 
 ## Not in this phase
 

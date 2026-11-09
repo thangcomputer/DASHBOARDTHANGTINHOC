@@ -1,5 +1,5 @@
 /**
- * uploadsAuth — Bảo vệ /uploads (trừ asset brand công khai).
+ * uploadsAuth - Bảo vệ /uploads (trừ asset brand công khai).
  * Chấp nhận: Authorization Bearer | query access_token
  */
 const jwt = require('jsonwebtoken');
@@ -7,17 +7,17 @@ const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
 const FileAsset = require('../models/FileAsset');
 
-/** Thư mục công khai (logo, popup marketing, avatar) — không cần đăng nhập */
+/** Thư mục công khai (logo, popup marketing, avatar) - không cần đăng nhập */
 const PUBLIC_UPLOAD_PREFIXES = [
   '/logo/',
   '/favicon/',
   '/popup/',
   '/images/',
-  '/avatars/', // ảnh đại diện — <img> không gửi Bearer → cần public giống /images/
+  '/avatars/', // ảnh đại diện - <img> không gửi Bearer → cần public giống /images/
   '/invoice_logo/',
   '/feed/',
-  '/blog/', // ảnh/file tin tức — cần public để <img> trong HTML hiển thị
-  '/center-info/', // logo/banner/gallery Thông tin trung tâm — <img> không gửi Bearer
+  '/blog/', // ảnh/file tin tức - cần public để <img> trong HTML hiển thị
+  '/center-info/', // logo/banner/gallery Thông tin trung tâm - <img> không gửi Bearer
 ];
 
 function isPublicUploadPath(urlPath) {

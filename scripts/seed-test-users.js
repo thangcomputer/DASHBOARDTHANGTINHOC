@@ -72,7 +72,7 @@ async function seedData() {
 
     for (const data of testUsers) {
       const roleDoc = roles.find(r => r.code === data.roleCode);
-      
+
       let legacyId;
       // Because authRoutes.js still checks Teacher / Student collection, we MUST create them there first!
       if (data.legacyRole === 'student') {

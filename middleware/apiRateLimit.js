@@ -1,7 +1,7 @@
 /**
- * General API rate limit — skips /api/auth/* (already limited there).
+ * General API rate limit - skips /api/auth/* (already limited there).
  *
- * KEY STRATEGY: Decode JWT token (without verify — just for rate limiting identity)
+ * KEY STRATEGY: Decode JWT token (without verify - just for rate limiting identity)
  * so each authenticated user has their own quota, even if multiple users share the same IP.
  * Falls back to IP for unauthenticated requests.
  *
@@ -19,7 +19,7 @@ function parseMax(name, fallback) {
 
 /**
  * Lấy userId từ Bearer token (decode nhanh, không verify)
- * để mỗi người dùng có quota riêng — tránh share theo IP.
+ * để mỗi người dùng có quota riêng - tránh share theo IP.
  */
 function resolveKey(req) {
   try {
@@ -31,7 +31,7 @@ function resolveKey(req) {
       if (uid) return `u:${String(uid)}`;
     }
   } catch (_) { /* ignore */ }
-  // Fallback: IP (request chưa đăng nhập) — ipKeyGenerator bắt buộc với express-rate-limit v8 + IPv6
+  // Fallback: IP (request chưa đăng nhập) - ipKeyGenerator bắt buộc với express-rate-limit v8 + IPv6
   return `ip:${ipKeyGenerator(req.ip)}`;
 }
 

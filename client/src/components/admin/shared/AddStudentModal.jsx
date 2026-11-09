@@ -413,7 +413,7 @@ export default function AddStudentModal({
       onClose();
       return true;
     } catch (err) {
-      // useAdminStudents đã toast — giữ modal mở để sửa form
+      // useAdminStudents đã toast - giữ modal mở để sửa form
       if (!err?.message) toast.error('Lỗi thêm học viên');
       return false;
     } finally {
@@ -626,8 +626,8 @@ export default function AddStudentModal({
                     type="button"
                     onClick={() => setForm(f => ({ ...f, gender: 'male' }))}
                     className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${form.gender === 'male' || form.gender === 'Nam'
-                        ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-sky-50 text-sky-700 border-sky-300 ring-2 ring-sky-400/20 shadow-sm'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}
                   >
                     <span>👨 Nam</span>
@@ -636,8 +636,8 @@ export default function AddStudentModal({
                     type="button"
                     onClick={() => setForm(f => ({ ...f, gender: 'female' }))}
                     className={`flex-1 py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${form.gender === 'female' || form.gender === 'Nữ'
-                        ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-400/20 shadow-sm'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}
                   >
                     <span>👩 Nữ</span>
@@ -673,7 +673,7 @@ export default function AddStudentModal({
                 <input type="checkbox" name="paid" checked={form.paid} onChange={handleChange} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 shrink-0" />
                 <span className="min-w-0">
                   <span className="block text-[13px] font-semibold text-slate-800 leading-tight">Thanh toán tiền mặt</span>
-                  <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp — hoặc dùng &quot;Lưu chưa thanh toán&quot; nếu thu sau</span>
+                  <span className="block text-[11px] text-slate-500 leading-tight">HV đã nộp tiền mặt trực tiếp - hoặc dùng &quot;Lưu chưa thanh toán&quot; nếu thu sau</span>
                 </span>
               </label>
             </section>
@@ -736,7 +736,7 @@ export default function AddStudentModal({
                       const sessions = Number(c.totalSessions) > 0 ? Number(c.totalSessions) : 12;
                       return (
                         <option key={c._id} value={c._id}>
-                          {c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
+                          {c.name} - {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
                         </option>
                       );
                     })}
@@ -800,7 +800,7 @@ export default function AddStudentModal({
                     return !bid || teacherInStudentBranch(t, bid);
                   }).map((t) => (
                     <option key={t.id || t._id} value={t.id || t._id}>
-                      {t.name}{t.phone ? ` — ${t.phone}` : ''}
+                      {t.name}{t.phone ? ` - ${t.phone}` : ''}
                     </option>
                   ))}
                 </CmsSelect>

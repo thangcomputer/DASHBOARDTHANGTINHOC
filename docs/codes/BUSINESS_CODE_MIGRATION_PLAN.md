@@ -1,8 +1,8 @@
 # BUSINESS CODE MIGRATION PLAN
 
-**Phase:** B — Design  
+**Phase:** B - Design  
 **Date:** 2026-08-11  
-**Status:** PLAN ONLY — chưa chạy migration / chưa đổi schema runtime  
+**Status:** PLAN ONLY - chưa chạy migration / chưa đổi schema runtime  
 
 ---
 
@@ -23,13 +23,13 @@ Live DB snapshot (2026-08-11, read-only): xem [`BUSINESS_CODE_DB_AUDIT.md`](./BU
 
 ## 2. Phased implementation (sau owner approve = PHASE C+)
 
-### C0 — Prerequisites
+### C0 - Prerequisites
 
 - Owner approve PHASE B.
 - Re-run DB audit on **production** before any write.
 - If `duplicateGroups > 0` → **STOP**.
 
-### C1 — CodeGeneratorService + counters (create-path only)
+### C1 - CodeGeneratorService + counters (create-path only)
 
 - Add `services/codeGeneratorService.js` (+ Counter model).
 - Wire **new creates only**: Student, Teacher, Employee, Course.
@@ -38,14 +38,14 @@ Live DB snapshot (2026-08-11, read-only): xem [`BUSINESS_CODE_DB_AUDIT.md`](./BU
 - **No** unique index yet; **no** backfill yet.
 - Tests: concurrent create, format, multi-enrollment still one code.
 
-### C2 — Compatibility layer (Student)
+### C2 - Compatibility layer (Student)
 
-- Add `legacyStudentCodes: [String]` (or mapping collection) — design in COMPATIBILITY.md.
+- Add `legacyStudentCodes: [String]` (or mapping collection) - design in COMPATIBILITY.md.
 - On backfill: move old code → legacy array; set canonical `HV######`.
 - Payment fallback: match `studentCode` **or** `legacyStudentCodes` (exact), unpaid, amount; `>1` → fail closed.
 - Keep PaymentSession.ref primary.
 
-### C3 — Backfill existing rows
+### C3 - Backfill existing rows
 
 Order:
 
@@ -61,7 +61,7 @@ Rules:
 - Idempotent: skip if already matches `/^HV\d{6}$/` (etc.).
 - Seed counters to max seq used.
 
-### C4 — Unique indexes
+### C4 - Unique indexes
 
 Only after:
 
@@ -70,7 +70,7 @@ Only after:
 - payment regression green
 - messaging regression green (no code changes)
 
-### C5 — Remove client legacy paths
+### C5 - Remove client legacy paths
 
 - Delete FE `TTH` generators.
 - Unify QR/CK to server `studentCode`.
@@ -83,7 +83,7 @@ Only after:
 | Finding | Action |
 |---------|--------|
 | No duplicates | Proceed |
-| Duplicates on live | **STOP** — report codes + `_id`s; owner decides (no auto-merge) |
+| Duplicates on live | **STOP** - report codes + `_id`s; owner decides (no auto-merge) |
 | Empty codes | Backfill only (C3) |
 
 ---
@@ -105,11 +105,11 @@ Next generate → `maxSeq+1`.
 
 | Layer | Rollback |
 |-------|----------|
-| New fields | Stop writing; keep fields (nullable) — no delete of data |
+| New fields | Stop writing; keep fields (nullable) - no delete of data |
 | counters | Stop using generator; revert create routes to previous (deploy previous release) |
 | Backfill | Restore `studentCode` from `legacyStudentCodes[0]` if needed via reverse script (owner-approved); **never** delete students |
-| Unique index | `dropIndex` only — no document deletes |
-| Messaging / payments | Untouched by design — nothing to roll back |
+| Unique index | `dropIndex` only - no document deletes |
+| Messaging / payments | Untouched by design - nothing to roll back |
 
 **Forbidden rollback:** delete students/teachers, merge docs, rewrite ledger/invoice/payroll/message history.
 
@@ -156,5 +156,5 @@ Minimum:
 ## Next
 
 ```
-STOP — await owner approval for PHASE C
+STOP - await owner approval for PHASE C
 ```

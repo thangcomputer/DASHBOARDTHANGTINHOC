@@ -1,5 +1,5 @@
 /**
- * Phase 8.14 (updated) + 8.15 — bare admin is LEGACY_PRINCIPAL (permission-bearing).
+ * Phase 8.14 (updated) + 8.15 - bare admin is LEGACY_PRINCIPAL (permission-bearing).
  * Still must NOT flatten to SUPER_ADMIN / ADMIN_STAFF.
  */
 const { describe, it } = require('node:test');

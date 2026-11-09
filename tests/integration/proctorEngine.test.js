@@ -133,7 +133,7 @@ test('evaluateFacePresence: empty detector result is absent (no heuristic)', asy
   const { evaluateFacePresence, PROCTOR_CONFIG } = await loadProctor();
   const w = PROCTOR_CONFIG.DETECT_W;
   const h = PROCTOR_CONFIG.DETECT_H;
-  // Frame giả lập "da" trong oval — nhưng faces=[] nghĩa là detector đã chạy
+  // Frame giả lập "da" trong oval - nhưng faces=[] nghĩa là detector đã chạy
   const data = new Uint8ClampedArray(w * h * 4);
   for (let i = 0; i < data.length; i += 4) {
     data[i] = 180; data[i + 1] = 120; data[i + 2] = 100; data[i + 3] = 255;

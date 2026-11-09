@@ -42,7 +42,7 @@ export default function ScheduleMessagePreviewModal({ open, data, onClose }) {
             <div>
               <p className="text-[10px] font-bold  tracking-wide text-slate-400">Thứ · Ngày</p>
               <p className="font-semibold text-slate-900">
-                {[data.weekday, data.dateLabel].filter(Boolean).join(' · ') || '—'}
+                {[data.weekday, data.dateLabel].filter(Boolean).join(' · ') || '-'}
               </p>
             </div>
           </div>
@@ -53,7 +53,7 @@ export default function ScheduleMessagePreviewModal({ open, data, onClose }) {
               <p className="font-semibold text-slate-900">
                 {data.startTime && data.endTime
                   ? `${data.startTime} – ${data.endTime}`
-                  : (data.timeRange || '—')}
+                  : (data.timeRange || '-')}
               </p>
             </div>
           </div>
@@ -61,7 +61,7 @@ export default function ScheduleMessagePreviewModal({ open, data, onClose }) {
             <BookOpen size={16} className="text-violet-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-[10px] font-bold  tracking-wide text-slate-400">Buổi học / Khóa</p>
-              <p className="font-semibold text-slate-900">{data.course || '—'}</p>
+              <p className="font-semibold text-slate-900">{data.course || '-'}</p>
             </div>
           </div>
           {(data.studentName || data.teacherName) ? (

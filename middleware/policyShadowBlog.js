@@ -86,7 +86,7 @@ function policyShadowBlog(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] blog evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] blog evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `blog_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -121,7 +121,7 @@ function policyShadowBlog(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] blog shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] blog shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -133,7 +133,7 @@ function policyShadowBlog(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected blog error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected blog error - fail closed to legacy only',
       );
     }
     return next();

@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * KPI card — MD3 / HIG compact metric tile (≈88–92px).
+ * KPI card - MD3 / HIG compact metric tile (≈88–92px).
  * Props giữ nguyên: icon, label, value, sub, color, trend.
  */
 export default function StatCard({ icon: Icon, label, value, sub, color, trend }) {
@@ -17,9 +17,8 @@ export default function StatCard({ icon: Icon, label, value, sub, color, trend }
           </p>
           {trend != null && (
             <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${
-                trend > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
-              }`}
+              className={`text-xs font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${trend > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                }`}
             >
               {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
             </span>

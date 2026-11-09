@@ -23,26 +23,26 @@ export function useDataAdminCrud({
   const addStudent = useCallback(async (student) => {
     const ageNum = Number(student.age);
     const payload = {
-      name:          student.name,
-      gender:        student.gender || 'male',
-      age:           Number.isFinite(ageNum) && ageNum >= 10 ? ageNum : undefined,
-      phone:         student.phone || '',
-      zalo:          student.zalo || student.phone || '',
-      address:       student.address || '',
-      courseId:      student.courseId || undefined,
-      course:        student.course,
-      price:         student.price || 0,
+      name: student.name,
+      gender: student.gender || 'male',
+      age: Number.isFinite(ageNum) && ageNum >= 10 ? ageNum : undefined,
+      phone: student.phone || '',
+      zalo: student.zalo || student.phone || '',
+      address: student.address || '',
+      courseId: student.courseId || undefined,
+      course: student.course,
+      price: student.price || 0,
       totalSessions: Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12,
       remainingSessions: Number(student.totalSessions) > 0 ? Number(student.totalSessions) : 12,
-      paid:          !!student.paid,
+      paid: !!student.paid,
       paymentMethod: student.paymentMethod,
-      notes:         student.notes || '',
-      teacherAlert:  String(student.teacherAlert || '').trim(),
-      linkHoc:       student.linkHoc || '',
-      teacherId:     student.teacherId || null,
-      learningMode:  student.learningMode || 'OFFLINE',
-      branchId:      student.branchId || undefined,
-      branchCode:    student.branchCode || '',
+      notes: student.notes || '',
+      teacherAlert: String(student.teacherAlert || '').trim(),
+      linkHoc: student.linkHoc || '',
+      teacherId: student.teacherId || null,
+      learningMode: student.learningMode || 'OFFLINE',
+      branchId: student.branchId || undefined,
+      branchCode: student.branchCode || '',
       ...(student.reservedStudentCode
         ? { reservedStudentCode: String(student.reservedStudentCode).trim() }
         : {}),
@@ -62,18 +62,18 @@ export function useDataAdminCrud({
     const rawEmail = (teacher.email || '').trim();
     const email = rawEmail && rawEmail !== 'email@example.com' ? rawEmail : undefined;
     const payload = {
-      name:      teacher.name,
-      phone:     teacher.phone,
-      age:       teacher.age === '' || teacher.age == null ? null : Number(teacher.age),
+      name: teacher.name,
+      phone: teacher.phone,
+      age: teacher.age === '' || teacher.age == null ? null : Number(teacher.age),
       email,
       specialty: teacher.specialty || '',
       subjectIds: Array.isArray(teacher.subjectIds) ? teacher.subjectIds : [],
       startDate: teacher.startDate || undefined,
-      address:   teacher.address || '',
+      address: teacher.address || '',
       voiceRegion: teacher.voiceRegion || '',
-      password:  teacher.password || teacher.phone,
-      status:    teacher.status || 'inactive',
-      branchId:   teacher.branchId || undefined,
+      password: teacher.password || teacher.phone,
+      status: teacher.status || 'inactive',
+      branchId: teacher.branchId || undefined,
       branchCode: teacher.branchCode || undefined,
       baseSalaryPerSession: Math.max(0, Number(teacher.baseSalaryPerSession) || 0),
     };
@@ -133,7 +133,7 @@ export function useDataAdminCrud({
       if (res && res.success === false) throw new Error(res.message);
       triggerBackgroundSync();
       return res;
-    } catch(err) {
+    } catch (err) {
       setTeachers(previousTeachers);
       throw err;
     }
@@ -183,7 +183,7 @@ export function useDataAdminCrud({
       if (res && res.success === false) throw new Error(res.message);
       triggerBackgroundSync();
       return res;
-    } catch(err) {
+    } catch (err) {
       setStudents(previousStudents);
       throw err;
     }
@@ -237,9 +237,9 @@ export function useDataAdminCrud({
           setStudents(previousStudents);
           throw new Error(res?.message || 'Không bỏ phân công được');
         }
-        // Giữ danh sách hiện tại — chỉ revalidate cùng filter/branch (không refetch page-only làm mất data)
+        // Giữ danh sách hiện tại - chỉ revalidate cùng filter/branch (không refetch page-only làm mất data)
         if (typeof refreshStudents === 'function') {
-          Promise.resolve(refreshStudents()).catch(() => {});
+          Promise.resolve(refreshStudents()).catch(() => { });
         } else {
           triggerBackgroundSync();
         }
@@ -285,7 +285,7 @@ export function useDataAdminCrud({
       const res = await api.students?.assignTeacher(studentId, teacherId, enrollmentId);
       if (res?.success) {
         if (typeof refreshStudents === 'function') {
-          Promise.resolve(refreshStudents()).catch(() => {});
+          Promise.resolve(refreshStudents()).catch(() => { });
         } else {
           triggerBackgroundSync();
         }
@@ -489,7 +489,7 @@ export function useDataAdminCrud({
     }
   }, [students, setStudents, triggerBackgroundSync, addNotification]);
 
-  // Cập nhật lịch học — sync sang StudentDashboard
+  // Cập nhật lịch học - sync sang StudentDashboard
   const updateStudentSchedule = useCallback(async (studentId, nextClass, nextClassTime) => {
     const previousStudents = [...students];
     setStudents(prev => prev.map(s =>
@@ -539,7 +539,7 @@ export function useDataAdminCrud({
     }
   }, [students, setStudents, triggerBackgroundSync, addNotification]);
 
-  // Admin/GV đánh trượt — khóa phòng thi qua API (lưu DB + thông báo + socket)
+  // Admin/GV đánh trượt - khóa phòng thi qua API (lưu DB + thông báo + socket)
   const failStudentExam = useCallback(async (studentId, reason = '') => {
     const previousStudents = [...students];
     setStudents((prev) => prev.map((s) =>
@@ -558,7 +558,7 @@ export function useDataAdminCrud({
     }
   }, [students, setStudents, triggerBackgroundSync]);
 
-  // Admin thu hồi quyền thi (không qua lock-exam — dùng khi chỉ revoke quyền)
+  // Admin thu hồi quyền thi (không qua lock-exam - dùng khi chỉ revoke quyền)
   const revokeStudentExam = useCallback(async (studentId) => {
     const previousStudents = [...students];
     setStudents(prev => prev.map(s =>
@@ -584,7 +584,7 @@ export function useDataAdminCrud({
     ));
   }, [setStudents]);
 
-  // ── KẾT QUẢ THI ADMIN — ghi nhận & chấm điểm (lưu vào MongoDB) ─────────────
+  // ── KẾT QUẢ THI ADMIN - ghi nhận & chấm điểm (lưu vào MongoDB) ─────────────
   const addExamResult = useCallback(async (data) => {
     const previousExamResults = [...examResults];
     const tempId = `temp_${Date.now()}`;

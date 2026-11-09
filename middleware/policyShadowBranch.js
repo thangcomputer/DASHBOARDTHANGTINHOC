@@ -57,7 +57,7 @@ function policyShadowBranch(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] branch evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] branch evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `branch_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -92,7 +92,7 @@ function policyShadowBranch(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] branch shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] branch shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -104,7 +104,7 @@ function policyShadowBranch(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected branch error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected branch error - fail closed to legacy only',
       );
     }
     return next();

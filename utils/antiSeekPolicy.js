@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Anti-seek policy — SoT: lesson.antiSeek
+ * Anti-seek policy - SoT: lesson.antiSeek
  * Convention: antiSeek !== false => ENABLED (undefined/null => ON)
  *
  * Duration SoT for threshold (Module 5):

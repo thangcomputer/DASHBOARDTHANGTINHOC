@@ -1,8 +1,8 @@
 /**
- * Phase 7.27 — Controlled cutover gate for LIVE /api/analytics ONLY.
+ * Phase 7.27 - Controlled cutover gate for LIVE /api/analytics ONLY.
  *
  * LEGACY (default):
- *   checkAnyPermission(MANAGE_FINANCE, VIEW_BRANCH_REVENUE) — retained here.
+ *   checkAnyPermission(MANAGE_FINANCE, VIEW_BRANCH_REVENUE) - retained here.
  *   BranchFilter remains DATA SCOPE (applied before this gate).
  *
  * POLICY (env opt-in): Policy decision is HTTP authority.
@@ -72,7 +72,7 @@ function analyticsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] analytics authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] analytics authority helper failed - Legacy gate',
       );
     }
 
@@ -117,7 +117,7 @@ function analyticsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] analytics Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] analytics Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

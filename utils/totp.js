@@ -1,5 +1,5 @@
 /**
- * Minimal TOTP (RFC 6238) — SHA1, 6 digits, 30s period.
+ * Minimal TOTP (RFC 6238) - SHA1, 6 digits, 30s period.
  */
 const crypto = require('crypto');
 

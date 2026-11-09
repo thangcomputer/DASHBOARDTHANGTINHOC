@@ -1,5 +1,5 @@
 /**
- * Wave 6.8 — Policy SHADOW for schedule / settings / notification / quiz write.
+ * Wave 6.8 - Policy SHADOW for schedule / settings / notification / quiz write.
  * Authorization equivalence only; legacy remains HTTP authority.
  */
 const test = require('node:test');
@@ -65,7 +65,7 @@ function assertMatch(label, compare, legacyFn, policyFn, subject, action, ctx = 
   // Always pass ctx as 3rd arg; policies that ignore it are fine.
   // Policies with (subject, action, untrusted) only: pass untrusted as 3rd when no ctx keys.
   const legacy = legacyFn(subject, action, ctx);
-  const policyArity = policyFn.length; // may be 2 with defaults — still pass both
+  const policyArity = policyFn.length; // may be 2 with defaults - still pass both
   const policy = policyFn(subject, action, ctx, untrusted);
   void policyArity;
   const result = compare(legacy, policy);
@@ -132,7 +132,7 @@ test('Wave6.8 SCHEDULE: teacher create own student ALLOW; unrelated DENY', () =>
   assert.equal(teacherCanAccessStudent(ownedStudent, TEACHER_A, []), true);
 });
 
-test('Wave6.8 SCHEDULE: staff create has no branch gate (legacy weak) — Branch B ALLOW', () => {
+test('Wave6.8 SCHEDULE: staff create has no branch gate (legacy weak) - Branch B ALLOW', () => {
   const staff = subjectOf(buildSchedSubject, { permissions: [PERMISSIONS.MANAGE_SCHEDULE] });
   assert.equal(
     assertMatch('sc-xb', compareSched, evaluateLegacySchedule, evaluatePolicySchedule, staff, 'create', {

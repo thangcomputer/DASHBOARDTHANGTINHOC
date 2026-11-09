@@ -1,6 +1,6 @@
 /**
  * CoursePricingTab.jsx
- * Quản lý Đơn giá Khóa học — CRUD Table + Modal
+ * Quản lý Đơn giá Khóa học - CRUD Table + Modal
  * Tích hợp trong SystemSettingsTab
  */
 
@@ -201,21 +201,21 @@ function CourseModal({
   const isEdit = !!course?._id;
 
   const [form, setForm] = useState({
-    name:            course?.name || '',
-    price:           course?.price || '',
+    name: course?.name || '',
+    price: course?.price || '',
     discountPercent: course?.discountPercent || 0,
     discountStartsAt: toLocalDateTimeInput(course?.discountStartsAt),
-    discountEndsAt:   toLocalDateTimeInput(course?.discountEndsAt),
-    totalSessions:   course?.totalSessions || 12,
-    deliveryMode:    course?.deliveryMode || 'instructor',
-    category:        course?.category || 'van-phong',
-    examSubjects:    Array.isArray(course?.examSubjects) && course.examSubjects.length
+    discountEndsAt: toLocalDateTimeInput(course?.discountEndsAt),
+    totalSessions: course?.totalSessions || 12,
+    deliveryMode: course?.deliveryMode || 'instructor',
+    category: course?.category || 'van-phong',
+    examSubjects: Array.isArray(course?.examSubjects) && course.examSubjects.length
       ? [...course.examSubjects]
       : [],
-    description:     course?.description || '',
-    thumbnail:       course?.thumbnail || '',
+    description: course?.description || '',
+    thumbnail: course?.thumbnail || '',
     bannerColorStart: course?.bannerColorStart || '',
-    bannerColorEnd:   course?.bannerColorEnd || '',
+    bannerColorEnd: course?.bannerColorEnd || '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -407,21 +407,21 @@ function CourseModal({
       const endpoint = isEdit ? `/courses/${course._id}` : '/courses';
       const method = isEdit ? 'PUT' : 'POST';
       const payload = {
-        name:            form.name.trim(),
-        price:           Number(form.price),
+        name: form.name.trim(),
+        price: Number(form.price),
         discountPercent: Number(form.discountPercent),
-        discountPrice:   effective,
+        discountPrice: effective,
         discountStartsAt: fromLocalDateTimeInput(form.discountStartsAt),
-        discountEndsAt:   fromLocalDateTimeInput(form.discountEndsAt),
-        totalSessions:   Number(form.totalSessions),
-        deliveryMode:    form.deliveryMode,
-        category:        form.category,
-        examSubjects:    form.examSubjects,
-        description:     form.description,
-        thumbnail:       form.thumbnail || '',
+        discountEndsAt: fromLocalDateTimeInput(form.discountEndsAt),
+        totalSessions: Number(form.totalSessions),
+        deliveryMode: form.deliveryMode,
+        category: form.category,
+        examSubjects: form.examSubjects,
+        description: form.description,
+        thumbnail: form.thumbnail || '',
         bannerColorStart: form.bannerColorStart,
-        bannerColorEnd:   form.bannerColorEnd,
-        status:          isEdit ? (course.status || 'published') : 'published',
+        bannerColorEnd: form.bannerColorEnd,
+        status: isEdit ? (course.status || 'published') : 'published',
       };
 
       const res = await apiFetch(endpoint, {
@@ -449,7 +449,7 @@ function CourseModal({
       style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
     >
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[min(92vh,920px)]">
-        {/* Header lớn — cùng kiểu modal học viên */}
+        {/* Header lớn - cùng kiểu modal học viên */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6 flex items-center justify-between flex-shrink-0">
           <h3 className="text-white font-black text-xl sm:text-2xl flex items-center gap-4">
             <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
@@ -501,11 +501,10 @@ function CourseModal({
                     return (
                       <label
                         key={option.id}
-                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-blue-300 ${
-                          selected
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-3 transition focus-within:ring-2 focus-within:ring-blue-300 ${selected
                             ? 'border-red-500 bg-red-50 text-red-800'
                             : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200'
-                        }`}
+                          }`}
                       >
                         <input
                           type="radio"
@@ -515,9 +514,8 @@ function CourseModal({
                           onChange={() => setForm((current) => ({ ...current, deliveryMode: option.id }))}
                           className="sr-only"
                         />
-                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                          selected ? 'bg-red-100 text-red-700' : 'bg-white text-gray-500'
-                        }`}>
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected ? 'bg-red-100 text-red-700' : 'bg-white text-gray-500'
+                          }`}>
                           <option.Icon size={20} />
                         </span>
                         <span className="min-w-0">
@@ -608,9 +606,8 @@ function CourseModal({
                 </div>
                 <div>
                   <label className="text-xs font-black text-gray-500  tracking-widest block mb-2">Giá thu thực tế</label>
-                  <div className={`rounded-[20px] px-4 py-3 border-2 min-h-[56px] flex flex-col justify-center shadow-sm transition ${
-                    hasDiscount ? 'border-red-200 bg-red-50' : 'border-transparent bg-gray-50'
-                  }`}>
+                  <div className={`rounded-[20px] px-4 py-3 border-2 min-h-[56px] flex flex-col justify-center shadow-sm transition ${hasDiscount ? 'border-red-200 bg-red-50' : 'border-transparent bg-gray-50'
+                    }`}>
                     {hasDiscount ? (
                       <>
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -623,7 +620,7 @@ function CourseModal({
                       </>
                     ) : (
                       <span className="text-base font-black text-blue-700 leading-tight">
-                        {form.price ? `${fmt(Number(form.price))}đ` : '—'}
+                        {form.price ? `${fmt(Number(form.price))}đ` : '-'}
                       </span>
                     )}
                   </div>
@@ -822,9 +819,8 @@ function CourseModal({
                         return (
                           <label
                             key={id}
-                            className={`group relative flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${
-                              checked ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-                            }`}
+                            className={`group relative flex items-center gap-2 border-2 rounded-2xl px-3 py-2.5 cursor-pointer transition ${checked ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                              }`}
                           >
                             <input
                               type="checkbox"
@@ -966,7 +962,7 @@ function CourseModal({
                     />
                     {newSubjectLabel.trim() && (
                       <p className="text-[10px] text-emerald-700">
-                        Mã sẽ lưu: <strong>{resolveExamSubjectId(newSubjectId.trim(), newSubjectLabel.trim()) || '—'}</strong>
+                        Mã sẽ lưu: <strong>{resolveExamSubjectId(newSubjectId.trim(), newSubjectLabel.trim()) || '-'}</strong>
                       </p>
                     )}
                     <div className="flex gap-2">
@@ -1097,10 +1093,10 @@ export default function CoursePricingTab() {
     removeCustomExamSubject,
     updateExamAdminGroupLabel,
   } = useData();
-  const [courses, setCourses]       = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalCourse, setModalCourse] = useState(undefined); // undefined=closed, null=add, obj=edit
-  const [deleting, setDeleting]     = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef(null);
@@ -1557,7 +1553,7 @@ export default function CoursePricingTab() {
                           -{course.discountPercent}%
                         </span>
                       ) : (
-                        <span className="text-[13px] text-slate-300">—</span>
+                        <span className="text-[13px] text-slate-300">-</span>
                       )}
                     </div>
                     <div className="min-w-0 text-right">
@@ -1625,7 +1621,7 @@ export default function CoursePricingTab() {
                             -{course.discountPercent}%
                           </span>
                         ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                          <span className="text-slate-300 text-xs">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-right">

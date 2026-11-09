@@ -1,5 +1,5 @@
 /**
- * QA Group 2 — Admin ↔ Student (API E2E local)
+ * QA Group 2 - Admin ↔ Student (API E2E local)
  * node scripts/_qa_group2_admin_student.cjs
  */
 require('dotenv').config();
@@ -12,7 +12,7 @@ const results = [];
 
 function record(tc) {
   results.push(tc);
-  console.log(`[${tc.result}] ${tc.id} — ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
+  console.log(`[${tc.result}] ${tc.id} - ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
 }
 
 function req(method, path, { token, body, cookie, csrfToken } = {}) {
@@ -47,7 +47,7 @@ async function csrf() {
   const res = await req('GET', '/api/auth/csrf-token');
   const token = res.json?.csrfToken || res.json?.data?.csrfToken;
   const setCookie = res.headers?.['set-cookie'] || [];
-  // http module doesn't expose set-cookie easily on resolve — re-fetch via raw
+  // http module doesn't expose set-cookie easily on resolve - re-fetch via raw
   return new Promise((resolve) => {
     const url = new URL('/api/auth/csrf-token', BASE);
     http.get({ hostname: url.hostname, port: url.port, path: url.pathname }, (res) => {
@@ -186,7 +186,7 @@ async function main() {
   record({
     id: 'G2-04', name: 'Gửi SMS khi tạo HV',
     expected: 'SMS riêng hoặc Zalo OA thay SMS',
-    actual: 'Product không có SMS gateway — welcome queue gửi Zalo OA theo SĐT/Zalo',
+    actual: 'Product không có SMS gateway - welcome queue gửi Zalo OA theo SĐT/Zalo',
     result: createWelcome.queued ? 'PASS' : 'SKIP', severity: 'Medium',
     fix: 'SMS gateway ngoài scope; Zalo OA là kênh tin nhắn hiện có',
   });
@@ -217,7 +217,7 @@ async function main() {
   // Course / fee / debt
   {
     const me = await req('GET', `/api/students/${studentId}`, { token: studentAccess });
-    // may be forbidden for self via this route — try admin view + student view
+    // may be forbidden for self via this route - try admin view + student view
     const adminView = await req('GET', `/api/students/${studentId}`, { token: adminToken });
     const d = adminView.json?.data || me.json?.data || {};
     record({
@@ -402,7 +402,7 @@ async function main() {
     });
   }
 
-  // "Lock" student — try suspended / Ngừng học
+  // "Lock" student - try suspended / Ngừng học
   {
     const lock1 = await mut('PUT', `/api/students/${studentId}`, {
       token: adminToken,
@@ -419,8 +419,8 @@ async function main() {
       actual: `put=${lock1.status} oldToken=${withOld.status} login=${loginAfter.status} msg=${loginAfter.json?.message || ''}`,
       result:
         lock1.status === 200
-        && (withOld.status === 401 || withOld.status === 403)
-        && loginAfter.status === 403
+          && (withOld.status === 401 || withOld.status === 403)
+          && loginAfter.status === 403
           ? 'PASS'
           : 'FAIL',
       severity: 'Critical',

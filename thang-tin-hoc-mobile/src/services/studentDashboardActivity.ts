@@ -1,4 +1,4 @@
-import type { Assignment } from '../types';
+﻿import type { Assignment } from '../types';
 import type { RawStudent } from './studentApi';
 import type { StudentEvaluationActivity, StudentQuiz } from './studentQuizApi';
 
@@ -136,7 +136,7 @@ export function buildStudentDashboardActivity(
     add(
       `quiz-${quiz.id}`,
       submission.forfeit
-        ? `Trắc nghiệm: ${quiz.title} — Rớt (thoát giữa giờ)`
+        ? `Trắc nghiệm: ${quiz.title} - Rớt (thoát giữa giờ)`
         : `Trắc nghiệm: ${quiz.title} (${submission.correctCount ?? 0}/${submission.totalQuestions ?? 0} câu)`,
       submission.submittedAt,
       submission.score == null ? null : Math.round((submission.score / 10) * 10) / 10,
@@ -155,7 +155,7 @@ export function buildStudentDashboardActivity(
         : 'Đánh giá';
     add(
       `evaluation-${evaluation.id}`,
-      `${title}${evaluation.content ? ` — ${evaluation.content}` : ''}${evaluation.courseName ? ` (${evaluation.courseName})` : ''}`,
+      `${title}${evaluation.content ? ` - ${evaluation.content}` : ''}${evaluation.courseName ? ` (${evaluation.courseName})` : ''}`,
       evaluation.updatedAt || evaluation.createdAt,
       grade,
     );

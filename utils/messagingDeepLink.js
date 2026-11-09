@@ -1,5 +1,5 @@
 /**
- * Phase 7 — Frontend deep-link UX gate (NOT authorization).
+ * Phase 7 - Frontend deep-link UX gate (NOT authorization).
  * Server MessagingPolicy remains the only send/discover authority.
  *
  * Allow opening a peer in the UI only when:

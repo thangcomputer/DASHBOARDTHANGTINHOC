@@ -1,5 +1,5 @@
 /**
- * Phase 8.10 — Resolve manage_student_training UNKNOWN (observe-only parity).
+ * Phase 8.10 - Resolve manage_student_training UNKNOWN (observe-only parity).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -29,7 +29,7 @@ test('Phase8.10 catalog: student_training:manage exists and is mapped 1:1', () =
   assert.equal(map.getMappingStatus('manage_student_training'), 'MATCH');
 });
 
-test('Phase8.10 Actor A: student_training only — ALLOW student_training; DENY manage_training', () => {
+test('Phase8.10 Actor A: student_training only - ALLOW student_training; DENY manage_training', () => {
   const a = actor([LIVE.MANAGE_STUDENT_TRAINING]);
   const st = compareStaffLivePermission(a, LIVE.MANAGE_STUDENT_TRAINING);
   const tr = compareStaffLivePermission(a, LIVE.MANAGE_TRAINING);
@@ -45,7 +45,7 @@ test('Phase8.10 Actor A: student_training only — ALLOW student_training; DENY 
   assert.ok(!held.has(ENT.EXAM_MANAGE));
 });
 
-test('Phase8.10 Actor B: manage_training only — ALLOW training; DENY student_training (no widen)', () => {
+test('Phase8.10 Actor B: manage_training only - ALLOW training; DENY student_training (no widen)', () => {
   const b = actor([LIVE.MANAGE_TRAINING]);
   const tr = compareStaffLivePermission(b, LIVE.MANAGE_TRAINING);
   const st = compareStaffLivePermission(b, LIVE.MANAGE_STUDENT_TRAINING);
@@ -60,13 +60,13 @@ test('Phase8.10 Actor B: manage_training only — ALLOW training; DENY student_t
   assert.ok(!held.has(ENT.STUDENT_TRAINING_MANAGE));
 });
 
-test('Phase8.10 Actor C: both — ALLOW each gate MATCH', () => {
+test('Phase8.10 Actor C: both - ALLOW each gate MATCH', () => {
   const c = actor([LIVE.MANAGE_TRAINING, LIVE.MANAGE_STUDENT_TRAINING]);
   assert.equal(compareStaffLivePermission(c, LIVE.MANAGE_TRAINING).comparison, COMPARISON.MATCH);
   assert.equal(compareStaffLivePermission(c, LIVE.MANAGE_STUDENT_TRAINING).comparison, COMPARISON.MATCH);
 });
 
-test('Phase8.10 Actor D: neither — DENY both MATCH', () => {
+test('Phase8.10 Actor D: neither - DENY both MATCH', () => {
   const d = actor([LIVE.VIEW_TEACHERS]);
   assert.equal(compareStaffLivePermission(d, LIVE.MANAGE_TRAINING).finalDecision, DECISION.DENY);
   assert.equal(compareStaffLivePermission(d, LIVE.MANAGE_STUDENT_TRAINING).finalDecision, DECISION.DENY);
@@ -86,7 +86,7 @@ test('Phase8.10 branch scopeOk false DENY MATCH both sides', () => {
   assert.equal(r.finalDecision, DECISION.DENY);
 });
 
-test('Phase8.10 rejected candidate course:update would widen — proven by Actor B held set', () => {
+test('Phase8.10 rejected candidate course:update would widen - proven by Actor B held set', () => {
   // Document: if student_training mapped to course:update, Actor B would enterprise-ALLOW student_training
   const bHeld = expandLivePermissionsToEnterprise([LIVE.MANAGE_TRAINING]);
   assert.ok(bHeld.has(ENT.COURSE_UPDATE), 'manage_training expands to course:update');

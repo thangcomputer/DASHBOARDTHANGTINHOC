@@ -1,6 +1,6 @@
 /**
  * Policy shadow evaluator for LIVE student READ routes.
- * READ-ONLY — does not authorize HTTP.
+ * READ-ONLY - does not authorize HTTP.
  *
  * Live legacy (source: routes/studentRoutes.js):
  * - list/stats Middleware: requireManageStudentsUnlessTeacher
@@ -58,7 +58,7 @@ function branchFilterKey(bf) {
 }
 
 /**
- * HTTP authz — requireManageStudentsUnlessTeacher + checkPermission(MANAGE_STUDENTS).
+ * HTTP authz - requireManageStudentsUnlessTeacher + checkPermission(MANAGE_STUDENTS).
  */
 function evaluateLegacyPermission(subject) {
   if (!subject?.id) {
@@ -131,7 +131,7 @@ function evaluateLegacyDataScope(subject, action, ctx = {}) {
     };
   }
 
-  // stats — legacy has no teacher ownership filter
+  // stats - legacy has no teacher ownership filter
   return {
     mode: 'stats_branch',
     branchFilter: effectiveBranchFilter(subject, trustedBf, queryBranchId),
@@ -140,7 +140,7 @@ function evaluateLegacyDataScope(subject, action, ctx = {}) {
 }
 
 /**
- * GET /:id and GET /:id/full-detail — handler-owned authz (not MANAGE_STUDENTS).
+ * GET /:id and GET /:id/full-detail - handler-owned authz (not MANAGE_STUDENTS).
  * Missing resource → ALLOW (handler 404). Does not strengthen Legacy.
  */
 function evaluateLegacyGetById(subject, action, ctx = {}) {
@@ -265,7 +265,7 @@ function evaluatePolicyStudentRead(subject, action, ctx = {}, _untrusted = {}) {
   // Spoofed teacherId/studentId must not become authz identity.
   // Trusted list ownership uses subject.id only; optional staff ?teacherId is data filter from query
   // but only when actor already ALLOW via MANAGE_STUDENTS (captured in scope.optionalTeacherIdFilter
-  // from trusted query after permission ALLOW — not from body).
+  // from trusted query after permission ALLOW - not from body).
   void _untrusted.spoofTeacherId;
   void _untrusted.spoofStudentId;
   void _untrusted.queryBranchId;

@@ -5,7 +5,7 @@ import { gameSounds } from '../../../utils/sound';
 import { reminderCopy } from '../../../utils/dailyPractice';
 import Mascot from './Mascot';
 
-/** Popup nhắc luyện tập hằng ngày — hiện tối đa một lần mỗi ngày khi HV chưa luyện tập. */
+/** Popup nhắc luyện tập hằng ngày - hiện tối đa một lần mỗi ngày khi HV chưa luyện tập. */
 export default function DailyPracticeReminder({ stats, topicCount, onStart, onClose }) {
   const copy = reminderCopy(stats, topicCount);
   const lost = stats?.streakState === 'lost';

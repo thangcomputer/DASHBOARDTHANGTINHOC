@@ -71,7 +71,7 @@
 - **Backend chạy tại:** `/www/wwwroot/dashboardthangtinhoc/` (port 5000)
 - **Frontend dist tại:** `/www/wwwroot/dashboardthangtinhoc/client/dist/`
 - **PM2 app name:** `dashboardthangtinhoc`
-- **Web server:** Apache (aaPanel) — không có Nginx
+- **Web server:** Apache (aaPanel) - không có Nginx
 - **Apache config include path:** `/www/server/panel/vhost/apache/*.conf`
 
 ## Lệnh hay dùng trên VPS

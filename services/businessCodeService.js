@@ -1,5 +1,5 @@
 /**
- * Business code generator — atomic Mongo counters.
+ * Business code generator - atomic Mongo counters.
  * Prefixes: student→HV, teacher→GV, employee→NV, course→KH
  * Format: PREFIX + 6 zero-padded digits. Fail-closed above 999999.
  */

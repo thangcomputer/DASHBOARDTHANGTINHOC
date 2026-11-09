@@ -1,15 +1,15 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  dashboardthangtinhoc — Cleanup Test Accounts
+ *  dashboardthangtinhoc - Cleanup Test Accounts
  *  Xóa tất cả tài khoản test khỏi DB sau khi kiểm thử xong
  *  Chạy: node tests/cleanup_test_accounts.js
  * ═══════════════════════════════════════════════════════════════════════
  */
-const path     = require('path');
+const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
-const Student  = require('../models/Student');
-const Teacher  = require('../models/Teacher');
+const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
 const ExamResult = require('../models/ExamResult');
 
 async function cleanup() {

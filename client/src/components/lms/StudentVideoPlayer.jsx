@@ -23,7 +23,7 @@ export const extractYouTubeId = (url = '') => {
   const match = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]+)/);
   return match ? match[1] : url.trim();
 };
-/** Clamp resume/seek vào [0, duration-1] — tránh start vượt độ dài thật làm YT không phát. */
+/** Clamp resume/seek vào [0, duration-1] - tránh start vượt độ dài thật làm YT không phát. */
 export const clampYtTime = (t, duration) => {
   const n = Math.max(0, Math.floor(Number(t) || 0));
   const d = Math.max(0, Math.floor(Number(duration) || 0));
@@ -77,7 +77,7 @@ export const StudentVideoPlayer = ({
     return () => setStudyMediaPlaying(key, false);
   }, [isPlaying, lessonId]);
 
-  // Restore watched seconds: lấy max(session, server) — không để session thấp ghi đè SoT
+  // Restore watched seconds: lấy max(session, server) - không để session thấp ghi đè SoT
   const bestInitial = useMemo(() => {
     if (lessonCompleted) return 0; // If already completed, restart from 0 when revisiting
     const sessionWatched = Number(sessionStorage.getItem(`student_lms_watched_${lessonId}`) || 0);
@@ -128,7 +128,7 @@ export const StudentVideoPlayer = ({
     && !gateSatisfied;
   seekUnlockedRef.current = seekUnlocked;
 
-  // Chỉ reset overlay khi đổi bài — không bật lại nút Play khi parent cập nhật tiến độ
+  // Chỉ reset overlay khi đổi bài - không bật lại nút Play khi parent cập nhật tiến độ
   useEffect(() => {
     const sessionWatched = Number(sessionStorage.getItem(`student_lms_watched_${lessonId}`) || 0);
     const serverWatched = Number(initialWatchedSeconds) || 0;
@@ -174,7 +174,7 @@ export const StudentVideoPlayer = ({
     }
   }, [bestInitial]);
 
-  // ── Complete khi đủ threshold 2/3 (COMPLETION ≠ SEEK) — chờ player ready ──
+  // ── Complete khi đủ threshold 2/3 (COMPLETION ≠ SEEK) - chờ player ready ──
   useEffect(() => {
     if (!isReady || !effectiveDuration || !onEligibilityReached) return;
     if (eligibilitySentRef.current) return;
@@ -205,7 +205,7 @@ export const StudentVideoPlayer = ({
     }
   }, [isReady, displayWatched, effectiveDuration, xpRatio, onXpRatioReached]);
 
-  // ── Giám sát tab ẩn (không dùng window.blur — iframe YouTube fire blur khi rê/click) ──
+  // ── Giám sát tab ẩn (không dùng window.blur - iframe YouTube fire blur khi rê/click) ──
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -228,7 +228,7 @@ export const StudentVideoPlayer = ({
     };
   }, []);
 
-  // ── Khởi tạo YouTube Iframe API — chỉ remount khi đổi bài/video (không vì completed) ──
+  // ── Khởi tạo YouTube Iframe API - chỉ remount khi đổi bài/video (không vì completed) ──
   useEffect(() => {
     if (!videoId) return;
     let cancelled = false;
@@ -345,7 +345,7 @@ export const StudentVideoPlayer = ({
       playerRef.current = null;
       isReadyRef.current = false;
     };
-  // eslint-disable-line react-hooks/exhaustive-deps -- remount only on video/lesson change
+    // eslint-disable-line react-hooks/exhaustive-deps -- remount only on video/lesson change
   }, [videoId, lessonId]);
 
   // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────
@@ -394,7 +394,7 @@ export const StudentVideoPlayer = ({
           player,
         );
         const req = requiredSecs(resolveEffectiveDuration(adminDurationSeconds, dur)) || 1;
-        // % theo full video — tránh kẹt cập nhật sau cửa ≥67% (req)
+        // % theo full video - tránh kẹt cập nhật sau cửa ≥67% (req)
         const base = dur > 0 ? dur : Math.max(1, Math.round(req * 1.5));
         const pct = Math.min(100, Math.round((actualWatchedRef.current / base) * 100));
         if (pct !== watchPctSentRef.current) {
@@ -456,7 +456,7 @@ export const StudentVideoPlayer = ({
       setIsPlaying(true);
       setHasEnded(false);
       setPlayerError('');
-      // Không gọi preferMaxYouTubeQuality ở đây — pause/seek mỗi PLAYING gây giật
+      // Không gọi preferMaxYouTubeQuality ở đây - pause/seek mỗi PLAYING gây giật
       startCounting();
       if (!totalDuration || totalDuration === 0) {
         const dur = readYouTubeDuration(event.target);
@@ -672,15 +672,13 @@ export const StudentVideoPlayer = ({
       </div>
       {showPlayerHints ? (
         <div
-          className={`shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-slate-950 px-3 py-2 ${
-            appearance === 'window' || isFullscreen ? '' : 'lg:rounded-b-2xl'
-          }`}
+          className={`shrink-0 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-slate-950 px-3 py-2 ${appearance === 'window' || isFullscreen ? '' : 'lg:rounded-b-2xl'
+            }`}
         >
-          <span className={`text-[11px] px-2.5 py-1 rounded-md border font-bold ${
-            antiSeekEnabled
+          <span className={`text-[11px] px-2.5 py-1 rounded-md border font-bold ${antiSeekEnabled
               ? 'bg-amber-500/15 text-amber-200 border-amber-500/30'
               : 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
-          }`}
+            }`}
           >
             {antiSeekEnabled ? 'Chống tua đang bật' : 'Tua tự do'}
           </span>

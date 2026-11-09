@@ -29,6 +29,16 @@ const MODES = [
 ];
 const CONFETTI_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#0EA5E9', '#A855F7', '#F97316'];
 
+function shuffleList(list) {
+  if (!Array.isArray(list)) return [];
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 function Confetti({ count = 22, spread = 160 }) {
   const pieces = useMemo(() => Array.from({ length: count }, (_, i) => {
     const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
@@ -103,13 +113,6 @@ function HomeScreen({
 
   return (
     <div className="dp-shell mx-auto w-full max-w-6xl space-y-5 xl:max-w-7xl">
-      <header className="min-w-0">
-        <p className="text-xs font-black uppercase tracking-wider text-red-600">Hành trình phát triển kỹ năng</p>
-        <h1 className="mt-1 text-2xl font-black text-slate-900 sm:text-3xl">Luyện tập hằng ngày</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-500">
-          Theo lộ trình có học bài và luyện (có XP). Luyện tự do chỉ trắc nghiệm ôn, không tính XP.
-        </p>
-      </header>
 
       <DailyPracticeHero
         stats={stats}
@@ -706,7 +709,7 @@ function FireworkBurst() {
   ));
 }
 
-/** Xác nhận cược XP — lần đầu bấm Làm / Bắt đầu hoặc Làm lại sau kết quả. */
+/** Xác nhận cược XP - lần đầu bấm Làm / Bắt đầu hoặc Làm lại sau kết quả. */
 function StakeSessionConfirm({
   variant = 'rematch',
   stakeXp,
@@ -1025,7 +1028,7 @@ export default function DailyPracticePage() {
           setMeetOfferOpen(true);
         }, 5000);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
@@ -1107,7 +1110,10 @@ export default function DailyPracticePage() {
         : await dailyPracticeApi.student.start(pick.topicId, pick.difficulty);
       setLastPick(pick);
       setSummary(null);
-      setSession(data);
+      setSession({
+        ...data,
+        questions: shuffleList(data.questions),
+      });
       if (typeof data.profileXp === 'number') applyStats({ xpTotal: data.profileXp });
       loadOverview(true);
     } catch (err) {

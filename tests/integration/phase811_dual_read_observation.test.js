@@ -1,5 +1,5 @@
 /**
- * Phase 8.11 — Dual-read observation (Enterprise OBSERVER ONLY).
+ * Phase 8.11 - Dual-read observation (Enterprise OBSERVER ONLY).
  * LIVE remains the sole authorization authority.
  */
 const { describe, it } = require('node:test');
@@ -83,7 +83,7 @@ async function withFlag(value, fn) {
 }
 
 describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
-  it('Phase8.11 A: feature OFF — observer skipped; LIVE auth unchanged', async () => {
+  it('Phase8.11 A: feature OFF - observer skipped; LIVE auth unchanged', async () => {
     resetParityMetricsForTests();
     await withFlag('false', async () => {
       assert.equal(isRbacParityObserveEnabled(), false);
@@ -108,7 +108,7 @@ describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
     });
   });
 
-  it('Phase8.11 B: feature ON — observer runs; LIVE remains authoritative ALLOW', async () => {
+  it('Phase8.11 B: feature ON - observer runs; LIVE remains authoritative ALLOW', async () => {
     resetParityMetricsForTests();
     await withFlag('true', async () => {
       assert.equal(isRbacParityObserveEnabled(), true);
@@ -224,7 +224,7 @@ describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
     });
   });
 
-  it('Phase8.11 G: observer throws — LIVE result still applied', async () => {
+  it('Phase8.11 G: observer throws - LIVE result still applied', async () => {
     await withFlag('true', async () => {
       const parityCompare = require('../../services/rbacParity/compareLiveEnterprise');
       const orig = parityCompare.compareStaffLivePermission;
@@ -407,7 +407,7 @@ describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
     });
   });
 
-  it('Phase8.11 O: no response mutation — comparison not on client body', async () => {
+  it('Phase8.11 O: no response mutation - comparison not on client body', async () => {
     await withFlag('true', async () => {
       await withTeacher(
         { adminRole: 'STAFF', permissions: [], role: 'staff' },
@@ -418,7 +418,7 @@ describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
             body: { wantEnterprise: true },
           });
           const res = mockRes();
-          await mw(req, res, () => {});
+          await mw(req, res, () => { });
           assert.equal(res.statusCode, 403);
           const s = JSON.stringify(res.body);
           assert.ok(!s.includes('RBAC_PARITY'));
@@ -457,7 +457,7 @@ describe('Phase 8.11 dual-read observation', { concurrency: false }, () => {
     assert.ok(auth.includes('observeLiveStaffGate'));
     assert.ok(
       auth.includes("liveDecision: ok ? 'ALLOW' : 'DENY'")
-        || auth.includes('liveDecision: ok ? "ALLOW" : "DENY"'),
+      || auth.includes('liveDecision: ok ? "ALLOW" : "DENY"'),
     );
     const observeIdx = auth.indexOf('observeLiveStaffGate');
     const nextIdx = auth.indexOf('if (ok) next()', observeIdx);

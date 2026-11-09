@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Phase 10 messaging load harness — isolated DB, real server.js, real socket.io-client.
+ * Phase 10 messaging load harness - isolated DB, real server.js, real socket.io-client.
  * Does NOT change MessagingPolicy / pairing / schemas.
  */
 const path = require('path');
@@ -465,7 +465,7 @@ function connectClient(actor, origin, { timeoutMs = 45000 } = {}) {
 
     socket.on('connect', () => {
       socket.emit('register', {});
-      // Presence broadcast can lag under load — accept connected+registered after grace.
+      // Presence broadcast can lag under load - accept connected+registered after grace.
       fallbackTimer = setTimeout(() => {
         if (socket.connected) finish(true);
       }, 4000);

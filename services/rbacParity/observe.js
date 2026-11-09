@@ -1,5 +1,5 @@
 /**
- * Phase 8.11 — Dual-read observation hook (NON-AUTHORITATIVE).
+ * Phase 8.11 - Dual-read observation hook (NON-AUTHORITATIVE).
  *
  * LIVE decision is always final. This module only compares + logs + meters.
  * Never writes HTTP responses, never calls next(), never mutates authz state.
@@ -28,7 +28,7 @@ function buildTrustedActor(req) {
     id: u.id || u._id || '',
     role: u.role || '',
     adminRole: u.adminRole || null,
-    // Trusted only — never req.body / query permissions
+    // Trusted only - never req.body / query permissions
     permissions: Array.isArray(u.permissions) ? u.permissions : [],
   };
 }
@@ -52,9 +52,9 @@ function classifyActorRole(actor) {
  *
  * @param {object} req
  * @param {object} opts
- * @param {'ALLOW'|'DENY'} opts.liveDecision — authoritative from assertStaffPermissions
- * @param {string} [opts.livePermission] — single permission (checkPermission)
- * @param {string[]} [opts.livePermissions] — OR list (checkAnyPermission)
+ * @param {'ALLOW'|'DENY'} opts.liveDecision - authoritative from assertStaffPermissions
+ * @param {string} [opts.livePermission] - single permission (checkPermission)
+ * @param {string[]} [opts.livePermissions] - OR list (checkAnyPermission)
  * @param {string} [opts.family]
  */
 function observeLiveStaffGate(req, opts = {}) {
@@ -105,7 +105,7 @@ function observeLiveStaffGate(req, opts = {}) {
       return null;
     }
 
-    // Ownership (shadow) — SUPER/root bypass
+    // Ownership (shadow) - SUPER/root bypass
     if (
       opts.ownershipOk === false
       && enterpriseResult.enterprise
@@ -174,9 +174,9 @@ function observeLiveStaffGate(req, opts = {}) {
     payload.evidenceChannel = evidenceChannel;
 
     if (comparison === COMPARISON.MISMATCH) {
-      logger.warn(payload, '[RBAC_PARITY] MISMATCH — LIVE remains authoritative');
+      logger.warn(payload, '[RBAC_PARITY] MISMATCH - LIVE remains authoritative');
     } else if (comparison === COMPARISON.UNSUPPORTED) {
-      logger.info(payload, '[RBAC_PARITY] UNSUPPORTED legacy-only — LIVE remains authoritative');
+      logger.info(payload, '[RBAC_PARITY] UNSUPPORTED legacy-only - LIVE remains authoritative');
     } else {
       logger.info(payload, '[RBAC_PARITY] observe');
     }
@@ -199,7 +199,7 @@ function observeLiveStaffGate(req, opts = {}) {
           requestId: req?.requestId || null,
           correlationId: req?.correlationId || null,
         },
-        '[RBAC_PARITY] observer failed — LIVE unchanged',
+        '[RBAC_PARITY] observer failed - LIVE unchanged',
       );
     } catch {
       /* swallow */

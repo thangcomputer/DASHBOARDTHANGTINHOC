@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { CheckCircle2, Clapperboard, ExternalLink, Lock, Play } from 'lucide-react-native';
@@ -13,7 +13,7 @@ import { spacing } from '../../theme/tokens';
 type PlaylistItem = { id: string; title: string; url: string; source: 'unit' | 'step' | 'lesson'; locked: boolean; stepLabel?: string };
 
 /**
- * Popup video của chặng — mở ngay trên màn lộ trình, đóng lại là về đúng chỗ đang xem.
+ * Popup video của chặng - mở ngay trên màn lộ trình, đóng lại là về đúng chỗ đang xem.
  * Danh sách phát: video riêng của chặng + video buổi bài giảng đã gắn (vẫn có nút mở trang bài giảng).
  */
 export function PathVideoModal({ unit, initialVideoId = '', color, userId, play, onClose, onWatched, onOpenLesson }: {
@@ -145,7 +145,7 @@ export function PathVideoModal({ unit, initialVideoId = '', color, userId, play,
                 >
                   <Play size={38} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 6 }} />
                 </Pressable>
-                {!playable ? <Text style={styles.startLabel}>Liên kết video chưa đúng — trung tâm sẽ cập nhật sớm</Text> : null}
+                {!playable ? <Text style={styles.startLabel}>Liên kết video chưa đúng - trung tâm sẽ cập nhật sớm</Text> : null}
               </View>
             )}
           </View>

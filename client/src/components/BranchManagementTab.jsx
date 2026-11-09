@@ -16,7 +16,7 @@ import { csrfFetch } from '../services/api';
 const API = import.meta.env.VITE_API_URL || '';
 
 function getToken() {
-  for (const role of ['admin','staff','teacher']) {
+  for (const role of ['admin', 'staff', 'teacher']) {
     const directToken = localStorage.getItem(`${role}_access_token`);
     if (directToken) return directToken;
     const s = localStorage.getItem(`${role}_user`);
@@ -34,7 +34,7 @@ function getToken() {
 
 const EMPTY = { name: '', code: '', address: '', phone: '', isActive: true };
 
-// ── Field component — PHẢI khai báo ngoài BranchModal để tránh mất focus ──────
+// ── Field component - PHẢI khai báo ngoài BranchModal để tránh mất focus ──────
 function BranchField({ label, name, placeholder, icon: Icon, type, hint, value, onChange }) {
   return (
     <div>
@@ -56,7 +56,7 @@ function BranchField({ label, name, placeholder, icon: Icon, type, hint, value, 
 
 // ── Inline Modal ──────────────────────────────────────────────────────────────
 function BranchModal({ branch, onClose, onSaved }) {
-  const toast  = useToast();
+  const toast = useToast();
   const isEdit = !!branch?._id;
   const [form, setForm] = useState(branch ? { ...branch } : { ...EMPTY });
   const [saving, setSaving] = useState(false);
@@ -69,7 +69,7 @@ function BranchModal({ branch, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      const url    = isEdit ? `${API}/api/branches/${branch._id}` : `${API}/api/branches`;
+      const url = isEdit ? `${API}/api/branches/${branch._id}` : `${API}/api/branches`;
       const method = isEdit ? 'PUT' : 'POST';
       const res = await csrfFetch(url, {
         method,
@@ -105,11 +105,11 @@ function BranchModal({ branch, onClose, onSaved }) {
         </div>
 
         <div className="p-6 space-y-4">
-          <BranchField label="Tên chi nhánh *"  name="name"    placeholder="Cơ sở 1 - Quận 1"      icon={Building2} value={form.name}    onChange={setField} />
-          <BranchField label="Mã chi nhánh *"   name="code"    placeholder="CS1"                    icon={Hash}      value={form.code}    onChange={setField}
-             hint="Dùng làm prefix trong nội dung QR chuyển khoản (VD: CS1 TTH123 Nop hoc phi)" />
-          <BranchField label="Địa chỉ"          name="address" placeholder="123 Đường ABC, Quận X"  icon={MapPin}    value={form.address} onChange={setField} />
-          <BranchField label="Số điện thoại"    name="phone"   placeholder="028 xxxxxxx"             icon={Phone}     value={form.phone}   onChange={setField} />
+          <BranchField label="Tên chi nhánh *" name="name" placeholder="Cơ sở 1 - Quận 1" icon={Building2} value={form.name} onChange={setField} />
+          <BranchField label="Mã chi nhánh *" name="code" placeholder="CS1" icon={Hash} value={form.code} onChange={setField}
+            hint="Dùng làm prefix trong nội dung QR chuyển khoản (VD: CS1 TTH123 Nop hoc phi)" />
+          <BranchField label="Địa chỉ" name="address" placeholder="123 Đường ABC, Quận X" icon={MapPin} value={form.address} onChange={setField} />
+          <BranchField label="Số điện thoại" name="phone" placeholder="028 xxxxxxx" icon={Phone} value={form.phone} onChange={setField} />
 
           {isEdit && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
@@ -118,7 +118,7 @@ function BranchModal({ branch, onClose, onSaved }) {
                 className={`flex items-center gap-2 text-sm font-bold transition ${form.isActive ? 'text-emerald-600' : 'text-gray-400'}`}>
                 {form.isActive
                   ? <><ToggleRight size={22} className="text-emerald-500" /> Đang hoạt động</>
-                  : <><ToggleLeft  size={22} /> Đã vô hiệu</>
+                  : <><ToggleLeft size={22} /> Đã vô hiệu</>
                 }
               </button>
             </div>
@@ -146,8 +146,8 @@ export default function BranchManagementTab() {
   const toast = useToast();
   const { showModal } = useModal();
   const [branches, setBranches] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [modal, setModal]       = useState(undefined); // undefined=hidden null=add obj=edit
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(undefined); // undefined=hidden null=add obj=edit
   const [deleting, setDeleting] = useState(null);
 
   const fetchBranches = useCallback(() => {
@@ -246,16 +246,14 @@ export default function BranchManagementTab() {
           {branches.map(b => (
             <div
               key={b._id}
-              className={`rounded-xl border p-3.5 transition ${
-                b.isActive
+              className={`rounded-xl border p-3.5 transition ${b.isActive
                   ? 'bg-white border-slate-200'
                   : 'bg-slate-50 border-slate-200 opacity-70'
-              }`}
+                }`}
             >
               <div className="flex items-start gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  b.isActive ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-500'
-                }`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${b.isActive ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-500'
+                  }`}>
                   <Building2 size={18} />
                 </div>
 

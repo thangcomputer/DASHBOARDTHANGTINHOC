@@ -1,5 +1,5 @@
 /**
- * Phase 7.6 — Controlled cutover + production activation for /api/tenants
+ * Phase 7.6 - Controlled cutover + production activation for /api/tenants
  * (alongside existing backups + monitoring Policy-primary).
  */
 const test = require('node:test');
@@ -46,10 +46,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -225,7 +225,7 @@ test('Phase7.6 resource semantics: status/branchId/paramsId do not alter SUPER g
     parity('get', high, { queryTenantId: 'other' }, { paramsId: 'missing-resource' }).policy.decision,
     'DENY',
   );
-  // Missing resource: SUPER still ALLOW (handler may 404) — authz is not 404
+  // Missing resource: SUPER still ALLOW (handler may 404) - authz is not 404
   assert.equal(
     parity('stats', superS, {}, { paramsId: 'does-not-exist' }).policy.decision,
     'ALLOW',
@@ -287,9 +287,9 @@ test('Phase7.6 rollback TESTED AND RESTORED: remove tenants → LEGACY; restore 
   if (parsed) assert.equal(parsed.POLICY_CUTOVER_ENABLED, 'true');
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('backups'));
-      assert.ok(restoredRoutes.includes('monitoring'));
-      assert.ok(restoredRoutes.includes('tenants'));
+    assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('monitoring'));
+    assert.ok(restoredRoutes.includes('tenants'));
   }
 });
 
@@ -302,8 +302,8 @@ test('Phase7.6 functional smoke: non-destructive authz PASS; mutations NOT EXECU
   assert.equal(parity('update', superS).policy.decision, 'ALLOW');
   assert.equal(parity('assign_branch', superS).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — destructive/persistent production mutation',
-    'NOT EXECUTED — destructive/persistent production mutation',
+    'NOT EXECUTED - destructive/persistent production mutation',
+    'NOT EXECUTED - destructive/persistent production mutation',
   );
 });
 
@@ -327,7 +327,7 @@ test('Phase7.6 static: wiring + isolation + CQRS OFF + no Policy side effects + 
   if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 
   for (const a of ACTIONS) {
     assert.ok(routes.includes(`guard('${a}')`), a);

@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Mirror client/src/utils/schedulingLimits.js — keep in sync
+// Mirror client/src/utils/schedulingLimits.js - keep in sync
 
 const MAX_STUDENT_SESSIONS_PER_DAY = 1;
 const SLOT_OCCUPYING = new Set(['scheduled', 'completed', 'no_show']);
@@ -116,7 +116,7 @@ test('TEST6: HV2 same day different student → PASS', () => {
   assert.equal(g.canSchedule, true);
 });
 
-test('TEST7: Teacher multi-HV same day — each student isolated', () => {
+test('TEST7: Teacher multi-HV same day - each student isolated', () => {
   const schedules = [
     { _id: '1', studentId: 'A', course: 'Excel', status: 'scheduled', date: DAY },
     { _id: '2', studentId: 'B', course: 'Word', status: 'scheduled', date: DAY },
@@ -136,7 +136,7 @@ test('TEST9: cancelled does not consume daily slot', () => {
   assert.equal(g.canSchedule, true);
 });
 
-test('TEST10: reschedule exclude self — not counted as second session', () => {
+test('TEST10: reschedule exclude self - not counted as second session', () => {
   const schedules = [{
     _id: 'self', studentId: 'A', course: 'Excel', status: 'scheduled', date: DAY,
   }];

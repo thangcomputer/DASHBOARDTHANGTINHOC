@@ -12,7 +12,7 @@ function emit(id, open) {
   } catch { /* ignore */ }
 }
 
-/** Overlay đăng nhập đang mở — popup tin/lịch / QC đợi xong mới hiện. */
+/** Overlay đăng nhập đang mở - popup tin/lịch / QC đợi xong mới hiện. */
 export function setLoginOverlay(id, open) {
   if (!id) return;
   const key = String(id);
@@ -25,7 +25,7 @@ export function getActiveLoginOverlayIds() {
   return Array.from(activeOverlays.keys());
 }
 
-/** Có overlay đang chặn không? (bỏ qua exceptIds — vd. chính PopupBanner). */
+/** Có overlay đang chặn không? (bỏ qua exceptIds - vd. chính PopupBanner). */
 export function hasBlockingLoginOverlay(exceptIds = []) {
   const except = new Set((exceptIds || []).map(String).filter(Boolean));
   for (const id of activeOverlays.keys()) {
@@ -35,7 +35,7 @@ export function hasBlockingLoginOverlay(exceptIds = []) {
 }
 
 export function subscribeLoginOverlays(onChange) {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
   const handler = () => {
     try { onChange(getActiveLoginOverlayIds()); } catch { /* ignore */ }
   };

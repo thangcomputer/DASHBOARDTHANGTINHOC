@@ -2,7 +2,7 @@
 
 /**
  * Shared scheduling business rules (student-scoped).
- * Backend SoT — do not trust FE progress/status.
+ * Backend SoT - do not trust FE progress/status.
  *
  * RULE A: MAX_STUDENT_SESSIONS_PER_DAY per studentId+date (not teacherId).
  * RULE B: enrollment capacity = lịch (scheduled+completed) + buổi ghi nhận trước
@@ -124,7 +124,7 @@ async function findTeacherScheduleClash({
 
 /**
  * Assert enrollment can accept a new (or additional) schedule slot.
- * Loads student from DB — never trusts FE counters.
+ * Loads student from DB - never trusts FE counters.
  */
 async function assertEnrollmentCanSchedule({ studentId, courseName, excludeScheduleId } = {}) {
   const student = await Student.findById(studentId)
@@ -170,7 +170,7 @@ async function assertEnrollmentCanSchedule({ studentId, courseName, excludeSched
   });
 
   // Buổi ghi nhận trước (Admin chỉnh completedSessions cao hơn số ca completed trên lịch)
-  // vẫn chiếm slot — tránh xếp vượt «còn lại» trên hồ sơ.
+  // vẫn chiếm slot - tránh xếp vượt «còn lại» trên hồ sơ.
   const calendarCompleted = await Schedule.countDocuments({
     studentId,
     status: 'completed',
@@ -228,7 +228,7 @@ async function assertTeacherNoConflict({
     throw schedulingError(
       ERROR_CODES.TEACHER_SCHEDULE_CONFLICT,
       `Giáo viên đã có lịch trùng thời gian này (${clash.startTime}${end}`
-        + (clash.studentName ? `, HV: ${clash.studentName}` : '') + ').',
+      + (clash.studentName ? `, HV: ${clash.studentName}` : '') + ').',
       { clash },
     );
   }

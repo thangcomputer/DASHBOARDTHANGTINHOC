@@ -1,5 +1,5 @@
 /**
- * EmployeeManagementTab.jsx — Module Quản lý Nhân sự & Trả lương
+ * EmployeeManagementTab.jsx - Module Quản lý Nhân sự & Trả lương
  * Tab 1: Danh sách nhân sự (CRUD)
  * Tab 2: Trả lương (thanh toán + VietQR + lịch sử)
  */
@@ -18,7 +18,7 @@ import { csrfFetch } from '../services/api';
 const API = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : '';
 
 function getToken() {
-  for (const role of ['admin','staff','teacher','student']) {
+  for (const role of ['admin', 'staff', 'teacher', 'student']) {
     const directToken = localStorage.getItem(`${role}_access_token`);
     if (directToken) return directToken;
     const s = localStorage.getItem(`${role}_user`);
@@ -35,57 +35,57 @@ function getToken() {
 }
 
 const POSITIONS = [
-  { value: 'BAO_VE',     label: 'Bảo vệ',     emoji: '🛡️' },
-  { value: 'QUAN_LY',    label: 'Quản lý',     emoji: '👔' },
-  { value: 'GIANG_VIEN', label: 'Giảng viên',   emoji: '👨‍🏫' },
-  { value: 'THU_VIEC',   label: 'Thử việc',     emoji: '🆕' },
-  { value: 'IT',          label: 'IT',           emoji: '💻' },
-  { value: 'KE_TOAN',    label: 'Kế toán',     emoji: '📊' },
-  { value: 'THU_NGAN',   label: 'Thu ngân',     emoji: '💵' },
-  { value: 'TRO_GIANG',  label: 'Trợ giảng',   emoji: '📚' },
-  { value: 'KHAC',        label: 'Khác',         emoji: '📋' },
+  { value: 'BAO_VE', label: 'Bảo vệ', emoji: '🛡️' },
+  { value: 'QUAN_LY', label: 'Quản lý', emoji: '👔' },
+  { value: 'GIANG_VIEN', label: 'Giảng viên', emoji: '👨‍🏫' },
+  { value: 'THU_VIEC', label: 'Thử việc', emoji: '🆕' },
+  { value: 'IT', label: 'IT', emoji: '💻' },
+  { value: 'KE_TOAN', label: 'Kế toán', emoji: '📊' },
+  { value: 'THU_NGAN', label: 'Thu ngân', emoji: '💵' },
+  { value: 'TRO_GIANG', label: 'Trợ giảng', emoji: '📚' },
+  { value: 'KHAC', label: 'Khác', emoji: '📋' },
 ];
 
 // ── Danh sách Ngân hàng Việt Nam (VietQR bin code) ──────────────────────────
 const VN_BANKS = [
-  { code: '970436', shortName: 'Vietcombank',      name: 'Ngân hàng TMCP Ngoại Thương Việt Nam' },
-  { code: '970418', shortName: 'BIDV',             name: 'Ngân hàng TMCP Đầu Tư và Phát Triển Việt Nam' },
-  { code: '970415', shortName: 'VietinBank',       name: 'Ngân hàng TMCP Công Thương Việt Nam' },
-  { code: '970405', shortName: 'Agribank',         name: 'Ngân hàng NN & PTNT Việt Nam' },
-  { code: '970416', shortName: 'ACB',              name: 'Ngân hàng TMCP Á Châu' },
-  { code: '970407', shortName: 'Techcombank',       name: 'Ngân hàng TMCP Kỹ Thương Việt Nam' },
-  { code: '970423', shortName: 'TPBank',           name: 'Ngân hàng TMCP Tiên Phong' },
-  { code: '970422', shortName: 'MBBank',           name: 'Ngân hàng TMCP Quân Đội' },
-  { code: '970432', shortName: 'VPBank',           name: 'Ngân hàng TMCP Việt Nam Thịnh Vượng' },
-  { code: '970448', shortName: 'OCB',              name: 'Ngân hàng TMCP Phương Đông' },
-  { code: '970431', shortName: 'Eximbank',         name: 'Ngân hàng TMCP Xuất Nhập Khẩu Việt Nam' },
-  { code: '970443', shortName: 'SHB',              name: 'Ngân hàng TMCP Sài Gòn – Hà Nội' },
-  { code: '970403', shortName: 'Sacombank',        name: 'Ngân hàng TMCP Sài Gòn Thương Tín' },
-  { code: '970437', shortName: 'HDBank',           name: 'Ngân hàng TMCP Phát Triển TPHCM' },
-  { code: '970441', shortName: 'VIB',              name: 'Ngân hàng TMCP Quốc Tế Việt Nam' },
-  { code: '970427', shortName: 'VietABank',        name: 'Ngân hàng TMCP Việt Á' },
+  { code: '970436', shortName: 'Vietcombank', name: 'Ngân hàng TMCP Ngoại Thương Việt Nam' },
+  { code: '970418', shortName: 'BIDV', name: 'Ngân hàng TMCP Đầu Tư và Phát Triển Việt Nam' },
+  { code: '970415', shortName: 'VietinBank', name: 'Ngân hàng TMCP Công Thương Việt Nam' },
+  { code: '970405', shortName: 'Agribank', name: 'Ngân hàng NN & PTNT Việt Nam' },
+  { code: '970416', shortName: 'ACB', name: 'Ngân hàng TMCP Á Châu' },
+  { code: '970407', shortName: 'Techcombank', name: 'Ngân hàng TMCP Kỹ Thương Việt Nam' },
+  { code: '970423', shortName: 'TPBank', name: 'Ngân hàng TMCP Tiên Phong' },
+  { code: '970422', shortName: 'MBBank', name: 'Ngân hàng TMCP Quân Đội' },
+  { code: '970432', shortName: 'VPBank', name: 'Ngân hàng TMCP Việt Nam Thịnh Vượng' },
+  { code: '970448', shortName: 'OCB', name: 'Ngân hàng TMCP Phương Đông' },
+  { code: '970431', shortName: 'Eximbank', name: 'Ngân hàng TMCP Xuất Nhập Khẩu Việt Nam' },
+  { code: '970443', shortName: 'SHB', name: 'Ngân hàng TMCP Sài Gòn – Hà Nội' },
+  { code: '970403', shortName: 'Sacombank', name: 'Ngân hàng TMCP Sài Gòn Thương Tín' },
+  { code: '970437', shortName: 'HDBank', name: 'Ngân hàng TMCP Phát Triển TPHCM' },
+  { code: '970441', shortName: 'VIB', name: 'Ngân hàng TMCP Quốc Tế Việt Nam' },
+  { code: '970427', shortName: 'VietABank', name: 'Ngân hàng TMCP Việt Á' },
   { code: '970449', shortName: 'LienVietPostBank', name: 'Ngân hàng TMCP Bưu Điện Liên Việt' },
-  { code: '970426', shortName: 'MSB',              name: 'Ngân hàng TMCP Hàng Hải Việt Nam' },
-  { code: '970414', shortName: 'OceanBank',        name: 'Ngân hàng TNHH MTV Đại Dương' },
-  { code: '970429', shortName: 'SCB',              name: 'Ngân hàng TMCP Sài Gòn' },
-  { code: '970433', shortName: 'VietBank',         name: 'Ngân hàng TMCP Việt Nam Thương Tín' },
-  { code: '970440', shortName: 'SeABank',          name: 'Ngân hàng TMCP Đông Nam Á' },
-  { code: '970424', shortName: 'ShinhanBank',      name: 'Ngân hàng TNHH MTV Shinhan Việt Nam' },
-  { code: '970452', shortName: 'KienLongBank',     name: 'Ngân hàng TMCP Kiên Long' },
-  { code: '970430', shortName: 'PGBank',           name: 'Ngân hàng TMCP Xăng Dầu Petrolimex' },
-  { code: '970400', shortName: 'SaigonBank',       name: 'Ngân hàng TMCP Sài Gòn Công Thương' },
-  { code: '970412', shortName: 'DongABank',        name: 'Ngân hàng TMCP Đông Á' },
-  { code: '970458', shortName: 'UnitedOverseas',   name: 'Ngân hàng United Overseas Bank Việt Nam' },
-  { code: '970425', shortName: 'ABBank',           name: 'Ngân hàng TMCP An Bình' },
-  { code: '970446', shortName: 'COOPBANK',         name: 'Ngân hàng Hợp tác xã Việt Nam' },
-  { code: '970457', shortName: 'Woori',            name: 'Ngân hàng TNHH MTV Woori Việt Nam' },
-  { code: '970462', shortName: 'KookminHN',        name: 'Ngân hàng Kookmin - CN Hà Nội' },
-  { code: '970409', shortName: 'BacABank',         name: 'Ngân hàng TMCP Bắc Á' },
-  { code: '970434', shortName: 'IndovinaBank',     name: 'Ngân hàng TNHH Indovina' },
-  { code: '422589', shortName: 'CIMB',             name: 'Ngân hàng TNHH MTV CIMB Việt Nam' },
-  { code: '546034', shortName: 'KBank',            name: 'Ngân hàng Đại Chúng TNHH Kasikornbank' },
+  { code: '970426', shortName: 'MSB', name: 'Ngân hàng TMCP Hàng Hải Việt Nam' },
+  { code: '970414', shortName: 'OceanBank', name: 'Ngân hàng TNHH MTV Đại Dương' },
+  { code: '970429', shortName: 'SCB', name: 'Ngân hàng TMCP Sài Gòn' },
+  { code: '970433', shortName: 'VietBank', name: 'Ngân hàng TMCP Việt Nam Thương Tín' },
+  { code: '970440', shortName: 'SeABank', name: 'Ngân hàng TMCP Đông Nam Á' },
+  { code: '970424', shortName: 'ShinhanBank', name: 'Ngân hàng TNHH MTV Shinhan Việt Nam' },
+  { code: '970452', shortName: 'KienLongBank', name: 'Ngân hàng TMCP Kiên Long' },
+  { code: '970430', shortName: 'PGBank', name: 'Ngân hàng TMCP Xăng Dầu Petrolimex' },
+  { code: '970400', shortName: 'SaigonBank', name: 'Ngân hàng TMCP Sài Gòn Công Thương' },
+  { code: '970412', shortName: 'DongABank', name: 'Ngân hàng TMCP Đông Á' },
+  { code: '970458', shortName: 'UnitedOverseas', name: 'Ngân hàng United Overseas Bank Việt Nam' },
+  { code: '970425', shortName: 'ABBank', name: 'Ngân hàng TMCP An Bình' },
+  { code: '970446', shortName: 'COOPBANK', name: 'Ngân hàng Hợp tác xã Việt Nam' },
+  { code: '970457', shortName: 'Woori', name: 'Ngân hàng TNHH MTV Woori Việt Nam' },
+  { code: '970462', shortName: 'KookminHN', name: 'Ngân hàng Kookmin - CN Hà Nội' },
+  { code: '970409', shortName: 'BacABank', name: 'Ngân hàng TMCP Bắc Á' },
+  { code: '970434', shortName: 'IndovinaBank', name: 'Ngân hàng TNHH Indovina' },
+  { code: '422589', shortName: 'CIMB', name: 'Ngân hàng TNHH MTV CIMB Việt Nam' },
+  { code: '546034', shortName: 'KBank', name: 'Ngân hàng Đại Chúng TNHH Kasikornbank' },
   { code: '970410', shortName: 'StandardChartered', name: 'Ngân hàng TNHH MTV Standard Chartered Việt Nam' },
-  { code: '970439', shortName: 'PublicBank',       name: 'Ngân hàng TNHH MTV Public Bank Việt Nam' },
+  { code: '970439', shortName: 'PublicBank', name: 'Ngân hàng TNHH MTV Public Bank Việt Nam' },
 ];
 
 const BANK_MAP = Object.fromEntries(VN_BANKS.map(b => [b.code, b]));
@@ -96,7 +96,7 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString('vi-VN') : '';
 
 // ── Session info ─────────────────────────────────────────────────────────────
 function getSession() {
-  for (const k of ['admin_user','staff_user']) {
+  for (const k of ['admin_user', 'staff_user']) {
     try {
       const s = JSON.parse(localStorage.getItem(k) || '{}');
       if (s?.id) return s;
@@ -111,28 +111,28 @@ export default function EmployeeManagementTab() {
   const [activeTab, setActiveTab] = useState('list');  // 'list' | 'payroll'
   const [employees, setEmployees] = useState([]);
   const [payrollLogs, setPayrollLogs] = useState([]);
-  const [stats, setStats]         = useState(null);
-  const [loading, setLoading]     = useState(false);
-  const [search, setSearch]       = useState('');
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
   const [posFilter, setPosFilter] = useState('all');
-  const [error, setError]         = useState('');
+  const [error, setError] = useState('');
 
   // Modal states
-  const [showForm, setShowForm]     = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
   const [showPayModal, setShowPayModal] = useState(null);  // employee obj
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Form fields
-  const emptyForm = { name:'', phone:'', position:'KHAC', baseSalary:'', startDate:'', note:'', branchId:'', branchCode:'', bankCode:'', bankAccountNumber:'', bankAccountName:'' };
+  const emptyForm = { name: '', phone: '', position: 'KHAC', baseSalary: '', startDate: '', note: '', branchId: '', branchCode: '', bankCode: '', bankAccountNumber: '', bankAccountName: '' };
   const [form, setForm] = useState(emptyForm);
-  const [payForm, setPayForm] = useState({ amount:'', payDate:'', note:'', monthLabel:'' });
+  const [payForm, setPayForm] = useState({ amount: '', payDate: '', note: '', monthLabel: '' });
   const [saving, setSaving] = useState(false);
 
   const sess = getSession();
   const isSuperAdmin = sess?.id === 'admin' || sess?.adminRole === 'SUPER_ADMIN';
   const headers = { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' };
-  
+
   const { selectedBranchId } = useBranch();
 
   // ── Branches (for super admin) ──
@@ -142,7 +142,7 @@ export default function EmployeeManagementTab() {
       fetch(`${API}/api/branches`, { headers: { Authorization: `Bearer ${getToken()}` } })
         .then(r => r.json())
         .then(res => { if (res.success) setBranches(res.data || []); })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, []);
 
@@ -164,9 +164,9 @@ export default function EmployeeManagementTab() {
         fetch(`${API}/api/employees/stats?${bQuery.slice(1)}`, { headers }).then(r => r.json()),
         fetch(`${API}/api/employees/payroll?${bQuery.slice(1)}`, { headers }).then(r => r.json()),
       ]);
-      if (empRes.success)   setEmployees(empRes.data);
+      if (empRes.success) setEmployees(empRes.data);
       if (statsRes.success) setStats(statsRes.data);
-      if (payRes.success)   setPayrollLogs(payRes.data);
+      if (payRes.success) setPayrollLogs(payRes.data);
     } catch { setError('Lỗi kết nối server'); }
     finally { setLoading(false); }
   }, [posFilter, search, selectedBranchId]);
@@ -229,7 +229,7 @@ export default function EmployeeManagementTab() {
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      const res = await csrfFetch(`${API}/api/employees/${deleteConfirm._id}`, { method:'DELETE', headers });
+      const res = await csrfFetch(`${API}/api/employees/${deleteConfirm._id}`, { method: 'DELETE', headers });
       const data = await res.json();
       if (data.success) { setDeleteConfirm(null); fetchAll(); }
       else setError(data.message);
@@ -247,7 +247,7 @@ export default function EmployeeManagementTab() {
       const data = await res.json();
       if (data.success) {
         setShowPayModal(null);
-        setPayForm({ amount:'', payDate:'', note:'', monthLabel:'' });
+        setPayForm({ amount: '', payDate: '', note: '', monthLabel: '' });
         fetchAll();
       } else setError(data.message);
     } catch { setError('Lỗi thanh toán'); }
@@ -316,9 +316,8 @@ export default function EmployeeManagementTab() {
           <button
             type="button"
             onClick={() => setShowSalaries(!showSalaries)}
-            className={`cms-hr-btn w-full md:w-auto ${
-              showSalaries ? 'cms-hr-btn-amber' : 'cms-hr-btn-muted'
-            }`}
+            className={`cms-hr-btn w-full md:w-auto ${showSalaries ? 'cms-hr-btn-amber' : 'cms-hr-btn-muted'
+              }`}
           >
             {showSalaries ? <X size={14} /> : <QrCode size={14} />}
             {showSalaries ? 'Khóa bảo mật' : 'Xem số liệu'}
@@ -460,7 +459,7 @@ export default function EmployeeManagementTab() {
                         {(isSuperAdmin || emp.branchCode) && (
                           <p className="text-slate-600">
                             <span className="text-slate-400 text-[12px] font-semibold  tracking-wide mr-1">Chi nhánh</span>
-                            {emp.branchCode || '—'}
+                            {emp.branchCode || '-'}
                           </p>
                         )}
                         <p className="text-slate-800 font-semibold">
@@ -531,7 +530,7 @@ export default function EmployeeManagementTab() {
                     {isSuperAdmin && (
                       <td className="px-4 py-4">
                         <span className="text-xs text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full font-semibold border border-teal-200">
-                          🏢 {emp.branchCode || '—'}
+                          🏢 {emp.branchCode || '-'}
                         </span>
                       </td>
                     )}
@@ -643,7 +642,7 @@ export default function EmployeeManagementTab() {
                     <span className="text-[12px] text-slate-500">{fmtDate(log.payDate)}</span>
                   </div>
                   {(log.monthLabel || log.note) && (
-                    <p className="text-[13px] text-slate-500">{log.monthLabel}{log.note ? ` — ${log.note}` : ''}</p>
+                    <p className="text-[13px] text-slate-500">{log.monthLabel}{log.note ? ` - ${log.note}` : ''}</p>
                   )}
                 </article>
               ))}
@@ -680,7 +679,7 @@ export default function EmployeeManagementTab() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-gray-500">{fmtDate(log.payDate)}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{log.monthLabel}{log.note ? ` — ${log.note}` : ''}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{log.monthLabel}{log.note ? ` - ${log.note}` : ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -752,7 +751,7 @@ export default function EmployeeManagementTab() {
                         setForm((f) => ({ ...f, branchId: e.target.value, branchCode: br?.code || br?.name || '' }));
                       }}
                         className="cms-hr-input w-full">
-                        <option value="">— Chọn chi nhánh —</option>
+                        <option value="">- Chọn chi nhánh -</option>
                         {branches.map((b) => <option key={b._id} value={b._id}>🏢 {b.name} ({b.code})</option>)}
                       </CmsSelect>
                     </div>
@@ -769,8 +768,8 @@ export default function EmployeeManagementTab() {
                     <label className="cms-hr-label">Ngân hàng</label>
                     <CmsSelect value={form.bankCode} onChange={(e) => setForm((f) => ({ ...f, bankCode: e.target.value }))}
                       className="cms-hr-input w-full">
-                      <option value="">— Chọn ngân hàng —</option>
-                      {VN_BANKS.map((b) => <option key={`${b.code}-${b.shortName}`} value={b.code}>🏦 {b.shortName} — {b.name}</option>)}
+                      <option value="">- Chọn ngân hàng -</option>
+                      {VN_BANKS.map((b) => <option key={`${b.code}-${b.shortName}`} value={b.code}>🏦 {b.shortName} - {b.name}</option>)}
                     </CmsSelect>
                   </div>
                   <div>
@@ -817,7 +816,7 @@ export default function EmployeeManagementTab() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={`Thanh toán lương — ${showPayModal.name}`}
+            aria-label={`Thanh toán lương - ${showPayModal.name}`}
             className="cms-sheet cms-hr-sheet w-full md:max-w-3xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -825,7 +824,7 @@ export default function EmployeeManagementTab() {
             <div className="cms-hr-sheet-header cms-hr-sheet-header-pay">
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2 min-w-0">
                 <DollarSign size={18} className="flex-shrink-0" />
-                <span className="truncate">Thanh toán — {showPayModal.name}</span>
+                <span className="truncate">Thanh toán - {showPayModal.name}</span>
               </h3>
               <button type="button" onClick={() => setShowPayModal(null)} className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center text-white" aria-label="Đóng">
                 <X size={18} />

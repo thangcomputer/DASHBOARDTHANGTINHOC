@@ -1,5 +1,5 @@
 /**
- * Phase 8.16 — Production soak readiness & evidence gate (audit tests).
+ * Phase 8.16 - Production soak readiness & evidence gate (audit tests).
  * Does NOT promote Enterprise. Does NOT claim production soak evidence.
  */
 const { describe, it } = require('node:test');
@@ -259,7 +259,7 @@ describe('Phase 8.16 production soak readiness gate', { concurrency: false }, ()
       assert.ok(Object.prototype.hasOwnProperty.call(j, 'SOAK_EVIDENCE'));
       assert.ok(j.soakWindow || j.soakDelta);
     }
-    // Phase 8.17 ships production orchestrator — must not auto-enable flags / PRIMARY
+    // Phase 8.17 ships production orchestrator - must not auto-enable flags / PRIMARY
     const prodScript = path.join(__dirname, '../../scripts/rbac-soak-production.cjs');
     assert.equal(fs.existsSync(prodScript), true);
     const prodSrc = fs.readFileSync(prodScript, 'utf8');
@@ -272,7 +272,7 @@ describe('Phase 8.16 production soak readiness gate', { concurrency: false }, ()
     const snap = computeAndRecordStaticParity();
     assert.equal(snap.mappedGateMatch, 8);
     assert.equal(snap.mappedGateMatchTarget, 8);
-    // Dimensions still requiring real RUNTIME soak (documented gate — not claimed here)
+    // Dimensions still requiring real RUNTIME soak (documented gate - not claimed here)
     const requiresRuntimeSoak = {
       roles: ['SUPER_ADMIN', 'HIGH_ADMIN', 'ADMIN_STAFF', 'SUPPORT_AGENT', 'TEACHER', 'STUDENT', 'LEGACY_PRINCIPAL', 'id=admin', 'unauthenticated'],
       branch: ['same', 'cross', 'null'],

@@ -1,5 +1,5 @@
 /**
- * Report builder — dinh nghia bao cao tu nguon he thong / form submissions.
+ * Report builder - dinh nghia bao cao tu nguon he thong / form submissions.
  */
 const ReportDefinition = require('../models/ReportDefinition');
 const FormDefinition = require('../models/FormDefinition');

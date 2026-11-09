@@ -1,6 +1,6 @@
 /**
  * Policy shadow for LIVE quiz routes except admin/all (Wave 6.2 quizAdminReadPolicy).
- * Mirrors routes/quizRoutes.js write/list/submit — including weak auth-only create.
+ * Mirrors routes/quizRoutes.js write/list/submit - including weak auth-only create.
  */
 const ACTIONS = new Set([
   'teacher_list',
@@ -26,7 +26,7 @@ function buildSubject({ user, actorDoc, userBranchId }) {
 
 /**
  * Legacy create/teacher_list/get: authMiddleware only.
- * Delete: ownership enforced via findOneAndDelete → 404 (not 403) — auth ALLOW.
+ * Delete: ownership enforced via findOneAndDelete → 404 (not 403) - auth ALLOW.
  * Submit/student_list: auth; handler 404 if Student missing.
  */
 function evaluateAuthOnly(subject) {

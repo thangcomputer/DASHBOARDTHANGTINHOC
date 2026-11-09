@@ -82,7 +82,7 @@ grep -E '^(ENABLE_CQRS|MONGODB_URI)=' .env || true`,
       );
       await run(ssh, 'GIT HEAD', 'git rev-parse --short HEAD && git status -sb', { cwd: APP, allowFail: true });
     } else {
-      console.log('No .git — uploading critical fix files via SFTP');
+      console.log('No .git - uploading critical fix files via SFTP');
       const files = [
         'config/validateEnv.js',
         'shared/cqrs/flags.js',

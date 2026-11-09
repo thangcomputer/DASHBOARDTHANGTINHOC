@@ -18,9 +18,9 @@ Distinction:
 | Claim | Status |
 |---|---|
 | ARCHITECTURALLY READY | Yes (Phase 9 + this evidence) |
-| LOAD-TEST PROVEN (1,000 concurrent + private DM) | **Yes** — this phase |
-| Multi-instance proven | **No** — not tested |
-| Reconnect storms at 1,000 | **Partial** — 10% reconnect failures |
+| LOAD-TEST PROVEN (1,000 concurrent + private DM) | **Yes** - this phase |
+| Multi-instance proven | **No** - not tested |
+| Reconnect storms at 1,000 | **Partial** - 10% reconnect failures |
 
 Evidence artifact: `artifacts/phase10-load-evidence.json`  
 Harness: `tests/load/messaging/runLoad.js`
@@ -37,7 +37,7 @@ Harness: `tests/load/messaging/runLoad.js`
 | MongoDB | Isolated DB `dashboardthangtinhoc_p10load` (host `127.0.0.1:27018`) |
 | Redis | **NOT USED** (`REDIS_URL` cleared for harness) |
 | Topology | **Single Node** |
-| Production data | **Not used** — dedicated Phase 10 DB dropped/reseeded |
+| Production data | **Not used** - dedicated Phase 10 DB dropped/reseeded |
 | JWT | Minted with `JWT_SECRET` (test actors only) |
 | Duration | ~2026-08-10T16:51:58Z → 16:58:48Z (~6.8 min wall) |
 
@@ -150,7 +150,7 @@ DM path: Student → Support **same tenant** (approved SUPPORT global-send behav
 | 500 | 100% | 1164 | 1652 | 1730 |
 | 1000 | 100% | 3129 | 6368 | 8508 |
 
-Connection time grows with online population — consistent with `broadcastOnlinePresence` cost on each `register`.
+Connection time grows with online population - consistent with `broadcastOnlinePresence` cost on each `register`.
 
 ---
 
@@ -236,7 +236,7 @@ Index creation: schema indexes on empty DB (no blind new indexes added).
 
 Private DM + presence worked via in-process Map + memory Socket.IO adapter.
 
-Classification: **NOT USED** (optional for single-node; still required for multi-instance — Phase 9).
+Classification: **NOT USED** (optional for single-node; still required for multi-instance - Phase 9).
 
 ---
 
@@ -257,7 +257,7 @@ Classification: **NOT USED** (optional for single-node; still required for multi
 | Support | 14 | 134 KB | 460 |
 | HIGH_ADMIN | 12 | 145 KB | 499 |
 
-At **current seed size (~1k users)** contacts remain fast. Phase 9 P2 (unbounded HIGH_ADMIN lists) remains a **future** risk if org size ≫ test dataset — not a measured bottleneck here.
+At **current seed size (~1k users)** contacts remain fast. Phase 9 P2 (unbounded HIGH_ADMIN lists) remains a **future** risk if org size ≫ test dataset - not a measured bottleneck here.
 
 ---
 
@@ -302,7 +302,7 @@ Under all measured DM traffic:
 | Message loss | **0** |
 | Security stop triggered | **No** |
 
-No P0 isolation failure — performance testing continued to completion.
+No P0 isolation failure - performance testing continued to completion.
 
 ---
 
@@ -360,27 +360,27 @@ Proven parameters:
 
 ## Findings
 
-### P0 — security/data isolation
+### P0 - security/data isolation
 
 None.
 
-### P1 — production correctness
+### P1 - production correctness
 
 None under load.
 
-### P2 — scalability
+### P2 - scalability
 
 1. **Presence broadcast** makes connection time grow with online users.
-2. **Reconnect under 1k** showed 10% failures — improve reconnect backoff / presence storm control before marketing “seamless reconnect at 1k”.
+2. **Reconnect under 1k** showed 10% failures - improve reconnect backoff / presence storm control before marketing “seamless reconnect at 1k”.
 3. **Broadcast O(targets)** OK at 175; still a cost center at much larger fanout.
 4. Multi-instance still requires Redis adapter + shared presence (unproven here).
 
-### P3 — observability / harness
+### P3 - observability / harness
 
 1. `console.log` on every connect/disconnect remains noisy at 1k (not removed this phase).
 2. High-rate probe after reconnect at 500 invalidated by harness stale socket map (measurement bug, not app bug).
 
-### P4 — cleanup
+### P4 - cleanup
 
 Phase 10 DB `dashboardthangtinhoc_p10load` may be dropped when convenient.
 
@@ -388,7 +388,7 @@ Phase 10 DB `dashboardthangtinhoc_p10load` may be dropped when convenient.
 
 ## Recommended Upgrades
 
-1. Reduce presence fanout cost (debounce / delta presence) — **only if** product needs faster mass connect/reconnect.
+1. Reduce presence fanout cost (debounce / delta presence) - **only if** product needs faster mass connect/reconnect.
 2. Enable Redis adapter + Redis presence before **multi-instance** deploy.
 3. Soften socket lifecycle `console.log` at scale.
 4. Re-test reconnect storms with client backoff after any presence change.
@@ -445,6 +445,6 @@ Phase 10 DB `dashboardthangtinhoc_p10load` may be dropped when convenient.
 
 ## Next Phase
 
-**STOP** — await approval for Phase 11.
+**STOP** - await approval for Phase 11.
 
 Do not implement speculative optimizations until product prioritizes a measured bottleneck (presence fanout / reconnect / multi-instance).

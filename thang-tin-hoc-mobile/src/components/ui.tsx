@@ -212,11 +212,16 @@ function BrandingTopBar() {
               source={{ uri: logoUrl }}
               style={styles.brandingLogo}
               resizeMode="contain"
-              accessibilityLabel="Logo Thắng Tin Học"
+              accessibilityLabel="Logo DewSkill"
               onError={() => setLogoLoadFailed(true)}
             />
           ) : (
-            <Text style={styles.brandingFallback}>Thắng Tin Học</Text>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.brandingLogo}
+              resizeMode="contain"
+              accessibilityLabel="Logo DewSkill"
+            />
           )}
         </Pressable>
         <Pressable

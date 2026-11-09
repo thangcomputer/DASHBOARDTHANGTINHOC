@@ -378,7 +378,7 @@ function gradeExamAttempt({ token, expected, bank, answers }) {
   }
 
   const allowedIds = new Set(payload.questionIds.map(String));
-  // Bỏ câu tự luận (publicQuestions ghép sau MC) — token chỉ chấm trắc nghiệm
+  // Bỏ câu tự luận (publicQuestions ghép sau MC) - token chỉ chấm trắc nghiệm
   const mcAnswers = answers.filter((answer) => allowedIds.has(String(answer?.questionId || '').trim()));
   if (mcAnswers.length !== payload.questionIds.length) {
     fail('Phải gửi đúng một câu trả lời cho mỗi câu hỏi', 400, 'ANSWER_COUNT_MISMATCH');

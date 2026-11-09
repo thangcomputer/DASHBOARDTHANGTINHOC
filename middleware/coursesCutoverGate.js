@@ -1,5 +1,5 @@
 /**
- * Phase 7.11 — Controlled cutover gate for /api/courses ONLY.
+ * Phase 7.11 - Controlled cutover gate for /api/courses ONLY.
  *
  * LEGACY (default):
  *   - list/get/stats → public (pass-through)
@@ -80,7 +80,7 @@ function coursesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] courses authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] courses authority helper failed - Legacy gate',
       );
     }
 
@@ -125,7 +125,7 @@ function coursesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] courses Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] courses Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -145,7 +145,7 @@ function coursesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] courses Policy ALLOW — Legacy write gate skipped',
+        '[POLICY_CUTOVER] courses Policy ALLOW - Legacy write gate skipped',
       );
       return next();
     }

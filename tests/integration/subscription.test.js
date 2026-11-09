@@ -36,7 +36,7 @@ test('nextExpiry: cộng từ max(hôm nay, hạn cũ); cuối tháng không tr�
   assert.equal(service.addMonths(new Date(2026, 0, 31), 1).getMonth(), 1, '31/1 + 1 tháng vẫn ở tháng 2');
 });
 
-test('pickReminder: chỉ 2 mốc — còn 7 ngày và ngày cuối, mỗi mốc 1 lần', () => {
+test('pickReminder: chỉ 2 mốc - còn 7 ngày và ngày cuối, mỗi mốc 1 lần', () => {
   const now = new Date('2026-05-10T01:00:00Z');
   const expiresAt = new Date(now.getTime() + 6.5 * DAY);
   const student = { subscription: { plan: '1m', expiresAt, remindedFor: [] } };

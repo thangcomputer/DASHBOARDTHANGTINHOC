@@ -30,7 +30,7 @@ function getStudentRefundedTotal(student) {
     .reduce((sum, e) => sum + Math.abs(Number(e.refundedAmount) || 0), 0);
 }
 
-/** Không còn khóa active — chỉ còn khóa đã hủy/hoàn → dòng mờ + khóa thao tác. */
+/** Không còn khóa active - chỉ còn khóa đã hủy/hoàn → dòng mờ + khóa thao tác. */
 function isStudentRowLocked(student) {
   const active = getActiveClientEnrollments(student);
   if (active.length > 0) return false;
@@ -53,7 +53,7 @@ function formatLastSeenLabel(lastSeenAt) {
   return `Truy cập ${Math.floor(diffSeconds / 86400)} ngày trước`;
 }
 
-/** Khóa active đã đóng phí — ưu tiên primary. */
+/** Khóa active đã đóng phí - ưu tiên primary. */
 function getRefundableEnrollment(student) {
   const paid = getActiveClientEnrollments(student).filter(isEnrollmentPaidFlag);
   if (!paid.length) return null;
@@ -66,7 +66,7 @@ function RefundHint({ amount }) {
   return (
     <p
       className="text-xs text-slate-400/90 mt-0.5 tabular-nums pointer-events-none select-none"
-      title="Hoàn học phí — chỉ xem, không chỉnh sửa"
+      title="Hoàn học phí - chỉ xem, không chỉnh sửa"
       aria-readonly="true"
     >
       −{amt.toLocaleString('vi-VN')}đ · hoàn
@@ -107,10 +107,10 @@ async function confirmAdminAction({ title, content, confirmText, confirmButtonCl
   return window.confirm(content);
 }
 
-/** Nút ⋯ + menu portal (fixed) — tránh bị che bởi overflow bảng/card. */
+/** Nút ⋯ + menu portal (fixed) - tránh bị che bởi overflow bảng/card. */
 function StudentRowActions({
-    submittingAction,
-    setSubmittingAction,
+  submittingAction,
+  setSubmittingAction,
   s,
   actionMenuId,
   setActionMenuId,
@@ -182,7 +182,7 @@ function StudentRowActions({
       });
     };
     place();
-    // Đo lại 1 lần sau khi menu mount (chiều cao thật) — không put object vào deps
+    // Đo lại 1 lần sau khi menu mount (chiều cao thật) - không put object vào deps
     const t = window.setTimeout(place, 0);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
@@ -224,16 +224,16 @@ function StudentRowActions({
         )}
         {!locked && (
           <button type="button" role="menuitem" onClick={async () => {
-                setActionMenuId(null);
-                setSubmittingAction(s.id + '-exam');
-                try {
-                  if (s.studentExamUnlocked) await revokeStudentExam(s.id);
-                  else await approveStudentExam(s.id);
-                } finally {
-                  setSubmittingAction(null);
-                }
-              }}
-              disabled={submittingAction === s.id + '-exam'}
+            setActionMenuId(null);
+            setSubmittingAction(s.id + '-exam');
+            try {
+              if (s.studentExamUnlocked) await revokeStudentExam(s.id);
+              else await approveStudentExam(s.id);
+            } finally {
+              setSubmittingAction(null);
+            }
+          }}
+            disabled={submittingAction === s.id + '-exam'}
             className={`${itemCls} text-slate-700 hover:bg-slate-50`}>
             {s.studentExamUnlocked
               ? <><Lock size={15} className="shrink-0 text-slate-500" /><span className="min-w-0">Khóa phòng thi</span></>
@@ -265,9 +265,8 @@ function StudentRowActions({
         {!locked && (
           <button type="button" role="menuitem" onClick={() => { handlePrintInvoice(s); setActionMenuId(null); }}
             disabled={!studentHasActivePaid(s)}
-            className={`${itemCls} ${
-              studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
-            }`}>
+            className={`${itemCls} ${studentHasActivePaid(s) ? 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' : 'text-slate-300 cursor-not-allowed'
+              }`}>
             <Printer size={15} className="shrink-0" />
             <span className="min-w-0">Xuất hóa đơn PDF</span>
           </button>
@@ -591,7 +590,7 @@ export default function AdminStudentsTab() {
           setDbCourses(json.data);
         }
       } catch {
-        /* ignore — giữ dropdown rỗng */
+        /* ignore - giữ dropdown rỗng */
       }
     })();
     return () => { cancelled = true; };
@@ -652,7 +651,7 @@ export default function AdminStudentsTab() {
   };
 
   const menuProps = {
-      submittingAction, setSubmittingAction,
+    submittingAction, setSubmittingAction,
     actionMenuId, setActionMenuId, setShowStudentDetailId,
     setEnrollmentModalStudent, approveStudentExam, revokeStudentExam,
     ctxUpdateStudent, toast, handlePrintInvoice, removeStudent,
@@ -837,7 +836,7 @@ export default function AdminStudentsTab() {
           </div>
         </div>
 
-        {/* Branch + Status (+ Course) — one wrapping row */}
+        {/* Branch + Status (+ Course) - one wrapping row */}
         <div className="cms-students-filters">
           <div className="lg:hidden">
             <BranchFilterDropdown fullWidth />
@@ -1067,7 +1066,7 @@ export default function AdminStudentsTab() {
                       <div className="min-w-0">
                         <p className="text-[10px] font-semibold text-slate-500  tracking-wide sm:hidden mb-1">Giảng viên HD</p>
                         {locked ? (
-                          <span className="text-xs text-slate-400 font-semibold">—</span>
+                          <span className="text-xs text-slate-400 font-semibold">-</span>
                         ) : (
                           renderTeacherSelects(s, enrollments, false, primaryEnr, teacherVal)
                         )}
@@ -1185,7 +1184,7 @@ export default function AdminStudentsTab() {
                   </td>
                   <td className="px-4 py-3 min-w-[180px] max-w-[260px]">
                     {locked ? (
-                      <span className="text-xs text-slate-400 font-semibold">—</span>
+                      <span className="text-xs text-slate-400 font-semibold">-</span>
                     ) : (
                       renderTeacherSelects(s, enrollments, hasMultiCourse, primaryEnr, teacherVal)
                     )}
@@ -1247,11 +1246,10 @@ export default function AdminStudentsTab() {
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`w-9 h-9 shrink-0 rounded-lg text-sm font-semibold transition-all ${
-                    p === cp
+                  className={`w-9 h-9 shrink-0 rounded-lg text-sm font-semibold transition-all ${p === cp
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >{p}</button>
               )
             ));
@@ -1354,7 +1352,7 @@ export default function AdminStudentsTab() {
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Mặc định 100%. Đổi tiền hoặc % — hai ô đồng bộ. Nhập 0 nếu không hoàn.
+                  Mặc định 100%. Đổi tiền hoặc % - hai ô đồng bộ. Nhập 0 nếu không hoàn.
                 </p>
               </div>
             </div>

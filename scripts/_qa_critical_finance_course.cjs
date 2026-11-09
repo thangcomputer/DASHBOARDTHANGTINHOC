@@ -12,7 +12,7 @@ const out = [];
 
 function record(id, name, pass, actual) {
   out.push({ id, name, result: pass ? 'PASS' : 'FAIL', actual });
-  console.log(`[${pass ? 'PASS' : 'FAIL'}] ${id} — ${name} | ${actual}`);
+  console.log(`[${pass ? 'PASS' : 'FAIL'}] ${id} - ${name} | ${actual}`);
 }
 
 function req(method, urlPath, { token, body, cookie, csrfToken } = {}) {
@@ -102,10 +102,10 @@ async function main() {
   const refundPartial = await LedgerEntry.find({ studentId: sid, type: 'refund' }).lean();
   record('PAY-REF-01', 'Partial refund 500k keeps paid',
     partial.status === 200
-      && afterPartial?.paid === true
-      && Number(afterPartial?.paidAmount) === 2000000
-      && refundPartial.some((r) => Number(r.amount) === 500000)
-      && partial.json?.data?.partial === true,
+    && afterPartial?.paid === true
+    && Number(afterPartial?.paidAmount) === 2000000
+    && refundPartial.some((r) => Number(r.amount) === 500000)
+    && partial.json?.data?.partial === true,
     `status=${partial.status} paid=${afterPartial?.paid} paidAmount=${afterPartial?.paidAmount} ledgerRefunds=${refundPartial.map((r) => r.amount).join(',')} msg=${partial.json?.message}`);
 
   // Over-refund
@@ -144,7 +144,7 @@ async function main() {
 
   await mongoose.disconnect();
   const fail = out.filter((x) => x.result === 'FAIL').length;
-  console.log(`\n=== Critical finance/course: PASS ${out.length - fail} FAIL ${fail} ===`);
+  console.log(`\n=== Critical finance/course: PASS ${out.length - fail} FAIL ${fail} === `);
   process.exit(fail ? 1 : 0);
 }
 

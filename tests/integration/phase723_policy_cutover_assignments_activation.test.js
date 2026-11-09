@@ -1,10 +1,10 @@
 /**
- * Phase 7.23 — Controlled cutover + production activation for /api/assignments
+ * Phase 7.23 - Controlled cutover + production activation for /api/assignments
  *
  * LIVE: auth → [branchFilter create/update] → policyShadowAssignment → assignmentsCutoverGate → handler.
  * Role/permission/ownership in Policy + handlers; graded-lock remains handler-owned.
  * Socket / NotificationService remain handler-owned.
- * modules/course/routes/assignmentRoutes.js is unmounted — not migrated.
+ * modules/course/routes/assignmentRoutes.js is unmounted - not migrated.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -68,10 +68,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId !== undefined ? opts.userBranchId : BRANCH_A,
   });
 }
@@ -354,7 +354,7 @@ test('Phase7.23 rollback: remove assignments → LEGACY; prior stay POLICY; rest
 test('Phase7.23 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'evaluations',  'proctor',
+    'employees', 'evaluations', 'proctor',
   ];
   for (const fam of legacyFamilies) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
@@ -426,8 +426,8 @@ test('Phase7.23 side-effect audit: gate/policy have no mutations', () => {
 test('Phase7.23 functional smoke: read authz; mutations NOT EXECUTED', () => {
   assert.equal(parity('get_course', sub({ role: 'teacher', adminRole: null })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/update/delete/submit/grade production mutation',
-    'NOT EXECUTED — create/update/delete/submit/grade production mutation',
+    'NOT EXECUTED - create/update/delete/submit/grade production mutation',
+    'NOT EXECUTED - create/update/delete/submit/grade production mutation',
   );
 });
 

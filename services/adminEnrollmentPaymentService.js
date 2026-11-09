@@ -77,7 +77,7 @@ async function fulfillAdminEnrollmentPayment({ session, amount, transferContent 
     sourceRef: session.sessionId,
     idempotencyKey: `payment:sepay:session:${session.sessionId}`,
     actor: { id: 'sepay', role: 'system' },
-    note: `Thanh toán khóa học qua SePay${transferContent ? ` — ${String(transferContent).slice(0, 240)}` : ''}`,
+    note: `Thanh toán khóa học qua SePay${transferContent ? ` - ${String(transferContent).slice(0, 240)}` : ''}`,
     metadata: {
       sessionId: session.sessionId,
       ref: session.ref,

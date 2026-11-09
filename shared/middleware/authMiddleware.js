@@ -52,7 +52,7 @@ const requireScope = (requiredScope) => {
       }
       const role = await Role.findById(req.currentUser.roleId);
       req.accessScope = role.scope;
-      
+
       if (requiredScope === 'GLOBAL' && role.scope !== 'GLOBAL') {
         return res.status(403).json({ success: false, message: 'Requires GLOBAL access scope' });
       }

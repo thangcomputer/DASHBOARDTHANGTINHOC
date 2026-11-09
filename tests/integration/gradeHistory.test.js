@@ -1,5 +1,5 @@
 /**
- * GRADE-HIST — score/grade change keeps old/new/user/time.
+ * GRADE-HIST - score/grade change keeps old/new/user/time.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -88,7 +88,7 @@ export default function AdminModalManager() {
           teachers={teachers}
           examSubjectsCatalog={examSubjectsCatalog}
           onAdd={async (d) => {
-            // addStudent tự toast — safeRun chỉ chặn double-submit; reject để modal không đóng khi lỗi
+            // addStudent tự toast - safeRun chỉ chặn double-submit; reject để modal không đóng khi lỗi
             const ok = await safeRun(() => addStudent(d), { skipToast: true });
             if (!ok) throw new Error('ADD_STUDENT_FAILED');
           }}

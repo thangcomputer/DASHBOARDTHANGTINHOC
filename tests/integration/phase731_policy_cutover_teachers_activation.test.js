@@ -1,5 +1,5 @@
 /**
- * Phase 7.31 — Controlled cutover + production activation for /api/teachers
+ * Phase 7.31 - Controlled cutover + production activation for /api/teachers
  *
  * students was NOT ELIGIBLE (GET /:id + /full-detail lack Policy/Shadow).
  * LIVE: auth → [branchFilter] → policyShadowTeacher* → teachersCutoverGate → handler.
@@ -65,10 +65,10 @@ function sub(opts = {}) {
     actorDoc: role === 'teacher' || role === 'student'
       ? { role, adminRole: null, permissions: [] }
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? PERMS,
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? PERMS,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -410,8 +410,8 @@ test('Phase7.31 side-effect audit', () => {
 test('Phase7.31 functional smoke: list/get authz; mutations NOT EXECUTED', () => {
   assert.equal(parityRoute('list', sub({ permissions: PERMS })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — teachers create/update/delete/score/approve/reject/finance-pay production mutations',
-    'NOT EXECUTED — teachers create/update/delete/score/approve/reject/finance-pay production mutations',
+    'NOT EXECUTED - teachers create/update/delete/score/approve/reject/finance-pay production mutations',
+    'NOT EXECUTED - teachers create/update/delete/score/approve/reject/finance-pay production mutations',
   );
 });
 

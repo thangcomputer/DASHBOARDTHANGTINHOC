@@ -1,5 +1,5 @@
 /**
- * Phase 8.24 — Messaging pairing lock + canonical conversationId.
+ * Phase 8.24 - Messaging pairing lock + canonical conversationId.
  * Does NOT touch Enterprise RBAC.
  */
 const { describe, it } = require('node:test');
@@ -64,7 +64,7 @@ describe('Phase 8.24 messaging pairing lock', { concurrency: false }, () => {
 
   it('canonical id ignores client admin role for STAFF peer', () => {
     const sender = { id: STUDENT_ID, role: 'student' };
-    // Wrong client would say admin — server must still build staff_* when peer transport is staff
+    // Wrong client would say admin - server must still build staff_* when peer transport is staff
     const wrongClientWouldBe = buildConversationId('student', STUDENT_ID, 'admin', STAFF_ID);
     const canonical = buildCanonicalConversationId(sender, 'staff', STAFF_ID);
     assert.notEqual(wrongClientWouldBe, canonical);

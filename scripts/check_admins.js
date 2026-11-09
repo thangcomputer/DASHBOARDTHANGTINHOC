@@ -9,14 +9,14 @@ async function check() {
   admins.forEach(a => {
     console.log(`Name: ${a.name}, Role: ${a.role}, AdminRole: ${a.adminRole}, ID: ${a._id}`);
   });
-  
+
   const superAdminsQuery = { role: 'admin', adminRole: { $ne: 'STAFF' } };
   const found = await Teacher.find(superAdminsQuery);
   console.log('--- FOUND WITH CURRENT QUERY ---');
   found.forEach(a => {
     console.log(`Name: ${a.name}, ID: ${a._id}`);
   });
-  
+
   await mongoose.disconnect();
 }
 check();

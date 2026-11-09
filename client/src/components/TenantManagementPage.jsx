@@ -119,7 +119,7 @@ export default function TenantManagementPage() {
             <li key={t._id} className={`p-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50 ${selected?._id === t._id ? 'bg-red-50' : ''}`} onClick={() => openTenant(t)}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-gray-900 truncate">
-                  {t.code} — {t.name}
+                  {t.code} - {t.name}
                   {t.isDefault && <span className="ml-1 text-[10px] text-red-600">Default</span>}
                 </p>
                 <p className="text-[10px] text-gray-400 font-bold ">{t.status} · {t.branchCount ?? 0} chi nhánh</p>
@@ -152,7 +152,7 @@ export default function TenantManagementPage() {
                 <p className="text-[10px] font-black text-gray-400  mb-1">Chi nhánh</p>
                 <ul className="text-xs space-y-1">
                   {(stats?.branches || []).map((b) => (
-                    <li key={b._id} className="font-bold text-gray-700">{b.code} — {b.name}</li>
+                    <li key={b._id} className="font-bold text-gray-700">{b.code} - {b.name}</li>
                   ))}
                 </ul>
               </div>
@@ -163,7 +163,7 @@ export default function TenantManagementPage() {
                     <option value="">Chọn...</option>
                     {branches.map((b) => (
                       <option key={b._id} value={b._id}>
-                        {b.code} — {b.name}{b.tenantId && String(b.tenantId) !== String(selected._id) ? ' (tenant khác)' : ''}
+                        {b.code} - {b.name}{b.tenantId && String(b.tenantId) !== String(selected._id) ? ' (tenant khác)' : ''}
                       </option>
                     ))}
                   </CmsSelect>

@@ -1,6 +1,6 @@
-# MESSAGING POLICY — Canonical Design Spec (Phase 2)
+# MESSAGING POLICY - Canonical Design Spec (Phase 2)
 
-**Status:** Design only — **DO NOT IMPLEMENT** in this step.  
+**Status:** Design only - **DO NOT IMPLEMENT** in this step.  
 **Sources of truth for rules:** `services/messagingPairing.js`, `routes/messageRoutes.js` contacts, `docs/messaging/pairing-matrix-824.md`, `docs/messaging/contact-visibility-824b.md`.  
 **Non-source:** Frontend `useDataMessaging` / legacy `MessagesContext` (duplicated; must converge to backend).
 
@@ -11,13 +11,13 @@
 Every decision function receives:
 
 ```text
-actor          — authenticated user { id, role, adminRole, branchId, branchCode, … }
-actorRole      — productRole(actor)
-recipient      — resolved peer document / identity (never trust client role alone)
-recipientRole  — productRole(recipient)
-tenantId       — reserved; live Message path does not yet enforce tenant on DM
-branchId       — from actor/peer docs (branchCode used heavily today)
-conversation   — { conversationId, membership/participants, isGroup?, … }
+actor          - authenticated user { id, role, adminRole, branchId, branchCode, … }
+actorRole      - productRole(actor)
+recipient      - resolved peer document / identity (never trust client role alone)
+recipientRole  - productRole(recipient)
+tenantId       - reserved; live Message path does not yet enforce tenant on DM
+branchId       - from actor/peer docs (branchCode used heavily today)
+conversation   - { conversationId, membership/participants, isGroup?, … }
 ```
 
 Transport role is an **implementation detail** of persistence/routing, not a business permission input.
@@ -41,15 +41,15 @@ Notes:
 
 Equivalent to: discoverable **or** already a participant in an existing conversation **and** `canSendMessage` for first message.
 
-Live code today: start is implicit — first successful `sendCanonicalMessage` creates the thread. Contacts seed empty rows in UI only.
+Live code today: start is implicit - first successful `sendCanonicalMessage` creates the thread. Contacts seed empty rows in UI only.
 
 ### 2.3 `canViewConversation(actor, conversation)`
 
 Live rules:
 
-- Direct: `canAccessDirectConversation` — exact transport participant tokens **or** SUPER/HIGH on legacy `admin_admin` mailbox.
+- Direct: `canAccessDirectConversation` - exact transport participant tokens **or** SUPER/HIGH on legacy `admin_admin` mailbox.
 - Group: membership in `Group.participants` (or elevated admin overrides in some paths).
-- REST history/sync: self or `role===admin` (note: JWT `admin` vs product elevated — existing quirk).
+- REST history/sync: self or `role===admin` (note: JWT `admin` vs product elevated - existing quirk).
 
 ### 2.4 `canSendMessage(actor, conversation)` / pair form `canSendMessage(actor, recipient)`
 
@@ -61,7 +61,7 @@ Broadcast targets (`ALL_*`) are **not** private send; separate broadcast authori
 
 Actor is the `receiverId` of a private message, or group member in `group_{id}` room, or (legacy) SUPER/HIGH receiving `admin` mailbox delivery via `admin` + `ALL_ADMIN`.
 
-Wrong SUPPORT must not receive another SUPPORT’s private student thread (delivery is user-room based — verified by design; regression tests required).
+Wrong SUPPORT must not receive another SUPPORT’s private student thread (delivery is user-room based - verified by design; regression tests required).
 
 ### 2.6 `canMarkRead(actor, conversation)`
 
@@ -124,8 +124,8 @@ Live precursors:
 | STUDENT | TEACHER | assigned only |
 | STUDENT | STAFF | same branch (empty branch soft-allow) |
 | STUDENT | SUPPORT / HIGH / SUPER | allow (send ACL) |
-| STUDENT ↔ STUDENT | — | **deny** |
-| TEACHER ↔ TEACHER | — | **deny** |
+| STUDENT ↔ STUDENT | - | **deny** |
+| TEACHER ↔ TEACHER | - | **deny** |
 
 ---
 
@@ -135,13 +135,13 @@ Live precursors:
 |---|---|---|
 | C1 | STUDENT discover vs send to SUPER | Pairing allows send to elevated; contacts hide SUPER from student |
 | C2 | STUDENT discover HIGH | Contacts 8.24B: student list has no HIGH; pairing allows elevated |
-| C3 | SUPPORT cross-branch students | Contacts: SUPPORT sees all HV; pairing: SUPPORT unrestricted — confirm intentional |
-| C4 | STAFF sees SUPPORT with null branch | Contacts OR includes null branch SUPPORT — confirm |
+| C3 | SUPPORT cross-branch students | Contacts: SUPPORT sees all HV; pairing: SUPPORT unrestricted - confirm intentional |
+| C4 | STAFF sees SUPPORT with null branch | Contacts OR includes null branch SUPPORT - confirm |
 | C5 | `admin_admin` mailbox vs per-user admin threads | `buildConversationId` special-case vs Phase 8.24 per-peer IDs |
-| C6 | JWT `role=admin` without adminRole | Pairing treats as SUPER_ADMIN hint — confirm |
+| C6 | JWT `role=admin` without adminRole | Pairing treats as SUPER_ADMIN hint - confirm |
 | C7 | Group unread semantics | Global `isRead` vs per-participant need |
 
-Mark in matrix as `CONFLICT — REQUIRES BUSINESS DECISION` where outcomes diverge.
+Mark in matrix as `CONFLICT - REQUIRES BUSINESS DECISION` where outcomes diverge.
 
 ---
 

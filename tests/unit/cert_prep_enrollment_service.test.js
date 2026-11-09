@@ -165,7 +165,7 @@ test('CASE 2b: one LMS course can map to multiple CertPrep courses', async () =>
   }
 });
 
-test('CASE 3: same enrollment twice is idempotent — one access', async () => {
+test('CASE 3: same enrollment twice is idempotent - one access', async () => {
   const db = store();
   db.mappings.push({ courseId: LMS_COURSE_A, certPrepCourseId: CERT_A, isActive: true });
   const restore = installStubs(db);

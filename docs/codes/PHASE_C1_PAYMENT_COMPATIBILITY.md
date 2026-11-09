@@ -1,8 +1,8 @@
-# PHASE C1 — PAYMENT COMPATIBILITY
+# PHASE C1 - PAYMENT COMPATIBILITY
 
 **Phase:** C1  
 **Date:** 2026-08-11  
-**Mode:** READ-ONLY audit — **no** payment runtime change, **no** webhook edit, **no** `legacyStudentCodes` created  
+**Mode:** READ-ONLY audit - **no** payment runtime change, **no** webhook edit, **no** `legacyStudentCodes` created  
 
 Related: [`PHASE_C1_PRODUCTION_AUDIT.md`](./PHASE_C1_PRODUCTION_AUDIT.md), Phase B [`BUSINESS_CODE_COMPATIBILITY.md`](./BUSINESS_CODE_COMPATIBILITY.md)
 
@@ -21,13 +21,13 @@ Invoice.maHoaDon (HD…) → independent document number
 
 Evidence:
 
-- [`routes/webhookRoutes.js`](../../routes/webhookRoutes.js) — session loop then studentCode fallback  
-- [`utils/sepayMatch.js`](../../utils/sepayMatch.js) — `extractStudentCodeCandidates`, `amountsMatch`  
-- [`models/PaymentSession.js`](../../models/PaymentSession.js) — `sessionId`, `ref`, amount, status; **no** `studentId` in schema  
-- [`models/Invoice.js`](../../models/Invoice.js) — `hocVien` ObjectId; **no** `studentCode`  
-- [`models/LedgerEntry.js`](../../models/LedgerEntry.js) — `studentId` ObjectId; sample `sourceRef` = `HD2608-000x`
+- [`routes/webhookRoutes.js`](../../routes/webhookRoutes.js) - session loop then studentCode fallback  
+- [`utils/sepayMatch.js`](../../utils/sepayMatch.js) - `extractStudentCodeCandidates`, `amountsMatch`  
+- [`models/PaymentSession.js`](../../models/PaymentSession.js) - `sessionId`, `ref`, amount, status; **no** `studentId` in schema  
+- [`models/Invoice.js`](../../models/Invoice.js) - `hocVien` ObjectId; **no** `studentCode`  
+- [`models/LedgerEntry.js`](../../models/LedgerEntry.js) - `studentId` ObjectId; sample `sourceRef` = `HD2608-000x`
 
-This env: `paymentsessions` count **0** (TTL/empty); invoices **4**; ledgerentries **4** — all ObjectId-linked.
+This env: `paymentsessions` count **0** (TTL/empty); invoices **4**; ledgerentries **4** - all ObjectId-linked.
 
 ---
 
@@ -48,16 +48,16 @@ This env: `paymentsessions` count **0** (TTL/empty); invoices **4**; ledgerentri
 
 ## 3. Scenarios A–E
 
-### Scenario A — PaymentSession.ref → Student/settlement
+### Scenario A - PaymentSession.ref → Student/settlement
 
 ```text
 content includes session.ref + amount OK → mark session paid → settlePayment
 ```
 
-**Status:** Primary path — **KEEP**. Migration of `studentCode` does not break active sessions keyed by `ref` (often full CK text).  
-**TTL:** sessions expire 24h — historical session refs are not durable payment identity.
+**Status:** Primary path - **KEEP**. Migration of `studentCode` does not break active sessions keyed by `ref` (often full CK text).  
+**TTL:** sessions expire 24h - historical session refs are not durable payment identity.
 
-### Scenario B — Legacy student code → Student
+### Scenario B - Legacy student code → Student
 
 Today: only `Student.studentCode` is queried.  
 After future migration `HV45836680 → HV000001` **without** alias: unpaid transfers still quoting `HV45836680` **miss** → **P1**.
@@ -76,12 +76,12 @@ Classification of current legacy codes (this env):
 | HV45836680 | YES until sunset | YES (QR/CK possible) | **MUST PRESERVE** |
 | HV81146854 | YES | YES | **MUST PRESERVE** |
 | HV85357155 | YES | YES | **MUST PRESERVE** |
-| HV15865369 | YES (unpaid now) | **YES — unpaid** | **MUST PRESERVE** |
+| HV15865369 | YES (unpaid now) | **YES - unpaid** | **MUST PRESERVE** |
 | TTH##### (FE) | May appear in session.ref / QR | Session-primary if pending | **MUST PRESERVE** if ever persisted or in open QR; else **NEEDS OWNER DECISION** on sunset |
 
 `extractStudentCodeCandidates` also harvests loose `[a-z0-9]{5,16}` tokens → TTH-like tokens **can** enter variant set.
 
-### Scenario C — New canonical studentCode → Student
+### Scenario C - New canonical studentCode → Student
 
 ```text
 HV000001 in content → match studentCode after backfill
@@ -89,11 +89,11 @@ HV000001 in content → match studentCode after backfill
 
 **OK** once generators + backfill exist. C1 does not apply.
 
-### Scenario D — Same legacy code matches >1 student
+### Scenario D - Same legacy code matches >1 student
 
 **Policy target:** FAIL CLOSED (0 apply).  
 
-**Current runtime:** query `studentCode: { $in: variants }`, iterate, first content+amount hit wins, then `break` — **PICK-FIRST**, not fail-closed.
+**Current runtime:** query `studentCode: { $in: variants }`, iterate, first content+amount hit wins, then `break` - **PICK-FIRST**, not fail-closed.
 
 | Item | Value |
 |------|-------|
@@ -103,11 +103,11 @@ HV000001 in content → match studentCode after backfill
 | Affected path | SePay student fallback |
 | Recommended fix (later) | If ≥2 candidates pass filters → reject / alert; do not pay |
 | Migration impact | Unique index alone insufficient until matcher fail-closed |
-| C1 action | **REPORT ONLY — not fixed** |
+| C1 action | **REPORT ONLY - not fixed** |
 
 This env: **0** duplicate studentCodes → Scenario D not currently triggered here. Prod unknown.
 
-### Scenario E — No match
+### Scenario E - No match
 
 No session + no unpaid student match → webhook does not settle. **FAIL CLOSED** for apply. **OK**.
 
@@ -152,7 +152,7 @@ Also consider (owner decision): any TTH values historically persisted on Student
 | Ledger.studentId | ObjectId | **SAFE** |
 | Ledger.sourceRef | HD… / session ids | **SAFE** |
 | PayrollLog.employeeId | ObjectId | **SAFE**; employeeCode additive only |
-| Payment history rewrite | — | **FORBIDDEN** |
+| Payment history rewrite | - | **FORBIDDEN** |
 
 ---
 
@@ -208,5 +208,5 @@ Messaging changed: NO
 ```
 
 ```text
-STOP — await owner review before PHASE C2 / any DB write.
+STOP - await owner review before PHASE C2 / any DB write.
 ```

@@ -16,8 +16,8 @@ async function test() {
   const stuToken = stuData.data.accessToken;
   const stuUser = stuData.data;
 
-  const adminSocket = io('http://localhost:5000', { auth: { token: adminToken }, query: { userId: adminUser.id, role: 'admin', name: adminUser.name }});
-  const stuSocket = io('http://localhost:5000', { auth: { token: stuToken }, query: { userId: stuUser.id, role: 'student', name: stuUser.name }});
+  const adminSocket = io('http://localhost:5000', { auth: { token: adminToken }, query: { userId: adminUser.id, role: 'admin', name: adminUser.name } });
+  const stuSocket = io('http://localhost:5000', { auth: { token: stuToken }, query: { userId: stuUser.id, role: 'student', name: stuUser.name } });
 
   stuSocket.on('message:receive', (msg) => {
     console.log("✅ Student received message via socket:", msg.content);
@@ -30,7 +30,7 @@ async function test() {
   await new Promise(r => setTimeout(r, 1000));
 
   const convId = ['admin_admin', `student_${stuUser.id}`].sort().join('__');
-  
+
   console.log("Student sending message to Admin...");
   const stuSendRes = await fetch('http://localhost:5000/api/messages', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${stuToken}` },

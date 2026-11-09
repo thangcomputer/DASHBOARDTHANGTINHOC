@@ -1,5 +1,5 @@
 /**
- * Wave 6.6 — Policy SHADOW for LIVE finance authorization.
+ * Wave 6.6 - Policy SHADOW for LIVE finance authorization.
  * Does not execute financial writes; authorization equivalence only.
  */
 const test = require('node:test');
@@ -415,7 +415,7 @@ test('Wave6.6 money invariant services unchanged by this wave (hash smoke)', () 
           return false;
         }
       });
-    assert.ok(found || true); // soft — presence of postSalary/void is enough
+    assert.ok(found || true); // soft - presence of postSalary/void is enough
   }
   assert.ok(ledger.includes('postSalary'));
   assert.ok(!ledger.includes('policyShadow'));

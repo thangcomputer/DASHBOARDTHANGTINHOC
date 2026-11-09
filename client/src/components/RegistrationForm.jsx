@@ -551,7 +551,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                   </div>
                 </div>
 
-                {/* Chọn khóa học — dynamic từ DB */}
+                {/* Chọn khóa học - dynamic từ DB */}
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
                     <BookOpen size={14} /> Chọn khóa học
@@ -568,7 +568,7 @@ const RegistrationForm = ({ onNavigate, initialData = {} }) => {
                         const pct = isCourseDiscountActive(c) ? c.discountPercent || 0 : 0;
                         return (
                           <option key={c._id} value={c._id}>
-                            {c.name} — {pct > 0 ? `${ep.toLocaleString('vi-VN')}đ (-${pct}%)` : `${c.price.toLocaleString('vi-VN')}đ`}
+                            {c.name} - {pct > 0 ? `${ep.toLocaleString('vi-VN')}đ (-${pct}%)` : `${c.price.toLocaleString('vi-VN')}đ`}
                           </option>
                         );
                       })}

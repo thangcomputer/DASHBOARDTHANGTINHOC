@@ -1,5 +1,5 @@
 /**
- * YouTube helpers — duration probe for Admin Course Builder + LMS.
+ * YouTube helpers - duration probe for Admin Course Builder + LMS.
  */
 
 export function extractYouTubeId(url = '') {
@@ -30,7 +30,7 @@ export function readYouTubeDuration(player) {
   }
 }
 
-/** Playback position clamped to duration — avoids 1:38:38 / 1:38:35 mismatch in UI. */
+/** Playback position clamped to duration - avoids 1:38:38 / 1:38:35 mismatch in UI. */
 export function readYouTubeCurrentTime(player, durationHint = 0) {
   try {
     const t = Number(player?.getCurrentTime?.());
@@ -43,14 +43,14 @@ export function readYouTubeCurrentTime(player, durationHint = 0) {
   }
 }
 
-/** Prefer max(stored, live YT) — duration can shift slightly after load/end. */
+/** Prefer max(stored, live YT) - duration can shift slightly after load/end. */
 export function resolveYouTubeDisplayDuration(storedDuration, player) {
   const stored = Math.max(0, Math.floor(Number(storedDuration) || 0));
   const live = readYouTubeDuration(player);
   return Math.max(stored, live);
 }
 
-/** Đồng bộ duration + currentTime cho UI — tránh current > total trên thanh player. */
+/** Đồng bộ duration + currentTime cho UI - tránh current > total trên thanh player. */
 export function syncYouTubePlaybackState(player, storedDuration = 0) {
   const liveDur = readYouTubeDuration(player);
   let rawTime = 0;

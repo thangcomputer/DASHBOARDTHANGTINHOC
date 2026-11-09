@@ -281,7 +281,7 @@ const ExamMonitor = forwardRef(({
     let faceDetector = null;
     if ('FaceDetector' in window) {
       try {
-        // fastMode: false — ưu tiên chính xác (landmarks mắt/mũi/miệng)
+        // fastMode: false - ưu tiên chính xác (landmarks mắt/mũi/miệng)
         faceDetector = new window.FaceDetector({ maxDetectedFaces: 4, fastMode: false });
       } catch {
         try { faceDetector = new window.FaceDetector({ maxDetectedFaces: 4 }); } catch { faceDetector = null; }
@@ -341,7 +341,7 @@ const ExamMonitor = forwardRef(({
           videoRef.current.srcObject = stream;
           videoRef.current.muted = true;
           videoRef.current.setAttribute('playsinline', '');
-          videoRef.current.play().catch(() => {});
+          videoRef.current.play().catch(() => { });
         }
         const ready = await waitForVideoFrames(videoRef.current);
         if (!isMounted) return;
@@ -496,7 +496,7 @@ const ExamMonitor = forwardRef(({
               confirmHard('lens_blocked', {
                 type: 'camera',
                 message: '🚫 Camera bị che!',
-                sub: `Bỏ vật cản trước ống kính. Lỗi cộng dồn — đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
+                sub: `Bỏ vật cản trước ống kính. Lỗi cộng dồn - đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
               }, () => lens.reset());
             }
 
@@ -506,7 +506,7 @@ const ExamMonitor = forwardRef(({
               confirmHard('multi_face', {
                 type: 'camera',
                 message: '🚫 Phát hiện nhiều khuôn mặt!',
-                sub: `Chỉ một người trong khung hình. Lỗi cộng dồn — đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
+                sub: `Chỉ một người trong khung hình. Lỗi cộng dồn - đủ ${CONFIG.MAX_FACE_VIOLATIONS} lần sẽ hủy bài.`,
               }, () => multi.reset());
             }
 
@@ -766,7 +766,7 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
         prev.srcObject = source;
         prev.muted = true;
         prev.setAttribute('playsinline', '');
-        prev.play().catch(() => {});
+        prev.play().catch(() => { });
       }
     };
     const t = setInterval(() => {
@@ -788,22 +788,20 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
   });
   return (
     <div
-      className={`backdrop-blur-xl shadow-2xl min-w-0 max-w-full ${
-        isLarge
+      className={`backdrop-blur-xl shadow-2xl min-w-0 max-w-full ${isLarge
           ? 'flex flex-col gap-1.5 rounded-xl border border-white/15 bg-gradient-to-br from-slate-800/95 to-slate-950/95 p-2 md:gap-2 md:rounded-2xl md:p-2.5'
           : isCompact
             ? 'flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-1.5'
             : 'flex items-center gap-4 rounded-2xl border border-white/5 bg-slate-900/90 p-2.5'
-      }`}
+        }`}
     >
       <div
-        className={`relative bg-black/40 overflow-hidden border border-white/10 rounded-lg ${
-          isLarge
+        className={`relative bg-black/40 overflow-hidden border border-white/10 rounded-lg ${isLarge
             ? 'block aspect-[5/3] w-full max-h-[4.75rem] sm:max-h-[5.25rem] md:max-h-24'
             : isCompact
               ? 'block h-11 w-16 shrink-0'
               : 'block h-12 w-[4.5rem] shrink-0 sm:h-14 sm:w-20'
-        }`}
+          }`}
       >
         <video ref={previewVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
         <div className="absolute inset-0 flex items-start justify-center pt-0.5 pointer-events-none">
@@ -823,39 +821,38 @@ export const CameraHeaderPanel = ({ monitorRef, variant = 'default' }) => {
       </div>
       <div className={`flex flex-col min-w-0 ${isLarge ? 'w-full' : isCompact ? '' : 'pr-3'}`}>
         {!isCompact && (
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck size={14} className="text-sky-400 shrink-0" />
-          <span className={`text-white/60  font-black tracking-wider ${isLarge ? 'text-xs' : 'text-xs text-white/50'}`}>Giám sát bài thi</span>
-        </div>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-sky-400 shrink-0" />
+            <span className={`text-white/60  font-black tracking-wider ${isLarge ? 'text-xs' : 'text-xs text-white/50'}`}>Giám sát bài thi</span>
+          </div>
         )}
         <div className={`flex flex-col font-mono ${isLarge ? 'mt-1 gap-0' : isCompact ? 'gap-0.5' : 'mt-1.5 gap-0.5'}`}>
           <div className="flex items-center gap-1.5">
-            <span className={`font-bold leading-tight text-xs ${
-              ui.level === 'green' ? 'text-emerald-400' : ui.level === 'yellow' ? 'text-amber-300' : ui.level === 'orange' ? 'text-orange-300' : 'text-red-400'
-            }`}>
+            <span className={`font-bold leading-tight text-xs ${ui.level === 'green' ? 'text-emerald-400' : ui.level === 'yellow' ? 'text-amber-300' : ui.level === 'orange' ? 'text-orange-300' : 'text-red-400'
+              }`}>
               {ui.label}
             </span>
           </div>
           {!isCompact && <span className="text-white/55 font-semibold leading-tight text-xs">{ui.guide}</span>}
           {stats.cameraStatus === 'denied' && (
-            <span className="text-xs font-bold text-red-400 leading-tight">Camera bị chặn — cho phép rồi bấm Thử lại.</span>
+            <span className="text-xs font-bold text-red-400 leading-tight">Camera bị chặn - cho phép rồi bấm Thử lại.</span>
           )}
           <div className={`flex flex-wrap items-center gap-x-3 gap-y-0 mt-0.5`}>
             {!isCompact && (
-            <>
-            <span className="font-bold text-white/70 text-xs">
-              Rủi ro:{' '}
-              <span className={(stats.riskScore || 0) >= 70 ? 'text-red-400' : (stats.riskScore || 0) >= 25 ? 'text-amber-300' : 'text-emerald-400'}>
-                {Math.round(stats.riskScore || 0)}
-              </span>
-            </span>
-            <span className="font-bold text-white/70 text-xs">
-              FPS:{' '}
-              <span className={(stats.fpsEstimate || 0) < 8 ? 'text-amber-300' : 'text-emerald-400'}>
-                {stats.fpsEstimate ? Number(stats.fpsEstimate).toFixed(1) : '—'}
-              </span>
-            </span>
-            </>
+              <>
+                <span className="font-bold text-white/70 text-xs">
+                  Rủi ro:{' '}
+                  <span className={(stats.riskScore || 0) >= 70 ? 'text-red-400' : (stats.riskScore || 0) >= 25 ? 'text-amber-300' : 'text-emerald-400'}>
+                    {Math.round(stats.riskScore || 0)}
+                  </span>
+                </span>
+                <span className="font-bold text-white/70 text-xs">
+                  FPS:{' '}
+                  <span className={(stats.fpsEstimate || 0) < 8 ? 'text-amber-300' : 'text-emerald-400'}>
+                    {stats.fpsEstimate ? Number(stats.fpsEstimate).toFixed(1) : '-'}
+                  </span>
+                </span>
+              </>
             )}
             <span className="font-bold text-white text-xs">
               Vi phạm:{' '}

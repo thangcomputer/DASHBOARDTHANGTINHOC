@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-// Lightweight middleware smoke — mock Teacher.findById
+// Lightweight middleware smoke - mock Teacher.findById
 const Teacher = require('../../models/Teacher');
 const { checkPermission, checkAnyPermission } = require('../../middleware/auth');
 const { PERMISSIONS } = require('../../constants/permissions');

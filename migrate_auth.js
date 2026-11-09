@@ -67,7 +67,7 @@ const profileBlock = `      let sysSettings = await SystemSettings.findOne({ _ke
 
       let changed = false;
 
-      // Đổi tên — đồng bộ cả SystemSettings và Teacher collection
+      // Đổi tên - đồng bộ cả SystemSettings và Teacher collection
       if (name && name.trim()) {
         const newName = name.trim();
         sysSettings.adminName = newName;
@@ -114,7 +114,7 @@ const profileBlockNew = `      let sysSettings = await systemRepository.findMain
       let changed = false;
       const updates = {};
 
-      // Đổi tên — đồng bộ cả SystemSettings và Teacher collection
+      // Đổi tên - đồng bộ cả SystemSettings và Teacher collection
       if (name && name.trim()) {
         const newName = name.trim();
         updates.adminName = newName;

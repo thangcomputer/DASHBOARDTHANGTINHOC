@@ -1,5 +1,5 @@
 /**
- * Phase 7.5 — Production activation + verification for /api/monitoring
+ * Phase 7.5 - Production activation + verification for /api/monitoring
  * (alongside existing /api/backups Policy-primary).
  */
 const test = require('node:test');
@@ -46,10 +46,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -160,7 +160,7 @@ test('Phase7.5 all four monitoring actions resolve POLICY under production allow
 });
 
 test('Phase7.5 role matrix MATCH Legacy isAdmin (SUPPORT with role=staff ALLOW; reset SUPER-only)', () => {
-  // Legacy isAdmin: role admin|staff — adminRole SUPPORT does NOT deny if role is staff
+  // Legacy isAdmin: role admin|staff - adminRole SUPPORT does NOT deny if role is staff
   const matrixHealth = [
     [{ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' }, 'ALLOW'],
     [{ role: 'admin', adminRole: 'HIGH_ADMIN' }, 'ALLOW'],
@@ -259,8 +259,8 @@ test('Phase7.5 rollback TESTED AND RESTORED: remove monitoring → LEGACY; resto
   if (parsed) assert.equal(parsed.POLICY_CUTOVER_ENABLED, 'true');
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('backups'));
-      assert.ok(restoredRoutes.includes('monitoring'));
+    assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('monitoring'));
   }
 });
 
@@ -270,8 +270,8 @@ test('Phase7.5 functional smoke: non-destructive authz PASS; metrics_reset NOT E
     assert.equal(parity(action, staff).policy.decision, 'ALLOW');
   }
   assert.equal(
-    'NOT EXECUTED — destructive production operation',
-    'NOT EXECUTED — destructive production operation',
+    'NOT EXECUTED - destructive production operation',
+    'NOT EXECUTED - destructive production operation',
   );
   const superS = sub({ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' });
   assert.equal(parity('metrics_reset', superS).policy.decision, 'ALLOW');

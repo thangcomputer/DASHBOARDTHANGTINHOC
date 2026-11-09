@@ -30,7 +30,7 @@ if [ -d .git ]; then
   git pull origin "$BRANCH" || true
   git rev-parse --short HEAD
 else
-  echo "WARN: no .git — pulling tarball of branch"
+  echo "WARN: no .git - pulling tarball of branch"
   TMP=$(mktemp -d)
   curl -fsSL "https://codeload.github.com/thangcomputer/DASHBOARDTHANGTINHOC/tar.gz/refs/heads/${BRANCH}" | tar -xz -C "$TMP"
   SRC=$(echo "$TMP"/DASHBOARDTHANGTINHOC-*)

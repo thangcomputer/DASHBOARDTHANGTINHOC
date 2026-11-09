@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OfflineBanner.tsx
  * Hiển thị thanh thông báo khi mất kết nối mạng / server unreachable.
  * Đồng bộ với OfflineBanner.jsx trên web app.
@@ -37,7 +37,7 @@ export function OfflineBanner() {
       <View style={styles.content}>
         <WifiOff size={16} color="#FFFBEB" />
         <Text style={styles.text}>
-          Mất kết nối máy chủ — đang giữ phiên đăng nhập và tự thử lại…
+          Mất kết nối máy chủ - đang giữ phiên đăng nhập và tự thử lại…
         </Text>
       </View>
     </View>

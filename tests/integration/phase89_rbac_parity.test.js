@@ -1,5 +1,5 @@
 /**
- * Phase 8.9 — LIVE vs Enterprise RBAC parity (observe-only).
+ * Phase 8.9 - LIVE vs Enterprise RBAC parity (observe-only).
  * Enterprise never becomes HTTP authority.
  */
 const test = require('node:test');
@@ -136,7 +136,7 @@ test('Phase8.9 teacher: SUPER / id=admin allow manage; create stays role authori
   const root = actor({ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN', permissions: [] });
   assert.equal(compareStaffLivePermission(superA, LIVE.MANAGE_TEACHERS).finalDecision, DECISION.ALLOW);
   assert.equal(compareStaffLivePermission(root, LIVE.MANAGE_TEACHERS).finalDecision, DECISION.ALLOW);
-  // create/delete are SUPER role gates — not manage_teachers mapping; document as role authority
+  // create/delete are SUPER role gates - not manage_teachers mapping; document as role authority
   assert.equal(superA.adminRole, 'SUPER_ADMIN');
 });
 
@@ -226,7 +226,7 @@ test('Phase8.9 actors: teacher/student/unauth deny staff gates; HIGH with grant'
   assert.equal(compareStaffLivePermission(highNo, LIVE.MANAGE_TEACHERS).finalDecision, DECISION.DENY);
 });
 
-test('Phase8.9 spoof: client permissions/role ignored — only trusted actor fields', () => {
+test('Phase8.9 spoof: client permissions/role ignored - only trusted actor fields', () => {
   const trusted = actor({ permissions: [LIVE.VIEW_TEACHERS] });
   const untrusted = {
     ...trusted,
@@ -286,7 +286,7 @@ test('Phase8.9/8.11 static: parity not authority on server/routes; observe-only 
   assert.ok(!server.includes('rbacParity'));
   assert.ok(!server.includes('compareLiveEnterprise'));
   const auth = fs.readFileSync(path.join(__dirname, '../../middleware/auth.js'), 'utf8');
-  // Phase 8.11 may mount observeLiveStaffGate AFTER LIVE decision — never as authorize()
+  // Phase 8.11 may mount observeLiveStaffGate AFTER LIVE decision - never as authorize()
   assert.ok(!auth.includes('enterpriseAuthorize') && !auth.includes("require('../shared/middleware/authorize')"));
   if (auth.includes('rbacParity')) {
     assert.ok(auth.includes('observeLiveStaffGate'));

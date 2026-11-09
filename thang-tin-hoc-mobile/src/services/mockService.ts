@@ -1,4 +1,4 @@
-import {
+﻿import {
   mockAssignments,
   mockEvaluations,
   mockFeedPosts,
@@ -525,7 +525,7 @@ function mapMaterial(value: unknown, index: number, fallbackType = ''): Learning
     date: date && !Number.isNaN(date.getTime())
       ? date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : rawText(dateValue) || 'Chưa xác định',
-    size: rawText(raw.sizeLabel || raw.size || raw.fileSize) || '—',
+    size: rawText(raw.sizeLabel || raw.size || raw.fileSize) || '-',
     url: url || undefined,
   };
 }
@@ -1198,7 +1198,7 @@ export const studentProfileService = {
           _id: user.id,
           enrollments: mockStudentProfileQaEnrollments,
           email: 'minhanh@example.test',
-          address: 'Địa chỉ mẫu — chỉ dùng xem giao diện',
+          address: 'Địa chỉ mẫu - chỉ dùng xem giao diện',
           zalo: mockStudent.phone,
           branch: mockStudent.branch,
         } as RawStudent,
@@ -1233,7 +1233,7 @@ export const teacherProfileService = {
         email: 'giangvien@example.test',
         zalo: mockTeacher.phone,
         age: 30,
-        address: 'Địa chỉ mẫu — chỉ dùng xem giao diện',
+        address: 'Địa chỉ mẫu - chỉ dùng xem giao diện',
         bio: 'Thông tin giới thiệu mẫu để xem trước màn hình.',
         voiceRegion: 'nam',
         status: 'active',

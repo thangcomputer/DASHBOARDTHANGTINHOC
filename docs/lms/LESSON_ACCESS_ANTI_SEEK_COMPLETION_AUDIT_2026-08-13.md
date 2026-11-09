@@ -1,13 +1,13 @@
-# LMS Lesson Access / Anti-Seek / Completion — Audit & Report
+# LMS Lesson Access / Anti-Seek / Completion - Audit & Report
 
 **Date:** 2026-08-13  
 **Mode:** PHASE 0 AUDIT → implement module-by-module  
 **Live mount:** `server.js` → `app.use('/api/training-lms', routes/trainingRoutes.js)`  
-**Not live:** `modules/course/routes/trainingRoutes.js` (twin — out of hot path)
+**Not live:** `modules/course/routes/trainingRoutes.js` (twin - out of hot path)
 
 ---
 
-## PHASE 0 — Current architecture (pre-fix)
+## PHASE 0 - Current architecture (pre-fix)
 
 ### Data storage (no dedicated Lesson mongoose for Course Builder LMS)
 
@@ -33,13 +33,13 @@
 
 ---
 
-## Target SoT (3 independent laws) — IMPLEMENTED
+## Target SoT (3 independent laws) - IMPLEMENTED
 
 | Law | Field / rule | Does NOT control |
 |-----|--------------|------------------|
 | **ACCESS** | `allowEarlyAccess` + prerequisite `completed` | seek, 2/3 |
 | **SEEK** | `antiSeek` | access, complete |
-| **COMPLETION** | `watchedSeconds >= ceil(duration*2/3)` **always** | — |
+| **COMPLETION** | `watchedSeconds >= ceil(duration*2/3)` **always** | - |
 
 Defaults (backward compatible):
 
@@ -54,7 +54,7 @@ Defaults (backward compatible):
 
 | File | Change |
 |------|--------|
-| `utils/lessonLearningPolicy.js` | **NEW** — ACCESS + COMPLETION resolvers |
+| `utils/lessonLearningPolicy.js` | **NEW** - ACCESS + COMPLETION resolvers |
 | `utils/antiSeekPolicy.js` | unchanged core; still SEEK + duration math |
 | `client/src/utils/antiSeekPolicy.js` | FE twin + `evaluateCompletionRequirement`, dual error codes |
 | `routes/trainingRoutes.js` | lessons list via `resolveLessonLearningState`; complete always 2/3; early-access skips prev; save-watch ACCESS gate |
@@ -105,7 +105,7 @@ Coverage includes:
 - Server ignores any client `completed: true` (field unused)
 - Watch progress clamped by wall-clock elapsed (`clampWatchProgressIncrease`)
 - Locked lesson: no `videoUrl` in list; save-watch + complete fail-closed without access
-- Residual: slow inflate via repeated save within elapsed cap (same as prior — not DRM)
+- Residual: slow inflate via repeated save within elapsed cap (same as prior - not DRM)
 
 ### Regression
 
@@ -118,7 +118,7 @@ Coverage includes:
 1. Admin duration `0` + YT not loaded → fail-closed require ≥1s (may feel strict until duration resolves)
 2. Slow progress inflate within elapsed clamp still possible
 3. Manual E2E on VPS still needed after deploy
-4. Old FE clients expecting `ANTI_SEEK_PROGRESS_REQUIRED` — FE accepts both codes via `isCompletionRequirementCode`
+4. Old FE clients expecting `ANTI_SEEK_PROGRESS_REQUIRED` - FE accepts both codes via `isCompletionRequirementCode`
 
 ---
 
@@ -154,17 +154,17 @@ Conditions:
 
 Acceptance mapping:
 
-1. ACCESS ≠ SEEK — yes  
-2. SEEK ≠ COMPLETION — yes  
-3. allowEarlyAccess only access — yes  
-4. antiSeek only seek — yes  
-5. All lessons ≥ 2/3 to complete — yes (server)  
-6. Server SoT completion — yes  
-7. No complete via client `completed:true` — yes  
-8. Next unlock by completion/early rules — yes  
-9–10. Early + antiSeek — yes  
-11. Student = Teacher rules — yes  
-12. Admin 2 settings — yes  
-13. Reload uses server progress — yes (TrainingProgress)  
-14. Out-of-scope modules untouched — yes  
-15. Unit tests PASS — yes  
+1. ACCESS ≠ SEEK - yes  
+2. SEEK ≠ COMPLETION - yes  
+3. allowEarlyAccess only access - yes  
+4. antiSeek only seek - yes  
+5. All lessons ≥ 2/3 to complete - yes (server)  
+6. Server SoT completion - yes  
+7. No complete via client `completed:true` - yes  
+8. Next unlock by completion/early rules - yes  
+9–10. Early + antiSeek - yes  
+11. Student = Teacher rules - yes  
+12. Admin 2 settings - yes  
+13. Reload uses server progress - yes (TrainingProgress)  
+14. Out-of-scope modules untouched - yes  
+15. Unit tests PASS - yes  

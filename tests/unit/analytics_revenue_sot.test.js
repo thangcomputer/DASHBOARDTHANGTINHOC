@@ -9,7 +9,7 @@ const {
   enumerateVnBucketKeys,
 } = require('../../utils/vnTimezone');
 
-test('C — 1d is calendar today 00:00 VN → now (not rolling 24h)', () => {
+test('C - 1d is calendar today 00:00 VN → now (not rolling 24h)', () => {
   // 2026-08-13 15:30 VN = 2026-08-13 08:30 UTC
   const now = new Date('2026-08-13T08:30:00.000Z');
   const { start, end, prevStart, prevEnd } = getAnalyticsPeriodRange('1d', now);
@@ -26,7 +26,7 @@ test('C — 1d is calendar today 00:00 VN → now (not rolling 24h)', () => {
   assert.equal(prevEnd - prevStart, end - start);
 });
 
-test('D — timezone: 00:30 VN buckets as VN calendar day, not UTC date', () => {
+test('D - timezone: 00:30 VN buckets as VN calendar day, not UTC date', () => {
   // 2026-08-13 00:30 VN = 2026-08-12 17:30 UTC
   const utcEvening = new Date('2026-08-12T17:30:00.000Z');
   assert.equal(vnDateKey(utcEvening), '2026-08-13');
@@ -36,7 +36,7 @@ test('D — timezone: 00:30 VN buckets as VN calendar day, not UTC date', () => 
   assert.equal(vnDateKey(sod), '2026-08-13');
 });
 
-test('E — net revenue definition (payment − refund) matches KPI/chart contract', () => {
+test('E - net revenue definition (payment − refund) matches KPI/chart contract', () => {
   const payments = 10_000_000;
   const refunds = 4_000_000;
   const net = payments - refunds;
@@ -74,7 +74,7 @@ test('routes/analyticsRevenue no longer uses listPaidItems for chart', () => {
   assert.ok(!/generateTimeSeries\(paidItems/.test(src));
 });
 
-test('period consistency — revenue byBranch includes branchName enrichment', () => {
+test('period consistency - revenue byBranch includes branchName enrichment', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const src = fs.readFileSync(path.join(__dirname, '../../routes/analyticsRoutes.js'), 'utf8');

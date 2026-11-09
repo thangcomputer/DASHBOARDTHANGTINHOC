@@ -2,7 +2,7 @@
  * Policy shadow for LIVE /api/ai (Wave 6.18).
  * Legacy gate: authMiddleware + isAdmin (role admin|staff).
  * No AI permission invented. Branch/tenant/ownership: ignored.
- * sensitiveFlowLimiter is rate/business — not modeled as authz.
+ * sensitiveFlowLimiter is rate/business - not modeled as authz.
  */
 const ACTIONS = new Set([
   'status',
@@ -24,7 +24,7 @@ function buildSubject({ user, actorDoc, userBranchId }) {
   };
 }
 
-/** Mirrors isAdmin — JWT role admin OR staff. */
+/** Mirrors isAdmin - JWT role admin OR staff. */
 function evaluateIsAdmin(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };

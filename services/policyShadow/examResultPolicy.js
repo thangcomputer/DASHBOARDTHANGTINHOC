@@ -119,7 +119,7 @@ function evaluateExamDelete(subject, subjectBranchId) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
   }
-  // Live: checkAnyPermission(MANAGE_STUDENTS|MANAGE_STUDENT_TRAINING|MANAGE_TRAINING) — no role gate
+  // Live: checkAnyPermission(MANAGE_STUDENTS|MANAGE_STUDENT_TRAINING|MANAGE_TRAINING) - no role gate
   if (
     !actorHasAnyLivePermission(subject, [
       STUDENT_WRITE_LIVE,

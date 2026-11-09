@@ -1,5 +1,5 @@
 /**
- * CreditNote — chứng từ hoàn (không xóa HĐ gốc).
+ * CreditNote - chứng từ hoàn (không xóa HĐ gốc).
  * Liên kết Invoice gốc + Ledger REFUND.
  */
 const mongoose = require('mongoose');

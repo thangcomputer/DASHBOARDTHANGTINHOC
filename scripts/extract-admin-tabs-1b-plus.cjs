@@ -178,7 +178,7 @@ const newTabValue = `  const adminTabValue = {
   };`;
 
 if (!dash.includes(oldTabValue)) {
-  console.error('adminTabValue block not found — abort patch');
+  console.error('adminTabValue block not found - abort patch');
   process.exit(1);
 }
 dash = dash.replace(oldTabValue, newTabValue);

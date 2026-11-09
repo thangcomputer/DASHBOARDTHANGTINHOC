@@ -1,5 +1,5 @@
 /**
- * Wave 6.5 — Policy SHADOW for remaining LIVE teacher routes.
+ * Wave 6.5 - Policy SHADOW for remaining LIVE teacher routes.
  * Wave 6 score/approve/reject remain on policyShadowTeacherWrite.
  */
 const test = require('node:test');
@@ -303,7 +303,7 @@ test('Wave6.5 finance_pay requires MANAGE_FINANCE + Super hoặc HIGH_ADMIN', ()
 
 // ── Spoof ────────────────────────────────────────────────────────────────────
 
-test('Wave6.5 spoof: client branch/tenant/role/permissions ignored — cross-branch still DENY', () => {
+test('Wave6.5 spoof: client branch/tenant/role/permissions ignored - cross-branch still DENY', () => {
   const subject = subjectOf({ permissions: [PERMISSIONS.MANAGE_TEACHERS] });
   const { legacy } = assertMatch(
     'spoof',

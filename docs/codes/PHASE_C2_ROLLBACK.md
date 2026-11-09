@@ -1,4 +1,4 @@
-# PHASE C2 — ROLLBACK
+# PHASE C2 - ROLLBACK
 
 ## Principles
 
@@ -21,9 +21,9 @@ Must be owner-approved script; not auto-run.
 
 ## Teacher / Employee / Course
 
-Unset or clear `teacherCode` / `employeeCode` / `courseCode` if required — `_id` and relations stay.
+Unset or clear `teacherCode` / `employeeCode` / `courseCode` if required - `_id` and relations stay.
 
-`Course.slug` was never changed — no slug rollback needed.
+`Course.slug` was never changed - no slug rollback needed.
 
 ## Counters
 
@@ -31,7 +31,7 @@ If rolling back creates, set counter `seq` down only with extreme care (risk of 
 
 ## Unique indexes
 
-Not created in C2 — nothing to drop for indexes.
+Not created in C2 - nothing to drop for indexes.
 
 ## Application rollback
 

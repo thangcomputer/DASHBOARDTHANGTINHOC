@@ -1,5 +1,5 @@
 /**
- * Phase 7.14 — Controlled cutover gate for LIVE /api/branches ONLY.
+ * Phase 7.14 - Controlled cutover gate for LIVE /api/branches ONLY.
  *
  * LEGACY (default):
  *   - list_public → public pass-through (no auth)
@@ -74,7 +74,7 @@ function branchesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] branches authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] branches authority helper failed - Legacy gate',
       );
     }
 
@@ -119,7 +119,7 @@ function branchesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] branches Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] branches Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

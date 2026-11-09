@@ -1,2 +1,2 @@
-/** Canonical: models/PayrollLog.js — re-export to avoid mongoose dual registration */
+/** Canonical: models/PayrollLog.js - re-export to avoid mongoose dual registration */
 module.exports = require('../../../models/PayrollLog.js');

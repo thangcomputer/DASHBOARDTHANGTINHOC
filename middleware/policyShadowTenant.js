@@ -67,7 +67,7 @@ function policyShadowTenant(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] tenant evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] tenant evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `tenant_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -105,7 +105,7 @@ function policyShadowTenant(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] tenant shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] tenant shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -117,7 +117,7 @@ function policyShadowTenant(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected tenant error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected tenant error - fail closed to legacy only',
       );
     }
     return next();

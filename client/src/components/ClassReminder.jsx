@@ -67,7 +67,7 @@ const ClassReminder = ({ nextClassTime, linkHoc, studentName, courseName }) => {
                 {isLive
                   ? '🔴 Vào lớp ngay!'
                   : isUrgent
-                    ? `⚡ CÒN ${minutesLeft} PHÚT — Vào lớp ngay!`
+                    ? `⚡ CÒN ${minutesLeft} PHÚT - Vào lớp ngay!`
                     : `📚 Sắp đến giờ vào lớp! (Còn ${minutesLeft} phút)`
                 }
               </p>

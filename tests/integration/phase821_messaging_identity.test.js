@@ -1,5 +1,5 @@
 /**
- * Phase 8.21 — Messaging identity / display / isolation forensic tests.
+ * Phase 8.21 - Messaging identity / display / isolation forensic tests.
  * LIVE messaging only. Does not touch Enterprise RBAC.
  */
 const { describe, it } = require('node:test');

@@ -1,5 +1,5 @@
 /**
- * Phase 8 — LIVE multi-client Socket.IO messaging runtime verification.
+ * Phase 8 - LIVE multi-client Socket.IO messaging runtime verification.
  *
  * Boots real server.js (no notifyUser / sendCanonicalMessage mocks).
  * Measures message:receive on independent socket.io-client connections.
@@ -81,7 +81,7 @@ describe('Phase 8 live messaging runtime', {
       return;
     }
 
-    // Prefer dedicated port — do not attach to unknown external instance
+    // Prefer dedicated port - do not attach to unknown external instance
     child = harness.startServer(PORT);
     const healthy = await harness.waitHealth(PORT, 90000);
     if (!healthy) {
@@ -145,7 +145,7 @@ describe('Phase 8 live messaging runtime', {
     if (!ready) {
       record('infra', 'ENVIRONMENT_FAILURE', evidence.envFailure || 'not ready');
       assert.ok(evidence.envFailure, 'must classify env failure');
-      // Soft-fail the suite body via skips below — still assert we classified
+      // Soft-fail the suite body via skips below - still assert we classified
       return;
     }
     record('infra', 'PASS', {
@@ -266,7 +266,7 @@ describe('Phase 8 live messaging runtime', {
     record('teacher_to_student', 'PASS', { studentA: 1, others: 0 });
   });
 
-  it('Branch: Student A → Staff B DENY — no persist, no receive', async (t) => {
+  it('Branch: Student A → Staff B DENY - no persist, no receive', async (t) => {
     if (!ready) { t.skip(evidence.envFailure || 'not ready'); return; }
     const content = `[P8:branch-deny-staff] ${Date.now()}`;
     const before = await harness.countMessagesByContent(content);
@@ -292,7 +292,7 @@ describe('Phase 8 live messaging runtime', {
     });
   });
 
-  it('Branch: Student A → Support B same-tenant ALLOW (global SUPPORT freeze) — only Support B receives', async (t) => {
+  it('Branch: Student A → Support B same-tenant ALLOW (global SUPPORT freeze) - only Support B receives', async (t) => {
     if (!ready) { t.skip(evidence.envFailure || 'not ready'); return; }
     // Approved matrix / Phase 5: Student → Support is global send (not branch-deny).
     const content = `[P8:branch-support-global] ${Date.now()}`;
@@ -302,17 +302,17 @@ describe('Phase 8 live messaging runtime', {
     await recv;
     await noA;
     record('branch_student_supportB_allow_global', 'PASS', {
-      note: 'CURRENT DESIGNED BEHAVIOR — SUPPORT send global; private room still isolated',
+      note: 'CURRENT DESIGNED BEHAVIOR - SUPPORT send global; private room still isolated',
       supportB: 1,
       supportA: 0,
     });
   });
 
-  it('Tenant: Student A → Support TenantB DENY — no persist, no receive', async (t) => {
+  it('Tenant: Student A → Support TenantB DENY - no persist, no receive', async (t) => {
     if (!ready) { t.skip(evidence.envFailure || 'not ready'); return; }
     const content = `[P8:tenant-deny] ${Date.now()}`;
     const before = await harness.countMessagesByContent(content);
-    // No socket for tenantB support — verify DB + no accidental local delivery
+    // No socket for tenantB support - verify DB + no accidental local delivery
     const leaks = Promise.all([
       harness.assertNoReceive(sockets.supportA, (p) => p.content === content, 2000),
       harness.assertNoReceive(sockets.supportB, (p) => p.content === content, 2000),
@@ -337,7 +337,7 @@ describe('Phase 8 live messaging runtime', {
     const content = `[P8:wrong-role] ${Date.now()}`;
     const recv = harness.waitReceive(sockets.supportA, (p) => p.content === content);
     const noTeacher = harness.assertNoReceive(sockets.teacherA, (p) => p.content === content);
-    // Hint "teacher" but id is Support A — canonical resolution must win
+    // Hint "teacher" but id is Support A - canonical resolution must win
     await harness.sendViaSocket(sockets.studentA, seeded.actors.supportA, content, {
       receiverRole: 'teacher',
     });
@@ -419,7 +419,7 @@ describe('Phase 8 live messaging runtime', {
     sockets.supportA.emit('message:read', { conversationId: convId });
     await leak;
     record('read_isolation', 'PASS', {
-      note: 'Message.isRead remains global boolean — only verify no Support B socket event',
+      note: 'Message.isRead remains global boolean - only verify no Support B socket event',
       convId,
     });
   });
@@ -473,7 +473,7 @@ describe('Phase 8 live messaging runtime', {
       receiverRole: doc.receiverRole,
       senderBranchCode: doc.senderBranchCode || null,
       receiverBranchCode: doc.receiverBranchCode || null,
-      note: 'Message schema has no tenantId field — unchanged',
+      note: 'Message schema has no tenantId field - unchanged',
       clientConversationId: sent.conversationId,
     });
   });
@@ -519,9 +519,9 @@ describe('Phase 8 live messaging runtime', {
       record('http_contacts', 'ENVIRONMENT_FAILURE', {
         status: res.status,
         body: res.json,
-        note: 'minted JWT may lack full HTTP auth session/CSRF path — not messaging DM failure',
+        note: 'minted JWT may lack full HTTP auth session/CSRF path - not messaging DM failure',
       });
-      // Do not fail the suite — classify as env for HTTP layer
+      // Do not fail the suite - classify as env for HTTP layer
       return;
     }
     assert.equal(res.status, 200);
@@ -537,9 +537,9 @@ describe('Phase 8 live messaging runtime', {
   });
 
   it('Existing messaging-isolation.test.js 401 classification note', () => {
-    // Document only — that suite needs live API on PORT 5000 + test_account_ids.json
+    // Document only - that suite needs live API on PORT 5000 + test_account_ids.json
     record('messaging_isolation_suite', 'DOCUMENTED', {
-      note: 'If 401: ENVIRONMENT FAILURE — API/auth seed, not DM authorization',
+      note: 'If 401: ENVIRONMENT FAILURE - API/auth seed, not DM authorization',
     });
   });
 });

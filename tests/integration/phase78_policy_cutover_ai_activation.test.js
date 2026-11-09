@@ -1,5 +1,5 @@
 /**
- * Phase 7.8 — Controlled cutover + production activation for /api/ai
+ * Phase 7.8 - Controlled cutover + production activation for /api/ai
  * (alongside backups, monitoring, tenants, system-logs Policy-primary).
  *
  * Legacy gate: auth + isAdmin (role admin|staff). sensitiveFlowLimiter is rate control, not authz.
@@ -56,10 +56,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -345,9 +345,9 @@ test('Phase7.8 rollback TESTED AND RESTORED: OFF / remove ai → LEGACY; restore
   if (parsed) assert.equal(parsed.POLICY_CUTOVER_ENABLED, 'true');
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('ai'));
-      assert.ok(restoredRoutes.includes('backups'));
-      assert.ok(restoredRoutes.includes('system-logs'));
+    assert.ok(restoredRoutes.includes('ai'));
+    assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('system-logs'));
   }
 });
 
@@ -358,8 +358,8 @@ test('Phase7.8 functional smoke: status authz PASS; POST AI ops NOT EXECUTED', (
     assert.equal(parity(action, staff).policy.decision, 'ALLOW');
   }
   assert.equal(
-    'NOT EXECUTED — AI provider / cost-bearing production operation',
-    'NOT EXECUTED — AI provider / cost-bearing production operation',
+    'NOT EXECUTED - AI provider / cost-bearing production operation',
+    'NOT EXECUTED - AI provider / cost-bearing production operation',
   );
 });
 
@@ -380,7 +380,7 @@ test('Phase7.8 static: wiring + limiter order + isolation + CQRS OFF + no side e
   if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 
   for (const a of ACTIONS) {
     assert.ok(routes.includes(`guard('${a}')`), a);

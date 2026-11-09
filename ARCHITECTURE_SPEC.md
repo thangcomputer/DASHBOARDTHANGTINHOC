@@ -1,5 +1,5 @@
 # 📘 Software Architecture Specification (SAS)
-## DASHBOARDTHANGTINHOC — Education Management ERP/LMS
+## DASHBOARDTHANGTINHOC - Education Management ERP/LMS
 ### Version 1.0 | Principal Architect Review
 
 ---
@@ -28,7 +28,7 @@
 ---
 
 <a id="section-1"></a>
-# Section 1 — Architecture Vision
+# Section 1 - Architecture Vision
 
 ## 1.1 Business Goals
 
@@ -93,7 +93,7 @@
 ---
 
 <a id="section-2"></a>
-# Section 2 — Architecture Style
+# Section 2 - Architecture Style
 
 ## 2.1 Chosen Architecture: **Modular Monolith + Clean Architecture**
 
@@ -146,7 +146,7 @@
 ---
 
 <a id="section-3"></a>
-# Section 3 — Business Domains
+# Section 3 - Business Domains
 
 ## 3.1 Domain Map
 
@@ -267,7 +267,7 @@ graph LR
 ---
 
 <a id="section-4"></a>
-# Section 4 — Modules
+# Section 4 - Modules
 
 ## 4.1 Academic Domain Modules
 
@@ -430,7 +430,7 @@ graph LR
 ---
 
 <a id="section-5"></a>
-# Section 5 — Dependency Rules
+# Section 5 - Dependency Rules
 
 ## 5.1 Core Principle
 
@@ -442,19 +442,19 @@ graph LR
 
 | Module ↓ calls → | auth | student | teacher | course | enrollment | schedule | branch | finance | chat | notification | exam | audit |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **auth** | — | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **student** | ✅ | — | ❌ | ✅ | ✅ | ❌ | ✅ | 🔶 | ❌ | ❌ | ❌ | ❌ |
-| **teacher** | ✅ | ❌ | — | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **course** | ❌ | ❌ | ❌ | — | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **enrollment** | ❌ | ✅ | ❌ | ✅ | — | ❌ | ❌ | 🔶 | ❌ | ❌ | ❌ | ❌ |
-| **schedule** | ❌ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **auth** | - | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **student** | ✅ | - | ❌ | ✅ | ✅ | ❌ | ✅ | 🔶 | ❌ | ❌ | ❌ | ❌ |
+| **teacher** | ✅ | ❌ | - | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **course** | ❌ | ❌ | ❌ | - | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **enrollment** | ❌ | ✅ | ❌ | ✅ | - | ❌ | ❌ | 🔶 | ❌ | ❌ | ❌ | ❌ |
+| **schedule** | ❌ | ✅ | ✅ | ✅ | ❌ | - | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **attendance** | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **exam** | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | — | ❌ |
+| **exam** | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | - | ❌ |
 | **payment** | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | 🔶 | ❌ | ❌ |
 | **refund** | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | 🔶 | ❌ | ❌ |
-| **chat** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | — | ✅ | ❌ | ❌ |
-| **notification** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | — | ❌ | ❌ |
-| **audit** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | — |
+| **chat** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | - | ✅ | ❌ | ❌ |
+| **notification** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | - | ❌ | ❌ |
+| **audit** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | - |
 
 **Legend**: ✅ Direct call allowed | 🔶 Via Domain Events only | ❌ Forbidden
 
@@ -479,7 +479,7 @@ student.created → Event: STUDENT_CREATED
 ---
 
 <a id="section-6"></a>
-# Section 6 — Backend Folder Structure
+# Section 6 - Backend Folder Structure
 
 ```text
 src/
@@ -504,11 +504,11 @@ src/
 │   │
 │   ├── errors/
 │   │   ├── AppError.js                 # Base error (statusCode, isOperational)
-│   │   ├── ValidationError.js          # 400 — input validation failures
-│   │   ├── NotFoundError.js            # 404 — resource not found
-│   │   ├── UnauthorizedError.js        # 401 — authentication failure
-│   │   ├── ForbiddenError.js           # 403 — permission denied
-│   │   └── ConflictError.js            # 409 — duplicate / conflict
+│   │   ├── ValidationError.js          # 400 - input validation failures
+│   │   ├── NotFoundError.js            # 404 - resource not found
+│   │   ├── UnauthorizedError.js        # 401 - authentication failure
+│   │   ├── ForbiddenError.js           # 403 - permission denied
+│   │   └── ConflictError.js            # 409 - duplicate / conflict
 │   │
 │   ├── repository/
 │   │   └── BaseRepository.js           # CRUD base: find, findById, create, update, delete
@@ -615,17 +615,17 @@ src/
 
 | Folder | Purpose | Rules |
 |---|---|---|
-| `bootstrap/` | Application wiring — connects all pieces | No business logic |
+| `bootstrap/` | Application wiring - connects all pieces | No business logic |
 | `shared/` | Code used by 3+ modules | Must be stateless |
-| `modules/` | Business capabilities — heart of the system | Each module is self-contained |
+| `modules/` | Business capabilities - heart of the system | Each module is self-contained |
 | `models/` | Mongoose schema definitions only | No business logic, no query helpers |
-| `infrastructure/` | External service wrappers | Adapter pattern — easily swappable |
+| `infrastructure/` | External service wrappers | Adapter pattern - easily swappable |
 | `config/` | Environment-based configuration | Read-only at runtime |
 
 ---
 
 <a id="section-7"></a>
-# Section 7 — Frontend Folder Structure
+# Section 7 - Frontend Folder Structure
 
 ```text
 client/src/
@@ -739,12 +739,12 @@ client/src/
 | Shared components are UI-only (no API calls) | Reusability: `<Table>` works for any data |
 | Hooks encapsulate API + state logic | Components become pure renderers |
 | No component file exceeds 300 lines | Split into sub-components when approaching limit |
-| `apiClient.js` max 150 lines | Infrastructure only — no business endpoints |
+| `apiClient.js` max 150 lines | Infrastructure only - no business endpoints |
 
 ---
 
 <a id="section-8"></a>
-# Section 8 — Coding Standards
+# Section 8 - Coding Standards
 
 ## 8.1 Folder Naming
 
@@ -790,7 +790,7 @@ client/src/
 ---
 
 <a id="section-9"></a>
-# Section 9 — Role & Permission Design
+# Section 9 - Role & Permission Design
 
 ## 9.1 Core Principle
 
@@ -862,7 +862,7 @@ router.post('/',
 ---
 
 <a id="section-10"></a>
-# Section 10 — Database Design
+# Section 10 - Database Design
 
 ## 10.1 Collection Overview
 
@@ -929,7 +929,7 @@ Every collection MUST have:
 ---
 
 <a id="section-11"></a>
-# Section 11 — API Standards
+# Section 11 - API Standards
 
 ## 11.1 URL Convention
 
@@ -1010,7 +1010,7 @@ GET /api/students?search=Nguyễn                       # Text search
 ---
 
 <a id="section-12"></a>
-# Section 12 — Security Standards
+# Section 12 - Security Standards
 
 | Layer | Implementation | Status |
 |---|---|---|
@@ -1031,7 +1031,7 @@ GET /api/students?search=Nguyễn                       # Text search
 ---
 
 <a id="section-13"></a>
-# Section 13 — Performance Standards
+# Section 13 - Performance Standards
 
 | Area | Strategy | Target |
 |---|---|---|
@@ -1047,19 +1047,19 @@ GET /api/students?search=Nguyễn                       # Text search
 ---
 
 <a id="section-14"></a>
-# Section 14 — Testing Strategy
+# Section 14 - Testing Strategy
 
 ## 14.1 Testing Pyramid
 
 ```text
         ┌─────────┐
-        │  E2E    │  5%  — Critical user flows (Playwright)
+        │  E2E    │  5%  - Critical user flows (Playwright)
         │  Tests  │
        ┌┴─────────┴┐
-       │ Integration│ 25% — API endpoint tests (Supertest)
+       │ Integration│ 25% - API endpoint tests (Supertest)
        │   Tests    │
       ┌┴────────────┴┐
-      │  Unit Tests   │ 70% — Service + Repository logic (Jest/Vitest)
+      │  Unit Tests   │ 70% - Service + Repository logic (Jest/Vitest)
       └───────────────┘
 ```
 
@@ -1070,7 +1070,7 @@ GET /api/students?search=Nguyễn                       # Text search
 | **Service** | 80% | Business logic, edge cases, error handling |
 | **Repository** | 60% | Query correctness, pagination, filters |
 | **Controller** | 50% | Request validation, status codes, response format |
-| **Utils** | 90% | Pure functions — easy to test |
+| **Utils** | 90% | Pure functions - easy to test |
 | **Frontend Hooks** | 70% | State transitions, API call behavior |
 
 ## 14.3 Testing Rules
@@ -1084,7 +1084,7 @@ GET /api/students?search=Nguyễn                       # Text search
 ---
 
 <a id="section-15"></a>
-# Section 15 — Future Scalability
+# Section 15 - Future Scalability
 
 ## 15.1 Scale Target Analysis
 
@@ -1135,7 +1135,7 @@ Phase 4: Full Scale (500K+ users)
 ---
 
 <a id="section-16"></a>
-# Section 16 — Architecture Decision Records
+# Section 16 - Architecture Decision Records
 
 ## ADR-001: Choose Modular Monolith
 
@@ -1153,7 +1153,7 @@ Phase 4: Full Scale (500K+ users)
 | **Status** | Accepted (existing) |
 | **Context** | Education data has varied schemas (different course types, exam formats). Document model fits naturally. |
 | **Decision** | Continue with MongoDB + Mongoose. Leverage compound indexes and `.lean()` for performance. |
-| **Consequences** | Flexible schema evolution. Trade-off: no JOIN support — use application-level joins or denormalization. |
+| **Consequences** | Flexible schema evolution. Trade-off: no JOIN support - use application-level joins or denormalization. |
 
 ## ADR-003: Use Repository Pattern
 
@@ -1203,7 +1203,7 @@ Phase 4: Full Scale (500K+ users)
 ---
 
 <a id="section-17"></a>
-# Section 17 — Development Rules
+# Section 17 - Development Rules
 
 ## 17.1 Absolute Rules (MUST follow)
 
@@ -1228,16 +1228,16 @@ Phase 4: Full Scale (500K+ users)
 | 2 | Every module MUST have a `__tests__/` folder |
 | 3 | Every module MUST declare its dependencies in a comment block at the top of `service.js` |
 | 4 | Every module MUST export only through its routes (public API) |
-| 5 | Module internal files are PRIVATE — no other module may import them |
+| 5 | Module internal files are PRIVATE - no other module may import them |
 
 ## 17.3 Frontend Rules
 
 | # | Rule |
 |---|---|
-| 1 | No component file exceeds 300 lines — split into sub-components |
-| 2 | No API calls directly in components — use custom hooks |
-| 3 | No business logic in JSX — extract to utility functions or hooks |
-| 4 | Every feature folder has its own `services/xxxApi.js` — no importing from other features |
+| 1 | No component file exceeds 300 lines - split into sub-components |
+| 2 | No API calls directly in components - use custom hooks |
+| 3 | No business logic in JSX - extract to utility functions or hooks |
+| 4 | Every feature folder has its own `services/xxxApi.js` - no importing from other features |
 | 5 | Shared components MUST be UI-only (no API calls, no business logic) |
 | 6 | All new routes use `React.lazy()` + `Suspense` |
 
@@ -1245,7 +1245,7 @@ Phase 4: Full Scale (500K+ users)
 
 | # | Rule |
 |---|---|
-| 1 | One module per Pull Request — never mix changes across modules |
+| 1 | One module per Pull Request - never mix changes across modules |
 | 2 | Every PR must include tests for new logic |
 | 3 | Commit message format: `[module] action: description` (e.g., `[student] feat: add bulk import`) |
 | 4 | No force-push to `main` or `develop` branches |
@@ -1253,13 +1253,13 @@ Phase 4: Full Scale (500K+ users)
 ---
 
 <a id="section-18"></a>
-# Section 18 — Migration Roadmap
+# Section 18 - Migration Roadmap
 
-## Phase 1 — Foundation (Week 1-2)
+## Phase 1 - Foundation (Week 1-2)
 
 | Task | Effort | Risk | Rollback |
 |---|---|---|---|
-| Create `shared/errors/` — AppError, NotFoundError, etc. | 1 day | ⚪ None | Delete files |
+| Create `shared/errors/` - AppError, NotFoundError, etc. | 1 day | ⚪ None | Delete files |
 | Create `shared/repository/BaseRepository.js` | 2 days | ⚪ None | Delete file |
 | Create `shared/middleware/authorize.js` (permission-based) | 2 days | ⚪ None | Delete file |
 | Create `shared/utils/responseBuilder.js` | 1 day | ⚪ None | Delete file |
@@ -1267,11 +1267,11 @@ Phase 4: Full Scale (500K+ users)
 | Setup Jest/Vitest testing framework | 1 day | ⚪ None | Remove config |
 | Create module folder template (empty structure) | 1 day | ⚪ None | Delete folders |
 
-**Testing**: Run existing system. All new files are additive — zero risk to production.
+**Testing**: Run existing system. All new files are additive - zero risk to production.
 
 ---
 
-## Phase 2 — Auth Module (Week 3-4)
+## Phase 2 - Auth Module (Week 3-4)
 
 | Task | Effort | Risk | Rollback |
 |---|---|---|---|
@@ -1279,15 +1279,15 @@ Phase 4: Full Scale (500K+ users)
 | Create `modules/auth/auth.service.js` | 3 days | 🟡 Low | Revert to old routes |
 | Create `modules/auth/auth.controller.js` | 2 days | 🟡 Low | Revert to old routes |
 | Create `modules/auth/auth.validator.js` | 1 day | 🟡 Low | Revert to old routes |
-| Create `modules/auth/auth.routes.js` — new routes pointing to controller | 1 day | 🟡 Low | Keep old route file |
+| Create `modules/auth/auth.routes.js` - new routes pointing to controller | 1 day | 🟡 Low | Keep old route file |
 | Switch route mounting in `bootstrap/routes.js` | 1 day | 🟠 Medium | Revert route mount |
 | Write tests for auth.service | 2 days | ⚪ None | N/A |
 
-**Testing**: Full auth flow test — login, logout, refresh, MFA, password reset.
+**Testing**: Full auth flow test - login, logout, refresh, MFA, password reset.
 
 ---
 
-## Phase 3 — Academic Domain (Week 5-10)
+## Phase 3 - Academic Domain (Week 5-10)
 
 | Module | Effort | Risk |
 |---|---|---|
@@ -1305,7 +1305,7 @@ Phase 4: Full Scale (500K+ users)
 
 ---
 
-## Phase 4 — Finance Domain (Week 11-13)
+## Phase 4 - Finance Domain (Week 11-13)
 
 | Module | Effort | Risk |
 |---|---|---|
@@ -1317,7 +1317,7 @@ Phase 4: Full Scale (500K+ users)
 
 ---
 
-## Phase 5 — Communication Domain (Week 14-16)
+## Phase 5 - Communication Domain (Week 14-16)
 
 | Module | Effort | Risk |
 |---|---|---|
@@ -1329,7 +1329,7 @@ Phase 4: Full Scale (500K+ users)
 
 ---
 
-## Phase 6 — CMS & Analytics Domain (Week 17-18)
+## Phase 6 - CMS & Analytics Domain (Week 17-18)
 
 | Module | Effort | Risk |
 |---|---|---|
@@ -1343,7 +1343,7 @@ Phase 4: Full Scale (500K+ users)
 
 ---
 
-## Phase 7 — AI Domain (Week 19-22, Future)
+## Phase 7 - AI Domain (Week 19-22, Future)
 
 | Module | Effort | Risk |
 |---|---|---|

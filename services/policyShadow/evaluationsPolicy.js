@@ -1,6 +1,6 @@
 /**
  * Policy shadow for LIVE /api/evaluations (Wave 6.15).
- * No checkPermission — VIEW_EVALUATIONS exists in constants but is UNUSED on live routes.
+ * No checkPermission - VIEW_EVALUATIONS exists in constants but is UNUSED on live routes.
  * Mirror weak Legacy role/ownership gates exactly.
  */
 const ACTIONS = new Set([
@@ -30,7 +30,7 @@ function evaluateAuthOnly(subject) {
   return { decision: 'ALLOW', reason: 'authenticated', statusHint: 200 };
 }
 
-/** GET /admin — handler: role admin|staff only (no VIEW_EVALUATIONS). */
+/** GET /admin - handler: role admin|staff only (no VIEW_EVALUATIONS). */
 function evaluateAdminList(subject) {
   const auth = evaluateAuthOnly(subject);
   if (auth.decision === 'DENY') return auth;
@@ -42,14 +42,14 @@ function evaluateAdminList(subject) {
 }
 
 /**
- * GET /teacher/:teacherId — auth only; any authenticated user may read any teacherId.
- * P2 weak Legacy — mirrored.
+ * GET /teacher/:teacherId - auth only; any authenticated user may read any teacherId.
+ * P2 weak Legacy - mirrored.
  */
 function evaluateTeacherRatings(subject) {
   return evaluateAuthOnly(subject);
 }
 
-/** GET /mine — học viên đọc đánh giá mốc của chính mình. */
+/** GET /mine - học viên đọc đánh giá mốc của chính mình. */
 function evaluateStudentMine(subject) {
   const auth = evaluateAuthOnly(subject);
   if (auth.decision === 'DENY') return auth;
@@ -61,7 +61,7 @@ function evaluateStudentMine(subject) {
 }
 
 /**
- * POST / — student may only submit for self; teacher/staff/admin have no studentId gate.
+ * POST / - student may only submit for self; teacher/staff/admin have no studentId gate.
  * body.studentId is operation param for non-students (Legacy trusts it for write).
  */
 function evaluateCreate(subject, ctx) {
@@ -78,7 +78,7 @@ function evaluateCreate(subject, ctx) {
 }
 
 /**
- * POST /:id/read — admin|staff|teacher; teacher must own targetTeacherId; missing → 404 after role OK.
+ * POST /:id/read - admin|staff|teacher; teacher must own targetTeacherId; missing → 404 after role OK.
  */
 function evaluateMarkRead(subject, ctx) {
   const auth = evaluateAuthOnly(subject);

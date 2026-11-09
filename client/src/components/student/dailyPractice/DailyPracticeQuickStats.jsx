@@ -1,13 +1,13 @@
 import { BookOpen, Flame, Route, Trophy } from 'lucide-react';
 
-/** Bốn thẻ tóm tắt — dùng overview + lộ trình chủ đề đang chọn (không dữ liệu giả). */
+/** Bốn thẻ tóm tắt - dùng overview + lộ trình chủ đề đang chọn (không dữ liệu giả). */
 export default function DailyPracticeQuickStats({ stats, pathTopic, freeTopicName, mode }) {
   const subject = mode === 'path'
-    ? (pathTopic?.topic?.name || '—')
+    ? (pathTopic?.topic?.name || '-')
     : (freeTopicName || 'Chưa chọn');
   const stageLine = pathTopic?.totalUnits
     ? `${pathTopic.completedUnits}/${pathTopic.totalUnits} chặng`
-    : '—';
+    : '-';
 
   const cards = [
     { icon: BookOpen, label: 'Môn / chủ đề', value: subject, tone: 'text-sky-700 bg-sky-50' },

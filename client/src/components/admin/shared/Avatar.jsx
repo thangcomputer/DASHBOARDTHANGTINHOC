@@ -18,7 +18,7 @@ const ROLE_RING = {
 };
 
 /**
- * Avatar dung chung — anh cartoon mac dinh theo role + gender
+ * Avatar dung chung - anh cartoon mac dinh theo role + gender
  * + badge GV/HV de phan biet nhanh khi danh sach dai.
  */
 export default function Avatar({

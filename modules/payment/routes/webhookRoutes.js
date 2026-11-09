@@ -1,10 +1,10 @@
 /**
  * webhookRoutes.js
  *
- * POST /api/webhooks/sepay              — SePay gọi khi có tiền vào TK
- * GET  /api/webhooks/payment-status/:id — Polling kiểm tra HV đã thanh toán
- * POST /api/webhooks/payment-session    — Tạo session thanh toán tạm (đăng ký mới)
- * GET  /api/webhooks/payment-session/:id — Kiểm tra session
+ * POST /api/webhooks/sepay              - SePay gọi khi có tiền vào TK
+ * GET  /api/webhooks/payment-status/:id - Polling kiểm tra HV đã thanh toán
+ * POST /api/webhooks/payment-session    - Tạo session thanh toán tạm (đăng ký mới)
+ * GET  /api/webhooks/payment-session/:id - Kiểm tra session
  */
 
 const express = require('express');
@@ -36,10 +36,10 @@ function verifySepaySignature(req, res, next) {
   // Production: bắt buộc cấu hình xác thực webhook
   if (!apiKey && !hmacSecret) {
     if (process.env.NODE_ENV === 'production') {
-      logger.error('[SEPAY] Webhook rejected — SEPAY_API_KEY / SEPAY_SECRET_KEY not configured');
+      logger.error('[SEPAY] Webhook rejected - SEPAY_API_KEY / SEPAY_SECRET_KEY not configured');
       return res.status(503).json({ success: false, message: 'Webhook payment not configured' });
     }
-    logger.warn('[SEPAY] Dev mode — webhook verification skipped (no SEPAY keys)');
+    logger.warn('[SEPAY] Dev mode - webhook verification skipped (no SEPAY keys)');
     return next();
   }
 
@@ -56,7 +56,7 @@ function verifySepaySignature(req, res, next) {
       logger.info('[SEPAY] ✅ API Key (x-api-key) verified');
       return next();
     }
-    logger.warn('[SEPAY] ❌ API Key mismatch — rejected');
+    logger.warn('[SEPAY] ❌ API Key mismatch - rejected');
     return res.status(401).json({ success: false, message: 'Invalid API Key' });
   }
 
@@ -64,13 +64,13 @@ function verifySepaySignature(req, res, next) {
   if (hmacSecret) {
     const signature = req.headers['x-sepay-token'];
     if (!signature) {
-      logger.warn('[SEPAY] Missing HMAC signature — rejected');
+      logger.warn('[SEPAY] Missing HMAC signature - rejected');
       return res.status(401).json({ success: false, message: 'Missing webhook signature' });
     }
     const rawBody = JSON.stringify(req.body);
     const expected = crypto.createHmac('sha256', hmacSecret).update(rawBody).digest('hex');
     if (signature !== expected) {
-      logger.warn('[SEPAY] Invalid HMAC signature — rejected');
+      logger.warn('[SEPAY] Invalid HMAC signature - rejected');
       return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
     }
     return next();
@@ -89,7 +89,7 @@ const handleCreateSession = async (req, res) => {
     if (!finalRef) return res.status(400).json({ success: false, message: 'Thiếu nội dung chuyển khoản (ref/content)' });
 
     const sessionId = `ps_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    
+
     await paymentSessionRepository.create({
       sessionId,
       ref: finalRef,
@@ -99,7 +99,7 @@ const handleCreateSession = async (req, res) => {
       courseName: courseName || '',
     });
 
-    logger.info(`[PAYMENT SESSION] Tạo mới (DB): ${sessionId} — ref: "${finalRef}"`);
+    logger.info(`[PAYMENT SESSION] Tạo mới (DB): ${sessionId} - ref: "${finalRef}"`);
     return res.json({ success: true, sessionId, expiresIn: SESSION_TTL_MS / 1000 });
   } catch (err) {
     logger.error('[CREATE SESSION ERROR]', err);
@@ -115,7 +115,7 @@ const handleCheckSession = async (req, res) => {
   try {
     const sessionId = req.params.id || req.query.sessionId;
     if (!sessionId) {
-       return res.status(400).json({ success: false, message: 'Missing sessionId' });
+      return res.status(400).json({ success: false, message: 'Missing sessionId' });
     }
 
     const session = await paymentSessionRepository.findOne({ sessionId });
@@ -154,9 +154,9 @@ router.get('/payment-status', authMiddleware, handleCheckSession);
 
 
 // ── POST /api/webhooks/sepay ── SePay Webhook (HMAC verified) ──────────────────
-router.post('/sepay', verifySepaySignature,paymentController.post_sepay);
+router.post('/sepay', verifySepaySignature, paymentController.post_sepay);
 
 // ── GET /api/webhooks/payment-status/:studentId ── Polling HV đã có tài khoản ─
-router.get('/payment-status/:studentId', authMiddleware,paymentController.get_payment_status_studentId);
+router.get('/payment-status/:studentId', authMiddleware, paymentController.get_payment_status_studentId);
 
 module.exports = router;

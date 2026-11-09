@@ -1,5 +1,5 @@
 /**
- * Wave 6.18 — Policy SHADOW for LIVE /api/ai + /api/workflows + /api/builder.
+ * Wave 6.18 - Policy SHADOW for LIVE /api/ai + /api/workflows + /api/builder.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -40,10 +40,10 @@ function aiSub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-          role,
-        },
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+        role,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -55,10 +55,10 @@ function wfSub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-          role,
-        },
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+        role,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -71,10 +71,10 @@ function bSub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : defaultAdmin,
-          permissions: opts.permissions ?? [],
-          role,
-        },
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : defaultAdmin,
+        permissions: opts.permissions ?? [],
+        role,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }

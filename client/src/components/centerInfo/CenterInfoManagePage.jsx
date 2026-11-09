@@ -36,7 +36,7 @@ async function confirmDiscard(message) {
   return window.confirm(message);
 }
 
-/** Tách ra ngoài page — tránh remount input file khi parent re-render (mất lần chọn ảnh đầu). */
+/** Tách ra ngoài page - tránh remount input file khi parent re-render (mất lần chọn ảnh đầu). */
 function ImagePick({ value, onChange, label = 'Ảnh', uploading, onPickFile }) {
   const inputRef = useRef(null);
   const [localPreview, setLocalPreview] = useState('');
@@ -62,7 +62,7 @@ function ImagePick({ value, onChange, label = 'Ảnh', uploading, onPickFile }) 
     setImgFailed(false);
     onPickFile(file, (url) => {
       onChange(url);
-      // Giữ blob đến khi value server đã có — rồi bỏ blob
+      // Giữ blob đến khi value server đã có - rồi bỏ blob
       if (localPreviewRef.current) {
         URL.revokeObjectURL(localPreviewRef.current);
         localPreviewRef.current = '';
@@ -83,7 +83,7 @@ function ImagePick({ value, onChange, label = 'Ảnh', uploading, onPickFile }) 
               className="w-full h-full object-cover"
               onLoad={() => setImgFailed(false)}
               onError={() => {
-                if (localPreview) return; // blob lỗi rất hiếm — đừng hiện "lỗi tải"
+                if (localPreview) return; // blob lỗi rất hiếm - đừng hiện "lỗi tải"
                 setImgFailed(true);
               }}
             />
@@ -93,7 +93,7 @@ function ImagePick({ value, onChange, label = 'Ảnh', uploading, onPickFile }) 
           ) : null}
           {displaySrc && imgFailed ? (
             <span className="absolute inset-0 flex items-center justify-center text-[10px] text-amber-600 font-bold px-2 text-center bg-slate-50">
-              Ảnh lỗi tải — chọn lại
+              Ảnh lỗi tải - chọn lại
             </span>
           ) : null}
         </div>
@@ -207,7 +207,7 @@ export default function CenterInfoManagePage() {
     setItems(Array.isArray(res.data) ? res.data : []);
   }, []);
 
-  // Chỉ reload khi đổi tab — KHÔNG phụ thuộc toast (toast đổi identity mỗi lần hiện → xóa form/ảnh vừa upload)
+  // Chỉ reload khi đổi tab - KHÔNG phụ thuộc toast (toast đổi identity mỗi lần hiện → xóa form/ảnh vừa upload)
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -271,7 +271,7 @@ export default function CenterInfoManagePage() {
       const res = await api.centerInfo.uploadImage(file);
       if (!res?.success || !res.imageUrl) throw new Error(res?.message || 'Upload thất bại');
       onUrl(res.imageUrl);
-      toast.success('Đã tải ảnh — nhớ bấm Lưu để giữ lại');
+      toast.success('Đã tải ảnh - nhớ bấm Lưu để giữ lại');
     } catch (err) {
       toast.error(err.message || 'Upload thất bại');
     } finally {
@@ -354,10 +354,10 @@ export default function CenterInfoManagePage() {
 
   const statusLabel =
     overview?.status === 'published'
-      ? 'Published — đang hiện công khai'
+      ? 'Published - đang hiện công khai'
       : overview?.status === 'archived'
-        ? 'Archived — đang ẩn'
-        : 'Draft — chưa hiện cho mọi người';
+        ? 'Archived - đang ẩn'
+        : 'Draft - chưa hiện cho mọi người';
 
   return (
     <div className={`cms-sd cms-sd-page bg-slate-50 min-h-full py-2 sm:py-4 ${hasUnsaved ? 'pb-24' : ''}`}>
@@ -403,9 +403,8 @@ export default function CenterInfoManagePage() {
                 key={s.key}
                 type="button"
                 onClick={() => requestSectionChange(s.key)}
-                className={`w-full text-left px-3 min-h-10 rounded-xl text-sm font-bold ${
-                  section === s.key ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`w-full text-left px-3 min-h-10 rounded-xl text-sm font-bold ${section === s.key ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
               >
                 {s.label}
               </button>
@@ -434,7 +433,7 @@ export default function CenterInfoManagePage() {
               {overviewDirty ? (
                 <div className="flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 font-bold">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  Có thay đổi chưa lưu — nhớ bấm 「Lưu tổng quan」.
+                  Có thay đổi chưa lưu - nhớ bấm 「Lưu tổng quan」.
                 </div>
               ) : null}
               <Field label="Trạng thái trang">
@@ -443,9 +442,9 @@ export default function CenterInfoManagePage() {
                   onChange={(e) => patchOverview('status', e.target.value)}
                   className={inputClass}
                 >
-                  <option value="draft">Draft — chưa hiện cho mọi người</option>
-                  <option value="published">Published — công khai</option>
-                  <option value="archived">Archived — ẩn</option>
+                  <option value="draft">Draft - chưa hiện cho mọi người</option>
+                  <option value="published">Published - công khai</option>
+                  <option value="archived">Archived - ẩn</option>
                 </CmsSelect>
               </Field>
               <Field label="Tên trung tâm">
@@ -563,7 +562,7 @@ export default function CenterInfoManagePage() {
                   {formDirty ? (
                     <div className="flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 font-bold">
                       <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                      Có thay đổi chưa lưu — nhớ bấm 「Lưu」.
+                      Có thay đổi chưa lưu - nhớ bấm 「Lưu」.
                     </div>
                   ) : null}
                   <Field label="Tên / tiêu đề *">
@@ -763,7 +762,7 @@ export default function CenterInfoManagePage() {
                   </div>
                 ))}
                 {!items.length ? (
-                  <p className="p-8 text-center text-sm text-slate-400">Chưa có mục — bấm Thêm mới</p>
+                  <p className="p-8 text-center text-sm text-slate-400">Chưa có mục - bấm Thêm mới</p>
                 ) : null}
               </div>
             </>
@@ -776,7 +775,7 @@ export default function CenterInfoManagePage() {
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 justify-between">
             <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
               <AlertCircle size={16} className="text-red-600 shrink-0" />
-              Có nội dung chưa lưu — thoát hoặc đổi mục sẽ mất thay đổi.
+              Có nội dung chưa lưu - thoát hoặc đổi mục sẽ mất thay đổi.
             </p>
             {section === 'overview' ? (
               <button

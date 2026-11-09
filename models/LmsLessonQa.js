@@ -14,7 +14,7 @@ const qaThreadMessageSchema = new mongoose.Schema(
 );
 
 /**
- * LMS lesson Q&A — server SoT (replaces localStorage-only tab).
+ * LMS lesson Q&A - server SoT (replaces localStorage-only tab).
  */
 const lmsLessonQaSchema = new mongoose.Schema(
   {
@@ -25,7 +25,7 @@ const lmsLessonQaSchema = new mongoose.Schema(
     /** Snapshot so Support can open video without Settings lookup failures */
     videoUrl: { type: String, default: '' },
     videoDuration: { type: Number, default: 0 },
-    /** student | teacher — which LMS surface asked */
+    /** student | teacher - which LMS surface asked */
     audience: { type: String, enum: ['student', 'teacher'], default: 'student', index: true },
     askerId: { type: String, required: true, index: true },
     askerRole: { type: String, enum: ['student', 'teacher', 'admin', 'staff'], default: 'student' },

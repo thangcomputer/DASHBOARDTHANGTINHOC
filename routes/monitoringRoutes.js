@@ -7,7 +7,7 @@ const monitoring = require('../services/monitoringService');
 const logger = require('../config/logger');
 
 /**
- * Phase 7.2 — Controlled cutover for /api/monitoring ONLY.
+ * Phase 7.2 - Controlled cutover for /api/monitoring ONLY.
  *
  * Default (POLICY_CUTOVER_ENABLED=false or monitoring not allowlisted):
  *   auth → policyShadow (observe) → Legacy isAdmin (via monitoringCutoverGate) → handler
@@ -26,7 +26,7 @@ const guard = (action) => [
   monitoringCutoverGate(action),
 ];
 
-// GET /api/monitoring/health — chi tiet hon /healthz
+// GET /api/monitoring/health - chi tiet hon /healthz
 router.get('/health', guard('health'), (req, res) => {
   const data = monitoring.getHealth();
   res.status(data.ok ? 200 : 503).json({ success: true, data });
@@ -37,12 +37,12 @@ router.get('/metrics', guard('metrics'), (req, res) => {
   res.json({ success: true, data: monitoring.getMetrics() });
 });
 
-// GET /api/monitoring/overview — dashboard
+// GET /api/monitoring/overview - dashboard
 router.get('/overview', guard('overview'), (req, res) => {
   res.json({ success: true, data: monitoring.getOverview() });
 });
 
-// POST /api/monitoring/metrics/reset — Super Admin / admin reset counters
+// POST /api/monitoring/metrics/reset - Super Admin / admin reset counters
 router.post('/metrics/reset', guard('metrics_reset'), (req, res) => {
   try {
     // When Policy is authoritative, SUPER check already applied by monitoringPolicy.

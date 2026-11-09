@@ -10,7 +10,7 @@ const router = express.Router();
 /**
  * LIVE mount: server.js → app.use('/api/training', teachingGuideRoutes)
  *
- * Phase 7.12 — Controlled cutover for /api/training ONLY (not /api/training-lms).
+ * Phase 7.12 - Controlled cutover for /api/training ONLY (not /api/training-lms).
  * Legacy: authMiddleware only (any authenticated role). Data filter: isActive + category.
  * Flow: auth → policyShadowTrainingLms(guide_list) → trainingCutoverGate → handler
  */

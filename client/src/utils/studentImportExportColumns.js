@@ -1,7 +1,7 @@
 import { getCurrentStudentAge } from './studentAge';
 
 /**
- * Schema cột Excel học viên — khớp form "Thêm học viên mới".
+ * Schema cột Excel học viên - khớp form "Thêm học viên mới".
  * Dùng chung Xuất + Nhập + file mẫu. Không đụng question-bank / invoice.
  */
 
@@ -20,7 +20,7 @@ export const STUDENT_EXCEL_HEADERS = [
   'Thanh toán tiền mặt',
 ];
 
-/** Dòng mẫu — giá trị ví dụ giống form tạo HV */
+/** Dòng mẫu - giá trị ví dụ giống form tạo HV */
 export const STUDENT_EXCEL_TEMPLATE_ROWS = [
   {
     'Họ tên': 'NGUYỄN VĂN A',
@@ -174,7 +174,7 @@ export function excelRowToStudentPayload(item = {}) {
     pick(item, ['Giảng viên', 'Giảng viên hướng dẫn', 'Teacher', 'teacherName']),
   ).trim();
 
-  // Alias cũ: Địa chỉ bỏ qua (không có trên form tạo) — giữ nếu có trong file cũ
+  // Alias cũ: Địa chỉ bỏ qua (không có trên form tạo) - giữ nếu có trong file cũ
   const address = String(pick(item, ['Địa chỉ', 'Address', 'address']) || '').trim();
 
   return {

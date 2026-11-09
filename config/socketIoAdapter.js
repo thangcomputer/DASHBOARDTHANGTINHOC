@@ -1,5 +1,5 @@
 /**
- * Socket.IO Redis adapter — multi-instance fan-out when REDIS_URL is set.
+ * Socket.IO Redis adapter - multi-instance fan-out when REDIS_URL is set.
  * Falls back to in-memory adapter if Redis is missing or connect fails.
  */
 const logger = require('./logger');
@@ -41,7 +41,7 @@ async function attachSocketIoAdapter(io) {
     return { mode: 'redis' };
   } catch (err) {
     process.env.__SOCKET_ADAPTER_MODE = 'memory';
-    logger.warn({ err: err.message }, 'Socket.IO Redis adapter failed — using memory');
+    logger.warn({ err: err.message }, 'Socket.IO Redis adapter failed - using memory');
     return { mode: 'memory', error: err.message };
   }
 }

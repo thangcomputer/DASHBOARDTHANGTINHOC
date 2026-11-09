@@ -45,36 +45,36 @@ Evidence:
 
 ## Support A / Support B Isolation
 
-**PASS** — Support B never received Support A’s private DMs (Student→Support A, Staff→Support A, concurrent matrix).
+**PASS** - Support B never received Support A’s private DMs (Student→Support A, Staff→Support A, concurrent matrix).
 
 ## STAFF / SUPPORT Transport Collision
 
-**PASS** — shared `transportRole=staff` / `ALL_STAFF` membership did **not** cause Staff A to receive Student→Support A private DM.
+**PASS** - shared `transportRole=staff` / `ALL_STAFF` membership did **not** cause Staff A to receive Student→Support A private DM.
 
 ## Reverse Direction
 
-**PASS** — Support A → Student A; Student B / Staff A / Support B = 0 receives.
+**PASS** - Support A → Student A; Student B / Staff A / Support B = 0 receives.
 
 ## Teacher Isolation
 
-**PASS** — Teacher A → Student A; Student B / Support A / Staff A = 0.
+**PASS** - Teacher A → Student A; Student B / Support A / Staff A = 0.
 
 ## Branch Isolation
 
 | Case | Result |
 |---|---|
-| Student A → Staff B (diff branch) | **DENY** — dbDelta 0, no receive |
-| Student A → Support B (same tenant, diff branch) | **ALLOW** — approved global SUPPORT send freeze; only Support B received |
+| Student A → Staff B (diff branch) | **DENY** - dbDelta 0, no receive |
+| Student A → Support B (same tenant, diff branch) | **ALLOW** - approved global SUPPORT send freeze; only Support B received |
 
 Documented as **CURRENT DESIGNED BEHAVIOR** (not a bug). Phase 8 prompt’s “Support cross-branch DENY” does **not** match the frozen pairing matrix.
 
 ## Tenant Isolation
 
-**PASS** — Student A → Support TenantB: dbDelta 0, no local socket delivery.
+**PASS** - Student A → Support TenantB: dbDelta 0, no local socket delivery.
 
 ## Wrong Role Hint
 
-**PASS** — client `receiverRole: 'teacher'` with Support A id → still delivered to Support A with `receiverRole: staff` (canonical resolution).
+**PASS** - client `receiverRole: 'teacher'` with Support A id → still delivered to Support A with `receiverRole: staff` (canonical resolution).
 
 ## Duplicate Send
 
@@ -82,11 +82,11 @@ Not a dedicated idempotency feature. Concurrent distinct contents verified; no u
 
 ## Typing Isolation
 
-**PASS** — peer events are `typing:show` / `typing:hide` (not raw `typing:start`). Support A received; Support B did not. Conv id from live DM.
+**PASS** - peer events are `typing:show` / `typing:hide` (not raw `typing:start`). Support A received; Support B did not. Conv id from live DM.
 
 ## Read Isolation
 
-**PASS** — Support A `message:read` did not emit to Support B. `Message.isRead` remains global boolean (unchanged).
+**PASS** - Support A `message:read` did not emit to Support B. `Message.isRead` remains global boolean (unchanged).
 
 ## Presence
 
@@ -98,19 +98,19 @@ Private DM path uses `sendCanonicalMessage` + `notifyUser` (user room / presence
 
 ## Concurrent Sends
 
-**PASS** — four parallel DMs; each intended recipient only; no cross-delivery between Support A/B.
+**PASS** - four parallel DMs; each intended recipient only; no cross-delivery between Support A/B.
 
 ## Reconnect
 
-**PASS** — Support A disconnect → reconnect → still receives Student DM.
+**PASS** - Support A disconnect → reconnect → still receives Student DM.
 
 ## Multi-tab
 
-**PASS (documented current semantics)** — `app.notifyUser` prefers `onlineUsers[role_id].socketId` (last `register`) and returns early; **latest tab** receives. Not classified as duplicate-user leak.
+**PASS (documented current semantics)** - `app.notifyUser` prefers `onlineUsers[role_id].socketId` (last `register`) and returns early; **latest tab** receives. Not classified as duplicate-user leak.
 
 ## Message Persistence
 
-**PASS** — `senderId`, `receiverId`, `senderRole=student`, `receiverRole=staff`, `conversationId`, branch codes present. Schema has **no** `tenantId` field (unchanged).
+**PASS** - `senderId`, `receiverId`, `senderRole=student`, `receiverRole=staff`, `conversationId`, branch codes present. Schema has **no** `tenantId` field (unchanged).
 
 ## No Partial Persistence
 
@@ -118,14 +118,14 @@ Private DM path uses `sendCanonicalMessage` + `notifyUser` (user room / presence
 
 ## Live HTTP Contacts
 
-**PASS** on Phase 8 ephemeral server — Student contacts include Support A; exclude cross-tenant Support (count 3).
+**PASS** on Phase 8 ephemeral server - Student contacts include Support A; exclude cross-tenant Support (count 3).
 
 ## Existing 401 Environment Failure
 
 `tests/messaging-isolation.test.js` against default `localhost:5000`:
 
 ```text
-ENVIRONMENT FAILURE — API/auth seed (401 ≠ 201)
+ENVIRONMENT FAILURE - API/auth seed (401 ≠ 201)
 ```
 
 Not classified as messaging authorization failure. Default API was not the Phase 8 harness (`:5018`).
@@ -150,7 +150,7 @@ Not classified as messaging authorization failure. Default API was not the Phase
 
 ## Application Code Changes
 
-**NO** — test harness + docs only.
+**NO** - test harness + docs only.
 
 ## Known Environment Failures
 
@@ -170,4 +170,4 @@ Delete Phase 8 test helper/suite/report/evidence artifact. No app rollback neede
 
 ## Next Phase
 
-**STOP** — await approval for Phase 9.
+**STOP** - await approval for Phase 9.

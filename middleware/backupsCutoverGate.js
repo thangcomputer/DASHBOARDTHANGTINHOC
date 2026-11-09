@@ -1,5 +1,5 @@
 /**
- * Phase 7.3 — Controlled cutover gate for /api/backups ONLY.
+ * Phase 7.3 - Controlled cutover gate for /api/backups ONLY.
  *
  * LEGACY (default): existing isSuperAdmin remains HTTP authority.
  * POLICY (env opt-in): Policy decision is HTTP authority; Legacy isSuperAdmin skipped.
@@ -49,7 +49,7 @@ function backupsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] backups authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] backups authority helper failed - Legacy gate',
       );
     }
 
@@ -94,7 +94,7 @@ function backupsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] backups Policy unsafe — fallback Legacy isSuperAdmin',
+        '[POLICY_CUTOVER] backups Policy unsafe - fallback Legacy isSuperAdmin',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -114,7 +114,7 @@ function backupsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] backups Policy ALLOW — Legacy isSuperAdmin skipped',
+        '[POLICY_CUTOVER] backups Policy ALLOW - Legacy isSuperAdmin skipped',
       );
       return next();
     }

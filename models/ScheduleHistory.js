@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 /**
- * ScheduleHistory — Nhật ký sắp lịch / hủy lịch
+ * ScheduleHistory - Nhật ký sắp lịch / hủy lịch
  * Mỗi hành động Thêm hoặc Hủy lịch đều tạo 1 bản ghi ở đây.
  * Dùng để Admin theo dõi hành vi hủy lịch của Giảng viên.
  */

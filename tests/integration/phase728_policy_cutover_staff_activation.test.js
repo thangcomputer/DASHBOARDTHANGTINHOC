@@ -1,5 +1,5 @@
 /**
- * Phase 7.28 — Controlled cutover + production activation for /api/staff
+ * Phase 7.28 - Controlled cutover + production activation for /api/staff
  *
  * LIVE: auth → policyShadowStaff → staffCutoverGate → handler.
  * Legacy checkPermission('manage_staff') retained inside staffCutoverGate.
@@ -62,10 +62,10 @@ function sub(opts = {}) {
     actorDoc: role === 'teacher' || role === 'student'
       ? { role, adminRole: null, permissions: [] }
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [PERMISSIONS.MANAGE_STAFF],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [PERMISSIONS.MANAGE_STAFF],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -326,7 +326,7 @@ test('Phase7.28 rollback: remove staff → LEGACY; prior stay POLICY; restore �
 test('Phase7.28 cross-family isolation', () => {
   for (const fam of [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 
+    'employees',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
   }
@@ -391,8 +391,8 @@ test('Phase7.28 side-effect audit: gate/policy have no mutations', () => {
 test('Phase7.28 functional smoke: list authz; create/update/delete NOT EXECUTED', () => {
   assert.equal(parity('list', sub({ permissions: [PERMISSIONS.MANAGE_STAFF] })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — staff create/update/delete production mutations',
-    'NOT EXECUTED — staff create/update/delete production mutations',
+    'NOT EXECUTED - staff create/update/delete production mutations',
+    'NOT EXECUTED - staff create/update/delete production mutations',
   );
   void OTHER;
 });

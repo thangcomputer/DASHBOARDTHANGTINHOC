@@ -65,7 +65,7 @@ async function notifyIfNewStudentDevice(io, student, record) {
     await NotificationService.notifyBranchAdmins(io, {
       branchId: student.branchId || null,
       title: 'Học viên dùng thêm trình duyệt',
-      content: `${name}${phone ? ` (${phone})` : ''} vừa đăng nhập trên trình duyệt thứ ${record.count}. Tài khoản vẫn được vào — Admin có thể reset thiết bị hoặc khóa đăng nhập.`,
+      content: `${name}${phone ? ` (${phone})` : ''} vừa đăng nhập trên trình duyệt thứ ${record.count}. Tài khoản vẫn được vào - Admin có thể reset thiết bị hoặc khóa đăng nhập.`,
       payload: {
         kind: 'student_device_alert',
         studentId: sid,

@@ -64,7 +64,7 @@ export default function DailyPracticeHero({ stats, mode, onPrimaryAction, primar
           ))}
         </div>
         <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-slate-300 lg:text-right">
-          XP luyện để chơi và mở gợi ý. Trong đó XP đã mua: {stats?.purchasedXp || 0}. XP học bài nằm ở thẻ Học bài.
+          XP luyện để chơi và mở gợi ý.
         </p>
       </div>
     </section>

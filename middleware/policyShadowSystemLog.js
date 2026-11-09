@@ -70,7 +70,7 @@ function policyShadowSystemLog(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] system_log evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] system_log evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `system_log_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -106,7 +106,7 @@ function policyShadowSystemLog(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] system_log shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] system_log shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -118,7 +118,7 @@ function policyShadowSystemLog(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected system_log error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected system_log error - fail closed to legacy only',
       );
     }
     return next();

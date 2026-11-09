@@ -28,6 +28,7 @@ import { getMobileSoundEnabled, setMobileSoundEnabled, subscribeToMobileSoundPre
 import { getMobileImageSource, resolveMobilePublicUrl } from '../services/apiClient';
 import { messageService, notificationService, scheduleService, teacherFinanceService } from '../services/mockService';
 import { LoginScreen } from '../screens/LoginScreen';
+import { EditableMobileAvatar } from '../components/EditableMobileAvatar';
 import { SubscriptionExpiredScreen, SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CallScreen } from '../screens/CallScreen';
@@ -75,9 +76,10 @@ const TAB_ICON_TONES: Record<string, string> = {
   Schedule: '#2563EB',
   Messages: '#7C3AED',
   Feed: '#D97706',
-  Home: '#DC2626',
+  Home: '#059669',
   Finance: '#059669',
   CourseVideos: '#0891B2',
+  DailyPractice: '#059669',
   Support: '#0891B2',
   Profile: '#4F46E5',
 };
@@ -87,6 +89,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   Schedule: CalendarDays,
   Messages: MessageCircle,
   Feed: Newspaper,
+  DailyPractice: Gamepad2,
   Support: Headphones,
   CourseVideos: BookOpen,
   Finance: DollarSign,
@@ -101,6 +104,7 @@ const NAV_TAB_LABELS: Record<'student' | 'teacher', Record<string, string>> = {
     Messages: 'Hộp thư',
     Feed: 'Bảng tin',
     Home: 'Tổng quan',
+    DailyPractice: 'Luyện tập',
     Support: 'Hỗ trợ',
     CourseVideos: 'Bài giảng',
     Profile: 'Hồ sơ',
@@ -111,6 +115,7 @@ const NAV_TAB_LABELS: Record<'student' | 'teacher', Record<string, string>> = {
     Feed: 'Bảng tin',
     Home: 'Tổng quan',
     Finance: 'Tài chính',
+    DailyPractice: 'Luyện tập',
     Support: 'Hỗ trợ',
     Profile: 'Hồ sơ',
   },
@@ -490,6 +495,7 @@ export function RootNavigator() {
               <Stack.Screen name="CertPrepPlayer" component={CertPrepPlayerScreen} />
               <Stack.Screen name="CertPrepResult" component={CertPrepResultScreen} />
               <Stack.Screen name="DailyPractice" component={DailyPracticeScreen} />
+              <Stack.Screen name="Support" component={SupportEntryScreen} />
             </>
           ) : null}
           {user.role === 'teacher' ? (
@@ -725,7 +731,7 @@ function PersistentTabBar({
     : freeMenu
       ? [
         { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
-        { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
+        { name: 'DailyPractice' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Gamepad2 },
         { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
         { name: 'CourseVideos' as const, label: 'Bài giảng', shortLabel: 'Bài giảng', icon: BookOpen },
         { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
@@ -735,7 +741,7 @@ function PersistentTabBar({
         { name: 'Messages' as const, label: 'Hộp thư', shortLabel: 'Hộp thư', icon: MessageCircle },
         { name: 'Feed' as const, label: 'Bảng tin', shortLabel: 'Bảng tin', icon: Newspaper },
         { name: 'Home' as const, label: 'Tổng quan', shortLabel: 'Tổng quan', icon: House },
-        { name: 'Support' as const, label: 'Support hỗ trợ', shortLabel: 'Hỗ trợ', icon: Headphones },
+        { name: 'DailyPractice' as const, label: 'Luyện tập', shortLabel: 'Luyện tập', icon: Gamepad2 },
         { name: 'CourseVideos' as const, label: 'Bài giảng', shortLabel: 'Bài giảng', icon: BookOpen },
         { name: 'Profile' as const, label: 'Hồ sơ', shortLabel: 'Hồ sơ', icon: UserRound },
       ];
@@ -859,8 +865,8 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         items: [
           { label: 'Bảng tin', destination: 'Feed', icon: Radio },
           { label: 'Tin tức', destination: 'News', icon: Newspaper },
-          { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText },
           { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
+          { label: 'Thông tin Trung tâm', destination: 'CenterInfo', icon: FileText }
         ],
       },
     ]
@@ -869,9 +875,9 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
         label: 'KHÔNG GIAN HỌC TẬP',
         items: [
           { label: 'Tổng quan', destination: 'Home', icon: House },
-          { label: 'Luyện tập hằng ngày', destination: 'DailyPractice', icon: Gamepad2 },
-          { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
+          { label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 },
           { label: 'Bài giảng', destination: 'CourseVideos', icon: BookOpen },
+          { label: 'Hộp thư', destination: 'Messages', icon: MessageCircle },
           ...(!freeMenu ? [{ label: 'Lịch học', destination: 'Schedule' as const, icon: CalendarDays }] : []),
           { label: 'Bài tập và tài nguyên', destination: 'Assignments', icon: FileBox },
           { label: 'Phòng thi', destination: 'StudentExam', icon: GraduationCap },
@@ -884,7 +890,6 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
             { label: 'Bảng tin', destination: 'Feed' as const, icon: Radio },
             { label: 'Tin tức', destination: 'News' as const, icon: Newspaper },
             { label: 'Đánh giá giảng viên', destination: 'Evaluations' as const, icon: Star },
-            { label: 'Thông tin học phí', destination: 'Tuition' as const, icon: WalletCards },
             { label: 'Liên hệ Trung tâm', destination: 'CenterInfo' as const, icon: Building2 },
           ] : []),
           { label: 'Hỗ trợ', destination: 'Support', icon: Headphones },
@@ -976,7 +981,15 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
       navigationRef.navigate('Students');
       return;
     }
-    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile', 'Support'].includes(destination)) {
+    if (destination === 'Support') {
+      if (isTeacher) {
+        navigationRef.navigate('MainTabs', { screen: 'Support' });
+      } else {
+        navigationRef.navigate('Support');
+      }
+      return;
+    }
+    if (['Home', 'Schedule', 'Messages', 'CourseVideos', 'Feed', 'Profile'].includes(destination)) {
       navigationRef.navigate('MainTabs', { screen: destination as keyof MainTabsParamList });
       return;
     }
@@ -1041,21 +1054,19 @@ function FloatingNavigationMenu({ onSignOut }: { onSignOut: () => void }) {
             </BlurView>
             <View style={styles.drawerHeader}>
               <View style={styles.drawerProfileCard}>
-                <View style={styles.drawerAvatar}>
-                  {user?.avatar
-                    ? <Image source={getMobileImageSource(resolveMobilePublicUrl(user.avatar))} style={styles.drawerAvatarImage} />
-                    : <UserRound size={23} color="#FFFFFF" />}
-                </View>
-                <View style={styles.drawerIdentity}>
-                  <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
-                  <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
-                    <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
-                      {isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}
-                    </Text>
+                <View style={styles.drawerProfileTop}>
+                  <EditableMobileAvatar size={46} name={user?.name} showBadge />
+                  <View style={styles.drawerIdentity}>
+                    <Text numberOfLines={1} style={styles.drawerName}>{user?.name || 'Tài khoản'}</Text>
+                    <View style={[styles.drawerRoleBadge, isTeacher && styles.drawerRoleBadgeTeacher]}>
+                      <Text style={[styles.drawerRole, isTeacher && styles.drawerRoleTeacher]}>
+                        {isTeacher ? 'GIẢNG VIÊN' : 'HỌC VIÊN'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
+                {!isTeacher ? <SubscriptionStatusCard compact variant="drawer" /> : null}
               </View>
-              {!isTeacher ? <SubscriptionStatusCard compact /> : null}
             </View>
             <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerItems} showsVerticalScrollIndicator={false}>
               {menuSections.map((section) => (
@@ -1152,7 +1163,11 @@ function FloatingSupportButton() {
             DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
             return;
           }
-          navigationRef.navigate('MainTabs', { screen: 'Support' });
+          if (user?.role === 'teacher') {
+            navigationRef.navigate('MainTabs', { screen: 'Support' });
+          } else {
+            navigationRef.navigate('Support');
+          }
         }}
         onHoverIn={() => setHovered(true)}
         onHoverOut={() => setHovered(false)}
@@ -1401,104 +1416,97 @@ function MainTabs() {
         },
       })}
     >
-      {isTeacher ? (
-        <>
-          <Tab.Screen
-            name="Schedule"
-            component={ScheduleScreen}
-            options={{
-              title: 'Lịch dạy',
-            }}
-          />
-          <Tab.Screen
-            name="Feed"
-            component={FeedScreen}
-            options={{ title: 'Bảng tin' }}
-          />
-          <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Tổng quan' }} />
-          <Tab.Screen
-            name="Finance"
-            component={TeacherFinanceScreen}
-            options={{
-              title: 'Tài chính',
-            }}
-          />
-          <Tab.Screen
-            name="Messages"
-            component={MessagesScreen}
-            options={{
-              title: 'Tin nhắn',
-            }}
-          />
-          <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
-          <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
-        </>
-      ) : freeMenu ? (
-        <>
-          <Tab.Screen
-            name="Messages"
-            component={MessagesScreen}
-            options={{
-              title: 'Tin nhắn',
-            }}
-            listeners={{
-              tabPress: (e) => {
-                if (freeLocked) {
-                  e.preventDefault();
-                  DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
-                }
-              },
-            }}
-          />
-          <Tab.Screen
-            name="Support"
-            component={SupportEntryScreen}
-            options={{ title: 'Hỗ trợ' }}
-            listeners={{
-              tabPress: (e) => {
-                if (freeLocked) {
-                  e.preventDefault();
-                  DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
-                }
-              },
-            }}
-          />
-          <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
-          <Tab.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{ title: 'Hồ sơ' }}
-          />
-        </>
-      ) : (
-        <>
-          <Tab.Screen
-            name="Schedule"
-            component={ScheduleScreen}
-            options={{
-              title: 'Lịch học',
-            }}
-          />
-          <Tab.Screen
-            name="Messages"
-            component={MessagesScreen}
-            options={{
-              title: 'Tin nhắn',
-            }}
-          />
-          <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
-          <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
-          <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
-          <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
-          <Tab.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{ title: 'Hồ sơ' }}
-          />
-        </>
-      )}
-    </Tab.Navigator>
+      {
+        isTeacher ? (
+          <>
+            <Tab.Screen
+              name="Schedule"
+              component={ScheduleScreen}
+              options={{
+                title: 'Lịch dạy',
+              }}
+            />
+            <Tab.Screen
+              name="Feed"
+              component={FeedScreen}
+              options={{ title: 'Bảng tin' }}
+            />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Tổng quan' }} />
+            <Tab.Screen
+              name="Finance"
+              component={TeacherFinanceScreen}
+              options={{
+                title: 'Tài chính',
+              }}
+            />
+            <Tab.Screen
+              name="Messages"
+              component={MessagesScreen}
+              options={{
+                title: 'Tin nhắn',
+              }}
+            />
+            <Tab.Screen name="Support" component={SupportEntryScreen} options={{ title: 'Hỗ trợ' }} />
+            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Hồ sơ' }} />
+          </>
+        ) : freeMenu ? (
+          <>
+            <Tab.Screen
+              name="Messages"
+              component={MessagesScreen}
+              options={{
+                title: 'Tin nhắn',
+              }}
+              listeners={{
+                tabPress: (e) => {
+                  if (freeLocked) {
+                    e.preventDefault();
+                    DeviceEventEmitter.emit(MOBILE_OPEN_FREE_LOCK_MODAL_EVENT);
+                  }
+                },
+              }}
+            />
+            <Tab.Screen
+              name="DailyPractice"
+              component={DailyPracticeScreen}
+              options={{ title: 'Luyện tập' }}
+            />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
+            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
+            <Tab.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{ title: 'Hồ sơ' }}
+            />
+          </>
+        ) : (
+          <>
+            <Tab.Screen
+              name="Schedule"
+              component={ScheduleScreen}
+              options={{
+                title: 'Lịch học',
+              }}
+            />
+            <Tab.Screen
+              name="Messages"
+              component={MessagesScreen}
+              options={{
+                title: 'Tin nhắn',
+              }}
+            />
+            <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Bảng tin' }} />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Trang chủ' }} />
+            <Tab.Screen name="DailyPractice" component={DailyPracticeScreen} options={{ title: 'Luyện tập' }} />
+            <Tab.Screen name="CourseVideos" component={CourseVideosScreen} options={{ title: 'Bài giảng' }} />
+            <Tab.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{ title: 'Hồ sơ' }}
+            />
+          </>
+        )}
+    </Tab.Navigator >
   );
 }
 
@@ -1550,14 +1558,14 @@ const styles = StyleSheet.create({
   persistentTabItem: { flex: 1, minWidth: 0, height: 64, alignItems: 'stretch', justifyContent: 'flex-start' },
   navItem: { alignSelf: 'stretch', marginHorizontal: 3, height: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2, paddingVertical: 3, borderWidth: 1, borderColor: 'transparent', borderRadius: 16 },
   navItemCard: { borderColor: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(255,255,255,0.45)', boxShadow: droplet.button },
-  navItemActive: { borderColor: 'rgba(252,165,165,0.8)', backgroundColor: 'rgba(254,242,242,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(254,242,242,0.8) 100%)', boxShadow: droplet.navItemActive },
+  navItemActive: { borderColor: 'rgba(167,243,208,0.8)', backgroundColor: 'rgba(236,253,245,0.8)', backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(236,253,245,0.8) 100%)', boxShadow: droplet.navItemActive },
   navTile: { position: 'relative', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(226,232,240,0.8)', borderRadius: 12, backgroundColor: '#FFFFFF', boxShadow: droplet.navTile },
-  navTileActive: { borderColor: 'rgba(239,68,68,0.2)', backgroundColor: colors.brand, backgroundImage: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', boxShadow: droplet.navTileActive },
+  navTileActive: { borderColor: 'rgba(16,185,129,0.25)', backgroundColor: colors.brand, backgroundImage: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', boxShadow: droplet.navTileActive },
   navItemHome: { gap: 0, paddingVertical: 0 },
-  navTileHome: { width: 56, height: 56, borderWidth: 3, borderColor: '#FFFFFF', borderRadius: 28, backgroundColor: colors.brand, backgroundImage: 'linear-gradient(160deg, #F87171 0%, #DC2626 55%, #991B1B 100%)', boxShadow: droplet.navHome },
+  navTileHome: { width: 56, height: 56, borderWidth: 3, borderColor: '#FFFFFF', borderRadius: 28, backgroundColor: colors.brand, backgroundImage: 'linear-gradient(160deg, #34D399 0%, #059669 55%, #047857 100%)', boxShadow: droplet.navHome },
   navLabel: { maxWidth: '100%', color: colors.muted, fontSize: 10, lineHeight: 13, fontWeight: '600', textAlign: 'center' },
   navLabelActive: { color: colors.brand, fontWeight: '700' },
-  persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
+  persistentTabBadge: { position: 'absolute', top: -7, right: -9, minWidth: 18, height: 18, paddingHorizontal: 4, overflow: 'hidden', borderRadius: 9, backgroundColor: colors.brand, color: '#FFFFFF', fontSize: 10, lineHeight: 18, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center' },
   navLockBadge: { position: 'absolute', top: -6, right: -6, width: 17, height: 17, borderRadius: 9, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
   floatingMenuHandle: { position: 'absolute', left: 0, zIndex: 20 },
   floatingMenuButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: 12, borderBottomRightRadius: 12, backgroundColor: '#111827', shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 2, height: 2 }, elevation: 6 },
@@ -1566,7 +1574,7 @@ const styles = StyleSheet.create({
   floatingSupportButtonPressed: { transform: [{ translateY: 1 }], boxShadow: 'inset 3px 3px 8px rgba(120, 53, 15, 0.24), inset -2px -2px 5px rgba(255, 255, 255, 0.88)' },
   floatingSupportLabel: { paddingHorizontal: 2 },
   floatingSupportLabelText: { color: colors.ink, fontSize: typography.micro, fontWeight: '800' },
-  floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand, boxShadow: 'inset 2px 2px 4px rgba(127, 29, 29, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' },
+  floatingSupportIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, backgroundColor: colors.brand, boxShadow: 'inset 2px 2px 4px rgba(4, 120, 87, 0.28), inset -1px -1px 3px rgba(255, 255, 255, 0.2)' },
   drawerOverlay: { flex: 1, flexDirection: 'row' },
   drawerBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2, 6, 23, 0.64)' },
   drawerDismiss: { ...StyleSheet.absoluteFill },
@@ -1574,8 +1582,27 @@ const styles = StyleSheet.create({
   drawerGlassBackground: { ...StyleSheet.absoluteFill, borderTopRightRadius: 26, borderBottomRightRadius: 26, overflow: 'hidden' },
   drawerGlassTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(8, 15, 28, 0.52)', borderTopRightRadius: 26, borderBottomRightRadius: 26 },
   drawerHeader: { paddingBottom: spacing.md },
-  drawerProfileCard: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.09)', shadowColor: '#FFFFFF', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  drawerAvatar: { width: 46, height: 46, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 23, backgroundColor: '#334155' },
+  drawerProfileCard: {
+    flexDirection: 'column',
+    gap: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  drawerProfileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  drawerAvatar: { width: 46, height: 46, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 23, backgroundColor: '#334155' },
   drawerAvatarImage: { width: 46, height: 46, borderRadius: 23 },
   drawerIdentity: { flex: 1, minWidth: 0, gap: 6 },
   drawerName: { color: '#F8FAFC', fontSize: typography.small, fontWeight: '800' },
@@ -1596,7 +1623,7 @@ const styles = StyleSheet.create({
   drawerItemText: { flex: 1, color: '#D5DCE7', fontSize: typography.caption, fontWeight: '600' },
   drawerLogoutText: { color: '#FCA5A5' },
   drawerItemTextActive: { color: '#FFFFFF', fontWeight: '800' },
-  drawerItemSelectedMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FCA5A5' },
+  drawerItemSelectedMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' },
   drawerFooter: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.24)', gap: 2 },
   homeArcButton: {
     width: 58,

@@ -1,5 +1,5 @@
 /**
- * Phase 8.13 — RBAC soak / runtime parity evidence (observation only).
+ * Phase 8.13 - RBAC soak / runtime parity evidence (observation only).
  * Does NOT promote Enterprise. Separates STATIC / SYNTHETIC / RUNTIME.
  */
 const { describe, it } = require('node:test');
@@ -319,7 +319,7 @@ describe('Phase 8.13 RBAC soak evidence', { concurrency: false }, () => {
           const mw = checkPermission(LIVE.MANAGE_HR);
           const req = actorReq({ permissions: [] });
           const res = mockRes();
-          await mw(req, res, () => {});
+          await mw(req, res, () => { });
           assert.equal(res.statusCode, 403);
           const s = JSON.stringify(res.body);
           assert.ok(!s.includes('RBAC_DUAL_CHECK'));
@@ -366,7 +366,7 @@ describe('Phase 8.13 RBAC soak evidence', { concurrency: false }, () => {
       comparison: 'MATCH',
       permission: LIVE.MANAGE_HR,
     });
-    // soakEvidence is in-memory only — no mongoose calls
+    // soakEvidence is in-memory only - no mongoose calls
     assert.equal(typeof Teacher.findById, 'function');
     assert.equal(getSoakEvidenceSnapshot().channels.SYNTHETIC.match, 1);
   });

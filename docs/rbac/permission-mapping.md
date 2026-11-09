@@ -21,8 +21,8 @@
 | `manage_schedule` | `schedule:*`, `class:view`, `class:update` | PARTIAL (RBAC-S1) |
 | `manage_messages` | `message:*`, `ticket:view/create/update/close/archive/escalate` | PARTIAL (RBAC-S1; no `ticket:delete` for SUPPORT) |
 | `view_logs` | `audit:view` | PARTIAL (RBAC-S1) |
-| `view_evaluations` | — | LEGACY_ONLY |
+| `view_evaluations` | - | LEGACY_ONLY |
 
 **Rule:** Never map legacy permissions to `PERMISSIONS.ALL`. Never use Cutover `*`.
 
-**SUPPORT note:** Shadow catalog includes `ticket:close` / `ticket:archive`. Hard `ticket:delete` exists for SUPER/HIGH design only — SUPPORT must not receive it via role defaults.
+**SUPPORT note:** Shadow catalog includes `ticket:close` / `ticket:archive`. Hard `ticket:delete` exists for SUPER/HIGH design only - SUPPORT must not receive it via role defaults.

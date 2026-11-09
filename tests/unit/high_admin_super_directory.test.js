@@ -1,6 +1,6 @@
 /**
  * HIGH_ADMIN → SUPER directory discovery (synthetic root id=admin).
- * Discovery only — no pairing/send/auth changes.
+ * Discovery only - no pairing/send/auth changes.
  */
 'use strict';
 

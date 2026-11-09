@@ -1,8 +1,8 @@
 /**
- * Phase 7.28 — Controlled cutover gate for LIVE /api/staff ONLY.
+ * Phase 7.28 - Controlled cutover gate for LIVE /api/staff ONLY.
  *
  * LEGACY (default):
- *   checkPermission('manage_staff') — retained here.
+ *   checkPermission('manage_staff') - retained here.
  *   SUPER/HIGH create/update/delete gates remain handler-owned on Legacy path.
  *
  * POLICY (env opt-in): Policy decision is HTTP authority (incl. SUPER/HIGH mirrors).
@@ -115,7 +115,7 @@ function staffCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] staff authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] staff authority helper failed - Legacy gate',
       );
     }
 
@@ -160,7 +160,7 @@ function staffCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] staff Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] staff Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

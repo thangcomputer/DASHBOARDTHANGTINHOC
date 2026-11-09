@@ -69,7 +69,7 @@ function policyShadowAnalytics(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] analytics evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] analytics evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `analytics_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -107,7 +107,7 @@ function policyShadowAnalytics(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] analytics shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] analytics shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -119,7 +119,7 @@ function policyShadowAnalytics(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected analytics error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected analytics error - fail closed to legacy only',
       );
     }
     return next();

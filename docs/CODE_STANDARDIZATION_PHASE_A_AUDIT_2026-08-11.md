@@ -1,9 +1,9 @@
-# PHASE A COMPLETE — READ ONLY AUDIT  
+# PHASE A COMPLETE - READ ONLY AUDIT  
 ## Chuẩn hóa mã HV / GV / NV / KH / LH
 
 **Date:** 2026-08-11  
-**Mode:** READ ONLY — không sửa application code, DB, migration, Messaging, Auth/RBAC, Payment runtime  
-**Next:** STOP — await owner approval trước PHASE B (Design)
+**Mode:** READ ONLY - không sửa application code, DB, migration, Messaging, Auth/RBAC, Payment runtime  
+**Next:** STOP - await owner approval trước PHASE B (Design)
 
 ---
 
@@ -18,9 +18,9 @@ Employee code: FAIL (field không tồn tại)
 Course code: FAIL (không có courseCode; chỉ có slug)
 Class code: N/A (không có entity Class độc lập)
 
-Concurrency: FAIL (timestamp / countDocuments — không atomic counter)
-Multiple courses per student: PASS (Enrollment trên Student — 1 studentCode / nhiều khóa)
-Teacher assignment independence: PASS (chỉ ObjectId — không suy luận từ mã)
+Concurrency: FAIL (timestamp / countDocuments - không atomic counter)
+Multiple courses per student: PASS (Enrollment trên Student - 1 studentCode / nhiều khóa)
+Teacher assignment independence: PASS (chỉ ObjectId - không suy luận từ mã)
 Payment: PASS design session-first; FAIL risk (studentCode format lệch + non-unique)
 Invoice: PASS (hocVien = ObjectId; maHoaDon riêng)
 Payroll: PASS (employeeId = ObjectId; không employeeCode)
@@ -45,11 +45,11 @@ Tests: none run (read-only)
 |-------|--------|---------|
 | `AddStudentModal.jsx` | `TTH` + 5 số cuối `Date.now()` | Client; chỉ gắn payload khi QR success |
 | `studentRoutes.js` create | `HV` + 8 số từ `Date.now()` | Nếu client không gửi / rỗng |
-| `AddEnrollmentModal.jsx` | `TTH` + đuôi `_id` | Chỉ nội dung CK — **không** ghi `student.studentCode` |
+| `AddEnrollmentModal.jsx` | `TTH` + đuôi `_id` | Chỉ nội dung CK - **không** ghi `student.studentCode` |
 | `RegistrationForm.jsx` | `{branch?}{TÊN8} Nop hoc phi` | **Không** persist `studentCode` |
 | `TuitionPaymentModal.jsx` | stored code hoặc đuôi `_id` / `HV001` | Fallback display/QR |
 
-Index: `Student.studentCode` — **sparse, không unique** (`models/Student.js`).
+Index: `Student.studentCode` - **sparse, không unique** (`models/Student.js`).
 
 **Gap:** Cash / “Lưu chưa thanh toán” thường bỏ `studentCode` → server gán `HV…` trong khi QR đã hiện `TTH…`.
 
@@ -68,7 +68,7 @@ Index: `Student.studentCode` — **sparse, không unique** (`models/Student.js`)
 ### 1.4 Khóa học
 
 - **Không có** `courseCode`.
-- Có `Course.slug` (unique, từ name) — không phải `KH000001`.
+- Có `Course.slug` (unique, từ name) - không phải `KH000001`.
 
 ### 1.5 Lớp học
 
@@ -78,7 +78,7 @@ Index: `Student.studentCode` — **sparse, không unique** (`models/Student.js`)
 ### 1.6 Atomic counter
 
 - **Không có** collection `counters` / `$inc` sequence cho business code.
-- Invoice `maHoaDon` / CreditNote dùng count/retry — **không** dùng cho HV/GV/NV.
+- Invoice `maHoaDon` / CreditNote dùng count/retry - **không** dùng cho HV/GV/NV.
 
 ---
 
@@ -112,12 +112,12 @@ Index: `Student.studentCode` — **sparse, không unique** (`models/Student.js`)
 
 | Location | Sinh mã? | Authority? |
 |----------|----------|------------|
-| `AddStudentModal` | Có (`TTH`+time) | **Sai** — client authoritative khi QR |
+| `AddStudentModal` | Có (`TTH`+time) | **Sai** - client authoritative khi QR |
 | `AddEnrollmentModal` | Có (CK only) | Không persist |
 | `RegistrationForm` | Không mã ổn định | Session-only |
 | `studentRoutes` create | Có (`HV`+time) | Server nhưng timestamp |
-| Teacher / Employee / Course create | Không business seq | — |
-| `codeGeneratorService` | **Không tồn tại** | — |
+| Teacher / Employee / Course create | Không business seq | - |
+| `codeGeneratorService` | **Không tồn tại** | - |
 
 ---
 
@@ -125,9 +125,9 @@ Index: `Student.studentCode` — **sparse, không unique** (`models/Student.js`)
 
 | Cơ chế | Chi tiết |
 |--------|----------|
-| Primary | `PaymentSession.ref` + amount (±1) — `webhookRoutes.js` |
-| Fallback | Extract tokens từ CK → `Student.studentCode` + unpaid + amount ≈ price — `utils/sepayMatch.js` |
-| Invoice | `hocVien` = ObjectId; `maHoaDon` = `HD…` — **không** dùng để match CK |
+| Primary | `PaymentSession.ref` + amount (±1) - `webhookRoutes.js` |
+| Fallback | Extract tokens từ CK → `Student.studentCode` + unpaid + amount ≈ price - `utils/sepayMatch.js` |
+| Invoice | `hocVien` = ObjectId; `maHoaDon` = `HD…` - **không** dùng để match CK |
 | Rủi ro | TTH lưu ≠ HV trong DB; extractor rộng `[a-z0-9]{5,16}`; code non-unique → ambiguity |
 
 **Khuyến nghị (chỉ ghi nhận):** giữ session-first; fallback studentCode fail-closed khi nhiều match. Không rewrite payment history trong migration.
@@ -189,7 +189,7 @@ Socket.IO / RBAC / JWT / tenant / branch authorization: **không** dựa `studen
 
 ---
 
-## 10. Đề xuất migration an toàn (chỉ đề xuất — chưa làm)
+## 10. Đề xuất migration an toàn (chỉ đề xuất - chưa làm)
 
 ### Nguyên tắc
 
@@ -215,12 +215,12 @@ Socket.IO / RBAC / JWT / tenant / branch authorization: **không** dựa `studen
 
 | Risk | Severity |
 |------|----------|
-| TTH vs HV lệch QR/DB | High — payment rematch |
-| studentCode non-unique | High — wrong student match |
-| Client-generated authoritative code | High — concurrency |
-| Không atomic counter | High — race |
+| TTH vs HV lệch QR/DB | High - payment rematch |
+| studentCode non-unique | High - wrong student match |
+| Client-generated authoritative code | High - concurrency |
+| Không atomic counter | High - race |
 | Broad sepay extractor | Medium |
-| Missing GV/NV/KH codes | Medium — product goal |
+| Missing GV/NV/KH codes | Medium - product goal |
 | Live DB chưa scan duplicate | **Blocker** trước unique index |
 
 ---
@@ -238,7 +238,7 @@ Socket.IO / RBAC / JWT / tenant / branch authorization: **không** dựa `studen
 ## Next
 
 ```
-STOP — await approval
+STOP - await approval
 ```
 
 **Không chuyển PHASE B (Design) hoặc PHASE C (Implementation) cho đến khi owner approve báo cáo PHASE A này.**

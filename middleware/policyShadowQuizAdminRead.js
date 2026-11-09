@@ -1,6 +1,6 @@
 /**
  * Policy SHADOW middleware for GET /api/quizzes/admin/all.
- * Never alters HTTP outcome — legacy guards remain authoritative.
+ * Never alters HTTP outcome - legacy guards remain authoritative.
  *
  * Placement:
  *   authMiddleware → branchFilter → policyShadowQuizAdminRead()
@@ -71,7 +71,7 @@ function policyShadowQuizAdminRead() {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] quiz admin evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] quiz admin evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: 'quiz_admin_read', comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -112,7 +112,7 @@ function policyShadowQuizAdminRead() {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] quiz admin shadow disagrees with legacy — HTTP unchanged',
+          '[POLICY_MISMATCH] quiz admin shadow disagrees with legacy - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -124,7 +124,7 @@ function policyShadowQuizAdminRead() {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected quiz admin error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected quiz admin error - fail closed to legacy only',
       );
     }
     return next();

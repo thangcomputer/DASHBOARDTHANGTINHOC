@@ -644,7 +644,7 @@ function AiModal({ topic, defaultDifficulty, units = [], defaultUnitId = '', loc
   return (
     <Modal
       title={`AI tạo câu hỏi nháp: ${topic.name}`}
-      onClose={busy ? () => {} : onClose}
+      onClose={busy ? () => { } : onClose}
       footer={(
         <>
           <button type="button" onClick={onClose} disabled={busy} className="cms-btn cms-btn-outline">Hủy</button>
@@ -1008,7 +1008,7 @@ function UnitPathNodesPanel({ unit, onSaved, onComposeQuestion, onAiDraft }) {
   );
 }
 
-/** Ảnh minh họa chặng — sửa ngay trong khung Lộ trình (desktop), không cần mở modal. */
+/** Ảnh minh họa chặng - sửa ngay trong khung Lộ trình (desktop), không cần mở modal. */
 function UnitImagePanel({ unit, onSaved }) {
   const toast = useToast();
   const [imageUrl, setImageUrl] = useState(unit.imageUrl || '');
@@ -1115,7 +1115,7 @@ function VideoChecksEditor({ checks, onChange }) {
   );
 }
 
-/** Danh sách video riêng của một chặng — sửa ngay trong khung Lộ trình chặng. */
+/** Danh sách video riêng của một chặng - sửa ngay trong khung Lộ trình chặng. */
 function UnitVideosPanel({ unit, onSaved }) {
   const toast = useToast();
   const mapVideo = (video) => ({ id: video.id, title: video.title, url: video.url, checks: video.checks || [] });
@@ -1275,7 +1275,7 @@ function QuizNodeConfig({ unit, node, nodeIndex, onVideosChange, onComposeQuesti
   );
 }
 
-/** Video ôn theo cấp — hoặc danh sách Bài 1, 2… (lessonMode: nội dung +/hoặc video). */
+/** Video ôn theo cấp - hoặc danh sách Bài 1, 2… (lessonMode: nội dung +/hoặc video). */
 function UnitStepVideosPanel({
   unit, stepKey, stepLabel, onSaved, videos: controlledVideos, onVideosChange, deferSave = false, lessonMode = false,
 }) {
@@ -1496,36 +1496,36 @@ function UnitsManager({ topic, units, unassigned, filterUnitId, onFilterUnit, on
             return (
               <li key={unit.id} className={`space-y-2 rounded-xl bg-white p-2.5 ring-1 ${active || videosOpen ? 'ring-red-300' : 'ring-slate-100'} ${unit.active ? '' : 'opacity-60'}`}>
                 <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-red-500 to-red-700 text-xs font-black text-white">{index + 1}</span>
-                <button type="button" onClick={() => onFilterUnit(active ? '' : unit.id)} className="min-w-0 flex-1 text-left !shadow-none" title="Lọc câu hỏi của chặng">
-                  <p className="truncate text-sm font-black text-slate-900">
-                    {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {unit.counts.total} câu · Dễ {unit.counts.easy} · Vừa {unit.counts.medium} · Khó {unit.counts.hard}
-                    {unit.counts.draft ? <span className="font-bold text-amber-600"> · {unit.counts.draft} nháp</span> : null}
-                    {unit.lessonUnitId ? <span className="font-bold text-red-600"> · gắn buổi bài giảng</span> : null}
-                  </p>
-                  {short && <p className="text-[11px] font-bold text-amber-600">Chưa hiện trên lộ trình: cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản</p>}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpenVideosId(videosOpen ? '' : unit.id)}
-                  aria-expanded={videosOpen}
-                  title="Nút lộ trình, ảnh và video của chặng"
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-red-600 text-white' : 'bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
-                >
-                  <Route size={14} /> Cấu hình
-                  <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-[10px]">{(unit.pathNodes?.length || 5)} nút</span>
-                  {unitVideoCount(unit) > 0 ? <Clapperboard size={13} aria-label={`${unitVideoCount(unit)} video`} /> : null}
-                  {unit.imageUrl ? <ImagePlus size={13} aria-label="Đã có ảnh chặng" /> : null}
-                </button>
-                <span className="flex shrink-0 flex-col">
-                  <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
-                  <button type="button" disabled={index === units.length - 1} onClick={() => move(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
-                </span>
-                <button type="button" onClick={() => setModal(unit)} aria-label="Sửa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><Pencil size={14} /></button>
-                <button type="button" onClick={() => remove(unit)} aria-label="Xóa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-red-500 to-red-700 text-xs font-black text-white">{index + 1}</span>
+                  <button type="button" onClick={() => onFilterUnit(active ? '' : unit.id)} className="min-w-0 flex-1 text-left !shadow-none" title="Lọc câu hỏi của chặng">
+                    <p className="truncate text-sm font-black text-slate-900">
+                      {unit.title}{!unit.active && <span className="ml-1 text-[10px] font-bold text-slate-400">(ẩn)</span>}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {unit.counts.total} câu · Dễ {unit.counts.easy} · Vừa {unit.counts.medium} · Khó {unit.counts.hard}
+                      {unit.counts.draft ? <span className="font-bold text-amber-600"> · {unit.counts.draft} nháp</span> : null}
+                      {unit.lessonUnitId ? <span className="font-bold text-red-600"> · gắn buổi bài giảng</span> : null}
+                    </p>
+                    {short && <p className="text-[11px] font-bold text-amber-600">Chưa hiện trên lộ trình: cần ≥ {MIN_UNIT_QUESTIONS} câu đã xuất bản</p>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpenVideosId(videosOpen ? '' : unit.id)}
+                    aria-expanded={videosOpen}
+                    title="Nút lộ trình, ảnh và video của chặng"
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-black transition !shadow-none ${videosOpen ? 'bg-red-600 text-white' : 'bg-violet-50 text-violet-800 hover:bg-violet-100'}`}
+                  >
+                    <Route size={14} /> Cấu hình
+                    <span className="rounded-md bg-black/10 px-1.5 py-0.5 text-[10px]">{(unit.pathNodes?.length || 5)} nút</span>
+                    {unitVideoCount(unit) > 0 ? <Clapperboard size={13} aria-label={`${unitVideoCount(unit)} video`} /> : null}
+                    {unit.imageUrl ? <ImagePlus size={13} aria-label="Đã có ảnh chặng" /> : null}
+                  </button>
+                  <span className="flex shrink-0 flex-col">
+                    <button type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label="Lên" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowUp size={13} /></button>
+                    <button type="button" disabled={index === units.length - 1} onClick={() => move(index, 1)} aria-label="Xuống" className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 !shadow-none"><ArrowDown size={13} /></button>
+                  </span>
+                  <button type="button" onClick={() => setModal(unit)} aria-label="Sửa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><Pencil size={14} /></button>
+                  <button type="button" onClick={() => remove(unit)} aria-label="Xóa chặng" className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 !shadow-none"><Trash2 size={14} /></button>
                 </div>
                 {videosOpen && (
                   <div className="space-y-2 border-t border-slate-100 pt-2">

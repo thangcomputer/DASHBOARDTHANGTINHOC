@@ -232,7 +232,7 @@ export async function exportStudentQuestionsExcel(questions, subjectId, subjectL
   XLSX.writeFile(wb, `NganHang_${suffix}_${safe}.xlsx`);
 }
 
-/** Cung format cot voi hoc vien — dung chung parser. */
+/** Cung format cot voi hoc vien - dung chung parser. */
 export async function parseQuestionBankExcel(bstr, options) {
   return parseStudentQuestionsExcel(bstr, options);
 }

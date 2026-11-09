@@ -306,8 +306,8 @@ function VideoPane({
           groupedLessons={groupedLessons}
           overallProgress={overallProgress}
           expandedChapters={{}}
-          setExpandedChapters={() => {}}
-          onSelectLesson={() => {}}
+          setExpandedChapters={() => { }}
+          onSelectLesson={() => { }}
           getCurrentTime={() => Number(playerApiRef.current?.getCurrentTime?.()) || 0}
           antiSeekEnabled={unit.antiSeek !== false}
           audience="student"
@@ -416,7 +416,7 @@ function isSectionDone(unit, item) {
 }
 
 /**
- * Thanh điều hướng đáy bài học — giống mobile: đang học thì "Mục trước / Mục sau"
+ * Thanh điều hướng đáy bài học - giống mobile: đang học thì "Mục trước / Mục sau"
  * (mục sau mở khi xong mục hiện tại); xong cả buổi thì "Bài trước / Bài tiếp theo".
  */
 function LessonNavigationBar({ unit, sections, activeId, previousUnit, nextUnit, onSection, onUnit }) {
@@ -553,7 +553,7 @@ function playFireworkSound() {
       tone('triangle', freq, freq, t, 0.6, 0.16);
       tone('sine', freq * 2, freq * 2, t, 0.5, 0.05);
     });
-    setTimeout(() => ctx.close().catch(() => {}), 5000);
+    setTimeout(() => ctx.close().catch(() => { }), 5000);
   } catch {
     // Audio may be blocked by the browser.
   }
@@ -954,101 +954,101 @@ export default function LessonPracticeUnitsPage() {
               <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 sm:px-2 sm:text-xs">{units.length}</span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-1.5 sm:p-2">
-            <ol className="space-y-1">
-              {units.map((unit, index) => {
-                const opened = openUnit?.id === unit.id;
-                const justUnlocked = unlockCelebrationUnitId === unit.id && !unit.locked;
-                const lessonStatus = unit.status === 'completed'
-                  ? { label: 'Đã học', className: 'bg-emerald-50 text-emerald-700' }
-                  : unit.status === 'in_progress'
-                    ? { label: 'Đang học', className: 'bg-sky-50 text-sky-700' }
-                    : { label: 'Chưa học', className: 'bg-slate-100 text-slate-600' };
-                return (
-                  <li key={unit.id} className="relative pb-1">
-                    {unit.locked ? (
-                      <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2.5 text-left" aria-disabled="true">
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-400">{index + 1}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-bold text-slate-400">{unit.title}</span>
-                          {!unit.purchaseRequired && (
-                            <span className="block text-xs text-slate-400">Hoàn thành buổi trước để mở</span>
-                          )}
-                        </span>
-                        {unit.purchaseRequired ? (
-                          <Lock size={15} className="shrink-0 text-slate-400" aria-label="Buổi học bị khóa" />
-                        ) : (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 text-xs font-bold text-amber-800">
-                            <Lock size={14} /> Khóa
+              <ol className="space-y-1">
+                {units.map((unit, index) => {
+                  const opened = openUnit?.id === unit.id;
+                  const justUnlocked = unlockCelebrationUnitId === unit.id && !unit.locked;
+                  const lessonStatus = unit.status === 'completed'
+                    ? { label: 'Đã học', className: 'bg-emerald-50 text-emerald-700' }
+                    : unit.status === 'in_progress'
+                      ? { label: 'Đang học', className: 'bg-sky-50 text-sky-700' }
+                      : { label: 'Chưa học', className: 'bg-slate-100 text-slate-600' };
+                  return (
+                    <li key={unit.id} className="relative pb-1">
+                      {unit.locked ? (
+                        <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2.5 text-left" aria-disabled="true">
+                          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-black text-slate-400">{index + 1}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-bold text-slate-400">{unit.title}</span>
+                            {!unit.purchaseRequired && (
+                              <span className="block text-xs text-slate-400">Hoàn thành buổi trước để mở</span>
+                            )}
                           </span>
-                        )}
-                      </div>
-                    ) : (
-                    <button
-                      type="button"
-                      onClick={() => chooseUnit(unit)}
-                      title={unit.title}
-                      aria-label={`${unit.title}, ${lessonStatus.label}`}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
-                    >
-                      <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate font-bold ${opened ? 'text-red-700' : 'text-slate-900'}`}>{unit.title}</span>
-                        <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${lessonStatus.className}`}>
-                          {lessonStatus.label}
-                        </span>
-                      </span>
-                      {unit.status === 'completed' && <CheckCircle2 size={16} className="text-emerald-600" />}
-                    </button>
-                    )}
-                    {justUnlocked && (
-                      <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[4.25rem]" aria-hidden="true">
-                        {UNLOCK_CONFETTI.map(([x, y, color, burstX, burstY, delay], pieceIndex) => (
-                          <i
-                            key={pieceIndex}
-                            className="lesson-unlock-burst"
-                            style={{
-                              backgroundColor: color,
-                              '--burst-x': `${burstX}px`,
-                              '--burst-y': `${burstY}px`,
-                              '--burst-rotate': `${(pieceIndex % 2 ? 1 : -1) * 240}deg`,
-                              '--burst-delay': `${delay}ms`,
-                              left: `calc(50% + ${x}px)`,
-                              top: `calc(50% + ${y}px)`,
-                            }}
-                          />
-                        ))}
-                      </span>
-                    )}
-                    {opened && (
-                      <div className="mb-1 ml-11 mt-1 space-y-1 pr-2">
-                        {orderedSections(unit).map((item) => {
-                          const Icon = item.icon;
-                          const active = section === item.id;
-                          const done = isSectionDone(unit, item);
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                setSection(item.id);
-                                saveResumePoint(resumeStorageKey, unit.id, item.id);
-                                setLessonListOpen(false);
+                          {unit.purchaseRequired ? (
+                            <Lock size={15} className="shrink-0 text-slate-400" aria-label="Buổi học bị khóa" />
+                          ) : (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 text-xs font-bold text-amber-800">
+                              <Lock size={14} /> Khóa
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => chooseUnit(unit)}
+                          title={unit.title}
+                          aria-label={`${unit.title}, ${lessonStatus.label}`}
+                          className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2.5 text-left ${justUnlocked ? 'lesson-unlocked-card border-amber-300 bg-amber-50' : opened ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                        >
+                          <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black ${opened ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{index + 1}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className={`block truncate font-bold ${opened ? 'text-red-700' : 'text-slate-900'}`}>{unit.title}</span>
+                            <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${lessonStatus.className}`}>
+                              {lessonStatus.label}
+                            </span>
+                          </span>
+                          {unit.status === 'completed' && <CheckCircle2 size={16} className="text-emerald-600" />}
+                        </button>
+                      )}
+                      {justUnlocked && (
+                        <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[4.25rem]" aria-hidden="true">
+                          {UNLOCK_CONFETTI.map(([x, y, color, burstX, burstY, delay], pieceIndex) => (
+                            <i
+                              key={pieceIndex}
+                              className="lesson-unlock-burst"
+                              style={{
+                                backgroundColor: color,
+                                '--burst-x': `${burstX}px`,
+                                '--burst-y': `${burstY}px`,
+                                '--burst-rotate': `${(pieceIndex % 2 ? 1 : -1) * 240}deg`,
+                                '--burst-delay': `${delay}ms`,
+                                left: `calc(50% + ${x}px)`,
+                                top: `calc(50% + ${y}px)`,
                               }}
-                              title={item.label}
-                              className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'}`}
-                            >
-                              <Icon size={15} />
-                              <span className="min-w-0 flex-1 text-left">{item.label}</span>
-                              {done && <CheckCircle2 size={14} className={active ? 'text-white' : 'text-emerald-600'} />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
+                            />
+                          ))}
+                        </span>
+                      )}
+                      {opened && (
+                        <div className="mb-1 ml-11 mt-1 space-y-1 pr-2">
+                          {orderedSections(unit).map((item) => {
+                            const Icon = item.icon;
+                            const active = section === item.id;
+                            const done = isSectionDone(unit, item);
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setSection(item.id);
+                                  saveResumePoint(resumeStorageKey, unit.id, item.id);
+                                  setLessonListOpen(false);
+                                }}
+                                title={item.label}
+                                className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${active ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50'}`}
+                              >
+                                <Icon size={15} />
+                                <span className="min-w-0 flex-1 text-left">{item.label}</span>
+                                {done && <CheckCircle2 size={14} className={active ? 'text-white' : 'text-emerald-600'} />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
             </div>
           </aside>
           <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white p-1.5 sm:rounded-2xl sm:p-2 lg:col-start-2 lg:row-start-1">

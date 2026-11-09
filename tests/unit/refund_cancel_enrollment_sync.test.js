@@ -20,7 +20,7 @@ function baseStudent(overrides = {}) {
 }
 
 describe('REFUND-FIX-1 syncStudentFromPrimaryEnrollment', () => {
-  it('A: cancel one of many — course stays remaining active name', () => {
+  it('A: cancel one of many - course stays remaining active name', () => {
     const idA = new mongoose.Types.ObjectId();
     const idB = new mongoose.Types.ObjectId();
     const student = baseStudent({
@@ -51,7 +51,7 @@ describe('REFUND-FIX-1 syncStudentFromPrimaryEnrollment', () => {
     assert.equal(err, undefined);
   });
 
-  it('B: cancel final enrollment — course is (Đã hủy), not empty; validates', () => {
+  it('B: cancel final enrollment - course is (Đã hủy), not empty; validates', () => {
     const idA = new mongoose.Types.ObjectId();
     const student = baseStudent({
       enrollments: [
@@ -97,8 +97,8 @@ describe('REFUND-FIX-1 syncStudentFromPrimaryEnrollment', () => {
     assert.notEqual(key1, `refund:cancel:${sid}:cccccccccccccccccccccccc`);
   });
 
-  it('F: legacy main — list should not invent enrollment id (contract)', () => {
-    // Mirrors AdminStudentsTab openRefundModal guard — documentation as assertion
+  it('F: legacy main - list should not invent enrollment id (contract)', () => {
+    // Mirrors AdminStudentsTab openRefundModal guard - documentation as assertion
     const enrId = 'main';
     const blocked = !enrId || enrId === 'main';
     assert.equal(blocked, true);

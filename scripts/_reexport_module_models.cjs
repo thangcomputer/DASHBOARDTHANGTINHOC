@@ -38,7 +38,7 @@ for (const [modRel, rootRel] of pairs) {
   const rel = `${'../'.repeat(depth)}${rootRel.replace(/\\/g, '/')}`;
   fs.writeFileSync(
     modAbs,
-    `/** Canonical: ${rootRel} — re-export to avoid mongoose dual registration */\nmodule.exports = require('${rel}');\n`
+    `/** Canonical: ${rootRel} - re-export to avoid mongoose dual registration */\nmodule.exports = require('${rel}');\n`
   );
   console.log('re-export', modRel, '->', rel);
 }

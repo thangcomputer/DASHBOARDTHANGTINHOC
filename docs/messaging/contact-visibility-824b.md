@@ -1,4 +1,4 @@
-# Contact visibility matrix — Phase 8.24B
+# Contact visibility matrix - Phase 8.24B
 
 Authority: `GET /api/chat/contacts` in [`routes/messageRoutes.js`](../../routes/messageRoutes.js).
 

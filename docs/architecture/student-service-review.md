@@ -1,4 +1,4 @@
-# Student Service Review — Sprint 4.3 Batch 2
+# Student Service Review - Sprint 4.3 Batch 2
 
 ## Domain: `student`
 

@@ -73,7 +73,7 @@ const playExamWarningBeep = (playbackToken) => {
   if (muted) return;
   if (playbackToken != null && playbackToken !== warningPlaybackToken) return;
   try {
-    // Đảm bảo có audioCtx — tạo nếu chưa có (ưu tiên dùng lại)
+    // Đảm bảo có audioCtx - tạo nếu chưa có (ưu tiên dùng lại)
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -112,7 +112,7 @@ const playExamWarningBeep = (playbackToken) => {
       } catch { /* ignore */ }
     }, 120);
   } catch {
-    /* noop — context hoàn toàn không khả dụng, im lặng */
+    /* noop - context hoàn toàn không khả dụng, im lặng */
   }
 };
 

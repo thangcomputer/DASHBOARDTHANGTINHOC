@@ -5,7 +5,7 @@ import { STUDY_MINUTE_EVENT, isStudyLocation, isStudyMediaPlaying } from '../../
 
 const BEAT_MS = 60 * 1000;
 const IDLE_MS = 3 * 60 * 1000;
-/** Đang thao tác bên trong khung nhúng (Vimeo…) — trang cha không nhận được sự kiện chuột. */
+/** Đang thao tác bên trong khung nhúng (Vimeo…) - trang cha không nhận được sự kiện chuột. */
 const EMBED_IDLE_MS = 30 * 60 * 1000;
 
 /**
@@ -42,7 +42,7 @@ export default function StudyHeartbeat() {
         .then((res) => {
           window.dispatchEvent(new CustomEvent(STUDY_MINUTE_EVENT, { detail: res?.data || {} }));
         })
-        .catch(() => {});
+        .catch(() => { });
     }, BEAT_MS);
     return () => window.clearInterval(timer);
   }, [studying]);

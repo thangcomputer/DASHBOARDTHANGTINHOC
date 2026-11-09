@@ -20,7 +20,7 @@ function pickPublicCriteria(source = {}) {
 }
 
 /**
- * lesson_1 → đánh giá giảng viên (1 lần sau buổi đầu) — gửi Admin
+ * lesson_1 → đánh giá giảng viên (1 lần sau buổi đầu) - gửi Admin
  * course_end → một popup: bước 1 trung tâm (Admin), bước 2 GV công khai
  * startStep: 'teacher' khi resume (đã gửi trung tâm, chưa gửi GV)
  */
@@ -85,7 +85,7 @@ export function MilestoneEvaluationModal({
         },
         comment: feedback.comment,
       });
-      // Luôn sang bước GV (prefill nếu đã đánh giá ở tab) — lần cuối trước khi khóa
+      // Luôn sang bước GV (prefill nếu đã đánh giá ở tab) - lần cuối trước khi khóa
       setFeedback(EMPTY);
       setStep('teacher');
     } catch (err) {
@@ -161,15 +161,13 @@ export function MilestoneEvaluationModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-3 sm:p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-300">
-        <div className={`bg-gradient-to-r from-red-600 to-red-500 text-center text-white relative ${
-          isCompactHeader ? 'px-4 py-4' : 'px-6 py-8'
-        }`}>
+        <div className={`bg-gradient-to-r from-red-600 to-red-500 text-center text-white relative ${isCompactHeader ? 'px-4 py-4' : 'px-6 py-8'
+          }`}>
           {!isCompactHeader ? (
             <p className="text-sm mt-1">Khóa học: {courseName}</p>
           ) : null}
-          <div className={`bg-white/20 rounded-2xl flex items-center justify-center mx-auto shadow-inner ${
-            isCompactHeader ? 'w-10 h-10 mb-2' : 'w-16 h-16 mb-4'
-          }`}>
+          <div className={`bg-white/20 rounded-2xl flex items-center justify-center mx-auto shadow-inner ${isCompactHeader ? 'w-10 h-10 mb-2' : 'w-16 h-16 mb-4'
+            }`}>
             {step === 'center'
               ? <Building2 size={isCompactHeader ? 20 : 32} className="text-white" />
               : <Star size={isCompactHeader ? 20 : 32} className="fill-white text-white" />}
@@ -181,9 +179,8 @@ export function MilestoneEvaluationModal({
             {subtitle}
           </p>
           {isCourseEnd ? (
-            <p className={`font-bold text-white/80  tracking-wider ${
-              isCompactHeader ? 'text-[10px] mt-1' : 'text-[11px] mt-2'
-            }`}>
+            <p className={`font-bold text-white/80  tracking-wider ${isCompactHeader ? 'text-[10px] mt-1' : 'text-[11px] mt-2'
+              }`}>
               Bước {step === 'center' ? '1/2 · Trung tâm' : '2/2 · Giảng viên'}
             </p>
           ) : null}
@@ -294,11 +291,10 @@ export function MilestoneEvaluationModal({
                           key={opt.key}
                           type="button"
                           onClick={() => setRatingCriteria((prev) => ({ ...prev, [catKey]: opt.key }))}
-                          className={`min-h-[30px] px-1 py-1.5 rounded-lg text-[10px] font-black leading-tight transition-all ${
-                            ratingCriteria[catKey] === opt.key
+                          className={`min-h-[30px] px-1 py-1.5 rounded-lg text-[10px] font-black leading-tight transition-all ${ratingCriteria[catKey] === opt.key
                               ? 'bg-red-500 text-white shadow-sm'
                               : 'bg-white text-gray-500 border border-gray-200 hover:border-red-200 hover:text-red-600'
-                          }`}
+                            }`}
                         >
                           {opt.label}
                         </button>
@@ -342,11 +338,10 @@ function YesNoRow({ label, value, yesLabel, noLabel, onChange }) {
             key={v}
             type="button"
             onClick={() => onChange(v)}
-            className={`px-3 py-1 rounded-full text-xs font-black transition-all ${
-              value === v
+            className={`px-3 py-1 rounded-full text-xs font-black transition-all ${value === v
                 ? 'bg-red-500 text-white shadow-md shadow-red-200'
                 : 'bg-white text-gray-400 border border-gray-200'
-            }`}
+              }`}
           >
             {v === 'yes' ? yesLabel : noLabel}
           </button>

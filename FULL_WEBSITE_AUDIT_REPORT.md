@@ -206,7 +206,7 @@ Chi tiết test runner:
 
 ## 4. Chi tiết từng lỗi
 
-### [SEC-001] Lộ đáp án thi chứng chỉ học viên — Đã sửa – chờ kiểm thử môi trường QA
+### [SEC-001] Lộ đáp án thi chứng chỉ học viên - Đã sửa – chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái/nhóm: Nghiêm trọng; Đã xác nhận; Broken Access Control/Exam integrity.
 - File/dòng: `routes/settingsRoutes.js:498-529`; `StudentTest.jsx:424-433,641-644`.
@@ -219,7 +219,7 @@ Chi tiết test runner:
 - Đã sửa: `examAttemptService.js` tạo bản sao DTO answer-free đệ quy, không mutate bank; `studentRoutes.js` chỉ cấp đúng tập câu hỏi trong signed attempt; `settingsRoutes.js` chỉ trả bank đầy đủ khi có `MANAGE_STUDENT_TRAINING`.
 - Kiểm tra: unit test xác nhận loại answer key lồng nhau, không mutate nguồn và ma trận quyền logic. Chưa có route integration test với đủ tài khoản QA.
 
-### [SEC-002] Client tự chấm và gửi điểm/trạng thái thi học viên — Đã sửa – chờ kiểm thử môi trường QA
+### [SEC-002] Client tự chấm và gửi điểm/trạng thái thi học viên - Đã sửa – chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái/nhóm: Nghiêm trọng; Đã xác nhận; Business logic.
 - File/dòng: `StudentTest.jsx:641-677`; `studentRoutes.js:1638-1668`; `services/examProgressService.js:12-18,80-119,191-201`.
@@ -232,7 +232,7 @@ Chi tiết test runner:
 - Tương thích: metadata attempt optional được thêm vào `Student.examProgress`; không migration, không xóa lịch sử cũ. Cần QA dữ liệu legacy và resume/retry trên nhiều tab.
 - Kiểm tra: forged score/status/total không ảnh hưởng kết quả; ID ngoài đề, ID trùng, thiếu câu và cross-user token bị từ chối; đáp án và ngưỡng được chấm phía server.
 
-### [SEC-003] Ngân hàng thi giáo viên lộ cho mọi role — Đã sửa – chờ kiểm thử môi trường QA
+### [SEC-003] Ngân hàng thi giáo viên lộ cho mọi role - Đã sửa – chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái/nhóm: Cao; Đã xác nhận; Broken Access Control.
 - File/dòng: `settingsRoutes.js:588-618`; `settingsCutoverGate.js:61-64`; `TeacherTest.jsx:433-440`.
@@ -243,7 +243,7 @@ Chi tiết test runner:
 - Đã sửa: bank quản trị chỉ trả cho admin/staff có `MANAGE_TRAINING`; student bị 403; teacher nhận tập câu hỏi answer-free qua `/api/teachers/:id/exam-attempt`. Cache bank cũ trên trình duyệt bị loại khỏi candidate context/localStorage.
 - Kiểm tra: unit test ma trận role và DTO; chưa chạy ma trận HTTP với tài khoản QA thật.
 
-### [SEC-006] Giáo viên tự sửa điểm và trạng thái thi — Đã sửa – chờ kiểm thử môi trường QA
+### [SEC-006] Giáo viên tự sửa điểm và trạng thái thi - Đã sửa – chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái/nhóm: Nghiêm trọng; Đã xác nhận; Authorization/Mass assignment.
 - File/dòng: `teacherRoutes.js:514-592`; `TeacherTest.jsx:890-920`; `examResultRoutes.js:110-220`; `examResultDto.js:5-30`.
@@ -369,7 +369,7 @@ Chi tiết test runner:
 - Khắc phục: server attempt record/start time/deadline/status; reject atomically.
 - Test lại: before-open, expired, closed, timeout đều 403/409.
 
-### [SEC-018/FUN-002] Race và double submit bài thi/quiz — Đã sửa phần nộp bài, chờ kiểm thử môi trường QA
+### [SEC-018/FUN-002] Race và double submit bài thi/quiz - Đã sửa phần nộp bài, chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái: Trung bình backend; Cao ở client exam; Có khả năng xảy ra/Đã xác nhận theo source.
 - File: `quizRoutes.js:266-346`; `LessonQuiz.js`; `StudentTest.jsx:641-684,1455-1461`.
@@ -379,7 +379,7 @@ Chi tiết test runner:
 - Đã sửa: StudentTest/TeacherTest/StudentQuizExamRoom dùng ref in-flight và disable nút; exam submit claim active attempt bằng conditional `findOneAndUpdate`; quiz submit dùng atomic conditional push. Request lặp nhận kết quả idempotent hoặc `409` mà không ghi/thông báo lần hai.
 - Kiểm tra: unit mock concurrency chứng minh chỉ một writer cho student attempt, teacher attempt và quiz submission. Chưa stress test trên MongoDB QA.
 
-### [CFG-001] Google OAuth không dùng vẫn hoạt động — Đã sửa – chờ kiểm thử môi trường QA
+### [CFG-001] Google OAuth không dùng vẫn hoạt động - Đã sửa – chờ kiểm thử môi trường QA
 
 - Mức độ/trạng thái: Trung bình; Đã xác nhận source và HTTP 302.
 - File: `authRoutes.js`, `utils/googleOAuthDisabled.js`.
@@ -597,7 +597,7 @@ Chưa đủ bằng chứng: khai thác race thực tế, browser responsive/WCAG
 
 Báo cáo dừng tại đây. Đã sửa source trong phạm vi Giai đoạn 1; chưa commit, push, deploy, migration hoặc chủ động thay đổi database.
 
-## 12. Phụ lục Giai đoạn 1.5 — Phone Auth và QA (31/08/2026)
+## 12. Phụ lục Giai đoạn 1.5 - Phone Auth và QA (31/08/2026)
 
 ### Trạng thái
 

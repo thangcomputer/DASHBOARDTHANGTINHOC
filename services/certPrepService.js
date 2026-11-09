@@ -36,72 +36,72 @@ function requireOid(id, label = 'ID') {
 }
 
 function serializeAsset(asset) {
-    if (!asset) return null;
-    return {
-      assetId: String(asset._id),
-      url: asset.url,
-      originalName: asset.originalName || '',
-      mimeType: asset.mimeType || '',
-      size: Number(asset.size) || 0,
-    };
-  }
+  if (!asset) return null;
+  return {
+    assetId: String(asset._id),
+    url: asset.url,
+    originalName: asset.originalName || '',
+    mimeType: asset.mimeType || '',
+    size: Number(asset.size) || 0,
+  };
+}
 
 async function saveEssayPromptFile(testId, file, actor) {
-    const id = requireOid(testId, 'testId');
-    const test = await CertPrepTest.findById(id);
-    if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
-    if (!file) throw new CertPrepError(400, 'Chưa chọn file tự luận');
-    const asset = await fileService.registerUploadedFile(file, {
-      category: 'cert_prep',
-      uploadedBy: actor,
-      uploadedByRole: 'admin',
-      relatedType: 'cert_prep_essay_prompt',
-      relatedId: id,
-    });
-    if (test.essayPromptFile?.assetId) {
-      const old = await FileAsset.findById(test.essayPromptFile.assetId);
-      if (old) await fileService.deleteAsset(old);
-    }
-    test.essayPromptFile = serializeAsset(asset);
-    await test.save();
-    return test.toObject();
+  const id = requireOid(testId, 'testId');
+  const test = await CertPrepTest.findById(id);
+  if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
+  if (!file) throw new CertPrepError(400, 'Chưa chọn file tự luận');
+  const asset = await fileService.registerUploadedFile(file, {
+    category: 'cert_prep',
+    uploadedBy: actor,
+    uploadedByRole: 'admin',
+    relatedType: 'cert_prep_essay_prompt',
+    relatedId: id,
+  });
+  if (test.essayPromptFile?.assetId) {
+    const old = await FileAsset.findById(test.essayPromptFile.assetId);
+    if (old) await fileService.deleteAsset(old);
   }
+  test.essayPromptFile = serializeAsset(asset);
+  await test.save();
+  return test.toObject();
+}
 
 async function removeEssayPromptFile(testId) {
-    const id = requireOid(testId, 'testId');
-    const test = await CertPrepTest.findById(id);
-    if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
-    if (test.essayPromptFile?.assetId) {
-      const asset = await FileAsset.findById(test.essayPromptFile.assetId);
-      if (asset) await fileService.deleteAsset(asset);
-    }
-    test.essayPromptFile = { assetId: null, url: '', originalName: '', mimeType: '', size: 0 };
-    await test.save();
-    return test.toObject();
+  const id = requireOid(testId, 'testId');
+  const test = await CertPrepTest.findById(id);
+  if (!test) throw new CertPrepError(404, 'Không tìm thấy bài kiểm tra');
+  if (test.essayPromptFile?.assetId) {
+    const asset = await FileAsset.findById(test.essayPromptFile.assetId);
+    if (asset) await fileService.deleteAsset(asset);
   }
+  test.essayPromptFile = { assetId: null, url: '', originalName: '', mimeType: '', size: 0 };
+  await test.save();
+  return test.toObject();
+}
 
 async function uploadEssayAnswer(studentId, sessionId, file) {
-    const sid = requireOid(studentId, 'studentId');
-    const id = requireOid(sessionId, 'sessionId');
-    const session = await CertPrepSession.findById(id);
-    assertSessionOwner(session, sid);
-    if (session.status !== 'in_progress') throw new CertPrepError(409, 'Phiên làm bài đã kết thúc');
-    if (!file) throw new CertPrepError(400, 'Chưa chọn file bài làm');
-    const asset = await fileService.registerUploadedFile(file, {
-      category: 'cert_prep',
-      uploadedBy: sid,
-      uploadedByRole: 'student',
-      relatedType: 'cert_prep_essay_answer',
-      relatedId: id,
-    });
-    if (session.essayAnswerFile?.assetId) {
-      const old = await FileAsset.findById(session.essayAnswerFile.assetId);
-      if (old) await fileService.deleteAsset(old);
-    }
-    session.essayAnswerFile = { ...serializeAsset(asset), uploadedAt: new Date() };
-    session.essayGradingStatus = 'pending_manual_grading';
-    await session.save();
-    return serializeSession(session);
+  const sid = requireOid(studentId, 'studentId');
+  const id = requireOid(sessionId, 'sessionId');
+  const session = await CertPrepSession.findById(id);
+  assertSessionOwner(session, sid);
+  if (session.status !== 'in_progress') throw new CertPrepError(409, 'Phiên làm bài đã kết thúc');
+  if (!file) throw new CertPrepError(400, 'Chưa chọn file bài làm');
+  const asset = await fileService.registerUploadedFile(file, {
+    category: 'cert_prep',
+    uploadedBy: sid,
+    uploadedByRole: 'student',
+    relatedType: 'cert_prep_essay_answer',
+    relatedId: id,
+  });
+  if (session.essayAnswerFile?.assetId) {
+    const old = await FileAsset.findById(session.essayAnswerFile.assetId);
+    if (old) await fileService.deleteAsset(old);
+  }
+  session.essayAnswerFile = { ...serializeAsset(asset), uploadedAt: new Date() };
+  session.essayGradingStatus = 'pending_manual_grading';
+  await session.save();
+  return serializeSession(session);
 }
 
 function slugify(raw) {
@@ -206,7 +206,7 @@ function elapsedSeconds(session, now = new Date()) {
   return Math.max(0, Math.floor(activeElapsedMs(session, now) / 1000));
 }
 
-/** Cộng dồn pause hiện tại và bỏ pausedAt — trả true nếu có thay đổi. */
+/** Cộng dồn pause hiện tại và bỏ pausedAt - trả true nếu có thay đổi. */
 function applyResumeTimer(session, now = new Date()) {
   if (!session?.pausedAt) return false;
   const pausedAt = new Date(session.pausedAt);
@@ -303,7 +303,7 @@ function validateTestConfig(body, { partial = false } = {}) {
 async function uniqueCourseSlug(base, excludeId) {
   let slug = slugify(base);
   let n = 0;
-  for (;;) {
+  for (; ;) {
     const candidate = n === 0 ? slug : `${slug}-${n}`;
     const q = { slug: candidate };
     if (excludeId) q._id = { $ne: excludeId };

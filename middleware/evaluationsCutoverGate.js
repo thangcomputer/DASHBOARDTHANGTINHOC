@@ -1,5 +1,5 @@
 /**
- * Phase 7.25 — Controlled cutover gate for LIVE /api/evaluations ONLY.
+ * Phase 7.25 - Controlled cutover gate for LIVE /api/evaluations ONLY.
  *
  * LEGACY (default):
  *   All actions → auth already applied; pass-through.
@@ -88,7 +88,7 @@ function evaluationsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] evaluations authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] evaluations authority helper failed - Legacy gate',
       );
     }
 
@@ -133,7 +133,7 @@ function evaluationsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] evaluations Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] evaluations Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

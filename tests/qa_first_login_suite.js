@@ -33,11 +33,11 @@ async function login(identifier, password, roleType) {
     });
     if (!res.data.success) throw new Error(res.data.message || 'Login failed');
     return {
-        token: res.data.data.accessToken,
-        csrfToken: csrfToken,
-        user: res.data.data,
-        isFirstLogin: res.data.data.user?.isFirstLogin || false
-      };
+      token: res.data.data.accessToken,
+      csrfToken: csrfToken,
+      user: res.data.data,
+      isFirstLogin: res.data.data.user?.isFirstLogin || false
+    };
   } catch (err) {
     console.error(`Login failed for ${identifier}:`, err.response ? err.response.data : err);
     return null;
@@ -69,7 +69,7 @@ async function runTests() {
       branchId: null,
       password: studentTempPassword
     }, {
-      headers: { 
+      headers: {
         Authorization: `Bearer ${adminToken}`,
         'Cookie': `csrf_token=${adminCsrf}`,
         'x-csrf-token': adminCsrf
@@ -93,7 +93,7 @@ async function runTests() {
     studentToken = studentAuth.token;
     studentCsrf = studentAuth.csrfToken;
     isFirstLoginFlag = studentAuth.isFirstLogin;
-    
+
     if (isFirstLoginFlag) {
       addResult('Student', 'First Login with Temp Password', 'isFirstLogin = true', 'isFirstLogin = true', 'Passed', 'N/A');
     } else {
@@ -125,13 +125,13 @@ async function runTests() {
       oldPassword: 'WRONG_PASSWORD_123!',
       newPassword: 'ValidNewPassword123'
     }, {
-      headers: { 
+      headers: {
         Authorization: `Bearer ${studentToken}`,
         'Cookie': `csrf_token=${studentCsrf}`,
         'x-csrf-token': studentCsrf
       }
     });
-    
+
     // Nếu thành công dù sai pass cũ
     addResult('Student', 'Change Password (Wrong Old Password)', 'Rejected', 'Accepted', 'Failed', 'Backend skips old password check if isFirstLogin=true', 'High');
   } catch (err) {
@@ -144,13 +144,13 @@ async function runTests() {
       oldPassword: studentTempPassword,
       newPassword: 'ValidNewPassword123'
     }, {
-      headers: { 
+      headers: {
         Authorization: `Bearer ${studentToken}`,
         'Cookie': `csrf_token=${studentCsrf}`,
         'x-csrf-token': studentCsrf
       }
     });
-    
+
     addResult('Student', 'Change Password (Correct Old Password)', 'Success', 'Success', 'Passed', 'N/A');
   } catch (err) {
     addResult('Student', 'Change Password (Correct Old Password)', 'Success', 'Failed', 'Failed', err.response?.data?.message || 'Error', 'High');

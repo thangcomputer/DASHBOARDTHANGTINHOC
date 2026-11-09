@@ -77,7 +77,7 @@ export default function RichTextEditor({ value, onChange, placeholder }) {
 
   const handleInput = () => {
     if (!editorRef.current) return;
-    // Không đổi src trên DOM đang hiện — chỉ normalize bản clone khi lưu
+    // Không đổi src trên DOM đang hiện - chỉ normalize bản clone khi lưu
     const clone = editorRef.current.cloneNode(true);
     onChange(normalizeEditorHtmlForSave(clone));
   };

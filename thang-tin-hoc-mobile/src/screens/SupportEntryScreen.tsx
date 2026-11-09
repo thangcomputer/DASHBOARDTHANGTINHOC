@@ -29,7 +29,7 @@ export function SupportEntryScreen() {
       setChoiceVisible(false);
       navigation.navigate('Conversation', {
         conversationId: support.conversationId,
-        conversationName: 'Trợ lý Thắng Tin Học',
+        conversationName: 'Trợ lý AI',
         participantId: 'ai_support',
         participantRole: 'system',
         participantOnline: true,
@@ -147,36 +147,36 @@ export function SupportEntryScreen() {
             {choiceError ? <Text style={styles.choiceError} accessibilityRole="alert">{choiceError}</Text> : null}
 
             <View style={{ gap: spacing.sm }}>
-                <Pressable
-                  onPress={() => { void openAiSupport(); }}
-                  disabled={Boolean(opening)}
-                  style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
-                  accessibilityRole="button"
-                >
-                  <View style={styles.choiceIcon}><Bot size={21} color={colors.brand} /></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.choiceRowTitle}>Trợ lý AI Thắng Tin Học</Text>
-                    <Text style={styles.choiceRowDescription}>Hỏi về tin học, Office, MOS và LMS.</Text>
-                  </View>
-                  {opening === 'ai'
-                    ? <ActivityIndicator color={colors.brand} />
-                    : <ChevronRight size={18} color={colors.muted} />}
-                </Pressable>
-                <Pressable
-                  onPress={() => { void loadSupportContacts(); }}
-                  disabled={Boolean(opening)}
-                  style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
-                  accessibilityRole="button"
-                >
-                  <View style={styles.choiceIcon}><Users size={21} color={colors.brand} /></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.choiceRowTitle}>Nhân viên hỗ trợ trực tiếp</Text>
-                    <Text style={styles.choiceRowDescription}>Trò chuyện trực tiếp với chuyên viên hỗ trợ.</Text>
-                  </View>
-                  {opening === 'staff'
-                    ? <ActivityIndicator color={colors.brand} />
-                    : <ChevronRight size={18} color={colors.muted} />}
-                </Pressable>
+              <Pressable
+                onPress={() => { void openAiSupport(); }}
+                disabled={Boolean(opening)}
+                style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
+                accessibilityRole="button"
+              >
+                <View style={styles.choiceIcon}><Bot size={21} color={colors.brand} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.choiceRowTitle}>Trợ lý AI Thắng Tin Học</Text>
+                  <Text style={styles.choiceRowDescription}>Hỏi về tin học, Office, MOS và LMS.</Text>
+                </View>
+                {opening === 'ai'
+                  ? <ActivityIndicator color={colors.brand} />
+                  : <ChevronRight size={18} color={colors.muted} />}
+              </Pressable>
+              <Pressable
+                onPress={() => { void loadSupportContacts(); }}
+                disabled={Boolean(opening)}
+                style={({ pressed }) => [styles.choiceRow, pressed && styles.choiceRowPressed, opening && styles.choiceRowDisabled]}
+                accessibilityRole="button"
+              >
+                <View style={styles.choiceIcon}><Users size={21} color={colors.brand} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.choiceRowTitle}>Nhân viên hỗ trợ trực tiếp</Text>
+                  <Text style={styles.choiceRowDescription}>Trò chuyện trực tiếp với chuyên viên hỗ trợ.</Text>
+                </View>
+                {opening === 'staff'
+                  ? <ActivityIndicator color={colors.brand} />
+                  : <ChevronRight size={18} color={colors.muted} />}
+              </Pressable>
             </View>
           </View>
         </View>

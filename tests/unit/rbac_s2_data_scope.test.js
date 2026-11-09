@@ -1,5 +1,5 @@
 /**
- * Unit tests — RBAC-S2 Data Scope helpers (observe contract).
+ * Unit tests - RBAC-S2 Data Scope helpers (observe contract).
  * Does not mount LIVE deny.
  */
 const { describe, it } = require('node:test');

@@ -24,20 +24,20 @@ routeFiles.forEach(file => {
   const content = fs.readFileSync(path.join(ROUTES_DIR, file), 'utf8');
   // Match router.METHOD('/path', middleware...)
   const regex = /router\.(get|post|put|delete|patch|use)\s*\(\s*['"`](.*?)['"`]\s*,\s*(.*?)(?=\)|async|\(req|function)/g;
-  
+
   let match;
   while ((match = regex.exec(content)) !== null) {
     const method = match[1].toUpperCase();
     const routePath = match[2];
     const middlewareArgs = match[3];
-    
+
     totalRoutes++;
-    
+
     let isLegacy = false;
     let isNewRbac = false;
     let hasAuthMiddleware = false;
     let permission = 'None';
-    
+
     if (middlewareArgs.includes('guard')) {
       isLegacy = true;
       hasAuthMiddleware = true;
@@ -54,7 +54,7 @@ routeFiles.forEach(file => {
         permission = 'Dynamic';
       }
     }
-    
+
     if (!hasAuthMiddleware && !isNewRbac) {
       noAuthRoutes++;
     } else if (isNewRbac) {
@@ -62,7 +62,7 @@ routeFiles.forEach(file => {
     } else if (isLegacy) {
       legacyRoutes++;
     }
-    
+
     endpointCoverageLines.push(`| ${method} | /api/${file.replace('Routes.js', '')}${routePath} | ${hasAuthMiddleware ? '✅' : '❌'} | ${isNewRbac ? '✅ New RBAC' : (isLegacy ? '⚠️ Legacy Guard' : '❌ None')} | ${permission} | Yes | ${isLegacy ? 'Yes' : 'No'} | ${isNewRbac ? '100%' : 'Requires Update'} |`);
     rbacValidationLines.push(`| /api/${file.replace('Routes.js', '')}${routePath} | ${permission} | Orchestrator | ${isLegacy ? 'Legacy Array' : 'RBAC Resolved'} | ${isNewRbac ? '✅ Verified' : '⚠️ Pending Migration'} |`);
   }

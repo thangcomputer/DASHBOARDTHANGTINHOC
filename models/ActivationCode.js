@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-/** Mã kích hoạt gói tài khoản HV — admin phát hành theo lô, mỗi mã dùng một lần. */
+/** Mã kích hoạt gói tài khoản HV - admin phát hành theo lô, mỗi mã dùng một lần. */
 const activationCodeSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true, trim: true },
   plan: { type: String, enum: ['1m', '3m', '6m', '12m', 'lifetime'], required: true },

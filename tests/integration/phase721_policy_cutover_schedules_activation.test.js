@@ -1,5 +1,5 @@
 /**
- * Phase 7.21 — Controlled cutover + production activation for /api/schedules
+ * Phase 7.21 - Controlled cutover + production activation for /api/schedules
  *
  * LIVE: auth → [branchFilter on list/stats] → policyShadowSchedule → schedulesCutoverGate → handler.
  * Role/ownership in handlers; MANAGE_SCHEDULE unused on live.
@@ -66,10 +66,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -358,7 +358,7 @@ test('Phase7.21 rollback: remove schedules → LEGACY; prior stay POLICY; restor
 test('Phase7.21 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor',
   ];
   for (const fam of legacyFamilies) {
@@ -430,8 +430,8 @@ test('Phase7.21 functional smoke: list authz; mutations NOT EXECUTED', () => {
   const staff = sub({ role: 'staff', adminRole: 'STAFF' });
   assert.equal(parity('list', staff).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/update/delete/cancel production mutation',
-    'NOT EXECUTED — create/update/delete/cancel production mutation',
+    'NOT EXECUTED - create/update/delete/cancel production mutation',
+    'NOT EXECUTED - create/update/delete/cancel production mutation',
   );
 });
 

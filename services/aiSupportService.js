@@ -491,7 +491,7 @@ function isWelcomeMessage(m) {
     && /hỗ trợ Word, Excel, PowerPoint, MOS, LMS/i.test(t);
 }
 
-/** Phiên đã có lời chào hoặc đang trao đổi — không chào lại trong tin Gemini. */
+/** Phiên đã có lời chào hoặc đang trao đổi - không chào lại trong tin Gemini. */
 function isOngoingConversation(history) {
   return (history || []).some((m) => {
     const t = String(m?.messageType || 'text');
@@ -545,11 +545,11 @@ function teacherFaqReply(userRole, userText) {
     return [
       'Thầy/Cô dùng **LMS Thắng Tin Học** như sau:',
       '**Bước 1:** Mở *menu bên trái*: **Tổng quan**, **Quản lý học viên**, **Lịch dạy**, **Tài chính**, **Đào tạo**, **Hộp thư**.',
-      '**Bước 2:** **Tổng quan** — xem lịch sắp tới, học viên, thông báo nhanh. ⟦go:/teacher|Mở Tổng quan⟧',
-      '**Bước 3:** **Quản lý học viên** — mở thẻ từng em để *điểm danh*, nhận xét, giao bài. ⟦go:/teacher#students|Mở Quản lý học viên⟧',
-      '**Bước 4:** **Đào tạo** — video/tài liệu nội bộ cho giảng viên. ⟦go:/teacher#training|Mở Đào tạo⟧',
-      '**Bước 5:** **Bảng tin** — đăng câu hỏi, chia sẻ ảnh bài tập. ⟦go:/teacher/feed|Mở Bảng tin⟧',
-      '**Bước 6:** **Tạo trắc nghiệm & bài tập** — soạn đề giao học viên. ⟦go:/teacher#assignments|Mở giao bài⟧',
+      '**Bước 2:** **Tổng quan** - xem lịch sắp tới, học viên, thông báo nhanh. ⟦go:/teacher|Mở Tổng quan⟧',
+      '**Bước 3:** **Quản lý học viên** - mở thẻ từng em để *điểm danh*, nhận xét, giao bài. ⟦go:/teacher#students|Mở Quản lý học viên⟧',
+      '**Bước 4:** **Đào tạo** - video/tài liệu nội bộ cho giảng viên. ⟦go:/teacher#training|Mở Đào tạo⟧',
+      '**Bước 5:** **Bảng tin** - đăng câu hỏi, chia sẻ ảnh bài tập. ⟦go:/teacher/feed|Mở Bảng tin⟧',
+      '**Bước 6:** **Tạo trắc nghiệm & bài tập** - soạn đề giao học viên. ⟦go:/teacher#assignments|Mở giao bài⟧',
       'Thầy/Cô cần bước nào *chi tiết hơn* ạ?',
     ].join('\n');
   }
@@ -571,7 +571,7 @@ function teacherFaqReply(userRole, userText) {
       '**Bước 1:** Vào menu **Tài chính** trên sidebar (hoặc nút Tài chính ở **Tổng quan**).',
       '**Bước 2:** Trang này hiện buổi đã dạy, *đã thanh toán* và còn *tạm tính*.',
       '**Bước 3:** Có thể **xuất bảng kê** nếu cần đối chiếu.',
-      '**Bước 4:** Học phí từng học viên nằm ở *hồ sơ học viên / giáo vụ* — **không sửa số tiền** trên trang này.',
+      '**Bước 4:** Học phí từng học viên nằm ở *hồ sơ học viên / giáo vụ* - **không sửa số tiền** trên trang này.',
       '⟦go:/teacher/finance|Mở trang Tài chính⟧',
       'Thầy/Cô muốn xem buổi *chưa thanh toán* hay bảng kê *tháng này* ạ?',
     ].join('\n');
@@ -634,11 +634,11 @@ function studentFaqReply(userRole, userText) {
       '| Hà Nội | Thước | 150 |',
       '| Đà Nẵng | Bút | 300 |',
       '',
-      '**SUMIF** — cộng theo *một* điều kiện.',
+      '**SUMIF** - cộng theo *một* điều kiện.',
       '**Bước 1:** Viết `SUMIF`(range; tiêu_chí; [sum_range]).',
       '**Bước 2:** *Ví dụ* cộng doanh thu chi nhánh **Hà Nội** → `SUMIF(A2:A5; "Hà Nội"; C2:C5)` = **250**.',
       '',
-      '**SUMIFS** — cộng theo *nhiều* điều kiện.',
+      '**SUMIFS** - cộng theo *nhiều* điều kiện.',
       '**Bước 1:** Viết `SUMIFS`(sum_range; criteria_range1; criteria1; ...).',
       '**Bước 2:** *Ví dụ* **Hà Nội** và sản phẩm **Bút** → `SUMIFS(C2:C5; A2:A5; "Hà Nội"; B2:B5; "Bút")` = **100**.',
       '',
@@ -1026,24 +1026,24 @@ function buildSupportSystemPrompt(userRole, userName, { ongoing = false } = {}) 
     'Không hứa hoàn tiền, không đổi điểm, không tiết lộ mật khẩu.',
     'Không tạo, không vẽ, không sinh hình ảnh; không nhắc công cụ AI tạo ảnh. Chỉ xem ảnh người dùng gửi (màn hình Office). Nếu họ yêu cầu tạo ảnh: trả đúng câu "' + IMAGE_GEN_REFUSE + '" rồi dừng.',
     'Không viết hộ tiểu luận, báo cáo, công văn, văn bản hành chính. Nếu họ yêu cầu viết hộ những loại đó: trả đúng câu "' + GHOSTWRITE_REFUSE + '" rồi dừng.',
-    'Học viên mới: làm hộ thao tác tin học được — công thức Excel điền sẵn, từng bước Word/PowerPoint/LMS, sửa lỗi trên ảnh màn hình.',
+    'Học viên mới: làm hộ thao tác tin học được - công thức Excel điền sẵn, từng bước Word/PowerPoint/LMS, sửa lỗi trên ảnh màn hình.',
     'Không nhắc, không mô tả, không bảo bấm nút (Gặp nhân viên, Cần nhân viên, biểu tượng hỗ trợ). Không in chữ "Lịch sử" hay "Câu hỏi mới".',
     'CÁCH TRẢ LỜI: đầy đủ, dạy được luôn. Không sơ sài, không cắt giữa danh sách. Câu hỏi dạng "học những gì / hàm nào / thao tác nào" thì liệt kê HẾT nhóm phổ biến, mỗi mục 1–2 dòng.',
     'Mỗi mục: tên + cú pháp hoặc vị trí Ribbon (thẻ > nhóm > lệnh) + ví dụ ngắn. Kết thúc trọn ý, có thể thêm 1 mẹo cuối.',
-    'PHÂN BIỆT DANH SÁCH: Hướng dẫn THAO TÁC (một luồng làm tuần tự: cách dùng hàm, cách xếp lịch, cách vào menu) → **Bước 1:** **Bước 2:** … Không viết 1. 2. 3. Liệt kê MỤC / PHƯƠNG ÁN / LỘ TRÌNH / GIẢI THÍCH (nhiều hàm, nhiều cách, lộ trình học) → dùng 1. 2. 3. Không viết "Bước". Ví dụ how-to: "**Bước 1:** Vào tab Data...". Ví dụ liệt kê: "1. COUNT — đếm số. 2. COUNTA — đếm ô không trống."',
+    'PHÂN BIỆT DANH SÁCH: Hướng dẫn THAO TÁC (một luồng làm tuần tự: cách dùng hàm, cách xếp lịch, cách vào menu) → **Bước 1:** **Bước 2:** … Không viết 1. 2. 3. Liệt kê MỤC / PHƯƠNG ÁN / LỘ TRÌNH / GIẢI THÍCH (nhiều hàm, nhiều cách, lộ trình học) → dùng 1. 2. 3. Không viết "Bước". Ví dụ how-to: "**Bước 1:** Vào tab Data...". Ví dụ liệt kê: "1. COUNT - đếm số. 2. COUNTA - đếm ô không trống."',
     'Không dùng markdown heading (##). Đậm/nghiêng/hàm: **đậm** cho bước và từ khóa (menu, nút, kết quả), *nghiêng* cho ghi chú/cảnh báo, `SUMIF` cho tên hàm. Bảng dữ liệu Excel: markdown table | cột | cột |, có dòng | --- | --- |. Không viết "Dòng 1: A | B".',
-    'KIẾN THỨC NỀN — Excel: COUNT, COUNTA, COUNTBLANK, COUNTIF, COUNTIFS, SUM, SUMIF, SUMIFS, AVERAGE, AVERAGEIF, AVERAGEIFS, MAX, MIN, MEDIAN, MODE, LARGE, SMALL, RANK, STDEV.S; IF, IFS, AND, OR, IFERROR; VLOOKUP, XLOOKUP, INDEX, MATCH; tham chiếu A1 vs $A$1; bảng Excel (Ctrl+T); PivotTable; biểu đồ; lọc/sắp xếp; Data Validation; Conditional Formatting; Text to Columns.',
-    'KIẾN THỨC NỀN — Word: Styles (Heading 1/2/3), mục lục, ngắt trang/section, Header/Footer, số trang, lề/khổ giấy, mail merge, bảng, bọc chữ ảnh, Find/Replace, Track Changes.',
-    'KIẾN THỨC NỀN — PowerPoint: layout, theme, Slide Master, transition, animation, SmartArt, biểu đồ, Presenter View, Notes, xuất PDF.',
-    'KIẾN THỨC NỀN — MOS: làm đúng thao tác đề (Word/Excel/PowerPoint Associate). Máy tính: File Explorer, copy/cut, USB, in, WiFi cơ bản.',
-    'Khi người dùng gửi ảnh: xem ảnh rồi trả lời. Nếu là màn hình Word/Excel/PowerPoint, đề bài, hoặc lỗi — mô tả ngắn những gì thấy và hướng dẫn từng bước. Không bịa chi tiết không có trong ảnh.',
+    'KIẾN THỨC NỀN - Excel: COUNT, COUNTA, COUNTBLANK, COUNTIF, COUNTIFS, SUM, SUMIF, SUMIFS, AVERAGE, AVERAGEIF, AVERAGEIFS, MAX, MIN, MEDIAN, MODE, LARGE, SMALL, RANK, STDEV.S; IF, IFS, AND, OR, IFERROR; VLOOKUP, XLOOKUP, INDEX, MATCH; tham chiếu A1 vs $A$1; bảng Excel (Ctrl+T); PivotTable; biểu đồ; lọc/sắp xếp; Data Validation; Conditional Formatting; Text to Columns.',
+    'KIẾN THỨC NỀN - Word: Styles (Heading 1/2/3), mục lục, ngắt trang/section, Header/Footer, số trang, lề/khổ giấy, mail merge, bảng, bọc chữ ảnh, Find/Replace, Track Changes.',
+    'KIẾN THỨC NỀN - PowerPoint: layout, theme, Slide Master, transition, animation, SmartArt, biểu đồ, Presenter View, Notes, xuất PDF.',
+    'KIẾN THỨC NỀN - MOS: làm đúng thao tác đề (Word/Excel/PowerPoint Associate). Máy tính: File Explorer, copy/cut, USB, in, WiFi cơ bản.',
+    'Khi người dùng gửi ảnh: xem ảnh rồi trả lời. Nếu là màn hình Word/Excel/PowerPoint, đề bài, hoặc lỗi - mô tả ngắn những gì thấy và hướng dẫn từng bước. Không bịa chi tiết không có trong ảnh.',
     'KHÔNG ĐƯỢC CẮT NGANG CÂU TRẢ LỜI. Trả lời chi tiết, trọn vẹn TẤT CẢ các bước từ đầu đến cuối.',
     'BẮT BUỘC: Cuối mỗi câu trả lời, hãy đề xuất 2-3 câu hỏi ngắn (mỗi câu dưới 10 chữ) để người dùng có thể hỏi tiếp. Bọc các gợi ý đó trong cú pháp này ở dòng cuối cùng: [GỢI Ý: Gợi ý 1 | Gợi ý 2 | Gợi ý 3]',
   ].join('\n');
 }
 
-/** Chat messages cho Gemini — tách system / user / assistant, không nhét prompt admin. */
-function buildSupportMessages(history, userRole, userName) {
+/** Chat messages cho Gemini - tách system / user / assistant, không nhét prompt admin. */
+function buildSupportMessages(history, userRole, userName, currentPrompt = '') {
   const ongoing = isOngoingConversation(history);
   const messages = [{ role: 'system', content: buildSupportSystemPrompt(userRole, userName, { ongoing }) }];
   const rows = (history || [])
@@ -1060,12 +1060,12 @@ function buildSupportMessages(history, userRole, userName) {
 
   for (const m of rows) {
     let text = String(m.content).trim().slice(0, 1500);
-    // Nếu tin nhắn là ảnh và caption chỉ là placeholder — thay bằng mô tả rõ hơn
+    // Nếu tin nhắn là ảnh và caption chỉ là placeholder - thay bằng mô tả rõ hơn
     if (m.messageType === 'image') {
       if (!text || text === '[Hình ảnh]') {
         text = 'Người dùng gửi một hình ảnh (đề bài, màn hình hoặc tài liệu).';
       } else {
-        // Có caption thực sự — gữ nguyên và thêm chú thích đây là tin kèm ảnh
+        // Có caption thực sự - gữ nguyên và thêm chú thích đây là tin kèm ảnh
         text = `[Người dùng gửi ảnh kèm nội dung] ${text}`;
       }
     }
@@ -1075,9 +1075,28 @@ function buildSupportMessages(history, userRole, userName) {
     messages.push({ role: isBot ? 'assistant' : 'user', content: text });
   }
 
-  // Gemini cần tin user cuối — nếu history rỗng vẫn có placeholder
+  const prompt = String(currentPrompt || '').trim();
+  if (prompt) {
+    const lastItem = messages[messages.length - 1];
+    if (!lastItem || lastItem.role !== 'user' || lastItem.content !== prompt) {
+      messages.push({ role: 'user', content: prompt });
+    }
+  }
+
+  // Gemini cần tin user cuối - nếu kết thúc bằng bot thì drop bot thừa hoặc thêm prompt
+  if (messages.length > 1 && messages[messages.length - 1].role !== 'user') {
+    if (prompt) {
+      messages.push({ role: 'user', content: prompt });
+    } else {
+      while (messages.length > 1 && messages[messages.length - 1].role !== 'user') {
+        messages.pop();
+      }
+    }
+  }
+
+  // Gemini cần tin user cuối - nếu history rỗng vẫn có placeholder
   if (!messages.some((x) => x.role === 'user')) {
-    messages.push({ role: 'user', content: 'Xin chào' });
+    messages.push({ role: 'user', content: prompt || 'Xin chào' });
   }
   return messages;
 }
@@ -1364,7 +1383,7 @@ async function replyToUserMessage({
 
   try {
     const history = await loadThreadMessages(conversationId);
-    const messages = buildSupportMessages(history, humanRole, humanName);
+    const messages = buildSupportMessages(history, humanRole, humanName, userText);
     const ongoing = isOngoingConversation(history);
     const images = [];
     if (imageFileUrl) {
@@ -1651,7 +1670,7 @@ async function sendWelcomeIfEmpty({ conversationId, sender, io, notifyUser }) {
   });
 }
 
-const ESCALATE_TEXT = 'Đã chuyển yêu cầu tới nhân viên hỗ trợ. Bạn có thể tiếp tục nhắn trong cuộc trò chuyện này — nhân viên sẽ nhận toàn bộ nội dung đã trao đổi.';
+const ESCALATE_TEXT = 'Đã chuyển yêu cầu tới nhân viên hỗ trợ. Bạn có thể tiếp tục nhắn trong cuộc trò chuyện này - nhân viên sẽ nhận toàn bộ nội dung đã trao đổi.';
 
 function currentSessionMessages(history) {
   const rows = (history || []).filter((m) => !isEscalationMessage(m));

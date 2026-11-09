@@ -1,5 +1,5 @@
 /**
- * Phase 8.24 — Messaging pairing allow-list + canonical peer resolution.
+ * Phase 8.24 - Messaging pairing allow-list + canonical peer resolution.
  * LIVE messaging ACL only. Does not touch Enterprise RBAC.
  *
  * Product roles: SUPER_ADMIN | HIGH_ADMIN | STAFF | SUPPORT | TEACHER | STUDENT
@@ -36,7 +36,7 @@ function resolveProductRole(user = {}) {
   if (adminRole === 'STAFF' || role === 'staff') return PRODUCT_ROLES.STAFF;
   if (role === 'student') return PRODUCT_ROLES.STUDENT;
   if (role === 'teacher') return PRODUCT_ROLES.TEACHER;
-  // JWT role=admin without elevated adminRole — treat as unresolved elevated hint, not STAFF
+  // JWT role=admin without elevated adminRole - treat as unresolved elevated hint, not STAFF
   if (role === 'admin' && !adminRole) return PRODUCT_ROLES.SUPER_ADMIN;
   return null;
 }

@@ -1,5 +1,5 @@
 /**
- * Monitoring service — health snapshot + process metrics.
+ * Monitoring service - health snapshot + process metrics.
  */
 const mongoose = require('mongoose');
 const os = require('os');

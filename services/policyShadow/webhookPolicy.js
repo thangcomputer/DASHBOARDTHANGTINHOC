@@ -2,7 +2,7 @@
  * Policy shadow for LIVE /api/webhooks (Wave 6.16).
  *
  * JWT payment-session / payment-status routes already shadowed by financePolicy (Wave 6.6).
- * This module covers SePay provider gate ONLY — observational, no re-verify crypto,
+ * This module covers SePay provider gate ONLY - observational, no re-verify crypto,
  * no ledger/session/invoice writes, no socket emit.
  *
  * ctx.verificationStatus (trusted, set after Legacy verifySepaySignature next()):
@@ -25,7 +25,7 @@ function buildSubject({ user, actorDoc, userBranchId }) {
 
 /**
  * Mirror verifySepaySignature outcomes as authorization decisions.
- * Does NOT perform HMAC/API key crypto — uses trusted ctx from Legacy gate / tests.
+ * Does NOT perform HMAC/API key crypto - uses trusted ctx from Legacy gate / tests.
  */
 function evaluateSepayVerification(ctx = {}) {
   const status = ctx.verificationStatus || 'unknown';
@@ -117,7 +117,7 @@ function evaluatePolicyWebhook(subject, action, ctx = {}, _untrusted = {}) {
   void _untrusted.bodyTenantId;
   void _untrusted.bodyProvider;
   void _untrusted.spoofedSignature;
-  // Never trust client signature/secret fields as actor — only ctx.verificationStatus
+  // Never trust client signature/secret fields as actor - only ctx.verificationStatus
   const legacy = evaluateLegacyWebhook(subject, action, ctx);
   if (legacy.decision === 'DENY') {
     return {

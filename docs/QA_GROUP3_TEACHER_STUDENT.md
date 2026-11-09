@@ -1,4 +1,4 @@
-# QA Báo cáo — Nhóm 3: Giảng viên ↔ Học viên
+# QA Báo cáo - Nhóm 3: Giảng viên ↔ Học viên
 
 **Ngày:** 2026-07-28 · Script `scripts/_qa_group3_teacher_student.cjs`
 

@@ -1,5 +1,5 @@
 /**
- * Phase 7 — Frontend deep-link UX gate (NOT authorization).
+ * Phase 7 - Frontend deep-link UX gate (NOT authorization).
  * Mirror of utils/messagingDeepLink.js for Vite ESM. Keep logic identical.
  */
 

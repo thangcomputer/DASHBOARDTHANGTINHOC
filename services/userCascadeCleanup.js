@@ -2,7 +2,7 @@
 
 /**
  * Cascade cleanup khi hard-delete Student / Teacher.
- * Giữ Invoice + Ledger (audit tài chính) — chỉ dọn lịch, chat orphan, assignedStudents.
+ * Giữ Invoice + Ledger (audit tài chính) - chỉ dọn lịch, chat orphan, assignedStudents.
  */
 const mongoose = require('mongoose');
 const Schedule = require('../models/Schedule');
@@ -112,7 +112,7 @@ async function purgeTeacherSideEffects(teacherId, { teacherName } = {}) {
   };
 }
 
-/** HV không còn khóa active — chỉ cancelled/refunded (hoặc không enrollment). */
+/** HV không còn khóa active - chỉ cancelled/refunded (hoặc không enrollment). */
 function isCancelledOnlyStudent(student) {
   const enrollments = Array.isArray(student?.enrollments) ? student.enrollments : [];
   if (!enrollments.length) {
@@ -183,7 +183,7 @@ function isSpecialMessagingPeerId(id) {
  */
 async function purgeOrphanMessages() {
   const rows = await Message.aggregate([
-    // Group messages use receiverId = Group._id — never treat those ids as peers
+    // Group messages use receiverId = Group._id - never treat those ids as peers
     { $match: { isGroup: { $ne: true } } },
     { $project: { ids: ['$senderId', '$receiverId'] } },
     { $unwind: '$ids' },

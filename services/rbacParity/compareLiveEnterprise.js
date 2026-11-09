@@ -1,5 +1,5 @@
 /**
- * Phase 8.9 — Observe-only LIVE vs Enterprise RBAC parity comparator.
+ * Phase 8.9 - Observe-only LIVE vs Enterprise RBAC parity comparator.
  *
  * NON-AUTHORITATIVE. Never call from LIVE middleware for deny/allow.
  * Never mutates req, DB, HTTP, sockets, queues, or notifications.
@@ -43,7 +43,7 @@ function isRootOrSuper(actor) {
 
 /**
  * LIVE staff-gate mirror (checkPermission-style): admin|staff role + permission
- * (or SUPER / id=admin bypass). Does not reimplement branch — caller passes scopeOk.
+ * (or SUPER / id=admin bypass). Does not reimplement branch - caller passes scopeOk.
  */
 function liveStaffPermissionDecision(actor, livePermission, { scopeOk = true } = {}) {
   if (!actor || !actor.id) {

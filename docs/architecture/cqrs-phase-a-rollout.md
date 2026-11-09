@@ -1,4 +1,4 @@
-# CQRS Phase A — Rollout checklist
+# CQRS Phase A - Rollout checklist
 
 Tài liệu vận hành cho **Giai đoạn A**: củng cố slice CQRS đã có (Student create, Invoice create) trước khi mở rộng sang Teacher / domain khác.
 
@@ -59,7 +59,7 @@ Chỉ nhận giá trị `true` / `1` mới bật (xem strangler trong `routes/st
 | `OUTBOX_POLL_MS` | Chu kỳ poll (mặc định 5000) |
 | `OUTBOX_LEASE_MS` | Timeout reclaim `PROCESSING` kẹt (mặc định 60000) |
 
-**Single process API:** để mặc định — Outbox chạy trong `server.js`.
+**Single process API:** để mặc định - Outbox chạy trong `server.js`.
 
 **Docker Compose / multi-API:**
 
@@ -75,7 +75,7 @@ Claim dùng `findOneAndUpdate` trên `PENDING` hoặc `PROCESSING` hết lease �
 3. [ ] Flag **tắt** trên production khi test staging
 4. [ ] Chạy: `node tests/api/student_cqrs_migration.test.js` (hoặc suite CI tương đương)
 5. [ ] Chạy: `node tests/api/transaction_rollback.test.js`
-6. [ ] Smoke tạo HV qua UI/API — response còn `tempPassword` / invoice như FE expect
+6. [ ] Smoke tạo HV qua UI/API - response còn `tempPassword` / invoice như FE expect
 7. [ ] Quan sát collection `outboxevents`: `PENDING` → `PROCESSED` (không stuck)
 8. [ ] Bật flag staging 24–48h; so sánh lỗi / rollback
 9. [ ] Production: bật flag + monitor; giữ khả năng tắt ngay (`ENABLE_CQRS_STUDENT_CREATE=false`)
@@ -95,7 +95,7 @@ ENABLE_CQRS_STUDENT_CREATE=false
 ENABLE_CQRS_INVOICE=false
 ```
 
-Restart API. Middleware auth/branch không đổi — chỉ nhánh handler bên trong route.
+Restart API. Middleware auth/branch không đổi - chỉ nhánh handler bên trong route.
 
 ## 7. Liên quan code
 
@@ -108,13 +108,13 @@ Restart API. Middleware auth/branch không đổi — chỉ nhánh handler bên 
 | Outbox worker | `shared/outbox/OutboxWorker.js` |
 | Docker | `docker-compose.yml` |
 
-## 8. Checklist `ENABLE_CQRS_TEACHER` (Giai đoạn B — đã wire)
+## 8. Checklist `ENABLE_CQRS_TEACHER` (Giai đoạn B - đã wire)
 
 `routes/teacherRoutes.js` đã có strangler (2026-08).
 
 1. [x] Replica set (local staging: `127.0.0.1:27018?replicaSet=rs0`)
-2. [x] `node test_teacher_migration.js` — legacy 201, CQRS 201 + Outbox, rollback sạch
-3. [ ] Staging UI: tạo GV với flag bật — còn `tempPassword`
+2. [x] `node test_teacher_migration.js` - legacy 201, CQRS 201 + Outbox, rollback sạch
+3. [ ] Staging UI: tạo GV với flag bật - còn `tempPassword`
 4. [ ] Outbox `TeacherCreatedEvent` → `PROCESSED` (cần subscriber welcome nếu muốn gửi mail)
 5. [ ] Bật prod sau student (+ invoice nếu đã ổn)
 

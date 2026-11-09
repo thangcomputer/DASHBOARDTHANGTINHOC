@@ -1,10 +1,10 @@
 /**
- * employeeRoutes.js — CRUD Nhân sự + Trả lương
+ * employeeRoutes.js - CRUD Nhân sự + Trả lương
  * Branch-aware: STAFF chỉ thấy nhân viên chi nhánh mình
  */
-const express    = require('express');
-const router     = express.Router();
-const Employee   = require('../models/Employee');
+const express = require('express');
+const router = express.Router();
+const Employee = require('../models/Employee');
 const PayrollLog = require('../models/PayrollLog');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
 const { policyShadowEmployee } = require('../middleware/policyShadowEmployee');
@@ -12,7 +12,7 @@ const { employeesCutoverGate } = require('../middleware/employeesCutoverGate');
 const { generateEmployeeCode } = require('../services/businessCodeService');
 
 /**
- * Phase 7.29 — Controlled cutover for LIVE /api/employees ONLY.
+ * Phase 7.29 - Controlled cutover for LIVE /api/employees ONLY.
  *
  * Flow: auth → branchFilter (DATA SCOPE + trusted userBranchId)
  *   → policyShadowEmployee → employeesCutoverGate → handler
@@ -32,7 +32,7 @@ function emitEmployeesChanged(req, action = 'update') {
   const io = req.app.get('io');
   if (!io) return;
   const { emitBranch, emitDataRefresh } = require('../utils/realtimeEmit');
-  // Trusted scope from auth branchFilter — không tin body.branchId
+  // Trusted scope from auth branchFilter - không tin body.branchId
   const branchId = req.userBranchId || null;
   emitBranch(io, branchId, 'employees:updated', { action });
   emitDataRefresh(io, { type: 'employees', action }, { branchId });
@@ -44,12 +44,12 @@ router.get('/', hrGuard('list'), async (req, res) => {
   try {
     const filter = { ...req.branchFilter };
     if (req.query.position && req.query.position !== 'all') filter.position = req.query.position;
-    if (req.query.status && req.query.status !== 'all')     filter.status   = req.query.status;
+    if (req.query.status && req.query.status !== 'all') filter.status = req.query.status;
     if (req.query.search) {
       // Escape ký tự đặc biệt regex → chống ReDoS / injection
       const safeSearch = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 100);
       filter.$or = [
-        { name:  { $regex: safeSearch, $options: 'i' } },
+        { name: { $regex: safeSearch, $options: 'i' } },
         { phone: { $regex: safeSearch, $options: 'i' } },
         { employeeCode: { $regex: safeSearch, $options: 'i' } },
       ];
@@ -65,7 +65,7 @@ router.get('/', hrGuard('list'), async (req, res) => {
 router.get('/stats', hrGuard('stats'), async (req, res) => {
   try {
     const bf = { ...req.branchFilter };
-    const total  = await Employee.countDocuments({ ...bf, status: 'active' });
+    const total = await Employee.countDocuments({ ...bf, status: 'active' });
     const salaryResult = await Employee.aggregate([
       { $match: { ...bf, status: 'active' } },
       { $group: { _id: null, total: { $sum: '$baseSalary' } } },
@@ -102,7 +102,7 @@ router.post('/', hrGuard('create'), async (req, res) => {
     if (!name) return res.status(400).json({ success: false, message: 'Tên nhân viên là bắt buộc' });
 
     // STAFF: auto-assign branch
-    const finalBranchId   = req.userBranchId || branchId || '';
+    const finalBranchId = req.userBranchId || branchId || '';
     const finalBranchCode = req.userBranchCode || branchCode || '';
 
     const employee = await Employee.create({
@@ -184,17 +184,17 @@ router.post('/:id/pay', hrGuard('pay'), async (req, res) => {
     }
 
     const log = await PayrollLog.create({
-      employeeId:   employee._id,
+      employeeId: employee._id,
       employeeName: employee.name,
-      position:     employee.position,
-      branchId:     employee.branchId,
-      branchCode:   employee.branchCode,
-      amount:       Number(amount),
-      payDate:      payDate ? new Date(payDate) : new Date(),
-      monthLabel:   monthLabel || '',
-      note:         note || '',
-      paidBy:       req.user?.name || 'Admin',
-      salaryType:   'LUONG_CUNG',
+      position: employee.position,
+      branchId: employee.branchId,
+      branchCode: employee.branchCode,
+      amount: Number(amount),
+      payDate: payDate ? new Date(payDate) : new Date(),
+      monthLabel: monthLabel || '',
+      note: note || '',
+      paidBy: req.user?.name || 'Admin',
+      salaryType: 'LUONG_CUNG',
     });
 
     emitEmployeesChanged(req, 'pay');
@@ -214,7 +214,7 @@ router.get('/payroll', hrGuard('payroll'), async (req, res) => {
       const [y, m] = req.query.month.split('-').map(Number);
       filter.payDate = {
         $gte: new Date(y, m - 1, 1),
-        $lt:  new Date(y, m, 1),
+        $lt: new Date(y, m, 1),
       };
     }
     const logs = await PayrollLog.find(filter)

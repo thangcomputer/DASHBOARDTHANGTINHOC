@@ -1,4 +1,4 @@
-# Service Boundary — Batch 1
+# Service Boundary - Batch 1
 
 ## Architecture After Batch 1
 

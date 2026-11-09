@@ -1,9 +1,9 @@
-const express  = require('express');
-const jwt      = require('jsonwebtoken');
-const bcrypt   = require('bcryptjs');
-const crypto   = require('crypto');
-const Teacher  = require('../models/Teacher');
-const Student  = require('../models/Student');
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const Teacher = require('../models/Teacher');
+const Student = require('../models/Student');
 const blacklist = require('../middleware/tokenBlacklist');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowAuth } = require('../middleware/policyShadowAuth');
@@ -241,7 +241,7 @@ function trackStudentKnownDevice(user, userRole, fingerprint, req) {
 
 function fireStudentDeviceAlert(req, user, userRole, record) {
   if (userRole !== 'student' || !record) return;
-  notifyIfNewStudentDevice(req.app?.get?.('io'), user, record).catch(() => {});
+  notifyIfNewStudentDevice(req.app?.get?.('io'), user, record).catch(() => { });
 }
 
 function issueAdminMfaChallenge(sysSettings, audience = 'internal', deviceFingerprint = null) {
@@ -259,7 +259,7 @@ function issueAdminMfaChallenge(sysSettings, audience = 'internal', deviceFinger
   };
 }
 
-/** Thử thách MFA cho tài khoản admin/staff trong DB — chưa cấp access token */
+/** Thử thách MFA cho tài khoản admin/staff trong DB - chưa cấp access token */
 function issueUserMfaChallenge(user, deviceFingerprint = null) {
   const mfaToken = jwt.sign(
     {
@@ -295,10 +295,10 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
 
   const tokenPayload = {
     id: user._id, role: userRole, name: user.name,
-    adminRole:   user.adminRole  || null,
+    adminRole: user.adminRole || null,
     permissions: user.permissions || [],
-    branchId:    user.branchId   || null,
-    branchCode:  user.branchCode || '',
+    branchId: user.branchId || null,
+    branchCode: user.branchCode || '',
     tokenVersion: newTokenVersion,
   };
   const { accessToken, refreshToken } = generateTokens(tokenPayload, 'internal');
@@ -312,18 +312,18 @@ async function completeInternalLogin(user, userRole, deviceFingerprint, io) {
 
   return {
     success: true,
-    message: `Chào mừng ${user.name} — ${userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}`,
+    message: `Chào mừng ${user.name} - ${userRole === 'admin' ? 'Quản trị viên' : 'Nhân viên'}`,
     data: {
       user: {
         _id: user._id, name: user.name, role: userRole,
-        phone:       normalizeVNPhone(user.phone) || user.phone || '',
-        avatar:      user.avatar || '',
-        gender:      user.gender || '',
-        adminRole:   user.adminRole  || null,
+        phone: normalizeVNPhone(user.phone) || user.phone || '',
+        avatar: user.avatar || '',
+        gender: user.gender || '',
+        adminRole: user.adminRole || null,
         permissions: user.permissions || [],
-        branchId:    user.branchId   || null,
-        branchCode:  user.branchCode || '',
-        status:      user.status,
+        branchId: user.branchId || null,
+        branchCode: user.branchCode || '',
+        status: user.status,
         isFirstLogin: !!user.isFirstLogin,
       },
       accessToken, refreshToken,
@@ -389,17 +389,17 @@ router.get('/csrf-token', policyShadowAuth('csrf_token'), (req, res) => {
   res.json({ success: true, csrfToken: token });
 });
 
-// ─── GET /api/auth/captcha  — Sinh CAPTCHA mới ────────────────────────────────
+// ─── GET /api/auth/captcha  - Sinh CAPTCHA mới ────────────────────────────────
 router.get('/captcha', captchaLimiter, policyShadowAuth('captcha'), (req, res) => {
   const captcha = svgCaptcha.create({
-    size:        5,
+    size: 5,
     ignoreChars: '0oOlI1',
-    noise:       2,
-    color:       true,
-    background:  '#1e293b',
-    fontSize:    48,
-    width:       140,
-    height:      50,
+    noise: 2,
+    color: true,
+    background: '#1e293b',
+    fontSize: 48,
+    width: 140,
+    height: 50,
   });
   const cid = `c_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   captchaStore.set(cid, { text: captcha.text.toLowerCase(), expiresAt: Date.now() + CAPTCHA_TTL });
@@ -411,7 +411,7 @@ router.get('/captcha', captchaLimiter, policyShadowAuth('captcha'), (req, res) =
   res.json(payload);
 });
 
-// ─── POST /api/auth/captcha/verify  — Xác thực CAPTCHA (nội bộ) ───────────────
+// ─── POST /api/auth/captcha/verify  - Xác thực CAPTCHA (nội bộ) ───────────────
 function verifyCaptcha(cid, input) {
   const record = captchaStore.get(cid);
   if (!record) return { ok: false, reason: 'Mã bảo vệ hết hạn. Vui lòng làm mới.' };
@@ -421,7 +421,7 @@ function verifyCaptcha(cid, input) {
   return { ok: true };
 }
 
-// ─── POST /api/auth/refresh — xoay refresh token + blacklist bản cũ ───────────
+// ─── POST /api/auth/refresh - xoay refresh token + blacklist bản cũ ───────────
 router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -509,17 +509,17 @@ router.post('/refresh', refreshTokenLimiter, policyShadowAuth('refresh'), async 
     const expSec = decoded.exp ? Math.max(1, decoded.exp - Math.floor(Date.now() / 1000)) : 86400 * 30;
 
     const tokenPayload = {
-      id:           decoded.id,
-      role:         decoded.role,
-      name:         decoded.name,
-      adminRole:    decoded.adminRole   || null,
-      permissions:  decoded.permissions || [],
-      branchId:     decoded.branchId    || null,
-      branchCode:   decoded.branchCode  || '',
+      id: decoded.id,
+      role: decoded.role,
+      name: decoded.name,
+      adminRole: decoded.adminRole || null,
+      permissions: decoded.permissions || [],
+      branchId: decoded.branchId || null,
+      branchCode: decoded.branchCode || '',
       tokenVersion: decoded.tokenVersion,
     };
 
-    // Tài khoản admin cứng — không lưu refresh trong DB, chỉ ký JWT
+    // Tài khoản admin cứng - không lưu refresh trong DB, chỉ ký JWT
     if (id === 'admin') {
       const currentSettings = await SystemSettings.findOne({ _key: 'main' }).select('adminTokenVersion').lean();
       if ((currentSettings?.adminTokenVersion || 0) !== decoded.tokenVersion) {
@@ -661,22 +661,22 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
 
     // ── Tạo tokens ────────────────────────────────────────────────
     const tokenPayload = {
-      id:           user._id,
-      role:         userRole,
-      name:         user.name,
-      adminRole:    user.adminRole  || null,
-      permissions:  user.permissions || [],
-      branchId:     user.branchId   || null,
-      branchCode:   user.branchCode || '',
+      id: user._id,
+      role: userRole,
+      name: user.name,
+      adminRole: user.adminRole || null,
+      permissions: user.permissions || [],
+      branchId: user.branchId || null,
+      branchCode: user.branchCode || '',
       tokenVersion: newTokenVersion,                // ⭐ Embed version in JWT
     };
 
     const { accessToken, refreshToken } = generateTokens(tokenPayload);
 
     // Lưu refresh token + tokenVersion vào DB
-    user.refreshToken    = refreshToken;
-    user.lastLogin       = new Date();
-    user.loginAttempts   = 0;
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    user.loginAttempts = 0;
     if (user.lockUntil) user.lockUntil = undefined;
     user.markModified('tokenVersion');  // Force Mongoose to persist new field
     await user.save({ validateModifiedOnly: true });
@@ -684,37 +684,37 @@ router.post('/login', loginLimiter, policyShadowAuth('login'), async (req, res) 
 
     // ── Chuẩn bị response data (không trả password) ───────────────
     const userData = {
-      _id:         user._id,
-      name:        user.name,
-      phone:       normalizeVNPhone(user.phone) || user.phone || '',
-      role:        userRole,
-      adminRole:   user.adminRole  || null,
+      _id: user._id,
+      name: user.name,
+      phone: normalizeVNPhone(user.phone) || user.phone || '',
+      role: userRole,
+      adminRole: user.adminRole || null,
       permissions: user.permissions || [],
-      branchId:    user.branchId   || null,
-      branchCode:  user.branchCode || '',
-      status:      user.status,
-      avatar:      user.avatar || '',
-      gender:      user.gender || '',
+      branchId: user.branchId || null,
+      branchCode: user.branchCode || '',
+      status: user.status,
+      avatar: user.avatar || '',
+      gender: user.gender || '',
       ...(userRole === 'teacher' || userRole === 'admin' || userRole === 'staff'
         ? {
-            testScore:       user.testScore,
-            testStatus:      user.testStatus,
-            practicalStatus: user.practicalStatus,
-            assignedClasses: user.assignedClasses,
-            specialty:       user.specialty,
-            subjectIds:      Array.isArray(user.subjectIds) ? user.subjectIds : [],
-            isFirstLogin:    !!user.isFirstLogin,
-            showWelcomeCelebration: user.welcomeCelebrationSeen === false,
-          }
+          testScore: user.testScore,
+          testStatus: user.testStatus,
+          practicalStatus: user.practicalStatus,
+          assignedClasses: user.assignedClasses,
+          specialty: user.specialty,
+          subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
+          isFirstLogin: !!user.isFirstLogin,
+          showWelcomeCelebration: user.welcomeCelebrationSeen === false,
+        }
         : {
-            course:            user.course,
-            remainingSessions: user.remainingSessions,
-            grade:             user.grade,
-            isFirstLogin:      !!user.isFirstLogin,
-            showWelcomeCelebration: user.welcomeCelebrationSeen === false,
-            subscription:      subscriptionStatusOf(user),
-            ...freePortalFlags(user),
-          }),
+          course: user.course,
+          remainingSessions: user.remainingSessions,
+          grade: user.grade,
+          isFirstLogin: !!user.isFirstLogin,
+          showWelcomeCelebration: user.welcomeCelebrationSeen === false,
+          subscription: subscriptionStatusOf(user),
+          ...freePortalFlags(user),
+        }),
     };
 
     // ── Trả về response ───────────────────────────────────────────
@@ -1015,7 +1015,7 @@ router.post('/login/mobile', loginLimiter, policyShadowAuth('login_public'), asy
 });
 
 // ─── POST /api/auth/login/internal ───────────────────────────────────────────
-// Cổng đăng nhập nội bộ — CHỈ ADMIN & STAFF — yêu cầu CAPTCHA
+// Cổng đăng nhập nội bộ - CHỈ ADMIN & STAFF - yêu cầu CAPTCHA
 router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'), async (req, res) => {
   try {
     const { identifier, phone: phoneField, password, captchaId, captchaAnswer, forceTicket } = req.body;
@@ -1023,7 +1023,7 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     const phone = normalizeVNPhone(rawId);
 
     // Vé cấp sau khi đã qua CAPTCHA + mật khẩu ở lần gọi trước, dùng cho thao tác
-    // "đăng nhập và đăng xuất máy kia" — CAPTCHA chỉ dùng được 1 lần nên không gửi lại được.
+    // "đăng nhập và đăng xuất máy kia" - CAPTCHA chỉ dùng được 1 lần nên không gửi lại được.
     let forceFromTicket = false;
     if (forceTicket) {
       try {
@@ -1061,7 +1061,7 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
       if (collisions.length) {
         logger.warn(
           { phone: maskPhone(phone), count: collisions.length },
-          '[AUTH] MASTER_ADMIN_PHONE collides with HV/GV — allowing master login after password OK',
+          '[AUTH] MASTER_ADMIN_PHONE collides with HV/GV - allowing master login after password OK',
         );
       }
       if (sysSettings?.adminMfaEnabled && sysSettings?.adminMfaSecret) {
@@ -1108,7 +1108,7 @@ router.post('/login/internal', loginLimiter, policyShadowAuth('login_internal'),
     // Lần đăng nhập nội bộ mới cũng thay thế phiên trước đó trên thiết bị khác.
     const { deviceFingerprint: fp3 } = req.body;
 
-    // Bước 5: MFA — nếu tài khoản đã bật TOTP thì dừng ở đây, chưa cấp token
+    // Bước 5: MFA - nếu tài khoản đã bật TOTP thì dừng ở đây, chưa cấp token
     if (user.mfaEnabled && user.mfaSecret) {
       return res.json(issueUserMfaChallenge(user, fp3));
     }
@@ -1191,14 +1191,14 @@ async function loadInternalMfaUser(req, extraSelect = '') {
   return Teacher.findById(req.user.id).select(`+mfaSecret +mfaPendingSecret ${extraSelect}`.trim());
 }
 
-/** Bắt đầu setup MFA — trả secret + QR (chưa bật) */
+/** Bắt đầu setup MFA - trả secret + QR (chưa bật) */
 router.post('/mfa/setup', authMiddleware, policyShadowAuth('mfa_setup'), async (req, res) => {
   try {
     if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
       return res.status(403).json({ success: false, message: 'Chỉ tài khoản nội bộ mới cấu hình được MFA' });
     }
 
-    // Tài khoản admin/staff trong DB — secret lưu trên chính user
+    // Tài khoản admin/staff trong DB - secret lưu trên chính user
     const dbUser = await loadInternalMfaUser(req);
     if (dbUser) {
       const secret = generateSecret();
@@ -1271,7 +1271,7 @@ router.post('/mfa/enable', authMiddleware, policyShadowAuth('mfa_enable'), async
   }
 });
 
-/** Tắt MFA — cần mật khẩu + OTP hiện tại */
+/** Tắt MFA - cần mật khẩu + OTP hiện tại */
 router.post('/mfa/disable', authMiddleware, policyShadowAuth('mfa_disable'), async (req, res) => {
   try {
     if (req.user?.id !== 'admin' && !['admin', 'staff'].includes(req.user?.role)) {
@@ -1328,7 +1328,7 @@ router.get('/mfa/status', authMiddleware, policyShadowAuth('mfa_status'), async 
 // ─── POST /api/auth/logout ────────────────────────────────────────────────────
 /**
  * @route   POST /api/auth/logout
- * @desc    Đăng xuất — blacklist token + xóa refreshToken/deviceFingerprint khỏi DB.
+ * @desc    Đăng xuất - blacklist token + xóa refreshToken/deviceFingerprint khỏi DB.
  *          Không bắt buộc access token còn hạn (tránh phiên “ma” khi bị kick / token hết hạn).
  * @access  Public (cần access hoặc refresh token trong body/header)
  */
@@ -1618,7 +1618,7 @@ router.post('/change-password', authMiddleware, policyShadowAuth('change_passwor
     }
 
     const Model = role === 'student' ? Student : Teacher;
-    const user  = await Model.findById(userId).select('+password');
+    const user = await Model.findById(userId).select('+password');
 
     if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
 
@@ -1765,17 +1765,17 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
     let user = null;
 
     if (decoded.id === 'admin') {
-      // Hardcoded admin — lấy tên từ DB nếu đã đổi
+      // Hardcoded admin - lấy tên từ DB nếu đã đổi
       const sysSettings = await SystemSettings.findOne({ _key: 'main' });
       const dbAdminName = sysSettings?.adminName || 'Admin Thắng Tin Học';
       return res.json({
         success: true,
         data: {
-          _id:    'admin',
-          id:     'admin',
-          name:   dbAdminName,
-          phone:  normalizeVNPhone(process.env.MASTER_ADMIN_PHONE),
-          role:   'admin',
+          _id: 'admin',
+          id: 'admin',
+          name: dbAdminName,
+          phone: normalizeVNPhone(process.env.MASTER_ADMIN_PHONE),
+          role: 'admin',
           status: 'active',
           avatar: sysSettings?.adminAvatar || '',
           gender: '',
@@ -1811,38 +1811,38 @@ router.get('/me', authMiddleware, policyShadowAuth('me'), async (req, res) => {
     return res.json({
       success: true,
       data: {
-        _id:         user._id,
-        id:          user._id,
-        name:        user.name,
-        phone:       normalizeVNPhone(user.phone) || user.phone || '',
-        role:        decoded.role,
-        adminRole:   user.adminRole  || null,
+        _id: user._id,
+        id: user._id,
+        name: user.name,
+        phone: normalizeVNPhone(user.phone) || user.phone || '',
+        role: decoded.role,
+        adminRole: user.adminRole || null,
         permissions: user.permissions || [],
-        branchId:    user.branchId   || null,
-        branchCode:  user.branchCode || '',
-        status:      user.status,
-        avatar:      user.avatar || '',
-        gender:      user.gender || '',
+        branchId: user.branchId || null,
+        branchCode: user.branchCode || '',
+        status: user.status,
+        avatar: user.avatar || '',
+        gender: user.gender || '',
         isFirstLogin: !!user.isFirstLogin,
         showWelcomeCelebration:
           (decoded.role === 'student' || decoded.role === 'teacher')
           && user.welcomeCelebrationSeen === false,
         ...(decoded.role === 'teacher' || decoded.role === 'admin' || decoded.role === 'staff' ? {
-          testScore:       user.testScore,
-          testStatus:      user.testStatus,
+          testScore: user.testScore,
+          testStatus: user.testStatus,
           practicalStatus: user.practicalStatus,
           assignedClasses: user.assignedClasses,
-          specialty:       user.specialty,
-          subjectIds:      Array.isArray(user.subjectIds) ? user.subjectIds : [],
+          specialty: user.specialty,
+          subjectIds: Array.isArray(user.subjectIds) ? user.subjectIds : [],
         } : {}),
         ...(decoded.role === 'student' ? {
-          course:              user.course,
-          remainingSessions:   user.remainingSessions,
+          course: user.course,
+          remainingSessions: user.remainingSessions,
           studentExamUnlocked: user.studentExamUnlocked,
-          grade:               user.grade,
-          learningAccess:      studentHasLearningAccess(user),
+          grade: user.grade,
+          learningAccess: studentHasLearningAccess(user),
           pendingCourseCelebration,
-          subscription:        subscriptionStatusOf(user),
+          subscription: subscriptionStatusOf(user),
           ...freePortalFlags(user),
         } : {}),
       },
@@ -1983,7 +1983,7 @@ router.post('/forgot-password/verify', sensitiveFlowLimiter, policyShadowAuth('f
     user.isFirstLogin = false;
     await user.save({ validateModifiedOnly: true });
 
-    // Gửi mật khẩu mới qua queue (Zalo OA / email) — không trả password về client
+    // Gửi mật khẩu mới qua queue (Zalo OA / email) - không trả password về client
     const destPhone = (user.zalo || user.phone || canonicalPhone || '').trim();
     await enqueuePassword({
       phone: destPhone || undefined,
@@ -2036,7 +2036,7 @@ router.post('/admin/generate-otp', authMiddleware, policyShadowAuth('admin_gener
     });
     setTimeout(() => otpStore.delete(key), 125000);
 
-    // Gửi OTP qua queue (Zalo OA / email) — không trả mã về client
+    // Gửi OTP qua queue (Zalo OA / email) - không trả mã về client
     const job = await enqueueOtp({
       phone: (user.zalo || phone).trim(),
       email: user.email || undefined,
@@ -2065,7 +2065,7 @@ router.post('/admin/generate-otp', authMiddleware, policyShadowAuth('admin_gener
         delivery: job ? 'queued' : 'manual_channel_required',
         message: job
           ? 'OTP đã được đưa vào hàng đợi gửi (Zalo/email). Không hiển thị mã trên giao diện.'
-          : 'OTP đã tạo. Hệ thống chưa gửi được qua kênh tự động — yêu cầu người dùng dùng Quên mật khẩu sau khi Admin kích hoạt gửi tay ngoài hệ thống, hoặc thử lại.',
+          : 'OTP đã tạo. Hệ thống chưa gửi được qua kênh tự động - yêu cầu người dùng dùng Quên mật khẩu sau khi Admin kích hoạt gửi tay ngoài hệ thống, hoặc thử lại.',
       },
     });
   } catch (error) {
@@ -2159,14 +2159,14 @@ router.put('/admin/profile', authMiddleware, policyShadowAuth('admin_profile'), 
     const { name, oldPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    // Hardcoded admin — lưu vào SystemSettings
+    // Hardcoded admin - lưu vào SystemSettings
     if (userId === 'admin') {
       let sysSettings = await SystemSettings.findOne({ _key: 'main' });
       if (!sysSettings) sysSettings = new SystemSettings({ _key: 'main' });
 
       let changed = false;
 
-      // Đổi tên — đồng bộ cả SystemSettings và Teacher collection
+      // Đổi tên - đồng bộ cả SystemSettings và Teacher collection
       if (name && name.trim()) {
         const newName = name.trim();
         sysSettings.adminName = newName;
@@ -2220,7 +2220,7 @@ router.put('/admin/profile', authMiddleware, policyShadowAuth('admin_profile'), 
       return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản' });
     }
 
-    // Đổi tên — nếu là Super Admin thì đồng bộ cả SystemSettings
+    // Đổi tên - nếu là Super Admin thì đồng bộ cả SystemSettings
     if (name && name.trim()) {
       const newName = name.trim();
       user.name = newName;

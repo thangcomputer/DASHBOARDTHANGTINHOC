@@ -1,5 +1,5 @@
 /**
- * Multi-tenant service — Tenant bọc Branch, default tenant cho du lieu cu.
+ * Multi-tenant service - Tenant bọc Branch, default tenant cho du lieu cu.
  */
 const tenantRepository = require('../repositories');
 const branchRepository = require('../../branch/repositories');
@@ -21,7 +21,7 @@ async function ensureDefaultTenant() {
       code: DEFAULT_CODE,
       status: 'active',
       isDefault: true,
-      notes: 'Tao tu dong — gan tat ca chi nhanh hien co',
+      notes: 'Tao tu dong - gan tat ca chi nhanh hien co',
     });
     logger.info({ tenantId: String(tenant._id) }, '[Tenant] created default tenant');
   }

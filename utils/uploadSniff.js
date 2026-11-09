@@ -1,5 +1,5 @@
 /**
- * Sniff magic bytes cơ bản — từ chối file spoof ext/mime.
+ * Sniff magic bytes cơ bản - từ chối file spoof ext/mime.
  * Không thay antivirus; chỉ chặn lệch header phổ biến.
  */
 const fs = require('fs');

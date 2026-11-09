@@ -38,9 +38,8 @@ export default function CertPrepReview({ questions = [] }) {
             key={f.id}
             type="button"
             onClick={() => { setFilter(f.id); setCurrent(0); }}
-            className={`min-h-11 px-3 rounded-xl text-sm font-bold border ${
-              filter === f.id ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200'
-            }`}
+            className={`min-h-11 px-3 rounded-xl text-sm font-bold border ${filter === f.id ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200'
+              }`}
           >
             {f.label}
           </button>
@@ -49,7 +48,7 @@ export default function CertPrepReview({ questions = [] }) {
       <nav aria-label="Danh sách câu hỏi" className="grid grid-cols-5 sm:grid-cols-8 gap-2">
         {questions.map((q, i) => {
           const hidden = !matchesFilter(q, filter);
-          let mark = '—';
+          let mark = '-';
           let cls = 'border-slate-200 bg-slate-50 text-slate-500';
           if (q.answered && q.isCorrect) {
             mark = '✓';

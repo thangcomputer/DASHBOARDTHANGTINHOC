@@ -21,7 +21,7 @@ function addResult(module, func, result, severity, description) {
 
 async function runApiTests() {
   console.log('🚀 Bắt đầu API Security & Isolation Testing...');
-  
+
   let token = '';
   // 1. Đăng nhập qua cổng nội bộ (Admin/Staff)
   try {
@@ -71,7 +71,7 @@ async function runApiTests() {
     const students = res.data.data;
     const hasBranchB = students.some(s => s.branchCode === testData.branchB.code);
     const hasBranchA = students.some(s => s.branchCode === testData.branchA.code);
-    
+
     if (hasBranchB) {
       addResult('Students', 'Read List', 'Failed', 'Critical', 'Staff A có thể xem học viên của Branch B!');
     } else if (hasBranchA) {
@@ -100,7 +100,7 @@ async function runApiTests() {
     const res = await axios.get(`${API_URL}/api/employees`, reqConfig);
     const emps = res.data.data;
     const hasBranchB = emps.some(e => e.branchCode === testData.branchB.code);
-    
+
     if (hasBranchB) {
       addResult('Employees', 'Read List', 'Failed', 'Critical', 'Staff A có thể xem nhân viên của Branch B!');
     } else {
@@ -124,7 +124,7 @@ async function runApiTests() {
       name: 'Hacker Teacher', phone: '0999999888',
       branchId: testData.branchB.id // Cố tình gán branch B
     }, reqConfig);
-    
+
     // Kiểm tra xem backend có ép lại thành Branch A hay báo 403 không
     if (res.data && res.data.data && res.data.data.branchId === testData.branchB.id) {
       addResult('Teachers', 'Create for Branch B', 'Failed', 'Critical', 'Staff A đã tạo được giảng viên cho Branch B!');
@@ -135,9 +135,9 @@ async function runApiTests() {
     }
   } catch (err) {
     if (err.response && (err.response.status === 403 || err.response.status === 401)) {
-       addResult('Teachers', 'Create for Branch B', 'Passed', 'High', `Bị từ chối vì thiếu quyền (RBAC chặn STAFF tạo teacher, chỉ có SuperAdmin) (Status ${err.response.status})`);
+      addResult('Teachers', 'Create for Branch B', 'Passed', 'High', `Bị từ chối vì thiếu quyền (RBAC chặn STAFF tạo teacher, chỉ có SuperAdmin) (Status ${err.response.status})`);
     } else {
-       addResult('Teachers', 'Create for Branch B', 'Failed', 'Low', `Lỗi khác: ${err.message}`);
+      addResult('Teachers', 'Create for Branch B', 'Failed', 'Low', `Lỗi khác: ${err.message}`);
     }
   }
 

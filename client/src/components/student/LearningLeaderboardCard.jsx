@@ -98,7 +98,7 @@ export default function LearningLeaderboardCard() {
       <ol className="mt-3 flex-1 space-y-1.5">
         {data && !top.length && (
           <li className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">
-            Tuần này chưa có ai trên bảng — hãy là người đầu tiên!
+            Tuần này chưa có ai trên bảng - hãy là người đầu tiên!
           </li>
         )}
         {top.map((row) => (

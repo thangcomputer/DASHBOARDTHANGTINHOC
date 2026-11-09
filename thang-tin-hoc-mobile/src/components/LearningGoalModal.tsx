@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Alert, Animated, AppState, DeviceEventEmitter, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarCheck, CalendarDays, Check, Clock3, Flame, PlayCircle, Sparkles, Sprout, Target, Trophy, X } from 'lucide-react-native';
 import { PIN_LOCK_STATE_EVENT, isPinLockedNow } from '../services/pinLock';
 import { getStudyResumePoint, type StudyResumePoint } from '../services/courseVideoApi';
@@ -55,7 +56,8 @@ const DROPLETS = [
 
 /**
  * Popup đặt mục tiêu học (giữa màn hình) + bộ đếm phút học cho học viên.
- * Hiện tự động khi chưa từng đặt mục tiêu; mục tiêu hết hạn không tự bật lại.
+ * CHỈ tự động hiển thị khi HẾT THỜI GIAN MỤC TIÊU (goal?.expired === true).
+ * Khi chưa từng đặt mục tiêu hoặc mục tiêu còn hạn: KHÔNG tự bật (muốn đổi thì tự vào đổi).
  */
 export function LearningGoalHost({ user }: { user: DemoUser }) {
   const enabled = user.role === 'student' && !user.previewMode;
@@ -74,7 +76,7 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
   }, [pinLocked]);
 
   const load = useCallback(() => {
-    getLearningGoal().then(setData).catch(() => {});
+    getLearningGoal().then(setData).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -92,9 +94,20 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
 
   useEffect(() => {
     if (!enabled || !data || open || dismissedRef.current) return;
-    if (data.goal) return;
-    setOpen(true);
-  }, [data, enabled, open]);
+    const goal = data.goal;
+    // CHỈ HIỂN THỊ KHI HẾT THỜI GIAN MỤC TIÊU:
+    if (!goal || !goal.expired) return;
+
+    const dismissKey = `@cms_goal_expired_dismissed_${user.id}_${goal.endsAt || ''}`;
+    AsyncStorage.getItem(dismissKey)
+      .then((val) => {
+        if (val === '1') return;
+        setOpen(true);
+      })
+      .catch(() => {
+        setOpen(true);
+      });
+  }, [data, enabled, open, user.id]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -107,13 +120,13 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
       } else if (!isActivelyStudying()) return;
       sendStudyHeartbeat()
         .then((result) => DeviceEventEmitter.emit(STUDY_MINUTE_EVENT, result))
-        .catch(() => {});
+        .catch(() => { });
     }, BEAT_MS);
     return () => clearInterval(timer);
   }, [enabled]);
 
   if (!enabled) return null;
-  const goalSettled = Boolean(data) && !open && (Boolean(data?.goal) || dismissedRef.current);
+  const goalSettled = Boolean(data) && !open;
   return (
     <>
       <DailyPracticeReminder userId={user.id} ready={goalSettled && !pinLocked} />
@@ -123,6 +136,11 @@ export function LearningGoalHost({ user }: { user: DemoUser }) {
           onClose={() => {
             dismissedRef.current = true;
             setOpen(false);
+            const goal = data?.goal;
+            if (goal?.expired) {
+              const dismissKey = `@cms_goal_expired_dismissed_${user.id}_${goal.endsAt || ''}`;
+              AsyncStorage.setItem(dismissKey, '1').catch(() => undefined);
+            }
           }}
           onSaved={(next) => {
             dismissedRef.current = true;
@@ -184,7 +202,7 @@ function LearningGoalModal({
   const float = useLoop(6000, motion);
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then((reduce) => setMotion(!reduce)).catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled().then((reduce) => setMotion(!reduce)).catch(() => { });
     Animated.spring(enter, { toValue: 1, friction: 7, tension: 90, useNativeDriver: true }).start();
   }, [enter]);
 
@@ -228,7 +246,7 @@ function LearningGoalModal({
     setSaving(true);
     try {
       onSaved(await saveLearningGoal(period, hours));
-      setCelebrate({ label: `${hours} giờ/ngày · ${selected.label}`, endDate });
+      setCelebrate({ label: `${hours} giờ / ngày · ${selected.label} `, endDate });
     } catch (error) {
       Alert.alert('Không lưu được mục tiêu', error instanceof Error ? error.message : 'Vui lòng thử lại.');
     } finally {
@@ -296,7 +314,7 @@ function LearningGoalModal({
               {celebrate
                 ? 'Hệ thống sẽ theo dõi tiến độ mỗi ngày giúp bạn. Cố lên nhé!'
                 : currentGoal?.expired
-                  ? 'Mục tiêu trước đã kết thúc — đặt mục tiêu mới để tiếp tục nhé!'
+                  ? 'Mục tiêu trước đã kết thúc - đặt mục tiêu mới để tiếp tục nhé!'
                   : 'Chọn thời gian và số giờ học mỗi ngày, hệ thống sẽ theo dõi tiến độ giúp bạn.'}
             </Text>
           </View>
@@ -319,7 +337,7 @@ function LearningGoalModal({
                 />
               )) : null}
               <Animated.View style={[styles.successPill, { transform: [{ scale: pop }] }]}>
-                <Target size={16} color="#B91C1C" />
+                <Target size={16} color="#047857" />
                 <Text style={styles.successPillText}>{celebrate.label}</Text>
               </Animated.View>
               <View style={styles.inlineRow}>
@@ -381,7 +399,7 @@ function LearningGoalModal({
                         {option.popular ? (
                           <View style={styles.popular}><Text style={styles.popularText}>PHỔ BIẾN</Text></View>
                         ) : null}
-                        <Icon size={18} color={active ? '#DC2626' : '#94A3B8'} />
+                        <Icon size={18} color={active ? colors.brand : '#94A3B8'} />
                         <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>{option.label}</Text>
                         <Text style={styles.optionHint}>{`${option.days} ngày`}</Text>
                       </Pressable>
@@ -410,7 +428,7 @@ function LearningGoalModal({
                         style={[styles.option, styles.hourOption, active && { borderColor: tone.color, backgroundColor: tone.soft }]}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: active }}
-                        accessibilityLabel={`${value} giờ mỗi ngày — ${tone.label}`}
+                        accessibilityLabel={`${value} giờ mỗi ngày - ${tone.label} `}
                       >
                         <Text style={[styles.hourValue, active && { color: tone.color }]}>{value}</Text>
                         <Text style={styles.optionHint}>giờ</Text>
@@ -438,7 +456,7 @@ function LearningGoalModal({
                   </Text>
                   <View style={styles.inlineRow}>
                     <CalendarCheck size={13} color="#047857" />
-                    <Text style={styles.summaryDate}>{`Hoàn thành dự kiến ${endDate}`}</Text>
+                    <Text style={styles.summaryDate}>{`Hoàn thành dự kiến ${endDate} `}</Text>
                   </View>
                   <View style={styles.inlineRow}>
                     <Sparkles size={12} color="#F59E0B" />
@@ -488,9 +506,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.75)',
-    backgroundColor: 'rgba(254, 226, 226, 0.6)',
-    backgroundImage: 'radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(254, 226, 226, 0.7) 38%, rgba(248, 113, 113, 0.22) 78%, rgba(248, 113, 113, 0.08) 100%)',
-    boxShadow: '0px 6px 14px rgba(220, 38, 38, 0.12), inset 0px -3px 6px rgba(220, 38, 38, 0.12)',
+    backgroundColor: 'rgba(236, 253, 245, 0.6)',
+    backgroundImage: 'radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(236, 253, 245, 0.7) 38%, rgba(52, 211, 153, 0.22) 78%, rgba(52, 211, 153, 0.08) 100%)',
+    boxShadow: '0px 6px 14px rgba(5, 150, 105, 0.12), inset 0px -3px 6px rgba(5, 150, 105, 0.12)',
   } as never,
   dropletAmber: {
     backgroundColor: 'rgba(254, 243, 199, 0.65)',
@@ -502,11 +520,11 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255, 255, 255, 0.85)', zIndex: 2,
   },
   badgeWrap: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
-  ring: { position: 'absolute', width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: 'rgba(239, 68, 68, 0.55)' },
+  ring: { position: 'absolute', width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: 'rgba(16, 185, 129, 0.55)' },
   badge: {
     width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand,
-    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #B91C1C 100%)',
-    boxShadow: '0px 10px 22px rgba(185, 28, 28, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(127, 29, 29, 0.5)',
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
+    boxShadow: '0px 10px 22px rgba(4, 120, 87, 0.35), inset 0px 2px 3px rgba(255, 255, 255, 0.4), inset 0px -4px 6px rgba(4, 120, 87, 0.5)',
   } as never,
   badgeSuccess: {
     backgroundColor: '#059669',
@@ -526,13 +544,13 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0', backgroundColor: colors.surface,
   },
   hourOption: { paddingTop: 10, paddingBottom: 8, gap: 0 },
-  optionActive: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
+  optionActive: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
   optionTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
-  optionTitleActive: { color: '#B91C1C' },
+  optionTitleActive: { color: '#047857' },
   optionHint: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
   popular: {
-    position: 'absolute', top: -10, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: '#DC2626',
-    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #DC2626 100%)',
+    position: 'absolute', top: -10, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.brand,
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
   } as never,
   popularText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
   hoursHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -553,17 +571,17 @@ const styles = StyleSheet.create({
   inlineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   successBody: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.xl, gap: spacing.md },
   confetti: { position: 'absolute', top: 28, left: '50%', width: 8, height: 12, marginLeft: -4, borderRadius: 2 },
-  successPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#FEF2F2' },
-  successPillText: { color: '#B91C1C', fontSize: 14, fontWeight: '900' },
+  successPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#ECFDF5' },
+  successPillText: { color: '#047857', fontSize: 14, fontWeight: '900' },
   successText: { color: '#475569', fontSize: 14 },
   successButton: { alignSelf: 'stretch', marginTop: spacing.xs },
   resumeCard: {
     alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm,
-    borderRadius: 16, borderWidth: 1, borderColor: '#FEE2E2', backgroundColor: '#FEF2F2',
+    borderRadius: 16, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5',
   },
   resumeIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand },
   resumeCopy: { flex: 1, minWidth: 0 },
-  resumeEyebrow: { color: '#DC2626', fontSize: 11, fontWeight: '800' },
+  resumeEyebrow: { color: colors.brand, fontSize: 11, fontWeight: '800' },
   resumeTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   resumeSub: { color: colors.muted, fontSize: 12 },
   laterButton: { alignSelf: 'stretch', alignItems: 'center', paddingVertical: 6 },
@@ -577,8 +595,8 @@ const styles = StyleSheet.create({
   primary: {
     minHeight: 46, borderRadius: radius.md, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.brand,
-    backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
-    boxShadow: '0px 8px 18px rgba(185, 28, 28, 0.3), inset 0px 2px 3px rgba(255, 255, 255, 0.35), inset 0px -3px 6px rgba(127, 29, 29, 0.45)',
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 55%, #047857 100%)',
+    boxShadow: '0px 8px 18px rgba(4, 120, 87, 0.3), inset 0px 2px 3px rgba(255, 255, 255, 0.35), inset 0px -3px 6px rgba(4, 120, 87, 0.45)',
   } as never,
   primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
 });

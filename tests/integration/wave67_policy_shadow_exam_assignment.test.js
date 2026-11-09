@@ -1,5 +1,5 @@
 /**
- * Wave 6.7 — Policy SHADOW for LIVE exam-result + assignment authorization.
+ * Wave 6.7 - Policy SHADOW for LIVE exam-result + assignment authorization.
  * Authorization equivalence only; does not change HTTP authority.
  */
 const test = require('node:test');
@@ -386,7 +386,7 @@ test('Wave6.7 ASSIGN: missing resource update → ALLOW (404); delete role-only 
     assertAssignMatch('a-miss', staff, 'update', { assignment: null }).legacy.decision,
     'ALLOW',
   );
-  // Legacy delete is role-only — teacher ALLOW without ownership (preserved weak gate)
+  // Legacy delete is role-only - teacher ALLOW without ownership (preserved weak gate)
   assert.equal(assertAssignMatch('a-del-t', teacher, 'delete').legacy.decision, 'ALLOW');
   assert.equal(
     assertAssignMatch('a-del-s', assignSubject({
@@ -710,7 +710,7 @@ test('Wave6.7 static: CQRS OFF; no global Policy; constants authority; sockets p
   assert.ok(exam.includes('emitDataRefresh'));
   assert.ok(!/\bio\.emit\(/.test(exam));
   assert.ok(assign.includes('emitDataRefresh'));
-  // Assignment still uses course-room io.to(...).emit — preserved, not redesigned
+  // Assignment still uses course-room io.to(...).emit - preserved, not redesigned
   assert.ok(/io\.to\(/.test(assign));
   assert.ok(!/\bio\.emit\(/.test(assign.replace(/io\.to\([^)]+\)\.emit/g, 'ROOM_EMIT')));
 });

@@ -1,4 +1,4 @@
-# DTO Design Strategy — Phase 2
+# DTO Design Strategy - Phase 2
 
 This document outlines the conceptual DTO hierarchy for each Application Service. **No implementation has been made; this is strictly architectural design.**
 

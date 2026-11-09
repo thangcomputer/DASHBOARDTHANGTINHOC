@@ -1,5 +1,5 @@
 /**
- * Phase 8.20C — Export RUNTIME evidence from the LIVE application process.
+ * Phase 8.20C - Export RUNTIME evidence from the LIVE application process.
  *
  * Reads counters via HTTP GET to the same Node process (loopback).
  * Does NOT create its own counters.

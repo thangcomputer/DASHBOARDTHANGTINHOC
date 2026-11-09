@@ -1,5 +1,5 @@
 /**
- * financeRoutes — Ledger SoT (P0–P4).
+ * financeRoutes - Ledger SoT (P0–P4).
  */
 const express = require('express');
 const router = express.Router();
@@ -106,7 +106,7 @@ router.get('/ledger', readGuard('ledger_list'), async (req, res) => {
   }
 });
 
-// GET /api/finance/students/:id — card 5 chỉ tiêu TO-BE
+// GET /api/finance/students/:id - card 5 chỉ tiêu TO-BE
 router.get('/students/:id', readGuard('student_card'), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id).select('branchId').lean();
@@ -128,7 +128,7 @@ router.get('/students/:id', readGuard('student_card'), async (req, res) => {
   }
 });
 
-// POST /api/finance/students/:id/heal-orphans — admin reconcile only (not on GET card)
+// POST /api/finance/students/:id/heal-orphans - admin reconcile only (not on GET card)
 router.post('/students/:id/heal-orphans', manageGuard('heal_orphans'), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -169,7 +169,7 @@ router.post('/ledger/:id/void', manageGuard('ledger_void'), async (req, res) => 
   }
 });
 
-// POST /api/finance/discount — ghi discount/coupon
+// POST /api/finance/discount - ghi discount/coupon
 router.post('/discount', manageGuard('discount'), async (req, res) => {
   try {
     const { studentId, amount, kind, enrollmentId, courseName, note, sourceRef } = req.body || {};
@@ -228,7 +228,7 @@ router.post('/snapshots/rebuild', manageGuard('snapshots_rebuild'), async (req, 
   }
 });
 
-// POST /api/finance/students/:id/sync-cache — recompute paidAmount từ Ledger
+// POST /api/finance/students/:id/sync-cache - recompute paidAmount từ Ledger
 router.post('/students/:id/sync-cache', manageGuard('sync_cache'), async (req, res) => {
   try {
     const data = await syncStudentFinanceCache(req.params.id);

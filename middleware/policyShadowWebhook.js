@@ -13,7 +13,7 @@ const {
 function policyShadowWebhook(action) {
   return async (req, res, next) => {
     try {
-      // SePay has no JWT actor — subject is empty / system provider context
+      // SePay has no JWT actor - subject is empty / system provider context
       const subject = buildSubject({
         user: req.user || { id: 'sepay', role: 'system' },
         actorDoc: null,
@@ -58,7 +58,7 @@ function policyShadowWebhook(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] webhook evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] webhook evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `webhook_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -92,7 +92,7 @@ function policyShadowWebhook(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] webhook shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] webhook shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -104,7 +104,7 @@ function policyShadowWebhook(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected webhook error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected webhook error - fail closed to legacy only',
       );
     }
     return next();

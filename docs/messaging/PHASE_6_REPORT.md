@@ -112,7 +112,7 @@ Empty `/contacts` → `[]` no longer repopulated from local staff arrays.
 
 ## MessagesContext Status
 
-**LEGACY / UNMOUNTED** — file header documented; App mounts `DataProvider` + `useDataMessaging` only. Not deleted in Phase 6.
+**LEGACY / UNMOUNTED** - file header documented; App mounts `DataProvider` + `useDataMessaging` only. Not deleted in Phase 6.
 
 ## Conversation ID Compatibility
 
@@ -160,7 +160,7 @@ Send / recipient / unread / ordering suites unchanged in behavior.
 ## Known Risks
 
 1. **Deep-link `seedContact`** can still open a chat UI for a navigated user who is not in `/contacts` (intentional for SEND-without-DISCOVER / support presence entry). Send still gated by MessagingPolicy.
-2. **Elevated FloatingMessenger “directory” mode** still uses online presence for SUPER/HIGH-style viewers (`isSuperAdminViewer` is broad historically) — out of student contacts scope; not used to refill empty student contacts.
+2. **Elevated FloatingMessenger “directory” mode** still uses online presence for SUPER/HIGH-style viewers (`isSuperAdminViewer` is broad historically) - out of student contacts scope; not used to refill empty student contacts.
 3. **MessagesContext** still contains contradictory seed logic if remounted accidentally.
 4. Live HTTP `/contacts` multi-role fixtures against real Mongo/JWT not executed in this phase (stubbed orchestration + policy integration tests used).
 5. Accounts without resolvable tenant remain fail-closed on discover (Phase 5.1).
@@ -174,4 +174,4 @@ Send / recipient / unread / ordering suites unchanged in behavior.
 
 ## Next Phase
 
-**STOP** — await approval for Phase 7.
+**STOP** - await approval for Phase 7.

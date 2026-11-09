@@ -29,7 +29,7 @@ async function runTests() {
     }, {
       headers: { 'Cookie': `csrf_token=${csrfToken}`, 'x-csrf-token': csrfToken }
     });
-    
+
     if (!adminLoginRes.data.success) throw new Error('Đăng nhập Admin thất bại');
     const adminToken = adminLoginRes.data.data.accessToken;
     addResult('Auth', 'Admin Login', 'Passed', 'High', 'Đăng nhập Super Admin thành công');
@@ -46,7 +46,7 @@ async function runTests() {
 
     for (const role of rolesToTest) {
       console.log(`\n--- Test cho Role: ${role.name} ---`);
-      
+
       // Update to Nam
       let updateNam = await axios.put(`${API_URL}${role.endpoint}`, { gender: 'Nam' }, { headers });
       if (updateNam.data.success && updateNam.data.data.gender === 'Nam') {

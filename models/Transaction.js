@@ -74,7 +74,7 @@ const transactionSchema = new mongoose.Schema({
   /** GV chưa xem popup "Bạn vừa nhận được thanh toán" cho phiếu đã xác nhận này */
   teacherPaymentNoticePending: { type: Boolean, default: false },
 
-  /** Thưởng sao cộng kèm (VNĐ) — tách khỏi lương cứng × buổi */
+  /** Thưởng sao cộng kèm (VNĐ) - tách khỏi lương cứng × buổi */
   starBonusAmount: { type: Number, default: 0, min: 0 },
   /** Các tháng YYYY-MM đã chi thưởng trong phiếu này */
   starBonusMonths: { type: [String], default: [] },

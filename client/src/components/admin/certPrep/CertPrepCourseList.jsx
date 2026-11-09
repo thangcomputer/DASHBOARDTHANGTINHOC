@@ -92,9 +92,9 @@ export default function CertPrepCourseList({
                 <tr key={cid} className="border-t border-slate-100">
                   <td className="px-4 py-3 font-bold text-slate-800">{c.name}</td>
                   <td className="px-4 py-3 text-slate-500">{c.slug}</td>
-                  <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{c.description || '—'}</td>
+                  <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{c.description || '-'}</td>
                   <td className="px-4 py-3">{c.sortOrder}</td>
-                  <td className="px-4 py-3">{c.levelCount ?? '—'}</td>
+                  <td className="px-4 py-3">{c.levelCount ?? '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-bold ${c.isActive === false ? 'text-slate-400' : 'text-emerald-600'}`}>
                       {c.isActive === false ? 'Tắt' : 'Bật'}

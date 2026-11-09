@@ -7,7 +7,7 @@
 
 /**
  * Canonical map: role + gender → asset path.
- * unknown → role PNG trung tinh (student.png / teacher.png / ...) — KHONG doan male.
+ * unknown → role PNG trung tinh (student.png / teacher.png / ...) - KHONG doan male.
  * staff default KHONG dung staff_female.
  */
 export const DEFAULT_AVATARS = {
@@ -39,7 +39,7 @@ export const DEFAULT_AVATARS = {
 
 /**
  * Chuan hoa gender ve: male | female | unknown.
- * Source of truth: field gender tu DB/session — khong doan tu ten/avatar/role.
+ * Source of truth: field gender tu DB/session - khong doan tu ten/avatar/role.
  */
 export function normalizeGender(value) {
   const raw = String(value ?? '').trim().toLowerCase();
@@ -79,7 +79,7 @@ export function isAvatarUrl(value) {
   return false;
 }
 
-/** Alias canonical — uploaded/real image detection. */
+/** Alias canonical - uploaded/real image detection. */
 export function isRealAvatar(value) {
   return isAvatarUrl(value);
 }
@@ -129,7 +129,7 @@ export function resolveAvatarUrl(userObj = {}) {
   const g = normalizeGender(gender);
 
   // Phase 8.21: STAFF/SUPPORT by adminRole BEFORE generic role==="admin"
-  // (JWT staff often has role=admin — must NOT resolve SUPER avatar).
+  // (JWT staff often has role=admin - must NOT resolve SUPER avatar).
   if (ar === 'SUPPORT' || r === 'support') {
     return pickRoleGenderAsset('support', g);
   }

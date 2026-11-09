@@ -1,5 +1,5 @@
 /**
- * BI service — executive KPIs, so sánh kỳ trước, breakdown.
+ * BI service - executive KPIs, so sánh kỳ trước, breakdown.
  * P0: Doanh thu thuần / hoàn = Ledger sumFinancialRevenue (không phụ thuộc enrollment.paid).
  */
 const Student = require('../../student/models/Student');

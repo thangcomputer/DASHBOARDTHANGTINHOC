@@ -1,5 +1,5 @@
 /**
- * Phase 8.23 — Conversation list ordering helpers (FE only).
+ * Phase 8.23 - Conversation list ordering helpers (FE only).
  * Newest lastMessageAt / lastTime first. Dedupe by conversationId.
  */
 
@@ -50,21 +50,21 @@ export function mergeConversationsById(entries = []) {
     const preferNext = conversationActivityTime(next) >= conversationActivityTime(prev);
     byId.set(id, preferNext
       ? {
-          ...prev,
-          ...next,
-          user: { ...(prev.user || {}), ...(next.user || {}) },
-          lastMessage: next.lastMessage ?? prev.lastMessage,
-          lastTime: next.lastTime ?? prev.lastTime,
-          unread: next.unread ?? prev.unread,
-        }
+        ...prev,
+        ...next,
+        user: { ...(prev.user || {}), ...(next.user || {}) },
+        lastMessage: next.lastMessage ?? prev.lastMessage,
+        lastTime: next.lastTime ?? prev.lastTime,
+        unread: next.unread ?? prev.unread,
+      }
       : {
-          ...next,
-          ...prev,
-          user: { ...(next.user || {}), ...(prev.user || {}) },
-          lastMessage: prev.lastMessage ?? next.lastMessage,
-          lastTime: prev.lastTime ?? next.lastTime,
-          unread: prev.unread ?? next.unread,
-        });
+        ...next,
+        ...prev,
+        user: { ...(next.user || {}), ...(prev.user || {}) },
+        lastMessage: prev.lastMessage ?? next.lastMessage,
+        lastTime: prev.lastTime ?? next.lastTime,
+        unread: prev.unread ?? next.unread,
+      });
   }
   return sortConversationsByLastMessageAt([...byId.values()]);
 }

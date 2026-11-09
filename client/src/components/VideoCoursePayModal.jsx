@@ -89,7 +89,7 @@ export default function VideoCoursePayModal({
     return () => { cancelled = true; };
   }, []);
 
-  // Kiểm tra session trước khi hiện QR — tránh modal success khi reload session đã paid
+  // Kiểm tra session trước khi hiện QR - tránh modal success khi reload session đã paid
   useEffect(() => {
     if (!sessionId) return undefined;
     let cancelled = false;
@@ -197,7 +197,7 @@ export default function VideoCoursePayModal({
               disabled={simulatingPayment}
               className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold hover:bg-amber-100 transition disabled:cursor-wait disabled:opacity-60"
             >
-              {simulatingPayment ? 'Đang giả lập thanh toán…' : 'Đã thanh toán (test — chỉ dev)'}
+              {simulatingPayment ? 'Đang giả lập thanh toán…' : 'Đã thanh toán (test - chỉ dev)'}
             </button>
           ) : null}
         </div>

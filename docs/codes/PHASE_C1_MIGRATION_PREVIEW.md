@@ -1,4 +1,4 @@
-# PHASE C1 — MIGRATION PREVIEW (IN-MEMORY DRY-RUN)
+# PHASE C1 - MIGRATION PREVIEW (IN-MEMORY DRY-RUN)
 
 **Phase:** C1  
 **Date:** 2026-08-11  
@@ -35,7 +35,7 @@ Sort order used: Mongo `_id` ascending (stable, deterministic for preview).
 | employee | 0 |
 | course | 1 |
 
-Next create would be HV000005 / GV000005 / NV000001 / KH000002 — **only after** counters exist (not created in C1).
+Next create would be HV000005 / GV000005 / NV000001 / KH000002 - **only after** counters exist (not created in C1).
 
 ---
 
@@ -50,7 +50,7 @@ Next create would be HV000005 / GV000005 / NV000001 / KH000002 — **only after*
 
 Rules demonstrated:
 
-- New canonical sequence — **not** truncating `HV45836680 → HV458366`.
+- New canonical sequence - **not** truncating `HV45836680 → HV458366`.
 - Each student keeps the same `_id`.
 - `enrollmentCount` remained 1 per student in this env; multi-enrollment would still share one `newCode`.
 - Future: store `oldCode` in `legacyStudentCodes[]` (**not applied in C1**).
@@ -67,7 +67,7 @@ Rules demonstrated:
 | (missing) | GV000004 | `6a7a04cdcb8547ec5edc6ef8` | GENERATE |
 
 - Sequence **independent** of Student (GV000001 can coexist with HV000001 without coupling).
-- Assignments stay on `teacherId` ObjectId — **unchanged** by this preview.
+- Assignments stay on `teacherId` ObjectId - **unchanged** by this preview.
 
 ---
 
@@ -75,11 +75,11 @@ Rules demonstrated:
 
 | OLD CODE | NEW CODE | ENTITY ID | ACTION |
 |----------|----------|-----------|--------|
-| — | — | — | **no rows** (0 employees) |
+| - | - | - | **no rows** (0 employees) |
 
 Counter seed `employee = 0` → first future employee `NV000001`.
 
-Payroll continues to use `employeeId` — business code is display/reference only.
+Payroll continues to use `employeeId` - business code is display/reference only.
 
 ---
 
@@ -119,7 +119,7 @@ No shared counter. No `HV000001 ↔ GV000001` assignment implication.
 
 ---
 
-## 8. Rollback (design reminder — not executed)
+## 8. Rollback (design reminder - not executed)
 
 If a future write phase were applied incorrectly:
 
@@ -139,5 +139,5 @@ PHASE C2: BLOCKED
 ```
 
 ```text
-STOP — await owner review before any DB write.
+STOP - await owner review before any DB write.
 ```

@@ -62,7 +62,7 @@ function policyShadowEmployee(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] employee evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] employee evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `employee_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -99,7 +99,7 @@ function policyShadowEmployee(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] employee shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] employee shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -111,7 +111,7 @@ function policyShadowEmployee(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected employee error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected employee error - fail closed to legacy only',
       );
     }
     return next();

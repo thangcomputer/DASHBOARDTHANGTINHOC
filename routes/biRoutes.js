@@ -7,12 +7,12 @@ const biService = require('../services/biService');
 const logger = require('../config/logger');
 
 /**
- * Phase 7.26 — Controlled cutover for LIVE /api/bi ONLY.
+ * Phase 7.26 - Controlled cutover for LIVE /api/bi ONLY.
  *
  * Flow: auth → branchFilter (DATA SCOPE) → policyShadowBI → biCutoverGate → handler
  * Legacy MANAGE_FINANCE|VIEW_BRANCH_REVENUE gate retained inside biCutoverGate.
  * Aggregation / CSV remain handler-owned via overview service.
- * modules/finance BiController is unmounted — not migrated.
+ * modules/finance BiController is unmounted - not migrated.
  */
 const guard = (action) => [
   authMiddleware,

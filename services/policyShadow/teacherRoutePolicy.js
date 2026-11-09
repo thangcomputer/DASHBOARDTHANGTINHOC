@@ -1,7 +1,7 @@
 /**
  * Policy shadow for remaining LIVE teacher routes (Wave 6.5).
  * Wave 6 already covers score/approve/reject via teacherMutationPolicy.
- * This module mirrors routes/teacherRoutes.js exactly — no authz redesign.
+ * This module mirrors routes/teacherRoutes.js exactly - no authz redesign.
  */
 const {
   TEACHER_WRITE_LIVE,
@@ -65,7 +65,7 @@ function evaluateCheckPermission(subject, livePermission) {
   return { decision: 'ALLOW', reason: `has_${livePermission}`, statusHint: 200 };
 }
 
-/** superAdminOnlyTeacher middleware — Super hoặc HIGH_ADMIN */
+/** superAdminOnlyTeacher middleware - Super hoặc HIGH_ADMIN */
 function evaluateSuperAdminOnly(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
@@ -131,7 +131,7 @@ function evaluateList(subject) {
   if (role === 'teacher' || role === 'student') {
     return { decision: 'DENY', reason: 'list_role_denied', statusHint: 403 };
   }
-  // Legacy: any other authenticated role (admin/staff) — no VIEW_TEACHERS required
+  // Legacy: any other authenticated role (admin/staff) - no VIEW_TEACHERS required
   if (!isStaffRole(subject) && subject.id !== 'admin') {
     return { decision: 'DENY', reason: 'list_role_denied', statusHint: 403 };
   }
@@ -160,7 +160,7 @@ function evaluateGetOne(subject, resourceId, resourceTeacher) {
 }
 
 /**
- * PUT /:id — teacher self OR staff with SUPER | manage_training | manage_teachers
+ * PUT /:id - teacher self OR staff with SUPER | manage_training | manage_teachers
  */
 function evaluateUpdateProfile(subject, resourceId) {
   if (!subject?.id) {
@@ -194,7 +194,7 @@ function evaluateSubmitPractical(subject, resourceId) {
 }
 
 /**
- * GET finance: role === 'admin' OR self (legacy — staff role is NOT treated as admin).
+ * GET finance: role === 'admin' OR self (legacy - staff role is NOT treated as admin).
  */
 function evaluateFinanceSelf(subject, resourceId) {
   if (!subject?.id) {

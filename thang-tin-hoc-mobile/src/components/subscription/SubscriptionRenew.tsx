@@ -23,7 +23,7 @@ const PLAN_TONES: Record<string, [string, string]> = {
 const gradient = (from: string, to: string) => ({ backgroundColor: to, backgroundImage: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` } as never);
 const formatVnd = (value: number) => `${Math.round(Number(value) || 0).toLocaleString('vi-VN')}đ`;
 
-/** Chọn gói (thanh toán QR SePay) hoặc nhập mã kích hoạt — dùng ở màn khóa và popup gia hạn. */
+/** Chọn gói (thanh toán QR SePay) hoặc nhập mã kích hoạt - dùng ở màn khóa và popup gia hạn. */
 export function SubscriptionRenewPanel({ overview, onRenewed }: { overview: SubscriptionOverview; onRenewed: () => void }) {
   const [code, setCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -146,7 +146,7 @@ export function SubscriptionExpiredScreen() {
         <Text style={styles.heroText}>
           {neverActivated
             ? 'Nhập mã kích hoạt trung tâm cấp hoặc chọn gói để bắt đầu học.'
-            : `Gói tài khoản của ${user?.name || 'bạn'} đã hết hạn ngày ${formatExpiryDate(subscription.subscription.expiresAt)}. Gia hạn để tiếp tục học — tiến độ học vẫn được giữ nguyên.`}
+            : `Gói tài khoản của ${user?.name || 'bạn'} đã hết hạn ngày ${formatExpiryDate(subscription.subscription.expiresAt)}. Gia hạn để tiếp tục học - tiến độ học vẫn được giữ nguyên.`}
         </Text>
         <Pressable onPress={() => { void signOut(); }} style={styles.outline} accessibilityRole="button">
           <LogOut size={15} color={colors.ink} /><Text style={styles.outlineText}>Đăng xuất</Text>
@@ -160,13 +160,108 @@ export function SubscriptionExpiredScreen() {
 }
 
 /** Thẻ hạn dùng cho Hồ sơ / drawer; bấm Gia hạn mở popup chọn gói + nhập mã. */
-export function SubscriptionStatusCard({ compact = false }: { compact?: boolean }) {
+export function SubscriptionStatusCard({
+  compact = false,
+  variant = 'default',
+}: {
+  compact?: boolean;
+  variant?: 'default' | 'drawer';
+}) {
   const { subscription, refreshSubscription } = useAuth();
   const [open, setOpen] = useState(false);
   if (!subscription) return null;
   const sub = subscription.subscription;
   const expiring = sub.state === 'expiring';
   const isLifetime = sub.state === 'lifetime';
+  const isDrawer = variant === 'drawer';
+
+  if (isDrawer) {
+    return (
+      <>
+        <View
+          style={[
+            styles.drawerSubCard,
+            isLifetime
+              ? styles.drawerSubCardLifetime
+              : expiring
+                ? styles.drawerSubCardExpiring
+                : styles.drawerSubCardActive,
+          ]}
+        >
+          <View
+            style={[
+              styles.drawerSubIconBox,
+              isLifetime
+                ? styles.drawerSubIconLifetime
+                : expiring
+                  ? styles.drawerSubIconExpiring
+                  : styles.drawerSubIconActive,
+            ]}
+          >
+            {isLifetime ? (
+              <Crown size={13} color="#FBBF24" />
+            ) : (
+              <CalendarClock size={13} color={expiring ? '#FB923C' : '#34D399'} />
+            )}
+          </View>
+
+          <View style={styles.flex}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.drawerSubText,
+                isLifetime
+                  ? styles.drawerSubTextLifetime
+                  : expiring
+                    ? styles.drawerSubTextExpiring
+                    : styles.drawerSubTextActive,
+              ]}
+            >
+              {subscriptionShortLabel(sub)}
+            </Text>
+          </View>
+
+          {isLifetime ? (
+            <View style={styles.drawerSubTag}>
+              <Text style={styles.drawerSubTagText}>VĨNH VIỄN</Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setOpen(true)}
+              style={styles.drawerRenewBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Gia hạn tài khoản"
+            >
+              <Text style={styles.drawerRenewBtnText}>Gia hạn</Text>
+            </Pressable>
+          )}
+        </View>
+
+        <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+          <View style={styles.sheetBackdrop}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHead}>
+                <Text style={styles.sheetTitle}>Gia hạn tài khoản</Text>
+                <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Đóng">
+                  <X size={20} color={colors.muted} />
+                </Pressable>
+              </View>
+              <ScrollView contentContainerStyle={styles.sheetBody}>
+                <SubscriptionRenewPanel
+                  overview={subscription}
+                  onRenewed={() => {
+                    setOpen(false);
+                    void refreshSubscription();
+                  }}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
+  }
+
   return (
     <>
       <View style={[styles.statusCard, compact && styles.statusCardCompact, expiring && styles.statusCardExpiring]}>
@@ -253,4 +348,80 @@ const styles = StyleSheet.create({
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, paddingBottom: spacing.sm },
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   sheetBody: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xxl },
+
+  /* Drawer Glass Styles */
+  drawerSubCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  drawerSubCardLifetime: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderColor: 'rgba(245, 158, 11, 0.28)',
+  },
+  drawerSubCardExpiring: {
+    backgroundColor: 'rgba(249, 115, 22, 0.14)',
+    borderColor: 'rgba(249, 115, 22, 0.35)',
+  },
+  drawerSubCardActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  drawerSubIconBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawerSubIconLifetime: {
+    backgroundColor: 'rgba(245, 158, 11, 0.22)',
+  },
+  drawerSubIconExpiring: {
+    backgroundColor: 'rgba(249, 115, 22, 0.25)',
+  },
+  drawerSubIconActive: {
+    backgroundColor: 'rgba(52, 211, 153, 0.2)',
+  },
+  drawerSubText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  drawerSubTextLifetime: {
+    color: '#FEF3C7',
+  },
+  drawerSubTextExpiring: {
+    color: '#FDBA74',
+  },
+  drawerSubTextActive: {
+    color: '#E2E8F0',
+  },
+  drawerSubTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  drawerSubTagText: {
+    color: '#FDE68A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  drawerRenewBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#DC2626',
+  },
+  drawerRenewBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
 });

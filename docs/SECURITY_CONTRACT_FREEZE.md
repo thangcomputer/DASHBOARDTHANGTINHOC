@@ -1,4 +1,4 @@
-# SECURITY CONTRACT FREEZE — Wave 5.5
+# SECURITY CONTRACT FREEZE - Wave 5.5
 
 **Status:** FROZEN (read-only documentation)  
 **Date:** 2026-08-09  
@@ -47,22 +47,22 @@ This document freezes the authorization/security contract that any future Policy
 | `manage_students` | Student CRUD / assign / exam unlock | Yes | Yes | Yes | Yes (via branchFilter) | No |
 | `manage_schedule` | Schedule management | Yes | Yes | Yes | Yes | No |
 | `manage_finance` | Pay / refund / invoices / teacher pay | Yes | Yes | Limited | Yes | No |
-| `manage_messages` | Messaging / support | Yes | Yes | — | Partial | No |
-| `manage_training` | Teacher training / quiz admin / teacher exam | Yes | Yes | — | Yes | No |
-| `manage_student_training` | Student exam bank / training | Yes | Yes | — | Yes | No |
-| `manage_staff` | Staff accounts | Yes | Yes | — | Super-heavy | No |
+| `manage_messages` | Messaging / support | Yes | Yes | - | Partial | No |
+| `manage_training` | Teacher training / quiz admin / teacher exam | Yes | Yes | - | Yes | No |
+| `manage_student_training` | Student exam bank / training | Yes | Yes | - | Yes | No |
+| `manage_staff` | Staff accounts | Yes | Yes | - | Super-heavy | No |
 | `manage_hr` | Employees / payroll HR | Yes | Yes | Yes | Yes | No |
 | `manage_blog` | Blog CMS | Yes | Yes | Yes | Global CMS | No |
 | `system_settings` | System settings / reset | Yes | Yes | Destructive | System-wide | No |
-| `view_logs` | System logs | Yes | No | No | — | No |
-| `view_evaluations` | Evaluations view | Yes | No | No | — | No |
+| `view_logs` | System logs | Yes | No | No | - | No |
+| `view_evaluations` | Evaluations view | Yes | No | No | - | No |
 | `view_branch_revenue` | Analytics revenue | Yes | No | No | Branch | No |
 | `view_teachers` | Teacher list/view | Yes | **No** | No | Yes | No |
-| `manage_teachers` | Teacher score/approve/reject | — | Yes | — | Yes | No |
+| `manage_teachers` | Teacher score/approve/reject | - | Yes | - | Yes | No |
 
 **Invariant:** `view_teachers` does **not** grant `manage_teachers` (proven by Wave 5.1 tests).
 
-**Not present in live taxonomy:** `CREATE_*`, `UPDATE_*`, `DELETE_*`, `APPROVE_*`, `SCORE_*` as separate keys — writes are folded into `MANAGE_*`.
+**Not present in live taxonomy:** `CREATE_*`, `UPDATE_*`, `DELETE_*`, `APPROVE_*`, `SCORE_*` as separate keys - writes are folded into `MANAGE_*`.
 
 **Unmounted RBAC taxonomy** (`shared/constants/permissions.js` / `modules/rbac/rolePermissions.js`) uses a **different** vocabulary (`COURSE_VIEW`, `STUDENT_CREATE`, …). It is **not** the live contract.
 
@@ -74,25 +74,25 @@ Abbreviated; middleware names refer to live Express stack.
 
 | Family | Method | Path (prefix `/api`) | Permission / Gate | Role exception | Branch | Ownership | Realtime | Finance |
 |--------|--------|----------------------|-------------------|----------------|--------|-----------|----------|---------|
-| Students | GET | `/students` | `manage_students` unless teacher | Teacher ownership filter | `branchFilter` | Teacher→assigned | scoped | — |
-| Students | POST | `/students` | `manage_students` | — | `branchFilter` | — | scoped | settle on create if paid |
+| Students | GET | `/students` | `manage_students` unless teacher | Teacher ownership filter | `branchFilter` | Teacher→assigned | scoped | - |
+| Students | POST | `/students` | `manage_students` | - | `branchFilter` | - | scoped | settle on create if paid |
 | Students | PUT | `/students/:id` | staff→`manage_students` | Teacher allowlist / self | assertStudentBranch | Yes | scoped | paid fields stripped |
-| Students | PUT | `.../pay` `.../refund` | `manage_finance` | — | assertStudentBranch | — | scoped | ledger |
-| Teachers | PUT | `.../score\|approve\|reject` | `manage_teachers` | — | assertTeacherBranch | — | emitTeacherEvent | — |
-| Teachers | POST | `/teachers` | Super only | — | branchFilter | — | emitTeacherEvent | — |
-| Teachers | finance pay | `.../finance/pay-*` | `manage_finance` + Super | — | Super | — | emitFinanceEvent | postSalary |
-| Schedules | * | `/schedules` | auth + role | Teacher/student self | branchFilter | teacher/student | emitScheduleEvent | — |
-| Quiz | GET | `/quizzes/admin/all` | `manage_training` | — | teacher branch filter | — | — | — |
-| ExamResult | * | `/exam-results` | type-based manage_* / teacher relation | Student GET self | subject branch | Yes | emitDataRefresh | — |
-| Assignment | POST/PUT | `/assignments` | staff→`manage_students` | Teacher assigned | student branch | Yes | course_/student_ | — |
-| Evaluation | POST | `/evaluations` | student self | — | teacher branch on refresh | student→teacher | scoped refresh | — |
-| Transactions | * | `/transactions` | `manage_finance` | — | branchFilter | — | emitFinanceEvent | ledger |
-| Webhooks | POST | `/webhooks/sepay` | HMAC/API key | system | from claimed student/session | — | emitFinanceEvent | settlePayment |
-| Settings | PUT | `/settings/*` | SYSTEM_SETTINGS / training perms | — | system-wide | — | emitSystemWide | — |
-| Settings | POST | `/settings/reset-data` | SYSTEM_SETTINGS + Super password | — | system | — | SYSTEM_RESET | wipe |
-| Employees | * | `/employees` | `manage_hr` | — | branchFilter | — | emitBranch | — |
-| Auth | POST | `/auth/logout` | — | — | — | — | — | blacklist refresh |
-| Messages | * | `/messages` | auth + chat access | — | conversation | participants | io.to(user) | — |
+| Students | PUT | `.../pay` `.../refund` | `manage_finance` | - | assertStudentBranch | - | scoped | ledger |
+| Teachers | PUT | `.../score\|approve\|reject` | `manage_teachers` | - | assertTeacherBranch | - | emitTeacherEvent | - |
+| Teachers | POST | `/teachers` | Super only | - | branchFilter | - | emitTeacherEvent | - |
+| Teachers | finance pay | `.../finance/pay-*` | `manage_finance` + Super | - | Super | - | emitFinanceEvent | postSalary |
+| Schedules | * | `/schedules` | auth + role | Teacher/student self | branchFilter | teacher/student | emitScheduleEvent | - |
+| Quiz | GET | `/quizzes/admin/all` | `manage_training` | - | teacher branch filter | - | - | - |
+| ExamResult | * | `/exam-results` | type-based manage_* / teacher relation | Student GET self | subject branch | Yes | emitDataRefresh | - |
+| Assignment | POST/PUT | `/assignments` | staff→`manage_students` | Teacher assigned | student branch | Yes | course_/student_ | - |
+| Evaluation | POST | `/evaluations` | student self | - | teacher branch on refresh | student→teacher | scoped refresh | - |
+| Transactions | * | `/transactions` | `manage_finance` | - | branchFilter | - | emitFinanceEvent | ledger |
+| Webhooks | POST | `/webhooks/sepay` | HMAC/API key | system | from claimed student/session | - | emitFinanceEvent | settlePayment |
+| Settings | PUT | `/settings/*` | SYSTEM_SETTINGS / training perms | - | system-wide | - | emitSystemWide | - |
+| Settings | POST | `/settings/reset-data` | SYSTEM_SETTINGS + Super password | - | system | - | SYSTEM_RESET | wipe |
+| Employees | * | `/employees` | `manage_hr` | - | branchFilter | - | emitBranch | - |
+| Auth | POST | `/auth/logout` | - | - | - | - | - | blacklist refresh |
+| Messages | * | `/messages` | auth + chat access | - | conversation | participants | io.to(user) | - |
 
 ---
 
@@ -151,8 +151,8 @@ Abbreviated; middleware names refer to live Express stack.
 | `ALL_ADMIN` / `ALL_STAFF` / `ALL_SUPPORT` / `ALL_TEACHER` / `ALL_STUDENT` | Role | register | emitSystemWide / notify | ROLE |
 | `ALL_USERS` message | Everyone | admin broadcast | io.emit message | SAFE GLOBAL (admin-gated) |
 | `feed_room` | Authenticated | feed:join | feed | PUBLIC-ish |
-| `GLOBAL` | — | **Denied** | — | DENY |
-| SYSTEM_RESET | Authenticated roles | — | emitSystemWide | SYSTEM |
+| `GLOBAL` | - | **Denied** | - | DENY |
+| SYSTEM_RESET | Authenticated roles | - | emitSystemWide | SYSTEM |
 
 Payload sensitivity: finance/exam/teacher events must stay BRANCH/USER; settings refresh payload is type-only (no secrets).
 
@@ -172,20 +172,20 @@ Payload sensitivity: finance/exam/teacher events must stay BRANCH/USER; settings
 
 ## I. Legacy → Policy Mapping
 
-Live Policy files: `modules/rbac/policy.service.js` + tenant/branch/ownership/condition — **unmounted**.
+Live Policy files: `modules/rbac/policy.service.js` + tenant/branch/ownership/condition - **unmounted**.
 
 | Legacy Rule | Policy Equivalent | Match | Gap |
 |-------------|-------------------|-------|-----|
 | `checkPermission(manage_*)` | PermissionService + shared taxonomy | **MISSING** | Different permission strings vs live `constants/permissions.js` |
 | `branchFilter` + assert*Branch (fail-closed if no branch) | branch.policy | **PARTIAL** | Policy allows when resource has no branch; live exam DENY |
-| Super bypass | Super Admin bypass in policies | **EXACT** (concept) | — |
-| HIGH_ADMIN must have grants | — | **MISSING** | Not modeled as distinct from Super bypass carefully |
+| Super bypass | Super Admin bypass in policies | **EXACT** (concept) | - |
+| HIGH_ADMIN must have grants | - | **MISSING** | Not modeled as distinct from Super bypass carefully |
 | Teacher ownership via enrollments | ownership.policy field match | **PARTIAL** | No `studentMatchesTeacher` / enrollment walk |
 | Staff manage others' students | ownership would DENY | **MISSING** | Needs staff+permission bypass context |
 | Soft tenant ignore | tenant.policy missing→allow | **PARTIAL** | Aligns loosely; no soft-ignore logging semantics |
 | VIEW ≠ WRITE | live tests | **AMBIGUOUS** in Policy | Policy rolePermissions use different verbs |
-| Mass-assignment DTOs | — | **MISSING** | Not a Policy concern; remain in controllers |
-| Socket room auth | — | **MISSING** | Out of Policy HTTP chain |
+| Mass-assignment DTOs | - | **MISSING** | Not a Policy concern; remain in controllers |
+| Socket room auth | - | **MISSING** | Out of Policy HTTP chain |
 
 ---
 
@@ -287,7 +287,7 @@ Conditions:
 ## O. Recommended First Policy Route Family
 
 **`GET/PUT teacher score|approve|reject` + teacher branch assert**  
-(or **quiz `GET /admin/all`**) — narrow surface, already permission + branch clean, non-financial, strong golden coverage.
+(or **quiz `GET /admin/all`**) - narrow surface, already permission + branch clean, non-financial, strong golden coverage.
 
 **Do not start with:** finance, webhooks, auth, messages, SYSTEM_RESET.
 

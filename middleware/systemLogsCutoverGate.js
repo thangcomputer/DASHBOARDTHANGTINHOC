@@ -1,5 +1,5 @@
 /**
- * Phase 7.7 — Controlled cutover gate for /api/system-logs ONLY.
+ * Phase 7.7 - Controlled cutover gate for /api/system-logs ONLY.
  *
  * LEGACY (default): existing isAdmin remains HTTP authority.
  * POLICY (env opt-in): Policy decision is HTTP authority; Legacy isAdmin skipped.
@@ -49,7 +49,7 @@ function systemLogsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] system-logs authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] system-logs authority helper failed - Legacy gate',
       );
     }
 
@@ -94,7 +94,7 @@ function systemLogsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] system-logs Policy unsafe — fallback Legacy isAdmin',
+        '[POLICY_CUTOVER] system-logs Policy unsafe - fallback Legacy isAdmin',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -114,7 +114,7 @@ function systemLogsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] system-logs Policy ALLOW — Legacy isAdmin skipped',
+        '[POLICY_CUTOVER] system-logs Policy ALLOW - Legacy isAdmin skipped',
       );
       return next();
     }

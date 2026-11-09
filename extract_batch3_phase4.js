@@ -10,7 +10,7 @@ function getRelativeFromServicesDir(originalDir, importPath) {
 
 function extractDomain({ domain, routeFile, serviceName, controllerName }) {
   if (!fs.existsSync(routeFile)) {
-    console.log(`⚠️ Skipping ${domain} — route file not found: ${routeFile}`);
+    console.log(`⚠️ Skipping ${domain} - route file not found: ${routeFile}`);
     return;
   }
   const routesDir = path.dirname(routeFile);
@@ -96,12 +96,12 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
       .replace(/^\//, '').replace(/\//g, '_').replace(/:/g, '').replace(/[-]/g, '_')
       .replace(/[^a-zA-Z0-9_]/g, '') || 'root';
     let methodName = method + '_' + safePath;
-    
+
     let duplicateCount = 1;
     let originalName = methodName;
-    while(routes.some(r => r.methodName === methodName)) {
-        methodName = originalName + '_' + duplicateCount;
-        duplicateCount++;
+    while (routes.some(r => r.methodName === methodName)) {
+      methodName = originalName + '_' + duplicateCount;
+      duplicateCount++;
     }
 
     routes.push({ method, routePath, methodName, handlerBody, block, endIdx: i });
@@ -113,29 +113,29 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
   let serviceCode = '';
   const serviceFilePath = path.join(servicesDir, `${serviceName}.js`);
   if (fs.existsSync(serviceFilePath)) {
-      let existingCode = fs.readFileSync(serviceFilePath, 'utf8');
-      const insertIdx = existingCode.lastIndexOf('}');
-      if (insertIdx !== -1) {
-          let newMethods = '';
-          for (const { methodName, handlerBody } of routes) {
-              let body = handlerBody
-                .replace(/\breq\./g, 'data.')
-                .replace(/return\s+res\.status\((\d+)\)\.json\(/g, 'return { _status: $1, _body: (')
-                .replace(/res\.status\((\d+)\)\.json\(/g, 'return { _status: $1, _body: (')
-                .replace(/return\s+res\.json\(/g, 'return { _status: 200, _body: (')
-                .replace(/res\.json\(/g, 'return { _status: 200, _body: (')
-                .replace(/return\s+res\.status\((\d+)\)\.send\(/g, 'return { _status: $1, _isSend: true, _body: (')
-                .replace(/res\.status\((\d+)\)\.send\(/g, 'return { _status: $1, _isSend: true, _body: (')
-                .replace(/res\.cookie\(/g, 'data._res.cookie(')
-                .replace(/res\.clearCookie\(/g, 'data._res.clearCookie(')
-                .replace(/res\.redirect\(/g, 'data._res.redirect(')
-                .replace(/res\.download\(/g, 'data._res.download(')
-                .replace(/res\.set\(/g, 'data._res.set(')
-                .replace(/res\.end\(/g, 'data._res.end(');
-              newMethods += `  async ${methodName}(data) {${body}}\n\n`;
-          }
-          serviceCode = existingCode.slice(0, insertIdx) + newMethods + existingCode.slice(insertIdx);
+    let existingCode = fs.readFileSync(serviceFilePath, 'utf8');
+    const insertIdx = existingCode.lastIndexOf('}');
+    if (insertIdx !== -1) {
+      let newMethods = '';
+      for (const { methodName, handlerBody } of routes) {
+        let body = handlerBody
+          .replace(/\breq\./g, 'data.')
+          .replace(/return\s+res\.status\((\d+)\)\.json\(/g, 'return { _status: $1, _body: (')
+          .replace(/res\.status\((\d+)\)\.json\(/g, 'return { _status: $1, _body: (')
+          .replace(/return\s+res\.json\(/g, 'return { _status: 200, _body: (')
+          .replace(/res\.json\(/g, 'return { _status: 200, _body: (')
+          .replace(/return\s+res\.status\((\d+)\)\.send\(/g, 'return { _status: $1, _isSend: true, _body: (')
+          .replace(/res\.status\((\d+)\)\.send\(/g, 'return { _status: $1, _isSend: true, _body: (')
+          .replace(/res\.cookie\(/g, 'data._res.cookie(')
+          .replace(/res\.clearCookie\(/g, 'data._res.clearCookie(')
+          .replace(/res\.redirect\(/g, 'data._res.redirect(')
+          .replace(/res\.download\(/g, 'data._res.download(')
+          .replace(/res\.set\(/g, 'data._res.set(')
+          .replace(/res\.end\(/g, 'data._res.end(');
+        newMethods += `  async ${methodName}(data) {${body}}\n\n`;
       }
+      serviceCode = existingCode.slice(0, insertIdx) + newMethods + existingCode.slice(insertIdx);
+    }
   } else {
     serviceCode = `'use strict';\n`;
     serviceCode += uniqueImports.join('\n') + '\n\n';
@@ -167,12 +167,12 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
   let controllerCode = '';
   const controllerFilePath = path.join(controllersDir, `${controllerName}.js`);
   if (fs.existsSync(controllerFilePath)) {
-      let existingCode = fs.readFileSync(controllerFilePath, 'utf8');
-      const insertIdx = existingCode.lastIndexOf('}');
-      if (insertIdx !== -1) {
-          let newMethods = '';
-          for (const { methodName } of routes) {
-              newMethods += `  async ${methodName}(req, res) {
+    let existingCode = fs.readFileSync(controllerFilePath, 'utf8');
+    const insertIdx = existingCode.lastIndexOf('}');
+    if (insertIdx !== -1) {
+      let newMethods = '';
+      for (const { methodName } of routes) {
+        newMethods += `  async ${methodName}(req, res) {
     try {
       const data = {
         body: req.body, query: req.query, params: req.params, headers: req.headers,
@@ -188,9 +188,9 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
       return res.status(status).json({ success: false, message: err.message || 'Lỗi server' });
     }
   }\n\n`;
-          }
-          controllerCode = existingCode.slice(0, insertIdx) + newMethods + existingCode.slice(insertIdx);
       }
+      controllerCode = existingCode.slice(0, insertIdx) + newMethods + existingCode.slice(insertIdx);
+    }
   } else {
     controllerCode = `'use strict';\nconst ${serviceVar} = require('../services/${serviceName}');\n\n`;
     controllerCode += `class ${controllerName} {\n`;
@@ -217,7 +217,7 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
 
   let newRouteCode = code;
   const controllerVar = controllerName.charAt(0).toLowerCase() + controllerName.slice(1);
-  
+
   for (const { methodName, block } of routes) {
     const handlerIdx = block.indexOf('async (req, res)');
     if (handlerIdx === -1) continue;
@@ -227,16 +227,16 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
   }
 
   if (!newRouteCode.includes(`${controllerName}')`)) {
-      newRouteCode = newRouteCode.replace(
-        /const router = express\.Router\(\);/,
-        `const router = express.Router();\nconst ${controllerVar} = require('../controllers/${controllerName}');`
-      );
+    newRouteCode = newRouteCode.replace(
+      /const router = express\.Router\(\);/,
+      `const router = express.Router();\nconst ${controllerVar} = require('../controllers/${controllerName}');`
+    );
   }
 
   for (const imp of importLines) {
     const orig = lines.find(l => l === imp);
     if (orig && !fs.existsSync(serviceFilePath)) {
-        newRouteCode = newRouteCode.replace(orig + '\n', '').replace(orig + '\r\n', '');
+      newRouteCode = newRouteCode.replace(orig + '\n', '').replace(orig + '\r\n', '');
     }
   }
 

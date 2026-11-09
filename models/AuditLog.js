@@ -1,5 +1,5 @@
 /**
- * AuditLog — nhật ký nghiệp vụ có old/new (bổ sung SystemLog HTTP).
+ * AuditLog - nhật ký nghiệp vụ có old/new (bổ sung SystemLog HTTP).
  */
 const mongoose = require('mongoose');
 

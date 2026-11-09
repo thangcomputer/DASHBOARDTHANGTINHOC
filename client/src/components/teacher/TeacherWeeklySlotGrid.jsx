@@ -301,7 +301,7 @@ export default function TeacherWeeklySlotGrid({
       return;
     }
     if (own && LOCKED_STATUSES.has(String(own.status))) {
-      toast.info('Buổi đã điểm danh — không đổi giờ từ bảng này.');
+      toast.info('Buổi đã điểm danh - không đổi giờ từ bảng này.');
       return;
     }
     if (dayOccupying && !own) {
@@ -329,7 +329,7 @@ export default function TeacherWeeklySlotGrid({
       const endTime = slotEndForStart(nextStart, own);
 
       if (isWeekSlotElapsed(dateKey, nextStart, endTime)) {
-        toast.error('Ca này đã kết thúc — chỉ xếp khung giờ hiện tại trở đi.');
+        toast.error('Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
         return;
       }
 
@@ -431,11 +431,10 @@ export default function TeacherWeeklySlotGrid({
               key={opt.id}
               type="button"
               onClick={() => setRosterFilter(opt.id)}
-              className={`flex min-h-[34px] min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 text-xs font-extrabold transition sm:text-xs ${
-                rosterFilter === opt.id
+              className={`flex min-h-[34px] min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1 text-xs font-extrabold transition sm:text-xs ${rosterFilter === opt.id
                   ? 'border-red-600 bg-red-600 text-white shadow-sm'
                   : 'border-slate-200 bg-white text-slate-500 hover:text-red-700'
-              }`}
+                }`}
               aria-pressed={rosterFilter === opt.id}
             >
               <span className="truncate">{opt.label}</span>
@@ -450,9 +449,8 @@ export default function TeacherWeeklySlotGrid({
               if (searchOpen) setNameQuery('');
               setSearchOpen((open) => !open);
             }}
-            className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border ${
-              searchOpen ? 'border-red-200 bg-red-50' : 'border-blue-100 bg-blue-50'
-            } text-red-600`}
+            className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border ${searchOpen ? 'border-red-200 bg-red-50' : 'border-blue-100 bg-blue-50'
+              } text-red-600`}
             aria-label={searchOpen ? 'Đóng tìm kiếm học viên' : 'Tìm học viên'}
             aria-expanded={searchOpen}
           >
@@ -527,9 +525,8 @@ export default function TeacherWeeklySlotGrid({
                   }}
                   aria-label="Sắp xếp theo tên"
                   title="Sắp xếp theo tên A–Z hoặc Z–A"
-                  className={`mt-1 h-7 w-full rounded-md border bg-white px-1 text-xs font-semibold text-slate-600 outline-none ${
-                    sort.kind === 'name' ? 'border-red-300 text-red-700' : 'border-slate-200'
-                  }`}
+                  className={`mt-1 h-7 w-full rounded-md border bg-white px-1 text-xs font-semibold text-slate-600 outline-none ${sort.kind === 'name' ? 'border-red-300 text-red-700' : 'border-slate-200'
+                    }`}
                 >
                   {sort.kind !== 'name' && <option value="">Tên</option>}
                   <option value="asc">A–Z</option>
@@ -543,9 +540,8 @@ export default function TeacherWeeklySlotGrid({
                 return (
                   <th
                     key={key}
-                    className={`w-[5rem] min-w-[5rem] border-b border-r border-slate-200 px-0.5 py-1.5 text-center align-bottom ${
-                      isToday ? 'bg-red-50/80' : ''
-                    }`}
+                    className={`w-[5rem] min-w-[5rem] border-b border-r border-slate-200 px-0.5 py-1.5 text-center align-bottom ${isToday ? 'bg-red-50/80' : ''
+                      }`}
                   >
                     <div className={`${past ? 'opacity-70' : ''}`}>
                       <div className={`text-xs font-black ${isToday ? 'text-red-700' : 'text-slate-700'}`}>
@@ -560,9 +556,8 @@ export default function TeacherWeeklySlotGrid({
                       onClick={() => setSortMenuDayIndex(i)}
                       aria-label={`Chọn sắp xếp lịch theo giờ ${WEEKDAY_LABELS[i]}`}
                       aria-haspopup="dialog"
-                      className={`mt-0.5 flex h-6 w-full items-center justify-center gap-0.5 rounded-md border px-1 text-xs font-semibold ${
-                        dayActive ? 'border-blue-200 bg-blue-50 text-red-700' : 'border-transparent text-slate-500 hover:bg-white'
-                      }`}
+                      className={`mt-0.5 flex h-6 w-full items-center justify-center gap-0.5 rounded-md border px-1 text-xs font-semibold ${dayActive ? 'border-blue-200 bg-blue-50 text-red-700' : 'border-transparent text-slate-500 hover:bg-white'
+                        }`}
                     >
                       <span>{dayActive ? (sort.dir === 'asc' ? '↑' : '↓') : 'Giờ'}</span>
                       {!dayActive ? <ChevronDown size={10} aria-hidden="true" /> : null}
@@ -599,7 +594,7 @@ export default function TeacherWeeklySlotGrid({
                   <td className="sticky left-0 z-10 h-[4.5rem] w-[8rem] min-w-[8rem] border-r border-slate-200 bg-white px-1.5 py-2 align-middle sm:px-2">
                     <p className="text-xs font-bold text-slate-900 truncate" title={name}>{name}</p>
                     <p className="line-clamp-2 text-xs font-medium text-slate-500">
-                      {student.course || '—'}
+                      {student.course || '-'}
                     </p>
                     <p className="text-xs font-medium text-slate-400">
                       {displayDone}/{totalSessions} buổi
@@ -618,7 +613,7 @@ export default function TeacherWeeklySlotGrid({
                       busy={busyKey === `${studentRowKey(student)}|${dateKey}`}
                       isToday={dateKey === todayKey}
                       now={now}
-                                      extraTakenRanges={otherTeacherRangesByDate.get(dateKey) || []}
+                      extraTakenRanges={otherTeacherRangesByDate.get(dateKey) || []}
                       onChange={handleSlotChange}
                     />
                   ))}
@@ -688,9 +683,8 @@ export default function TeacherWeeklySlotGrid({
                       setCourseFilter(course);
                       setCoursePickerOpen(false);
                     }}
-                    className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${
-                      selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
-                    }`}
+                    className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
+                      }`}
                   >
                     <span>{course || 'Tất cả khóa học'}</span>
                     {selected ? <Check size={17} className="shrink-0 text-red-600" /> : null}
@@ -752,9 +746,8 @@ export default function TeacherWeeklySlotGrid({
                     else setSort({ kind: 'day', dir: option.value, dayIndex: sortMenuDayIndex });
                     setSortMenuDayIndex(null);
                   }}
-                  className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${
-                    selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
-                  }`}
+                  className={`flex min-h-[46px] w-full items-center justify-between gap-3 rounded-xl px-2 text-left text-xs font-bold transition ${selected ? 'bg-blue-50 text-red-700' : 'text-slate-900 hover:bg-slate-50'
+                    }`}
                 >
                   <span>{option.label}</span>
                   {selected ? <Check size={17} className="shrink-0 text-red-600" /> : null}
@@ -813,7 +806,7 @@ function SlotCell({
   if (past || lockedDone) {
     const label = own
       ? (extra?.label || WEEK_SLOT_OPTIONS.find((o) => o.value === slotValue)?.label || slotValue)
-      : '—';
+      : '-';
     const tone = String(own?.status) === 'completed'
       ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
       : own
@@ -841,13 +834,12 @@ function SlotCell({
         data-native-select
         title={!own && !gate.canSchedule ? (gate.reason || 'Không xếp thêm được') : undefined}
         onChange={(e) => onChange(student, dateKey, e.target.value)}
-        className={`min-h-11 w-full min-w-0 max-w-full appearance-none rounded-md border border-transparent bg-none bg-transparent px-0 text-center text-xs font-semibold outline-none hover:bg-white/70 focus:border-red-300 focus:bg-white ${
-          own
+        className={`min-h-11 w-full min-w-0 max-w-full appearance-none rounded-md border border-transparent bg-none bg-transparent px-0 text-center text-xs font-semibold outline-none hover:bg-white/70 focus:border-red-300 focus:bg-white ${own
             ? 'text-amber-700'
             : 'text-slate-600'
-        } ${busy ? 'opacity-60' : ''} ${disabledAll ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+          } ${busy ? 'opacity-60' : ''} ${disabledAll ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       >
-        <option value="">—</option>
+        <option value="">-</option>
         {options.map((opt) => {
           const meta = weekSlotSelectMeta(opt, dateKey, {
             schedules,

@@ -48,7 +48,7 @@ function requireManageHr(subject) {
 }
 
 function evaluateListLike(subject) {
-  // branchFilter scopes DATA — not HTTP DENY
+  // branchFilter scopes DATA - not HTTP DENY
   return requireManageHr(subject);
 }
 

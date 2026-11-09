@@ -81,7 +81,7 @@ function resolveNavPath(path, notif) {
     targetPath = '/admin#' + targetPath.replace('/admin/', '');
   } else if (targetPath.startsWith('/student/') && !['/student/exam', '/student/inbox', '/student/notifications'].includes(targetPath) && !targetPath.includes('#')) {
     targetPath = '/student#' + targetPath.replace('/student/', '');
-  } else   if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/notifications'].includes(targetPath) && !targetPath.includes('#')) {
+  } else if (targetPath.startsWith('/teacher/') && !['/teacher/test', '/teacher/finance', '/teacher/inbox', '/teacher/profile', '/teacher/notifications'].includes(targetPath) && !targetPath.includes('#')) {
     targetPath = '/teacher#' + targetPath.replace('/teacher/', '');
   }
   if (
@@ -94,7 +94,7 @@ function resolveNavPath(path, notif) {
 }
 
 /**
- * Notification Center — trang đầy đủ thông báo hệ thống với Modal Chi tiết & cuộn trang mượt mà.
+ * Notification Center - trang đầy đủ thông báo hệ thống với Modal Chi tiết & cuộn trang mượt mà.
  */
 export default function NotificationCenterPage({ role = 'admin', session }) {
   const navigate = useNavigate();
@@ -655,8 +655,8 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                   <div className="flex justify-between border-b border-slate-50 pb-2">
                     <span className="text-slate-500">Người lập phiếu:</span>
                     <span className="font-bold text-slate-800">
-                      {quickPopup.notif.payload?.creatorName 
-                        ? `${quickPopup.notif.payload.creatorName} (${quickPopup.notif.payload.creatorRole})` 
+                      {quickPopup.notif.payload?.creatorName
+                        ? `${quickPopup.notif.payload.creatorName} (${quickPopup.notif.payload.creatorRole})`
                         : 'Hệ thống'}
                     </span>
                   </div>
@@ -798,11 +798,10 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
                       return (
                         <div
                           key={msg.id || `qa-msg-${idx}`}
-                          className={`rounded-lg border p-2.5 ${
-                            staffish
+                          className={`rounded-lg border p-2.5 ${staffish
                               ? 'bg-emerald-50 border-emerald-100'
                               : 'bg-white border-slate-200'
-                          }`}
+                            }`}
                         >
                           <p className={`text-[10px] font-black  mb-1 ${staffish ? 'text-emerald-700' : 'text-slate-500'}`}>
                             {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Học viên · ${msg.authorName || ''}`}
@@ -894,7 +893,7 @@ export default function NotificationCenterPage({ role = 'admin', session }) {
         />
       ) : null}
 
-      {/* ── StudentDetailModal — mở trực tiếp từ thông báo ── */}
+      {/* ── StudentDetailModal - mở trực tiếp từ thông báo ── */}
       {studentDetailId && (
         <StudentDetailModal
           studentId={studentDetailId}

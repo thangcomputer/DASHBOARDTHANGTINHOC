@@ -1,5 +1,5 @@
 /**
- * Phase 7.17 — Controlled cutover + production activation for /api/feed
+ * Phase 7.17 - Controlled cutover + production activation for /api/feed
  *
  * LIVE: authMiddleware → policyShadowFeed → feedCutoverGate → handler.
  * Auth-only for list/create/upload/like/react/comment/report/pin/report moderation.
@@ -64,10 +64,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -387,7 +387,7 @@ test('Phase7.17 rollback: remove feed → LEGACY; prior stay POLICY; restore →
 test('Phase7.17 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'files', 'schedules', 'messages', 'settings',
   ];
   for (const fam of legacyFamilies) {
@@ -456,8 +456,8 @@ test('Phase7.17 functional smoke: list authz; mutations NOT EXECUTED', () => {
   const student = sub({ id: AUTHOR, role: 'student' });
   assert.equal(parity('list', student).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/delete/like/react/comment/upload production mutation',
-    'NOT EXECUTED — create/delete/like/react/comment/upload production mutation',
+    'NOT EXECUTED - create/delete/like/react/comment/upload production mutation',
+    'NOT EXECUTED - create/delete/like/react/comment/upload production mutation',
   );
 });
 

@@ -8,7 +8,7 @@ const backupService = require('../services/backupService');
 const { enqueue } = require('../services/queue/jobQueue');
 
 /**
- * Phase 7.3 — Controlled cutover for /api/backups ONLY.
+ * Phase 7.3 - Controlled cutover for /api/backups ONLY.
  *
  * Default (POLICY_CUTOVER_ENABLED=false or backups not allowlisted):
  *   auth → policyShadowBackup → Legacy isSuperAdmin (via backupsCutoverGate) → handler
@@ -52,7 +52,7 @@ router.get('/', guard('list'), async (req, res) => {
   }
 });
 
-// POST /api/backups — tao backup (async qua queue)
+// POST /api/backups - tao backup (async qua queue)
 router.post('/', guard('create'), async (req, res) => {
   try {
     const job = await backupService.createBackupJob({

@@ -1,6 +1,6 @@
-# S3 — LIVE module alignment runbook
+# S3 - LIVE module alignment runbook
 
-**Status:** GATED — do not flip Enterprise PRIMARY  
+**Status:** GATED - do not flip Enterprise PRIMARY  
 **LIVE authority remains:** `constants/permissions.js` + `middleware/auth.js` + CutoverGate  
 **Prerequisite:** S0 matrix · S1 shadow catalog · S2 `dataScope` observe
 
@@ -10,12 +10,12 @@ This runbook defines **how** to align LIVE one module at a time. Each module PR 
 
 ## Order (mandatory)
 
-1. **student** — profiles, list/get, branch/teacher scope  
-2. **teacher** — view/manage, assign  
-3. **ticket** — support track (today proxied by `manage_messages` / inbox until dedicated ticket routes exist)  
-4. **class / enrollment** — schedule overlap  
-5. **finance** — keep `view_branch_revenue` ≠ `finance:view`  
-6. **settings / audit** — SUPER/HIGH forbidden lists  
+1. **student** - profiles, list/get, branch/teacher scope  
+2. **teacher** - view/manage, assign  
+3. **ticket** - support track (today proxied by `manage_messages` / inbox until dedicated ticket routes exist)  
+4. **class / enrollment** - schedule overlap  
+5. **finance** - keep `view_branch_revenue` ≠ `finance:view`  
+6. **settings / audit** - SUPER/HIGH forbidden lists  
 
 Do not start module N+1 until module N has: scope filter server-side, tests, and no Enterprise promote.
 
@@ -33,7 +33,7 @@ Do not start module N+1 until module N has: scope filter server-side, tests, and
 
 ---
 
-## Module 1 — student (started)
+## Module 1 - student (started)
 
 ### LIVE keys
 
@@ -42,7 +42,7 @@ Do not start module N+1 until module N has: scope filter server-side, tests, and
 | List / manage | `manage_students` | `student:view|create|update|delete` |
 | Teacher list own | role `teacher` bypass on list | scope `OWN_AND_ASSIGNED_CLASS` |
 
-### Wired (observe — no deny change)
+### Wired (observe - no deny change)
 
 - `GET /api/students` → `dataScopeObserve('student')` after `policyShadowStudentRead('list')`  
 - Helpers: `shared/security/authorization/dataScope.js`  
@@ -58,7 +58,7 @@ Do not start module N+1 until module N has: scope filter server-side, tests, and
 
 ---
 
-## Module 2 — teacher (pending)
+## Module 2 - teacher (pending)
 
 - LIVE: `view_teachers`, `manage_teachers`  
 - Keep manage ≠ view  
@@ -66,30 +66,30 @@ Do not start module N+1 until module N has: scope filter server-side, tests, and
 
 ---
 
-## Module 3 — ticket (pending)
+## Module 3 - ticket (pending)
 
-- No dedicated ticket HTTP module yet — messaging + `manage_messages`  
+- No dedicated ticket HTTP module yet - messaging + `manage_messages`  
 - Target: `ticket:close|archive` for SUPPORT; no `ticket:delete`  
 - Observe today: `GET /api/messages/contacts` + `dataScopeObserve('message')`  
 - When ticket routes land: mount observe then gated enforce  
 
 ---
 
-## Module 4 — class / enrollment (pending)
+## Module 4 - class / enrollment (pending)
 
 - Split from `manage_schedule` / `manage_students` enrollments  
 - STAFF branch/assigned; TEACHER assigned class only  
 
 ---
 
-## Module 5 — finance (pending)
+## Module 5 - finance (pending)
 
 - Never collapse `view_branch_revenue` into `finance:view`  
 - Destructive refund/delete: SUPER/HIGH preference; STAFF scoped  
 
 ---
 
-## Module 6 — settings / audit (pending)
+## Module 6 - settings / audit (pending)
 
 - HIGH: no high system config CRUD; no audit delete  
 - STAFF/SUPPORT: no settings, no full audit  

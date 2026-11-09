@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Phase 10 — realistic messaging load runner.
+ * Phase 10 - realistic messaging load runner.
  * Usage: node tests/load/messaging/runLoad.js
  * Optional: PHASE10_TIERS=100,250,500,1000 PHASE10_PORT=5020
  */
@@ -148,7 +148,7 @@ async function runMultiTabProbe(origin, actor) {
   const { connectClient } = require('./harness');
   const a = await connectClient(actor, origin);
   const b = await connectClient(actor, origin);
-  // latest socket preference: send from another peer if available — just verify both registered
+  // latest socket preference: send from another peer if available - just verify both registered
   const result = {
     status: 'ok',
     sockets: [a.id, b.id],
@@ -338,19 +338,19 @@ async function runTier({
   const classification = abort
     ? 'FAIL'
     : classifyTier({
-        connectionSuccessRate: connSuccessRate,
-        messageSuccessRate,
-        deliverySuccessRate,
-        wrongRecipient: dm.wrongRecipient,
-        crossTenant: dm.crossTenant,
-        p95DeliveryMs: dm.deliveryLatency.p95,
-        peakCpuPct: resources.peakCpuPct,
-        peakRssMb: resources.peakRssMb,
-        eventLoopP99Ms: resources.eventLoop.p99,
-        stoppedReason: abort,
-      });
+      connectionSuccessRate: connSuccessRate,
+      messageSuccessRate,
+      deliverySuccessRate,
+      wrongRecipient: dm.wrongRecipient,
+      crossTenant: dm.crossTenant,
+      p95DeliveryMs: dm.deliveryLatency.p95,
+      peakCpuPct: resources.peakCpuPct,
+      peakRssMb: resources.peakRssMb,
+      eventLoopP99Ms: resources.eventLoop.p99,
+      stoppedReason: abort,
+    });
 
-  // Soft degrade if HIGH rate would be unsafe — optional short HIGH probe only when PASS so far
+  // Soft degrade if HIGH rate would be unsafe - optional short HIGH probe only when PASS so far
   let highProbe = null;
   if (classification === 'PASS' && tier <= 500) {
     for (const s of allSockets) s.__inbox = [];
@@ -448,7 +448,7 @@ async function main() {
     evidence.contacts = await runContactsProbe(origin, dataset.actors);
     console.log('[P10] Contacts probe', evidence.contacts);
 
-    // Broadcast AFTER some connections for emission cost — run mid-suite after 100
+    // Broadcast AFTER some connections for emission cost - run mid-suite after 100
     evidence.multiTab = await runMultiTabProbe(
       origin,
       dataset.actors.find((a) => a.adminRole === 'SUPPORT'),
@@ -472,8 +472,8 @@ async function main() {
       evidence.tiers[String(tier)] = serializable;
       console.log(
         `[P10] Tier ${tier}: ${result.classification} conn=${result.connection?.connected}/${result.connection?.attempted} ` +
-          `dm sendOk=${result.dm?.sendOk} deliveryOk=${result.dm?.deliveryOk} wrong=${result.dm?.wrongRecipient} ` +
-          `p95=${result.dm?.deliveryLatency?.p95} cpu=${result.resources?.peakCpuPct} rss=${result.resources?.peakRssMb}`,
+        `dm sendOk=${result.dm?.sendOk} deliveryOk=${result.dm?.deliveryOk} wrong=${result.dm?.wrongRecipient} ` +
+        `p95=${result.dm?.deliveryLatency?.p95} cpu=${result.resources?.peakCpuPct} rss=${result.resources?.peakRssMb}`,
       );
 
       if (tier === 100) {
@@ -489,7 +489,7 @@ async function main() {
             crossTenant: result.dm.crossTenant,
             tier,
           };
-          console.error('[P10] SECURITY STOP — isolation failure under load');
+          console.error('[P10] SECURITY STOP - isolation failure under load');
         }
       }
     }

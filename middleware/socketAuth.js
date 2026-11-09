@@ -1,5 +1,5 @@
 /**
- * Socket.io auth — mirror HTTP authMiddleware (blacklist + tokenVersion).
+ * Socket.io auth - mirror HTTP authMiddleware (blacklist + tokenVersion).
  */
 const jwt = require('jsonwebtoken');
 const blacklist = require('./tokenBlacklist');

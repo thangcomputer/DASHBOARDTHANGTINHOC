@@ -1,5 +1,5 @@
 /**
- * Khóa màn hình bằng mã PIN — lưu riêng trên từng thiết bị (không gửi lên server).
+ * Khóa màn hình bằng mã PIN - lưu riêng trên từng thiết bị (không gửi lên server).
  * Mã PIN chỉ lưu dạng băm SHA-256 có muối.
  */
 

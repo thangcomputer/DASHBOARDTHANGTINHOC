@@ -157,7 +157,7 @@ export const MaterialsView = ({ trainingData, studentQuestions, onSelectAssignme
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-gray-800 truncate">{m.title}</p>
                     <p className="text-xs text-gray-400 line-clamp-2">
-                      {htmlToPlainText(m.desc) || '—'} {m.fileSize ? `• ${m.fileSize}` : ''}
+                      {htmlToPlainText(m.desc) || '-'} {m.fileSize ? `• ${m.fileSize}` : ''}
                     </p>
                   </div>
                 </div>

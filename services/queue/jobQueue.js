@@ -146,7 +146,7 @@ async function enqueue(kind, name, data, opts = {}) {
     }
   }
 
-  // Inline: khong block request — chay o tick tiep theo
+  // Inline: khong block request - chay o tick tiep theo
   const inlineId = jobId ? String(jobId) : `inline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   setImmediate(() => {
     runInline(kind, name, data).catch((err) => {

@@ -1,4 +1,4 @@
-# Enrollment Service Review — Sprint 4.3 Batch 2
+# Enrollment Service Review - Sprint 4.3 Batch 2
 
 ## Domain: `enrollment`
 

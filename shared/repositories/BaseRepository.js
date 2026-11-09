@@ -12,7 +12,7 @@ const cacheManager = require('../cache/CacheManager');
 class BaseRepository {
   constructor(model) {
     this.model = model;
-    
+
     // Performance Metrics
     this.metrics = {
       queryCount: 0,
@@ -23,7 +23,7 @@ class BaseRepository {
       maximumDuration: 0,
     };
   }
-  
+
   get averageDuration() {
     const totalCalls = this.metrics.queryCount + this.metrics.aggregateCount;
     if (totalCalls === 0) return 0;
@@ -166,7 +166,7 @@ class BaseRepository {
       return docs[0];
     });
   }
-  
+
   createInstance(data) {
     return new this.model(data);
   }

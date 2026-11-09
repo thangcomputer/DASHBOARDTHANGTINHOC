@@ -69,12 +69,12 @@ const STUDENT_STATUS_HINT = {
 
 function teacherStatusLabel(s) {
   const k = String(s || '').toLowerCase();
-  return TEACHER_STATUS_LABEL[k] || s || '—';
+  return TEACHER_STATUS_LABEL[k] || s || '-';
 }
 
 function studentStatusLabel(s) {
   const k = String(s || '').toLowerCase();
-  return STUDENT_STATUS_HINT[k] || s || '—';
+  return STUDENT_STATUS_HINT[k] || s || '-';
 }
 
 /**

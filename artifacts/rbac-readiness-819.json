@@ -27,7 +27,7 @@
     "teacher": "NOT_EVALUATED",
     "studentTraining": "NOT_EVALUATED",
     "legacyPrincipal": "NOT_EVALUATED",
-    "note": "No STAGING/PRODUCTION RUNTIME evidence — domains NOT_EVALUATED (not FAIL)"
+    "note": "No STAGING/PRODUCTION RUNTIME evidence - domains NOT_EVALUATED (not FAIL)"
   },
   "finalDecisionInvariant": "PASS",
   "unsupportedLegacy": [
@@ -74,6 +74,6 @@
     "notEvaluatedIsNotFail": true,
     "notEvaluatedStillBlocksPrimary": true
   },
-  "note": "NOT_EVALUATED ≠ FAIL and ≠ PASS. NOT_EVALUATED still blocks ENTERPRISE_PRIMARY_READY. ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only — never auto-promote.",
+  "note": "NOT_EVALUATED ≠ FAIL and ≠ PASS. NOT_EVALUATED still blocks ENTERPRISE_PRIMARY_READY. ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only - never auto-promote.",
   "generatedAt": "2026-11-05T17:45:29.228Z"
 }

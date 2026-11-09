@@ -59,7 +59,7 @@ export function ScheduleProvider({ user, children }) {
     { revalidateOnFocus: false, dedupingInterval: 45_000 }
   );
 
-  // Force fetch — tránh kẹt cache SWR / sync 15s khi Admin xếp/hủy lịch.
+  // Force fetch - tránh kẹt cache SWR / sync 15s khi Admin xếp/hủy lịch.
   const refreshSchedules = useCallback(() => {
     const k = scheduleKey(userRef.current);
     if (!k) return mutate();
@@ -71,7 +71,7 @@ export function ScheduleProvider({ user, children }) {
     if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
     refreshDebounceRef.current = setTimeout(() => {
       refreshDebounceRef.current = null;
-      Promise.resolve(refreshSchedules()).catch(() => {});
+      Promise.resolve(refreshSchedules()).catch(() => { });
     }, 150);
   }, [refreshSchedules]);
 
@@ -86,7 +86,7 @@ export function ScheduleProvider({ user, children }) {
     if (!socket || !key) return undefined;
     const onEvt = (eventName) => (payload) => {
       let patched = false;
-      // Patch tức thì — HV thấy hủy/đổi lịch trước khi refetch xong
+      // Patch tức thì - HV thấy hủy/đổi lịch trước khi refetch xong
       if (eventName === 'schedule:cancelled' && payload) {
         const sid = String(payload.scheduleId || payload._id || payload.id || '');
         if (sid) {
@@ -175,7 +175,7 @@ export function ScheduleProvider({ user, children }) {
 export function useScheduleContext() {
   const ctx = useContext(ScheduleContext);
   if (!ctx) {
-    return { schedules: [], refreshSchedules: async () => {}, setSchedulesLocal: () => {}, isSchedulesLoading: false };
+    return { schedules: [], refreshSchedules: async () => { }, setSchedulesLocal: () => { }, isSchedulesLoading: false };
   }
   return ctx;
 }

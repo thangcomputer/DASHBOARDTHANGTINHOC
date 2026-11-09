@@ -1,10 +1,10 @@
 /**
  * webhookRoutes.js
  *
- * POST /api/webhooks/sepay              — SePay gọi khi có tiền vào TK
- * GET  /api/webhooks/payment-status/:id — Polling kiểm tra HV đã thanh toán
- * POST /api/webhooks/payment-session    — Tạo session thanh toán tạm (đăng ký mới)
- * GET  /api/webhooks/payment-session/:id — Kiểm tra session
+ * POST /api/webhooks/sepay              - SePay gọi khi có tiền vào TK
+ * GET  /api/webhooks/payment-status/:id - Polling kiểm tra HV đã thanh toán
+ * POST /api/webhooks/payment-session    - Tạo session thanh toán tạm (đăng ký mới)
+ * GET  /api/webhooks/payment-session/:id - Kiểm tra session
  */
 
 const express = require('express');
@@ -41,10 +41,10 @@ function verifySepaySignature(req, res, next) {
 
   if (!apiKey && !hmacSecret) {
     if (process.env.NODE_ENV === 'production') {
-      logger.error('[SEPAY] Webhook rejected — API Key / HMAC secret not configured');
+      logger.error('[SEPAY] Webhook rejected - API Key / HMAC secret not configured');
       return res.status(503).json({ success: false, message: 'Webhook payment not configured' });
     }
-    logger.warn('[SEPAY] Dev mode — webhook verification skipped (no SEPAY keys)');
+    logger.warn('[SEPAY] Dev mode - webhook verification skipped (no SEPAY keys)');
     req.sepayVerificationStatus = 'dev_skip';
     return next();
   }
@@ -150,7 +150,7 @@ const handleCreateSession = async (req, res) => {
     }
 
     const sessionId = `ps_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    
+
     await PaymentSession.create({
       sessionId,
       ref: finalRef,
@@ -168,7 +168,7 @@ const handleCreateSession = async (req, res) => {
       teacherAlert: String(teacherAlert || '').slice(0, 500),
     });
 
-    logger.info(`[PAYMENT SESSION] Tạo mới (DB): ${sessionId} — ref: "${finalRef}"`);
+    logger.info(`[PAYMENT SESSION] Tạo mới (DB): ${sessionId} - ref: "${finalRef}"`);
     return res.json({
       success: true,
       sessionId,
@@ -232,7 +232,7 @@ const handleCheckSession = async (req, res) => {
   try {
     const sessionId = req.params.id || req.query.sessionId;
     if (!sessionId) {
-       return res.status(400).json({ success: false, message: 'Missing sessionId' });
+      return res.status(400).json({ success: false, message: 'Missing sessionId' });
     }
 
     const session = await PaymentSession.findOne({ sessionId });
@@ -271,13 +271,13 @@ router.get('/payment-status', authMiddleware, policyShadowFinance('wh_payment_se
 
 
 // ── POST /api/webhooks/sepay ── SePay Webhook (HMAC verified) ──────────────────
-// Policy SHADOW after Legacy verification — never re-verifies / never mutates finance
+// Policy SHADOW after Legacy verification - never re-verifies / never mutates finance
 router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async (req, res) => {
   try {
     const SepayWebhookEvent = require('../models/SepayWebhookEvent');
     const body = req.body;
     const content = (body.content || body.description || '').toLowerCase().trim();
-    const amount  = Number(body.transferAmount || body.amount || 0);
+    const amount = Number(body.transferAmount || body.amount || 0);
     let gatewayTxnId = String(
       body.id || body.transactionID || body.transaction_id || body.referenceCode || body.transferId || ''
     ).trim();
@@ -295,7 +295,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
         .digest('hex')
         .slice(0, 40);
       if (process.env.NODE_ENV === 'production') {
-        logger.warn('[SEPAY] Missing gateway txn id — using content hash fallback');
+        logger.warn('[SEPAY] Missing gateway txn id - using content hash fallback');
       }
     }
 
@@ -333,7 +333,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
               matchedRef: existing.matchedRef || '',
             });
           }
-          logger.warn(`[SEPAY] Duplicate gatewayTxnId chưa matched — rematch: ${gatewayTxnId}`);
+          logger.warn(`[SEPAY] Duplicate gatewayTxnId chưa matched - rematch: ${gatewayTxnId}`);
         } else {
           throw dupErr;
         }
@@ -377,14 +377,14 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             });
             matched = true;
             matchedRef = claimed.ref;
-            logger.info(`[SEPAY] Video-course session ${claimed.sessionId} — ${amount}đ`);
+            logger.info(`[SEPAY] Video-course session ${claimed.sessionId} - ${amount}đ`);
           } else if (String(claimed.kind || 'tuition') === 'daily_practice_xp') {
             const { fulfillDailyPracticeXpPurchase } = require('../services/dailyPracticeService');
             const credited = await fulfillDailyPracticeXpPurchase({ session: claimed, amount });
             matched = true;
             matchedRef = claimed.ref;
             logger.info(
-              `[SEPAY] Daily-practice XP session ${claimed.sessionId} — +${credited.xp || 0} XP student ${claimed.studentId} — ${amount}đ`,
+              `[SEPAY] Daily-practice XP session ${claimed.sessionId} - +${credited.xp || 0} XP student ${claimed.studentId} - ${amount}đ`,
             );
           } else if (String(claimed.kind || 'tuition') === 'course_purchase') {
             const { fulfillCoursePurchase } = require('../services/lessonPracticePurchaseService');
@@ -403,7 +403,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matched = true;
             matchedRef = claimed.ref;
             logger.info(
-              `[SEPAY] Course-purchase session ${claimed.sessionId} — student ${purchase.studentId} course ${purchase.courseId} — ${amount}đ`,
+              `[SEPAY] Course-purchase session ${claimed.sessionId} - student ${purchase.studentId} course ${purchase.courseId} - ${amount}đ`,
             );
           } else if (String(claimed.kind || 'tuition') === 'subscription_renewal') {
             const { fulfillSubscriptionPayment } = require('../services/subscriptionService');
@@ -423,7 +423,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matched = true;
             matchedRef = claimed.ref;
             logger.info(
-              `[SEPAY] Subscription session ${claimed.sessionId} — student ${renewal.studentId} plan ${renewal.plan} — ${amount}đ`,
+              `[SEPAY] Subscription session ${claimed.sessionId} - student ${renewal.studentId} plan ${renewal.plan} - ${amount}đ`,
             );
           } else if (String(claimed.kind || 'tuition') === 'admin_enrollment') {
             const { fulfillAdminEnrollmentPayment } = require('../services/adminEnrollmentPaymentService');
@@ -454,79 +454,79 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
             matched = true;
             matchedRef = claimed.ref;
             logger.info(
-              `[SEPAY] Admin enrollment session ${claimed.sessionId} — student ${claimed.studentId} enrollment ${enrollment._id} — ${amount}đ`,
+              `[SEPAY] Admin enrollment session ${claimed.sessionId} - student ${claimed.studentId} enrollment ${enrollment._id} - ${amount}đ`,
             );
           } else {
             const { settlePayment } = require('../services/ledgerService');
-          await settlePayment({
-            student: claimed.studentId
-              ? { _id: claimed.studentId, branchId: claimed.branchId || null }
-              : { _id: null, branchId: claimed.branchId || null },
-            amount,
-            courseName: claimed.courseName || '',
-            source: 'sepay_session',
-            sourceRef: claimed.sessionId,
-            idempotencyKey: `payment:sepay:session:${claimed.sessionId}`,
-            actor: { id: 'sepay', role: 'system' },
-            note: String(body.content || '').slice(0, 300),
-            metadata: {
-              sessionId: claimed.sessionId,
-              ref: claimed.ref,
-              studentName: claimed.studentName || '',
-            },
-            reqMeta: { ip: req.ip, userAgent: 'sepay-webhook', branchId: claimed.branchId || null },
-          });
-          matched = true;
-          matchedRef = claimed.ref;
-          logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" — ${amount}đ (+Ledger)`);
-
-          // Update student if studentId is present (re-enroll sau hoàn → enrollment mới sạch)
-          if (claimed.studentId) {
-            try {
-              const Student = require('../models/Student');
-              const Course = require('../models/Course');
-              const { applyReEnrollmentAfterPayment } = require('../services/enrollmentService');
-
-              let totalSessions = 12;
-              if (claimed.courseId) {
-                const courseDoc = await Course.findById(claimed.courseId).select('totalSessions').lean();
-                if (Number(courseDoc?.totalSessions) > 0) totalSessions = Number(courseDoc.totalSessions);
-              }
-
-              const studentDoc = await Student.findById(claimed.studentId);
-              if (studentDoc) {
-                await applyReEnrollmentAfterPayment(studentDoc, {
-                  courseName: claimed.courseName || '',
-                  courseId: claimed.courseId || null,
-                  branchId: claimed.branchId || null,
-                  branchCode: claimed.branchCode || '',
-                  amount,
-                  totalSessions,
-                  learningMode: 'OFFLINE',
-                });
-                studentDoc.paidNote = String(body.content || '').slice(0, 300);
-                await studentDoc.save({ validateModifiedOnly: true });
-                logger.info(`[SEPAY] Re-enrolled student ${claimed.studentId} with fresh enrollment (${totalSessions} buổi)`);
-              }
-            } catch (stuErr) {
-              logger.error(`[SEPAY] Failed to update student ${claimed.studentId} from session: %s`, stuErr.message);
-            }
-          }
-
-          const io = req.app.get('io');
-          if (io) {
-            emitFinanceEvent(io, {
-              branchId: claimed.branchId || null,
-              userIds: claimed.studentId ? [claimed.studentId] : [],
-            }, 'tuition:paid', {
-              sessionId: claimed.sessionId,
+            await settlePayment({
+              student: claimed.studentId
+                ? { _id: claimed.studentId, branchId: claimed.branchId || null }
+                : { _id: null, branchId: claimed.branchId || null },
               amount,
-              message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+              courseName: claimed.courseName || '',
+              source: 'sepay_session',
+              sourceRef: claimed.sessionId,
+              idempotencyKey: `payment:sepay:session:${claimed.sessionId}`,
+              actor: { id: 'sepay', role: 'system' },
+              note: String(body.content || '').slice(0, 300),
+              metadata: {
+                sessionId: claimed.sessionId,
+                ref: claimed.ref,
+                studentName: claimed.studentName || '',
+              },
+              reqMeta: { ip: req.ip, userAgent: 'sepay-webhook', branchId: claimed.branchId || null },
             });
-          }
+            matched = true;
+            matchedRef = claimed.ref;
+            logger.info(`[SEPAY] Session ${claimed.sessionId} khớp ref="${claimed.ref}" - ${amount}đ (+Ledger)`);
+
+            // Update student if studentId is present (re-enroll sau hoàn → enrollment mới sạch)
+            if (claimed.studentId) {
+              try {
+                const Student = require('../models/Student');
+                const Course = require('../models/Course');
+                const { applyReEnrollmentAfterPayment } = require('../services/enrollmentService');
+
+                let totalSessions = 12;
+                if (claimed.courseId) {
+                  const courseDoc = await Course.findById(claimed.courseId).select('totalSessions').lean();
+                  if (Number(courseDoc?.totalSessions) > 0) totalSessions = Number(courseDoc.totalSessions);
+                }
+
+                const studentDoc = await Student.findById(claimed.studentId);
+                if (studentDoc) {
+                  await applyReEnrollmentAfterPayment(studentDoc, {
+                    courseName: claimed.courseName || '',
+                    courseId: claimed.courseId || null,
+                    branchId: claimed.branchId || null,
+                    branchCode: claimed.branchCode || '',
+                    amount,
+                    totalSessions,
+                    learningMode: 'OFFLINE',
+                  });
+                  studentDoc.paidNote = String(body.content || '').slice(0, 300);
+                  await studentDoc.save({ validateModifiedOnly: true });
+                  logger.info(`[SEPAY] Re-enrolled student ${claimed.studentId} with fresh enrollment (${totalSessions} buổi)`);
+                }
+              } catch (stuErr) {
+                logger.error(`[SEPAY] Failed to update student ${claimed.studentId} from session: %s`, stuErr.message);
+              }
+            }
+
+            const io = req.app.get('io');
+            if (io) {
+              emitFinanceEvent(io, {
+                branchId: claimed.branchId || null,
+                userIds: claimed.studentId ? [claimed.studentId] : [],
+              }, 'tuition:paid', {
+                sessionId: claimed.sessionId,
+                amount,
+                message: `✅ Đã nhận ${amount.toLocaleString('vi-VN')}đ`,
+              });
+            }
           } // end else tuition session
         } catch (ledgerErr) {
-          logger.error('[SEPAY] session ledger FAILED — rollback session: %s', ledgerErr.message);
+          logger.error('[SEPAY] session ledger FAILED - rollback session: %s', ledgerErr.message);
           try {
             await PaymentSession.findByIdAndUpdate(claimed._id, {
               $set: { status: 'pending' },
@@ -539,7 +539,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
       }
     }
 
-    // ── 2. Học viên hiện có: studentCode OR legacyStudentCodes — FAIL CLOSED nếu >1 ─
+    // ── 2. Học viên hiện có: studentCode OR legacyStudentCodes - FAIL CLOSED nếu >1 ─
     if (!matched) {
       const {
         extractStudentCodeCandidates,
@@ -549,15 +549,15 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
 
       const unpaid = variants.length
         ? await Student.find({
-            paid: false,
-            $or: [
-              { studentCode: { $in: variants } },
-              { legacyStudentCodes: { $in: variants } },
-            ],
-          })
-            .select('studentCode legacyStudentCodes name price paid enrollments course branchId')
-            .limit(50)
-            .lean()
+          paid: false,
+          $or: [
+            { studentCode: { $in: variants } },
+            { legacyStudentCodes: { $in: variants } },
+          ],
+        })
+          .select('studentCode legacyStudentCodes name price paid enrollments course branchId')
+          .limit(50)
+          .lean()
         : [];
 
       const selection = selectUnpaidStudentCandidates(unpaid, content, amount);
@@ -565,7 +565,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
       if (selection.status === 'ambiguous') {
         const ids = selection.candidates.map((c) => String(c.student._id));
         logger.error(
-          '[SEPAY] FAIL CLOSED multi-match unpaid students — no settlement. ids=%j identities=%j amount=%s',
+          '[SEPAY] FAIL CLOSED multi-match unpaid students - no settlement. ids=%j identities=%j amount=%s',
           ids,
           selection.candidates.map((c) => c.matchedIdentity),
           amount,
@@ -685,7 +685,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
               hoTen: updated.name || s.name,
               khoaHoc: settledCourseName || updated.course || unpaidEnr?.courseName || 'Học phí',
               hocPhi: amount,
-              ghiChu: `SePay CK — ${String(body.content || '').slice(0, 120)}`,
+              ghiChu: `SePay CK - ${String(body.content || '').slice(0, 120)}`,
             });
           } catch (invErr) {
             logger.warn('[SEPAY] Invoice create skipped:', invErr.message);
@@ -712,7 +712,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
               reqMeta: { ip: req.ip, userAgent: 'sepay-webhook', branchId: updated.branchId },
             });
           } catch (ledgerErr) {
-            logger.error('[SEPAY] ledger settle FAILED — rollback paid: %s', ledgerErr.message);
+            logger.error('[SEPAY] ledger settle FAILED - rollback paid: %s', ledgerErr.message);
             try {
               if (needsFreshEnrollment) {
                 // Gỡ enrollment vừa thêm; giữ các enrollment cancelled cũ
@@ -784,7 +784,7 @@ router.post('/sepay', verifySepaySignature, policyShadowWebhook('sepay'), async 
     }
 
     if (!matched) {
-      logger.warn('[SEPAY] Không match được — contentLen=', content.length);
+      logger.warn('[SEPAY] Không match được - contentLen=', content.length);
     }
 
     return res.json({ success: true });

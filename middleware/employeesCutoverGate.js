@@ -1,8 +1,8 @@
 /**
- * Phase 7.29 — Controlled cutover gate for LIVE /api/employees ONLY.
+ * Phase 7.29 - Controlled cutover gate for LIVE /api/employees ONLY.
  *
  * LEGACY (default):
- *   checkPermission(MANAGE_HR) — retained here.
+ *   checkPermission(MANAGE_HR) - retained here.
  *   Cross-branch mutation checks remain handler-owned on Legacy path.
  *
  * POLICY (env opt-in): Policy decision is HTTP authority (incl. cross-branch mirrors).
@@ -89,7 +89,7 @@ function employeesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] employees authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] employees authority helper failed - Legacy gate',
       );
     }
 
@@ -134,7 +134,7 @@ function employeesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] employees Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] employees Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

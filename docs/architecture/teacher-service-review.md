@@ -1,4 +1,4 @@
-# Teacher Service Review — Sprint 4.3 Batch 2
+# Teacher Service Review - Sprint 4.3 Batch 2
 
 ## Domain: `teacher`
 

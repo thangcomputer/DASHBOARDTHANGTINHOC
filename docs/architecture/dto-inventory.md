@@ -1,4 +1,4 @@
-# DTO Inventory — Phase 1 Analysis
+# DTO Inventory - Phase 1 Analysis
 
 This document maps all identified `req.body`, `req.query`, `req.params`, and `req.file` dependencies accessed within the Application Service Layer.
 

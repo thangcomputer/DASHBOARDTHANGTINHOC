@@ -110,7 +110,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
         setForm((f) => {
           const matched = findCourse(res.data, f.courseId || f.course);
           if (!matched) return f;
-          // Chỉ gắn courseId/name — giữ số buổi thủ công đã có trên HV
+          // Chỉ gắn courseId/name - giữ số buổi thủ công đã có trên HV
           return {
             ...f,
             courseId: String(matched._id),
@@ -119,7 +119,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
           };
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [API]);
 
   const handleCourseSelect = (e) => {
@@ -330,7 +330,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
                     const sessions = courseDefaultSessions(c);
                     return (
                       <option key={c._id} value={c._id}>
-                        {c.name} — {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
+                        {c.name} - {ep.toLocaleString('vi-VN')}đ ({sessions} buổi)
                       </option>
                     );
                   })}
@@ -421,7 +421,7 @@ export default function EditStudentModal({ student, onSave, onClose, teachers, o
                   if (!bid) return false;
                   return teacherInStudentBranch(t, bid);
                 }).map((t) => (
-                  <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.phone ? ` — ${t.phone}` : ''}</option>
+                  <option key={t.id || t._id} value={t.id || t._id}>{t.name}{t.phone ? ` - ${t.phone}` : ''}</option>
                 ))}
               </CmsSelect>
             </div>

@@ -99,7 +99,7 @@ export function StudentsProvider({ user, children }) {
 
   const fetchStudentsPaginated = useCallback(async (params = {}) => {
     const prev = adminQueryRef.current;
-    // Merge với query hiện tại — gọi chỉ { page } không được xóa branch/filter
+    // Merge với query hiện tại - gọi chỉ { page } không được xóa branch/filter
     const q = {
       page: params.page != null ? params.page : (prev?.page || 1),
       limit: params.limit != null ? params.limit : (prev?.limit || 10),
@@ -143,7 +143,7 @@ export function StudentsProvider({ user, children }) {
           currentPage: res.currentPage || 1,
         },
       };
-      // Hook mutate gắn key SWR hiện tại (null khi F5) — ghi đúng key sắp đọc.
+      // Hook mutate gắn key SWR hiện tại (null khi F5) - ghi đúng key sắp đọc.
       if (nextKey) {
         await globalMutate(nextKey, payload, { revalidate: false });
       } else {
@@ -153,13 +153,13 @@ export function StudentsProvider({ user, children }) {
     return res;
   }, [mutate]);
 
-  // Force fetch — tránh kẹt cache SWR (dedupe 30s) khi Admin điểm danh bù.
+  // Force fetch - tránh kẹt cache SWR (dedupe 30s) khi Admin điểm danh bù.
   const refreshStudents = useCallback(() => {
     const role = userRef.current?.role;
     const q = adminQueryRef.current;
     const k = studentsKey(userRef.current, q);
     if (!k) return mutate();
-    // Admin giữ mutate() thường — danh sách phân trang do fetchStudentsPaginated / useAdminStudents lo.
+    // Admin giữ mutate() thường - danh sách phân trang do fetchStudentsPaginated / useAdminStudents lo.
     if (role === 'admin' || role === 'staff') return mutate();
     return mutate(async () => fetchStudents(k), { revalidate: false, populateCache: true });
   }, [mutate]);
@@ -170,7 +170,7 @@ export function StudentsProvider({ user, children }) {
     if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
     refreshDebounceRef.current = setTimeout(() => {
       refreshDebounceRef.current = null;
-      Promise.resolve(refreshStudents()).catch(() => {});
+      Promise.resolve(refreshStudents()).catch(() => { });
     }, 120);
   }, [refreshStudents]);
 
@@ -212,7 +212,7 @@ export function StudentsProvider({ user, children }) {
     return () => socket.off('attendance:locked', handleAttendanceLocked);
   }, [socket, setStudentsLocal, scheduleStudentsRefresh]);
 
-  // Gán GV / reset lịch sử / student:updated — không luôn kèm type: 'student' trên payload.
+  // Gán GV / reset lịch sử / student:updated - không luôn kèm type: 'student' trên payload.
   useEffect(() => {
     if (!socket) return undefined;
     if (user?.role !== 'teacher' && user?.role !== 'student') return undefined;
@@ -224,7 +224,7 @@ export function StudentsProvider({ user, children }) {
     };
   }, [socket, user?.role, scheduleStudentsRefresh]);
 
-  // data:refresh type student — Admin makeup đã emit; GV trước đây bỏ qua (useDataSync không refetch students).
+  // data:refresh type student - Admin makeup đã emit; GV trước đây bỏ qua (useDataSync không refetch students).
   useEffect(() => {
     if (!onDataRefresh) return undefined;
     const role = user?.role;
@@ -277,10 +277,10 @@ export function useStudentsContext() {
     return {
       students: [],
       studentsPagination: EMPTY_PAGINATION,
-      fetchStudentsPaginated: async () => {},
-      refreshStudents: async () => {},
-      patchStudent: () => {},
-      setStudentsLocal: () => {},
+      fetchStudentsPaginated: async () => { },
+      refreshStudents: async () => { },
+      patchStudent: () => { },
+      setStudentsLocal: () => { },
       isStudentsLoading: false,
     };
   }

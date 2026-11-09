@@ -1,4 +1,4 @@
-# Messaging pairing matrix — Phase 8.24
+# Messaging pairing matrix - Phase 8.24
 
 **Status:** LIVE messaging ACL  
 **Enterprise:** untouched / SHADOW ONLY  
@@ -30,7 +30,7 @@ One conversation per real peer pair; allow-list who may message whom; never trus
 ## Anti-duplicate rules
 
 1. `resolveCanonicalPeer` loads peer from DB → `getMessagingRole(peer)`.
-2. `sendCanonicalMessage` builds id via `buildCanonicalConversationId` — **ignores wrong client role**.
+2. `sendCanonicalMessage` builds id via `buildCanonicalConversationId` - **ignores wrong client role**.
 3. Client sending `receiverRole: 'admin'` for a STAFF MongoId still yields `staff_<id>__…`.
 4. Read alias: `admin_<mongoId>__…` ↔ `staff_<mongoId>__…` on GET/read (no DB migrate).
 5. Legacy `admin_admin__student_*` remains SUPER/HIGH shared mailbox; STAFF/SUPPORT never inherit it.

@@ -1,5 +1,5 @@
 /**
- * Phase 7.18 — Controlled cutover gate for LIVE /api/files ONLY.
+ * Phase 7.18 - Controlled cutover gate for LIVE /api/files ONLY.
  *
  * LEGACY (default):
  *   - upload → requireUploadCategoryPermission (open cats / training any / SYSTEM_SETTINGS)
@@ -106,7 +106,7 @@ function filesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] files authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] files authority helper failed - Legacy gate',
       );
     }
 
@@ -151,7 +151,7 @@ function filesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] files Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] files Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

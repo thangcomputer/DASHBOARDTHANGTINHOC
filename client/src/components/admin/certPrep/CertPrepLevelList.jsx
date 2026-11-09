@@ -33,7 +33,7 @@ export default function CertPrepLevelList({
         <div key={lv._id || lv.id} className="cms-card flex flex-col gap-3">
           <div>
             <p className="text-base font-bold text-slate-900">{lv.title}</p>
-            <p className="text-sm text-slate-500">{lv.subtitle || '—'}</p>
+            <p className="text-sm text-slate-500">{lv.subtitle || '-'}</p>
             <p className={`text-xs font-bold mt-1 ${lv.isActive === false ? 'text-slate-400' : 'text-emerald-600'}`}>
               {lv.isActive === false ? 'Tắt' : 'Bật'} · Thứ tự {lv.sortOrder}
             </p>

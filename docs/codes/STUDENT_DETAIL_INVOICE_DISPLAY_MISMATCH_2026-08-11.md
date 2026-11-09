@@ -1,7 +1,7 @@
-# STUDENT DETAIL — Lệch luồng Mã HĐ / studentCode
+# STUDENT DETAIL - Lệch luồng Mã HĐ / studentCode
 
 **Date:** 2026-08-11  
-**Mode:** REPORT ONLY — không sửa runtime, không rewrite Invoice/Ledger, không đụng Messaging, không chạy C4  
+**Mode:** REPORT ONLY - không sửa runtime, không rewrite Invoice/Ledger, không đụng Messaging, không chạy C4  
 **Component:** [`client/src/components/StudentDetailModal.jsx`](../../client/src/components/StudentDetailModal.jsx)  
 **Ledger settle:** [`services/ledgerService.js`](../../services/ledgerService.js)
 
@@ -69,20 +69,20 @@ Header / profile → hiện studentCode = HV###### (nếu đã có trên Student
 
 ## 3. Root cause
 
-### 3.1 Tab Khóa học — đúng mã hệ thống
+### 3.1 Tab Khóa học - đúng mã hệ thống
 
 [`StudentDetailModal.jsx`](../../client/src/components/StudentDetailModal.jsx) (~1077–1091):
 
 - Match `data.invoices` theo tên khóa + số tiền.
 - Render `inv.maHoaDon` (canonical invoice number, dạng `HDYYMM-####`).
 
-### 3.2 Tab Tài chính — synthetic UI code
+### 3.2 Tab Tài chính - synthetic UI code
 
 Cùng file (~661–676), khi ưu tiên `ledgerCard.lines`:
 
 ```text
 code = line.maHoaDon
-if (!code || code === '—' || code === 'HĐ')
+if (!code || code === '-' || code === 'HĐ')
   → code = `HĐ-${pad4(hdCounter)}`   // HĐ-0001, HĐ-0002, ...
 ```
 
@@ -134,7 +134,7 @@ DATA rewrite needed: NO
    `code = line.maHoaDon || line.sourceRef`  
    (hoặc join `invoiceId` → `Invoice.maHoaDon`).
 2. **Chỉ dùng** fallback `HĐ-####` khi cả `maHoaDon` và `sourceRef` đều trống.
-3. **Header detail:** hiển thị `student.studentCode` (HV######) cạnh SĐT / tên — display only; không đổi `_id` / FK.
+3. **Header detail:** hiển thị `student.studentCode` (HV######) cạnh SĐT / tên - display only; không đổi `_id` / FK.
 4. **Không** rewrite Invoice, Ledger, Payroll, PaymentSession.ref.
 5. **Không** đụng Messaging / Auth / RBAC.
 6. **Không** chạy C4 / unique index / migration trong báo cáo này.
@@ -156,11 +156,11 @@ C4 started: NO
 ## 7. Verdict
 
 ```text
-LUỒNG STUDENT DETAIL — MÃ HĐ: FAIL (UI inconsistency)
-LUỒNG STUDENT DETAIL — studentCode visibility: FAIL (not shown)
+LUỒNG STUDENT DETAIL - MÃ HĐ: FAIL (UI inconsistency)
+LUỒNG STUDENT DETAIL - studentCode visibility: FAIL (not shown)
 DB INVOICE IDENTITY: likely OK (single HD######)
 ROOT CAUSE: Finance tab ignores LedgerEntry.sourceRef
 
 NEXT: Owner approve UI fix on StudentDetailModal (+ optional ledger API enrich)
-STOP — report only
+STOP - report only
 ```

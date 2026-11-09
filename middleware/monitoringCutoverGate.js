@@ -1,5 +1,5 @@
 /**
- * Phase 7.2 — Controlled cutover gate for /api/monitoring ONLY.
+ * Phase 7.2 - Controlled cutover gate for /api/monitoring ONLY.
  *
  * LEGACY (default): existing isAdmin remains HTTP authority.
  * POLICY (env opt-in): Policy decision is HTTP authority; Legacy isAdmin skipped.
@@ -52,7 +52,7 @@ function monitoringCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] monitoring authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] monitoring authority helper failed - Legacy gate',
       );
     }
 
@@ -98,7 +98,7 @@ function monitoringCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] monitoring Policy unsafe — fallback Legacy isAdmin',
+        '[POLICY_CUTOVER] monitoring Policy unsafe - fallback Legacy isAdmin',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -118,12 +118,12 @@ function monitoringCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] monitoring Policy ALLOW — Legacy isAdmin skipped',
+        '[POLICY_CUTOVER] monitoring Policy ALLOW - Legacy isAdmin skipped',
       );
       return next();
     }
 
-    // DENY — Policy is sole HTTP authority (do not also run isAdmin)
+    // DENY - Policy is sole HTTP authority (do not also run isAdmin)
     req.policyAuthoritative = true;
     logger.info(
       {

@@ -1,7 +1,7 @@
 /**
  * Policy shadow for LIVE /api/courses (Wave 6.10).
  * Writes: auth + requireInternalToken + SYSTEM_SETTINGS.
- * Reads (list/get/stats): PUBLIC — no auth.
+ * Reads (list/get/stats): PUBLIC - no auth.
  * MANAGE_TRAINING unused on this router.
  */
 const {

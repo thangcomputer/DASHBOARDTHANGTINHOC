@@ -13,8 +13,8 @@ class EventBus {
     for (const hook of this.hooks) if (hook.beforeExecute) await hook.beforeExecute(event);
     try {
       // Direct in-memory dispatch to handlers (called by OutboxWorker after transaction commit)
-      await this.dispatcher.dispatch(event); 
-      
+      await this.dispatcher.dispatch(event);
+
       for (const hook of this.hooks) if (hook.afterExecute) await hook.afterExecute(event);
     } catch (err) {
       for (const hook of this.hooks) if (hook.onError) await hook.onError(event, err);

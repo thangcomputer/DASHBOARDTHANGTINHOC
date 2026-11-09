@@ -83,7 +83,7 @@ function policyShadowTeacherRoute(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] teacher route evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] teacher route evaluation error - legacy still authoritative',
         );
         req.policyShadow = {
           action: `teacher_route_${action}`,
@@ -126,7 +126,7 @@ function policyShadowTeacherRoute(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] teacher route shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] teacher route shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -138,7 +138,7 @@ function policyShadowTeacherRoute(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected teacher route error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected teacher route error - fail closed to legacy only',
       );
     }
     return next();

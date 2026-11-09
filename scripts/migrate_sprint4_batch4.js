@@ -62,13 +62,13 @@ function ensureDir(dir) {
 DOMAINS.forEach(domain => {
   const domainDir = path.join(ROOT_DIR, 'modules', domain);
   ensureDir(domainDir);
-  
+
   // Create index.js
   const indexFile = path.join(domainDir, 'index.js');
   if (!fs.existsSync(indexFile)) {
     fs.writeFileSync(indexFile, '// Entry point for ' + domain + ' module\n', 'utf8');
   }
-  
+
   // Create placeholders
   FOLDERS.forEach(folder => {
     ensureDir(path.join(domainDir, folder));
@@ -145,25 +145,25 @@ allFiles.forEach(filePath => {
 
   // Regex to match require('...') or require("...")
   const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-  
+
   content = content.replace(requireRegex, (match, importPath) => {
     // Only care about relative imports
     if (!importPath.startsWith('.')) return match;
-    
+
     const currentDir = path.dirname(filePath);
-    
+
     let isDirRequire = false;
     let absImportPath = path.resolve(currentDir, importPath);
-    
+
     if (fs.existsSync(absImportPath) && fs.statSync(absImportPath).isDirectory()) {
-        isDirRequire = true;
+      isDirRequire = true;
     } else if (!absImportPath.endsWith('.js') && !absImportPath.endsWith('.json')) {
       absImportPath += '.js';
     }
 
     let fileWasMoved = false;
     let oldFileDir = currentDir;
-    
+
     for (const [oldAbs, newAbs] of fileMap.entries()) {
       if (newAbs === filePath) {
         fileWasMoved = true;
@@ -178,46 +178,46 @@ allFiles.forEach(filePath => {
     if (newTargetAbs) {
       actualTargetAbs = newTargetAbs;
     } else if (isDirRequire) {
-        let movedDir = null;
-        for (const [oldAbs, newAbs] of fileMap.entries()) {
-            if (oldAbs.startsWith(absImportPath + path.sep)) {
-                movedDir = path.dirname(newAbs);
-                break;
-            }
+      let movedDir = null;
+      for (const [oldAbs, newAbs] of fileMap.entries()) {
+        if (oldAbs.startsWith(absImportPath + path.sep)) {
+          movedDir = path.dirname(newAbs);
+          break;
         }
-        if (movedDir) {
-           // We're requiring a directory that moved. This logic is a bit complex.
-           actualTargetAbs = movedDir;
+      }
+      if (movedDir) {
+        // We're requiring a directory that moved. This logic is a bit complex.
+        actualTargetAbs = movedDir;
+      } else {
+        if (fileWasMoved) {
+          actualTargetAbs = path.resolve(oldFileDir, importPath);
         } else {
-             if (fileWasMoved) {
-                 actualTargetAbs = path.resolve(oldFileDir, importPath);
-             } else {
-                 return match;
-             }
+          return match;
         }
+      }
     } else {
       if (fileWasMoved) {
-         let originalTargetAbs = path.resolve(oldFileDir, importPath);
-         if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
-         
-         if (fileMap.has(originalTargetAbs)) {
-           actualTargetAbs = fileMap.get(originalTargetAbs);
-         } else {
-           actualTargetAbs = originalTargetAbs;
-         }
+        let originalTargetAbs = path.resolve(oldFileDir, importPath);
+        if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
+
+        if (fileMap.has(originalTargetAbs)) {
+          actualTargetAbs = fileMap.get(originalTargetAbs);
+        } else {
+          actualTargetAbs = originalTargetAbs;
+        }
       } else {
         return match;
       }
     }
 
     let newRelative = path.relative(currentDir, actualTargetAbs);
-    
+
     if (newRelative.endsWith('.js')) {
       newRelative = newRelative.slice(0, -3);
     }
-    
+
     newRelative = newRelative.replace(/\\/g, '/');
-    
+
     if (!newRelative.startsWith('.')) {
       newRelative = './' + newRelative;
     }

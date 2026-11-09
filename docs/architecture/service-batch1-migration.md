@@ -1,11 +1,11 @@
 # Service Batch 1 Migration Summary
 
 ## Domains Migrated
-1. **auth** — `AuthApplicationService` + `AuthController` (27 endpoints)
-2. **notification** — `NotificationApplicationService` + `NotificationController` (7 endpoints)
-3. **tenant** — `TenantApplicationService` + `TenantController` (7 endpoints)
-4. **branch** — `BranchApplicationService` + `BranchController` (4 endpoints)
-5. **system** — `SystemApplicationService` + `SystemController` (25 endpoints)
+1. **auth** - `AuthApplicationService` + `AuthController` (27 endpoints)
+2. **notification** - `NotificationApplicationService` + `NotificationController` (7 endpoints)
+3. **tenant** - `TenantApplicationService` + `TenantController` (7 endpoints)
+4. **branch** - `BranchApplicationService` + `BranchController` (4 endpoints)
+5. **system** - `SystemApplicationService` + `SystemController` (25 endpoints)
 
 ## Files Created
 | File | Purpose |

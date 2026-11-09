@@ -103,9 +103,8 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                 return (
                   <span
                     key={label}
-                    className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      active ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}
+                    className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${active ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}
                   >
                     {i + 1}. {label}
                   </span>
@@ -223,7 +222,7 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                     </div>
                   </div>
 
-                  {/* Star bonus — compact */}
+                  {/* Star bonus - compact */}
                   <div className="rounded-xl border border-slate-200 px-3.5 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-start gap-2">
@@ -319,14 +318,14 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
                   {selectedSessions.length > 0 && (
                     <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-3.5 py-3 space-y-1.5">
                       <p className="text-xs font-bold  tracking-wide text-amber-800">
-                        Buổi sẽ chi (FIFO — cũ trước)
+                        Buổi sẽ chi (FIFO - cũ trước)
                       </p>
                       <ul className="space-y-1 max-h-28 overflow-y-auto">
                         {selectedSessions.map((s) => (
                           <li key={String(s.id)} className="text-xs text-slate-700 flex justify-between gap-2">
                             <span className="min-w-0 truncate font-medium">
                               {s.sessionNo != null ? `Buổi ${s.sessionNo}` : 'Buổi'}
-                              {' — '}
+                              {' - '}
                               {s.studentName || 'Học viên'}
                               {s.course ? ` · ${s.course}` : ''}
                             </span>
@@ -422,10 +421,10 @@ export default function TeacherPayoutModal({ payoutModal, setPayoutModal, onGoTo
 
               <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3 space-y-2 text-sm">
                 {[
-                  ['Ngân hàng', pm.bankInfo?.bankName || '—'],
-                  ['Số TK', pm.bankInfo?.accountNumber || '—'],
+                  ['Ngân hàng', pm.bankInfo?.bankName || '-'],
+                  ['Số TK', pm.bankInfo?.accountNumber || '-'],
                   ['Chủ TK', pm.bankInfo?.accountHolder || pm.teacherName],
-                  ['Nội dung', pm.note || '—'],
+                  ['Nội dung', pm.note || '-'],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-3">
                     <span className="text-slate-500 shrink-0">{k}</span>

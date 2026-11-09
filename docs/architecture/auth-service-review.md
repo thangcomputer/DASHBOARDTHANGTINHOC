@@ -1,4 +1,4 @@
-# Auth Service Review — Sprint 4.3 Batch 1
+# Auth Service Review - Sprint 4.3 Batch 1
 
 ## 1. Domain: `auth`
 
@@ -9,12 +9,12 @@
 - Business helpers (`generateTokens`, `checkDeviceConflict`, `safeEqualRefresh`, `issueAdminMfaChallenge`, `issueUserMfaChallenge`) were file-scoped functions with no separation from the HTTP layer.
 
 ### After
-- **`modules/auth/services/AuthApplicationService.js`** — Contains all business logic extracted verbatim from route handlers. Helper functions remain intact.
-- **`modules/auth/controllers/AuthController.js`** — Thin orchestration layer. Each method:
+- **`modules/auth/services/AuthApplicationService.js`** - Contains all business logic extracted verbatim from route handlers. Helper functions remain intact.
+- **`modules/auth/controllers/AuthController.js`** - Thin orchestration layer. Each method:
   1. Maps `req` into a plain `data` object.
   2. Calls the corresponding service method.
   3. Maps the service result back to `res`.
-- **`modules/auth/authRoutes.js`** — Reduced to routing declarations and middleware chains only.
+- **`modules/auth/authRoutes.js`** - Reduced to routing declarations and middleware chains only.
 
 ### Endpoints Migrated (27 routes)
 | Method | Path | Service Method |

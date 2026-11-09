@@ -1,5 +1,5 @@
 /**
- * Phase 8.23 — Inbox conversation sort / new-message priority.
+ * Phase 8.23 - Inbox conversation sort / new-message priority.
  * FE-only. Does not touch RBAC / backend conversationId / Enterprise.
  */
 const { describe, it } = require('node:test');

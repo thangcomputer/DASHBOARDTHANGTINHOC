@@ -1,5 +1,5 @@
 /**
- * Anti-seek / duration / learning policy — keep in sync with:
+ * Anti-seek / duration / learning policy - keep in sync with:
  * - utils/antiSeekPolicy.js
  * - utils/lessonLearningPolicy.js
  */
@@ -41,7 +41,7 @@ export function resolveEffectiveDuration(adminDuration, reportedDuration) {
   return reported;
 }
 
-/** COMPLETION — independent of antiSeek */
+/** COMPLETION - independent of antiSeek */
 export function evaluateCompletionRequirement({ watchedSeconds, effectiveDuration }) {
   const watched = Math.max(0, Number(watchedSeconds) || 0);
   const duration = Math.max(0, Number(effectiveDuration) || 0);

@@ -41,7 +41,7 @@ function sanitizeChanges(raw = {}) {
   }
   if (raw.essayFile !== undefined) {
     const f = String(raw.essayFile || '').trim().slice(0, 500);
-    // Chỉ path nội bộ uploads — chặn URL ngoài
+    // Chỉ path nội bộ uploads - chặn URL ngoài
     if (!f || f.startsWith('/uploads/') || f.startsWith('uploads/')) {
       out.essayFile = f.startsWith('uploads/') ? `/${f}` : f;
     }
@@ -79,7 +79,7 @@ function examMilestoneMet(subjectIds, subjectId, completedSessions, totalSession
 }
 
 /**
- * Cổng ghi tiến độ HV — khớp UI Phòng thi:
+ * Cổng ghi tiến độ HV - khớp UI Phòng thi:
  * mở khóa global / theo khóa, đang thi, hoặc đủ mốc buổi.
  */
 function canStudentWriteExamProgress(student, subjectId) {
@@ -220,7 +220,7 @@ function applyStudentExamProgress(student, subjectId, rawChanges) {
   // lockUntil chỉ cho phép tăng / set khi rớt
   if (changes.lockUntil !== undefined && changes.status !== 'khong_dat' && existing.status !== 'khong_dat') {
     if (!existing.lockUntil || Number(existing.lockUntil) <= now) {
-      // cho phép set lock khi hủy bài kèm khong_dat — nếu không có status khong_dat thì bỏ lockUntil
+      // cho phép set lock khi hủy bài kèm khong_dat - nếu không có status khong_dat thì bỏ lockUntil
       if (changes.status !== 'khong_dat') delete changes.lockUntil;
     }
   }

@@ -1,5 +1,5 @@
 /**
- * financeRoutes — Ledger SoT (P0–P4).
+ * financeRoutes - Ledger SoT (P0–P4).
  */
 const express = require('express');
 const router = express.Router();
@@ -49,27 +49,27 @@ function actorOf(req) {
 }
 
 // GET /api/finance/summary
-router.get('/summary', guard,financeController.get_summary);
+router.get('/summary', guard, financeController.get_summary);
 
 // GET /api/finance/ledger
-router.get('/ledger', guard,financeController.get_ledger);
+router.get('/ledger', guard, financeController.get_ledger);
 
-// GET /api/finance/students/:id — card 5 chỉ tiêu TO-BE
-router.get('/students/:id', guard,financeController.get_students_id);
+// GET /api/finance/students/:id - card 5 chỉ tiêu TO-BE
+router.get('/students/:id', guard, financeController.get_students_id);
 
 // POST /api/finance/ledger/:id/void
-router.post('/ledger/:id/void', voidGuard,financeController.post_ledger_id_void);
+router.post('/ledger/:id/void', voidGuard, financeController.post_ledger_id_void);
 
-// POST /api/finance/discount — ghi discount/coupon
-router.post('/discount', paymentGuard,financeController.post_discount);
+// POST /api/finance/discount - ghi discount/coupon
+router.post('/discount', paymentGuard, financeController.post_discount);
 
 // GET /api/finance/reconcile
-router.get('/reconcile', manageGuard,financeController.get_reconcile);
+router.get('/reconcile', manageGuard, financeController.get_reconcile);
 
 // POST /api/finance/snapshots/rebuild
-router.post('/snapshots/rebuild', manageGuard,financeController.post_snapshots_rebuild);
+router.post('/snapshots/rebuild', manageGuard, financeController.post_snapshots_rebuild);
 
-// POST /api/finance/students/:id/sync-cache — recompute paidAmount từ Ledger
-router.post('/students/:id/sync-cache', manageGuard,financeController.post_students_id_sync_cache);
+// POST /api/finance/students/:id/sync-cache - recompute paidAmount từ Ledger
+router.post('/students/:id/sync-cache', manageGuard, financeController.post_students_id_sync_cache);
 
 module.exports = router;

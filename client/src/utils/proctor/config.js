@@ -1,12 +1,12 @@
 /**
- * Cấu hình giám sát thi (eKYC-style): ưu tiên giảm false positive —
+ * Cấu hình giám sát thi (eKYC-style): ưu tiên giảm false positive -
  * confirm dài hơn, oval rộng hơn, tin FaceDetector hơn heuristic da.
  */
 export const PROCTOR_CONFIG = {
   MAX_FACE_VIOLATIONS: 5,
   MAX_TAB_WARNINGS: 2,
 
-  /** Lấy mẫu frame — ~3.3 Hz */
+  /** Lấy mẫu frame - ~3.3 Hz */
   SAMPLE_INTERVAL_MS: 300,
 
   /** Mất mặt: phải mất liên tục khá lâu mới tính 1 lỗi cứng */
@@ -35,7 +35,7 @@ export const PROCTOR_CONFIG = {
   WARN_COOLDOWN_MS: 7000,
   SOFT_WARN_COOLDOWN_MS: 10000,
 
-  /** Vùng “nhìn thẳng” rộng — ngồi lệch nhẹ / nghiêng đầu vẫn OK */
+  /** Vùng “nhìn thẳng” rộng - ngồi lệch nhẹ / nghiêng đầu vẫn OK */
   GAZE_CENTER_MIN: 0.22,
   GAZE_CENTER_MAX: 0.78,
   OVAL_CX: 0.5,
@@ -51,7 +51,7 @@ export const PROCTOR_CONFIG = {
   /** Bắt buộc cấu trúc mặt khi OS có landmarks (macOS/Android) */
   REQUIRE_FACE_LANDMARKS: true,
   /**
-   * Windows Chrome không trả landmarks — chỉ chấp nhận box nếu texture giống mặt người
+   * Windows Chrome không trả landmarks - chỉ chấp nhận box nếu texture giống mặt người
    * (da + độ tương phản + vùng mắt tối hơn). Ghế đen / mặt phẳng → loại.
    */
   ALLOW_TEXTURE_FALLBACK_WITHOUT_LANDMARKS: true,
@@ -68,7 +68,7 @@ export const PROCTOR_CONFIG = {
   MIN_FACE_AREA_RATIO: 0.01,
   MIN_FACE_BOX_ASPECT: 0.28,
   MAX_FACE_BOX_ASPECT: 1.65,
-  /** Ngưỡng da thấp hơn — tránh false “không thấy mặt” với ánh sáng / tone da khác nhau */
+  /** Ngưỡng da thấp hơn - tránh false “không thấy mặt” với ánh sáng / tone da khác nhau */
   MIN_FACE_SKIN_RATIO: 0.028,
   MIN_EYE_SKIN_RATIO: 0.016,
   MIN_BBOX_SKIN_RATIO: 0.032,

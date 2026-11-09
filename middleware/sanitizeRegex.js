@@ -1,5 +1,5 @@
 /**
- * sanitizeRegex — Escape chuỗi search để dùng an toàn trong MongoDB $regex
+ * sanitizeRegex - Escape chuỗi search để dùng an toàn trong MongoDB $regex
  * Chống: ReDoS, NoSQL injection, regex crafting attacks
  *
  * @param {string} str - Chuỗi đầu vào từ user

@@ -1,7 +1,7 @@
 import React from 'react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ERROR BOUNDARY — Ngăn trắng trang khi component crash
+// ERROR BOUNDARY - Ngăn trắng trang khi component crash
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class ErrorBoundary extends React.Component {
@@ -38,12 +38,12 @@ class ErrorBoundary extends React.Component {
         return (
           <div style={{
             background: '#1a0a0a',
-            border:     '1px solid #ef444433',
+            border: '1px solid #ef444433',
             borderRadius: '10px',
-            padding:    '1.5rem',
-            color:      '#fca5a5',
-            textAlign:  'center',
-            fontSize:   '0.875rem',
+            padding: '1.5rem',
+            color: '#fca5a5',
+            textAlign: 'center',
+            fontSize: '0.875rem',
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚠️</div>
             <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Có lỗi xảy ra trong tính năng này</p>
@@ -53,13 +53,13 @@ class ErrorBoundary extends React.Component {
             <button
               onClick={this.handleReset}
               style={{
-                background:   '#ef4444',
-                color:        '#fff',
-                border:       'none',
+                background: '#ef4444',
+                color: '#fff',
+                border: 'none',
                 borderRadius: '6px',
-                padding:      '0.4rem 1rem',
-                cursor:       'pointer',
-                fontSize:     '0.8rem',
+                padding: '0.4rem 1rem',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
               }}
             >
               Thử lại
@@ -71,22 +71,22 @@ class ErrorBoundary extends React.Component {
       // Full page error
       return (
         <div style={{
-          minHeight:   '100vh',
-          background:  '#0f172a',
-          display:     'flex',
-          alignItems:  'center',
+          minHeight: '100vh',
+          background: '#0f172a',
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
-          padding:     '2rem',
-          fontFamily:  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif',
+          padding: '2rem',
+          fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif',
         }}>
           <div style={{
-            background:   '#1e293b',
-            border:       '1px solid #ef444433',
+            background: '#1e293b',
+            border: '1px solid #ef444433',
             borderRadius: '16px',
-            padding:      '2.5rem',
-            maxWidth:     '480px',
-            width:        '100%',
-            textAlign:    'center',
+            padding: '2.5rem',
+            maxWidth: '480px',
+            width: '100%',
+            textAlign: 'center',
           }}>
             <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>💥</div>
             <h2 style={{ color: '#f87171', fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
@@ -99,15 +99,15 @@ class ErrorBoundary extends React.Component {
             {/* Chi tiết lỗi (development only) */}
             {import.meta.env.DEV && this.state.errorInfo && (
               <pre style={{
-                background:   '#0f172a',
-                border:       '1px solid #334155',
+                background: '#0f172a',
+                border: '1px solid #334155',
                 borderRadius: '8px',
-                padding:      '1rem',
-                fontSize:     '0.7rem',
-                color:        '#94a3b8',
-                textAlign:    'left',
-                overflow:     'auto',
-                maxHeight:    '200px',
+                padding: '1rem',
+                fontSize: '0.7rem',
+                color: '#94a3b8',
+                textAlign: 'left',
+                overflow: 'auto',
+                maxHeight: '200px',
                 marginBottom: '1.5rem',
               }}>
                 {this.state.errorInfo.componentStack}
@@ -118,14 +118,14 @@ class ErrorBoundary extends React.Component {
               <button
                 onClick={this.handleReset}
                 style={{
-                  background:   '#3b82f6',
-                  color:        '#fff',
-                  border:       'none',
+                  background: '#3b82f6',
+                  color: '#fff',
+                  border: 'none',
                   borderRadius: '8px',
-                  padding:      '0.6rem 1.5rem',
-                  cursor:       'pointer',
-                  fontWeight:   600,
-                  fontSize:     '0.875rem',
+                  padding: '0.6rem 1.5rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
                 }}
               >
                 Thử lại
@@ -133,14 +133,14 @@ class ErrorBoundary extends React.Component {
               <button
                 onClick={() => window.location.reload()}
                 style={{
-                  background:   '#1e293b',
-                  color:        '#94a3b8',
-                  border:       '1px solid #334155',
+                  background: '#1e293b',
+                  color: '#94a3b8',
+                  border: '1px solid #334155',
                   borderRadius: '8px',
-                  padding:      '0.6rem 1.5rem',
-                  cursor:       'pointer',
-                  fontWeight:   600,
-                  fontSize:     '0.875rem',
+                  padding: '0.6rem 1.5rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
                 }}
               >
                 Tải lại trang

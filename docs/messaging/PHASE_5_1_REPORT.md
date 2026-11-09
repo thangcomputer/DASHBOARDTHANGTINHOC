@@ -16,13 +16,13 @@ Close `PHASE_5_BLOCKER.md` by enforcing **fail-closed tenant isolation** on priv
 
 ## Files Changed
 
-- `services/messagingPolicy.js` — `resolveAuthoritativeTenantId`, `assertTenantIsolation`, tenant gate in `canSendMessage` + `canDiscoverContacts`; `POLICY_CODES.TENANT_MISMATCH`
-- `tests/integration/phase5_1_tenant_isolation.test.js` — **NEW**
-- `tests/integration/phase5_messaging_recipient_resolution.test.js` — fixtures + tenant expectations
-- `tests/integration/phase4_messaging_policy.test.js` — same-tenant fixture `tenantId`
-- `docs/messaging/PHASE_5_BLOCKER.md` — **CLOSED**
-- `docs/messaging/PHASE_5_REPORT.md` — tenant status update
-- `docs/messaging/PHASE_5_1_REPORT.md` — this file
+- `services/messagingPolicy.js` - `resolveAuthoritativeTenantId`, `assertTenantIsolation`, tenant gate in `canSendMessage` + `canDiscoverContacts`; `POLICY_CODES.TENANT_MISMATCH`
+- `tests/integration/phase5_1_tenant_isolation.test.js` - **NEW**
+- `tests/integration/phase5_messaging_recipient_resolution.test.js` - fixtures + tenant expectations
+- `tests/integration/phase4_messaging_policy.test.js` - same-tenant fixture `tenantId`
+- `docs/messaging/PHASE_5_BLOCKER.md` - **CLOSED**
+- `docs/messaging/PHASE_5_REPORT.md` - tenant status update
+- `docs/messaging/PHASE_5_1_REPORT.md` - this file
 
 ## Files Not Changed
 
@@ -58,13 +58,13 @@ Messaging pair allow-list
 
 ## Regression
 
-phase4, phase5, phase821–824, isolation_fix, hardening — **PASS**
+phase4, phase5, phase821–824, isolation_fix, hardening - **PASS**
 
 ## Remaining security risks
 
-1. Users without resolvable tenant (`tenantId` and `Branch.tenantId` via `branchId`) cannot DM (fail-closed) — includes some elevated/null-branch accounts until identity carries tenant.
+1. Users without resolvable tenant (`tenantId` and `Branch.tenantId` via `branchId`) cannot DM (fail-closed) - includes some elevated/null-branch accounts until identity carries tenant.
 2. `canViewConversation` does not independently re-validate peer tenant from conversationId.
-3. Contacts route (Phase 6) still inline — discover policy function is tenant-aware when identities include `tenantId`, but HTTP contacts not yet migrated.
+3. Contacts route (Phase 6) still inline - discover policy function is tenant-aware when identities include `tenantId`, but HTTP contacts not yet migrated.
 
 ## Rollback
 
@@ -72,4 +72,4 @@ Revert MessagingPolicy tenant helpers + gates; restore prior tests/docs. No sche
 
 ## Next
 
-**STOP** — await approval for Phase 6 (contacts API → MessagingPolicy), with tenant blocker closed.
+**STOP** - await approval for Phase 6 (contacts API → MessagingPolicy), with tenant blocker closed.

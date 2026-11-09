@@ -1,5 +1,5 @@
 /**
- * Editor soạn tin tức nội bộ — bold/heading/list/link/ảnh.
+ * Editor soạn tin tức nội bộ - bold/heading/list/link/ảnh.
  * Dùng contentEditable + execCommand với trạng thái Active nổi bật cho Toolbar.
  * Ảnh trong bài: kích thước vừa khung; bấm để kéo to/nhỏ và căn trái/giữa/phải.
  */
@@ -23,11 +23,10 @@ function ToolbarBtn({ onClick, title, children, disabled, active }) {
         e.preventDefault(); // giữ selection trong editor
         onClick?.();
       }}
-      className={`p-1.5 rounded-lg transition-all duration-150 disabled:opacity-40 flex items-center justify-center min-w-[28px] h-7 text-xs ${
-        active
+      className={`p-1.5 rounded-lg transition-all duration-150 disabled:opacity-40 flex items-center justify-center min-w-[28px] h-7 text-xs ${active
           ? 'bg-blue-600 text-white font-bold shadow-sm ring-1 ring-blue-400 scale-105'
           : 'text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-      }`}
+        }`}
     >
       {children}
     </button>
@@ -304,7 +303,7 @@ const NewsRichEditor = forwardRef(function NewsRichEditor(
         savedRange.current = live.cloneRange();
         return true;
       }
-    } catch { /* file dialog làm selection hỏng — chèn cuối bài */ }
+    } catch { /* file dialog làm selection hỏng - chèn cuối bài */ }
     el.appendChild(frag);
     return true;
   };

@@ -24,7 +24,7 @@ async function loginUser(identifier, password, role) {
     const csrfToken = csrfRes.data.csrfToken;
     const endpoint = (role === 'admin' || role === 'staff') ? '/api/auth/login/internal' : '/api/auth/login/public';
     const payload = { identifier, password, role };
-    
+
     // Nếu là internal, có thể cần captcha rỗng trong môi trường dev
     if (role === 'admin' || role === 'staff') {
       payload.captchaId = 'dummy';
@@ -48,7 +48,7 @@ async function sendMessage(token, receiverId, receiverName, receiverRole, conten
     const res = await axios.post(`${API_URL}/api/messages`, {
       receiverId, receiverName, receiverRole, content, messageType: 'text'
     }, {
-      headers: { 
+      headers: {
         Authorization: `Bearer ${token}`,
         'Cookie': `csrf_token=${csrfToken}`,
         'x-csrf-token': csrfToken
@@ -73,7 +73,7 @@ async function readConversation(token, conversationId) {
 
 async function runTests() {
   console.log('🚀 Bắt đầu Messaging API Testing...');
-  
+
   // 1. Login all users
   const tokens = {};
   tokens.superAdmin = await loginUser(testData.superAdmin.phone, testData.superAdmin.password, 'admin');
@@ -109,19 +109,19 @@ async function runTests() {
     { from: 'teacher', to: 'superAdmin' },
     { from: 'superAdmin', to: 'student' },
     { from: 'student', to: 'superAdmin' },
-    
+
     { from: 'branchAdmin', to: 'support' },
     { from: 'support', to: 'branchAdmin' },
     { from: 'branchAdmin', to: 'teacher' },
     { from: 'teacher', to: 'branchAdmin' },
     { from: 'branchAdmin', to: 'student' },
     { from: 'student', to: 'branchAdmin' },
-    
+
     { from: 'support', to: 'teacher' },
     { from: 'teacher', to: 'support' },
     { from: 'support', to: 'student' },
     { from: 'student', to: 'support' },
-    
+
     { from: 'teacher', to: 'student' },
     { from: 'student', to: 'teacher' }
   ];
@@ -131,7 +131,7 @@ async function runTests() {
   for (const flow of flows) {
     const sender = users[flow.from];
     const receiver = users[flow.to];
-    
+
     const msgRes = await sendMessage(tokens[flow.from], receiver.id, receiver.name, receiver.role, `Hello ${receiver.name} from ${sender.name}`);
     if (msgRes.success) {
       addResult('Message Flow', `${sender.name} -> ${receiver.name}`, 'Passed', 'High', 'Gửi tin nhắn thành công');

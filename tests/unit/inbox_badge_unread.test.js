@@ -14,7 +14,7 @@ test('badge Hộp thư chỉ đếm hội thoại người xem thực sự thấ
   assert.ok(helper.includes('AI_SUPPORT_PEER.id'), 'bỏ Trợ lý AI');
 
   const inbox = read('client/src/components/Inbox.jsx');
-  assert.ok(inbox.includes('if (isSuperAdmin && entry?.isGroup) return false;'), 'Inbox ẩn nhóm với SUPER — badge phải khớp');
+  assert.ok(inbox.includes('if (isSuperAdmin && entry?.isGroup) return false;'), 'Inbox ẩn nhóm với SUPER - badge phải khớp');
 
   assert.ok(read('client/src/components/AppSidebar.jsx').includes('return visibleInboxUnread(getConversations(session.id), {'));
   assert.ok(read('client/src/components/LoginInboxAlertPopup.jsx').includes('visibleInboxUnread(convs, {'));

@@ -32,11 +32,11 @@ Remove remaining **live** frontend messaging policy duplication, harden deep-lin
 
 ## Frontend policy duplication removed
 
-1. **Deep-link UX gate** — `resolveMessagingDeepLink` (client + `utils/messagingDeepLink.js`): allow open only if peer ∈ `/contacts` **or** existing DM activity.
-2. **Inbox** — removed synthetic `selectConversation({...})` invent path; waits `contactsLoaded`; `seedContact` gated.
-3. **`isElevatedPresenceDirectoryViewer`** — SUPER/HIGH/root only for presence directory.
-4. **FloatingMessenger** — STAFF/SUPPORT/Teacher/Student fetch `/contacts`; empty → empty (no staffs fallback).
-5. **`cms:open-chat` / `openSiteChat`** — gated via contacts + existing conversations (`FloatingMessengerProvider`).
+1. **Deep-link UX gate** - `resolveMessagingDeepLink` (client + `utils/messagingDeepLink.js`): allow open only if peer ∈ `/contacts` **or** existing DM activity.
+2. **Inbox** - removed synthetic `selectConversation({...})` invent path; waits `contactsLoaded`; `seedContact` gated.
+3. **`isElevatedPresenceDirectoryViewer`** - SUPER/HIGH/root only for presence directory.
+4. **FloatingMessenger** - STAFF/SUPPORT/Teacher/Student fetch `/contacts`; empty → empty (no staffs fallback).
+5. **`cms:open-chat` / `openSiteChat`** - gated via contacts + existing conversations (`FloatingMessengerProvider`).
 
 ## Deep-link behavior
 
@@ -55,7 +55,7 @@ deep link
   → else → do NOT invent discoverable peer (Case B)
 ```
 
-UX gate only — **send** still enforced by MessagingPolicy on server.
+UX gate only - **send** still enforced by MessagingPolicy on server.
 
 ## seedContact behavior
 
@@ -104,22 +104,22 @@ No changes to rooms, `notifyUser`, typing/read events, or send path. Incoming `o
 
 ## Tests
 
-- **NEW** `tests/integration/phase7_frontend_messaging_policy_cleanup.test.js` — PASS
-- phase4 / 5 / 5.1 / 6 / 821–824 / isolation_fix / hardening — PASS
-- Frontend `vite build` — PASS
+- **NEW** `tests/integration/phase7_frontend_messaging_policy_cleanup.test.js` - PASS
+- phase4 / 5 / 5.1 / 6 / 821–824 / isolation_fix / hardening - PASS
+- Frontend `vite build` - PASS
 
 ## Known environment failures
 
-- `tests/messaging-isolation.test.js` — prior ENVIRONMENT FAILURE (401), unchanged
-- Live multi-client Socket.IO browser harness — **NOT TESTED — infrastructure limitation**
+- `tests/messaging-isolation.test.js` - prior ENVIRONMENT FAILURE (401), unchanged
+- Live multi-client Socket.IO browser harness - **NOT TESTED - infrastructure limitation**
 
 ## Remaining risks
 
-1. SUPER/HIGH presence directory still lists online users (elevated intentional) — not contact-matrix scoped.
+1. SUPER/HIGH presence directory still lists online users (elevated intentional) - not contact-matrix scoped.
 2. `isSuperAdminViewer` remains broad for FeedBoard UI chrome (not used for contact invention after Phase 7).
 3. Dual-layer DISCOVER≠SEND: Student→HIGH may open via **existing** conversation or server send, but not via empty discovery invent.
 4. `MessagesContext` still contains old seeds if remounted accidentally.
-5. Deep-link util duplicated ESM (`client/src/utils`) + CJS (`utils/`) — keep logic aligned.
+5. Deep-link util duplicated ESM (`client/src/utils`) + CJS (`utils/`) - keep logic aligned.
 
 ## Rollback
 
@@ -127,4 +127,4 @@ Revert Inbox deep-link gate, FloatingMessenger elevated split, FloatingMessenger
 
 ## Next phase
 
-**STOP** — await approval for Phase 8.
+**STOP** - await approval for Phase 8.

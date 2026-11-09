@@ -8,7 +8,7 @@
  *  2. Fall back to in-process Memory Cache automatically if Redis is
  *     unavailable, initialising, or throws.
  *
- * No request may ever fail because of a cache error — every public method
+ * No request may ever fail because of a cache error - every public method
  * is fully wrapped so that failures degrade silently to a cache-miss.
  *
  * Cache key format : permission:{userId}
@@ -141,7 +141,7 @@ const PermissionCache = {
               _counters.hit++;
               return redisVal;
             }
-            // Redis miss — check memory too (in case we wrote there during a Redis outage)
+            // Redis miss - check memory too (in case we wrote there during a Redis outage)
             const memVal = MemoryProvider.get(k);
             if (memVal !== null) {
               _counters.hit++;
@@ -151,7 +151,7 @@ const PermissionCache = {
             return null;
           }
         } catch (redisErr) {
-          logger.warn({ err: redisErr.message }, '[PermissionCache] Redis get failed — falling back to memory');
+          logger.warn({ err: redisErr.message }, '[PermissionCache] Redis get failed - falling back to memory');
         }
       }
 
@@ -164,7 +164,7 @@ const PermissionCache = {
       _counters.miss++;
       return null;
     } catch (err) {
-      logger.warn({ err: err.message }, '[PermissionCache] get error — treating as miss');
+      logger.warn({ err: err.message }, '[PermissionCache] get error - treating as miss');
       _counters.miss++;
       return null;
     }
@@ -188,11 +188,11 @@ const PermissionCache = {
         try {
           await RedisProvider.set(k, permissions, ttlSec);
         } catch (redisErr) {
-          logger.warn({ err: redisErr.message }, '[PermissionCache] Redis set failed — memory-only');
+          logger.warn({ err: redisErr.message }, '[PermissionCache] Redis set failed - memory-only');
         }
       }
     } catch (err) {
-      logger.warn({ err: err.message }, '[PermissionCache] set error — cache write skipped');
+      logger.warn({ err: err.message }, '[PermissionCache] set error - cache write skipped');
     }
   },
 
@@ -220,7 +220,7 @@ const PermissionCache = {
         }
       }
     } catch (err) {
-      logger.warn({ err: err.message }, '[PermissionCache] invalidate error — ignored');
+      logger.warn({ err: err.message }, '[PermissionCache] invalidate error - ignored');
     }
   },
 

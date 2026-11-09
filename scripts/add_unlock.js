@@ -51,7 +51,7 @@ const replaceString = `<div className="flex items-center justify-between">
                            </button>
                          )}
                        </div>`;
-                       
+
 content = content.replace(targetString, replaceString);
 
 fs.writeFileSync(path, content, 'utf8');

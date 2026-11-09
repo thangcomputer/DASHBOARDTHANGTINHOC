@@ -1,16 +1,16 @@
 /**
- * branchRoutes.js — CRUD Chi nhánh
+ * branchRoutes.js - CRUD Chi nhánh
  *
- * GET    /api/branches          — Danh sách (public, để form đăng ký dùng)
- * POST   /api/branches          — Thêm chi nhánh (manage_staff)
- * PUT    /api/branches/:id      — Sửa chi nhánh (manage_staff)
- * DELETE /api/branches/:id      — Soft-disable chi nhánh (manage_staff)
+ * GET    /api/branches          - Danh sách (public, để form đăng ký dùng)
+ * POST   /api/branches          - Thêm chi nhánh (manage_staff)
+ * PUT    /api/branches/:id      - Sửa chi nhánh (manage_staff)
+ * DELETE /api/branches/:id      - Soft-disable chi nhánh (manage_staff)
  *
- * Phase 7.14 — Controlled cutover for /api/branches ONLY.
+ * Phase 7.14 - Controlled cutover for /api/branches ONLY.
  * Flow: (auth if admin) → policyShadowBranch → branchesCutoverGate → handler
  */
 const express = require('express');
-const Branch  = require('../models/Branch');
+const Branch = require('../models/Branch');
 const { authMiddleware } = require('../middleware/auth');
 const { policyShadowBranch } = require('../middleware/policyShadowBranch');
 const { branchesCutoverGate } = require('../middleware/branchesCutoverGate');
@@ -49,7 +49,7 @@ router.get('/', [
     const branches = await cache.wrap(cacheKey, BRANCH_TTL, async () => {
       return Branch.find({ isActive: true, ...tq }).sort({ name: 1 }).lean();
     });
-    // Cache 5 phút — danh sách chi nhánh ít thay đổi
+    // Cache 5 phút - danh sách chi nhánh ít thay đổi
     res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
     return res.json({ success: true, count: branches.length, data: branches });
   } catch (err) {
@@ -57,7 +57,7 @@ router.get('/', [
   }
 });
 
-// ── GET /api/branches/all — kể cả inactive (cho admin UI) ────────────────────
+// ── GET /api/branches/all - kể cả inactive (cho admin UI) ────────────────────
 router.get('/all', adminGuard('list_all'), async (req, res) => {
   try {
     const tq = await tenantBranchQuery(req);

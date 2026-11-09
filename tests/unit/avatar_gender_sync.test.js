@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * PHASE AVATAR-GENDER-SYNC-1 — normalizeGender + resolveAvatarUrl + auth payload.
+ * PHASE AVATAR-GENDER-SYNC-1 - normalizeGender + resolveAvatarUrl + auth payload.
  */
 
 const { describe, it } = require('node:test');
@@ -17,7 +17,7 @@ const sidebarPath = path.join(__dirname, '../../client/src/components/AppSidebar
 const avatarCompPath = path.join(__dirname, '../../client/src/components/admin/shared/Avatar.jsx');
 const publicAvatarsDir = path.join(__dirname, '../../client/public/avatars');
 
-describe('avatar gender sync — normalizeGender + resolveAvatarUrl', async () => {
+describe('avatar gender sync - normalizeGender + resolveAvatarUrl', async () => {
   const mod = await import(pathToFileURL(avatarsPath).href);
   const {
     normalizeGender,
@@ -153,7 +153,7 @@ describe('avatar gender sync — normalizeGender + resolveAvatarUrl', async () =
   });
 });
 
-describe('avatar gender sync — static UI/API wiring', () => {
+describe('avatar gender sync - static UI/API wiring', () => {
   const auth = fs.readFileSync(authPath, 'utf8');
   const editable = fs.readFileSync(editablePath, 'utf8');
   const sidebar = fs.readFileSync(sidebarPath, 'utf8');

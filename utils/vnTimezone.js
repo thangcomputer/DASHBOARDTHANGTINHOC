@@ -1,5 +1,5 @@
 /**
- * Business timezone helpers — Asia/Ho_Chi_Minh (UTC+7, no DST).
+ * Business timezone helpers - Asia/Ho_Chi_Minh (UTC+7, no DST).
  * Use for analytics calendar buckets; avoid Date#toISOString().slice(0,10) for VN days.
  */
 'use strict';

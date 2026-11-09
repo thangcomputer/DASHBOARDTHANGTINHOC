@@ -103,7 +103,7 @@ router.post('/generate-ai', [authMiddleware, ...quizzesGuard('generate_ai')], as
       success: true,
       data,
       message: data.source === 'fallback'
-        ? 'AI chưa sẵn sàng — đây là câu mẫu, hãy sửa trước khi giao bài'
+        ? 'AI chưa sẵn sàng - đây là câu mẫu, hãy sửa trước khi giao bài'
         : `Đã soạn ${data.count} câu. Kiểm tra rồi bấm Tạo bài trắc nghiệm.`,
     });
   } catch (err) {
@@ -296,7 +296,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       });
     }
 
-    // Đã nộp bình thường rồi — giữ bài cũ (kể cả forfeit muộn / nộp lại)
+    // Đã nộp bình thường rồi - giữ bài cũ (kể cả forfeit muộn / nộp lại)
     if (existing && !existing.forfeit) {
       return res.json({
         success: true,
@@ -377,7 +377,7 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
       learningGoalService.trackStudyActivity(student._id, { questions: learningGoalService.countAnswered(userAnswers) });
     }
 
-    // Thông báo GV (bỏ qua forfeit trùng khi đã nộp bình thường — đã return sớm ở trên)
+    // Thông báo GV (bỏ qua forfeit trùng khi đã nộp bình thường - đã return sớm ở trên)
     try {
       const teacherId = quiz.teacherId ? String(quiz.teacherId) : '';
       if (teacherId) {
@@ -387,8 +387,8 @@ router.post('/:id/submit', [authMiddleware, ...quizzesGuard('submit')], async (r
           ? '⚠️ Học viên thoát giữa giờ trắc nghiệm'
           : '📝 Học viên đã nộp trắc nghiệm';
         const content = isForfeit
-          ? `${student.name || 'Học viên'} — "${quiz.title}": RỚT (thoát giữa giờ).`
-          : `${student.name || 'Học viên'} — "${quiz.title}": ${score}% (${correctCount}/${totalQuestions} câu) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
+          ? `${student.name || 'Học viên'} - "${quiz.title}": RỚT (thoát giữa giờ).`
+          : `${student.name || 'Học viên'} - "${quiz.title}": ${score}% (${correctCount}/${totalQuestions} câu) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
         await NotificationService.send(io, {
           type: 'COURSE',
           title,

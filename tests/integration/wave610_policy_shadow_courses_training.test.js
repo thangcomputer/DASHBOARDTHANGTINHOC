@@ -1,5 +1,5 @@
 /**
- * Wave 6.10 — Policy SHADOW for LIVE courses + training-lms + teaching guides.
+ * Wave 6.10 - Policy SHADOW for LIVE courses + training-lms + teaching guides.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -346,7 +346,7 @@ test('Wave6.10 static: routes keep legacy + shadow; mass-assignment documented; 
   const courseGate = fs.readFileSync(path.join(ROOT, 'middleware/coursesCutoverGate.js'), 'utf8');
   assert.ok(courseGate.includes('requireInternalToken'));
   assert.ok(courseGate.includes("checkPermission('system_settings')"));
-  // Live mass-assignment preserved (documented finding) — do not "fix" in shadow wave
+  // Live mass-assignment preserved (documented finding) - do not "fix" in shadow wave
   assert.ok(courses.includes('const body = { ...req.body }'));
 
   for (const a of [

@@ -3,7 +3,6 @@ import { Flame, Lock, Medal, Sparkles, Trophy } from 'lucide-react';
 import { apiFetch, resolveMediaUrl } from '../../services/api';
 
 const SEEN_KEY = 'lms-progress-level-seen';
-const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const PERIODS = [
   ['week', 'Tuần'],
   ['month', 'Tháng'],
@@ -13,12 +12,6 @@ const PERIODS = [
 function formatWhen(value) {
   if (!value) return '';
   return new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-
-function shiftMonth(month, delta) {
-  const [year, mon] = String(month || '').split('-').map(Number);
-  const date = new Date(Date.UTC(year, (mon || 1) - 1 + delta, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /** Thẻ cấp độ học bài. Lỗi API thì ẩn thẻ, không chặn Tổng quan. */
@@ -39,7 +32,7 @@ export default function LmsProgressCard() {
         const seen = Number(localStorage.getItem(SEEN_KEY) || 0);
         if ((body.data.level || 1) > seen) setCelebrate(true);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => { load(); }, []);
@@ -50,7 +43,7 @@ export default function LmsProgressCard() {
     apiFetch(`/lms-progress/leaderboard?period=${period}`)
       .then((res) => res.json())
       .then((body) => { if (!cancelled && body?.success) setBoard(body.data); })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [tab, period]);
 
@@ -90,13 +83,10 @@ export default function LmsProgressCard() {
         {data.xpTotal || 0} XP học bài
         {data.atMaxLevel ? ' · đã đạt cấp cao nhất' : ` · ${into}/${need} tới ${data.nextTitle}`}
       </p>
-      <p className="mt-1 text-[11px] text-slate-400">
-        Kỷ lục {data.bestStreak || 0} ngày. XP học bài chỉ tính cấp độ và hạng, không dùng để luyện.
-      </p>
-      <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 text-[11px] font-black text-slate-500">
+
+      <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 text-[11px] font-black text-slate-500">
         {[
           ['history', 'Lịch sử'],
-          ['calendar', 'Lịch'],
           ['badges', 'Huy hiệu'],
           ['rank', 'Hạng'],
         ].map(([id, label]) => (
@@ -104,7 +94,6 @@ export default function LmsProgressCard() {
         ))}
       </div>
       {tab === 'history' && <HistoryList rows={data.history || []} />}
-      {tab === 'calendar' && <StudyCalendar calendar={data.calendar} streak={data.streak || 0} best={data.bestStreak || 0} onMonth={(month) => load(month)} />}
       {tab === 'badges' && <BadgeGrid badges={data.badges || []} />}
       {tab === 'rank' && <RankList board={board} period={period} onPeriod={setPeriod} />}
     </section>
@@ -123,33 +112,6 @@ function HistoryList({ rows }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function StudyCalendar({ calendar, streak, best, onMonth }) {
-  if (!calendar) return null;
-  return (
-    <div className="mt-3">
-      <div className="mb-2 flex items-center justify-between text-xs font-black text-slate-600">
-        <button type="button" onClick={() => onMonth(shiftMonth(calendar.month, -1))} className="rounded-lg px-2 py-1 hover:bg-slate-100">Trước</button>
-        <span>{calendar.month}</span>
-        <button type="button" onClick={() => onMonth(shiftMonth(calendar.month, 1))} className="rounded-lg px-2 py-1 hover:bg-slate-100">Sau</button>
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400">
-        {WEEKDAYS.map((label) => <span key={label}>{label}</span>)}
-        {(calendar.days || []).map((cell, index) => (
-          <span
-            key={cell?.key || `pad-${index}`}
-            className={`flex h-7 items-center justify-center rounded-full ${cell?.studied ? 'bg-orange-500 text-white' : cell?.today ? 'bg-orange-100 text-orange-700' : 'text-slate-500'}`}
-          >
-            {cell?.day || ''}
-          </span>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] font-semibold text-slate-500">
-        Tháng này {calendar.studiedCount || 0} ngày có học. Chuỗi {streak} ngày, kỷ lục {best} ngày. Mốc 60 và 100 ngày đang theo dõi, chưa có thưởng.
-      </p>
-    </div>
   );
 }
 

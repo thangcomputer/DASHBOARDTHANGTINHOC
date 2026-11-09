@@ -4,7 +4,7 @@ const DailyPracticeTopic = require('../models/DailyPracticeTopic');
 const DailyPracticeQuestion = require('../models/DailyPracticeQuestion');
 const rules = require('./dailyPracticeRules');
 
-/** Bộ câu hỏi mẫu để trung tâm dùng ngay — admin có thể sửa / xóa / thêm. */
+/** Bộ câu hỏi mẫu để trung tâm dùng ngay - admin có thể sửa / xóa / thêm. */
 const STARTER_TOPICS = [
   {
     name: 'Windows cơ bản',
@@ -78,7 +78,7 @@ const STARTER_TOPICS = [
       { type: 'fill', difficulty: 'medium', prompt: 'Kéo phím thích hợp vào chỗ trống', text: 'Nhấn {{Ctrl}} + {{P}} để in tài liệu.', distractors: ['Alt', 'I'], hint: 'P là Print.', explanation: 'Ctrl + P mở hộp thoại in.' },
       { type: 'order', difficulty: 'medium', prompt: 'Sắp xếp các bước sao chép một đoạn văn sang vị trí khác', items: ['Bôi đen đoạn văn', 'Nhấn Ctrl + C', 'Đặt con trỏ tại vị trí mới', 'Nhấn Ctrl + V'], hint: 'Chọn trước, sao chép sau.', explanation: 'Bôi đen → Ctrl + C → đặt con trỏ → Ctrl + V.' },
       { type: 'sort', difficulty: 'hard', prompt: 'Phân loại các phím tắt', groups: [{ name: 'Định dạng chữ', items: ['Ctrl + B', 'Ctrl + I', 'Ctrl + U'] }, { name: 'Thao tác tệp', items: ['Ctrl + S', 'Ctrl + O', 'Ctrl + N'] }], hint: 'S = Save, O = Open, N = New.', explanation: 'B/I/U định dạng chữ; S lưu, O mở, N tạo tệp mới.' },
-      { type: 'mcq', difficulty: 'hard', prompt: 'Ctrl + Y thường dùng để làm gì?', options: ['Làm lại thao tác vừa hoàn tác (Redo)', 'Hoàn tác (Undo)', 'Lưu tệp', 'Mở tệp mới'], correctIndex: 0, hint: 'Ngược lại với Ctrl + Z.', explanation: 'Ctrl + Y là Redo — làm lại thao tác vừa bị hoàn tác.' },
+      { type: 'mcq', difficulty: 'hard', prompt: 'Ctrl + Y thường dùng để làm gì?', options: ['Làm lại thao tác vừa hoàn tác (Redo)', 'Hoàn tác (Undo)', 'Lưu tệp', 'Mở tệp mới'], correctIndex: 0, hint: 'Ngược lại với Ctrl + Z.', explanation: 'Ctrl + Y là Redo - làm lại thao tác vừa bị hoàn tác.' },
     ],
   },
   {

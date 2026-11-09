@@ -21,10 +21,10 @@ const paymentService = {
     // Dev/Test mode: skip if not configured and not in production
     if (!apiKey && !hmacSecret) {
       if (config.isProduction) {
-        logger.error('[SEPAY] Webhook rejected — SEPAY_API_KEY / SEPAY_SECRET_KEY not configured in production');
+        logger.error('[SEPAY] Webhook rejected - SEPAY_API_KEY / SEPAY_SECRET_KEY not configured in production');
         return false;
       }
-      logger.warn('[SEPAY] Dev mode — webhook verification skipped (no SEPAY keys)');
+      logger.warn('[SEPAY] Dev mode - webhook verification skipped (no SEPAY keys)');
       return true;
     }
 

@@ -15,7 +15,7 @@ const MOVES = [
   { src: 'routes/studentRoutes.js', dest: 'modules/student/routes/studentRoutes.js' },
   { src: 'models/Student.js', dest: 'modules/student/models/Student.js' },
   { src: 'models/Group.js', dest: 'modules/student/models/Group.js' },
-  
+
   // Teacher
   { src: 'routes/teacherRoutes.js', dest: 'modules/teacher/routes/teacherRoutes.js' },
   { src: 'routes/staffRoutes.js', dest: 'modules/teacher/routes/staffRoutes.js' },
@@ -23,7 +23,7 @@ const MOVES = [
   { src: 'models/Teacher.js', dest: 'modules/teacher/models/Teacher.js' },
   { src: 'models/TeacherAssignmentSegment.js', dest: 'modules/teacher/models/TeacherAssignmentSegment.js' },
   { src: 'services/teacherStarBonus.js', dest: 'modules/teacher/services/teacherStarBonus.js' },
-  
+
   // Course
   { src: 'routes/courseRoutes.js', dest: 'modules/course/routes/courseRoutes.js' },
   { src: 'routes/trainingRoutes.js', dest: 'modules/course/routes/trainingRoutes.js' },
@@ -36,10 +36,10 @@ const MOVES = [
   { src: 'models/TeachingGuide.js', dest: 'modules/course/models/TeachingGuide.js' },
   { src: 'models/Assignment.js', dest: 'modules/course/models/Assignment.js' },
   { src: 'models/Submission.js', dest: 'modules/course/models/Submission.js' },
-  
+
   // Enrollment
   { src: 'services/enrollmentService.js', dest: 'modules/enrollment/services/enrollmentService.js' },
-  
+
   // Attendance
   { src: 'routes/scheduleRoutes.js', dest: 'modules/attendance/routes/scheduleRoutes.js' },
   { src: 'models/Schedule.js', dest: 'modules/attendance/models/Schedule.js' },
@@ -56,13 +56,13 @@ function ensureDir(dir) {
 DOMAINS.forEach(domain => {
   const domainDir = path.join(ROOT_DIR, 'modules', domain);
   ensureDir(domainDir);
-  
+
   // Create index.js
   const indexFile = path.join(domainDir, 'index.js');
   if (!fs.existsSync(indexFile)) {
     fs.writeFileSync(indexFile, '// Entry point for ' + domain + ' module\n', 'utf8');
   }
-  
+
   // Create placeholders
   FOLDERS.forEach(folder => {
     ensureDir(path.join(domainDir, folder));
@@ -112,14 +112,14 @@ allFiles.forEach(filePath => {
 
   // Regex to match require('...') or require("...")
   const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-  
+
   content = content.replace(requireRegex, (match, importPath) => {
     // Only care about relative imports
     if (!importPath.startsWith('.')) return match;
-    
+
     const currentDir = path.dirname(filePath);
     let absImportPath = path.resolve(currentDir, importPath);
-    
+
     if (!absImportPath.endsWith('.js')) {
       absImportPath += '.js';
     }
@@ -141,27 +141,27 @@ allFiles.forEach(filePath => {
       actualTargetAbs = newTargetAbs;
     } else {
       if (fileWasMoved) {
-         let originalTargetAbs = path.resolve(oldFileDir, importPath);
-         if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
-         
-         if (fileMap.has(originalTargetAbs)) {
-           actualTargetAbs = fileMap.get(originalTargetAbs);
-         } else {
-           actualTargetAbs = originalTargetAbs;
-         }
+        let originalTargetAbs = path.resolve(oldFileDir, importPath);
+        if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
+
+        if (fileMap.has(originalTargetAbs)) {
+          actualTargetAbs = fileMap.get(originalTargetAbs);
+        } else {
+          actualTargetAbs = originalTargetAbs;
+        }
       } else {
         return match;
       }
     }
 
     let newRelative = path.relative(currentDir, actualTargetAbs);
-    
+
     if (newRelative.endsWith('.js')) {
       newRelative = newRelative.slice(0, -3);
     }
-    
+
     newRelative = newRelative.replace(/\\/g, '/');
-    
+
     if (!newRelative.startsWith('.')) {
       newRelative = './' + newRelative;
     }

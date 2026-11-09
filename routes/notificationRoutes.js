@@ -9,7 +9,7 @@ const { notificationsCutoverGate } = require('../middleware/notificationsCutover
 /**
  * LIVE mount: server.js → app.use('/api/notifications', notificationRoutes)
  *
- * Phase 7.15 — Controlled cutover for /api/notifications ONLY.
+ * Phase 7.15 - Controlled cutover for /api/notifications ONLY.
  * Flow: auth → policyShadowNotification(action) → notificationsCutoverGate(action) → handler
  * Legacy fallback: auth-only pass-through; broadcast → isAdmin.
  */
@@ -18,7 +18,7 @@ function notifGuard(action) {
   return [authMiddleware, policyShadowNotification(action), notificationsCutoverGate(action)];
 }
 
-// GET /api/notifications — danh sach phan trang (Notification Center)
+// GET /api/notifications - danh sach phan trang (Notification Center)
 router.get('/', notifGuard('list'), async (req, res) => {
   try {
     const { page, limit, type, unreadOnly } = req.query;
@@ -35,7 +35,7 @@ router.get('/', notifGuard('list'), async (req, res) => {
   }
 });
 
-// GET /api/notifications/count — badge chua doc
+// GET /api/notifications/count - badge chua doc
 router.get('/count', notifGuard('count'), async (req, res) => {
   try {
     const count = await center.countUnread(req.user);
@@ -46,7 +46,7 @@ router.get('/count', notifGuard('count'), async (req, res) => {
   }
 });
 
-// GET /api/notifications/unread — tuong thich cu (50 gan day + count)
+// GET /api/notifications/unread - tuong thich cu (50 gan day + count)
 router.get('/unread', notifGuard('unread'), async (req, res) => {
   try {
     const result = await center.listForUser(req.user, { page: 1, limit: 50 });
@@ -72,7 +72,7 @@ router.put('/mark-read', notifGuard('mark_read'), async (req, res) => {
   }
 });
 
-// DELETE /api/notifications/:id — dismiss cho user hien tai
+// DELETE /api/notifications/:id - dismiss cho user hien tai
 router.delete('/:id', notifGuard('dismiss'), async (req, res) => {
   try {
     const data = await center.dismiss(req.user, req.params.id);
@@ -83,7 +83,7 @@ router.delete('/:id', notifGuard('dismiss'), async (req, res) => {
   }
 });
 
-// POST /api/notifications — admin broadcast
+// POST /api/notifications - admin broadcast
 router.post('/', notifGuard('broadcast'), async (req, res) => {
   try {
     const { title, content, type = 'SYSTEM', receivers = 'ALL_ADMIN', path = '', payload = {} } = req.body || {};

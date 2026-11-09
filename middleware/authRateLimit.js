@@ -1,5 +1,5 @@
 /**
- * Rate limiting cho /api/auth — chống brute-force và lạm dụng CAPTCHA.
+ * Rate limiting cho /api/auth - chống brute-force và lạm dụng CAPTCHA.
  * Giá trị có thể chỉnh qua biến môi trường (xem README).
  */
 const rateLimit = require('express-rate-limit');
@@ -34,7 +34,7 @@ const captchaLimiter = rateLimit({
   message: jsonMessage('Yêu cầu mã xác thực quá nhanh. Vui lòng đợi rồi thử lại.'),
 });
 
-/** Refresh token — vừa phải để app không bị chặn khi nhiều tab */
+/** Refresh token - vừa phải để app không bị chặn khi nhiều tab */
 const refreshTokenLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: parseMax('RATE_LIMIT_REFRESH_MAX', 200),
@@ -43,7 +43,7 @@ const refreshTokenLimiter = rateLimit({
   message: jsonMessage('Quá nhiều yêu cầu làm mới phiên. Vui lòng thử lại sau.'),
 });
 
-/** Quên mật khẩu / đặt lại / đăng ký — window dài hơn */
+/** Quên mật khẩu / đặt lại / đăng ký - window dài hơn */
 const sensitiveFlowLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: parseMax('RATE_LIMIT_SENSITIVE_MAX', 20),
@@ -52,7 +52,7 @@ const sensitiveFlowLimiter = rateLimit({
   message: jsonMessage('Quá nhiều yêu cầu từ địa chỉ này. Vui lòng thử lại sau một lúc.'),
 });
 
-/** Kiểm tra role theo SĐT/email — hạn chế enumeration */
+/** Kiểm tra role theo SĐT/email - hạn chế enumeration */
 const checkRoleLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: parseMax('RATE_LIMIT_CHECK_ROLE_MAX', 60),

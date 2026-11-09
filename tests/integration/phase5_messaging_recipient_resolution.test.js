@@ -1,7 +1,7 @@
 /**
- * Phase 5 — Canonical recipient resolution + private DM isolation.
+ * Phase 5 - Canonical recipient resolution + private DM isolation.
  * Authority: MESSAGING_BUSINESS_DECISIONS + MATRIX.
- * Live Socket.IO server not required — uses model stubs + mock notifyUser/io
+ * Live Socket.IO server not required - uses model stubs + mock notifyUser/io
  * matching server.js private delivery semantics.
  */
 'use strict';
@@ -336,7 +336,7 @@ describe('Phase 5 recipient resolution + DM isolation', { concurrency: false }, 
 
   it('branch: student A → staff B denied by pairing scope', async () => {
     const send = await canSendMessage(actorFromDoc(IDS.studentA), IDS.staffA, 'staff');
-    // same branch A — allow
+    // same branch A - allow
     assert.equal(send.allowed, true);
 
     // Place staff on branch B temporarily via fixture mutation
@@ -409,7 +409,7 @@ describe('Phase 5 recipient resolution + DM isolation', { concurrency: false }, 
 
       const receiveEvents = harness.emits.filter((e) => e.event === 'message:receive');
       assert.ok(receiveEvents.length >= 1);
-      // Exact socket or user room — never ALL_STAFF / ALL_SUPPORT
+      // Exact socket or user room - never ALL_STAFF / ALL_SUPPORT
       for (const e of receiveEvents) {
         assert.equal(e.rooms.includes('ALL_STAFF'), false);
         assert.equal(e.rooms.includes('ALL_SUPPORT'), false);
@@ -532,7 +532,7 @@ describe('Phase 5 recipient resolution + DM isolation', { concurrency: false }, 
     assert.ok(routes.includes('sendCanonicalMessage'));
   });
 
-  it('inactive recipient: current pairing does not deny on status (ALLOW — documented)', async () => {
+  it('inactive recipient: current pairing does not deny on status (ALLOW - documented)', async () => {
     const support = DOCS[IDS.supportA].doc;
     const prev = support.status;
     support.status = 'inactive';
@@ -541,7 +541,7 @@ describe('Phase 5 recipient resolution + DM isolation', { concurrency: false }, 
       assert.equal(r.ok, true);
       assert.equal(r.recipient.status, 'inactive');
       const send = await canSendMessage(actorFromDoc(IDS.studentA), IDS.supportA, 'staff');
-      assert.equal(send.allowed, true); // current behavior — not invented deny
+      assert.equal(send.allowed, true); // current behavior - not invented deny
     } finally {
       support.status = prev;
     }

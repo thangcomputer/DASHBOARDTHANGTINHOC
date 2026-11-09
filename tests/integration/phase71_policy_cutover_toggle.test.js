@@ -1,5 +1,5 @@
 /**
- * Phase 7.1 — Policy cutover toggle infrastructure (no route cutover).
+ * Phase 7.1 - Policy cutover toggle infrastructure (no route cutover).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -60,7 +60,7 @@ test('Phase7.1 config: monitoring selected + global true → POLICY in helper ON
   const env = { POLICY_CUTOVER_ENABLED: 'true', POLICY_CUTOVER_ROUTES: 'monitoring' };
   if (env) assert.equal(auth('monitoring', env), AUTHORITY.POLICY);
   if (env) assert.equal(shouldPolicyBeAuthoritative('monitoring', {}, env), true);
-  // Does not imply HTTP wiring — routes must still use Legacy gates (static test below)
+  // Does not imply HTTP wiring - routes must still use Legacy gates (static test below)
 });
 
 test('Phase7.1 config: unknown route family → LEGACY', () => {
@@ -144,7 +144,7 @@ test('Phase7.1 rollback: enabled → POLICY; disabled / removed route / invalid 
 test('Phase7.1 runtime: committed env may activate ONLY via explicit allowlist; helper still fail-safe', () => {
   const envFile = readDeployEnv() || '';
   // Phase 7.4 may set ENABLED=true + ROUTES=backups; never wildcard / never monitoring alone as accidental global
-  assert.ok(!/\*/.test((envFile.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  assert.ok(!/\*/.test((envFile.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
   assert.ok(!/POLICY_CUTOVER_ROUTES\s*=\s*.*\*/.test(envFile));
 
   const parsed = {};
@@ -189,8 +189,8 @@ test('Phase7.1 static: cutover defaults OFF; monitoring gate uses helper only vi
   if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_STUDENT_CREATE\s*=\s*false/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_INVOICE\s*=\s*false/.test(env));
-  // Phase 7.6: allowlist may be backups/monitoring/tenants — never wildcard
-  const routesLine = (env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1].trim();
+  // Phase 7.6: allowlist may be backups/monitoring/tenants - never wildcard
+  const routesLine = (env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1].trim();
   assert.ok(!routesLine.includes('*'));
   if (/POLICY_CUTOVER_ENABLED\s*=\s*true/.test(env)) {
     const allowed = new Set(['backups', 'monitoring', 'tenants', 'system-logs', 'ai', 'workflows', 'builder', 'courses', 'training', 'training-lms', 'branches', 'notifications', 'blog', 'feed', 'files', 'settings', 'messages', 'schedules', 'quizzes', 'assignments', 'proctor', 'evaluations', 'bi', 'analytics', 'staff', 'employees', 'exam-results', 'teachers']);

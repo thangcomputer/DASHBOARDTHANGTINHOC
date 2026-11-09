@@ -1,4 +1,4 @@
-# Service Regression Report — Batch 4
+# Service Regression Report - Batch 4
 
 ## 1. Result
 **ZERO REGRESSIONS**

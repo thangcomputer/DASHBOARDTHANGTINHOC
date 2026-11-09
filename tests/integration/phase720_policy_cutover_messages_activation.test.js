@@ -1,5 +1,5 @@
 /**
- * Phase 7.20 — Controlled cutover + production activation for /api/messages
+ * Phase 7.20 - Controlled cutover + production activation for /api/messages
  *
  * LIVE: router.use(auth) → policyShadowMessage → messagesCutoverGate → handler.
  * Auth-only / self-scope / ownership / DM / group / broadcast mirrored from Wave 6.9.
@@ -65,11 +65,11 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-          branchCode: opts.branchCode ?? 'A',
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+        branchCode: opts.branchCode ?? 'A',
+      },
     userBranchId: opts.userBranchId ?? '507f1f77bcf86cd7994390aa',
   });
 }
@@ -372,7 +372,7 @@ test('Phase7.20 rollback: remove messages → LEGACY; prior stay POLICY; restore
 test('Phase7.20 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'schedules',
   ];
   for (const fam of legacyFamilies) {
@@ -451,8 +451,8 @@ test('Phase7.20 functional smoke: contacts authz; mutations NOT EXECUTED', async
   const staff = sub({ role: 'staff', adminRole: 'STAFF' });
   assert.equal((await parity('contacts', staff)).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — send/broadcast/upload/recall/soft-delete/group mutations',
-    'NOT EXECUTED — send/broadcast/upload/recall/soft-delete/group mutations',
+    'NOT EXECUTED - send/broadcast/upload/recall/soft-delete/group mutations',
+    'NOT EXECUTED - send/broadcast/upload/recall/soft-delete/group mutations',
   );
 });
 

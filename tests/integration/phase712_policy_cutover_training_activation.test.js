@@ -1,9 +1,9 @@
 /**
- * Phase 7.12 — Controlled cutover + production activation for /api/training
+ * Phase 7.12 - Controlled cutover + production activation for /api/training
  *
  * LIVE mount: server.js → teachingGuideRoutes (NOT trainingRoutes / training-lms).
- * Single action: GET / → guide_list — auth-only (any authenticated role ALLOW).
- * Data filter: isActive + optional category — NOT authorization DENY.
+ * Single action: GET / → guide_list - auth-only (any authenticated role ALLOW).
+ * Data filter: isActive + optional category - NOT authorization DENY.
  * No ownership / branch / tenant HTTP deny on this family.
  */
 const test = require('node:test');
@@ -59,10 +59,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -197,7 +197,7 @@ test('Phase7.12 specialty/ownership: teacher/student relationships are NOT HTTP 
   const student = sub({ id: 's1', role: 'student' });
   assert.equal(parity('guide_list', teacher).policy.decision, 'ALLOW');
   assert.equal(parity('guide_list', student).policy.decision, 'ALLOW');
-  // Data filter (isActive/category) is handler-only — Policy mirrors ALLOW
+  // Data filter (isActive/category) is handler-only - Policy mirrors ALLOW
   assert.equal(
     parity('guide_list', teacher, { bodyBranchId: 'other', bodyTeacherId: 'spoof' }).policy.decision,
     'ALLOW',
@@ -313,16 +313,16 @@ test('Phase7.12 rollback: remove training → LEGACY; prior families stay POLICY
   const parsed = parseDotEnvFile();
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('training'));
-      assert.ok(restoredRoutes.includes('courses'));
-      assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('training'));
+    assert.ok(restoredRoutes.includes('courses'));
+    assert.ok(restoredRoutes.includes('backups'));
   }
 });
 
 test('Phase7.12 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'quizzes', 'assignments', 'evaluations',  'proctor',
+    'quizzes', 'assignments', 'evaluations', 'proctor',
     'files', 'blog', 'feed', 'schedules', 'messages', 'notifications',
   ];
   for (const fam of legacyFamilies) {
@@ -391,8 +391,8 @@ test('Phase7.12 functional smoke: guide_list authz only; mutations NOT EXECUTED'
   const staff = sub({ role: 'staff' });
   assert.equal(parity('guide_list', staff).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/update/delete/enroll/assign production mutation',
-    'NOT EXECUTED — create/update/delete/enroll/assign production mutation',
+    'NOT EXECUTED - create/update/delete/enroll/assign production mutation',
+    'NOT EXECUTED - create/update/delete/enroll/assign production mutation',
   );
 });
 

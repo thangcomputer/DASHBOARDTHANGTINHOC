@@ -68,7 +68,7 @@ export default function TeacherOverviewTab({
     return () => clearInterval(t);
   }, []);
 
-  // Đếm bài tập đã nộp chờ chấm — không dùng lastGrade (HV mới luôn bị báo sai)
+  // Đếm bài tập đã nộp chờ chấm - không dùng lastGrade (HV mới luôn bị báo sai)
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -249,7 +249,7 @@ export default function TeacherOverviewTab({
 
   return (
     <div className="bg-[#F5F8FC] py-3 sm:py-5 md:py-6 space-y-4 lg:space-y-5 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full min-w-0 max-w-full overflow-x-hidden pb-4 th-dashboard-overview th-dashboard-overview--teacher">
-      
+
       <header className="flex min-w-0">
         <WelcomeHero
           role="teacher"
@@ -262,94 +262,94 @@ export default function TeacherOverviewTab({
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-stretch">
-      {/* ── Cần xử lý: chỉ hiện việc còn tồn, bấm là tới đúng việc ── */}
-      <section className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 min-w-0">
-        <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
-          <Zap size={16} className="text-amber-500 shrink-0" aria-hidden="true" /> Cần xử lý
-        </h3>
-        {todoItems.length ? todoItems.map(({ key, icon: Icon, tone, title, sub, cta, action }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={action}
-            className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-red-200 hover:bg-red-50/40"
-          >
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
-              <Icon size={19} aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-black text-slate-900">{title}</span>
-              {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
-            </span>
-            <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-red-600">
-              {cta} <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </span>
-          </button>
-        )) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl bg-emerald-50 px-4 py-6 text-center">
-            <UserCheck size={28} className="text-emerald-500" aria-hidden="true" />
-            <p className="text-sm font-black text-emerald-700">Không còn việc tồn đọng</p>
-            <p className="text-xs text-emerald-600">Các ca đã điểm danh và không có bài chờ chấm.</p>
-          </div>
-        )}
-      </section>
+        {/* ── Cần xử lý: chỉ hiện việc còn tồn, bấm là tới đúng việc ── */}
+        <section className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 min-w-0">
+          <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
+            <Zap size={16} className="text-amber-500 shrink-0" aria-hidden="true" /> Cần xử lý
+          </h3>
+          {todoItems.length ? todoItems.map(({ key, icon: Icon, tone, title, sub, cta, action }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={action}
+              className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-red-200 hover:bg-red-50/40"
+            >
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tone}`}>
+                <Icon size={19} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-black text-slate-900">{title}</span>
+                {sub && <span className="block truncate text-xs text-slate-500">{sub}</span>}
+              </span>
+              <span className="flex shrink-0 items-center gap-0.5 text-xs font-black text-red-600">
+                {cta} <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+              </span>
+            </button>
+          )) : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl bg-emerald-50 px-4 py-6 text-center">
+              <UserCheck size={28} className="text-emerald-500" aria-hidden="true" />
+              <p className="text-sm font-black text-emerald-700">Không còn việc tồn đọng</p>
+              <p className="text-xs text-emerald-600">Các ca đã điểm danh và không có bài chờ chấm.</p>
+            </div>
+          )}
+        </section>
 
-      {/* ── Tháng này: 3 cột gọn (giống mobile) ── */}
-      <section className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 min-w-0">
-        <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
-          <TrendingUp size={16} className="text-sky-500 shrink-0" aria-hidden="true" /> Tháng này
-        </h3>
-        <div className="grid flex-1 grid-cols-3 gap-2 sm:gap-3">
-          {[
-            {
-              icon: WalletCards,
-              tint: 'bg-sky-50 text-sky-600',
-              label: `Thu nhập T${new Date().getMonth() + 1}`,
-              value: `${(Number(totalMonthlyIncome) || 0).toLocaleString('vi-VN')}đ`,
-              onClick: () => navigate('/teacher/finance'),
-            },
-            {
-              icon: CalendarDays,
-              tint: 'bg-indigo-50 text-indigo-600',
-              label: 'Buổi đã dạy',
-              value: taughtThisMonth,
-              onClick: () => navigate('/teacher#schedule'),
-            },
-            {
-              icon: Award,
-              tint: 'bg-amber-50 text-amber-600',
-              label: fiveStarStats.achieved ? 'Thưởng sao · đã đạt' : 'Thưởng sao',
-              value: `${fiveStarStats.count}/${fiveStarStats.need} HV`,
-              title: fiveStarStats.achieved ? 'Đã đạt thưởng' : `Cần thêm ${Math.max(0, fiveStarStats.need - fiveStarStats.count)} HV đánh giá 5★`,
-            },
-          ].map(({ icon: Icon, tint, label, value, title, onClick }) => {
-            const Tag = onClick ? 'button' : 'div';
-            return (
-              <Tag
-                key={label}
-                type={onClick ? 'button' : undefined}
-                onClick={onClick}
-                title={title}
-                className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:gap-3 sm:p-3 ${onClick ? 'cursor-pointer hover:border-red-200 hover:bg-red-50/40' : ''}`}
-              >
-                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tint}`}>
-                  <Icon size={24} strokeWidth={2.2} aria-hidden="true" />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-base font-black tabular-nums text-slate-900 sm:text-lg">{value}</span>
-                  <span className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</span>
-                </span>
-              </Tag>
-            );
-          })}
-        </div>
-      </section>
+        {/* ── Tháng này: 3 cột gọn (giống mobile) ── */}
+        <section className="lg:col-span-6 bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm flex flex-col gap-2.5 min-w-0">
+          <h3 className="flex items-center gap-2 font-bold text-sm lg:text-base text-slate-800">
+            <TrendingUp size={16} className="text-sky-500 shrink-0" aria-hidden="true" /> Tháng này
+          </h3>
+          <div className="grid flex-1 grid-cols-3 gap-2 sm:gap-3">
+            {[
+              {
+                icon: WalletCards,
+                tint: 'bg-sky-50 text-sky-600',
+                label: `Thu nhập T${new Date().getMonth() + 1}`,
+                value: `${(Number(totalMonthlyIncome) || 0).toLocaleString('vi-VN')}đ`,
+                onClick: () => navigate('/teacher/finance'),
+              },
+              {
+                icon: CalendarDays,
+                tint: 'bg-indigo-50 text-indigo-600',
+                label: 'Buổi đã dạy',
+                value: taughtThisMonth,
+                onClick: () => navigate('/teacher#schedule'),
+              },
+              {
+                icon: Award,
+                tint: 'bg-amber-50 text-amber-600',
+                label: fiveStarStats.achieved ? 'Thưởng sao · đã đạt' : 'Thưởng sao',
+                value: `${fiveStarStats.count}/${fiveStarStats.need} HV`,
+                title: fiveStarStats.achieved ? 'Đã đạt thưởng' : `Cần thêm ${Math.max(0, fiveStarStats.need - fiveStarStats.count)} HV đánh giá 5★`,
+              },
+            ].map(({ icon: Icon, tint, label, value, title, onClick }) => {
+              const Tag = onClick ? 'button' : 'div';
+              return (
+                <Tag
+                  key={label}
+                  type={onClick ? 'button' : undefined}
+                  onClick={onClick}
+                  title={title}
+                  className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-100 bg-slate-50/70 p-2.5 text-left !shadow-none transition sm:gap-3 sm:p-3 ${onClick ? 'cursor-pointer hover:border-red-200 hover:bg-red-50/40' : ''}`}
+                >
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${tint}`}>
+                    <Icon size={24} strokeWidth={2.2} aria-hidden="true" />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-base font-black tabular-nums text-slate-900 sm:text-lg">{value}</span>
+                    <span className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</span>
+                  </span>
+                </Tag>
+              );
+            })}
+          </div>
+        </section>
       </div>
 
       {/* ── Học viên / Lịch dạy / Đánh giá ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5 items-start">
 
-        {/* Cột 1: Học viên được phân công — hiện ~5, scroll thêm */}
+        {/* Cột 1: Học viên được phân công - hiện ~5, scroll thêm */}
         <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
             <h3 className="text-sm sm:text-base lg:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
@@ -421,7 +421,7 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        {/* Cột 2: Ca tiếp theo — giờ, thứ/ngày, link hướng dẫn, nhấp nháy khi đến ca */}
+        {/* Cột 2: Ca tiếp theo - giờ, thứ/ngày, link hướng dẫn, nhấp nháy khi đến ca */}
         <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-4 shadow-sm space-y-3 flex flex-col min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 min-w-0 pb-2 border-b border-slate-100 shrink-0">
             <h3 className="text-sm sm:text-base lg:text-lg font-bold text-slate-800 flex items-center gap-2 min-w-0">
@@ -443,15 +443,14 @@ export default function TeacherOverviewTab({
           <div className="space-y-2.5 min-h-0">
             {nextSessions.map(({ student, sch, live, weekday, dateLabel }) => {
               const enrollmentKey = student._enrollmentKey || student._id || student.id;
-              const timeRange = sch.endTime ? `${sch.startTime} - ${sch.endTime}` : (sch.startTime || '—');
+              const timeRange = sch.endTime ? `${sch.startTime} - ${sch.endTime}` : (sch.startTime || '-');
               return (
                 <div
                   key={`${enrollmentKey}-${sch._id || sch.id}`}
-                  className={`rounded-xl p-3 border transition ${
-                    live
+                  className={`rounded-xl p-3 border transition ${live
                       ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-red-400/40 shadow-md shadow-red-500/20 animate-pulse'
                       : 'bg-slate-50/80 border-slate-100 hover:border-red-200'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-2 min-w-0">
                     <div className="min-w-0 flex-1">
@@ -474,7 +473,7 @@ export default function TeacherOverviewTab({
                         {timeRange}
                       </p>
                       <p className={`text-[11px] font-semibold capitalize ${live ? 'text-red-100' : 'text-slate-500'}`}>
-                        {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
+                        {[weekday, dateLabel].filter(Boolean).join(' · ') || '-'}
                       </p>
                     </div>
                   </div>
@@ -490,7 +489,7 @@ export default function TeacherOverviewTab({
           </div>
         </div>
 
-        {/* Cột 3: Đánh giá từ học viên — list hiện ~3, scroll thêm */}
+        {/* Cột 3: Đánh giá từ học viên - list hiện ~3, scroll thêm */}
         <div className="min-w-0 w-full">
           <TeacherRatingDisplay rating={teacherRating} RATING_CRITERIA={RATING_CRITERIA} students={students} reviewsScrollLimit={3} />
         </div>

@@ -1,4 +1,4 @@
-# MESSAGING BASELINE — Phase 0 Freeze
+# MESSAGING BASELINE - Phase 0 Freeze
 
 **Status:** READ-ONLY snapshot (no code changes in this phase)  
 **Date:** 2026-08-10  
@@ -10,7 +10,7 @@
 
 | Check | Result |
 |---|---|
-| `git status` | Dirty tree exists (Redis/cache/RBAC artifacts, deploy scripts) — **unrelated to messaging**. Do not mix into messaging commits. |
+| `git status` | Dirty tree exists (Redis/cache/RBAC artifacts, deploy scripts) - **unrelated to messaging**. Do not mix into messaging commits. |
 | Code modified this phase | **None** |
 | Focused messaging tests | See §8 |
 
@@ -101,7 +101,7 @@ From `utils/messagingRoles.getMessagingRole` (mirrored in `client/src/lib/messag
 | TEACHER | `teacher` |
 | STUDENT | `student` |
 
-**Architectural fact (frozen):** SUPPORT and STAFF share transport identity `staff`. Student → Support is transported as `staff`. Distinguisher is `adminRole` / `displayRole` / `productRole` on identity payloads — **not** a separate `support` transport token.
+**Architectural fact (frozen):** SUPPORT and STAFF share transport identity `staff`. Student → Support is transported as `staff`. Distinguisher is `adminRole` / `displayRole` / `productRole` on identity payloads - **not** a separate `support` transport token.
 
 ### 2.3 Display roles (Phase 8.21/8.22)
 
@@ -117,7 +117,7 @@ Never elevate to SUPER by transport role alone.
 | `{userId}` | `register` | **Canonical private delivery** (`notifyUser` fallback / primary) |
 | `ALL_{TRANSPORT}` e.g. `ALL_STAFF`, `ALL_TEACHER` | `register` via transport | Presence / broadcast / lastSeen |
 | `ALL_STAFF` | STAFF adminRole **or** transport `staff` | **SUPPORT also joins** because transport is `staff` |
-| `ALL_SUPPORT` | `adminRole === 'SUPPORT'` (or transport `support` — currently unused) | Support-scoped broadcast/presence |
+| `ALL_SUPPORT` | `adminRole === 'SUPPORT'` (or transport `support` - currently unused) | Support-scoped broadcast/presence |
 | `ALL_ADMIN` | SUPER / HIGH / legacy root | Elevated admin fan-out |
 | `ALL_*_{branchId\|branchCode}` | Has branch | Branch-scoped broadcasts |
 | `presence_{branchId}` / `presence_none` | Branch | Scoped online list |
@@ -125,7 +125,7 @@ Never elevate to SUPER by transport role alone.
 | `group_{groupId}` | `group:join` after membership check | Group chat |
 | `teacher_{id}` / `student_{id}` / `admin_room` / `feed_room` | Explicit joins | Non-DM features |
 
-**Private DM delivery target:** user-specific room (`userId`) and/or presence socket lookup — **not** role broadcast rooms.
+**Private DM delivery target:** user-specific room (`userId`) and/or presence socket lookup - **not** role broadcast rooms.
 
 ---
 
@@ -181,12 +181,12 @@ Mounted at **`/api/messages`** (`server.js`). Comments sometimes say `/api/chat/
 
 Key fields:
 
-- `conversationId` (string, indexed) — format `role1_id1__role2_id2` (sorted) or `group_{id}`
+- `conversationId` (string, indexed) - format `role1_id1__role2_id2` (sorted) or `group_{id}`
 - `senderId`, `senderName`, `senderRole` ∈ `admin|teacher|student|staff`
 - `receiverId`, `receiverName`, `receiverRole` ∈ `admin|teacher|student|staff|system`
 - `senderBranchCode`, `receiverBranchCode`
 - `content`, `messageType`, file fields
-- **`isRead`**, **`readAt`** — **global per message** (not per participant)
+- **`isRead`**, **`readAt`** - **global per message** (not per participant)
 - `isRecalled`, `groupId`, `isGroup`, `reactions`, `hiddenFor`
 - timestamps
 
@@ -214,28 +214,28 @@ Target Conversation shape (participants, lastMessageAt, status) is **not** imple
 
 | Module | Status |
 |---|---|
-| `useDataMessaging` via `DataContext` | **Live** — message cache, send/sync, `getConversations` with local discovery seeds + `lastTime` ordering |
-| `Inbox.jsx` | **Live** — loads `/messages/contacts`, merges with activity, tabs Admin/Staff/Support/… |
+| `useDataMessaging` via `DataContext` | **Live** - message cache, send/sync, `getConversations` with local discovery seeds + `lastTime` ordering |
+| `Inbox.jsx` | **Live** - loads `/messages/contacts`, merges with activity, tabs Admin/Staff/Support/… |
 | `FloatingMessenger.jsx` | Uses `getConversations` from DataContext |
 | `client/src/lib/messagingRoles.js` | Transport role mirror |
 | `client/src/lib/messagingIdentity.js` | Display identity resolution |
 | `client/src/lib/conversationList.js` | `lastTime` / `lastMessageAt` sort + merge |
-| `MessagesContext.jsx` | **Not mounted in App** — DataContext comment: avoid double socket/SWR. Still present; hardening tests still read its source. |
+| `MessagesContext.jsx` | **Not mounted in App** - DataContext comment: avoid double socket/SWR. Still present; hardening tests still read its source. |
 
 ---
 
 ## 9. Known bugs / debt (frozen list)
 
-1. **SUPPORT transport = `staff`** — intentional compatibility; SUPPORT also joins `ALL_STAFF` on register → broadcast/presence coupling risk if misused for DM (DM path itself avoids role rooms).
-2. **Dual contact policy** — backend `/contacts` vs `useDataMessaging` local seeding (frontend may over-seed vs API).
-3. **Inbox ordering** — UI primarily from message cache `lastTime`, not solely from Conversation aggregate API.
-4. **Unread model** — `Message.isRead` cannot express independent read state per group participant.
-5. **`buildConversationId` legacy** — still special-cases student↔`admin` role into shared `admin_admin` mailbox (`utils/chatConversationId.js`), while pairing/contacts push per-user HIGH/SUPER threads — **potential ID conflict surface**.
-6. **Stale static tests** — `messaging_hardening` expects `assertCanDirectMessage` string inside `directMessageService` but live code calls `assertMessagingPairAllowed` (pairing). `wave69_*` similar drift.
-7. **`tests/messaging-isolation.test.js`** — fails with 401 (auth/env), not a proven DM logic regression.
-8. **Legacy `MessagesContext`** — unused at runtime but not proven dead for all import graphs; do not delete until separate proof phase.
-9. **No Notification document** on live chat send path — realtime only via Socket.
-10. **Policy shadow / Enterprise chat modules** — `modules/chat` unmounted; shadow mirrors may lag live pairing.
+1. **SUPPORT transport = `staff`** - intentional compatibility; SUPPORT also joins `ALL_STAFF` on register → broadcast/presence coupling risk if misused for DM (DM path itself avoids role rooms).
+2. **Dual contact policy** - backend `/contacts` vs `useDataMessaging` local seeding (frontend may over-seed vs API).
+3. **Inbox ordering** - UI primarily from message cache `lastTime`, not solely from Conversation aggregate API.
+4. **Unread model** - `Message.isRead` cannot express independent read state per group participant.
+5. **`buildConversationId` legacy** - still special-cases student↔`admin` role into shared `admin_admin` mailbox (`utils/chatConversationId.js`), while pairing/contacts push per-user HIGH/SUPER threads - **potential ID conflict surface**.
+6. **Stale static tests** - `messaging_hardening` expects `assertCanDirectMessage` string inside `directMessageService` but live code calls `assertMessagingPairAllowed` (pairing). `wave69_*` similar drift.
+7. **`tests/messaging-isolation.test.js`** - fails with 401 (auth/env), not a proven DM logic regression.
+8. **Legacy `MessagesContext`** - unused at runtime but not proven dead for all import graphs; do not delete until separate proof phase.
+9. **No Notification document** on live chat send path - realtime only via Socket.
+10. **Policy shadow / Enterprise chat modules** - `modules/chat` unmounted; shadow mirrors may lag live pairing.
 
 ---
 
@@ -249,8 +249,8 @@ Target Conversation shape (participants, lastMessageAt, status) is **not** imple
 | `phase823b_messaging_contact_discovery.test.js` | PASS |
 | `phase824_messaging_pairing_lock.test.js` | PASS |
 | `messaging_isolation_fix.test.js` | PASS |
-| `messaging_hardening.test.js` | **11/12 PASS** — fail: expects `assertCanDirectMessage` in DMS (stale assertion) |
-| `messaging-isolation.test.js` | **FAIL** — 401 on send (environment/auth), not isolation assertion |
+| `messaging_hardening.test.js` | **11/12 PASS** - fail: expects `assertCanDirectMessage` in DMS (stale assertion) |
+| `messaging-isolation.test.js` | **FAIL** - 401 on send (environment/auth), not isolation assertion |
 
 **Interpretation:** Core Phase 8.21–8.24 locks are green. Hardening failure is a **test contract drift**, not evidence that DM delivery is broken. Isolation suite needs env/auth fix before use as regression gate.
 

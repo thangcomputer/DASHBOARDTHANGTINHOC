@@ -12,7 +12,7 @@ const courseSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
   },
-  /** Canonical KH###### — business reference; slug/_id unchanged for routing/FK */
+  /** Canonical KH###### - business reference; slug/_id unchanged for routing/FK */
   courseCode: {
     type: String,
     default: '',
@@ -114,7 +114,7 @@ const courseSchema = new mongoose.Schema({
     enum: ['draft', 'published', 'archived'],
     default: 'published',
   },
-  /** Soft-delete — không xóa cứng; ledger/enrollment không đụng */
+  /** Soft-delete - không xóa cứng; ledger/enrollment không đụng */
   deletedAt: {
     type: Date,
     default: null,
@@ -168,8 +168,8 @@ courseSchema.index({ category: 1, status: 1 });
 // Tính discountPrice khi UPDATE (findByIdAndUpdate bypass pre-save)
 courseSchema.pre('findOneAndUpdate', async function () {
   const update = this.getUpdate();
-  const price   = update?.price   ?? update?.$set?.price;
-  const pct     = update?.discountPercent ?? update?.$set?.discountPercent;
+  const price = update?.price ?? update?.$set?.price;
+  const pct = update?.discountPercent ?? update?.$set?.discountPercent;
 
   if (price !== undefined || pct !== undefined) {
     if (price !== undefined && pct !== undefined) {

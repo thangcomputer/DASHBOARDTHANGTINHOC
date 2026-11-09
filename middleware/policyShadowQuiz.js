@@ -56,7 +56,7 @@ function policyShadowQuiz(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] quiz evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] quiz evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `quiz_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -90,7 +90,7 @@ function policyShadowQuiz(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] quiz shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] quiz shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -102,7 +102,7 @@ function policyShadowQuiz(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected quiz error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected quiz error - fail closed to legacy only',
       );
     }
     return next();

@@ -1,5 +1,5 @@
 /**
- * Phase 8.12 — Dual-Check shadow (Enterprise SHADOW ONLY; LIVE = PRIMARY).
+ * Phase 8.12 - Dual-Check shadow (Enterprise SHADOW ONLY; LIVE = PRIMARY).
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
@@ -210,7 +210,7 @@ describe('Phase 8.12 dual-check shadow', { concurrency: false }, () => {
           const mw = checkPermission(LIVE.MANAGE_HR);
           const req = actorReq({ permissions: [] });
           const res = mockRes();
-          await mw(req, res, () => {});
+          await mw(req, res, () => { });
           assert.equal(res.statusCode, 403);
           assert.ok(!JSON.stringify(res.body).includes('enterpriseDecision'));
         },

@@ -1,9 +1,9 @@
 /**
- * Phase 7.25 — Controlled cutover + production activation for /api/evaluations
+ * Phase 7.25 - Controlled cutover + production activation for /api/evaluations
  *
  * LIVE: auth → policyShadowEvaluation → evaluationsCutoverGate → handler.
  * Role/ownership remain handler-owned on Legacy; create side effects handler-owned.
- * modules/exam/routes/evaluationRoutes.js is unmounted — not migrated.
+ * modules/exam/routes/evaluationRoutes.js is unmounted - not migrated.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -65,10 +65,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? BRANCH_A,
   });
 }
@@ -302,7 +302,7 @@ test('Phase7.25 rollback: remove evaluations → LEGACY; prior stay POLICY; rest
 test('Phase7.25 cross-family isolation', () => {
   for (const fam of [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees',  'analytics', 'staff', 'bi',
+    'employees', 'analytics', 'staff', 'bi',
   ]) {
     assert.equal(withEnv(PROD, () => getAuthorizationAuthority(fam)), AUTHORITY.LEGACY, fam);
   }
@@ -366,8 +366,8 @@ test('Phase7.25 side-effect audit: gate/policy have no mutations', () => {
 test('Phase7.25 functional smoke: read authz; create/mark_read NOT EXECUTED', () => {
   assert.equal(parity('teacher_ratings', sub({ id: STUDENT_A, role: 'student' })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — evaluation create/mark_read production mutation',
-    'NOT EXECUTED — evaluation create/mark_read production mutation',
+    'NOT EXECUTED - evaluation create/mark_read production mutation',
+    'NOT EXECUTED - evaluation create/mark_read production mutation',
   );
 });
 

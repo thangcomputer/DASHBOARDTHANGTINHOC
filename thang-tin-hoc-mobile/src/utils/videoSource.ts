@@ -1,4 +1,4 @@
-/** Nhận diện nguồn video bài giảng — cùng quy tắc với web (client/src/utils/youtubeDuration.js). */
+﻿/** Nhận diện nguồn video bài giảng - cùng quy tắc với web (client/src/utils/youtubeDuration.js). */
 export function youtubeIdFromUrl(url: string) {
   const raw = String(url || '').trim();
   if (!raw) return '';

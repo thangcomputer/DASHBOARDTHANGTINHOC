@@ -1,6 +1,6 @@
 /**
  * In-process metrics collector (Phase 10 Monitoring).
- * Khong can Prometheus — snapshot qua API admin.
+ * Khong can Prometheus - snapshot qua API admin.
  */
 const MAX_LATENCIES = 300;
 const MAX_RECENT_ERRORS = 40;

@@ -20,7 +20,7 @@ const isValidInvoiceDisplayCode = (raw) => {
   const v = String(raw ?? '').trim();
   if (!v) return false;
   const upper = v.toUpperCase();
-  if (v === '—' || upper === 'HĐ' || upper === 'HD' || upper === 'HOÀN') return false;
+  if (v === '-' || upper === 'HĐ' || upper === 'HD' || upper === 'HOÀN') return false;
   if (/^cancel:/i.test(v)) return false;
   return true;
 };

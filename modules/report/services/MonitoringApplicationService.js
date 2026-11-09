@@ -2,7 +2,7 @@
 const monitoring = require('./monitoringService');
 const logger = require('./../../../config/logger');
 
-// GET /api/monitoring/health — chi tiet hon /healthz
+// GET /api/monitoring/health - chi tiet hon /healthz
 
 class MonitoringApplicationService {
   async get_health() {

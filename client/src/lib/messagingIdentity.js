@@ -1,5 +1,5 @@
 /**
- * Phase 8.21/8.22 — Frontend messaging identity resolver.
+ * Phase 8.21/8.22 - Frontend messaging identity resolver.
  * NEVER map role==="admin" alone → SUPER_ADMIN profile when senderId is a real ObjectId.
  */
 import { getMessagingRole } from './messagingRoles';
@@ -98,7 +98,7 @@ export function resolveMessagingActor(
     });
   }
 
-  // Server already resolved — trust ID + adminRole, still run safety assert
+  // Server already resolved - trust ID + adminRole, still run safety assert
   if (displayName && (displayRole || adminRole != null)) {
     return assertDisplayIdentitySafe({
       id: actorId,
@@ -157,7 +157,7 @@ export function resolveMessagingActor(
     });
   }
 
-  // Safe fallback — NEVER Super Admin
+  // Safe fallback - NEVER Super Admin
   return assertDisplayIdentitySafe({
     id: actorId,
     role: role || 'unknown',
@@ -168,7 +168,7 @@ export function resolveMessagingActor(
   });
 }
 
-/** System / broadcast / group peer ids — never treated as deleted users. */
+/** System / broadcast / group peer ids - never treated as deleted users. */
 export function isSpecialMessagingPeerId(id) {
   const s = String(id || '');
   return !s || s === 'admin' || s.startsWith('ALL_') || s.startsWith('group_');
@@ -176,7 +176,7 @@ export function isSpecialMessagingPeerId(id) {
 
 /**
  * True when peer is still a valid messaging counterpart.
- * Prefer server `contacts` (GET /api/messages/contacts) — local students/teachers/staffs
+ * Prefer server `contacts` (GET /api/messages/contacts) - local students/teachers/staffs
  * are incomplete for teacher/student and often empty for admin/staff until HV page loads.
  */
 export function isAliveMessagingPeer(peerId, {
@@ -195,7 +195,7 @@ export function isAliveMessagingPeer(peerId, {
 }
 
 /**
- * Canonical FE message shape — used for HTTP, socket, sync, optimistic merge.
+ * Canonical FE message shape - used for HTTP, socket, sync, optimistic merge.
  * Preserves senderId/senderRole/conversationId; prefers server sender{} identity.
  */
 export function normalizeMessage(raw = {}) {

@@ -1,5 +1,5 @@
 /**
- * Feature flags tài chính — P4 cutover.
+ * Feature flags tài chính - P4 cutover.
  * FINANCE_LEDGER_SOT mặc định bật (true) sau P0.
  */
 function isLedgerSot() {

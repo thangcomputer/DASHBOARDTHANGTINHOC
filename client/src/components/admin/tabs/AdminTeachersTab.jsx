@@ -372,7 +372,7 @@ export default function AdminTeachersTab() {
                     className="mt-2 w-full text-left text-[12px] font-semibold text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-2.5 py-1.5 flex items-center gap-1.5"
                   >
                     <FileSpreadsheet size={13} />
-                    {t.practicalStatus === 'reviewed' ? 'Đã duyệt thực hành' : 'File chờ kiểm tra — bấm xem'}
+                    {t.practicalStatus === 'reviewed' ? 'Đã duyệt thực hành' : 'File chờ kiểm tra - bấm xem'}
                   </button>
                 )}
                 {examDate && (
@@ -464,7 +464,7 @@ export default function AdminTeachersTab() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 max-w-[200px]">
-                      <p className="text-sm font-semibold text-slate-800 line-clamp-2">{t.specialty || '—'}</p>
+                      <p className="text-sm font-semibold text-slate-800 line-clamp-2">{t.specialty || '-'}</p>
                       {t.assignedStudents?.length > 0 && (
                         <p className="text-[11px] text-sky-600 font-semibold mt-0.5">
                           Đang dạy {t.assignedStudents.length} HV
@@ -497,11 +497,10 @@ export default function AdminTeachersTab() {
                         <button
                           type="button"
                           onClick={() => setReviewModal(t)}
-                          className={`text-left text-[12px] font-semibold rounded-lg px-2 py-1 border ${
-                            t.practicalStatus === 'reviewed'
+                          className={`text-left text-[12px] font-semibold rounded-lg px-2 py-1 border ${t.practicalStatus === 'reviewed'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                               : 'bg-amber-50 text-amber-700 border-amber-100'
-                          }`}
+                            }`}
                         >
                           {t.practicalStatus === 'reviewed' ? 'Đã duyệt' : 'Chờ kiểm tra'}
                         </button>
@@ -590,13 +589,13 @@ export default function AdminTeachersTab() {
             <div className="cms-sheet-footer">
               <button type="button" onClick={() => setReviewModal(null)} className="cms-btn cms-btn-outline flex-1">Đóng</button>
               <button type="button" onClick={async () => {
-                  setSubmittingAction('review');
-                  try {
-                    await markFileReviewed(reviewModal.id);
-                  } finally {
-                    setSubmittingAction(null);
-                  }
-                }}
+                setSubmittingAction('review');
+                try {
+                  await markFileReviewed(reviewModal.id);
+                } finally {
+                  setSubmittingAction(null);
+                }
+              }}
                 disabled={submittingAction === 'review'} className="cms-btn cms-btn-success flex-[1.4]">
                 <CheckCircle2 size={16} /> Đạt yêu cầu
               </button>

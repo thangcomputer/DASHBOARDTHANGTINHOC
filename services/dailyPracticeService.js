@@ -311,14 +311,16 @@ async function refillDailyXp(studentId) {
       : { studentId, xpAllowanceDay: { $ne: today } };
   const updated = await DailyPracticeProfile.findOneAndUpdate(
     filter,
-    { $set: {
-      xpTotal: next.xpTotal,
-      dailyXp: next.dailyXp,
-      purchasedXp: next.purchasedXp,
-      xpBrokeDay: next.xpBrokeDay,
-      xpAllowanceDay: today,
-      xpAllowanceAmount: next.xpAllowanceAmount,
-    } },
+    {
+      $set: {
+        xpTotal: next.xpTotal,
+        dailyXp: next.dailyXp,
+        purchasedXp: next.purchasedXp,
+        xpBrokeDay: next.xpBrokeDay,
+        xpAllowanceDay: today,
+        xpAllowanceAmount: next.xpAllowanceAmount,
+      }
+    },
     { new: true },
   ).lean();
   return updated || DailyPracticeProfile.findOne({ studentId }).lean();
@@ -383,12 +385,14 @@ async function adjustProfileXp(studentId, delta, { source = 'reward' } = {}) {
   const broke = next.xpTotal < rules.SESSION_STAKE_XP;
   return DailyPracticeProfile.findOneAndUpdate(
     { studentId },
-    { $set: {
-      xpTotal: next.xpTotal,
-      dailyXp: next.dailyXp,
-      purchasedXp: next.purchasedXp,
-      xpBrokeDay: broke ? today : '',
-    } },
+    {
+      $set: {
+        xpTotal: next.xpTotal,
+        dailyXp: next.dailyXp,
+        purchasedXp: next.purchasedXp,
+        xpBrokeDay: broke ? today : '',
+      }
+    },
     { new: true },
   ).lean();
 }
@@ -486,7 +490,7 @@ async function pickQuestions(topicId, difficulty) {
     ]);
     picked.push(...more);
   }
-  return picked;
+  return rules.shuffle(picked);
 }
 
 async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
@@ -505,6 +509,7 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     // Bước mới: Bắt buộc kiểm tra ví phải có ≥ stakeNeed XP (ví dụ 50 XP). Không đủ -> Chặn luôn!
     await assertCanSpendXp(sid, { recovery: false, stake: stakeNeed });
   }
+  const shuffledQuestions = rules.shuffle(prepared.questions);
   const { session, profileXp } = await createStakedSession({
     studentId: sid,
     topicId: prepared.topic._id,
@@ -514,7 +519,7 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     step,
     pathNodeKey: prepared.pathInfo.pathNodeKey,
     testOut: Boolean(testOut),
-    questionIds: prepared.questions.map((q) => q._id),
+    questionIds: shuffledQuestions.map((q) => q._id),
     recovery: false,
     review,
   }, { stakeXp: stakeDeductAtStart });
@@ -525,8 +530,8 @@ async function startPathSession(studentId, { unitId, step, nodeKey, testOut }) {
     recovery: false,
     topic: topicView(prepared.topic),
     difficulty: prepared.difficulty,
-    total: prepared.questions.length,
-    questions: prepared.questions.map((q) => rules.publicQuestion(q)),
+    total: shuffledQuestions.length,
+    questions: shuffledQuestions.map((q) => rules.publicQuestion(q)),
     path: { ...prepared.pathInfo, recovery, review },
     profileXp,
     review,
@@ -551,12 +556,13 @@ async function startSession(studentId, { topicId, difficulty, mode, unitId, step
   if (!questions.length) throw httpError(404, 'Chủ đề này chưa có câu Luyện tự do (chưa xếp chặng). Hãy soạn câu riêng cho Luyện tự do.');
   // Luyện tự do: tuyệt đối không cược / không cộng trừ XP hồ sơ.
   const profile = await getProfile(sid);
+  const shuffledQuestions = rules.shuffle(questions);
   const session = await DailyPracticeSession.create({
     studentId: sid,
     topicId: tid,
     difficulty,
     mode: 'free',
-    questionIds: questions.map((q) => q._id),
+    questionIds: shuffledQuestions.map((q) => q._id),
     stakeXp: 0,
     recovery: false,
   });
@@ -564,9 +570,9 @@ async function startSession(studentId, { topicId, difficulty, mode, unitId, step
     id: String(session._id),
     topic: topicView(topic),
     difficulty,
-    total: questions.length,
+    total: shuffledQuestions.length,
     mode: 'free',
-    questions: questions.map((q) => rules.publicQuestion(q)),
+    questions: shuffledQuestions.map((q) => rules.publicQuestion(q)),
     profileXp: rules.clampXp(profile?.xpTotal),
     stakeXp: 0,
     sessionStakeXp: 0,
@@ -748,7 +754,7 @@ async function finishSession(studentId, sessionId) {
   const perQuestionStake = !xpOff && rules.usesPerQuestionStake(finished);
   const perQ = rules.QUESTION_STAKE_XP;
   const wrongCount = Math.max(0, total - correct);
-  // Cược theo câu: sai và gợi ý đều đã trừ ngay — lấy đúng tổng đã trừ (ghi trong answers).
+  // Cược theo câu: sai và gợi ý đều đã trừ ngay - lấy đúng tổng đã trừ (ghi trong answers).
   const answerLossXp = perQuestionStake
     ? Math.max(-rules.answerXpLoss(finished), wrongCount * perQ)
     : 0;
@@ -855,7 +861,7 @@ async function finishSession(studentId, sessionId) {
   };
 }
 
-/** Thoát giữa chừng — mất stake đã trừ / còn lại (theo câu hoặc lump). */
+/** Thoát giữa chừng - mất stake đã trừ / còn lại (theo câu hoặc lump). */
 async function abandonSession(studentId, sessionId) {
   const session = await loadOwnSession(studentId, sessionId);
   if (session.status !== 'in_progress') return { abandoned: true, lostXp: session.stakeXp || 0 };
@@ -1095,17 +1101,21 @@ async function fulfillDailyPracticeXpPurchase({ session }) {
   const profile = await adjustProfileXp(session.studentId, xp, { source: 'purchase' });
   await DailyPracticeProfile.updateOne(
     { studentId: session.studentId, 'xpPurchases.sessionId': { $ne: String(session.sessionId || '') } },
-    { $push: { xpPurchases: {
-      $each: [{
-        sessionId: String(session.sessionId || ''),
-        xp,
-        amount: Number(session.paidAmount || session.amount || 0),
-        packId: String(session.plan || ''),
-        at: new Date(),
-      }],
-      $position: 0,
-      $slice: 20,
-    } } },
+    {
+      $push: {
+        xpPurchases: {
+          $each: [{
+            sessionId: String(session.sessionId || ''),
+            xp,
+            amount: Number(session.paidAmount || session.amount || 0),
+            packId: String(session.plan || ''),
+            at: new Date(),
+          }],
+          $position: 0,
+          $slice: 20,
+        }
+      }
+    },
   );
   logger.info(`[DAILY_PRACTICE] Credited ${xp} XP to student ${session.studentId} via ${session.sessionId}`);
   return { xp, profileXp: rules.clampXp(profile?.xpTotal), studentId: String(session.studentId) };

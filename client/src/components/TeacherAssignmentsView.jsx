@@ -11,7 +11,7 @@ import { useModal } from '../utils/Modal.jsx';
 
 import TeacherQuizManager from './teacher/TeacherQuizManager';
 
-/** Local datetime-local string (YYYY-MM-DDTHH:mm) — không dùng toISOString (UTC lệch). */
+/** Local datetime-local string (YYYY-MM-DDTHH:mm) - không dùng toISOString (UTC lệch). */
 function toDatetimeLocalValue(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.getTime())) return '';
@@ -52,7 +52,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const [assignments, setAssignments] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeSubmissions, setActiveSubmissions] = useState(null);
-  
+
   // Create / Grade state
   const [formData, setFormData] = useState({ title: '', description: '', attachedFileUrl: '', deadline: '' });
   const [assignScope, setAssignScope] = useState('all'); // 'all' | 'selected'
@@ -83,7 +83,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const [gradeData, setGradeData] = useState({ grade: '', teacherFeedback: '' });
   const [highlightStudentId, setHighlightStudentId] = useState(null);
 
-  // First paint often has myStudents=[] — pick first course when data arrives
+  // First paint often has myStudents=[] - pick first course when data arrives
   useEffect(() => {
     if (!uniqueCourses.length) return;
     if (selectedCourse && uniqueCourses.includes(selectedCourse)) return;
@@ -97,11 +97,11 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
       const params = new URLSearchParams(hash.split('?')[1]);
       const courseId = params.get('courseId');
       const assignmentId = params.get('assignmentId');
-      
+
       if (courseId && courseId !== selectedCourse) {
         setSelectedCourse(courseId);
       }
-      
+
       if (assignmentId && assignments.length > 0) {
         const target = assignments.find(a => a._id === assignmentId);
         if (target && (!activeSubmissions || activeSubmissions._id !== assignmentId)) {
@@ -177,12 +177,12 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!selectedCourse) {
-        showModal({ 
-            title: 'Yêu cầu chọn lớp', 
-            content: 'Vui lòng chọn một lớp học bên Sidebar trước khi thực hiện giao bài tập mới!', 
-            type: 'warning' 
-        });
-        return;
+      showModal({
+        title: 'Yêu cầu chọn lớp',
+        content: 'Vui lòng chọn một lớp học bên Sidebar trước khi thực hiện giao bài tập mới!',
+        type: 'warning'
+      });
+      return;
     }
     if (!formData.title || !formData.deadline) return;
 
@@ -277,12 +277,12 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
           const patchSub = (sub) => (
             String(sub._id) === String(submissionId)
               ? {
-                  ...sub,
-                  ...updated,
-                  grade: nextGrade,
-                  teacherFeedback: nextFeedback,
-                  status: 'graded',
-                }
+                ...sub,
+                ...updated,
+                grade: nextGrade,
+                teacherFeedback: nextFeedback,
+                status: 'graded',
+              }
               : sub
           );
 
@@ -324,7 +324,7 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         <p className="text-sm text-center max-w-sm">
           {waitingForStudents
             ? 'Vui lòng chờ danh sách học viên tải xong.'
-            : 'Chưa có học viên được phân công khóa học — không thể xem bài tập.'}
+            : 'Chưa có học viên được phân công khóa học - không thể xem bài tập.'}
         </p>
       </div>
     );
@@ -350,22 +350,20 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
         <button
           type="button"
           onClick={() => setActiveTab('quiz')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-            activeTab === 'quiz'
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'quiz'
               ? 'bg-red-600 text-white shadow-sm'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
+            }`}
         >
           <Clipboard size={16} /> Bài thi Trắc nghiệm
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('file')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-            activeTab === 'file'
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'file'
               ? 'bg-red-600 text-white shadow-sm'
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
+            }`}
         >
           <FileText size={16} /> Bài tập về nhà (Nộp file)
         </button>
@@ -378,344 +376,342 @@ const TeacherAssignmentsView = ({ teacherId, myStudents }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
               <span className="flex items-center gap-2"><Clipboard size={20} className="text-red-600" /> Bài tập của:</span>
-              <CmsSelect 
-                value={selectedCourse} 
+              <CmsSelect
+                value={selectedCourse}
                 onChange={(e) => setSelectedCourse(e.target.value)}
                 className="border-2 border-red-200 focus:border-red-500 rounded-xl px-3 py-1.5 outline-none font-black text-red-700 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer text-sm"
               >
                 {uniqueCourses.map(c => <option key={c} value={c}>{c}</option>)}
               </CmsSelect>
             </h2>
-        <button 
-          onClick={openCreateModal}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-red-200 transition-all flex items-center gap-2 active:scale-95"
-        >
-          <Plus size={16} /> Tạo bài tập mới
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 border-b border-slate-200" role="tablist" aria-label="Lọc bài tập theo trạng thái chấm">
-        {GRADING_FILTERS.map((option) => {
-          const active = gradingFilter === option.id;
-          const count = gradingCounts[option.id];
-          return (
             <button
-              key={option.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setGradingFilter(option.id)}
-              className={`relative flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold transition-colors !shadow-none ${active ? 'text-red-600' : 'text-slate-500 hover:text-slate-800'}`}
+              onClick={openCreateModal}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-red-200 transition-all flex items-center gap-2 active:scale-95"
             >
-              {option.label}
-              {option.id !== 'all' && count > 0 && (
-                <span className={`min-w-5 rounded-full px-1.5 text-[11px] font-black tabular-nums ${option.id === 'pending' ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {count}
-                </span>
-              )}
-              <span className={`absolute inset-x-0 -bottom-px h-0.5 rounded-full ${active ? 'bg-red-600' : 'bg-transparent'}`} aria-hidden="true" />
+              <Plus size={16} /> Tạo bài tập mới
             </button>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {visibleAssignments.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white px-6 py-10 text-center shadow-sm">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
-              <Inbox size={22} aria-hidden="true" />
-            </span>
-            <p className="mt-1 text-base font-black text-slate-900">
-              {assignments.length ? 'Không có bài tập' : 'Chưa có bài tập nào'}
-            </p>
-            <p className="text-sm text-slate-500">
-              {assignments.length ? 'Thử chọn bộ lọc khác nhé.' : 'Giao bài đầu tiên cho lớp tải về làm thực hành.'}
-            </p>
           </div>
-        ) : (
-          visibleAssignments.map(a => {
-            const stats = calculateStats(a.submissions);
-            const isClosed = new Date(a.deadline) < new Date();
-            const grading = gradingStatus(a);
-            
-            return (
-              <div key={a._id} className="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between hover:shadow-lg transition-shadow">
-                <div>
-                  <div className="flex justify-between items-start gap-2 mb-2">
-                    <h3 className="font-bold text-slate-800 text-lg leading-tight">{a.title}</h3>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`text-[10px] font-black  px-2 py-1 rounded-md ${isClosed ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                        {isClosed ? 'Đã đóng' : 'Hoạt động'}
-                      </span>
-                      {grading !== 'none' && (
-                        <span className={`text-[10px] font-black px-2 py-1 rounded-md ${grading === 'pending' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                          {grading === 'pending' ? 'Cần chấm' : 'Đã chấm'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 mb-3 line-clamp-2">{a.description || 'Không có mô tả'}</p>
-                  <p className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                    <Clock size={12}/> Hạn chót: {new Date(a.deadline).toLocaleString('vi-VN')}
-                  </p>
-                </div>
-                
-                <div className="mt-5 space-y-3">
-                  <div className="flex bg-slate-50 rounded-xl overflow-hidden divide-x divide-slate-100 border border-slate-100">
-                    <div className="flex-1 text-center py-2">
-                      <p className="text-xs font-semibold text-slate-400">Nộp bài</p>
-                      <p className="font-black text-slate-700">{stats.submitted}/{stats.total}</p>
-                    </div>
-                    <div className="flex-1 text-center py-2">
-                      <p className="text-xs font-semibold text-slate-400">Đã chấm</p>
-                      <p className="font-black text-green-600">{stats.graded}</p>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={() => setActiveSubmissions(a)}
-                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm transition-colors text-center"
-                  >
-                    Xem tất cả {stats.submitted} bài nộp
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
 
-      {/* CREATE SUBMISSION MODAL */}
-      {showCreateModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-              <h3 className="font-bold text-lg text-slate-800">Tạo mới Bài tập</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22}/></button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4 overflow-y-auto overscroll-contain min-h-0 flex-1">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Tên bài tập *</label>
-                <input required type="text" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="VD: THVP Buổi 1..."/>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả / Yêu cầu</label>
-                <textarea className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[100px]" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Yêu cầu làm các sheet..."></textarea>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Link File đề bài (Google Drive...)</label>
-                <input type="url" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({...formData, attachedFileUrl: e.target.value})} placeholder="HTTPS://..."/>
-              </div>
+          <div className="grid grid-cols-3 border-b border-slate-200" role="tablist" aria-label="Lọc bài tập theo trạng thái chấm">
+            {GRADING_FILTERS.map((option) => {
+              const active = gradingFilter === option.id;
+              const count = gradingCounts[option.id];
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setGradingFilter(option.id)}
+                  className={`relative flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold transition-colors !shadow-none ${active ? 'text-red-600' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  {option.label}
+                  {option.id !== 'all' && count > 0 && (
+                    <span className={`min-w-5 rounded-full px-1.5 text-[11px] font-black tabular-nums ${option.id === 'pending' ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {count}
+                    </span>
+                  )}
+                  <span className={`absolute inset-x-0 -bottom-px h-0.5 rounded-full ${active ? 'bg-red-600' : 'bg-transparent'}`} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
 
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Giao cho *</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => { setAssignScope('all'); setSelectedStudentIds([]); }}
-                    className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${
-                      assignScope === 'all'
-                        ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
-                    }`}
-                  >
-                    Cả lớp ({courseStudents.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAssignScope('selected')}
-                    className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${
-                      assignScope === 'selected'
-                        ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
-                    }`}
-                  >
-                    Chọn học viên
-                  </button>
-                </div>
-                {assignScope === 'selected' ? (
-                  <div className="max-h-40 overflow-y-auto rounded-xl border-2 border-slate-200 divide-y divide-slate-100 bg-slate-50/80">
-                    {courseStudents.length === 0 ? (
-                      <p className="text-xs text-slate-400 font-medium p-3">Không có học viên trong khóa này.</p>
-                    ) : (
-                      courseStudents.map((s) => {
-                        const sid = studentIdOf(s);
-                        const checked = selectedStudentIds.includes(sid);
-                        return (
-                          <label
-                            key={studentRowKey(s) || sid}
-                            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-white"
-                          >
-                            <input
-                              type="checkbox"
-                              className="rounded border-slate-300 text-red-600 focus:ring-red-500"
-                              checked={checked}
-                              onChange={() => toggleStudentId(sid)}
-                            />
-                            <span className="text-sm font-semibold text-slate-700 truncate">
-                              {s.name || 'Học viên'}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {visibleAssignments.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center gap-2 rounded-2xl border border-slate-100 bg-white px-6 py-10 text-center shadow-sm">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+                  <Inbox size={22} aria-hidden="true" />
+                </span>
+                <p className="mt-1 text-base font-black text-slate-900">
+                  {assignments.length ? 'Không có bài tập' : 'Chưa có bài tập nào'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {assignments.length ? 'Thử chọn bộ lọc khác nhé.' : 'Giao bài đầu tiên cho lớp tải về làm thực hành.'}
+                </p>
+              </div>
+            ) : (
+              visibleAssignments.map(a => {
+                const stats = calculateStats(a.submissions);
+                const isClosed = new Date(a.deadline) < new Date();
+                const grading = gradingStatus(a);
+
+                return (
+                  <div key={a._id} className="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between hover:shadow-lg transition-shadow">
+                    <div>
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <h3 className="font-bold text-slate-800 text-lg leading-tight">{a.title}</h3>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className={`text-[10px] font-black  px-2 py-1 rounded-md ${isClosed ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                            {isClosed ? 'Đã đóng' : 'Hoạt động'}
+                          </span>
+                          {grading !== 'none' && (
+                            <span className={`text-[10px] font-black px-2 py-1 rounded-md ${grading === 'pending' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                              {grading === 'pending' ? 'Cần chấm' : 'Đã chấm'}
                             </span>
-                          </label>
-                        );
-                      })
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-3 line-clamp-2">{a.description || 'Không có mô tả'}</p>
+                      <p className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                        <Clock size={12} /> Hạn chót: {new Date(a.deadline).toLocaleString('vi-VN')}
+                      </p>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      <div className="flex bg-slate-50 rounded-xl overflow-hidden divide-x divide-slate-100 border border-slate-100">
+                        <div className="flex-1 text-center py-2">
+                          <p className="text-xs font-semibold text-slate-400">Nộp bài</p>
+                          <p className="font-black text-slate-700">{stats.submitted}/{stats.total}</p>
+                        </div>
+                        <div className="flex-1 text-center py-2">
+                          <p className="text-xs font-semibold text-slate-400">Đã chấm</p>
+                          <p className="font-black text-green-600">{stats.graded}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveSubmissions(a)}
+                        className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-sm transition-colors text-center"
+                      >
+                        Xem tất cả {stats.submitted} bài nộp
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* CREATE SUBMISSION MODAL */}
+          {showCreateModal && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                  <h3 className="font-bold text-lg text-slate-800">Tạo mới Bài tập</h3>
+                  <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22} /></button>
+                </div>
+                <form onSubmit={handleCreate} className="p-6 space-y-4 overflow-y-auto overscroll-contain min-h-0 flex-1">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tên bài tập *</label>
+                    <input required type="text" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none font-semibold" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="VD: THVP Buổi 1..." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả / Yêu cầu</label>
+                    <textarea className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[100px]" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Yêu cầu làm các sheet..."></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Link File đề bài (Google Drive...)</label>
+                    <input type="url" className="w-full border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 outline-none text-sm" value={formData.attachedFileUrl} onChange={e => setFormData({ ...formData, attachedFileUrl: e.target.value })} placeholder="HTTPS://..." />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Giao cho *</label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => { setAssignScope('all'); setSelectedStudentIds([]); }}
+                        className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${assignScope === 'all'
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                          }`}
+                      >
+                        Cả lớp ({courseStudents.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAssignScope('selected')}
+                        className={`h-9 px-3 rounded-xl text-xs font-bold border-2 transition ${assignScope === 'selected'
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                          }`}
+                      >
+                        Chọn học viên
+                      </button>
+                    </div>
+                    {assignScope === 'selected' ? (
+                      <div className="max-h-40 overflow-y-auto rounded-xl border-2 border-slate-200 divide-y divide-slate-100 bg-slate-50/80">
+                        {courseStudents.length === 0 ? (
+                          <p className="text-xs text-slate-400 font-medium p-3">Không có học viên trong khóa này.</p>
+                        ) : (
+                          courseStudents.map((s) => {
+                            const sid = studentIdOf(s);
+                            const checked = selectedStudentIds.includes(sid);
+                            return (
+                              <label
+                                key={studentRowKey(s) || sid}
+                                className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-white"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                  checked={checked}
+                                  onChange={() => toggleStudentId(sid)}
+                                />
+                                <span className="text-sm font-semibold text-slate-700 truncate">
+                                  {s.name || 'Học viên'}
+                                </span>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        Sẽ giao cho từng học viên khóa <strong>{selectedCourse}</strong>
+                        {courseStudents.length ? ` (${courseStudents.length} HV)` : ''}.
+                      </p>
                     )}
                   </div>
-                ) : (
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Sẽ giao cho từng học viên khóa <strong>{selectedCourse}</strong>
-                    {courseStudents.length ? ` (${courseStudents.length} HV)` : ''}.
-                  </p>
-                )}
-              </div>
 
-              <div className="min-w-0">
-                <label className="block text-sm font-bold text-slate-700 mb-1">Thời hạn (Deadline) *</label>
-                <input
-                  required
-                  type="datetime-local"
-                  min={deadlineMin}
-                  className="w-full max-w-full min-w-0 border-2 border-slate-200 focus:border-red-500 rounded-xl px-3 sm:px-4 py-2.5 outline-none font-semibold text-sm sm:text-base"
-                  value={formData.deadline}
-                  onChange={e => setFormData({...formData, deadline: e.target.value})}
-                  onFocus={() => setDeadlineMin(toDatetimeLocalValue(new Date()))}
-                />
-                <p className="text-[11px] text-slate-400 mt-1">Chỉ chọn thời điểm từ hiện tại trở đi.</p>
+                  <div className="min-w-0">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Thời hạn (Deadline) *</label>
+                    <input
+                      required
+                      type="datetime-local"
+                      min={deadlineMin}
+                      className="w-full max-w-full min-w-0 border-2 border-slate-200 focus:border-red-500 rounded-xl px-3 sm:px-4 py-2.5 outline-none font-semibold text-sm sm:text-base"
+                      value={formData.deadline}
+                      onChange={e => setFormData({ ...formData, deadline: e.target.value })}
+                      onFocus={() => setDeadlineMin(toDatetimeLocalValue(new Date()))}
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Chỉ chọn thời điểm từ hiện tại trở đi.</p>
+                  </div>
+                  <button disabled={isSubmitting} type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-red-200 mt-4 disabled:opacity-50 sticky bottom-0">
+                    {isSubmitting ? 'Đang tạo...' : 'Tạo Bài Tập'}
+                  </button>
+                </form>
               </div>
-              <button disabled={isSubmitting} type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-red-200 mt-4 disabled:opacity-50 sticky bottom-0">
-                {isSubmitting ? 'Đang tạo...' : 'Tạo Bài Tập'}
-              </button>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+            </div>,
+            document.body
+          )}
 
-      {/* VIEW SUBMISSIONS MODAL */}
-      {activeSubmissions && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div>
-                <h3 className="font-bold text-lg text-slate-800">Bài nộp: {activeSubmissions.title}</h3>
-                <p className="text-xs text-slate-500 font-semibold mt-1">Hạn nộp: {new Date(activeSubmissions.deadline).toLocaleString('vi-VN')}</p>
-              </div>
-              <button onClick={() => setActiveSubmissions(null)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22}/></button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6">
-              {activeSubmissions.submissions?.length === 0 ? (
-                <div className="text-center py-10 opacity-50"><p className="font-bold">Chưa có học viên nào nộp bài</p></div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[600px]">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500 text-xs  font-black tracking-wider border-b border-slate-100">
-                        <th className="p-3">Học viên</th>
-                        <th className="p-3">Thời gian nộp</th>
-                        <th className="p-3">Trạng thái</th>
-                        <th className="p-3">Bài làm</th>
-                        <th className="p-3">Điểm / Chấm</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeSubmissions.submissions.map(sub => {
-                        const isGraded = sub.status === 'graded';
-                        const isHighlighted = highlightStudentId && (sub.studentId?._id === highlightStudentId || sub.studentId === highlightStudentId);
-                        return (
-                          <tr key={sub._id} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-500 ring-inset ring-opacity-50' : ''}`}>
-                            <td className="p-3 font-bold text-slate-700 text-sm whitespace-nowrap">
-                              {isHighlighted && <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></span>}
-                              {sub.studentId?.name || 'Không xác định'}
-                            </td>
-                            <td className="p-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{new Date(sub.submittedAt || sub.createdAt).toLocaleString('vi-VN')}</td>
-                            <td className="p-3 whitespace-nowrap">
-                              {isGraded ? <span className="bg-green-100 text-green-700 text-[10px]  font-black px-2 py-1 rounded-md">Đã chấm</span> : <span className="bg-blue-100 text-blue-700 text-[10px]  font-black px-2 py-1 rounded-md">Đã nộp</span>}
-                            </td>
-                            <td className="p-3 whitespace-nowrap">
-                              {sub.submittedFileUrl ? (
-                                <a href={buildMediaDownloadUrl(sub.submittedFileUrl, sub.submittedFileUrl.split('/').pop())} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 w-max">
-                                  <Download size={14}/> Mở bài làm
-                                </a>
-                              ) : (
-                                <span className="text-[10px] text-slate-400 italic">Không có file</span>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              {isGraded ? (
-                                <div className="text-sm max-w-[180px]">
-                                  <span className={`font-black ${getGradeTextClasses(sub.grade)}`}>{sub.grade}/10</span>
-                                  {sub.teacherFeedback ? (
-                                    <span className="block text-[10px] text-slate-500 mt-0.5 leading-snug whitespace-normal" title={sub.teacherFeedback}>
-                                      Góp ý: {sub.teacherFeedback}
-                                    </span>
-                                  ) : null}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setGradingSubmission(sub);
-                                      setGradeData({
-                                        grade: sub.grade != null ? String(sub.grade) : '',
-                                        teacherFeedback: sub.teacherFeedback || '',
-                                      });
-                                    }}
-                                    className="mt-1 text-[10px] font-bold text-orange-600 hover:underline"
-                                  >
-                                    Sửa điểm / góp ý
-                                  </button>
-                                </div>
-                              ) : (
-                                <button onClick={() => { setGradingSubmission(sub); setGradeData({ grade: '', teacherFeedback: '' }); }} className="text-xs font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                                  Chấm bài
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+          {/* VIEW SUBMISSIONS MODAL */}
+          {activeSubmissions && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+                <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-800">Bài nộp: {activeSubmissions.title}</h3>
+                    <p className="text-xs text-slate-500 font-semibold mt-1">Hạn nộp: {new Date(activeSubmissions.deadline).toLocaleString('vi-VN')}</p>
+                  </div>
+                  <button onClick={() => setActiveSubmissions(null)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22} /></button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
-      {/* GRADING MODAL */}
-      {gradingSubmission && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-lg text-slate-800">Chấm bài</h3>
-              <button onClick={() => setGradingSubmission(null)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22}/></button>
-            </div>
-            <form onSubmit={handleGrade} className="p-6 space-y-4">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
-                <p className="text-xs text-slate-500 font-semibold mb-1">Đang chấm cho:</p>
-                <p className="font-bold text-slate-800">{gradingSubmission.studentId?.name}</p>
-                <a href={gradingSubmission.submittedFileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline mt-2 inline-flex items-center gap-0.5">
-                  Xem bài làm
-                  <NavArrow size={14} className="text-blue-600" />
-                </a>
+                <div className="flex-1 overflow-y-auto p-6">
+                  {activeSubmissions.submissions?.length === 0 ? (
+                    <div className="text-center py-10 opacity-50"><p className="font-bold">Chưa có học viên nào nộp bài</p></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-xs  font-black tracking-wider border-b border-slate-100">
+                            <th className="p-3">Học viên</th>
+                            <th className="p-3">Thời gian nộp</th>
+                            <th className="p-3">Trạng thái</th>
+                            <th className="p-3">Bài làm</th>
+                            <th className="p-3">Điểm / Chấm</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeSubmissions.submissions.map(sub => {
+                            const isGraded = sub.status === 'graded';
+                            const isHighlighted = highlightStudentId && (sub.studentId?._id === highlightStudentId || sub.studentId === highlightStudentId);
+                            return (
+                              <tr key={sub._id} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${isHighlighted ? 'bg-blue-50 ring-2 ring-blue-500 ring-inset ring-opacity-50' : ''}`}>
+                                <td className="p-3 font-bold text-slate-700 text-sm whitespace-nowrap">
+                                  {isHighlighted && <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></span>}
+                                  {sub.studentId?.name || 'Không xác định'}
+                                </td>
+                                <td className="p-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{new Date(sub.submittedAt || sub.createdAt).toLocaleString('vi-VN')}</td>
+                                <td className="p-3 whitespace-nowrap">
+                                  {isGraded ? <span className="bg-green-100 text-green-700 text-[10px]  font-black px-2 py-1 rounded-md">Đã chấm</span> : <span className="bg-blue-100 text-blue-700 text-[10px]  font-black px-2 py-1 rounded-md">Đã nộp</span>}
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  {sub.submittedFileUrl ? (
+                                    <a href={buildMediaDownloadUrl(sub.submittedFileUrl, sub.submittedFileUrl.split('/').pop())} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 w-max">
+                                      <Download size={14} /> Mở bài làm
+                                    </a>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic">Không có file</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  {isGraded ? (
+                                    <div className="text-sm max-w-[180px]">
+                                      <span className={`font-black ${getGradeTextClasses(sub.grade)}`}>{sub.grade}/10</span>
+                                      {sub.teacherFeedback ? (
+                                        <span className="block text-[10px] text-slate-500 mt-0.5 leading-snug whitespace-normal" title={sub.teacherFeedback}>
+                                          Góp ý: {sub.teacherFeedback}
+                                        </span>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setGradingSubmission(sub);
+                                          setGradeData({
+                                            grade: sub.grade != null ? String(sub.grade) : '',
+                                            teacherFeedback: sub.teacherFeedback || '',
+                                          });
+                                        }}
+                                        className="mt-1 text-[10px] font-bold text-orange-600 hover:underline"
+                                      >
+                                        Sửa điểm / góp ý
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => { setGradingSubmission(sub); setGradeData({ grade: '', teacherFeedback: '' }); }} className="text-xs font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                                      Chấm bài
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Điểm số (0-10) *</label>
-                <input required type="number" min="0" max="10" step="0.5" className="w-full border-2 border-slate-200 focus:border-green-500 rounded-xl px-4 py-2.5 outline-none font-bold text-xl text-green-700" value={gradeData.grade} onChange={e => setGradeData({...gradeData, grade: e.target.value})}/>
+            </div>,
+            document.body
+          )}
+
+          {/* GRADING MODAL */}
+          {gradingSubmission && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h3 className="font-bold text-lg text-slate-800">Chấm bài</h3>
+                  <button onClick={() => setGradingSubmission(null)} className="text-slate-400 hover:text-red-500 bg-white shadow-sm p-1 rounded-full"><XCircle size={22} /></button>
+                </div>
+                <form onSubmit={handleGrade} className="p-6 space-y-4">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+                    <p className="text-xs text-slate-500 font-semibold mb-1">Đang chấm cho:</p>
+                    <p className="font-bold text-slate-800">{gradingSubmission.studentId?.name}</p>
+                    <a href={gradingSubmission.submittedFileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline mt-2 inline-flex items-center gap-0.5">
+                      Xem bài làm
+                      <NavArrow size={14} className="text-blue-600" />
+                    </a>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Điểm số (0-10) *</label>
+                    <input required type="number" min="0" max="10" step="0.5" className="w-full border-2 border-slate-200 focus:border-green-500 rounded-xl px-4 py-2.5 outline-none font-bold text-xl text-green-700" value={gradeData.grade} onChange={e => setGradeData({ ...gradeData, grade: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Nhận xét / Chữa bài</label>
+                    <textarea className="w-full border-2 border-slate-200 focus:border-green-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[80px]" value={gradeData.teacherFeedback} onChange={e => setGradeData({ ...gradeData, teacherFeedback: e.target.value })} placeholder="Tốt, nhưng cần chú ý hàm VLOOKUP..."></textarea>
+                  </div>
+                  <button disabled={isSubmitting} type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-200 mt-4 disabled:opacity-50">
+                    {isSubmitting ? 'Đang lưu...' : 'Hoàn tất Chấm'}
+                  </button>
+                </form>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Nhận xét / Chữa bài</label>
-                <textarea className="w-full border-2 border-slate-200 focus:border-green-500 rounded-xl px-4 py-2.5 outline-none text-sm min-h-[80px]" value={gradeData.teacherFeedback} onChange={e => setGradeData({...gradeData, teacherFeedback: e.target.value})} placeholder="Tốt, nhưng cần chú ý hàm VLOOKUP..."></textarea>
-              </div>
-              <button disabled={isSubmitting} type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-200 mt-4 disabled:opacity-50">
-                {isSubmitting ? 'Đang lưu...' : 'Hoàn tất Chấm'}
-              </button>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+            </div>,
+            document.body
+          )}
         </>
       )}
     </div>

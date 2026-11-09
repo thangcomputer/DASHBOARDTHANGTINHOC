@@ -8,11 +8,11 @@
  *   node scripts/seed_attendance_sim.js --mode overdue|ready|grace|attended|all
  *
  * Modes:
- *   overdue  — kết thúc > 60 phút trước → nút "Điểm danh bù"
- *   grace    — vừa kết thúc, còn trong 60 phút grace → điểm danh bổ sung
- *   ready    — đang trong giờ học → nút "Điểm danh"
- *   attended — đã điểm danh hôm nay (giờ hiện tại) → nút "Hủy điểm danh"
- *   all      — tạo overdue+grace+ready (không gồm attended)
+ *   overdue  - kết thúc > 60 phút trước → nút "Điểm danh bù"
+ *   grace    - vừa kết thúc, còn trong 60 phút grace → điểm danh bổ sung
+ *   ready    - đang trong giờ học → nút "Điểm danh"
+ *   attended - đã điểm danh hôm nay (giờ hiện tại) → nút "Hủy điểm danh"
+ *   all      - tạo overdue+grace+ready (không gồm attended)
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -67,7 +67,7 @@ async function main() {
     || student.enrollments?.find((e) => e.teacherId)?.teacherId
     || null;
   if (!teacherId) {
-    throw new Error(`HV ${student.name} chưa có teacherId — gán GV trước`);
+    throw new Error(`HV ${student.name} chưa có teacherId - gán GV trước`);
   }
 
   const teacher = await Teacher.findById(teacherId).lean();
@@ -95,7 +95,7 @@ async function main() {
       startTime: overdueStart,
       endTime: overdueEnd,
       status: 'scheduled',
-      note: '[SIM] Quá hạn — thử nút Điểm danh bù',
+      note: '[SIM] Quá hạn - thử nút Điểm danh bù',
       markAttended: false,
     },
     grace: {
@@ -111,7 +111,7 @@ async function main() {
       startTime: hm(Math.max(0, nowMins - 10)),
       endTime: hm(Math.min(23 * 60 + 59, nowMins + 80)),
       status: 'scheduled',
-      note: '[SIM] Đang trong giờ học — thử Điểm danh',
+      note: '[SIM] Đang trong giờ học - thử Điểm danh',
       markAttended: false,
     },
     attended: {
@@ -119,7 +119,7 @@ async function main() {
       startTime: hm(Math.max(0, nowMins - 20)),
       endTime: hm(Math.min(23 * 60 + 59, nowMins + 70)),
       status: 'completed',
-      note: '[SIM] Đã điểm danh — thử Hủy điểm danh',
+      note: '[SIM] Đã điểm danh - thử Hủy điểm danh',
       markAttended: true,
     },
   };

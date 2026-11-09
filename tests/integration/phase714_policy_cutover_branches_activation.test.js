@@ -1,5 +1,5 @@
 /**
- * Phase 7.14 — Controlled cutover + production activation for /api/branches
+ * Phase 7.14 - Controlled cutover + production activation for /api/branches
  *
  * LIVE: public GET / ; admin list_all/create/update/delete via manage_staff.
  * Tenant header/query = DATA FILTER only. Comment says SUPER_ADMIN; live uses manage_staff.
@@ -62,10 +62,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -325,7 +325,7 @@ test('Phase7.14 rollback: remove branches → LEGACY; prior stay POLICY; restore
 test('Phase7.14 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'files', 'blog', 'feed', 'schedules', 'messages',
     'notifications', 'settings',
   ];
@@ -389,8 +389,8 @@ test('Phase7.14 side-effect audit: gate + branch policy have no mutations', () =
 test('Phase7.14 functional smoke: public list authz; mutations NOT EXECUTED', () => {
   assert.equal(parity('list_public', buildSubject({ user: {}, actorDoc: null })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/update/delete production mutation',
-    'NOT EXECUTED — create/update/delete production mutation',
+    'NOT EXECUTED - create/update/delete production mutation',
+    'NOT EXECUTED - create/update/delete production mutation',
   );
   assert.ok(ADMIN_ACTIONS.has('delete'));
 });

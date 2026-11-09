@@ -1,5 +1,5 @@
 /**
- * Tin tức trung tâm — danh sách Card + chi tiết + soạn bài (manage_blog).
+ * Tin tức trung tâm - danh sách Card + chi tiết + soạn bài (manage_blog).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
@@ -355,8 +355,8 @@ function EditorForm({ initial, onSaved, onCancel }) {
                   type="button"
                   onClick={() => setTargetAudience(opt.key)}
                   className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${targetAudience === opt.key
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                     }`}
                 >
                   {opt.label}
@@ -521,7 +521,7 @@ function EditorForm({ initial, onSaved, onCancel }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-slate-400">Không bắt buộc — dùng khi cần tải file, không phải ảnh trong bài.</p>
+              <p className="text-xs text-slate-400">Không bắt buộc - dùng khi cần tải file, không phải ảnh trong bài.</p>
             )}
           </div>
         </>

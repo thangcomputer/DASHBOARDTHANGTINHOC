@@ -100,7 +100,7 @@ async function notifyTeacherAdminMakeup(io, schedule, actor = {}, sessionInfo = 
     const d = schedule.date ? new Date(schedule.date) : null;
     const dateLabel = d && !Number.isNaN(d.getTime())
       ? d.toLocaleDateString('vi-VN')
-      : '—';
+      : '-';
     const actorName = actor?.name ? ` (${actor.name})` : '';
     const hvLabel = studentId
       ? `⟦student_detail:${studentId}:profile|${studentName}⟧`
@@ -116,7 +116,7 @@ async function notifyTeacherAdminMakeup(io, schedule, actor = {}, sessionInfo = 
     await NotificationService.send(io, {
       type: 'SCHEDULE',
       title: '📋 Admin đã điểm danh bù',
-      content: `Admin${actorName} đã điểm danh bù${buoiPart} cho ${hvLabel} — ${course}, ngày ${dateLabel}. Buổi học được tính vào tiến độ và lương buổi.`,
+      content: `Admin${actorName} đã điểm danh bù${buoiPart} cho ${hvLabel} - ${course}, ngày ${dateLabel}. Buổi học được tính vào tiến độ và lương buổi.`,
       receivers: teacherId,
       payload: {
         kind: 'admin_makeup_attendance',
@@ -148,7 +148,7 @@ async function notifyTeacherMakeupRejected(io, schedule, actor = {}) {
     const d = schedule.date ? new Date(schedule.date) : null;
     const dateLabel = d && !Number.isNaN(d.getTime())
       ? d.toLocaleDateString('vi-VN')
-      : '—';
+      : '-';
     const actorName = actor?.name ? ` (${actor.name})` : '';
     const hvLabel = studentId
       ? `⟦student_detail:${studentId}:profile|${studentName}⟧`
@@ -168,7 +168,7 @@ async function notifyTeacherMakeupRejected(io, schedule, actor = {}) {
     await NotificationService.send(io, {
       type: 'SCHEDULE',
       title: '❌ Buổi điểm danh bù không được tính',
-      content: `Admin${actorName} không tính buổi điểm danh bù của ${hvLabel} — ${course}, ngày ${dateLabel}${sessionNumber ? ` (buổi ${sessionNumber})` : ''}. Buổi này không tính tiến độ/lương. Bạn được xếp thêm 1 ca cho học viên.`,
+      content: `Admin${actorName} không tính buổi điểm danh bù của ${hvLabel} - ${course}, ngày ${dateLabel}${sessionNumber ? ` (buổi ${sessionNumber})` : ''}. Buổi này không tính tiến độ/lương. Bạn được xếp thêm 1 ca cho học viên.`,
       receivers: teacherId,
       payload: {
         kind: 'admin_makeup_rejected',

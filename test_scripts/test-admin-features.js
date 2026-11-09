@@ -17,14 +17,14 @@ async function testAdminFeatures() {
       identifier: 'admin2@test.com',
       password: 'password123'
     }, { headers: { 'X-CSRF-Token': csrf, Cookie: cookie } });
-    
+
     adminToken = loginRes.data.data.accessToken;
     console.log('✅ Admin login success');
 
-    const headers = { 
-      Authorization: `Bearer ${adminToken}`, 
-      'X-CSRF-Token': csrf, 
-      Cookie: cookie 
+    const headers = {
+      Authorization: `Bearer ${adminToken}`,
+      'X-CSRF-Token': csrf,
+      Cookie: cookie
     };
 
     // 2. Create Course (Tạo khóa học)

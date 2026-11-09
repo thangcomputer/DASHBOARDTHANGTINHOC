@@ -1,5 +1,5 @@
 /**
- * Phase 8.20C — INTERNAL ONLY gate for runtime evidence export.
+ * Phase 8.20C - INTERNAL ONLY gate for runtime evidence export.
  * Loopback remote address required. Optional shared token (no auth bypass).
  */
 function normalizeIp(ip) {
@@ -14,7 +14,7 @@ function isLoopbackAddress(ip) {
 }
 
 function resolveClientIp(req) {
-  // Prefer socket peer — do not trust X-Forwarded-For for this gate.
+  // Prefer socket peer - do not trust X-Forwarded-For for this gate.
   return req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip || '';
 }
 

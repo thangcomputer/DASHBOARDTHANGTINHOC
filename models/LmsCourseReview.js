@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 
 /**
- * Đánh giá khóa học video LMS (HV / GV) — server SoT.
+ * Đánh giá khóa học video LMS (HV / GV) - server SoT.
  */
 const lmsCourseReviewSchema = new mongoose.Schema(
   {

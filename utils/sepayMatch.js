@@ -1,5 +1,5 @@
 /**
- * Helpers match SePay — tách để unit test (audit M10 / Phase C2).
+ * Helpers match SePay - tách để unit test (audit M10 / Phase C2).
  * Session-first matching lives in webhookRoutes; this module supports studentCode fallback.
  */
 

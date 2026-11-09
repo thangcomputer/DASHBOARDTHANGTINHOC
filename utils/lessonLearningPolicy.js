@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * LMS learning laws — ACCESS ≠ SEEK ≠ COMPLETION
+ * LMS learning laws - ACCESS ≠ SEEK ≠ COMPLETION
  * Uses duration helpers from antiSeekPolicy; does not couple completion to antiSeek.
  */
 
@@ -55,7 +55,7 @@ function resolveCanAccessLesson({ course, lessonId, lesson = null, completedLess
 }
 
 /**
- * COMPLETION only — independent of antiSeek / allowEarlyAccess.
+ * COMPLETION only - independent of antiSeek / allowEarlyAccess.
  * When duration unknown (0): requiredSeconds=0, not eligible (UI waits for YouTube).
  * Complete endpoint must call this only AFTER resolveEffectiveDuration(admin, yt).
  */
@@ -133,7 +133,7 @@ function resolveLessonLearningState({
 }
 
 const LESSON_COMPLETION_REQUIREMENT_CODE = 'LESSON_COMPLETION_REQUIREMENT_NOT_MET';
-/** @deprecated alias — prefer LESSON_COMPLETION_REQUIREMENT_CODE */
+/** @deprecated alias - prefer LESSON_COMPLETION_REQUIREMENT_CODE */
 const ANTI_SEEK_PROGRESS_CODE = 'ANTI_SEEK_PROGRESS_REQUIRED';
 const LESSON_COMPLETION_REQUIREMENT_MESSAGE =
   'Bạn chưa xem đủ thời lượng yêu cầu của bài học. Hãy tiếp tục xem.';

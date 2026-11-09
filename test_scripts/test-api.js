@@ -15,7 +15,7 @@ async function test() {
       }
     });
     console.log('Login res:', res.data.success);
-    
+
     const token = res.data.data.accessToken;
     const decoded = jwt.decode(token);
     console.log('Token version:', decoded.tokenVersion);
@@ -38,12 +38,12 @@ async function test() {
         { expiresIn: '1h' }
       );
       try {
-         const studRes = await axios.get('http://localhost:5000/api/students/6a71758a8871061f8d4aea05', {
-            headers: { Authorization: `Bearer ${token}` }
-         });
-         console.log('Student res:', studRes.data.success);
+        const studRes = await axios.get('http://localhost:5000/api/students/6a71758a8871061f8d4aea05', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log('Student res:', studRes.data.success);
       } catch (e) {
-         console.error('API Error:', e.response ? e.response.data : e.message);
+        console.error('API Error:', e.response ? e.response.data : e.message);
       }
     } else {
       console.error('Error:', err.response ? err.response.data : err.message);

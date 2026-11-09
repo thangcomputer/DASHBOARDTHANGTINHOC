@@ -13,7 +13,7 @@ const ROLES = Object.freeze({
   ADMIN_STAFF: 'ADMIN_STAFF',
   /** Canonical enterprise name for LIVE adminRole SUPPORT */
   SUPPORT_AGENT: 'SUPPORT_AGENT',
-  /** Alias / legacy enterprise key — same semantic class as SUPPORT_AGENT */
+  /** Alias / legacy enterprise key - same semantic class as SUPPORT_AGENT */
   SUPPORT: 'SUPPORT',
   TEACHER: 'TEACHER',
   STUDENT: 'STUDENT',

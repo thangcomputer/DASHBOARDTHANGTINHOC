@@ -28,13 +28,13 @@ function addResult(moduleName, func, result, severity, desc) {
   try {
     // 1. Đăng nhập
     await page.goto(`${FRONTEND_URL}/login`);
-    
+
     // Đăng nhập bằng Teacher A (GV Chính)
     await page.click('button[role="tab"]:has-text("Giảng viên")');
     await page.fill('input[type="text"], input[name="identifier"], input[placeholder*="SĐT"]', testData.teacherA.phone);
     await page.fill('input[type="password"]', testData.teacherA.password);
     await page.click('button[type="submit"]');
-    
+
     try {
       await page.waitForURL('**/teacher**', { timeout: 5000 });
     } catch (e) {
@@ -45,7 +45,7 @@ function addResult(moduleName, func, result, severity, desc) {
       console.log('Body snippet:', bodyText.slice(0, 500));
       throw new Error(`Timeout waiting for /teacher. Current URL: ${currentUrl}`);
     }
-    
+
     if (page.url().includes('/teacher')) {
       addResult('Auth', 'Login UI', 'Passed', 'High', 'Đăng nhập UI thành công vào Teacher Portal');
     } else {
@@ -57,9 +57,9 @@ function addResult(moduleName, func, result, severity, desc) {
     await page.reload();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
-    
+
     const studentText = (await page.textContent('body')).toLowerCase();
-    
+
     if (studentText.includes('học viên của gv chính') && !studentText.includes('học viên của gv khác')) {
       addResult('Students', 'Read UI', 'Passed', 'High', 'Teacher chỉ nhìn thấy Học viên của mình trên UI');
     } else {
@@ -69,23 +69,23 @@ function addResult(moduleName, func, result, severity, desc) {
     // 3. Kiểm tra bảo mật (Cố truy cập Admin)
     await page.goto(`${FRONTEND_URL}/admin`);
     await page.waitForTimeout(2000);
-    
+
     const currentUrl = page.url();
     if (currentUrl.includes('/admin/login') || currentUrl.includes('/login') || currentUrl.includes('/teacher')) {
       addResult('Security', 'Admin Access UI', 'Passed', 'High', 'Teacher bị chặn khi cố truy cập trang Admin');
     } else {
       addResult('Security', 'Admin Access UI', 'Failed', 'Critical', 'Teacher truy cập được trang Admin: ' + currentUrl);
     }
-    
+
     // 4. Kiểm tra Lịch dạy
     await page.goto(`${FRONTEND_URL}/teacher#schedule`);
     await page.reload();
     await page.waitForTimeout(2000);
     const scheduleText = (await page.textContent('body')).toLowerCase();
     if (scheduleText.includes('lịch dạy')) {
-       addResult('Schedule', 'View UI', 'Passed', 'Medium', 'Truy cập tab Lịch dạy thành công');
+      addResult('Schedule', 'View UI', 'Passed', 'Medium', 'Truy cập tab Lịch dạy thành công');
     } else {
-       addResult('Schedule', 'View UI', 'Failed', 'Medium', 'Không tải được tab Lịch dạy');
+      addResult('Schedule', 'View UI', 'Failed', 'Medium', 'Không tải được tab Lịch dạy');
     }
 
     // 5. Kiểm tra Hồ sơ
@@ -94,9 +94,9 @@ function addResult(moduleName, func, result, severity, desc) {
     await page.waitForTimeout(2000);
     const profileText = (await page.textContent('body')).toLowerCase();
     if (profileText.includes('giảng viên qa chính') || profileText.includes('0888888001')) {
-       addResult('Profile', 'View UI', 'Passed', 'Medium', 'Tải hồ sơ Teacher thành công');
+      addResult('Profile', 'View UI', 'Passed', 'Medium', 'Tải hồ sơ Teacher thành công');
     } else {
-       addResult('Profile', 'View UI', 'Failed', 'Medium', 'Lỗi hiển thị hồ sơ');
+      addResult('Profile', 'View UI', 'Failed', 'Medium', 'Lỗi hiển thị hồ sơ');
     }
 
   } catch (error) {

@@ -2,7 +2,7 @@
 
 Date: 2026-08-13  
 Phase: ATTENDANCE-FLOW-STRICT-02  
-Status: AUDIT COMPLETE — partial implementation allowed; Correction BLOCKED
+Status: AUDIT COMPLETE - partial implementation allowed; Correction BLOCKED
 
 ## 1. Current flow (evidence)
 
@@ -35,7 +35,7 @@ No Attendance model. No CorrectionRequest model. Grades lack `scheduleId`.
 | IN_PROGRESS / ATTENDANCE_PENDING statuses | No (UI-derived only) |
 | LATE_ATTENDANCE + grace | **No** |
 | ATTENDANCE_WINDOW_EXPIRED | **No** |
-| Correction request + Admin approve | **No** — STOP (RBAC/model) |
+| Correction request + Admin approve | **No** - STOP (RBAC/model) |
 | Server time window | **No** (popup uses client `now`) |
 | Popup closable without attending | **No** (no Đóng on check-in modal) |
 | Multi-pending queue | **No** |
@@ -44,13 +44,13 @@ No Attendance model. No CorrectionRequest model. Grades lack `scheduleId`.
 
 ## 4. STOP / BLOCKED
 
-1. **Correction request** — no model, no approval workflow, would need RBAC/permission → **BLOCKED** per §29/§35.
-2. **Attendance entity with scheduleId on grades** — schema change → out of scope unless reuse `Schedule.note` only.
+1. **Correction request** - no model, no approval workflow, would need RBAC/permission → **BLOCKED** per §29/§35.
+2. **Attendance entity with scheduleId on grades** - schema change → out of scope unless reuse `Schedule.note` only.
 3. Full Schedule enum expansion (`IN_PROGRESS`, `CORRECTION_REQUIRED`) → schema migration risk → avoid; derive window state in service.
 
 ## 5. Safe minimal patch (allowed)
 
-1. `services/attendanceWindow.js` — server-side REGULAR / LATE / EXPIRED from schedule date+endTime + `ATTENDANCE_LATE_GRACE_MINUTES`.
+1. `services/attendanceWindow.js` - server-side REGULAR / LATE / EXPIRED from schedule date+endTime + `ATTENDANCE_LATE_GRACE_MINUTES`.
 2. Enforce on `PUT /schedules/:id` when → `completed` (and completed create if applicable).
 3. LATE requires `lateReason` (store in `Schedule.note`).
 4. FE `getAttendanceAction` + popup wording + **Đóng** + single-schedule queue.

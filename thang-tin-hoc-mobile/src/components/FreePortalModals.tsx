@@ -32,6 +32,7 @@ import { CoursePaymentModal, type CoursePaymentCheckout } from './CoursePaymentM
 import { subscriptionApi, type SubscriptionOverview, type SubscriptionPlan, type SubscriptionPlanId } from '../services/subscriptionApi';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
 import type { DemoEnrollment, DemoUser } from '../types';
+import { colors } from '../theme/tokens';
 
 export const FREE_PORTAL_COURSE_NAME = 'Tài khoản miễn phí';
 
@@ -205,7 +206,7 @@ export function FreeMeetPlanModal({
 
             <View style={styles.slotSection}>
               <View style={styles.slotTitleRow}>
-                <Clock size={14} color="#DC2626" />
+                <Clock size={14} color={colors.brand} />
                 <Text style={styles.slotSectionLabel}>CHỌN 1 TRONG 3 CA HỌC MỖI NGÀY</Text>
               </View>
               <View style={styles.slotGrid}>
@@ -237,7 +238,7 @@ export function FreeMeetPlanModal({
               <Text style={styles.slotSectionLabel}>CHỌN THỜI HẠN GÓI</Text>
               {loading ? (
                 <View style={styles.loadingWrap}>
-                  <ActivityIndicator color="#DC2626" />
+                  <ActivityIndicator color={colors.brand} />
                 </View>
               ) : (
                 <View style={styles.planGrid}>
@@ -376,7 +377,7 @@ export function FreeFeatureLockModal({
               {LOCKED_ITEMS.map(({ key, label, Icon }) => (
                 <View key={key} style={styles.lockedItemRow}>
                   <View style={styles.lockedItemIcon}>
-                    <Icon size={16} color="#DC2626" />
+                    <Icon size={16} color={colors.brand} />
                   </View>
                   <Text style={styles.lockedItemLabel}>{label}</Text>
                 </View>
@@ -480,7 +481,7 @@ export function FreeSurveyModal({
                 {LOCKED_ITEMS.map(({ key, label, Icon }) => (
                   <View key={key} style={styles.lockedItemRow}>
                     <View style={styles.lockedItemIcon}>
-                      <Icon size={16} color="#DC2626" />
+                      <Icon size={16} color={colors.brand} />
                     </View>
                     <Text style={styles.lockedItemLabel}>{label}</Text>
                     <Lock size={13} color="#94A3B8" style={{ marginLeft: 'auto' }} />
@@ -717,7 +718,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderRadius: 16,
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.brand,
     paddingVertical: 14,
     paddingHorizontal: 18,
   },
@@ -928,8 +929,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   planCardSelected: {
-    borderColor: '#DC2626',
-    backgroundColor: '#FEF2F2',
+    borderColor: colors.brand,
+    backgroundColor: colors.brandSoft,
   },
   planBadge: {
     alignSelf: 'flex-start',
@@ -940,7 +941,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   planBadgeSelected: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.brand,
   },
   planBadgeText: {
     fontSize: 9,
@@ -962,7 +963,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   planCardLabelSelected: {
-    color: '#B91C1C',
+    color: colors.brandDark,
   },
   planRadio: {
     width: 18,
@@ -974,8 +975,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   planRadioSelected: {
-    borderColor: '#DC2626',
-    backgroundColor: '#DC2626',
+    borderColor: colors.brand,
+    backgroundColor: colors.brand,
   },
   planPrice: {
     marginTop: 6,
@@ -1073,8 +1074,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   occChipActive: {
-    borderColor: '#DC2626',
-    backgroundColor: '#FEF2F2',
+    borderColor: colors.brand,
+    backgroundColor: colors.brandSoft,
   },
   occChipText: {
     fontSize: 12,
@@ -1082,6 +1083,6 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   occChipTextActive: {
-    color: '#B91C1C',
+    color: colors.brandDark,
   },
 });

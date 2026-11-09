@@ -41,7 +41,7 @@ function loadPersisted(currentUserId) {
       || tabs.find((t) => !t.minimized)?.id
       || null;
     return {
-      // Mặc định đóng panel hỗ trợ — chat heads độc lập
+      // Mặc định đóng panel hỗ trợ - chat heads độc lập
       supportOpen: parsed.supportOpen === true,
       tabs: ensureExclusiveExpand(tabs, activeTabId),
       activeTabId,
@@ -180,7 +180,7 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
         return;
       }
 
-      // Existing conversation activity (Case A) — not discovery
+      // Existing conversation activity (Case A) - not discovery
       const convs = typeof getConversations === 'function'
         ? (getConversations(currentUserId) || [])
         : [];
@@ -203,7 +203,7 @@ export function FloatingMessengerProvider({ children, currentUserId, currentUser
         const gate = resolveMessagingDeepLink({ peerId, contacts, existingPeerIds });
         if (gate.allowed) openChat(d, { expand: true });
       } catch {
-        /* blocked — empty contacts / network */
+        /* blocked - empty contacts / network */
       }
     };
     window.addEventListener('cms:open-chat', onOpen);
@@ -233,13 +233,13 @@ export function useFloatingMessenger() {
   if (!ctx) {
     return {
       supportOpen: false,
-      setSupportOpen: () => {},
+      setSupportOpen: () => { },
       tabs: [],
       activeTabId: null,
       openChat: () => null,
-      closeChat: () => {},
-      minimizeChat: () => {},
-      focusChat: () => {},
+      closeChat: () => { },
+      minimizeChat: () => { },
+      focusChat: () => { },
     };
   }
   return ctx;

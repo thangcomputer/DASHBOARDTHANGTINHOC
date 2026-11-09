@@ -103,9 +103,9 @@ function FallbackPlayer({ url, onWatched, onTick }) {
   );
 }
 
-/** Popup video của chặng lộ trình — giao diện trình phát Thắng Tin Học. */
+/** Popup video của chặng lộ trình - giao diện trình phát Thắng Tin Học. */
 /**
- * Popup video của chặng — mở ngay trên trang lộ trình, đóng lại là về đúng chỗ đang xem.
+ * Popup video của chặng - mở ngay trên trang lộ trình, đóng lại là về đúng chỗ đang xem.
  * Danh sách phát: video riêng của chặng + video buổi bài giảng đã gắn (vẫn có liên kết mở trang bài giảng).
  */
 export default function PathVideoModal({ unit, initialVideoId = '', color, onClose, onWatched }) {
@@ -321,7 +321,7 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
     setBuyXpOpen(true);
     dailyPracticeApi.student.overview()
       .then((data) => setXpPacks(data?.stats?.xpPacks || []))
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const buyHint = async () => {
@@ -434,47 +434,47 @@ export default function PathVideoModal({ unit, initialVideoId = '', color, onClo
                       <button type="button" onClick={() => finishCheck(gate.id)} className="w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-black text-white !shadow-none">Tiếp tục xem</button>
                     </div>
                   ) : (
-                  <>
-                  {gate.kind === 'choice' && (
-                    <div className="space-y-1.5">
-                      {(gate.choices || []).map((choice, index) => (
-                        <button key={index} type="button" onClick={() => setPicked(index)} className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-bold !shadow-none ${picked === index ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
-                          {choice}
-                        </button>
+                    <>
+                      {gate.kind === 'choice' && (
+                        <div className="space-y-1.5">
+                          {(gate.choices || []).map((choice, index) => (
+                            <button key={index} type="button" onClick={() => setPicked(index)} className={`block w-full rounded-xl px-3 py-2 text-left text-sm font-bold !shadow-none ${picked === index ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
+                              {choice}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {gate.kind === 'text' && (
+                        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" value={answerText} placeholder="Nhập đáp án" onChange={(e) => setAnswerText(e.target.value)} />
+                      )}
+                      {gate.kind === 'screen' && (uploadPct != null ? (
+                        <UploadProgress percent={uploadPct} grading={grading} />
+                      ) : (
+                        <label className="block cursor-pointer rounded-xl bg-slate-100 px-3 py-3 text-center text-sm font-bold text-slate-700">
+                          {missed ? 'Tải đáp án mới' : 'Gửi ảnh'}
+                          <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { sendScreenshot(e.target.files?.[0]); e.target.value = ''; }} />
+                        </label>
                       ))}
-                    </div>
-                  )}
-                  {gate.kind === 'text' && (
-                    <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold" value={answerText} placeholder="Nhập đáp án" onChange={(e) => setAnswerText(e.target.value)} />
-                  )}
-                  {gate.kind === 'screen' && (uploadPct != null ? (
-                    <UploadProgress percent={uploadPct} grading={grading} />
-                  ) : (
-                    <label className="block cursor-pointer rounded-xl bg-slate-100 px-3 py-3 text-center text-sm font-bold text-slate-700">
-                      {missed ? 'Tải đáp án mới' : 'Gửi ảnh'}
-                      <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { sendScreenshot(e.target.files?.[0]); e.target.value = ''; }} />
-                    </label>
-                  ))}
-                  {checkHint && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{checkHint}</p>}
-                  {paidHint && <p className="rounded-xl bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">{paidHint}</p>}
-                  {checkError && <p className="text-sm font-semibold text-red-600">{checkError}</p>}
-                  <div className="flex flex-wrap gap-2">
-                    {gate.kind !== 'screen' && (
-                      <button type="button" disabled={checkBusy || (gate.kind === 'choice' ? picked == null : !answerText.trim())} onClick={() => submitCheck('')} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-black text-white disabled:opacity-50 !shadow-none">
-                        {checkBusy ? 'Đang chấm…' : 'Trả lời'}
-                      </button>
-                    )}
-                    <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 !shadow-none">Thôi</button>
-                    {Number(gate.hintCostXp) > 0 && (
-                      <button type="button" disabled={checkBusy} onClick={buyHint} className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white !shadow-none">
-                        {checkBusy ? 'Đang lấy gợi ý…' : `Gợi ý thêm · ${gate.hintCostXp} XP`}
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP và xem tiếp. Sai mất {VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.
-                  </p>
-                  </>
+                      {checkHint && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{checkHint}</p>}
+                      {paidHint && <p className="rounded-xl bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">{paidHint}</p>}
+                      {checkError && <p className="text-sm font-semibold text-red-600">{checkError}</p>}
+                      <div className="flex flex-wrap gap-2">
+                        {gate.kind !== 'screen' && (
+                          <button type="button" disabled={checkBusy || (gate.kind === 'choice' ? picked == null : !answerText.trim())} onClick={() => submitCheck('')} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-black text-white disabled:opacity-50 !shadow-none">
+                            {checkBusy ? 'Đang chấm…' : 'Trả lời'}
+                          </button>
+                        )}
+                        <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-600 !shadow-none">Thôi</button>
+                        {Number(gate.hintCostXp) > 0 && (
+                          <button type="button" disabled={checkBusy} onClick={buyHint} className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-black text-white !shadow-none">
+                            {checkBusy ? 'Đang lấy gợi ý…' : `Gợi ý thêm · ${gate.hintCostXp} XP`}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-semibold text-slate-500">
+                        Đúng lần đầu +{VIDEO_CHECK_ANSWER_XP} XP và xem tiếp. Sai mất {VIDEO_CHECK_ANSWER_XP} XP rồi {gate.kind === 'screen' ? 'tải đáp án mới' : gate.kind === 'text' ? 'nhập lại' : 'chọn lại'}.
+                      </p>
+                    </>
                   )}
                 </div>
               </div>

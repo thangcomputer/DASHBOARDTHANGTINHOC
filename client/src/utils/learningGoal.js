@@ -1,4 +1,4 @@
-/** Mục tiêu học của học viên — dùng chung popup, thẻ tiến độ và bộ đếm phút học. */
+/** Mục tiêu học của học viên - dùng chung popup, thẻ tiến độ và bộ đếm phút học. */
 export const LEARNING_GOAL_PERIODS = [
   { id: 'week', label: '1 tuần', days: 7 },
   { id: 'month', label: '1 tháng', days: 30, popular: true },
@@ -6,7 +6,7 @@ export const LEARNING_GOAL_PERIODS = [
 ];
 export const LEARNING_GOAL_HOURS = [1, 2, 3, 4, 5];
 
-/** Mức độ theo số giờ/ngày — màu chuyển dần từ xanh (nhẹ) sang đỏ (cao). */
+/** Mức độ theo số giờ/ngày - màu chuyển dần từ xanh (nhẹ) sang đỏ (cao). */
 export const LEARNING_GOAL_LEVELS = {
   1: { label: 'Người mới bắt đầu', color: '#10B981', soft: '#ECFDF5' },
   2: { label: 'Biết cơ bản', color: '#0EA5E9', soft: '#F0F9FF' },
@@ -18,9 +18,9 @@ export const LEARNING_GOAL_LEVELS = {
 const MOTIVATION = {
   1: 'Người mới bắt đầu: mỗi ngày một giờ, dễ vào nhịp.',
   2: 'Biết cơ bản: hai giờ mỗi ngày, vừa sức để tiến đều.',
-  3: 'Tập trung tốt — bạn sẽ thấy tiến bộ rõ rệt.',
-  4: 'Cam kết cao — hãy chia nhỏ thành nhiều buổi.',
-  5: 'Thử thách bứt phá — nhớ nghỉ ngơi hợp lý nhé!',
+  3: 'Tập trung tốt - bạn sẽ thấy tiến bộ rõ rệt.',
+  4: 'Cam kết cao - hãy chia nhỏ thành nhiều buổi.',
+  5: 'Thử thách bứt phá - nhớ nghỉ ngơi hợp lý nhé!',
 };
 
 export function goalMotivation(hours) {

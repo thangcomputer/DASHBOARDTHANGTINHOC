@@ -1,6 +1,6 @@
 /**
  * Policy SHADOW middleware for teacher score/approve/reject.
- * Never alters HTTP outcome — legacy guards remain authoritative.
+ * Never alters HTTP outcome - legacy guards remain authoritative.
  *
  * Placement:
  *   authMiddleware → branchFilter → policyShadowTeacherWrite(action)
@@ -72,7 +72,7 @@ function policyShadowTeacherWrite(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -111,7 +111,7 @@ function policyShadowTeacherWrite(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] shadow disagrees with legacy — HTTP unchanged',
+          '[POLICY_MISMATCH] shadow disagrees with legacy - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -123,7 +123,7 @@ function policyShadowTeacherWrite(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected error - fail closed to legacy only',
       );
     }
     return next();

@@ -4,7 +4,7 @@
  * CQRS flag resolution.
  *
  * Priority per flag (ENABLE_CQRS_TEACHER / INVOICE / STUDENT_CREATE / FINANCE):
- *  1. Explicit "false"|"0" → off (escape hatch — callers should use legacy)
+ *  1. Explicit "false"|"0" → off (escape hatch - callers should use legacy)
  *  2. Explicit "true"|"1" → on
  *  3. Master ENABLE_CQRS=false → all off
  *  4. Unset → on if MONGODB_URI has replicaSet / mongodb+srv

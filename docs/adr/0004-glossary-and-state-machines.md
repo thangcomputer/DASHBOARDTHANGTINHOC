@@ -1,4 +1,4 @@
-# ADR 0004 — Glossary & state machines
+# ADR 0004 - Glossary & state machines
 
 - **Status:** Accepted
 - **Date:** 2026-07-29

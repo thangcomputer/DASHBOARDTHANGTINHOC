@@ -12,7 +12,7 @@ function writeReport(filename, content) {
 const domains = ['student', 'teacher', 'course', 'enrollment', 'attendance'];
 
 domains.forEach(domain => {
-  writeReport(`${domain}-dto-review.md`, `# ${domain.charAt(0).toUpperCase() + domain.slice(1)} DTO Review — Sprint 4.4 Batch 2
+  writeReport(`${domain}-dto-review.md`, `# ${domain.charAt(0).toUpperCase() + domain.slice(1)} DTO Review - Sprint 4.4 Batch 2
 
 ## DTO & Validation Extraction Complete
 - **Zod Validators**: Generated inside \`dto/validators/\` with \`passthrough()\` for zero-regression backward compatibility.
@@ -27,7 +27,7 @@ domains.forEach(domain => {
 `);
 });
 
-writeReport('mapper-boundary-review.md', `# Mapper Boundary Review — Sprint 4.4 Batch 2
+writeReport('mapper-boundary-review.md', `# Mapper Boundary Review - Sprint 4.4 Batch 2
 
 ## Compliance
 - Mappers successfully generated for core domains.
@@ -36,7 +36,7 @@ writeReport('mapper-boundary-review.md', `# Mapper Boundary Review — Sprint 4.
 - **Isolation**: Mappers contain 0 database/repository logic.
 `);
 
-writeReport('validation-boundary-review.md', `# Validation Boundary Review — Sprint 4.4 Batch 2
+writeReport('validation-boundary-review.md', `# Validation Boundary Review - Sprint 4.4 Batch 2
 
 ## Compliance
 - **Exception Wrapping**: \`ValidationException\` created and utilized to wrap Zod errors.

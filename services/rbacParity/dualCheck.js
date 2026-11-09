@@ -1,8 +1,8 @@
 /**
- * Phase 8.12 — Dual-Check shadow evaluator (NON-AUTHORITATIVE).
+ * Phase 8.12 - Dual-Check shadow evaluator (NON-AUTHORITATIVE).
  *
  * Independently evaluates Enterprise authorization beside LIVE.
- * finalDecision is ALWAYS the LIVE decision passed in — never derived from Enterprise.
+ * finalDecision is ALWAYS the LIVE decision passed in - never derived from Enterprise.
  *
  * Flag: RBAC_DUAL_CHECK_ENABLED=true|1|yes|on (default OFF).
  * Never writes HTTP, never calls next(), never mutates authz / DB.
@@ -33,7 +33,7 @@ const MISMATCH_REASON = Object.freeze({
   OTHER: 'OTHER',
 });
 
-/** Architectural classification — never converts MISMATCH → MATCH. */
+/** Architectural classification - never converts MISMATCH → MATCH. */
 const MISMATCH_CLASSIFICATION = Object.freeze({
   LEGACY_COMPATIBILITY: 'LEGACY_COMPATIBILITY',
   INVALID_AUTH_CONTEXT: 'INVALID_AUTH_CONTEXT',
@@ -43,7 +43,7 @@ const MISMATCH_CLASSIFICATION = Object.freeze({
 });
 
 /**
- * Phase 8.14/8.15 — Annotate residual bare-admin ROLE_MISMATCH if still present.
+ * Phase 8.14/8.15 - Annotate residual bare-admin ROLE_MISMATCH if still present.
  * After Phase 8.15 LEGACY_PRINCIPAL permission eval, this should rarely fire.
  */
 function annotateKnownLegacyMismatch(payload, enterprise, actor, roleResolution) {
@@ -59,7 +59,7 @@ function annotateKnownLegacyMismatch(payload, enterprise, actor, roleResolution)
   payload.mismatchClassification = MISMATCH_CLASSIFICATION.LEGACY_COMPATIBILITY;
   payload.knownLegacyMismatch = 'KNOWN_LEGACY_MISMATCH';
   payload.mismatchNotes = (
-    'Unexpected ROLE_MISMATCH for LEGACY_PRINCIPAL — investigate. '
+    'Unexpected ROLE_MISMATCH for LEGACY_PRINCIPAL - investigate. '
     + 'Do not auto-map admin→SUPER_ADMIN or admin→ADMIN_STAFF.'
   );
   return payload;
@@ -76,7 +76,7 @@ function isRbacDualCheckEnabled(env = process.env) {
 }
 
 /**
- * Independent Enterprise shadow decision — does NOT copy liveDecision.
+ * Independent Enterprise shadow decision - does NOT copy liveDecision.
  */
 function evaluateEnterpriseShadow(actor, opts = {}) {
   const scopeOk = opts.scopeOk !== false;
@@ -118,7 +118,7 @@ function evaluateEnterpriseShadow(actor, opts = {}) {
     };
   }
 
-  // Phase 8.15 — LEGACY_PRINCIPAL (JWT admin|staff, adminRole=null):
+  // Phase 8.15 - LEGACY_PRINCIPAL (JWT admin|staff, adminRole=null):
   // Do NOT deny solely for missing adminRole.
   // Do NOT assign SUPER_ADMIN / ADMIN_STAFF.
   // Fall through to permission-code evaluation (same staff identity gate as LIVE).
@@ -163,7 +163,7 @@ function evaluateEnterpriseShadow(actor, opts = {}) {
     };
   }
 
-  // Apply scope (branch) after permission — SUPER/root bypass branch scope
+  // Apply scope (branch) after permission - SUPER/root bypass branch scope
   if (enterprise.decision === DECISION.ALLOW && !scopeOk && !parityCompare.isRootOrSuper(actor)) {
     enterprise = {
       ...enterprise,
@@ -195,7 +195,7 @@ function resolveRole(actor) {
   });
 }
 
-/** LIVE-aligned: teacher create/delete are SUPER/root — not manage_teachers alone. */
+/** LIVE-aligned: teacher create/delete are SUPER/root - not manage_teachers alone. */
 function shadowActionDeny(actor, action, livePermission) {
   const a = String(action || '').toLowerCase();
   if (!a) return null;
@@ -268,7 +268,7 @@ function classifyScope(opts = {}) {
  * Dual-check after LIVE gate. Must never throw to caller.
  * @param {object} req
  * @param {object} opts
- * @param {'ALLOW'|'DENY'} opts.liveDecision — authoritative LIVE only
+ * @param {'ALLOW'|'DENY'} opts.liveDecision - authoritative LIVE only
  */
 function dualCheckLiveStaffGate(req, opts = {}) {
   if (!isRbacDualCheckEnabled()) return null;
@@ -371,9 +371,9 @@ function dualCheckLiveStaffGate(req, opts = {}) {
     });
 
     if (comparison === COMPARISON.MISMATCH) {
-      logger.warn(payload, '[RBAC_DUAL_CHECK] MISMATCH — LIVE remains authoritative');
+      logger.warn(payload, '[RBAC_DUAL_CHECK] MISMATCH - LIVE remains authoritative');
     } else if (comparison === COMPARISON.UNSUPPORTED) {
-      logger.info(payload, '[RBAC_DUAL_CHECK] UNSUPPORTED — LIVE remains authoritative');
+      logger.info(payload, '[RBAC_DUAL_CHECK] UNSUPPORTED - LIVE remains authoritative');
     } else {
       logger.info(payload, '[RBAC_DUAL_CHECK] shadow');
     }
@@ -396,7 +396,7 @@ function dualCheckLiveStaffGate(req, opts = {}) {
           requestId: req?.requestId || null,
           correlationId: req?.correlationId || null,
         },
-        '[RBAC_DUAL_CHECK] evaluator failed — LIVE unchanged',
+        '[RBAC_DUAL_CHECK] evaluator failed - LIVE unchanged',
       );
     } catch {
       /* swallow */

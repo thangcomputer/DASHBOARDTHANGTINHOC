@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  dashboardthangtinhoc — Master Test Runner
+ *  dashboardthangtinhoc - Master Test Runner
  *  Chạy tất cả kịch bản test và xuất báo cáo tổng hợp
  *
  *  Chạy: node tests/run_all_tests.js
@@ -8,11 +8,11 @@
  * ═══════════════════════════════════════════════════════════════════════
  */
 const { execSync, spawn } = require('child_process');
-const path   = require('path');
-const fs     = require('fs');
-const os     = require('os');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
-const TESTS_DIR   = __dirname;
+const TESTS_DIR = __dirname;
 const REPORTS_DIR = path.join(TESTS_DIR, 'reports');
 
 // ── Parse CLI args ─────────────────────────────────────────────────────
@@ -27,11 +27,11 @@ if (!fs.existsSync(REPORTS_DIR)) fs.mkdirSync(REPORTS_DIR, { recursive: true });
 function getSystemInfo() {
   return {
     platform: os.platform(),
-    arch:     os.arch(),
-    cpus:     os.cpus().length,
+    arch: os.arch(),
+    cpus: os.cpus().length,
     cpuModel: os.cpus()[0]?.model || 'Unknown',
     totalRAM: `${(os.totalmem() / (1024 ** 3)).toFixed(1)} GB`,
-    freeRAM:  `${(os.freemem() / (1024 ** 3)).toFixed(1)} GB`,
+    freeRAM: `${(os.freemem() / (1024 ** 3)).toFixed(1)} GB`,
     nodeVersion: process.version,
     timestamp: new Date().toISOString(),
   };
@@ -59,16 +59,16 @@ function runStep(name, command, cwd = TESTS_DIR) {
 
     proc.on('close', (code) => {
       if (code === 0) {
-        console.log(`\n  ✅ ${name} — COMPLETED`);
+        console.log(`\n  ✅ ${name} - COMPLETED`);
         resolve(true);
       } else {
-        console.error(`\n  ❌ ${name} — FAILED (exit code: ${code})`);
+        console.error(`\n  ❌ ${name} - FAILED (exit code: ${code})`);
         resolve(false); // Don't reject, continue with other tests
       }
     });
 
     proc.on('error', (err) => {
-      console.error(`\n  ❌ ${name} — ERROR: ${err.message}`);
+      console.error(`\n  ❌ ${name} - ERROR: ${err.message}`);
       resolve(false);
     });
   });
@@ -82,7 +82,7 @@ async function main() {
 
   console.log('');
   console.log('╔══════════════════════════════════════════════════════════════╗');
-  console.log('║   🧪 dashboardthangtinhoc — MASTER TEST RUNNER                       ║');
+  console.log('║   🧪 dashboardthangtinhoc - MASTER TEST RUNNER                       ║');
   console.log('║   Load Testing + E2E Testing Suite                         ║');
   console.log('╠══════════════════════════════════════════════════════════════╣');
   console.log(`║   CPU:  ${systemInfo.cpuModel.substring(0, 50).padEnd(50)}║`);
@@ -107,7 +107,7 @@ async function main() {
     process.exit(1);
   }
 
-  // ── Step 1: Scenario 1 — Concurrency Test ──────────────────────────
+  // ── Step 1: Scenario 1 - Concurrency Test ──────────────────────────
   if (!onlyScenario || onlyScenario === 1) {
     results.scenario1 = await runStep(
       'Kịch bản 1: Concurrency Test (20 users, 5 phút)',
@@ -115,7 +115,7 @@ async function main() {
     );
   }
 
-  // ── Step 2: Scenario 2 — Exam Stress Test ──────────────────────────
+  // ── Step 2: Scenario 2 - Exam Stress Test ──────────────────────────
   if (!onlyScenario || onlyScenario === 2) {
     results.scenario2 = await runStep(
       'Kịch bản 2: Exam Stress Test (5 HV, phòng thi)',
@@ -123,12 +123,12 @@ async function main() {
     );
   }
 
-  // ── Step 3: K6 Load Test (optional — requires K6 installed) ────────
+  // ── Step 3: K6 Load Test (optional - requires K6 installed) ────────
   if (!onlyScenario || onlyScenario === 3) {
     try {
       execSync('k6 version', { stdio: 'ignore' });
-      console.log('\n✅ K6 detected — Running API load test...');
-      
+      console.log('\n✅ K6 detected - Running API load test...');
+
       // Generate admin token for K6
       const jwt = require('jsonwebtoken');
       require('dotenv').config({ path: path.join(TESTS_DIR, '..', '.env') });
@@ -143,7 +143,7 @@ async function main() {
         `k6 run -e JWT_TOKEN=${token} -e API_BASE_URL=http://localhost:5000 tests/load-test/k6_api_load.js`
       );
     } catch {
-      console.log('\n⚠️  K6 not installed — Skipping API load test');
+      console.log('\n⚠️  K6 not installed - Skipping API load test');
       console.log('    Install: https://k6.io/docs/get-started/installation/');
       results.k6 = 'skipped';
     }
@@ -184,7 +184,7 @@ function generateHTMLReport(results, systemInfo, totalTime) {
   for (const file of reportFiles) {
     try {
       reports[file] = JSON.parse(fs.readFileSync(path.join(REPORTS_DIR, file), 'utf-8'));
-    } catch {}
+    } catch { }
   }
 
   // Get screenshots
@@ -194,7 +194,7 @@ function generateHTMLReport(results, systemInfo, totalTime) {
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>dashboardthangtinhoc — Báo Cáo Kiểm Thử Hiệu Năng</title>
+  <title>dashboardthangtinhoc - Báo Cáo Kiểm Thử Hiệu Năng</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
@@ -235,8 +235,8 @@ function generateHTMLReport(results, systemInfo, totalTime) {
 <body>
   <div class="container">
     <div class="header">
-      <h1>🧪 dashboardthangtinhoc — Báo Cáo Kiểm Thử Hiệu Năng</h1>
-      <p class="subtitle">Load Testing & E2E Testing Report — Trung Tâm Thắng Tin Học</p>
+      <h1>🧪 dashboardthangtinhoc - Báo Cáo Kiểm Thử Hiệu Năng</h1>
+      <p class="subtitle">Load Testing & E2E Testing Report - Trung Tâm Thắng Tin Học</p>
       <p class="subtitle" style="margin-top:0.5rem">⏱️ Tổng thời gian: <strong style="color:#22d3ee">${totalTime} phút</strong> | 📅 ${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN')}</p>
     </div>
 
@@ -309,7 +309,7 @@ function generateHTMLReport(results, systemInfo, totalTime) {
     </div>` : ''}
 
     <footer>
-      <p>🏫 Trung Tâm Thắng Tin Học — dashboardthangtinhoc Load Testing Report</p>
+      <p>🏫 Trung Tâm Thắng Tin Học - dashboardthangtinhoc Load Testing Report</p>
       <p>Generated by Antigravity Testing Suite v1.0</p>
     </footer>
   </div>

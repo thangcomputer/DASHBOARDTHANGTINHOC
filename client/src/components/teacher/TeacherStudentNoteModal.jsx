@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 function formatDateLabel(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -14,7 +14,7 @@ function formatTimeRange(payload) {
   const start = payload?.startTime || '';
   const end = payload?.endTime || '';
   if (start && end) return `${start} – ${end}`;
-  return start || '—';
+  return start || '-';
 }
 
 export function isStudentScheduleNoteNotif(n) {

@@ -1,7 +1,7 @@
 /**
  * Thưởng sao GV (tách khỏi lương cứng / buổi):
  * - Trong 1 tháng: ≥ MIN_STUDENTS học viên distinct đánh giá ≥ MIN_STARS★
- * - Điểm TB (avgStars) vẫn tính cộng dồn toàn thời gian — chỉ để hiển thị uy tín, không chặn thưởng
+ * - Điểm TB (avgStars) vẫn tính cộng dồn toàn thời gian - chỉ để hiển thị uy tín, không chặn thưởng
  * → thưởng theo customStarBonusAmount của GV (fallback BONUS_PER_MONTH) / tháng.
  */
 
@@ -125,9 +125,9 @@ async function resolveLookbackStart(teacherId, teacher) {
   if (!start || Number.isNaN(start.getTime())) {
     const first = oid
       ? await Evaluation.findOne({ targetTeacherId: oid, type: 'teacher_rating' })
-          .sort({ createdAt: 1 })
-          .select('createdAt')
-          .lean()
+        .sort({ createdAt: 1 })
+        .select('createdAt')
+        .lean()
       : null;
     start = first?.createdAt ? new Date(first.createdAt) : fallback;
   }
@@ -200,7 +200,7 @@ async function computeStarBonusSummary(teacher) {
 /**
  * Chọn các tháng thưởng sẽ chi trong lần thanh toán này.
  * @param {object} teacher
- * @param {string[]|null} requestedMonths — null = tất cả tháng đủ điều kiện chưa chi
+ * @param {string[]|null} requestedMonths - null = tất cả tháng đủ điều kiện chưa chi
  */
 async function resolveBonusForPayout(teacher, requestedMonths = null) {
   const summary = await computeStarBonusSummary(teacher);

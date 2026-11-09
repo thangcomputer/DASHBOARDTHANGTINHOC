@@ -52,7 +52,7 @@ export function useDataTraining(currentUser) {
   const [studentTrainingData, setStudentTrainingData] = useState(() =>
     loadState('thvp_studentTrainingData', INITIAL_TRAINING),
   );
-  // Ngân hàng câu hỏi: khởi tạo rỗng — hydrate từ server (tránh localStorage SoT cũ)
+  // Ngân hàng câu hỏi: khởi tạo rỗng - hydrate từ server (tránh localStorage SoT cũ)
   const [questions, setQuestions] = useState([]);
   const [teacherExamBankHydrated, setTeacherExamBankHydrated] = useState(false);
   const [teacherExamConfigLoaded, setTeacherExamConfigLoaded] = useState(false);
@@ -102,7 +102,7 @@ export function useDataTraining(currentUser) {
     applyExamCatalogFromServer(d);
     if (d.hasStudentExamBank) {
       const serverQs = Array.isArray(d.studentQuestions) ? d.studentQuestions : [];
-      // Server là nguồn sự thật — tránh localStorage seed cũ che ngân hàng Admin
+      // Server là nguồn sự thật - tránh localStorage seed cũ che ngân hàng Admin
       setStudentQuestions(serverQs);
     }
     if (d.studentExamMinutes && typeof d.studentExamMinutes === 'object') {
@@ -318,12 +318,12 @@ export function useDataTraining(currentUser) {
     return () => { cancelled = true; };
   }, [currentUser?.id, currentUser?.role, applyStudentExamConfigFromServer]);
 
-  // Không seed ngân hàng HV từ localStorage/thvp_questions — server là SoT
+  // Không seed ngân hàng HV từ localStorage/thvp_questions - server là SoT
 
   useEffect(() => { localStorage.setItem('thvp_trainingData', JSON.stringify(trainingData)); }, [trainingData]);
   useEffect(() => { localStorage.setItem('thvp_studentTrainingData', JSON.stringify(studentTrainingData)); }, [studentTrainingData]);
 
-  // Ref + chuỗi PUT tuần tự — tránh request cũ (không có files) ghi đè request mới.
+  // Ref + chuỗi PUT tuần tự - tránh request cũ (không có files) ghi đè request mới.
   const studentTrainingDataRef = useRef(studentTrainingData);
   studentTrainingDataRef.current = studentTrainingData;
   const studentTrainingWriteChainRef = useRef(Promise.resolve());

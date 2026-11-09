@@ -1,4 +1,4 @@
-# LMS Q&A + Notification (Module 7–8) — 2026-08-13
+# LMS Q&A + Notification (Module 7–8) - 2026-08-13
 
 ## Problem
 Tab **Hỏi đáp** dưới player chỉ ghi `localStorage` → Admin/Teacher không thấy, chuông không báo.

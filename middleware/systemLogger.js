@@ -1,5 +1,5 @@
 /**
- * systemLogger.js — Middleware ghi nhật ký hoạt động hệ thống
+ * systemLogger.js - Middleware ghi nhật ký hoạt động hệ thống
  *
  * Chỉ ghi các hành động trong SYSTEM_LOG_VISIBLE_ACTIONS.
  */
@@ -20,21 +20,21 @@ function parseDevice(ua) {
   let browser = 'Trình duyệt khác';
   let os = 'Hệ điều hành khác';
 
-  if (ua.includes('Edg/'))          browser = 'Edge ' + (ua.match(/Edg\/([\d.]+)/)?.[1]?.split('.')[0] || '');
-  else if (ua.includes('OPR/'))     browser = 'Opera ' + (ua.match(/OPR\/([\d.]+)/)?.[1]?.split('.')[0] || '');
-  else if (ua.includes('Chrome/'))  browser = 'Chrome ' + (ua.match(/Chrome\/([\d.]+)/)?.[1]?.split('.')[0] || '');
+  if (ua.includes('Edg/')) browser = 'Edge ' + (ua.match(/Edg\/([\d.]+)/)?.[1]?.split('.')[0] || '');
+  else if (ua.includes('OPR/')) browser = 'Opera ' + (ua.match(/OPR\/([\d.]+)/)?.[1]?.split('.')[0] || '');
+  else if (ua.includes('Chrome/')) browser = 'Chrome ' + (ua.match(/Chrome\/([\d.]+)/)?.[1]?.split('.')[0] || '');
   else if (ua.includes('Firefox/')) browser = 'Firefox ' + (ua.match(/Firefox\/([\d.]+)/)?.[1]?.split('.')[0] || '');
   else if (ua.includes('Safari/') && !ua.includes('Chrome'))
     browser = 'Safari ' + (ua.match(/Version\/([\d.]+)/)?.[1]?.split('.')[0] || '');
 
-  if (ua.includes('Windows NT 10'))       os = 'Windows 10/11';
+  if (ua.includes('Windows NT 10')) os = 'Windows 10/11';
   else if (ua.includes('Windows NT 6.3')) os = 'Windows 8.1';
   else if (ua.includes('Windows NT 6.1')) os = 'Windows 7';
-  else if (ua.includes('Mac OS X'))       os = 'macOS';
-  else if (ua.includes('Android'))        os = 'Android ' + (ua.match(/Android ([\d.]+)/)?.[1] || '');
-  else if (ua.includes('iPhone'))         os = 'iOS (iPhone)';
-  else if (ua.includes('iPad'))           os = 'iOS (iPad)';
-  else if (ua.includes('Linux'))          os = 'Linux';
+  else if (ua.includes('Mac OS X')) os = 'macOS';
+  else if (ua.includes('Android')) os = 'Android ' + (ua.match(/Android ([\d.]+)/)?.[1] || '');
+  else if (ua.includes('iPhone')) os = 'iOS (iPhone)';
+  else if (ua.includes('iPad')) os = 'iOS (iPad)';
+  else if (ua.includes('Linux')) os = 'Linux';
 
   return `${browser} / ${os}`;
 }

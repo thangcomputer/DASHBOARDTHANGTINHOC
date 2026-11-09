@@ -194,17 +194,15 @@ export function LmsTabBar({
               if (t.key === 'qa') markQaItemsAsRead(storageKey, qaItems);
               setCourseTab(t.key);
             }}
-            className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${
-              t.mobileOnly ? 'lg:hidden' : ''
-            } ${
-              courseTab === t.key
+            className={`min-w-0 flex-1 basis-[30%] sm:flex-none sm:basis-auto px-2 sm:px-4 py-2.5 sm:py-3 text-[11px] sm:text-sm font-bold tracking-wide border-b-2 transition-colors text-center leading-tight ${t.mobileOnly ? 'lg:hidden' : ''
+              } ${courseTab === t.key
                 ? light
                   ? 'text-red-700 border-red-600 bg-red-50'
                   : 'text-white border-emerald-500 bg-white/[0.03]'
                 : light
                   ? 'text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-800'
                   : 'text-slate-500 border-transparent hover:text-slate-300'
-            }`}
+              }`}
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               {t.label}
@@ -309,7 +307,7 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light =
   const [notes, setNotes] = useLmsLocalStore(storageKey, []);
   const [draft, setDraft] = useState('');
   const [filterLesson, setFilterLesson] = useState('current');
-  // Đồng bộ với giây player — trước đây chỉ đọc lúc render nên lệch đến khi đổi tab
+  // Đồng bộ với giây player - trước đây chỉ đọc lúc render nên lệch đến khi đổi tab
   const [liveAtSec, setLiveAtSec] = useState(() => readNoteTimeSec(getCurrentTime));
   const getCurrentTimeRef = useRef(getCurrentTime);
   getCurrentTimeRef.current = getCurrentTime;
@@ -381,22 +379,20 @@ function NotesPanel({ storageKey, lessonId, lessonTitle, getCurrentTime, light =
         <button
           type="button"
           onClick={() => setFilterLesson('current')}
-          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${
-            filterLesson === 'current'
+          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${filterLesson === 'current'
               ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
               : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
-          }`}
+            }`}
         >
           Bài hiện tại
         </button>
         <button
           type="button"
           onClick={() => setFilterLesson('all')}
-          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${
-            filterLesson === 'all'
+          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border ${filterLesson === 'all'
               ? light ? 'border-emerald-600 text-emerald-800 bg-emerald-50' : 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10'
               : light ? 'border-slate-300 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400'
-          }`}
+            }`}
         >
           Tất cả bài giảng
         </button>
@@ -785,11 +781,10 @@ function QaPanel({
                 key={id}
                 id={`lms-qa-${id}`}
                 data-lms-qa-id={id}
-                className={`relative rounded-xl border p-4 ${
-                  highlighted
+                className={`relative rounded-xl border p-4 ${highlighted
                     ? light ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300' : 'border-emerald-500/50 bg-emerald-500/10 ring-1 ring-emerald-500/30'
                     : light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'
-                }`}
+                  }`}
               >
                 {dialogue.length > 0 ? (
                   <button
@@ -801,11 +796,10 @@ function QaPanel({
                       if (!expanded) markQaAsRead(readStorageKey, it);
                       setExpandedQaId((current) => (current === id ? '' : id));
                     }}
-                    className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${
-                      isRead
+                    className={`absolute right-3 top-3 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border px-2 text-xs font-black transition-colors ${isRead
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
                         : 'border-red-700 bg-red-600 text-white hover:bg-red-700'
-                    }`}
+                      }`}
                   >
                     <MessageSquare size={14} />
                     <span>{dialogue.length}</span>
@@ -831,13 +825,12 @@ function QaPanel({
                         <ChevronDown size={15} className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                       </button>
                       <span
-                        className={`text-[10px] font-bold  tracking-wide px-2 py-0.5 rounded-full ${
-                          it.status === 'answered'
+                        className={`text-[10px] font-bold  tracking-wide px-2 py-0.5 rounded-full ${it.status === 'answered'
                             ? isRead
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-red-100 text-red-800'
                             : light ? 'bg-amber-100 text-amber-800' : 'bg-amber-500/15 text-amber-300'
-                        }`}
+                          }`}
                       >
                         {it.status === 'answered' ? 'Đã trả lời' : 'Chờ trả lời'}
                       </span>
@@ -855,11 +848,10 @@ function QaPanel({
                       return (
                         <div
                           key={msg.id || `${id}-m-${idx}`}
-                          className={`mt-3 rounded-lg px-3 py-2.5 ${
-                            staffish
+                          className={`mt-3 rounded-lg px-3 py-2.5 ${staffish
                               ? 'border border-slate-200 bg-white shadow-sm'
                               : 'border border-emerald-500/20 bg-emerald-500/10'
-                          }`}
+                            }`}
                         >
                           <p className={`text-[10px] font-black  tracking-widest mb-1 ${staffish ? 'text-red-700' : light ? 'text-emerald-800' : 'text-emerald-300'}`}>
                             {staffish ? `Trả lời · ${msg.authorName || 'Support'}` : `Phản hồi · ${msg.authorName || 'Học viên'}`}
@@ -990,7 +982,7 @@ function ReviewsPanel({ courseId, courseTitle, audience = 'student', light = fal
       }
       setComment('');
       setRating(5);
-      setOkMsg('Đã gửi đánh giá — Admin sẽ nhận thông báo.');
+      setOkMsg('Đã gửi đánh giá - Admin sẽ nhận thông báo.');
       await load();
     } catch {
       setError('Lỗi kết nối khi gửi đánh giá');
@@ -1005,7 +997,7 @@ function ReviewsPanel({ courseId, courseTitle, audience = 'student', light = fal
     <div className={`space-y-5 w-full ${light ? 'mx-0' : 'max-w-3xl mx-auto'}`}>
       <div className={`flex items-center gap-4 rounded-xl border p-4 ${light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/[0.06] bg-white/[0.02]'}`}>
         <div>
-          <p className={`text-3xl font-extrabold tabular-nums ${light ? 'text-slate-900' : 'text-white'}`}>{avg ? avg.toFixed(1) : '—'}</p>
+          <p className={`text-3xl font-extrabold tabular-nums ${light ? 'text-slate-900' : 'text-white'}`}>{avg ? avg.toFixed(1) : '-'}</p>
           <div className="flex gap-0.5 mt-1">
             {[1, 2, 3, 4, 5].map((s) => (
               <Star
@@ -1208,13 +1200,11 @@ function ListPanel({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && lesson.isUnlocked) onSelectLesson?.(lesson);
                     }}
-                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all ${
-                      !lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
-                    } ${
-                      isCurrent
+                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all ${!lesson.isUnlocked ? 'opacity-40 pointer-events-none' : ''
+                      } ${isCurrent
                         ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
                         : 'border-l-4 border-transparent hover:bg-white/[0.04]'
-                    }`}
+                      }`}
                   >
                     <div className="mt-0.5 flex-shrink-0">
                       {isCurrent ? (
@@ -1233,13 +1223,12 @@ function ListPanel({
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4
-                        className={`text-[12px] leading-snug line-clamp-2 normal-case ${
-                          isCurrent
+                        className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent
                             ? 'text-emerald-400 font-bold'
                             : isLessonFullyWatched(lesson)
                               ? 'text-slate-500 font-semibold'
                               : 'text-slate-300 font-semibold'
-                        }`}
+                          }`}
                       >
                         {formatLessonDisplayTitle(lesson.title, idx)}
                       </h4>
@@ -1287,9 +1276,9 @@ export default function LmsPlayerPanels({
   const lessonId = currentLesson?._id;
   const lessonTitle = currentLesson
     ? formatLessonDisplayTitle(
-        currentLesson.title,
-        getChapterLessonIndex(lessons, currentLesson),
-      )
+      currentLesson.title,
+      getChapterLessonIndex(lessons, currentLesson),
+    )
     : '';
 
   const notesKey = lmsStoreKey('notes', userId, courseId);

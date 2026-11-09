@@ -1,5 +1,5 @@
 /**
- * Phase 8.8 — Enterprise RBAC catalog & mapping CONTRACT tests.
+ * Phase 8.8 - Enterprise RBAC catalog & mapping CONTRACT tests.
  * Does NOT exercise LIVE authorization, authorize(), or Cutover.
  */
 const test = require('node:test');

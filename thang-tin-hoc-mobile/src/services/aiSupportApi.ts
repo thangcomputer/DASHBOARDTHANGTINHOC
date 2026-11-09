@@ -35,6 +35,47 @@ export function isAiSupportWelcome(content: string) {
     && /hỗ trợ Word, Excel, PowerPoint, MOS, LMS/i.test(content);
 }
 
+export function isMeaningfulAiReply(message: { senderId?: string; text?: string; recalled?: boolean; messageType?: string }): boolean {
+  if (message.recalled || message.messageType === 'system') return false;
+  if (message.senderId !== 'ai_support') return false;
+  const content = String(message.text || '');
+  if (isAiSupportWelcome(content)) return false;
+  if (/Bạn có còn đó không/i.test(content)) return false;
+  if (/lượt hỏi Trợ lý AI hôm nay/i.test(content)) return false;
+  if (/Đã chuyển yêu cầu tới nhân viên hỗ trợ/i.test(content)) return false;
+  return true;
+}
+
+export function lastMeaningfulAiReplyId(thread: any[], myId?: string): string {
+  for (let i = thread.length - 1; i >= 0; i -= 1) {
+    const m = thread[i];
+    if (!m || m.recalled || m.messageType === 'system') continue;
+    if (m.senderId !== 'ai_support') return '';
+    if (!isMeaningfulAiReply(m)) return '';
+
+    let userText = '';
+    for (let j = i - 1; j >= 0; j -= 1) {
+      const prev = thread[j];
+      if (!prev || prev.recalled || prev.messageType === 'system') continue;
+      if (prev.senderId === 'ai_support') continue;
+      if (myId && prev.senderId && prev.senderId !== myId) continue;
+      userText = String(prev.text || '');
+      break;
+    }
+    const cleanUserText = userText.trim().toLowerCase().replace(/[.!?…,-]+$/g, '').trim();
+    if (!cleanUserText) return '';
+    if (/^(xin\s*chào|chào(\s+(bạn|em|cô|thầy|ad|admin))?|hello(\s+bạn)?|hi(\s+(bạn|there))?|hey|alo)$/i.test(cleanUserText)) {
+      return '';
+    }
+    return String(m.id || '');
+  }
+  return '';
+}
+
+export function canOfferHumanEscalation(thread: any[], myId?: string): boolean {
+  return Boolean(lastMeaningfulAiReplyId(thread, myId));
+}
+
 export function getAiSupportReplyPresentation(content: string) {
   const suggestions: string[] = [];
   const visibleContent = content

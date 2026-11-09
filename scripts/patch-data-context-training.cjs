@@ -7,10 +7,10 @@ if (!s.includes("from './useDataTraining'")) {
   s = s.replace(
     "import { useSocket } from './SocketContext';\n",
     "import { buildConversationId } from '../utils/chatConversationId';\n" +
-      "import { useSocket } from './SocketContext';\n" +
-      "import { loadState, applyDataVersionReset } from './dataStorage';\n" +
-      "import { useDataTraining } from './useDataTraining';\n\n" +
-      "export { buildConversationId } from '../utils/chatConversationId';\n",
+    "import { useSocket } from './SocketContext';\n" +
+    "import { loadState, applyDataVersionReset } from './dataStorage';\n" +
+    "import { useDataTraining } from './useDataTraining';\n\n" +
+    "export { buildConversationId } from '../utils/chatConversationId';\n",
   );
   console.log('imports updated');
 }

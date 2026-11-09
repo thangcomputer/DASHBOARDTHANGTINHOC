@@ -10,9 +10,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../app/AuthContext';
 import { Avatar, AppScreen, Card, ErrorState, LoadingSkeleton, SectionHeading, StatusBadge, ProgressBar } from '../components/ui';
-import { LearningGoalCard } from '../components/LearningGoalCard';
-import { LearningLeaderboardCard } from '../components/LearningLeaderboardCard';
-import { LmsProgressCard } from '../components/LmsProgressCard';
+import { LmsGoalMergedCard } from '../components/LmsGoalMergedCard';
 import { DailyPracticeOverviewCard } from '../components/DailyPracticeOverviewCard';
 import { isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
 import { CompactCoursePicker, type CoursePickerItem } from '../components/CompactCoursePicker';
@@ -130,8 +128,8 @@ export function HomeScreen() {
 
   useFocusEffect(useCallback(() => {
     if (isTeacher || !user || user.previewMode) return;
-    dailyPracticeApi.overview().then(setPractice).catch(() => {});
-    dailyPracticeApi.path().then(setPathData).catch(() => {});
+    dailyPracticeApi.overview().then(setPractice).catch(() => { });
+    dailyPracticeApi.path().then(setPathData).catch(() => { });
     mobileApiRequest<{ data?: MeetClassRow[] }>('/meet-classes/mine')
       .then((res) => setMeetClasses(Array.isArray(res?.data) ? res.data : []))
       .catch(() => setMeetClasses([]));
@@ -184,7 +182,7 @@ export function HomeScreen() {
           })),
         );
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isTeacher, user]));
   useEffect(() => {
     if (isTeacher || !user || user.previewMode) return undefined;
@@ -345,12 +343,6 @@ export function HomeScreen() {
   const meetCards = useMemo(() => sortMeetClasses(meetClasses), [meetClasses]);
   const liveMeet = useMemo(() => meetCards.find((m) => m.live) || null, [meetCards]);
   const nextMeet = meetCards[0] || null;
-  const studentIsLive = firstScheduleIsLive || Boolean(liveMeet);
-  const studentJoinUrl = (firstScheduleIsLive && firstSchedule?.meetingUrl)
-    || (liveMeet && liveMeet.linkHoc)
-    || (firstScheduleIsLive && typeof profile.data?.student?.linkHoc === 'string' ? profile.data.student.linkHoc : '')
-    || (firstScheduleIsLive && typeof profile.data?.student?.joinClassUrl === 'string' ? profile.data.student.joinClassUrl : '')
-    || '';
   const studentHeroChips = useMemo<WelcomeChip[]>(() => {
     if (firstScheduleIsLive && firstSchedule) {
       return [{ live: true, label: `Đang diễn ra · ${firstSchedule.time} · ${firstSchedule.courseName || currentCourse || 'Buổi học'}` }];
@@ -367,15 +359,55 @@ export function HomeScreen() {
     }
     return chips;
   }, [currentCourse, firstSchedule, firstScheduleIsLive, liveMeet, nextMeet]);
-  const studentJoinHint = studentIsLive
-    ? 'Đang diễn ra (chờ link từ GV)'
-    : firstSchedule
-      ? 'Chưa đến giờ học'
-      : meetCards.length
-        ? 'Chưa đến giờ Meet'
-        : freePortalCourse
-          ? ''
-          : 'Chưa có lịch học';
+
+  // ── Lịch học hôm nay trên mobile ──────────────────────────────────────────
+  const todayMobileClasses = useMemo(() => {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const list: Array<{
+      id: string;
+      title: string;
+      time: string;
+      dateLabel: string;
+      meetLink: string;
+      live: boolean;
+      teacher?: string;
+    }> = [];
+
+    (studentSchedules || [])
+      .filter((item) => item.date === todayKey && item.status !== 'cancelled')
+      .forEach((item) => {
+        const live = scheduleIsLive(item);
+        const meetLink = item.meetingUrl
+          || (typeof profile.data?.student?.linkHoc === 'string' ? profile.data.student.linkHoc : '')
+          || (typeof profile.data?.student?.joinClassUrl === 'string' ? profile.data.student.joinClassUrl : '');
+        list.push({
+          id: String(item.id || `1on1-${item.date}-${item.time}`),
+          title: item.title || item.subject || item.courseName || currentCourse || 'Buổi học 1 kèm 1',
+          time: item.time || `${item.startTime || ''} - ${item.endTime || ''}`,
+          dateLabel: item.dateLabel || 'Hôm nay',
+          meetLink: String(meetLink || '').trim(),
+          live,
+          teacher: item.teacherName || item.person || '',
+        });
+      });
+
+    (meetCards || [])
+      .filter((m) => m.dayLabel === 'Hôm nay' || m.live)
+      .forEach((m) => {
+        list.push({
+          id: String(m._id || m.id || `meet-${m.slotKey || m.slotLabel}-${m.startTime}`),
+          title: m.slotLabel ? `Lớp Google Meet · ${m.slotLabel}` : 'Lớp Google Meet',
+          time: m.startTime && m.endTime ? `${m.startTime} – ${m.endTime}` : (m.slotLabel || 'Trong ngày'),
+          dateLabel: m.dayLabel || 'Hôm nay',
+          meetLink: String(m.linkHoc || '').trim(),
+          live: Boolean(m.live),
+          teacher: '',
+        });
+      });
+
+    return list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0));
+  }, [studentSchedules, meetCards, currentCourse, profile.data]);
   const assignmentsToGrade = assignments.data?.filter((item) => item.status === 'Cần chấm') || [];
   const pendingAssignments = studentAssignments.filter((item) => item.mySubmission
     ? false
@@ -472,7 +504,7 @@ export function HomeScreen() {
     studentTasks.push({
       key: 'quiz',
       icon: Trophy,
-      tone: '#DC2626',
+      tone: '#059669',
       title: `Trắc nghiệm chưa làm (${pendingQuizzes.length})`,
       sub: pendingQuizzes[0].title,
       cta: 'Làm bài',
@@ -513,9 +545,7 @@ export function HomeScreen() {
           role="student"
           name={user?.name || ''}
           chips={studentHeroChips}
-          joinUrl={studentIsLive ? studentJoinUrl : ''}
-          joinHint={studentJoinHint}
-          onJoin={(url) => { void openDashboardLink(url); }}
+          showJoin={false}
         />
       )}
 
@@ -577,9 +607,9 @@ export function HomeScreen() {
             <SectionHeading title="Tháng này" />
             <View style={styles.ovStatRow}>
               {[
-                { label: `Thu nhập T${todayDate.getMonth() + 1}`, value: teacherMetrics.data ? formatCurrency(teacherMetrics.data.monthlyIncome) : '—', icon: WalletCards, tint: colors.blue, soft: '#EFF6FF', onPress: () => navigation?.navigate('TeacherFinance') },
-                { label: 'Buổi đã dạy', value: schedules.data ? String(taughtThisMonth) : '—', icon: CalendarDays, tint: '#4F46E5', soft: '#EEF2FF', onPress: () => tabNavigation.navigate('Schedule') },
-                { label: 'Thưởng sao', value: teacherMetrics.data ? `${teacherMetrics.data.fiveStarStudentCount}/5 HV` : '—', icon: Award, tint: '#D97706', soft: '#FFFBEB', onPress: undefined },
+                { label: `Thu nhập T${todayDate.getMonth() + 1}`, value: teacherMetrics.data ? formatCurrency(teacherMetrics.data.monthlyIncome) : '-', icon: WalletCards, tint: colors.blue, soft: '#EFF6FF', onPress: () => navigation?.navigate('TeacherFinance') },
+                { label: 'Buổi đã dạy', value: schedules.data ? String(taughtThisMonth) : '-', icon: CalendarDays, tint: '#4F46E5', soft: '#EEF2FF', onPress: () => tabNavigation.navigate('Schedule') },
+                { label: 'Thưởng sao', value: teacherMetrics.data ? `${teacherMetrics.data.fiveStarStudentCount}/5 HV` : '-', icon: Award, tint: '#D97706', soft: '#FFFBEB', onPress: undefined },
               ].map(({ label, value, icon: Icon, tint, soft, onPress }) => (
                 <Pressable key={label} onPress={onPress} disabled={!onPress} style={styles.ovStat} accessibilityRole={onPress ? 'button' : undefined}>
                   <View style={[styles.ovStatIcon, { backgroundColor: soft }]}><Icon size={22} color={tint} /></View>
@@ -603,7 +633,7 @@ export function HomeScreen() {
                       <Text numberOfLines={1} style={styles.cardTitle}>{student.name}</Text>
                       <StatusBadge label={student.status} />
                     </View>
-                    <Text numberOfLines={1} style={styles.muted}>{student.course} · {student.completedSessions != null && student.totalSessions != null ? `${student.completedSessions}/${student.totalSessions} buổi` : '— buổi'}</Text>
+                    <Text numberOfLines={1} style={styles.muted}>{student.course} · {student.completedSessions != null && student.totalSessions != null ? `${student.completedSessions}/${student.totalSessions} buổi` : '- buổi'}</Text>
                     {student.progress != null ? <ProgressBar value={student.progress} /> : null}
                   </View>
                 </Card>
@@ -676,71 +706,131 @@ export function HomeScreen() {
 
           <View style={isWide ? styles.studentGridWide : styles.studentGridStack}>
             <View style={isWide ? styles.studentColLeft : styles.studentColStack}>
-              <DailyPracticeOverviewCard
-                stats={practiceStats || null}
-                pathTopic={pathData?.topics?.[0] || null}
-                onBuyXp={() => navigation?.navigate('DailyPractice')}
-              />
+              {/* Lịch học hôm nay */}
               <Card style={styles.ovCard}>
                 <View style={styles.ovHeadRow}>
-                  <BookOpen size={18} color={colors.brand} />
-                  <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
-                </View>
-                <CompactCoursePicker items={coursePickerItems} activeName={currentCourse} onChange={setSelectedCourse} showProgress={false} />
-                {coursePickerItems.length <= 1 ? (
-                  <Text numberOfLines={2} style={styles.ovCourseName}>{currentCourse || 'Chưa có khóa học'}</Text>
-                ) : null}
-                {!freePortalCourse ? (
-                  <>
-                    <ProgressBar
-                      value={
-                        isVideoCourse
-                          ? (videoTotal > 0 ? Math.round((videoDone / videoTotal) * 100) : 0)
-                          : (studentProgress ?? 0)
-                      }
-                    />
-                    <Text style={styles.ovCourseMeta}>
-                      {(isVideoCourse
-                        ? [
-                            videoTotal > 0 ? `${videoDone}/${videoTotal} bài · ${Math.round((videoDone / videoTotal) * 100)}%` : 'Khóa video tự học',
-                            videoTotal > 0 ? `Còn ${Math.max(0, videoTotal - videoDone)} bài` : '',
-                          ]
-                        : [
-                            sessionCountsAvailable ? `${completedSessions}/${totalSessions} buổi · ${studentProgress ?? 0}%` : '',
-                            sessionCountsAvailable ? `Còn ${Math.max(0, (totalSessions || 0) - (completedSessions || 0))} buổi` : '',
-                            (currentEnrollment?.avgGrade ?? user?.avgGrade) != null ? `Điểm TB ${currentEnrollment?.avgGrade ?? user?.avgGrade}/10` : '',
-                            currentEnrollment?.teacherName ? `GV: ${currentEnrollment.teacherName}` : '',
-                          ]
-                      ).filter(Boolean).join('  ·  ') || 'Tiến độ sẽ cập nhật sau buổi học đầu tiên.'}
-                    </Text>
-                    <View style={styles.ovButtonRow}>
-                      {isVideoCourse ? (
-                        <Pressable
-                          onPress={() => tabNavigation.navigate('CourseVideos')}
-                          style={styles.ovPrimary}
-                          accessibilityRole="button"
-                        >
-                          <Video size={15} color="#FFFFFF" />
-                          <Text style={styles.ovPrimaryText}>
-                            {videoNextSubject ? `Học tiếp: ${videoNextSubject.name}` : 'Vào học'}
-                          </Text>
-                        </Pressable>
-                      ) : (
-                        <>
-                          <Pressable onPress={() => tabNavigation.navigate('CourseVideos')} style={styles.ovPrimary} accessibilityRole="button">
-                            <Video size={15} color="#FFFFFF" />
-                            <Text style={styles.ovPrimaryText}>Vào bài học</Text>
-                          </Pressable>
-                          <Pressable onPress={() => tabNavigation.navigate('Schedule')} style={styles.ovSecondary} accessibilityRole="button">
-                            <Calendar size={15} color={colors.ink} />
-                            <Text style={styles.ovSecondaryText}>Lịch học</Text>
-                          </Pressable>
-                        </>
-                      )}
+                  <Calendar size={18} color={colors.brand} />
+                  <Text style={[styles.ovTitle, styles.flex]}>Lịch học hôm nay</Text>
+                  {todayMobileClasses.some((c) => c.live) ? (
+                    <View style={styles.todayLiveBadge}>
+                      <Text style={styles.todayLiveBadgeText}>Đang diễn ra</Text>
                     </View>
-                  </>
-                ) : null}
+                  ) : null}
+                </View>
+
+                {todayMobileClasses.length > 0 ? (
+                  <View style={{ gap: 10 }}>
+                    {todayMobileClasses.map((item) => (
+                      <View key={item.id} style={[styles.todayClassBox, item.live && styles.todayClassBoxLive]}>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <Text style={styles.todayClassTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+                          <View style={styles.todayClassMetaRow}>
+                            <Clock size={13} color="#64748B" />
+                            <Text style={styles.todayClassMetaText}>{item.time}</Text>
+                            <Text style={styles.todayClassMetaDot}>·</Text>
+                            <Calendar size={13} color="#64748B" />
+                            <Text style={styles.todayClassMetaText}>{item.dateLabel}</Text>
+                          </View>
+                          {item.teacher ? (
+                            <Text style={styles.todayClassTeacherText}>GV: {item.teacher}</Text>
+                          ) : null}
+                        </View>
+
+                        {item.meetLink ? (
+                          <Pressable
+                            onPress={() => Linking.openURL(item.meetLink)}
+                            style={styles.todayJoinBtn}
+                            accessibilityRole="button"
+                          >
+                            <Video size={14} color="#FFFFFF" />
+                            <Text style={styles.todayJoinBtnText}>Vào Meet</Text>
+                          </Pressable>
+                        ) : (
+                          <View style={styles.todayNoLinkBadge}>
+                            <Text style={styles.todayNoLinkText}>Chưa có link</Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.todayEmptyBox}>
+                    <Calendar size={24} color="#94A3B8" />
+                    <Text style={styles.todayEmptyTitle}>Hôm nay không có lịch</Text>
+                    {firstSchedule ? (
+                      <Text style={styles.todayEmptySub}>
+                        Lịch tới: {firstSchedule.title || 'Buổi học'} · {firstSchedule.time} ({firstSchedule.dateLabel})
+                      </Text>
+                    ) : nextMeet ? (
+                      <Text style={styles.todayEmptySub}>
+                        Lịch Meet tới: {nextMeet.slotLabel || 'Lớp Meet'} · {nextMeet.startTime}–{nextMeet.endTime} ({nextMeet.dayLabel})
+                      </Text>
+                    ) : (
+                      <Text style={styles.todayEmptySub}>Hãy dành thời gian tự luyện tập hằng ngày nhé!</Text>
+                    )}
+                  </View>
+                )}
               </Card>
+              {!freePortalCourse && Boolean(currentCourse) ? (
+                <Card style={styles.ovCard}>
+                  <View style={styles.ovHeadRow}>
+                    <BookOpen size={18} color={colors.brand} />
+                    <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
+                  </View>
+                  <CompactCoursePicker items={coursePickerItems} activeName={currentCourse} onChange={setSelectedCourse} showProgress={false} />
+                  {coursePickerItems.length <= 1 ? (
+                    <Text numberOfLines={2} style={styles.ovCourseName}>{currentCourse || 'Chưa có khóa học'}</Text>
+                  ) : null}
+                  <ProgressBar
+                    value={
+                      isVideoCourse
+                        ? (videoTotal > 0 ? Math.round((videoDone / videoTotal) * 100) : 0)
+                        : (studentProgress ?? 0)
+                    }
+                  />
+                  <Text style={styles.ovCourseMeta}>
+                    {(isVideoCourse
+                      ? [
+                        videoTotal > 0 ? `${videoDone}/${videoTotal} bài · ${Math.round((videoDone / videoTotal) * 100)}%` : 'Khóa video tự học',
+                        videoTotal > 0 ? `Còn ${Math.max(0, videoTotal - videoDone)} bài` : '',
+                      ]
+                      : [
+                        sessionCountsAvailable ? `${completedSessions}/${totalSessions} buổi · ${studentProgress ?? 0}%` : '',
+                        sessionCountsAvailable ? `Còn ${Math.max(0, (totalSessions || 0) - (completedSessions || 0))} buổi` : '',
+                        (currentEnrollment?.avgGrade ?? user?.avgGrade) != null ? `Điểm TB ${currentEnrollment?.avgGrade ?? user?.avgGrade}/10` : '',
+                        currentEnrollment?.teacherName ? `GV: ${currentEnrollment.teacherName}` : '',
+                      ]
+                    ).filter(Boolean).join('  ·  ') || 'Tiến độ sẽ cập nhật sau buổi học đầu tiên.'}
+                  </Text>
+                  <View style={styles.ovButtonRow}>
+                    {isVideoCourse ? (
+                      <Pressable
+                        onPress={() => tabNavigation.navigate('CourseVideos')}
+                        style={styles.ovPrimary}
+                        accessibilityRole="button"
+                      >
+                        <Video size={15} color="#FFFFFF" />
+                        <Text style={styles.ovPrimaryText}>
+                          {videoNextSubject ? `Học tiếp: ${videoNextSubject.name}` : 'Vào học'}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <>
+                        <Pressable onPress={() => tabNavigation.navigate('CourseVideos')} style={styles.ovPrimary} accessibilityRole="button">
+                          <Video size={15} color="#FFFFFF" />
+                          <Text style={styles.ovPrimaryText}>Vào bài học</Text>
+                        </Pressable>
+                        <Pressable onPress={() => tabNavigation.navigate('Schedule')} style={styles.ovSecondary} accessibilityRole="button">
+                          <Calendar size={15} color={colors.ink} />
+                          <Text style={styles.ovSecondaryText}>Lịch học</Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                </Card>
+              ) : null}
 
               <Card style={styles.ovCard}>
                 <View style={styles.ovHeadRow}>
@@ -752,36 +842,42 @@ export function HomeScreen() {
                   : <OverviewDoneBox title="Hôm nay bạn đã hoàn thành hết việc!" text="Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ." />}
               </Card>
 
-              <Card style={styles.ovCard}>
-                <View style={styles.ovHeadRow}>
-                  <ClipboardList size={18} color="#059669" />
-                  <Text style={[styles.ovTitle, styles.flex]}>Hoạt động gần đây</Text>
-                  <Pressable
-                    onPress={() => {
-                      if (!freeMenu) tabNavigation.navigate('Schedule');
-                      else navigation?.navigate('Grades');
-                    }}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.ovLink}>{freeMenu ? 'Xem tất cả' : 'Xem nhật ký đầy đủ'}</Text>
-                  </Pressable>
-                </View>
-                {assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
-                  ? <Text style={styles.muted}>Đang tải…</Text>
-                  : gradeEntries.length ? gradeEntries.slice(0, 5).map((item) => (
-                    <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
-                      <Text style={styles.gradeRowTitle}>{item.note}</Text>
-                      <Text style={styles.gradeRowMeta}>{item.date}{item.grade == null ? '' : `  ·  Điểm: ${item.grade}`}</Text>
-                    </View>
-                  )) : <Text style={styles.muted}>Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</Text>}
-              </Card>
+              <DailyPracticeOverviewCard
+                stats={practiceStats || null}
+                pathTopic={pathData?.topics?.[0] || null}
+              />
+
+              {/* Hoạt động gần đây - Đã ẩn trên Web và Mobile theo yêu cầu */}
+              {false && (
+                <Card style={styles.ovCard}>
+                  <View style={styles.ovHeadRow}>
+                    <ClipboardList size={18} color="#059669" />
+                    <Text style={[styles.ovTitle, styles.flex]}>Hoạt động gần đây</Text>
+                    <Pressable
+                      onPress={() => {
+                        if (!freeMenu) tabNavigation.navigate('Schedule');
+                        else navigation?.navigate('Grades');
+                      }}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.ovLink}>{freeMenu ? 'Xem tất cả' : 'Xem nhật ký đầy đủ'}</Text>
+                    </Pressable>
+                  </View>
+                  {assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
+                    ? <Text style={styles.muted}>Đang tải…</Text>
+                    : gradeEntries.length ? gradeEntries.slice(0, 5).map((item) => (
+                      <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
+                        <Text style={styles.gradeRowTitle}>{item.note}</Text>
+                        <Text style={styles.gradeRowMeta}>{item.date}{item.grade == null ? '' : `  ·  Điểm: ${item.grade}`}</Text>
+                      </View>
+                    )) : <Text style={styles.muted}>Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</Text>}
+                </Card>
+              )}
             </View>
 
             {!user?.previewMode ? (
               <View style={isWide ? styles.studentColRight : styles.studentColStack}>
-                <LmsProgressCard />
-                <LearningGoalCard />
-                <LearningLeaderboardCard />
+                <LmsGoalMergedCard />
               </View>
             ) : null}
           </View>
@@ -801,7 +897,7 @@ type OverviewTask = {
   onPress: () => void;
 };
 
-/** Một dòng "việc cần làm" — bấm là tới đúng việc (mở bài tập, điểm danh ca…). */
+/** Một dòng "việc cần làm" - bấm là tới đúng việc (mở bài tập, điểm danh ca…). */
 function OverviewTaskRow({ icon: Icon, tone, title, sub, cta, onPress }: Omit<OverviewTask, 'key'>) {
   return (
     <Pressable onPress={onPress} style={styles.ovTask} accessibilityRole="button" accessibilityLabel={`${title}. ${cta}`}>
@@ -851,6 +947,22 @@ function formatCurrency(value: number) {
 }
 
 const styles = StyleSheet.create({
+  todayLiveBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: '#A7F3D0' },
+  todayLiveBadgeText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  todayClassBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: '#F8FAFC' },
+  todayClassBoxLive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  todayClassTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  todayClassMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  todayClassMetaText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  todayClassMetaDot: { color: colors.muted, fontSize: 12 },
+  todayClassTeacherText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  todayJoinBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, backgroundColor: '#2563EB', paddingHorizontal: 12, paddingVertical: 8 },
+  todayJoinBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  todayNoLinkBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
+  todayNoLinkText: { color: '#B45309', fontSize: 11, fontWeight: '700' },
+  todayEmptyBox: { alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 18, paddingHorizontal: spacing.md, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.line, backgroundColor: '#F8FAFC' },
+  todayEmptyTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  todayEmptySub: { color: colors.muted, fontSize: 12, textAlign: 'center', fontWeight: '500' },
   ovCard: { gap: spacing.sm },
   ovHeadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   ovTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
@@ -865,12 +977,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 10, borderRadius: 14,
     borderWidth: 1, borderColor: colors.line, backgroundColor: '#F8FAFC',
   },
-  meetCardLive: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  meetCardLive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   meetIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   meetDayLabel: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  meetDayLabelLive: { color: '#DC2626', fontWeight: '800' },
+  meetDayLabelLive: { color: colors.brand, fontWeight: '800' },
   meetJoinBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, backgroundColor: '#DC2626',
+    flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, backgroundColor: colors.brand,
     paddingHorizontal: 10, paddingVertical: 7,
   },
   meetJoinText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
@@ -890,7 +1002,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: 10, borderRadius: 14,
     borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
   },
-  ovSessionLive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  ovSessionLive: { backgroundColor: colors.brand, borderColor: colors.brand },
   ovSessionLiveText: { color: '#FFFFFF' },
   ovSessionTime: { width: 48, color: colors.brand, fontSize: 13, fontWeight: '900' },
   ovSessionBadge: { fontSize: 12, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
@@ -996,7 +1108,7 @@ const styles = StyleSheet.create({
   scheduleTodo: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   messagesTodo: { backgroundColor: '#FAF5FF', borderColor: '#E9D5FF' },
   todoCardIcon: { width: 36, height: 36, flexShrink: 0, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
-  todoBadge: { position: 'absolute', top: -7, right: -8, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, textAlign: 'center', overflow: 'hidden', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: typography.micro, lineHeight: 20, fontWeight: '900', borderWidth: 2, borderColor: '#FFFFFF' },
+  todoBadge: { position: 'absolute', top: -7, right: -8, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, textAlign: 'center', overflow: 'hidden', backgroundColor: colors.brand, color: '#FFFFFF', fontSize: typography.micro, lineHeight: 20, fontWeight: '900', borderWidth: 2, borderColor: '#FFFFFF' },
   quizTodoIcon: { backgroundColor: '#E11D48' },
   homeworkTodoIcon: { backgroundColor: '#F97316' },
   scheduleTodoIcon: { backgroundColor: '#3B82F6' },

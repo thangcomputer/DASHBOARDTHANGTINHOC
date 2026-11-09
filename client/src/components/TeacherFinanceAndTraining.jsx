@@ -48,9 +48,9 @@ const CircularProgress = ({ progress }) => {
       </svg>
       <div className="absolute inset-0 flex items-center justify-center flex-col">
         {progress === 100 ? (
-           <CheckCircle2 size={32} className="text-green-500 drop-shadow-sm" />
+          <CheckCircle2 size={32} className="text-green-500 drop-shadow-sm" />
         ) : (
-           <span className="text-xl font-black text-gray-800 tracking-tighter">{progress}%</span>
+          <span className="text-xl font-black text-gray-800 tracking-tighter">{progress}%</span>
         )}
       </div>
     </div>
@@ -198,7 +198,7 @@ const TeacherFinanceAndTraining = () => {
 
       const rows = [
         [`BẢNG KÊ THU NHẬP ${monthTitle.toUpperCase()}`],
-        [`Giảng viên: ${teacherName || '—'}`],
+        [`Giảng viên: ${teacherName || '-'}`],
         [],
         ['Học viên', 'Khóa học', 'Ngày dạy', 'Buổi số', 'Tiền/buổi (VNĐ)'],
       ];
@@ -208,8 +208,8 @@ const TeacherFinanceAndTraining = () => {
           rows.push([
             student.name,
             session.course,
-            session.date ? new Date(`${session.date.slice(0, 10)}T12:00:00`).toLocaleDateString('vi-VN') : '—',
-            session.number || '—',
+            session.date ? new Date(`${session.date.slice(0, 10)}T12:00:00`).toLocaleDateString('vi-VN') : '-',
+            session.number || '-',
             session.amount,
           ]);
         });
@@ -277,8 +277,8 @@ const TeacherFinanceAndTraining = () => {
         date: new Date().toLocaleDateString('vi-VN'),
         createdAt: new Date().toISOString(),
         note: sessions > 0
-          ? `Hoa hồng ${sessions} buổi dạy đã hoàn thành — chờ Admin chuyển`
-          : 'Hoa hồng buổi dạy đã hoàn thành — chờ Admin chuyển',
+          ? `Hoa hồng ${sessions} buổi dạy đã hoàn thành - chờ Admin chuyển`
+          : 'Hoa hồng buổi dạy đã hoàn thành - chờ Admin chuyển',
         _synthetic: true,
       });
     }
@@ -295,8 +295,8 @@ const TeacherFinanceAndTraining = () => {
   const chartData = useMemo(() => {
     const dataObj = {};
     myPayments.filter((p) => isPaidTxStatus(p.status)).forEach((p) => {
-        const key = p.month || 'Không rõ';
-        dataObj[key] = (dataObj[key] || 0) + (p.amount || 0);
+      const key = p.month || 'Không rõ';
+      dataObj[key] = (dataObj[key] || 0) + (p.amount || 0);
     });
     const arr = Object.entries(dataObj).map(([month, amount]) => ({ month, amount }));
     return arr.sort((a, b) => sortFinanceMonths(a.month, b.month));
@@ -336,7 +336,7 @@ const TeacherFinanceAndTraining = () => {
               <p role="status" className="text-xs font-medium text-slate-400">Đang tải dữ liệu tài chính…</p>
             ) : null}
 
-            {/* Stat Cards — Fintech soft cards */}
+            {/* Stat Cards - Fintech soft cards */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="col-span-2 bg-white shadow-sm border border-emerald-100 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -363,8 +363,8 @@ const TeacherFinanceAndTraining = () => {
               <div className="bg-white shadow-sm border border-slate-100 rounded-2xl p-4">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex min-w-0 items-center gap-2">
-                  <CalendarIcon size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
-                  <p className="text-slate-500 text-[10px] tracking-wider font-semibold">Tổng buổi đã dạy</p>
+                    <CalendarIcon size={16} className="text-rose-500 shrink-0" aria-hidden="true" />
+                    <p className="text-slate-500 text-[10px] tracking-wider font-semibold">Tổng buổi đã dạy</p>
                   </div>
                   <button
                     type="button"
@@ -389,32 +389,32 @@ const TeacherFinanceAndTraining = () => {
 
             {/* Báo cáo & Biểu đồ */}
             <div>
-               <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
-                  <div className="flex items-center gap-2 mb-3">
-                     <BarChart className="text-blue-600 shrink-0" size={18} aria-hidden="true" />
-                     <h3 className="text-sm sm:text-base font-extrabold text-slate-800  tracking-tight">Biểu đồ thu nhập</h3>
-                  </div>
-                  <div className="min-h-[136px] h-[136px] w-full flex items-end justify-start gap-4 sm:gap-6 md:gap-8 mt-1 pb-7 border-b border-dashed border-slate-200 px-1 sm:px-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200">
-                     {chartData.length > 0 ? chartData.map((d, i) => (
-                         <div key={i} className="w-14 sm:w-16 md:w-20 flex-shrink-0 flex flex-col items-center justify-end h-full gap-2 group relative">
-                             <span className="max-w-full truncate text-[9px] sm:text-[10px] font-bold text-slate-500 tabular-nums">
-                               {d.amount.toLocaleString('vi-VN')}đ
-                             </span>
-                             <div className="w-8 sm:w-9 bg-indigo-600 rounded-t-lg transition-all duration-700 ease-out group-hover:bg-indigo-500"
-                                  style={{ height: `${(d.amount / maxAmount) * 75}%`, minHeight: '8%' }}
-                                  title={`${d.month}: ${d.amount.toLocaleString('vi-VN')}đ`} />
-                             <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 absolute -bottom-8 truncate w-full text-center tracking-tight">
-                                {d.month.replace('Tháng ', 'T')}
-                             </span>
-                         </div>
-                     )) : (
-                         <div className="w-full min-h-[100px] h-full flex flex-col items-center justify-center text-sm text-slate-400 font-medium gap-1.5">
-                           <BarChart size={22} className="text-slate-300" aria-hidden="true" />
-                           Chưa có dữ liệu thống kê
-                         </div>
-                     )}
-                  </div>
-               </div>
+              <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <BarChart className="text-blue-600 shrink-0" size={18} aria-hidden="true" />
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-800  tracking-tight">Biểu đồ thu nhập</h3>
+                </div>
+                <div className="min-h-[136px] h-[136px] w-full flex items-end justify-start gap-4 sm:gap-6 md:gap-8 mt-1 pb-7 border-b border-dashed border-slate-200 px-1 sm:px-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200">
+                  {chartData.length > 0 ? chartData.map((d, i) => (
+                    <div key={i} className="w-14 sm:w-16 md:w-20 flex-shrink-0 flex flex-col items-center justify-end h-full gap-2 group relative">
+                      <span className="max-w-full truncate text-[9px] sm:text-[10px] font-bold text-slate-500 tabular-nums">
+                        {d.amount.toLocaleString('vi-VN')}đ
+                      </span>
+                      <div className="w-8 sm:w-9 bg-indigo-600 rounded-t-lg transition-all duration-700 ease-out group-hover:bg-indigo-500"
+                        style={{ height: `${(d.amount / maxAmount) * 75}%`, minHeight: '8%' }}
+                        title={`${d.month}: ${d.amount.toLocaleString('vi-VN')}đ`} />
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 absolute -bottom-8 truncate w-full text-center tracking-tight">
+                        {d.month.replace('Tháng ', 'T')}
+                      </span>
+                    </div>
+                  )) : (
+                    <div className="w-full min-h-[100px] h-full flex flex-col items-center justify-center text-sm text-slate-400 font-medium gap-1.5">
+                      <BarChart size={22} className="text-slate-300" aria-hidden="true" />
+                      Chưa có dữ liệu thống kê
+                    </div>
+                  )}
+                </div>
+              </div>
 
             </div>
 
@@ -431,11 +431,10 @@ const TeacherFinanceAndTraining = () => {
                     { key: 'pending', label: 'Chưa nhận' },
                   ].map(f => (
                     <button key={f.key} type="button" onClick={() => setFilterStatus(f.key)}
-                      className={`min-h-9 flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                        filterStatus === f.key
+                      className={`min-h-9 flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${filterStatus === f.key
                           ? 'bg-white text-slate-800 shadow-sm'
                           : 'text-slate-500 hover:text-slate-700'
-                      }`}>
+                        }`}>
                       {f.label}
                     </button>
                   ))}
@@ -477,13 +476,12 @@ const TeacherFinanceAndTraining = () => {
                           return (
                             <div
                               key={paymentId}
-                              className={`rounded-2xl border transition-all ${
-                                isCancelledTxStatus(p.status)
+                              className={`rounded-2xl border transition-all ${isCancelledTxStatus(p.status)
                                   ? 'border-slate-200 bg-slate-50'
                                   : isPendingTxStatus(p.status)
                                     ? 'border-amber-200 bg-amber-50/40'
                                     : 'border-emerald-200 bg-emerald-50'
-                              }`}
+                                }`}
                             >
                               <div className="px-2.5 py-2.5">
                                 <div className="flex items-start justify-between gap-3">
@@ -614,119 +612,119 @@ const TeacherFinanceAndTraining = () => {
         ) : activeCourse ? (
           /* ════════ CHI TIẾT KHÓA HỌC (TABS) ════════ */
           <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
-             {/* Header */}
-             <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                   <button onClick={() => setActiveCourse(null)} className="text-slate-400 hover:text-slate-700 text-sm font-bold flex items-center gap-1 mb-2 transition-colors">
-                     <NavArrow size={16} direction="back" className="text-slate-400" />
-                     Quay lại danh sách
-                   </button>
-                   <h2 className="text-2xl font-black text-slate-800 tracking-tight">{activeCourse.title}</h2>
+            {/* Header */}
+            <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <button onClick={() => setActiveCourse(null)} className="text-slate-400 hover:text-slate-700 text-sm font-bold flex items-center gap-1 mb-2 transition-colors">
+                  <NavArrow size={16} direction="back" className="text-slate-400" />
+                  Quay lại danh sách
+                </button>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">{activeCourse.title}</h2>
+              </div>
+              <CircularProgress progress={activeCourse.progress} />
+            </div>
+
+            {/* TabsMenu */}
+            <div className="flex px-8 border-b border-slate-100 bg-white">
+              <button onClick={() => setCourseTab('video')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'video' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
+                <Video size={14} className="inline mr-2" />  Bài giảng video
+              </button>
+              <button onClick={() => setCourseTab('data')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'data' ? 'text-green-600 border-green-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
+                <FileBox size={14} className="inline mr-2" />  Tài liệu của khóa
+              </button>
+              <button onClick={() => setCourseTab('notice')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'notice' ? 'text-orange-600 border-orange-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
+                <AlertCircle size={14} className="inline mr-2" />  Thông báo từ qu?N tr? Vi?N
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-8 flex-1 bg-slate-50/50">
+              {courseTab === 'video' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-xl ring-1 ring-slate-200">
+                      {(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0])?.url ? (
+                        <iframe
+                          src={(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0]).url}
+                          className="w-full h-full"
+                          allowFullScreen
+                          title={(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0]).title}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold">Chưa có video bài giảng nào</div>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-800">
+                        {(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0])?.title || 'Bài giảng đang được cập nhật'}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="lg:col-span-1 border border-slate-100 bg-white rounded-2xl overflow-hidden self-start">
+                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+                      <h4 className="font-bold text-slate-700 text-sm">Danh sách bài học</h4>
+                    </div>
+                    <div className="divide-y divide-slate-50 max-h-[400px] overflow-y-auto">
+                      {(activeCourse.videos || []).map((vid, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setActiveVideoIndex(idx)}
+                          className={`w-full text-left px-5 py-4 hover:bg-blue-50 transition-colors group flex gap-3 ${activeVideoIndex === idx ? 'bg-blue-50' : ''}`}
+                        >
+                          <div className="text-slate-300 font-black mt-0.5 group-hover:text-blue-400">{String(idx + 1).padStart(2, '0')}</div>
+                          <div>
+                            <p className="font-semibold text-slate-700 text-sm group-hover:text-blue-700 line-clamp-2 leading-snug">{vid.title}</p>
+                            <p className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center gap-1"><Clock size={10} /> {vid.duration}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <CircularProgress progress={activeCourse.progress} />
-             </div>
+              )}
 
-             {/* TabsMenu */}
-             <div className="flex px-8 border-b border-slate-100 bg-white">
-                <button onClick={() => setCourseTab('video')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'video' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                  <Video size={14} className="inline mr-2" />  Bài giảng video
-                </button>
-                <button onClick={() => setCourseTab('data')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'data' ? 'text-green-600 border-green-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                  <FileBox size={14} className="inline mr-2" />  Tài liệu của khóa
-                </button>
-                <button onClick={() => setCourseTab('notice')} className={`px-6 py-4 text-xs font-black  tracking-widest border-b-2 transition-all ${courseTab === 'notice' ? 'text-orange-600 border-orange-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}>
-                  <AlertCircle size={14} className="inline mr-2" />  Thông báo từ qu?N tr? Vi?N
-                </button>
-             </div>
-
-             {/* Tab Content */}
-             <div className="p-8 flex-1 bg-slate-50/50">
-               {courseTab === 'video' && (
-                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-4">
-                       <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-xl ring-1 ring-slate-200">
-                          {(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0])?.url ? (
-                            <iframe
-                              src={(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0]).url}
-                              className="w-full h-full"
-                              allowFullScreen
-                              title={(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0]).title}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold">Chưa có video bài giảng nào</div>
-                          )}
-                       </div>
-                       <div>
-                         <h3 className="text-xl font-bold text-slate-800">
-                           {(activeCourse.videos[activeVideoIndex] || activeCourse.videos[0])?.title || 'Bài giảng đang được cập nhật'}
-                         </h3>
-                       </div>
-                    </div>
-                    <div className="lg:col-span-1 border border-slate-100 bg-white rounded-2xl overflow-hidden self-start">
-                       <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
-                         <h4 className="font-bold text-slate-700 text-sm">Danh sách bài học</h4>
-                       </div>
-                       <div className="divide-y divide-slate-50 max-h-[400px] overflow-y-auto">
-                         {(activeCourse.videos || []).map((vid, idx) => (
-                           <button
-                             key={idx}
-                             type="button"
-                             onClick={() => setActiveVideoIndex(idx)}
-                             className={`w-full text-left px-5 py-4 hover:bg-blue-50 transition-colors group flex gap-3 ${activeVideoIndex === idx ? 'bg-blue-50' : ''}`}
-                           >
-                              <div className="text-slate-300 font-black mt-0.5 group-hover:text-blue-400">{String(idx + 1).padStart(2, '0')}</div>
-                              <div>
-                                <p className="font-semibold text-slate-700 text-sm group-hover:text-blue-700 line-clamp-2 leading-snug">{vid.title}</p>
-                                <p className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center gap-1"><Clock size={10} /> {vid.duration}</p>
-                              </div>
-                           </button>
-                         ))}
-                       </div>
-                    </div>
-                 </div>
-               )}
-
-               {courseTab === 'data' && (
-                 <div className="max-w-4xl mx-auto space-y-4">
-                    {(activeCourse.files || []).length === 0 ? (
-                      <div className="text-center py-12 text-slate-400 font-bold bg-white rounded-2xl border border-dashed border-slate-200">Khóa học này chưa có tài liệu đính kèm.</div>
-                    ) : (
-                      activeCourse.files.map((file, idx) => (
-                        <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:border-green-200 transition-colors">
-                           <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${file.type === 'PDF' ? 'bg-red-500' : file.type === 'DOCX' ? 'bg-red-500' : 'bg-green-500'}`}>{file.type}</div>
-                              <div>
-                                <h4 className="font-bold text-slate-700">{file.title}</h4>
-                                <p className="text-xs text-slate-400 mt-1 font-semibold">{file.size}</p>
-                              </div>
-                           </div>
-                           {file.url ? (
-                             <a href={file.url} target="_blank" rel="noreferrer" className="px-5 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors">
-                               <Download size={14} /> Tải file
-                             </a>
-                           ) : (
-                             <span className="px-5 py-2.5 text-xs text-slate-400 font-bold">Chưa có link</span>
-                           )}
+              {courseTab === 'data' && (
+                <div className="max-w-4xl mx-auto space-y-4">
+                  {(activeCourse.files || []).length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 font-bold bg-white rounded-2xl border border-dashed border-slate-200">Khóa học này chưa có tài liệu đính kèm.</div>
+                  ) : (
+                    activeCourse.files.map((file, idx) => (
+                      <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:border-green-200 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm ${file.type === 'PDF' ? 'bg-red-500' : file.type === 'DOCX' ? 'bg-red-500' : 'bg-green-500'}`}>{file.type}</div>
+                          <div>
+                            <h4 className="font-bold text-slate-700">{file.title}</h4>
+                            <p className="text-xs text-slate-400 mt-1 font-semibold">{file.size}</p>
+                          </div>
                         </div>
-                      ))
-                    )}
-                 </div>
-               )}
+                        {file.url ? (
+                          <a href={file.url} target="_blank" rel="noreferrer" className="px-5 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors">
+                            <Download size={14} /> Tải file
+                          </a>
+                        ) : (
+                          <span className="px-5 py-2.5 text-xs text-slate-400 font-bold">Chưa có link</span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
-               {courseTab === 'notice' && (
-                 <div className="max-w-4xl mx-auto space-y-4">
-                    {(activeCourse.notices || []).length === 0 ? (
-                      <div className="text-center py-12 text-slate-400 font-bold bg-white rounded-2xl border border-dashed border-slate-200">Chưa có thông báo nào.</div>
-                    ) : (
-                      activeCourse.notices.map((n, idx) => (
-                        <div key={idx} className="bg-orange-50 border-l-4 border-orange-400 p-5 rounded-r-2xl">
-                          <p className="text-sm font-semibold text-orange-900 leading-relaxed">{n}</p>
-                        </div>
-                      ))
-                    )}
-                 </div>
-               )}
-             </div>
+              {courseTab === 'notice' && (
+                <div className="max-w-4xl mx-auto space-y-4">
+                  {(activeCourse.notices || []).length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 font-bold bg-white rounded-2xl border border-dashed border-slate-200">Chưa có thông báo nào.</div>
+                  ) : (
+                    activeCourse.notices.map((n, idx) => (
+                      <div key={idx} className="bg-orange-50 border-l-4 border-orange-400 p-5 rounded-r-2xl">
+                        <p className="text-sm font-semibold text-orange-900 leading-relaxed">{n}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           /* ════════ ĐÀO TẠO TỔNG QUAN (GRID) ════════ */
@@ -749,30 +747,30 @@ const TeacherFinanceAndTraining = () => {
                 <p className="text-xs text-slate-400 mt-1">Admin cần thêm nội dung ở tab Đào tạo GV</p>
               </div>
             ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-               {courses.map(course => (
-                 <div
-                   onClick={() => { setActiveCourse(course); setActiveVideoIndex(0); setCourseTab('video'); }}
-                   key={course.id}
-                   className="bg-white rounded-[2rem] p-8 pb-6 border border-slate-100 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col relative overflow-hidden"
-                 >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {courses.map(course => (
+                  <div
+                    onClick={() => { setActiveCourse(course); setActiveVideoIndex(0); setCourseTab('video'); }}
+                    key={course.id}
+                    className="bg-white rounded-[2rem] p-8 pb-6 border border-slate-100 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col relative overflow-hidden"
+                  >
                     <div className="absolute -top-12 -right-12 w-32 h-32 bg-slate-50 rounded-full group-hover:bg-blue-50 transition-colors pointer-events-none" />
-                    
+
                     <div className="flex-1 flex justify-center py-4 relative z-10">
                       <CircularProgress progress={course.progress || 0} />
                     </div>
-                    
+
                     <div className="mt-4 text-center pb-2 border-b border-dashed border-slate-100 z-10">
                       <h3 className="font-extrabold text-slate-800 text-lg group-hover:text-blue-600 transition-colors line-clamp-2 leading-tight">{course.title}</h3>
                     </div>
 
                     <div className="flex justify-between items-center mt-4 text-slate-400 text-[10px] font-black  tracking-widest z-10">
-                       <span className="flex items-center gap-1"><Video size={14} className="text-blue-400" /> {(course.videos || []).length}  Video</span>
-                       <span className="flex items-center gap-1"><FileBox size={14} className="text-green-400" /> {(course.files || []).length}  Tài liệu</span>
+                      <span className="flex items-center gap-1"><Video size={14} className="text-blue-400" /> {(course.videos || []).length}  Video</span>
+                      <span className="flex items-center gap-1"><FileBox size={14} className="text-green-400" /> {(course.files || []).length}  Tài liệu</span>
                     </div>
-                 </div>
-               ))}
-            </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

@@ -1,4 +1,4 @@
-# Learning SoT — Module 0–10 status (2026-08-13)
+# Learning SoT - Module 0–10 status (2026-08-13)
 
 Order locked: Progress/complete → Sequential lock → Anti-seek FE → Anti-seek BE → Duration sync → Teacher → (later) Q&A → Notification → Player UI polish → Regression.
 
@@ -13,7 +13,7 @@ Order locked: Progress/complete → Sequential lock → Anti-seek FE → Anti-se
 | 4 Anti-seek BE | Done | Fail-closed `ANTI_SEEK_PROGRESS_REQUIRED` + elapsed clamp |
 | 5 Duration sync | Done | `resolveEffectiveDuration(admin, YouTube)` shared FE/BE |
 | 6 Teacher LMS | Done | Same learning path restrictions; Course Builder unchanged |
-| 7 Q&A | Deferred | Still localStorage — do not start until learning SoT verified |
+| 7 Q&A | Deferred | Still localStorage - do not start until learning SoT verified |
 | 8 Notification | Deferred | After Q&A API |
 | 9 Player height | Done | `+40px` Student + Teacher |
 | 10 Regression | Pending | Manual E2E on VPS after deploy |
@@ -28,5 +28,5 @@ Order locked: Progress/complete → Sequential lock → Anti-seek FE → Anti-se
 
 ## Residual risk
 
-- Slow inflate via repeated `save-watch-progress` still possible within elapsed clamp — acceptable Phase-1; harden later if needed.
+- Slow inflate via repeated `save-watch-progress` still possible within elapsed clamp - acceptable Phase-1; harden later if needed.
 - Q&A remains client-only until Modules 7–8.

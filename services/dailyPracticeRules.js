@@ -16,11 +16,11 @@ const TEST_OUT_XP = 40;
 const DAILY_ALLOWANCE_XP = 200;
 /** Tài khoản miễn phí, khi không có gói Meet: mỗi ngày 60 XP. */
 const FREE_PORTAL_DAILY_XP = 60;
-/** Hết XP: phục hồi bằng làm lại nấc đã xong — tối đa XP nhận được mỗi ngày. */
+/** Hết XP: phục hồi bằng làm lại nấc đã xong - tối đa XP nhận được mỗi ngày. */
 const RECOVERY_DAILY_CAP_XP = FREE_PORTAL_DAILY_XP;
 /** Gói Meet còn hạn: mỗi ngày 300 XP. Hết hạn quay về mức tài khoản. */
 const MEET_PLAN_DAILY_XP = 300;
-/** @deprecated tên cũ — cùng mức đặt lại mỗi ngày. */
+/** @deprecated tên cũ - cùng mức đặt lại mỗi ngày. */
 const DAILY_REFILL_XP = DAILY_ALLOWANCE_XP;
 /** % đúng tối thiểu để «đạt» ở Luyện tự do. */
 const FREE_PASS_PERCENT = 60;
@@ -165,7 +165,7 @@ function validateQuestion(input = {}) {
   return doc;
 }
 
-/** Bản câu hỏi gửi cho học viên — không lộ đáp án. */
+/** Bản câu hỏi gửi cho học viên - không lộ đáp án. */
 function publicQuestion(q, rng = Math.random) {
   const view = {
     id: String(q._id),
@@ -422,7 +422,7 @@ function applyXpDelta(profile, delta, source = 'reward') {
  * Trạng thái chuỗi để chọn lời nhắc:
  * - new: chưa từng luyện; active: hôm nay đã luyện;
  * - at_risk: hôm qua có luyện, hôm nay chưa (chuỗi mất lúc nửa đêm);
- * - lost: đã bỏ ít nhất một ngày — lostStreak là chuỗi vừa mất, missedDays là số ngày đã bỏ.
+ * - lost: đã bỏ ít nhất một ngày - lostStreak là chuỗi vừa mất, missedDays là số ngày đã bỏ.
  */
 function streakStatus(profile, today) {
   const last = profile?.lastPlayedDay || '';
@@ -479,7 +479,7 @@ function sessionNetXp(session = {}) {
   return 0;
 }
 
-/** XP «luyện hôm nay» — chỉ cộng phục hồi / lời ròng; hoàn cược lượt cược không tính. */
+/** XP «luyện hôm nay» - chỉ cộng phục hồi / lời ròng; hoàn cược lượt cược không tính. */
 function sessionTodayDisplayXp(session = {}) {
   if (isPracticeXpDisabled(session)) return 0;
   if (session.recovery === true) {

@@ -1,5 +1,5 @@
 /**
- * useInactivityTimer — Tự động đăng xuất sau 60 phút không tương tác
+ * useInactivityTimer - Tự động đăng xuất sau 60 phút không tương tác
  *
  * Theo dõi: mousemove, keydown, click, scroll, touchstart
  * Cảnh báo: 5 phút trước khi hết hạn
@@ -7,17 +7,17 @@
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-const INACTIVITY_LIMIT   = 60 * 60 * 1000; // 60 phút
-const WARNING_BEFORE     =  5 * 60 * 1000; // Cảnh báo trước 5 phút
-const STORAGE_KEY        = 'last_activity_at';
-const EVENTS             = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+const INACTIVITY_LIMIT = 60 * 60 * 1000; // 60 phút
+const WARNING_BEFORE = 5 * 60 * 1000; // Cảnh báo trước 5 phút
+const STORAGE_KEY = 'last_activity_at';
+const EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
 
 export function useInactivityTimer({ onLogout, enabled = true }) {
-  const timerRef      = useRef(null);
-  const warnTimerRef  = useRef(null);
+  const timerRef = useRef(null);
+  const warnTimerRef = useRef(null);
   const [warningVisible, setWarningVisible] = useState(false);
-  const [secondsLeft,    setSecondsLeft]    = useState(0);
-  const countdownRef  = useRef(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const countdownRef = useRef(null);
 
   // ── Lưu timestamp hoạt động gần nhất vào localStorage ──────────────────────
   const resetActivity = useCallback(function resetActivity() {
@@ -26,7 +26,7 @@ export function useInactivityTimer({ onLogout, enabled = true }) {
     setWarningVisible(false);
 
     if (countdownRef.current) clearInterval(countdownRef.current);
-    if (timerRef.current)     clearTimeout(timerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
     if (warnTimerRef.current) clearTimeout(warnTimerRef.current);
 
     if (!enabled) return;
@@ -85,7 +85,7 @@ export function useInactivityTimer({ onLogout, enabled = true }) {
 
     return () => {
       EVENTS.forEach(ev => window.removeEventListener(ev, handler));
-      if (timerRef.current)     clearTimeout(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
       if (warnTimerRef.current) clearTimeout(warnTimerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };

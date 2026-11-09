@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, DeviceEventEmitter, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
@@ -300,7 +300,7 @@ export function EvaluationsScreen() {
           {submittedIds.includes(evaluation.id) ? (
             <View style={styles.evaluationSubmitted}>
               <StatusBadge label="Đã gửi" />
-              {evaluation.public ? <Text style={styles.evaluationRating}>{(submittedStars[evaluation.id] ?? evaluation.existingRating?.stars)?.toFixed(1) || '—'} ★</Text> : null}
+              {evaluation.public ? <Text style={styles.evaluationRating}>{(submittedStars[evaluation.id] ?? evaluation.existingRating?.stars)?.toFixed(1) || '-'} ★</Text> : null}
             </View>
           ) : null}
           {evaluation.public && evaluation.locked ? (
@@ -1578,7 +1578,7 @@ export function NewsDetailScreen() {
       {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
       {news ? <Card>
         <Text style={styles.title}>{news.title}</Text>
-        <Text style={styles.caption}>{news.author || '—'} · {news.publishedAt} · {news.views} lượt xem</Text>
+        <Text style={styles.caption}>{news.author || '-'} · {news.publishedAt} · {news.views} lượt xem</Text>
         {news.excerpt ? <Text style={styles.muted}>{news.excerpt}</Text> : null}
         {news.contentHtml ? (
           <RenderHtml
@@ -1589,7 +1589,7 @@ export function NewsDetailScreen() {
         {news.attachments.map((file) => (
           <Pressable key={file.id} onPress={() => { void openExternalUrl(file.url, file.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={`Mở tệp đính kèm ${file.name}`}>
             <Paperclip size={17} color={colors.brand} />
-            <Text style={styles.newsAttachmentText}>{file.name} · {file.type}</Text><Text style={styles.newsAttachmentAction}>{file.url ? 'Mở' : '—'}</Text>
+            <Text style={styles.newsAttachmentText}>{file.name} · {file.type}</Text><Text style={styles.newsAttachmentAction}>{file.url ? 'Mở' : '-'}</Text>
           </Pressable>
         ))}
       </Card> : null}
@@ -1766,7 +1766,7 @@ export function SoftwareLinksScreen() {
           <Text style={styles.caption}>{item.category}</Text>
           <Text style={styles.body}>{item.description}</Text>
           <Pressable onPress={() => { void openExternalUrl(item.url, item.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}>
-            <Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text>
+            <Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '-'}</Text>
           </Pressable>
         </Card>
       ))}
@@ -2052,7 +2052,7 @@ export function TeacherQuizzesScreen() {
       const localQuiz: DemoQuiz = {
         id: `quiz-${Date.now()}`,
         title: value,
-        courseName: courseName || '—',
+        courseName: courseName || '-',
         timeLimitMinutes: limit,
         startTime: startTime.trim() || undefined,
         deadline: deadline.trim() || 'Không giới hạn',
@@ -2137,7 +2137,7 @@ export function TeacherQuizzesScreen() {
   };
   const handleRecreateQuiz = (quiz: DemoQuiz) => {
     setTitle(`${quiz.title} (Bản sao)`);
-    setCourseName(['Chưa chọn khóa học', '—', 'Tất cả'].includes(quiz.courseName) ? '' : quiz.courseName);
+    setCourseName(['Chưa chọn khóa học', '-', 'Tất cả'].includes(quiz.courseName) ? '' : quiz.courseName);
     setTargetStudentIds(quiz.targetStudentIds || []);
     setTargetAll(!quiz.targetStudentIds?.length);
     setTimeLimit(String(quiz.timeLimitMinutes));
@@ -2602,14 +2602,14 @@ function QuizCard({ quiz, onDelete, onRecreate }: { quiz: DemoQuiz; onDelete: ()
   const scoredSubmissions = quiz.submissions.filter((submission) => Number.isFinite(submission.score));
   const average = scoredSubmissions.length
     ? `${(scoredSubmissions.reduce((sum, submission) => sum + submission.score, 0) / scoredSubmissions.length).toFixed(1)}%`
-    : '—';
+    : '-';
   return (
     <Card>
       <Text style={styles.cardTitle}>{quiz.title}</Text>
       <Text style={styles.muted}>{quiz.courseName}</Text>
       <View style={styles.quizMetricGrid}>
         {[
-          ['Số học viên', quiz.studentCount != null ? String(quiz.studentCount) : '—'],
+          ['Số học viên', quiz.studentCount != null ? String(quiz.studentCount) : '-'],
           ['Thời lượng', `${quiz.timeLimitMinutes} phút`],
           ['Số câu', String(quiz.questions)],
           ['Số bài đã nộp', String(quiz.submissions.length)],
@@ -2632,7 +2632,7 @@ function QuizCard({ quiz, onDelete, onRecreate }: { quiz: DemoQuiz; onDelete: ()
             <Text style={styles.cardTitle}>{submission.studentName}</Text>
             <Text style={styles.metaText}>
               {submission.submittedAt ? `${submission.submittedAt} · ` : ''}
-              {submission.forfeit ? `Thoát giữa giờ${submission.exitReason ? ` · ${submission.exitReason}` : ''}` : `${submission.correctCount ?? '—'}/${submission.totalQuestions ?? quiz.questions} câu đúng`}
+              {submission.forfeit ? `Thoát giữa giờ${submission.exitReason ? ` · ${submission.exitReason}` : ''}` : `${submission.correctCount ?? '-'}/${submission.totalQuestions ?? quiz.questions} câu đúng`}
             </Text>
           </View>
           <View style={styles.gradeResult}>
@@ -2691,7 +2691,7 @@ export function TeacherTrainingScreen() {
         <>
           {softwareLinks.map((item) => <Card key={item.id}>
             <Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.metaText}>{item.category}</Text><Text style={styles.muted}>{item.description}</Text>
-            <Pressable onPress={() => { void openExternalUrl(item.url, item.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}><Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '—'}</Text></Pressable>
+            <Pressable onPress={() => { void openExternalUrl(item.url, item.name); }} style={styles.newsAttachment} accessibilityRole="button" accessibilityLabel={item.url ? `Mở phần mềm ${item.name}` : `Liên kết phần mềm ${item.name} chưa có`}><Text style={styles.newsAttachmentText}>{item.url ? 'Mở phần mềm' : 'Liên kết chưa có'}</Text><Text style={styles.newsAttachmentAction}>{item.url ? 'Mở' : '-'}</Text></Pressable>
           </Card>)}
           {!resource.loading && !resource.error && !softwareLinks.length ? <EmptyState title="Chưa có phần mềm" message="Chưa có phần mềm nào được giao." /> : null}
         </>
@@ -2957,7 +2957,7 @@ export function TuitionScreen() {
   return (
     <AppScreen>
       <AppHeader title="Học phí theo khóa" subtitle="Thông tin học phí trên hồ sơ học viên" showBackButton={false} centered />
-      {profileResource.data?.qaFixture ? <Text style={styles.note}>QA fixture — dữ liệu minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
+      {profileResource.data?.qaFixture ? <Text style={styles.note}>QA fixture - dữ liệu minh họa, không phải dữ liệu tài khoản thật.</Text> : null}
       {profileResource.loading ? <LoadingSkeleton /> : null}
       {profileResource.error ? <ErrorState onRetry={profileResource.reload} /> : null}
       {paymentResource.loading ? <LoadingSkeleton /> : null}
@@ -2989,9 +2989,9 @@ export function TuitionScreen() {
         return <Card key={enrollment.id}>
           <Text style={styles.cardTitle}>{enrollment.courseName}</Text>
           <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Trạng thái khóa học</Text><StatusBadge label={enrollment.status} /></View>
-          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Học phí</Text><Text style={styles.infoValue}>{amount != null ? formatCurrency(amount) : '—'}</Text></View>
-          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Đã thanh toán</Text><Text style={styles.infoValue}>{paidAmount != null ? formatCurrency(paidAmount) : '—'}</Text></View>
-          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Còn lại</Text><Text style={styles.infoValue}>{remaining != null ? formatCurrency(remaining) : '—'}</Text></View>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Học phí</Text><Text style={styles.infoValue}>{amount != null ? formatCurrency(amount) : '-'}</Text></View>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Đã thanh toán</Text><Text style={styles.infoValue}>{paidAmount != null ? formatCurrency(paidAmount) : '-'}</Text></View>
+          <View style={styles.tuitionAmountRow}><Text style={styles.metaText}>Còn lại</Text><Text style={styles.infoValue}>{remaining != null ? formatCurrency(remaining) : '-'}</Text></View>
         </Card>
       }) : null}
       {!profileResource.loading && !profileResource.error && !enrollments.length ? <EmptyState title="Chưa có khóa học" message="Thông tin học phí sẽ xuất hiện theo khóa học." /> : null}

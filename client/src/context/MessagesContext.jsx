@@ -1,5 +1,5 @@
 /**
- * LEGACY / UNMOUNTED / NO LIVE EXECUTION PATH — Phase 7.
+ * LEGACY / UNMOUNTED / NO LIVE EXECUTION PATH - Phase 7.
  * Not imported or mounted from App.jsx / DataProvider.
  * Contains outdated contact-seed / discovery policy. Do not wire back without migration.
  * Live messaging: useDataMessaging + GET /api/messages/contacts + MessagingPolicy.
@@ -182,14 +182,14 @@ export function MessagesProvider({ user, children }) {
           return prev.map((m) =>
             m.id === tempId
               ? {
-                  ...m,
-                  id: res.data._id,
-                  convId: res.data.conversationId || m.convId,
-                  senderId: res.data.senderId,
-                  senderRole: res.data.senderRole,
-                  receiverId: res.data.receiverId,
-                  receiverRole: res.data.receiverRole,
-                }
+                ...m,
+                id: res.data._id,
+                convId: res.data.conversationId || m.convId,
+                senderId: res.data.senderId,
+                senderRole: res.data.senderRole,
+                receiverId: res.data.receiverId,
+                receiverRole: res.data.receiverRole,
+              }
               : m
           );
         });
@@ -524,7 +524,7 @@ export function MessagesProvider({ user, children }) {
 
   const getMessages = useCallback((convId) =>
     [...messages.filter((m) => m.convId === convId)].sort((a, b) => a.time - b.time),
-  [messages]);
+    [messages]);
 
   const value = useMemo(() => ({
     messages,
@@ -560,17 +560,17 @@ export function useMessagesContext() {
     return {
       messages: [],
       groups: [],
-      sendMessage: async () => {},
-      syncMessages: async () => {},
-      markMessagesRead: async () => {},
+      sendMessage: async () => { },
+      syncMessages: async () => { },
+      markMessagesRead: async () => { },
       getConversations: () => [],
       getMessages: () => [],
-      recallMessage: async () => {},
-      softDeleteMessage: async () => {},
+      recallMessage: async () => { },
+      softDeleteMessage: async () => { },
       createChatGroup: async () => null,
       deleteChatGroup: async () => false,
-      toggleMessageReaction: async () => {},
-      refreshGroups: async () => {},
+      toggleMessageReaction: async () => { },
+      refreshGroups: async () => { },
       isGroupsLoading: false,
     };
   }

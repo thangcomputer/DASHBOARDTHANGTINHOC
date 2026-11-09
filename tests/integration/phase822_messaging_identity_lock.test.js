@@ -1,5 +1,5 @@
 /**
- * Phase 8.22 — Lock messaging identity (no SUPER collapse).
+ * Phase 8.22 - Lock messaging identity (no SUPER collapse).
  * LIVE messaging only. Does not touch Enterprise RBAC / no DB migration.
  */
 const { describe, it } = require('node:test');

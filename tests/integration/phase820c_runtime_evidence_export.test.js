@@ -1,5 +1,5 @@
 /**
- * Phase 8.20C — Live RUNTIME evidence export (read-only / shadow-only).
+ * Phase 8.20C - Live RUNTIME evidence export (read-only / shadow-only).
  */
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -195,7 +195,7 @@ describe('Phase 8.20C runtime evidence export', { concurrency: false }, () => {
 
     const app = express();
     app.use('/internal/rbac', internalRbacRoutes);
-    // Prove GET does not mutate — capture before
+    // Prove GET does not mutate - capture before
     const before = snapshotRuntimeEvidence().runtime.requests;
 
     const { server, port } = await listen(app);
@@ -242,12 +242,12 @@ describe('Phase 8.20C runtime evidence export', { concurrency: false }, () => {
       status(code) { status = code; return this; },
       json() { return this; },
     };
-    requireLoopbackInternal(req, res, () => {});
+    requireLoopbackInternal(req, res, () => { });
     assert.equal(status, 403);
   });
 
   it('13 LIVE decision unchanged by export builder', () => {
-    // Export path never calls next()/authorize — only reads counters.
+    // Export path never calls next()/authorize - only reads counters.
     const src = fs.readFileSync(
       path.join(__dirname, '../../services/rbacParity/runtimeEvidenceExport.js'),
       'utf8',

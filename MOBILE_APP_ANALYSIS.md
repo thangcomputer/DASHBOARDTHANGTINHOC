@@ -379,10 +379,10 @@ Mobile có thể dùng Socket.IO protocol hiện tại khi app foreground. Khôn
 
 | Phân loại | Mã hiện tại | Khả năng mobile |
 |---|---|---|
-| **A — logic có thể tái sử dụng** | Nghiệp vụ chọn câu hỏi, attempt, submit/forfeit, ownership, tiến trình và một số logic risk. `services/examAttemptService.js`, `examProgressService.js`, `examAttemptStore.js`. | Có thể dùng lại API và quy tắc nghiệp vụ; không đồng nghĩa tái sử dụng UI hoặc thiết bị. |
-| **B — phụ thuộc browser** | `getUserMedia`, `video`, `canvas`, `ImageData`, `FaceDetector`, `document.visibilitychange`, `document.hidden`, `window.blur`, Fullscreen API, `beforeunload`, local/session storage, `getDisplayMedia`. | Không thể bê trực tiếp sang React Native; cần thay lớp browser API bằng native. |
-| **C — phải viết riêng cho React Native** | Camera permission/lifecycle, app foreground/background, native navigation, file selection, secure attempt storage, native UI. | Tạo implementation riêng, xác định rõ nền tảng và quyền thiết bị. |
-| **D — cần POC thiết bị thật** | Face detection chính xác, gọi đến app khác/cuộc gọi, lịch sử cuộc gọi và tranh chấp nhiều lời mời, app suspend/resume, screen capture, fullscreen/kiosk behavior, mất mạng và resume attempt, dùng web/mobile cùng lúc. | Không chốt khả năng tương đương trước khi thử trên thiết bị thật. |
+| **A - logic có thể tái sử dụng** | Nghiệp vụ chọn câu hỏi, attempt, submit/forfeit, ownership, tiến trình và một số logic risk. `services/examAttemptService.js`, `examProgressService.js`, `examAttemptStore.js`. | Có thể dùng lại API và quy tắc nghiệp vụ; không đồng nghĩa tái sử dụng UI hoặc thiết bị. |
+| **B - phụ thuộc browser** | `getUserMedia`, `video`, `canvas`, `ImageData`, `FaceDetector`, `document.visibilitychange`, `document.hidden`, `window.blur`, Fullscreen API, `beforeunload`, local/session storage, `getDisplayMedia`. | Không thể bê trực tiếp sang React Native; cần thay lớp browser API bằng native. |
+| **C - phải viết riêng cho React Native** | Camera permission/lifecycle, app foreground/background, native navigation, file selection, secure attempt storage, native UI. | Tạo implementation riêng, xác định rõ nền tảng và quyền thiết bị. |
+| **D - cần POC thiết bị thật** | Face detection chính xác, gọi đến app khác/cuộc gọi, lịch sử cuộc gọi và tranh chấp nhiều lời mời, app suspend/resume, screen capture, fullscreen/kiosk behavior, mất mạng và resume attempt, dùng web/mobile cùng lúc. | Không chốt khả năng tương đương trước khi thử trên thiết bị thật. |
 
 Các vị trí chính:
 

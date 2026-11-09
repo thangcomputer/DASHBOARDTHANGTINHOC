@@ -166,7 +166,7 @@ export default function WorkflowCenterPage() {
                     <summary className="cursor-pointer font-bold">Lịch sử ({w.history.length})</summary>
                     <ul className="mt-1 space-y-1 pl-2 border-l border-gray-100">
                       {w.history.map((h, i) => (
-                        <li key={i}>{formatTime(h.at)} · {h.action} · {h.byName || h.by}{h.note ? ` — ${h.note}` : ''}</li>
+                        <li key={i}>{formatTime(h.at)} · {h.action} · {h.byName || h.by}{h.note ? ` - ${h.note}` : ''}</li>
                       ))}
                     </ul>
                   </details>

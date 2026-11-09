@@ -1,5 +1,5 @@
 /**
- * Live deep QA — concurrent logins + role API flows + assignment/chat.
+ * Live deep QA - concurrent logins + role API flows + assignment/chat.
  * Usage: node scripts/_qa_live_deep.cjs
  * Env: QA_API_BASE (default http://127.0.0.1:5000), QA_FE_BASE optional
  * Staff/internal login needs server CAPTCHA_BYPASS=1 + NODE_ENV=test for full pass.
@@ -272,7 +272,7 @@ async function main() {
   try {
     accountMap = JSON.parse(fs.readFileSync(accountsPath, 'utf8'));
   } catch {
-    console.error('Missing tests/test_account_ids.json — run: node tests/seed_test_accounts.js');
+    console.error('Missing tests/test_account_ids.json - run: node tests/seed_test_accounts.js');
     process.exit(1);
   }
 

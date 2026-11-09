@@ -69,7 +69,7 @@ async function assertUniqueContact({
     const hitStudent = await Student.findOne(studentPhoneQ).select('name phone zalo').lean();
     if (hitStudent) {
       throw contactConflictError(
-        `Số điện thoại đã được học viên "${hitStudent.name || 'N/A'}" sử dụng — không thể đăng ký trùng`,
+        `Số điện thoại đã được học viên "${hitStudent.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
       );
     }
 
@@ -79,7 +79,7 @@ async function assertUniqueContact({
     const hitTeacher = await Teacher.findOne(teacherPhoneQ).select('name phone zalo').lean();
     if (hitTeacher) {
       throw contactConflictError(
-        `Số điện thoại đã được giảng viên "${hitTeacher.name || 'N/A'}" sử dụng — không thể đăng ký trùng`,
+        `Số điện thoại đã được giảng viên "${hitTeacher.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
       );
     }
   }
@@ -92,7 +92,7 @@ async function assertUniqueContact({
     const hitStudentEmail = await Student.findOne(studentEmailQ).select('name email').lean();
     if (hitStudentEmail) {
       throw contactConflictError(
-        `Email đã được học viên "${hitStudentEmail.name || 'N/A'}" sử dụng — không thể đăng ký trùng`,
+        `Email đã được học viên "${hitStudentEmail.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
       );
     }
 
@@ -102,7 +102,7 @@ async function assertUniqueContact({
     const hitTeacherEmail = await Teacher.findOne(teacherEmailQ).select('name email').lean();
     if (hitTeacherEmail) {
       throw contactConflictError(
-        `Email đã được giảng viên "${hitTeacherEmail.name || 'N/A'}" sử dụng — không thể đăng ký trùng`,
+        `Email đã được giảng viên "${hitTeacherEmail.name || 'N/A'}" sử dụng - không thể đăng ký trùng`,
       );
     }
   }

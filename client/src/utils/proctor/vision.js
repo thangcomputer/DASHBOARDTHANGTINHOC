@@ -72,7 +72,7 @@ export function faceBoxHasRealSkin(imageData, w, h, box) {
 }
 
 /**
- * Windows không có landmarks — phân biệt mặt người vs ghế/vật thể bằng texture:
+ * Windows không có landmarks - phân biệt mặt người vs ghế/vật thể bằng texture:
  * da + độ sáng trung bình + độ lệch chuẩn (có chi tiết) + vùng mắt tối hơn má.
  */
 export function faceBoxLooksLikeHumanFace(imageData, w, h, box) {
@@ -167,7 +167,7 @@ export function measureSkinMass(imageData, w, h) {
 
 export function isSkinClearlyOutsideOval(imageData, w, h) {
   const mass = measureSkinMass(imageData, w, h);
-  // Chỉ kết luận “da ngoài oval” khi khối da lớn và lệch rõ — tránh false positive
+  // Chỉ kết luận “da ngoài oval” khi khối da lớn và lệch rõ - tránh false positive
   if (!mass || mass.skinHits < 55) return false;
   return !pointInProctorOval(mass.centroidX, mass.centroidY, 1.05);
 }
@@ -292,7 +292,7 @@ export function getValidatedOvalFaces(faces, frame, w, h) {
   return (faces || []).filter((face) => facePassesValidation(face, frame, w, h, { requireOval: true }));
 }
 
-/** Mọi khuôn mặt hợp lệ trong khung (không chỉ oval) — phát hiện người thứ 2 */
+/** Mọi khuôn mặt hợp lệ trong khung (không chỉ oval) - phát hiện người thứ 2 */
 export function getValidatedFrameFaces(faces, frame, w, h) {
   return (faces || []).filter((face) => facePassesValidation(face, frame, w, h, { requireOval: false }));
 }
@@ -309,7 +309,7 @@ export function heuristicFacePresent(imageData, w, h) {
 
 /**
  * @param {ImageData} frame
- * @param {DetectedFace[]|null} faces — null chỉ khi KHÔNG có FaceDetector; [] = đã chạy, không thấy mặt
+ * @param {DetectedFace[]|null} faces - null chỉ khi KHÔNG có FaceDetector; [] = đã chạy, không thấy mặt
  * @param {number} w
  * @param {number} h
  * @param {{ detectorAvailable?: boolean }} [opts]
@@ -324,7 +324,7 @@ export function evaluateFacePresence(frame, faces, w, h, opts = {}) {
   const frameFaces = getValidatedFrameFaces(list, frame, w, h);
   if (frameFaces.length > 0) return { present: true, ovalFaces: [] };
 
-  // Đã có FaceDetector: không heuristic — ghế trống = không có người
+  // Đã có FaceDetector: không heuristic - ghế trống = không có người
   if (detectorAvailable) {
     return { present: false, ovalFaces: [] };
   }

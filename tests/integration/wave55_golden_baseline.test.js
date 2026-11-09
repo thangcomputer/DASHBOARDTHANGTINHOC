@@ -1,5 +1,5 @@
 /**
- * Wave 5.5 — Golden security baseline registry (no app behavior change).
+ * Wave 5.5 - Golden security baseline registry (no app behavior change).
  * Ensures golden test files exist; documents frozen 58-test suite.
  */
 const test = require('node:test');

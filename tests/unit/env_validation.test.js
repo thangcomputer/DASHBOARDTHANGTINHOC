@@ -59,7 +59,7 @@ afterEach(() => {
   }
 });
 
-describe('config/validateEnv — Phase 2 secrets & environment hardening', () => {
+describe('config/validateEnv - Phase 2 secrets & environment hardening', () => {
   it('Test 1: production + missing JWT_SECRET fails', () => {
     delete process.env.JWT_SECRET;
     assert.throws(() => freshValidateEnv()(), /JWT_SECRET must be at least/);

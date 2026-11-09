@@ -1,6 +1,6 @@
 /**
  * Live permission adapter for Policy shadow (Wave 6+).
- * Authority: constants/permissions.js — NOT shared/constants/permissions.js.
+ * Authority: constants/permissions.js - NOT shared/constants/permissions.js.
  */
 const { PERMISSIONS } = require('../../constants/permissions');
 

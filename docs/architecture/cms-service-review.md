@@ -1,4 +1,4 @@
-# CMS & Blog Service Review — Sprint 4.3 Batch 4
+# CMS & Blog Service Review - Sprint 4.3 Batch 4
 
 ## Domains: `cms`, `blog`
 

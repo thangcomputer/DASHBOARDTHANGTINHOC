@@ -10,7 +10,7 @@ async function fix() {
   const kill = await ssh.execCommand('pm2 delete dashboardthangtinhoc 2>/dev/null; fuser -k 5000/tcp 2>/dev/null; sleep 1; echo "Done killing port 5000"');
   console.log(kill.stdout || kill.stderr);
 
-  // 2. Fix .env file — KHÔNG ghi secrets cứng vào repo/script.
+  // 2. Fix .env file - KHÔNG ghi secrets cứng vào repo/script.
   // Chỉ tạo stub; secrets thật lấy từ env máy chạy script hoặc .env sẵn có trên VPS.
   console.log('\n=== 2. FIX .ENV FILE (non-secret stubs only) ===');
   const jwtSecret = process.env.JWT_SECRET;

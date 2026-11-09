@@ -1,5 +1,5 @@
 /**
- * Phase 8.8 / 8.15 — FUTURE role alias contract (NON-RUNTIME for LIVE enforcement).
+ * Phase 8.8 / 8.15 - FUTURE role alias contract (NON-RUNTIME for LIVE enforcement).
  *
  * JWT `admin` / `staff` are identity roles, NOT enterprise canonical roles.
  * With adminRole → ALIAS to SUPER_ADMIN / HIGH_ADMIN / ADMIN_STAFF / SUPPORT_AGENT.

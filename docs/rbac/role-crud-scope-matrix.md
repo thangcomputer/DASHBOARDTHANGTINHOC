@@ -1,9 +1,9 @@
 # Role × CRUD × Data Scope Matrix
 
-**Status:** DESIGN CONTRACT — NON-AUTHORITATIVE on LIVE  
+**Status:** DESIGN CONTRACT - NON-AUTHORITATIVE on LIVE  
 **Date:** 2026-08-10  
 **LIVE authority (unchanged):** `constants/permissions.js` + `middleware/auth.js` + Policy adapter + CutoverGate  
-**Enterprise:** SHADOW ONLY — do not promote `ENTERPRISE_PRIMARY_READY`
+**Enterprise:** SHADOW ONLY - do not promote `ENTERPRISE_PRIMARY_READY`
 
 This document normalizes the product RBAC design (6 roles, CRUD, data scope) onto the existing codebase vocabulary. It does **not** change runtime authorization by itself.
 
@@ -15,11 +15,11 @@ Related: [permission-mapping.md](./permission-mapping.md) · [enterprise-rbac-co
 
 1. Access decision = **Permission (Resource × CRUD)** AND **Data Scope**.
 2. Organizational **hierarchy** ≠ business **interaction** ≠ messaging ACL.
-3. JWT `role=admin` is **not** a role — resolve via `adminRole`.
+3. JWT `role=admin` is **not** a role - resolve via `adminRole`.
 4. Transport messaging roles (`admin` | `staff` | `teacher` | `student`) are **not** RBAC identity.
 5. No permission inheritance like Admin ← Support ← Teacher for the target model.
 6. UI hide/show is UX only; server must enforce Permission + Scope.
-7. SUPPORT focuses on tickets/support — must **not** become a second Staff.
+7. SUPPORT focuses on tickets/support - must **not** become a second Staff.
 
 ---
 
@@ -40,7 +40,7 @@ Related: [permission-mapping.md](./permission-mapping.md) · [enterprise-rbac-co
 
 ## 3. Three layers (must not mix)
 
-### 3.1 Hierarchy (admin chain only — who manages whom)
+### 3.1 Hierarchy (admin chain only - who manages whom)
 
 ```text
 SUPER_ADMIN
@@ -52,7 +52,7 @@ STAFF (ADMIN_STAFF)
 
 SUPPORT, TEACHER, STUDENT are **not** children of this chain for permission inheritance.
 
-### 3.2 Support track (parallel — not under admin ops)
+### 3.2 Support track (parallel - not under admin ops)
 
 ```text
 SUPPORT (SUPPORT SUPER)
@@ -97,7 +97,7 @@ Messaging participant ACL remains separate (Phases 8.21–8.23B).
 **Hard rules**
 
 - Scope never comes from client `body` / `query` as authority.
-- Teacher `student:view` ⇒ `WHERE class/enrollment assigned to teacher` — never all students.
+- Teacher `student:view` ⇒ `WHERE class/enrollment assigned to teacher` - never all students.
 - Student `result:view` ⇒ `WHERE student_id = current_user`.
 
 Runtime helpers (observe / dual-check only until S3 gates):  
@@ -123,7 +123,7 @@ Optional composite `manage` may exist in LIVE today but design audits must expan
 | `teacher` | Teacher profiles / approval |
 | `course` / `class` / `enrollment` / `schedule` | Training ops |
 | `lesson` / `exam` / `result` | Content & assessment |
-| `ticket` | Support tickets (`ticket:close` / `ticket:archive` — not hard-delete for SUPPORT) |
+| `ticket` | Support tickets (`ticket:close` / `ticket:archive` - not hard-delete for SUPPORT) |
 | `message` | Direct/support messaging |
 | `finance` / `payment` | Payments, payroll-adjacent |
 | `report` | Analytics/revenue views |
@@ -134,9 +134,9 @@ Optional composite `manage` may exist in LIVE today but design audits must expan
 
 ## 6. Role × Resource × CRUD matrix (design target)
 
-Legend: `CRUD` = all four · `R` · `RU` · `CRU` · `—` = none · `*` = scoped only
+Legend: `CRUD` = all four · `R` · `RU` · `CRU` · `-` = none · `*` = scoped only
 
-### 6.1 SUPER_ADMIN — scope `ALL`
+### 6.1 SUPER_ADMIN - scope `ALL`
 
 | Resource | C | R | U | D | Notes |
 |---|---|---|---|---|---|
@@ -149,11 +149,11 @@ Legend: `CRUD` = all four · `R` · `RU` · `CRU` · `—` = none · `*` = scope
 | lesson / exam | ✓ | ✓ | ✓ | ✓ | |
 | result / payment | ✓ | ✓ | ✓ | ✓* | Prefer soft constraints on destructive ops |
 | ticket / message | ✓ | ✓ | ✓ | ✓ | |
-| report | — | ✓ | — | — | |
+| report | - | ✓ | - | - | |
 | settings | ✓ | ✓ | ✓ | ✓ | |
-| audit | — | ✓ | — | — | No delete |
+| audit | - | ✓ | - | - | No delete |
 
-### 6.2 HIGH_ADMIN — scope `ALL_OPERATIONAL`
+### 6.2 HIGH_ADMIN - scope `ALL_OPERATIONAL`
 
 **Allowed:** manage Staff, Student, Teacher, Course, Class, Enrollment; track ops; view reports; handle issues in scope.
 
@@ -161,10 +161,10 @@ Legend: `CRUD` = all four · `R` · `RU` · `CRU` · `—` = none · `*` = scope
 |---|---|---|---|---|
 | staff | ✓ | ✓ | ✓ | ✓ |
 | student / teacher | ✓ | ✓ | ✓ | ✓ |
-| course / class / enrollment | ✓ | ✓ | ✓ | ✓/— |
-| report | — | ✓ | — | — |
-| settings (high) | — | —/R | — | — |
-| audit | — | R* | — | — |
+| course / class / enrollment | ✓ | ✓ | ✓ | ✓/- |
+| report | - | ✓ | - | - |
+| settings (high) | - | -/R | - | - |
+| audit | - | R* | - | - |
 
 **Forbidden (explicit):**
 
@@ -175,18 +175,18 @@ Legend: `CRUD` = all four · `R` · `RU` · `CRU` · `—` = none · `*` = scope
 - Delete audit logs
 - Self-promote account to SUPER_ADMIN
 
-### 6.3 STAFF (`ADMIN_STAFF`) — scope `BRANCH_ASSIGNED`
+### 6.3 STAFF (`ADMIN_STAFF`) - scope `BRANCH_ASSIGNED`
 
 **Data tree:** STUDENT · TEACHER · COURSE · CLASS · ENROLLMENT (branch/assigned).
 
 | Resource | C | R | U | D |
 |---|---|---|---|---|
 | student | ✓ | ✓ | ✓ | ✓* |
-| teacher | ✓ | ✓ | ✓ | — |
-| class / schedule | ✓ | ✓ | ✓ | —/✓* |
-| enrollment | ✓ | ✓ | ✓ | — |
+| teacher | ✓ | ✓ | ✓ | - |
+| class / schedule | ✓ | ✓ | ✓ | -/✓* |
+| enrollment | ✓ | ✓ | ✓ | - |
 | ticket / support ops | ✓ | ✓ | ✓ | ✓* |
-| high_admin / settings / full audit | — | — | — | — |
+| high_admin / settings / full audit | - | - | - | - |
 
 **Forbidden (explicit):**
 
@@ -196,47 +196,47 @@ Legend: `CRUD` = all four · `R` · `RU` · `CRU` · `—` = none · `*` = scope
 - View full system audit logs
 - Access system configuration
 
-### 6.4 SUPPORT — scope `SUPPORT_RELATED`
+### 6.4 SUPPORT - scope `SUPPORT_RELATED`
 
 Support must **not** become a second Staff (no full student/course/class/enrollment admin).
 
 | Function | C | R | U | D |
 |---|---|---|---|---|
-| ticket create / view / update | ✓ | ✓ | ✓ | — |
-| close / archive ticket | — | ✓ | ✓ | — |
-| hard-delete ticket | — | — | — | **Denied** (Close/Archive only) |
-| student profile (minimal) | — | ✓ | — | — |
-| teacher profile (minimal) | — | ✓ | — | — |
-| reply Student / Teacher (message) | ✓ | ✓ | ✓ | — |
-| transfer / escalate to Admin | ✓ | ✓ | ✓ | — |
-| course/class full CRUD | — | R* | — | — |
+| ticket create / view / update | ✓ | ✓ | ✓ | - |
+| close / archive ticket | - | ✓ | ✓ | - |
+| hard-delete ticket | - | - | - | **Denied** (Close/Archive only) |
+| student profile (minimal) | - | ✓ | - | - |
+| teacher profile (minimal) | - | ✓ | - | - |
+| reply Student / Teacher (message) | ✓ | ✓ | ✓ | - |
+| transfer / escalate to Admin | ✓ | ✓ | ✓ | - |
+| course/class full CRUD | - | R* | - | - |
 
-### 6.5 TEACHER — scope `OWN_AND_ASSIGNED_CLASS`
+### 6.5 TEACHER - scope `OWN_AND_ASSIGNED_CLASS`
 
-Instructor / content provider — not a system admin.
+Instructor / content provider - not a system admin.
 
 | Resource | C | R | U | D |
 |---|---|---|---|---|
-| own profile | — | ✓ | ✓ | — |
-| assigned class | — | ✓ | ✓* | — |
-| students in class | — | ✓ | — | — |
+| own profile | - | ✓ | ✓ | - |
+| assigned class | - | ✓ | ✓* | - |
+| students in class | - | ✓ | - | - |
 | lesson / homework / exam | ✓ | ✓ | ✓ | ✓* |
 | results | ✓ | ✓ | ✓ | ✓* |
 | message (participants) | ✓ | ✓ | ✓ | ✓* |
-| own support ticket | ✓ | ✓ | ✓ | — |
+| own support ticket | ✓ | ✓ | ✓ | - |
 
-### 6.6 STUDENT — scope `OWN_AND_AUTHORIZED`
+### 6.6 STUDENT - scope `OWN_AND_AUTHORIZED`
 
 Most restricted scope: **own + explicitly authorized only**.
 
 | Resource | C | R | U | D |
 |---|---|---|---|---|
-| own profile | — | ✓ | ✓ | — |
-| authorized course/class | — | ✓ | — | — |
-| own teacher (class) | — | ✓ | — | — |
-| learning content | — | ✓ | — | — |
-| own exam attempt | ✓ | ✓ | ✓ | — |
-| own results | — | ✓ | — | — |
+| own profile | - | ✓ | ✓ | - |
+| authorized course/class | - | ✓ | - | - |
+| own teacher (class) | - | ✓ | - | - |
+| learning content | - | ✓ | - | - |
+| own exam attempt | ✓ | ✓ | ✓ | - |
+| own results | - | ✓ | - | - |
 | own ticket | ✓ | ✓ | ✓ | ✓* |
 | message with own teacher/staff | ✓ | ✓ | ✓ | ✓* |
 
@@ -244,13 +244,13 @@ Most restricted scope: **own + explicitly authorized only**.
 
 ---
 
-## 7. Summary matrix — 16 functions (parity checklist)
+## 7. Summary matrix - 16 functions (parity checklist)
 
 | Chức năng | Super Admin | Admin Cao | Staff | Support | Teacher | Student |
 |---|---|---|---|---|---|---|
-| Quản lý Admin | CRUD | R/U* | — | — | — | — |
-| Quản lý Staff | CRUD | CRUD | — | — | — | — |
-| Quản lý Support | CRUD | CRUD* | — | — | — | — |
+| Quản lý Admin | CRUD | R/U* | - | - | - | - |
+| Quản lý Staff | CRUD | CRUD | - | - | - | - |
+| Quản lý Support | CRUD | CRUD* | - | - | - | - |
 | Quản lý Student | CRUD | CRUD | CRUD* | R/U | R* | R* |
 | Quản lý Teacher | CRUD | CRUD | CRUD | R/U | R/U* | R* |
 | Quản lý khóa học | CRUD | CRUD | CRUD | R | R* | R |
@@ -262,8 +262,8 @@ Most restricted scope: **own + explicitly authorized only**.
 | Hỗ trợ / Ticket | CRUD | CRUD | CRUD | CRUD† | CRUD* | CRUD* |
 | Thanh toán | CRUD | CRUD/R | CRUD* | R* | R* | R* |
 | Báo cáo | R | R | R* | R* | R* | R* |
-| Cấu hình hệ thống | CRUD | R/U* | — | — | — | — |
-| Audit Log | R | R* | — | — | — | — |
+| Cấu hình hệ thống | CRUD | R/U* | - | - | - | - |
+| Audit Log | R | R* | - | - | - | - |
 
 `*` = data-scoped only.  
 `†` Support ticket = CRU + close/archive; **no hard-delete**.
@@ -296,9 +296,9 @@ LIVE keys today (`constants/permissions.js` / client mirror):
 
 1. No first-class **ticket** permission separate from `manage_messages`.
 2. No CRUD-split for students/teachers/classes (LIVE uses coarse `manage_*`).
-3. SUPPORT defaults only `manage_messages` — ticket close/archive not explicit on LIVE.
+3. SUPPORT defaults only `manage_messages` - ticket close/archive not explicit on LIVE.
 4. STAFF scope is mostly **branch**; “assigned student/class” finer scope needs consistent enrollment checks.
-5. Enterprise shadow catalog expanded in S1; LIVE remains coarse — **parity observe only** until S3 gates.
+5. Enterprise shadow catalog expanded in S1; LIVE remains coarse - **parity observe only** until S3 gates.
 
 See also: [permission-mapping.md](./permission-mapping.md), [enterprise-rbac-contract.md](./enterprise-rbac-contract.md).
 
@@ -314,7 +314,7 @@ SUPPORT inherits STUDENT
 TEACHER inherits STUDENT
 ```
 
-(Reference dormant pattern in `modules/rbac/rolePermissions.js` — **not** LIVE authority, and **not** the target model.)
+(Reference dormant pattern in `modules/rbac/rolePermissions.js` - **not** LIVE authority, and **not** the target model.)
 
 Target model:
 
@@ -340,7 +340,7 @@ Special cases:
 
 - SUPER_ADMIN / `id=admin`: permission bypass for LIVE today; design still forbids **self-delete**.
 - HIGH_ADMIN: permission array gated (no full bypass) + forbidden list in §6.2.
-- SUPPORT: never hard-delete tickets — close/archive only.
+- SUPPORT: never hard-delete tickets - close/archive only.
 - Messaging: participant / `canAccessDirectConversation` / `assertCanDirectMessage` remain messaging ACL until mapped to `message:*`.
 
 ---
@@ -353,7 +353,7 @@ Special cases:
 | **S1** | Expand Enterprise shadow catalog CRUD codes; map LIVE↔enterprise | No (shadow) | No |
 | **S2** | Scope resolver helpers + observe/dual-check on student list + message contacts | Observe only | No |
 | **S3** | Align one module at a time (see [s3-live-module-alignment.md](./s3-live-module-alignment.md)) | Yes, gated | No |
-| **S4** | Readiness review only | — | Manual only — never auto |
+| **S4** | Readiness review only | - | Manual only - never auto |
 
 **Out of scope for S0–S2:** JWT schema change, DB migration, Enterprise PRIMARY, rewriting all routes at once.
 
@@ -365,11 +365,11 @@ Keep Phases 8.21–8.23B contracts, plus **Phase 8.24 pairing lock**:
 
 - STAFF/SUPPORT transport `staff` + per-user conversationId
 - SUPER/HIGH legacy `admin_admin` for student mailbox where contract allows
-- Display identity by user id — never role `admin` alone → SUPER profile
-- Allow-list pairing + canonical peer from DB — see [../messaging/pairing-matrix-824.md](../messaging/pairing-matrix-824.md)
+- Display identity by user id - never role `admin` alone → SUPER profile
+- Allow-list pairing + canonical peer from DB - see [../messaging/pairing-matrix-824.md](../messaging/pairing-matrix-824.md)
 - Never trust client `receiverRole` when building `conversationId`
 
-Map later to `message:create|view|update|delete` with participant scope — without collapsing Support into Staff admin ops.
+Map later to `message:create|view|update|delete` with participant scope - without collapsing Support into Staff admin ops.
 
 ---
 

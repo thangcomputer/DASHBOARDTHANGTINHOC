@@ -1,6 +1,6 @@
 /**
  * Policy shadow for LIVE /api/messages (Wave 6.9).
- * Mirrors routes/messageRoutes.js — role/ownership/contacts matrix.
+ * Mirrors routes/messageRoutes.js - role/ownership/contacts matrix.
  * MANAGE_MESSAGES exists in constants but is NOT used on live message routes.
  * Socket message:send in server.js is documented separately (not HTTP-shadowed).
  */
@@ -153,7 +153,7 @@ async function evaluateSend(subject, ctx) {
     }
     return { decision: 'DENY', reason: 'not_group_member', statusHint: 403 };
   }
-  // DM: reuse live contacts matrix (Trợ lý AI — HV/GV only)
+  // DM: reuse live contacts matrix (Trợ lý AI - HV/GV only)
   if (
     receiverId === 'ai_support'
     && process.env.AI_SUPPORT_ENABLED === '1'

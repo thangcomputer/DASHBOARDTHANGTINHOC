@@ -1,4 +1,4 @@
-import { mobileApiRequest } from './apiClient';
+﻿import { mobileApiRequest } from './apiClient';
 
 export type SubscriptionPlanId = '1m' | '3m' | '6m' | '12m' | 'lifetime';
 
@@ -40,7 +40,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   return payload.data;
 }
 
-/** Gói tài khoản HV — cùng API với web; dùng được cả khi đã hết hạn. */
+/** Gói tài khoản HV - cùng API với web; dùng được cả khi đã hết hạn. */
 export const subscriptionApi = {
   overview: () => call<SubscriptionOverview>(''),
   redeem: (code: string) => call<StudentSubscription & { redeemedPlanLabel?: string }>('/redeem', { code }),

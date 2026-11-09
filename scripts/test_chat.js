@@ -16,7 +16,7 @@ async function test() {
     body: JSON.stringify({ identifier: '222222', password: '222222' })
   });
   const stuData = await stuRes.json();
-  if(!stuData.data) {
+  if (!stuData.data) {
     console.log("Student login failed", stuData);
     return;
   }
@@ -24,10 +24,10 @@ async function test() {
   const stuUser = stuData.data.user;
 
   console.log("Connecting Admin Socket...");
-  const adminSocket = io('http://localhost:5000', { auth: { token: adminToken }, query: { userId: adminUser.id, role: 'admin', name: adminUser.name }});
-  
+  const adminSocket = io('http://localhost:5000', { auth: { token: adminToken }, query: { userId: adminUser.id, role: 'admin', name: adminUser.name } });
+
   console.log("Connecting Student Socket...");
-  const stuSocket = io('http://localhost:5000', { auth: { token: stuToken }, query: { userId: stuUser._id || stuUser.id, role: 'student', name: stuUser.name }});
+  const stuSocket = io('http://localhost:5000', { auth: { token: stuToken }, query: { userId: stuUser._id || stuUser.id, role: 'student', name: stuUser.name } });
 
   let stuReceived = false;
   let adminReceived = false;

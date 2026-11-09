@@ -53,7 +53,7 @@ async function settingsResponseFor(req, settings) {
   return data;
 }
 
-/** Settings là TENANT/GLOBAL (SystemSettings _key=main) — ping refresh không kèm secret. */
+/** Settings là TENANT/GLOBAL (SystemSettings _key=main) - ping refresh không kèm secret. */
 function emitSettingsRefresh(io) {
   emitSystemWide(io, 'data:refresh', { type: 'settings', scope: 'system' });
 }
@@ -112,7 +112,7 @@ const upload = multer({
   },
 });
 
-// Helper: get or create singleton settings (lean, không secret) — có cache
+// Helper: get or create singleton settings (lean, không secret) - có cache
 async function getSettings() {
   return getCachedSettings();
 }
@@ -135,10 +135,10 @@ router.get('/bank', ...settingsGuard('public_read'), async (req, res) => {
     return res.json({
       success: true,
       data: {
-        centerBankCode:          settings.centerBankCode          || '',
-        centerBankName:          settings.centerBankName          || '',
+        centerBankCode: settings.centerBankCode || '',
+        centerBankName: settings.centerBankName || '',
         centerBankAccountNumber: settings.centerBankAccountNumber || '',
-        centerBankAccountName:   settings.centerBankAccountName   || '',
+        centerBankAccountName: settings.centerBankAccountName || '',
       },
     });
   } catch (err) {
@@ -270,7 +270,7 @@ router.get('/popup', authMiddleware, ...settingsGuard('auth_only'), async (req, 
   }
 });
 
-// ── GET /api/settings/payment ── PUBLIC — Lấy thông tin ngân hàng trung tâm ──
+// ── GET /api/settings/payment ── PUBLIC - Lấy thông tin ngân hàng trung tâm ──
 // Không cần auth: trang đăng ký học viên mới gọi endpoint này mà không có token
 router.get('/payment', ...settingsGuard('public_read'), async (req, res) => {
   try {
@@ -278,10 +278,10 @@ router.get('/payment', ...settingsGuard('public_read'), async (req, res) => {
     return res.json({
       success: true,
       data: {
-        bankCode:      settings.centerBankCode      || '',
-        bankName:      settings.centerBankName      || '',
+        bankCode: settings.centerBankCode || '',
+        bankName: settings.centerBankName || '',
         accountNumber: settings.centerBankAccountNumber || '',
-        accountName:   settings.centerBankAccountName   || '',
+        accountName: settings.centerBankAccountName || '',
       },
     });
   } catch (err) {
@@ -289,7 +289,7 @@ router.get('/payment', ...settingsGuard('public_read'), async (req, res) => {
   }
 });
 
-// ── GET /api/settings/web ── PUBLIC — Logo, Loading style, Staff popup ────────
+// ── GET /api/settings/web ── PUBLIC - Logo, Loading style, Staff popup ────────
 // Frontend gọi ngay khi khởi tạo App để render loading screen + logo
 router.get('/web', ...settingsGuard('public_read'), async (req, res) => {
   try {
@@ -297,23 +297,23 @@ router.get('/web', ...settingsGuard('public_read'), async (req, res) => {
     return res.json({
       success: true,
       data: {
-        logoUrl:      settings.logoUrl      || '',
-        faviconUrl:   settings.faviconUrl   || '',
+        logoUrl: settings.logoUrl || '',
+        faviconUrl: settings.faviconUrl || '',
         faviconAdminUrl: settings.faviconAdminUrl || '',
         loadingStyle: settings.loadingStyle || 1,
         staffPopup: {
-          isActive:  settings.staffPopup?.isActive  || false,
-          title:     settings.staffPopup?.title     || '',
-          content:   settings.staffPopup?.content   || '',
+          isActive: settings.staffPopup?.isActive || false,
+          title: settings.staffPopup?.title || '',
+          content: settings.staffPopup?.content || '',
           updatedAt: settings.staffPopup?.updatedAt || null,
         },
-        invoiceLogoUrl:      settings.invoiceLogoUrl      || '',
+        invoiceLogoUrl: settings.invoiceLogoUrl || '',
         invoiceSignatureUrl: settings.invoiceSignatureUrl || '',
-        invoiceStampText:    settings.invoiceStampText    || 'ĐÃ THANH TOÁN',
-        studentBanners:      settings.studentBanners      || [],
-        studentBannerSpeed:  settings.studentBannerSpeed  || 5,
-        teacherBanners:      settings.teacherBanners      || [],
-        teacherBannerSpeed:  settings.teacherBannerSpeed  || 5,
+        invoiceStampText: settings.invoiceStampText || 'ĐÃ THANH TOÁN',
+        studentBanners: settings.studentBanners || [],
+        studentBannerSpeed: settings.studentBannerSpeed || 5,
+        teacherBanners: settings.teacherBanners || [],
+        teacherBannerSpeed: settings.teacherBannerSpeed || 5,
       },
     });
   } catch (err) {
@@ -321,21 +321,21 @@ router.get('/web', ...settingsGuard('public_read'), async (req, res) => {
   }
 });
 
-// ── PUT /api/settings/web ── Admin only — Cập nhật cài đặt web ───────────────
+// ── PUT /api/settings/web ── Admin only - Cập nhật cài đặt web ───────────────
 router.put('/web', authMiddleware, ...settingsGuard('system_write'), async (req, res) => {
   try {
     const updates = {};
     const { logoUrl, faviconUrl, faviconAdminUrl, loadingStyle, staffPopup } = req.body;
 
-    if (logoUrl !== undefined)      updates.logoUrl = logoUrl;
-    if (faviconUrl !== undefined)   updates.faviconUrl = faviconUrl;
+    if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+    if (faviconUrl !== undefined) updates.faviconUrl = faviconUrl;
     if (faviconAdminUrl !== undefined) updates.faviconAdminUrl = faviconAdminUrl;
-    if (loadingStyle !== undefined)  updates.loadingStyle = Math.max(1, Math.min(4, Number(loadingStyle) || 1));
+    if (loadingStyle !== undefined) updates.loadingStyle = Math.max(1, Math.min(4, Number(loadingStyle) || 1));
 
     if (staffPopup) {
-      updates['staffPopup.isActive']  = staffPopup.isActive ?? false;
-      updates['staffPopup.title']     = staffPopup.title    ?? '';
-      updates['staffPopup.content']   = staffPopup.content  ?? '';
+      updates['staffPopup.isActive'] = staffPopup.isActive ?? false;
+      updates['staffPopup.title'] = staffPopup.title ?? '';
+      updates['staffPopup.content'] = staffPopup.content ?? '';
       updates['staffPopup.updatedAt'] = new Date();
     }
 
@@ -345,7 +345,7 @@ router.put('/web', authMiddleware, ...settingsGuard('system_write'), async (req,
     if (req.body.studentBannerSpeed !== undefined) {
       updates.studentBannerSpeed = Math.max(1, Number(req.body.studentBannerSpeed) || 5);
     }
-    
+
     if (req.body.teacherBanners !== undefined) {
       updates.teacherBanners = req.body.teacherBanners;
     }
@@ -1283,7 +1283,7 @@ router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGua
   }
 
   try {
-    // 1. Xác thực Super Admin — kiểm tra từ DB (SystemSettings) thay vì hardcode
+    // 1. Xác thực Super Admin - kiểm tra từ DB (SystemSettings) thay vì hardcode
     if (userId === 'admin') {
       const sysSettings = await SystemSettings.findOne({ _key: 'main' });
       const pwMatch = await verifyAdminPassword(password, sysSettings);
@@ -1297,7 +1297,7 @@ router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGua
       }
       const isMatch = await adminUser.comparePassword(password);
       if (!isMatch) {
-         return res.status(400).json({ success: false, message: 'Mật khẩu Super Admin không đúng' });
+        return res.status(400).json({ success: false, message: 'Mật khẩu Super Admin không đúng' });
       }
     }
 
@@ -1309,11 +1309,11 @@ router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGua
 
     if ((isAll || options.finance) && process.env.NODE_ENV === 'production') {
       logger.warn(
-        '[SETTINGS] Control Center finance wipe by %s — bypass FINANCE_ALLOW_HARD_DELETE gate',
+        '[SETTINGS] Control Center finance wipe by %s - bypass FINANCE_ALLOW_HARD_DELETE gate',
         userId,
       );
     }
-    
+
     // NHÓM: HỌC VIÊN
     if (isAll || options.students) {
       await Student.deleteMany({});
@@ -1323,7 +1323,7 @@ router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGua
       await Assignment.deleteMany({});
     }
 
-    // NHÓM: TÀI CHÍNH — factory reset xóa kèm Ledger/CreditNote/Snapshot
+    // NHÓM: TÀI CHÍNH - factory reset xóa kèm Ledger/CreditNote/Snapshot
     if (isAll || options.finance) {
       await Transaction.deleteMany({});
       await Invoice.deleteMany({});
@@ -1362,14 +1362,14 @@ router.post('/reset-data', authMiddleware, destructiveResetGuard, ...settingsGua
     if (isAll || options.logs) {
       await SystemLog.deleteMany({});
     }
-    
+
     // NHÓM 2 - DỮ LIỆU GIỮ NGUYÊN
     // Không bao giờ xóa: Teacher (Users), SystemSettings, Branch, Course.
-    
+
     // Auto-unlock tất cả giáo viên
     await Teacher.updateMany({}, { $set: { isLocked: false, loginAttempts: 0, lockReason: null } });
 
-    // 3. SYSTEM_RESET — intentional system-wide to authenticated role rooms.
+    // 3. SYSTEM_RESET - intentional system-wide to authenticated role rooms.
     // Authz: SYSTEM_SETTINGS + Super Admin password. Payload: empty (clients clear local storage).
     const io = req.app.get('io');
     if (io) {

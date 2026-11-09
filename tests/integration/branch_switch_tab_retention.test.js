@@ -12,7 +12,7 @@ describe('Branch Switching and Tab Permission Retention Verification', () => {
 
   // Test hasPermission logic from permissions.js
   const permissionsCode = fs.readFileSync(path.join(ROOT, 'client/src/constants/permissions.js'), 'utf8');
-  
+
   // Extract hasPermission function
   const fnCode = permissionsCode.substring(
     permissionsCode.indexOf('export function hasPermission')

@@ -3,7 +3,7 @@ import { Camera, X } from 'lucide-react';
 
 /**
  * Hướng dẫn trước khi mở hộp thoại chia sẻ màn hình của trình duyệt.
- * Hình ví dụ đã có mũi tên — chỉ giữ chú thích 3 bước.
+ * Hình ví dụ đã có mũi tên - chỉ giữ chú thích 3 bước.
  */
 export default function ScreenCaptureGuideModal({
   open,
@@ -44,7 +44,7 @@ export default function ScreenCaptureGuideModal({
                 Hướng dẫn chụp màn hình
               </p>
               <p className="text-xs text-red-100/90 mt-0.5">
-                {isRegion ? 'Làm theo số đỏ trên hình — rồi kéo chọn vùng' : 'Làm theo số đỏ trên hình, rất nhanh'}
+                {isRegion ? 'Làm theo số đỏ trên hình - rồi kéo chọn vùng' : 'Làm theo số đỏ trên hình, rất nhanh'}
               </p>
             </div>
           </div>

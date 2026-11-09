@@ -97,7 +97,7 @@ function policyShadowExamResult(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] exam evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] exam evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `exam_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -133,7 +133,7 @@ function policyShadowExamResult(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] exam shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] exam shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -145,7 +145,7 @@ function policyShadowExamResult(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected exam error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected exam error - fail closed to legacy only',
       );
     }
     return next();

@@ -1,4 +1,4 @@
-# Finance Service Review — Sprint 4.3 Batch 3
+# Finance Service Review - Sprint 4.3 Batch 3
 
 ## Domain: `finance` (including `finance_bi`)
 

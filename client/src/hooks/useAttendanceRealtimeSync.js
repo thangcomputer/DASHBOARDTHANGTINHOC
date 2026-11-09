@@ -84,7 +84,7 @@ function applyAttendanceSocketToSchedules(prev, eventName, payload) {
 }
 
 /**
- * GV/Admin/HV: cập nhật lịch điểm danh ngay từ socket — không chờ sync 15s.
+ * GV/Admin/HV: cập nhật lịch điểm danh ngay từ socket - không chờ sync 15s.
  */
 export function useAttendanceRealtimeSync({ enabled, myId, role }) {
   const { socket } = useSocket() || {};
@@ -102,7 +102,7 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       const sid = String(payload.studentId?._id || payload.studentId || '');
       if (role === 'teacher' && tid && tid === String(myId)) return true;
       if (role === 'student' && sid && sid === String(myId)) return true;
-      // schedule:cancelled đôi khi chỉ có scheduleId — vẫn nhận để patch/refetch
+      // schedule:cancelled đôi khi chỉ có scheduleId - vẫn nhận để patch/refetch
       if (role === 'teacher' || role === 'student') {
         return Boolean(payload.scheduleId || payload._id || payload.id);
       }
@@ -131,7 +131,7 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
           || eventName === 'schedule:new'
         ) {
           if (typeof refreshSchedules === 'function') {
-            Promise.resolve(refreshSchedules()).catch(() => {});
+            Promise.resolve(refreshSchedules()).catch(() => { });
           }
         }
         return;
@@ -146,7 +146,7 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       }
 
       if (eventName === 'attendance:confirmed' && typeof refreshStudents === 'function') {
-        Promise.resolve(refreshStudents()).catch(() => {});
+        Promise.resolve(refreshStudents()).catch(() => { });
       }
 
       const notePatched = eventName === 'schedule:updated'
@@ -158,27 +158,27 @@ export function useAttendanceRealtimeSync({ enabled, myId, role }) {
       if (notePatched) return;
 
       if (typeof triggerBackgroundSync === 'function') {
-        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => {});
+        Promise.resolve(triggerBackgroundSync({ force: true })).catch(() => { });
       } else if (typeof refreshSchedules === 'function') {
-        Promise.resolve(refreshSchedules()).catch(() => {});
+        Promise.resolve(refreshSchedules()).catch(() => { });
       }
     };
 
     const handlers = role === 'student'
       ? {
-          'schedule:updated': onEvent('schedule:updated'),
-          'schedule:cancelled': onEvent('schedule:cancelled'),
-          'schedule:new': onEvent('schedule:new'),
-        }
+        'schedule:updated': onEvent('schedule:updated'),
+        'schedule:cancelled': onEvent('schedule:cancelled'),
+        'schedule:new': onEvent('schedule:new'),
+      }
       : {
-          'attendance:awaiting-confirm': onEvent('attendance:awaiting-confirm'),
-          'attendance:confirmed': onEvent('attendance:confirmed'),
-          'attendance:disputed': onEvent('attendance:disputed'),
-          'attendance:rejected': onEvent('attendance:rejected'),
-          'schedule:updated': onEvent('schedule:updated'),
-          'schedule:cancelled': onEvent('schedule:cancelled'),
-          'schedule:new': onEvent('schedule:new'),
-        };
+        'attendance:awaiting-confirm': onEvent('attendance:awaiting-confirm'),
+        'attendance:confirmed': onEvent('attendance:confirmed'),
+        'attendance:disputed': onEvent('attendance:disputed'),
+        'attendance:rejected': onEvent('attendance:rejected'),
+        'schedule:updated': onEvent('schedule:updated'),
+        'schedule:cancelled': onEvent('schedule:cancelled'),
+        'schedule:new': onEvent('schedule:new'),
+      };
 
     Object.entries(handlers).forEach(([ev, fn]) => socket.on(ev, fn));
     return () => {

@@ -1,4 +1,4 @@
-# Student DTO Review — Sprint 4.4 Batch 2
+# Student DTO Review - Sprint 4.4 Batch 2
 
 ## DTO & Validation Extraction Complete
 - **Zod Validators**: Generated inside `dto/validators/` with `passthrough()` for zero-regression backward compatibility.

@@ -1,4 +1,4 @@
-# Payment & Invoice Service Review — Sprint 4.3 Batch 3
+# Payment & Invoice Service Review - Sprint 4.3 Batch 3
 
 ## Domains: `payment`, `invoice`, `transaction`
 

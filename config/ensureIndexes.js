@@ -1,5 +1,5 @@
 /**
- * ensureIndexes.js — Đồng bộ indexes MongoDB khi server khởi động
+ * ensureIndexes.js - Đồng bộ indexes MongoDB khi server khởi động
  */
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');

@@ -18,7 +18,7 @@ backendFolders.forEach(folder => {
   const targetDir = path.join(__dirname, folder);
   walkDir(targetDir, (filePath) => {
     if (!filePath.endsWith('.js')) return;
-    
+
     let content = fs.readFileSync(filePath, 'utf-8');
     let originalContent = content;
 

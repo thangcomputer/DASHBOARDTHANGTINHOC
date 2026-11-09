@@ -1,5 +1,5 @@
 /**
- * Assignment writable DTOs — explicit allowlist (no req.body spread).
+ * Assignment writable DTOs - explicit allowlist (no req.body spread).
  * assignedBy* is always server-set.
  */
 const CREATE_FIELDS = [

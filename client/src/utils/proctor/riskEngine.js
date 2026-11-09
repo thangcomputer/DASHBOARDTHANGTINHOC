@@ -1,7 +1,7 @@
 import { PROCTOR_CONFIG as CONFIG } from './config.js';
 
 /**
- * Điểm rủi ro cộng dồn — decay theo thời gian.
+ * Điểm rủi ro cộng dồn - decay theo thời gian.
  * Hard violation chỉ khi score >= RISK_HARD_THRESHOLD (hoặc confirm riêng).
  */
 export function createRiskEngine(overrides = {}) {
@@ -55,7 +55,7 @@ export function createRiskEngine(overrides = {}) {
 }
 
 /**
- * Bộ đếm xác nhận đa frame/thời gian — giảm false positive.
+ * Bộ đếm xác nhận đa frame/thời gian - giảm false positive.
  */
 export function createConfirmTracker({ minFrames, confirmMs }) {
   let frames = 0;

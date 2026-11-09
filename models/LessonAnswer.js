@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-/** Bài làm từng câu — chỉ học viên xem lại. API tiến độ admin không đọc collection này. */
+/** Bài làm từng câu - chỉ học viên xem lại. API tiến độ admin không đọc collection này. */
 const lessonAnswerSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
   itemId: { type: mongoose.Schema.Types.ObjectId, required: true },

@@ -84,26 +84,26 @@ The root also contains 85 files, including `server.js`, `worker.js`, Dockerfiles
 | **Total source/config files** | **2,612** |
 
 ### 2.4 Backend
-- `server.js` — main runtime entrypoint and HTTP server
-- `routes/` — live API endpoint definitions
-- `middleware/` — auth, rate limit, policy, CSRF, uploads, request context
-- `models/` — Mongoose schemas
-- `services/` — business logic, backup, queue, notifications, finance, exam, AI
-- `config/` — DB, env validation, logger, socket, performance, security config
-- `utils/` — validation, identity, tokens, phone normalization, file processing
-- `scripts/` — maintenance, QA, seed, patch, cleanup, restore scripts
-- `tests/` — unit/integration/QA scripts
-- `bootstrap/` — bootstrap logic
-- `deploy/`, `deployment/`, `deploy_scripts/` — deployment and Ops automation
+- `server.js` - main runtime entrypoint and HTTP server
+- `routes/` - live API endpoint definitions
+- `middleware/` - auth, rate limit, policy, CSRF, uploads, request context
+- `models/` - Mongoose schemas
+- `services/` - business logic, backup, queue, notifications, finance, exam, AI
+- `config/` - DB, env validation, logger, socket, performance, security config
+- `utils/` - validation, identity, tokens, phone normalization, file processing
+- `scripts/` - maintenance, QA, seed, patch, cleanup, restore scripts
+- `tests/` - unit/integration/QA scripts
+- `bootstrap/` - bootstrap logic
+- `deploy/`, `deployment/`, `deploy_scripts/` - deployment and Ops automation
 
 ### 2.5 Frontend
-- `client/src/App.jsx` — app shell and routers
-- `client/src/components/` — UI pages and feature components
-- `client/src/context/` — data/context providers
-- `client/src/hooks/` — React hooks
-- `client/src/services/api.js` — API client and token auth handling
-- `client/src/utils/` — media/file/export helpers, proctor utilities
-- `client/public/` — static assets
+- `client/src/App.jsx` - app shell and routers
+- `client/src/components/` - UI pages and feature components
+- `client/src/context/` - data/context providers
+- `client/src/hooks/` - React hooks
+- `client/src/services/api.js` - API client and token auth handling
+- `client/src/utils/` - media/file/export helpers, proctor utilities
+- `client/public/` - static assets
 
 ### 2.6 Infrastructure
 - `Dockerfile`, `Dockerfile.prod`, `docker-compose.yml`, `docker-compose.prod.yml`
@@ -457,7 +457,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 
 ## 21. Confirmed Critical Issues
 
-### DB-001 — CRITICAL
+### DB-001 - CRITICAL
 - File: `routes/settingsRoutes.js`
 - Lines: around the `router.post('/reset-data', ...)` function
 - Function: `reset-data`
@@ -467,7 +467,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 - Recommended fix: move this behind a dedicated staging-only environment, add a hardcoded environment guard, and require a second factor/production disable flag
 - Confidence: HIGH
 
-### DB-002 — CRITICAL
+### DB-002 - CRITICAL
 - File: `restore_backup.js`
 - Lines: `await db.collection(name).deleteMany({});`
 - Function: `restoreBackup()`
@@ -477,7 +477,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 - Recommended fix: require explicit `--force` and production dry-run; preferably restore to a disposable DB by default
 - Confidence: HIGH
 
-### AUTH-001 — HIGH
+### AUTH-001 - HIGH
 - File: `client/src/services/api.js`
 - Lines: token storage helpers (`setTokens`, `getAccessToken`, `getRefreshToken`)
 - Evidence: `localStorage.setItem(`${prefix}_access_token`, access)` and refresh token stored in localStorage
@@ -486,7 +486,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 - Recommended fix: httpOnly secure refresh cookie, memory-only access token, avoid query-string tokens
 - Confidence: HIGH
 
-### AUTH-002 — HIGH
+### AUTH-002 - HIGH
 - File: `client/src/services/api.js`
 - Function: `withUploadAccessToken()`
 - Evidence: appends `?access_token=...` to private upload URLs
@@ -497,7 +497,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 
 ## 22. Confirmed High Issues
 
-### AUTH-003 — HIGH
+### AUTH-003 - HIGH
 - File: `routes/authRoutes.js` / `middleware/auth.js`
 - Evidence: `jwt.verify()` and tokenVersion validation are used, but browser keeps tokens in localStorage; risk is not in JWT verification itself but in where the JWT is stored and exposed
 - Impact: stolen token can be replayed until version mismatch or revocation
@@ -505,7 +505,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 - Recommended fix: keep access token out of durable browser storage, use secure cookies for refresh token
 - Confidence: MEDIUM
 
-### DEP-001 — HIGH
+### DEP-001 - HIGH
 - File: `package.json`
 - Evidence: dependency set is broad and modern; no direct verification of dependency vulnerability status was completed in this session
 - Impact: supply-chain risk and library vulnerability exposure remain possible
@@ -515,7 +515,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 
 ## 23. Confirmed Medium Issues
 
-### FILE-001 — MEDIUM
+### FILE-001 - MEDIUM
 - File: `middleware/uploadsAuth.js`
 - Evidence: private file proxy allows a JWT in query string (`req.query.access_token`)
 - Impact: token leakage and request sniffing risk
@@ -523,7 +523,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 - Recommended fix: remove query-token support; prefer Authorization header and signed asset URLs
 - Confidence: HIGH
 
-### TEST-001 — MEDIUM
+### TEST-001 - MEDIUM
 - File: `scripts/` and `tests/` folder
 - Evidence: broad destructive cleanup scripts exist and some scripts target major collections without a production guard
 - Impact: if run against the wrong DB, data loss
@@ -533,7 +533,7 @@ At the source level, the project is not a small/simple app; it is genuinely comp
 
 ## 24. Confirmed Low Issues
 
-### OPS-001 — LOW
+### OPS-001 - LOW
 - File: `docker-compose.yml`
 - Evidence: named volumes are configured for MongoDB and uploads/backups
 - Impact: regular shutdown does not automatically destroy data, but `down -v` will

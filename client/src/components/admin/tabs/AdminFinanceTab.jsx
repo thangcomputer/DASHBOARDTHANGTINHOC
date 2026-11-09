@@ -112,7 +112,7 @@ export default function AdminFinanceTab() {
         category: 'finance',
         message: 'Tải file báo cáo tài chính (sổ cái)',
         target: 'finance-ledger-csv',
-      }).catch(() => {});
+      }).catch(() => { });
       addSystemLog('Xuất sổ cái', 'Tài chính (Ledger)', 'Admin', 'bg-orange-500 text-white');
       toast.dismiss(tid);
       toast.success('Xuất sổ cái thành công');
@@ -124,7 +124,7 @@ export default function AdminFinanceTab() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
-      {/* P2 P&L strip — 5 ô đều: mobile 2+2+full, md+ 5 cột */}
+      {/* P2 P&L strip - 5 ô đều: mobile 2+2+full, md+ 5 cột */}
       {ledger && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
@@ -172,7 +172,7 @@ export default function AdminFinanceTab() {
                     category: 'finance',
                     message: 'Tải file báo cáo doanh thu học phí',
                     target: 'finance-revenue-csv',
-                  }).catch(() => {});
+                  }).catch(() => { });
                   addSystemLog('Xuất báo cáo', 'Tài chính (Doanh thu học phí)', 'Admin', 'bg-orange-500 text-white');
                   toast.dismiss(tid);
                   toast.success('Xuất báo cáo doanh thu thành công!');
@@ -245,9 +245,8 @@ export default function AdminFinanceTab() {
               return (
                 <div key={r.key} className="cms-m-list-row hover:bg-slate-50 flex-col lg:flex-row lg:items-center">
                   <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-[1.5]">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${
-                      isRefund ? 'bg-red-500' : (r.paid ? 'bg-emerald-500' : 'bg-amber-500')
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${isRefund ? 'bg-red-500' : (r.paid ? 'bg-emerald-500' : 'bg-amber-500')
+                      }`}>
                       {(r.studentName || '?')[0]}
                     </div>
                     <div className="min-w-0">
@@ -261,12 +260,12 @@ export default function AdminFinanceTab() {
                     </div>
                   </div>
                   <div className="hidden lg:block min-w-0 flex-1">
-                     <p className="text-[13px] text-slate-700 font-semibold truncate">{r.courseName}</p>
-                     <p className="text-[11px] text-slate-400">Khóa học</p>
+                    <p className="text-[13px] text-slate-700 font-semibold truncate">{r.courseName}</p>
+                    <p className="text-[11px] text-slate-400">Khóa học</p>
                   </div>
                   <div className="hidden lg:block min-w-0 flex-1">
-                     <p className="text-[13px] text-slate-700 font-semibold truncate">{r.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</p>
-                     <p className="text-[11px] text-slate-400">Hình thức</p>
+                    <p className="text-[13px] text-slate-700 font-semibold truncate">{r.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</p>
+                    <p className="text-[11px] text-slate-400">Hình thức</p>
                   </div>
                   <div className="flex flex-col gap-2 min-[640px]:flex-row min-[640px]:flex-wrap min-[640px]:items-center min-[640px]:justify-end min-w-0 w-full min-[640px]:w-auto lg:flex-1">
                     <div className="text-left min-[640px]:text-right min-w-0">
@@ -274,9 +273,8 @@ export default function AdminFinanceTab() {
                         {(Number(r.price) || 0).toLocaleString('vi-VN')}đ
                       </p>
                       <div className="flex items-center gap-1.5 min-[640px]:justify-end">
-                        <span className={`text-[13px] font-bold ${
-                          isRefund ? 'text-red-600' : (r.paid ? 'text-sky-700' : 'text-red-500')
-                        }`}>
+                        <span className={`text-[13px] font-bold ${isRefund ? 'text-red-600' : (r.paid ? 'text-sky-700' : 'text-red-500')
+                          }`}>
                           {isRefund ? 'Hoàn' : (r.paid ? 'Đã nộp' : 'Chưa nộp')}
                         </span>
                         <span className="lg:hidden text-[11px] font-medium text-slate-400">· {r.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</span>
@@ -325,7 +323,7 @@ export default function AdminFinanceTab() {
                       category: 'finance',
                       message: 'Tải file báo cáo tài chính (phiếu chi lương)',
                       target: 'finance-transactions-csv',
-                    }).catch(() => {});
+                    }).catch(() => { });
                     toast.dismiss(tid);
                     toast.success('Xuất báo cáo tài chính thành công!');
                   } catch (e) {
@@ -442,7 +440,7 @@ export default function AdminFinanceTab() {
                     {line.courseName ? ` · ${line.courseName}` : ''}
                   </p>
                   <p className="cms-m-caption">
-                    {line.postedAt ? new Date(line.postedAt).toLocaleString('vi-VN') : '—'}
+                    {line.postedAt ? new Date(line.postedAt).toLocaleString('vi-VN') : '-'}
                     {line.note ? ` · ${line.note}` : ''}
                   </p>
                 </div>

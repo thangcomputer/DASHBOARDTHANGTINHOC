@@ -31,7 +31,7 @@ export const TOPIC_COLORS = {
   slate: { from: '#94A3B8', to: '#334155', soft: '#F8FAFC', text: '#334155' },
 };
 
-/** Ngày hôm nay theo giờ Việt Nam (YYYY-MM-DD) — khớp cách server tính chuỗi ngày. */
+/** Ngày hôm nay theo giờ Việt Nam (YYYY-MM-DD) - khớp cách server tính chuỗi ngày. */
 export function vnTodayKey(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -40,7 +40,7 @@ export function vnTodayKey(date = new Date()) {
 
 export const topicColor = (key) => TOPIC_COLORS[key] || TOPIC_COLORS.red;
 
-/** Mỗi chặng lộ trình một màu (xoay vòng) — giống các "phần" của Duolingo. */
+/** Mỗi chặng lộ trình một màu (xoay vòng) - giống các "phần" của Duolingo. */
 export const UNIT_COLORS = [
   { from: '#4ADE80', to: '#16A34A', soft: '#F0FDF4', text: '#15803D' },
   { from: '#60A5FA', to: '#2563EB', soft: '#EFF6FF', text: '#1D4ED8' },
@@ -82,7 +82,7 @@ export const QUESTION_TYPES = {
 const TYPE_CHIP = { soft: '#F1F5F9', color: '#475569' };
 
 /**
- * Nhãn ngữ cảnh trên thẻ câu — lộ trình gom Chặng + nút + nấc; loại câu riêng (không lặp «Vừa»).
+ * Nhãn ngữ cảnh trên thẻ câu - lộ trình gom Chặng + nút + nấc; loại câu riêng (không lặp «Vừa»).
  * @returns {{ id: string, text: string, soft?: string, color?: string }[]}
  */
 export function playQuestionHeaderChips({ path, typeLabel, levelMeta }) {
@@ -108,7 +108,7 @@ const COMFORT = ['Chưa đúng rồi', 'Tiếc quá!', 'Gần đúng rồi đó'
 export const randomPraise = () => PRAISE[Math.floor(Math.random() * PRAISE.length)];
 export const randomComfort = () => COMFORT[Math.floor(Math.random() * COMFORT.length)];
 
-/** Lời nhắc theo trạng thái chuỗi — giọng thúc đẩy, tạo cảm giác "đừng để mất". */
+/** Lời nhắc theo trạng thái chuỗi - giọng thúc đẩy, tạo cảm giác "đừng để mất". */
 export function reminderCopy(stats = {}, topicCount = 0) {
   const streak = stats.streak || 0;
   if (stats.streakState === 'lost' && stats.lostStreak > 0) {
@@ -116,7 +116,7 @@ export function reminderCopy(stats = {}, topicCount = 0) {
       mood: 'sad',
       badge: 'Bạn đã lỡ chuỗi',
       title: `Bạn đã lỡ chuỗi 🔥 ${stats.lostStreak} ngày!`,
-      text: `Đã ${stats.missedDays} ngày bạn chưa luyện tập. Đừng để công sức trôi đi — luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
+      text: `Đã ${stats.missedDays} ngày bạn chưa luyện tập. Đừng để công sức trôi đi - luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
       cta: 'Lấy lại phong độ ngay',
     };
   }
@@ -154,7 +154,7 @@ export function resultMessage(stars) {
   return { title: 'Đừng nản nhé!', text: 'Ai cũng bắt đầu từ đây. Thử độ khó Dễ để làm quen trước.' };
 }
 
-/** Trong lượt có cược: ví đã trừ stake — hiển thị tổng (ví + đang cược) cho khớp màn ngoài. */
+/** Trong lượt có cược: ví đã trừ stake - hiển thị tổng (ví + đang cược) cho khớp màn ngoài. */
 export function inPlayWalletXp(profileXp, stakeXp) {
   const wallet = Math.max(0, Number(profileXp) || 0);
   const stake = Math.max(0, Number(stakeXp) || 0);

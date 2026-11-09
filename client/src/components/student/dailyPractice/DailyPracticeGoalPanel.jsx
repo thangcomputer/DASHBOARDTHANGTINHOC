@@ -78,12 +78,23 @@ export default function DailyPracticeGoalPanel({ practiceStats }) {
           </div>
         ) : (
           <div className="mt-3 space-y-3">
-            <p className="text-xs font-bold text-slate-600">
-              {goal.hoursPerDay} giờ/ngày · {periodLabel(goal.period)}
-              {!goal.expired && (
-                <span className="ml-1 font-semibold text-slate-400">· còn {progress.daysLeft} ngày</span>
-              )}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold text-slate-600">
+                {goal.hoursPerDay} giờ/ngày · {periodLabel(goal.period)}
+                {!goal.expired ? (
+                  <span className="ml-1 font-semibold text-slate-400">· còn {progress.daysLeft} ngày</span>
+                ) : (
+                  <span className="ml-1 font-semibold text-amber-600">· đã hết hạn</span>
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={openLearningGoal}
+                className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline"
+              >
+                {goal.expired ? 'Đặt mới' : 'Đổi mục tiêu'}
+              </button>
+            </div>
             <div>
               <div className="flex justify-between text-[11px] font-bold text-slate-600">
                 <span>Giờ học hôm nay</span>

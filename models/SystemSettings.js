@@ -34,32 +34,32 @@ const systemSettingsSchema = new mongoose.Schema({
   },
 
   // ── Cài đặt Web (Logo, Favicon, Loading) ──────────────────────────────────
-  logoUrl:      { type: String, default: '' },                 // URL logo thương hiệu
-  faviconUrl:   { type: String, default: '' },                 // Favicon trang public / HV / GV
+  logoUrl: { type: String, default: '' },                 // URL logo thương hiệu
+  faviconUrl: { type: String, default: '' },                 // Favicon trang public / HV / GV
   faviconAdminUrl: { type: String, default: '' },              // Favicon khu vực Admin
   loadingStyle: { type: Number, default: 1, min: 1, max: 4 }, // 1-4 kiểu loading screen
 
-  // Legacy staffPopup — giữ schema để không lỗi dữ liệu cũ; UI dùng popupTargetRole=staff
+  // Legacy staffPopup - giữ schema để không lỗi dữ liệu cũ; UI dùng popupTargetRole=staff
   staffPopup: {
-    isActive:  { type: Boolean, default: false },
-    title:     { type: String, default: '' },
-    content:   { type: String, default: '' },
-    updatedAt: { type: Date,   default: Date.now },
+    isActive: { type: Boolean, default: false },
+    title: { type: String, default: '' },
+    content: { type: String, default: '' },
+    updatedAt: { type: Date, default: Date.now },
   },
 
   // ── Training Data Raw (Dữ liệu Admin tạo ra cho khóa học nội bộ) ─────────
-  trainingRawData: { 
-    type: mongoose.Schema.Types.Mixed, 
-    default: { videos: [], guides: [], files: [] } 
+  trainingRawData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: { videos: [], guides: [], files: [] }
   },
 
   // ── Student Training Data Raw (Dữ liệu Admin tạo cho học viên) ─────────
-  studentTrainingRawData: { 
-    type: mongoose.Schema.Types.Mixed, 
-    default: { videos: [], guides: [], files: [] } 
+  studentTrainingRawData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: { videos: [], guides: [], files: [] }
   },
 
-  // ── Ngân hàng câu hỏi thi + thời gian làm bài (HV) — đồng bộ mọi máy ───
+  // ── Ngân hàng câu hỏi thi + thời gian làm bài (HV) - đồng bộ mọi máy ───
   // Chỉ ghi khi admin PUT; undefined = chưa cấu hình trên server (client dùng local seed cũ)
   studentExamBankRawData: { type: mongoose.Schema.Types.Mixed },
   studentExamMinutesRaw: { type: mongoose.Schema.Types.Mixed },
@@ -75,7 +75,7 @@ const systemSettingsSchema = new mongoose.Schema({
   /** URL âm thanh cảnh báo phòng thi TN (click ngoài / chuyển tab). Trống = beep mặc định. */
   examWarningSoundUrl: { type: String, default: '' },
 
-  // ── Ngân hàng câu hỏi thi Giảng viên (Admin CRUD) — đồng bộ GV mọi máy ───
+  // ── Ngân hàng câu hỏi thi Giảng viên (Admin CRUD) - đồng bộ GV mọi máy ───
   teacherExamBankRawData: { type: mongoose.Schema.Types.Mixed },
   /** Tổng thời gian làm bài test trắc nghiệm GV (phút). null = client tự tính theo số câu */
   teacherExamTimeLimitMinutes: { type: Number, default: null },
@@ -88,34 +88,34 @@ const systemSettingsSchema = new mongoose.Schema({
   examAdminGroupLabel: { type: String, default: 'Admin tạo' },
 
   // ── Invoice Settings ─────────────────────────────────────────────
-  invoiceLogoUrl:      { type: String, default: '' },
+  invoiceLogoUrl: { type: String, default: '' },
   invoiceSignatureUrl: { type: String, default: '' },
-  invoiceStampText:    { type: String, default: 'ĐÃ THANH TOÁN' },
+  invoiceStampText: { type: String, default: 'ĐÃ THANH TOÁN' },
 
   // ── Admin Profile (cho tài khoản hardcoded) ─────────────────────────────
-  adminName:         { type: String, default: '' },   // Nếu empty → fallback 'Admin Thắng Tin Học'
-  adminAvatar:       { type: String, default: '' },
+  adminName: { type: String, default: '' },   // Nếu empty → fallback 'Admin Thắng Tin Học'
+  adminAvatar: { type: String, default: '' },
   adminPasswordHash: { type: String, default: '' },   // Nếu empty → dùng MASTER_ADMIN_PASSWORD hoặc dev fallback
   adminTokenVersion: { type: Number, default: 0 },
 
   // ── Super Admin MFA (TOTP) ─────────────────────────────────────────────
   adminMfaEnabled: { type: Boolean, default: false },
-  adminMfaSecret:  { type: String, default: '', select: false },
+  adminMfaSecret: { type: String, default: '', select: false },
   /** Secret tạm khi setup MFA (chưa enable) */
   adminMfaPendingSecret: { type: String, default: '', select: false },
 
   // ── Khung Banner Quảng Cáo Học viên & Giảng viên (Carousel) ─────────────────────────────
   studentBanners: [{
     imageUrl: { type: String, default: '' },
-    linkUrl:  { type: String, default: '' },
-    order:    { type: Number, default: 0 }
+    linkUrl: { type: String, default: '' },
+    order: { type: Number, default: 0 }
   }],
   studentBannerSpeed: { type: Number, default: 5 }, // giây
 
   teacherBanners: [{
     imageUrl: { type: String, default: '' },
-    linkUrl:  { type: String, default: '' },
-    order:    { type: Number, default: 0 }
+    linkUrl: { type: String, default: '' },
+    order: { type: Number, default: 0 }
   }],
   teacherBannerSpeed: { type: Number, default: 5 }, // giây
 }, { timestamps: true });

@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  dashboardthangtinhoc — K6 Load Test Script 
+ *  dashboardthangtinhoc - K6 Load Test Script 
  *  Kiểm thử sức chịu tải API thuần (không browser)
  *
  *  Cài đặt K6: https://k6.io/docs/get-started/installation/
@@ -31,25 +31,25 @@ export const options = {
       startVUs: 0,
       stages: [
         { duration: '30s', target: 10 },   // Ramp up to 10
-        { duration: '1m',  target: 20 },   // Ramp up to 20
-        { duration: '2m',  target: 20 },   // Hold at 20
+        { duration: '1m', target: 20 },   // Ramp up to 20
+        { duration: '2m', target: 20 },   // Hold at 20
         { duration: '30s', target: 50 },   // Spike to 50!
-        { duration: '1m',  target: 0 },    // Ramp down
+        { duration: '1m', target: 0 },    // Ramp down
       ],
       startTime: '5m', // Start after scenario 1
     },
   },
   thresholds: {
     http_req_duration: ['p(95)<2000'],  // 95% requests < 2s
-    http_req_failed:   ['rate<0.05'],   // Error rate < 5%
+    http_req_failed: ['rate<0.05'],   // Error rate < 5%
     'api_response_time': ['p(95)<2000', 'avg<500'],
   },
 };
 
 // ── Custom Metrics ─────────────────────────────────────────────────────
 const apiResponseTime = new Trend('api_response_time');
-const apiErrorRate    = new Rate('api_error_rate');
-const apiCallCounter  = new Counter('api_call_total');
+const apiErrorRate = new Rate('api_error_rate');
+const apiCallCounter = new Counter('api_call_total');
 
 // ── Config ─────────────────────────────────────────────────────────────
 const BASE_URL = __ENV.API_BASE_URL || 'http://localhost:5000';
@@ -88,7 +88,7 @@ export default function () {
   const vuId = __VU;
 
   // ── Group 1: Dashboard APIs ────────────────────────────────────────
-  group('Dashboard — Load Data', () => {
+  group('Dashboard - Load Data', () => {
     // GET Root API
     const rootRes = apiRequest('GET', '/');
     check(rootRes, {
@@ -114,7 +114,7 @@ export default function () {
   });
 
   // ── Group 2: Schedule APIs ─────────────────────────────────────────
-  group('Schedules — Load Calendar', () => {
+  group('Schedules - Load Calendar', () => {
     const schedRes = apiRequest('GET', '/api/schedules');
     check(schedRes, {
       'Schedules API returns 200|401': (r) => [200, 401].includes(r.status),
@@ -130,7 +130,7 @@ export default function () {
   });
 
   // ── Group 3: Courses API ───────────────────────────────────────────
-  group('Courses — Load List', () => {
+  group('Courses - Load List', () => {
     const coursesRes = apiRequest('GET', '/api/courses');
     check(coursesRes, {
       'Courses API returns 200|401': (r) => [200, 401].includes(r.status),
@@ -141,7 +141,7 @@ export default function () {
   });
 
   // ── Group 4: Teachers API ──────────────────────────────────────────
-  group('Teachers — Load List', () => {
+  group('Teachers - Load List', () => {
     const teachersRes = apiRequest('GET', '/api/teachers');
     check(teachersRes, {
       'Teachers API returns 200|401': (r) => [200, 401].includes(r.status),
@@ -152,7 +152,7 @@ export default function () {
   });
 
   // ── Group 5: Exam Results ──────────────────────────────────────────
-  group('Exam Results — Stress', () => {
+  group('Exam Results - Stress', () => {
     const examRes = apiRequest('GET', '/api/exam-results');
     check(examRes, {
       'Exam results API 200': (r) => r.status === 200,
@@ -180,7 +180,7 @@ export default function () {
   });
 
   // ── Group 6: Notifications ─────────────────────────────────────────
-  group('Notifications — Load', () => {
+  group('Notifications - Load', () => {
     const notifRes = apiRequest('GET', '/api/notifications');
     check(notifRes, {
       'Notifications 200|401': (r) => [200, 401].includes(r.status),
@@ -189,8 +189,8 @@ export default function () {
     sleep(0.3);
   });
 
-  // ── Group 7: Auth — Token Refresh ──────────────────────────────────
-  group('Auth — Token Operations', () => {
+  // ── Group 7: Auth - Token Refresh ──────────────────────────────────
+  group('Auth - Token Operations', () => {
     const captchaRes = apiRequest('GET', '/api/auth/captcha');
     check(captchaRes, {
       'Captcha API 200': (r) => r.status === 200,
@@ -223,7 +223,7 @@ function textSummary(data) {
 
   return `
 ╔══════════════════════════════════════════════════════════════╗
-║           📊 K6 LOAD TEST REPORT — dashboardthangtinhoc               ║
+║           📊 K6 LOAD TEST REPORT - dashboardthangtinhoc               ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  ── HTTP Request Duration ──────────────────────────────    ║

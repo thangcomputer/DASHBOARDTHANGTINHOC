@@ -4,7 +4,7 @@ export const TEACHER_EXAM_SECTIONS = [
 
 const LEGACY_TEACHER_SECTIONS = new Set();
 
-/** Section cũ trong DB — vẫn hiện để admin sửa/xóa */
+/** Section cũ trong DB - vẫn hiện để admin sửa/xóa */
 export function isLegacyTeacherExamSection(section) {
   return LEGACY_TEACHER_SECTIONS.has(String(section || '').toLowerCase().trim());
 }

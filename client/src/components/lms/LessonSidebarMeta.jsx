@@ -6,7 +6,7 @@ import {
   lessonSidebarChipClass,
 } from '../../utils/lmsLessonUi';
 
-/** Meta gọn cho mục lục bài học — chip + 1 dòng + % (không xếp 3–4 dòng chữ). */
+/** Meta gọn cho mục lục bài học - chip + 1 dòng + % (không xếp 3–4 dòng chữ). */
 export default function LessonSidebarMeta({ lesson, isCurrent = false, className = '' }) {
   const ui = getLessonSidebarUi(lesson, { isCurrent });
   const hasRow = ui.chips.length > 0 || ui.primary?.text;

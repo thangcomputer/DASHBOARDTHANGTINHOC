@@ -1,4 +1,4 @@
-# DashboardThangTinHoc — ERD (Entity Relationship)
+# DashboardThangTinHoc - ERD (Entity Relationship)
 
 Sơ đồ quan hệ logic MongoDB (Mongoose). Không phải SQL FK cứng; quan hệ qua `ObjectId` / string id.
 

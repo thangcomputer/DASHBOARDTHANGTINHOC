@@ -1,8 +1,8 @@
-# PHASE C1 — PRODUCTION AUDIT
+# PHASE C1 - PRODUCTION AUDIT
 
 **Phase:** C1  
 **Date:** 2026-08-11  
-**Mode:** READ-ONLY — no application change, no DB write, no index/counter/migration  
+**Mode:** READ-ONLY - no application change, no DB write, no index/counter/migration  
 **Audit script:** [`scripts/_tmp_phase_c1_audit_readonly.cjs`](../../scripts/_tmp_phase_c1_audit_readonly.cjs)  
 **Raw JSON:** [`_phase_c1_audit_raw.json`](./_phase_c1_audit_raw.json) (`NOT EXECUTED` dry-run embedded)  
 **Baseline:** Phase A + Phase B docs under `docs/codes/`
@@ -41,29 +41,29 @@ PRODUCTION AUDIT = BLOCKED
 | Teacher | `teachers` | 4 | **absent** |
 | Employee | `employees` | 0 | **absent** |
 | Course | `courses` | 1 | **absent** (`slug` exists) |
-| Enrollment | embedded `students.enrollments[]` | — | uses `courseId`, `teacherId` ObjectIds |
+| Enrollment | embedded `students.enrollments[]` | - | uses `courseId`, `teacherId` ObjectIds |
 | Invoice | `invoices` | 4 | **no** `studentCode`; `hocVien` ObjectId; `maHoaDon` |
 | Ledger | `ledgerentries` | 4 | **no** `studentCode`; `studentId` ObjectId; `sourceRef` often invoice # |
 | PaymentSession | `paymentsessions` | 0 | `ref` (string); TTL 24h |
 | PayrollLog | `payrolllogs` | 0 | `employeeId` ObjectId (model) |
 | Transaction | `transactions` | 0 | teacher finance |
-| Counters | — | **missing** | N/A |
+| Counters | - | **missing** | N/A |
 
-Also present (out of business-code scope): `messages`, `teacherassignmentsegments`, `sepaywebhookevents`, etc. — not modified; messaging not audited for writes.
+Also present (out of business-code scope): `messages`, `teacherassignmentsegments`, `sepaywebhookevents`, etc. - not modified; messaging not audited for writes.
 
 ### Model / index summary
 
 | Model | Field | Required | Unique | Sparse | Notes |
 |-------|-------|----------|--------|--------|-------|
 | Student | `studentCode` | no (default `''`) | **no** | **yes** | [`models/Student.js`](../../models/Student.js) index `studentCode_1` |
-| Teacher | `teacherCode` | — | — | — | field does not exist |
-| Employee | `employeeCode` | — | — | — | field does not exist |
-| Course | `courseCode` | — | — | — | field does not exist; `slug` unique |
-| Course | `slug` | yes (practically) | **yes** | no | URL identity — keep |
-| PaymentSession | `sessionId` | yes | **yes** | — | primary session key |
-| PaymentSession | `ref` | yes | no | — | compound with status |
-| Invoice | `maHoaDon` | yes | **yes** | — | independent of studentCode |
-| Invoice | `hocVien` | yes | no | — | ObjectId FK |
+| Teacher | `teacherCode` | - | - | - | field does not exist |
+| Employee | `employeeCode` | - | - | - | field does not exist |
+| Course | `courseCode` | - | - | - | field does not exist; `slug` unique |
+| Course | `slug` | yes (practically) | **yes** | no | URL identity - keep |
+| PaymentSession | `sessionId` | yes | **yes** | - | primary session key |
+| PaymentSession | `ref` | yes | no | - | compound with status |
+| Invoice | `maHoaDon` | yes | **yes** | - | independent of studentCode |
+| Invoice | `hocVien` | yes | no | - | ObjectId FK |
 
 **Index readiness for unique business codes:** **NOT YET SAFE** (legacy non-canonical codes; no prod duplicate proof; teacher/employee/course fields missing).
 
@@ -90,7 +90,7 @@ Also present (out of business-code scope): `messages`, `teacherassignmentsegment
 
 **Classification:** all **LEGACY_FORMAT** (timestamp generator). None **VALID** canonical.
 
-### Generator findings (report only — not fixed)
+### Generator findings (report only - not fixed)
 
 | Finding | Evidence | Risk | Path | Recommended fix (later) | Migration impact |
 |---------|----------|------|------|-------------------------|------------------|
@@ -110,7 +110,7 @@ Also present (out of business-code scope): `messages`, `teacherassignmentsegment
 | Employee | **NO** | 0 / 0 | 0 docs | N/A |
 | Course | **NO** | 0 / 1 | 1 | N/A |
 
-**Report only:** fields not present — do not add in C1.
+**Report only:** fields not present - do not add in C1.
 
 ---
 
@@ -122,7 +122,7 @@ Also present (out of business-code scope): `messages`, `teacherassignmentsegment
 | Students with ≥2 enrollments | **0** (data) | Schema still allows |
 | Students with ≥2 distinct teachers | **0** (data) | Schema still allows |
 | Assignment API uses ObjectIds | **PASS** | `assignTeacher(studentId, teacherId, enrollmentId)` |
-| HV number must equal GV number | **PASS** — no such rule | — |
+| HV number must equal GV number | **PASS** - no such rule | - |
 
 **Verdict:** Multi-course **PASS** (schema). Teacher assignment independence **PASS**. Migration must **not** create one Student per Course.
 
@@ -137,7 +137,7 @@ Also present (out of business-code scope): `messages`, `teacherassignmentsegment
 | conversationId uses business codes | **NO** (ObjectId / role pairs) |
 
 **Messaging isolation: PASS**  
-If any dependency appears later: **STOP / REPORT ONLY** — do not edit messaging to unblock migration.
+If any dependency appears later: **STOP / REPORT ONLY** - do not edit messaging to unblock migration.
 
 ---
 
@@ -147,7 +147,7 @@ If any dependency appears later: **STOP / REPORT ONLY** — do not edit messagin
 |-------|--------|
 | `counters` collection | **does not exist** |
 | Atomic `$inc` business sequence | **absent** |
-| Current create path | `Date.now()` — **not** race-safe / not monotonic under concurrency |
+| Current create path | `Date.now()` - **not** race-safe / not monotonic under concurrency |
 
 **Counter readiness:** **NOT READY** (design exists in Phase B; not implemented). C1 did **not** create counters.
 
@@ -172,12 +172,12 @@ See [`PHASE_C1_PAYMENT_COMPATIBILITY.md`](./PHASE_C1_PAYMENT_COMPATIBILITY.md).
 
 | Path | Uses studentCode? | Uses _id? | Uses invoice? | Uses PaymentSession.ref? |
 |------|-------------------|-----------|---------------|--------------------------|
-| SePay session match | No (primary) | optional studentId on session (schema lacks field) | via settle | **Yes — primary** |
+| SePay session match | No (primary) | optional studentId on session (schema lacks field) | via settle | **Yes - primary** |
 | SePay student fallback | **Yes** | update by `_id` after match | creates Invoice | No |
 | Invoice history | No | `hocVien` | `maHoaDon` | No |
 | Ledger | No | `studentId` | `sourceRef` often HD… | No |
 
-**Risk note (report only):** unpaid fallback loops candidates and **`break`s on first** successful match — not “count matches → fail closed if >1”. With non-unique `studentCode`, Scenario D is **PICK-FIRST** today (severity P1). Target policy wants FAIL CLOSED — future change only after owner approve; **not in C1**.
+**Risk note (report only):** unpaid fallback loops candidates and **`break`s on first** successful match - not “count matches → fail closed if >1”. With non-unique `studentCode`, Scenario D is **PICK-FIRST** today (severity P1). Target policy wants FAIL CLOSED - future change only after owner approve; **not in C1**.
 
 ---
 
@@ -187,14 +187,14 @@ See [`PHASE_C1_PAYMENT_COMPATIBILITY.md`](./PHASE_C1_PAYMENT_COMPATIBILITY.md).
 |---------|--------|
 | Production audit unavailable | **ACTIVE → C2 BLOCKED** |
 | Duplicate codes (this env) | Clear |
-| Ambiguous payment multi-match | **Code behavior PICK-FIRST** (policy wants fail-closed) — **REVIEW** |
+| Ambiguous payment multi-match | **Code behavior PICK-FIRST** (policy wants fail-closed) - **REVIEW** |
 | Non-atomic sequence | **ACTIVE** (Date.now) |
 | Unique index premature | Must not create until prod clean + backfill |
 | Frontend-generated TTH | **ACTIVE** (report only) |
 | Timestamp-generated HV | **ACTIVE** |
 | Messaging dependency | **NONE** |
 | Teacher assignment on business code | **NONE** |
-| Invoice/Ledger unclear | **CLEAR** — ObjectId based |
+| Invoice/Ledger unclear | **CLEAR** - ObjectId based |
 
 ---
 
@@ -211,7 +211,7 @@ See [`PHASE_C1_PAYMENT_COMPATIBILITY.md`](./PHASE_C1_PAYMENT_COMPATIBILITY.md).
 ## 12. Recommended PHASE C2 (not started)
 
 ```text
-PHASE C2 = BLOCKED until production re-audit PASS (or owner explicit waiver — not recommended).
+PHASE C2 = BLOCKED until production re-audit PASS (or owner explicit waiver - not recommended).
 
 When unblocked (doc only for now):
   C2a: CodeGeneratorService + counters (create path only)
@@ -280,5 +280,5 @@ Recommended PHASE C2: BLOCKED
 ---
 
 ```text
-STOP — await owner review. Do not migrate. Do not modify DB.
+STOP - await owner review. Do not migrate. Do not modify DB.
 ```

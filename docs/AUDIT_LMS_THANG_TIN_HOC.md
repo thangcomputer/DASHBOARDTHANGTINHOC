@@ -151,32 +151,32 @@ Không liệt kê file để xóa chỉ dựa vào tên/import chưa dùng. Các
 
 ## 10. Roadmap sửa
 
-### Giai đoạn 1 — Critical/security
+### Giai đoạn 1 - Critical/security
 
 1. [Đã làm một phần] Hoàn tất security line review và IDOR matrix; branch/tenant policy matrix đã đạt local test.
 2. [Đã hoàn tất] Fail-fast session store production.
 3. [Đã làm một phần] E2E upload/download với revoke token, MIME/path traversal và expiry.
 4. [Còn thiếu] Chạy staging HTTP matrix với dữ liệu nhiều chi nhánh; local policy matrix và quyền đọc certification của admin/staff/teacher đã có coverage.
 
-### Giai đoạn 2 — Logic nghiệp vụ
+### Giai đoạn 2 - Logic nghiệp vụ
 
 1. [Đã làm một phần] Test state machine exam: submit idempotent, reload/rời phòng và timeout đã có integration coverage; còn thiếu forfeit chủ động và E2E MC + essay với trình duyệt.
 2. Chuẩn hóa file đề theo canonical subject và version.
 3. Loại race autosave bằng version/ETag hoặc server-side patch contract.
 
-### Giai đoạn 3 — Structure
+### Giai đoạn 3 - Structure
 
 1. Tách `studentRoutes` theo bounded context.
 2. Đưa business logic khỏi component lớn và route handler.
 3. Ghi architecture map cho legacy vs mounted modules.
 
-### Giai đoạn 4 — Performance
+### Giai đoạn 4 - Performance
 
 1. Explain plan/index audit.
 2. Giới hạn pagination/export và N+1.
 3. Cache có invalidation rõ cho settings/analytics; không dùng cache để che consistency bug.
 
-### Giai đoạn 5 — Maintainability/test
+### Giai đoạn 5 - Maintainability/test
 
 1. Contract tests cho API config/exam/report.
 2. Regression suite login/RBAC/enrollment/progress/quiz/report/certificate.

@@ -12,7 +12,7 @@ const out = [];
 
 function record(id, name, pass, actual) {
   out.push({ id, name, result: pass ? 'PASS' : 'FAIL', actual });
-  console.log(`[${pass ? 'PASS' : 'FAIL'}] ${id} — ${name} | ${actual}`);
+  console.log(`[${pass ? 'PASS' : 'FAIL'}] ${id} - ${name} | ${actual}`);
 }
 
 function req(method, urlPath, { token, body, cookie, csrfToken } = {}) {
@@ -154,7 +154,7 @@ async function main() {
   await mongoose.disconnect();
 
   const fail = out.filter((x) => x.result === 'FAIL').length;
-  console.log(`\n=== Exam unlock critical: PASS ${out.length - fail} FAIL ${fail} ===`);
+  console.log(`\n=== Exam unlock critical: PASS ${out.length - fail} FAIL ${fail} === `);
   process.exit(fail ? 1 : 0);
 }
 

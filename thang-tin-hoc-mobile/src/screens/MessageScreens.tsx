@@ -21,8 +21,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle,
-  MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, UserPlus, Video, X,
+  Bot, CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, Clock, Copy, Download, FileText, Headphones, ImagePlus, Info, Lock, LogOut, MessageCircle, MessageSquare,
+  MoreHorizontal, Paperclip, Phone, Pin, PinOff, Plus, Reply, RotateCcw, Search, Send, Smile, ThumbsUp, Trash2, UserPlus, UserRound, Video, X,
 } from 'lucide-react-native';
 import { AppHeader, AppScreen, Avatar, Card, EmptyState, ErrorState, LoadingSkeleton, PrimaryButton, SearchField } from '../components/ui';
 import { useAuth } from '../app/AuthContext';
@@ -31,14 +31,19 @@ import { getMobileImageSource } from '../services/apiClient';
 import {
   AI_SUPPORT_WELCOME_CHIPS,
   AI_SUPPORT_STATUS,
+  canOfferHumanEscalation,
   escalateAiSupportConversation,
   getAiSupportReplyPresentation,
   isAiSupportWelcome,
+  lastMeaningfulAiReplyId,
   resetAiSupportConversation,
   type AiSupportStatus,
 } from '../services/aiSupportApi';
+import { MessageRichText } from '../components/MessageRichText';
+import { TypingDots } from '../components/TypingDots';
 import { downloadChatAttachment, openChatAttachment } from '../services/chatFileAccess';
 import {
+  buildDirectConversationId,
   getChatReactionEmoji,
   getChatReactionType,
   mapLiveChatMessage,
@@ -360,15 +365,15 @@ export function MessagesScreen() {
   const [conversationOptionsId, setConversationOptionsId] = useState<string | null>(null);
   const categoryFilters = user?.role === 'teacher'
     ? [
-        { id: 'all' as const, label: 'Tất cả' },
-        { id: 'student' as const, label: 'Học viên' },
+      { id: 'all' as const, label: 'Tất cả' },
+      { id: 'student' as const, label: 'Học viên' },
       { id: 'group' as const, label: 'Nhóm' },
     ]
     : [
-        { id: 'all' as const, label: 'Tất cả' },
-        { id: 'teacher' as const, label: 'Giảng viên' },
-        { id: 'group' as const, label: 'Nhóm' },
-      ];
+      { id: 'all' as const, label: 'Tất cả' },
+      { id: 'teacher' as const, label: 'Giảng viên' },
+      { id: 'group' as const, label: 'Nhóm' },
+    ];
   const loader = useCallback(() => messageService.conversations(isTeacher ? 'teacher' : 'student', user), [isTeacher, user]);
   const resource = useMockResource(loader);
   useFocusEffect(useCallback(() => {
@@ -472,10 +477,10 @@ export function MessagesScreen() {
       {socketStatus ? <Text style={styles.socketStatus}>{socketStatus}</Text> : null}
       <View style={[styles.inboxFilterRow, !isTeacher && styles.inboxFilterRowStudent]}>
         {isTeacher ? (
-        <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
+          <Pressable onPress={() => setShowCreateGroup(true)} style={styles.createGroupButton} accessibilityRole="button" accessibilityLabel="Tạo nhóm chat">
             <Plus size={25} color={colors.brand} strokeWidth={2.8} />
-        </Pressable>
-      ) : null}
+          </Pressable>
+        ) : null}
         <ScrollView
           style={styles.filtersWrapper}
           horizontal
@@ -485,15 +490,15 @@ export function MessagesScreen() {
           {categoryFilters.map((filter) => {
             const active = category === filter.id;
             return (
-            <Pressable
-              key={filter.id}
-              onPress={() => setCategory(filter.id)}
+              <Pressable
+                key={filter.id}
+                onPress={() => setCategory(filter.id)}
                 style={[styles.filterChip, active && styles.filterChipActive]}
-              accessibilityRole="button"
+                accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-            >
+              >
                 <Text style={[styles.filterText, active && styles.filterTextActive]}>{filter.label}</Text>
-            </Pressable>
+              </Pressable>
             );
           })}
         </ScrollView>
@@ -520,7 +525,7 @@ export function MessagesScreen() {
               && Boolean(conversation.participantId && onlineUserIds.includes(conversation.participantId));
             return (
               <View
-          key={conversation.id}
+                key={conversation.id}
                 style={[
                   styles.contactRow,
                   index === 0 && styles.contactRowFirst,
@@ -533,27 +538,27 @@ export function MessagesScreen() {
                   onPress={() => {
                     setConversationOptionsId(null);
                     navigation.navigate('Conversation', {
-            conversationId: conversation.id,
-            conversationName: conversation.name,
-            participantId: conversation.participantId,
-            participantRole: conversation.participantRole || conversation.category,
+                      conversationId: conversation.id,
+                      conversationName: conversation.name,
+                      participantId: conversation.participantId,
+                      participantRole: conversation.participantRole || conversation.category,
                       participantAdminRole: conversation.adminRole,
                       participantOnline: isOnline,
-            participantAvatarUri: conversation.avatarUri,
+                      participantAvatarUri: conversation.avatarUri,
                     });
                   }}
                   style={({ pressed }) => [styles.contactRowMain, pressed && styles.contactRowPressed]}
-          accessibilityRole="button"
-          accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
-        >
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mở cuộc trò chuyện với ${conversation.name}`}
+                >
                   <View style={styles.avatarContainer}>
                     <View style={[styles.avatarRing, { borderColor: badge.ring }]}>
                       <Image source={avatarSource} style={styles.avatarImg} />
-              </View>
+                    </View>
                     <View style={[styles.roleBadgePill, { backgroundColor: badge.bg }]}>
                       <Text style={styles.roleBadgePillText}>
                         {conversation.roleBadge || badge.label}
-                </Text>
+                      </Text>
                     </View>
                     {isOnline ? <View style={styles.onlineDot} /> : null}
                   </View>
@@ -577,8 +582,8 @@ export function MessagesScreen() {
                       </View>
                       {conversation.time ? (
                         <Text style={styles.contactTimeText}>{conversation.time}</Text>
-              ) : null}
-              </View>
+                      ) : null}
+                    </View>
 
                     <View style={styles.contactMessageRow}>
                       <Text
@@ -595,11 +600,11 @@ export function MessagesScreen() {
                           <Text style={styles.unreadCountText}>
                             {conversation.unread > 99 ? '99+' : conversation.unread}
                           </Text>
-            </View>
+                        </View>
                       ) : null}
                     </View>
                   </View>
-        </Pressable>
+                </Pressable>
                 <View style={styles.contactOptionsWrap}>
                   <Pressable
                     onPress={() => setConversationOptionsId((current) => current === conversation.id ? null : conversation.id)}
@@ -742,8 +747,68 @@ export function ConversationScreen() {
     );
     return () => subscription.remove();
   }, [isAiSupportConversation, isPreview, route.params.conversationId]);
+  const navigateToHumanSupport = async () => {
+    if (aiSupportBusy) return;
+    setAiSupportBusy(true);
+    setAiSupportError('');
+    try {
+      void escalateAiSupportConversation(route.params.conversationId).catch(() => null);
+
+      let targetContact: Conversation | null = null;
+      if (user) {
+        try {
+          const contacts = await messageService.conversations(user.role, user);
+          const supportContacts = contacts.filter((contact) => (
+            contact.category === 'support'
+            || String(contact.adminRole || '').toUpperCase() === 'SUPPORT'
+            || String(contact.role || '').toLowerCase() === 'support'
+          )).sort((a, b) => Number(Boolean(b.online)) - Number(Boolean(a.online)));
+
+          targetContact = supportContacts[0]
+            || contacts.find((c) => c.participantRole === 'staff' || c.participantRole === 'admin')
+            || contacts.find((c) => c.category === 'admin' || c.category === 'recruitment')
+            || null;
+        } catch {
+          targetContact = null;
+        }
+      }
+
+      if (targetContact) {
+        navigation.replace('Conversation', {
+          conversationId: targetContact.id,
+          conversationName: targetContact.name || 'Nhân viên Support Tin Học',
+          participantId: targetContact.participantId,
+          participantRole: targetContact.participantRole || 'staff',
+          participantAdminRole: targetContact.adminRole,
+          participantOnline: Boolean(targetContact.online),
+          ...(targetContact.avatarUri ? { participantAvatarUri: targetContact.avatarUri } : {}),
+        });
+      } else {
+        const fallbackConvId = user
+          ? buildDirectConversationId(user, 'admin', 'admin')
+          : 'support_direct_chat';
+        navigation.replace('Conversation', {
+          conversationId: fallbackConvId,
+          conversationName: 'Nhân viên Support Tin Học',
+          participantId: 'admin',
+          participantRole: 'admin',
+          participantAdminRole: 'SUPPORT',
+          participantOnline: true,
+        });
+      }
+    } catch (err: any) {
+      Alert.alert('Không thể chuyển tiếp', err?.message || 'Lỗi kết nối. Vui lòng thử lại sau.');
+    } finally {
+      setAiSupportBusy(false);
+    }
+  };
+
   const changeAiSupportStatus = async () => {
     if (!isAiSupportConversation || aiSupportBusy) return;
+    if (aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE) {
+      await navigateToHumanSupport();
+      return;
+    }
     setAiSupportBusy(true);
     setAiSupportError('');
     try {
@@ -1118,7 +1183,8 @@ export function ConversationScreen() {
       const message = thread[index];
       if (message.messageType === 'system' || message.recalled || message.callEvent) continue;
       if (!message.mine) return false;
-      return aiWaitNow - (message.timestampMs ?? aiWaitNow) < AI_REPLY_WAIT_MS;
+      const msgTime = message.timestampMs || aiWaitNow;
+      return aiWaitNow - msgTime < AI_REPLY_WAIT_MS;
     }
     return false;
   }, [aiSupportStatus, aiWaitNow, isAiSupportConversation, isPreview, thread]);
@@ -1128,6 +1194,11 @@ export function ConversationScreen() {
     const timer = setInterval(() => setAiWaitNow(Date.now()), 5000);
     return () => clearInterval(timer);
   }, [aiAwaitingReply, thread.length]);
+  useEffect(() => {
+    if (isAiSupportConversation && (sending || aiAwaitingReply)) {
+      threadRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [isAiSupportConversation, sending, aiAwaitingReply]);
   const latestServerMessages = messages || resource.data || [];
   const canLoadOlder = !isPreview
     && !isSearching
@@ -1176,10 +1247,30 @@ export function ConversationScreen() {
   const aiWelcomeChips = user?.role === 'teacher'
     ? AI_SUPPORT_WELCOME_CHIPS.teacher
     : AI_SUPPORT_WELCOME_CHIPS.student;
+
+  const [aiFeedbackPhase, setAiFeedbackPhase] = useState<'agree' | 'disagree_reason' | 're_explain' | 'disagree2' | 'final_choice' | 'more' | 'invite' | 'ended' | 'idle'>('agree');
+
+  const latestAiReplyId = useMemo(() => {
+    if (!isAiSupportConversation) return '';
+    return lastMeaningfulAiReplyId(thread, user?.id);
+  }, [isAiSupportConversation, thread, user?.id]);
+
+  const canShowEscalate = Boolean(
+    isAiSupportConversation
+    && !isPreview
+    && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+    && canOfferHumanEscalation(thread, user?.id)
+  );
+
+  const lastAiReplyIdRef = useRef('');
+  useEffect(() => {
+    if (!latestAiReplyId) return;
+    if (lastAiReplyIdRef.current === latestAiReplyId) return;
+    lastAiReplyIdRef.current = latestAiReplyId;
+    setAiFeedbackPhase((prev) => (prev === 're_explain' ? 'disagree2' : 'agree'));
+  }, [latestAiReplyId]);
   const conversationName = isAiSupportConversation
-    && (aiSupportStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
-      || aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE)
-    ? 'Hỗ trợ trực tiếp'
+    ? 'Trợ lý AI'
     : route.params.conversationName || 'Cuộc trò chuyện';
   const canShowMeetButton = Boolean(
     user
@@ -1465,7 +1556,10 @@ export function ConversationScreen() {
         .includes(searchText.trim().toLocaleLowerCase('vi-VN'))
     ))
     : thread;
-  const visibleMessages = searchText.trim() ? searchResults ?? localSearchResults : thread;
+  const baseMessages = searchText.trim() ? searchResults ?? localSearchResults : thread;
+  const visibleMessages = isAiSupportConversation
+    ? baseMessages.filter((message) => !String(message.text || '').includes('Đã chuyển yêu cầu tới nhân viên hỗ trợ'))
+    : baseMessages;
 
   useEffect(() => {
     if (!teacherAttendancePending) return undefined;
@@ -1595,12 +1689,16 @@ export function ConversationScreen() {
     .filter((contact) => matchesContactSearch(groupMemberSearch, contact));
   const groupMemberCount = groupDetails?.groupParticipants?.length;
   const peerId = String(route.params.participantId || '');
-  const isPeerOnline = peerId && getPresenceUserIds(presenceOnlineUsers).includes(peerId);
-  const contactStatus = isGroupConversation
-    ? groupMemberCount == null ? '' : `${groupMemberCount} thành viên`
-    : isPeerOnline
-      ? 'Trực tuyến'
-      : formatLastSeenStatus(presenceLastSeen[peerId]);
+  const isPeerOnline = isAiSupportConversation
+    ? true
+    : Boolean(peerId && getPresenceUserIds(presenceOnlineUsers).includes(peerId));
+  const contactStatus = isAiSupportConversation
+    ? 'Đang trực tuyến'
+    : isGroupConversation
+      ? (groupMemberCount == null ? '' : `${groupMemberCount} thành viên`)
+      : isPeerOnline
+        ? 'Trực tuyến'
+        : formatLastSeenStatus(presenceLastSeen[peerId]);
   const contactRole = ({
     admin: 'Admin',
     group: 'Nhóm',
@@ -1894,6 +1992,9 @@ export function ConversationScreen() {
     const isQuickPrompt = typeof quickPrompt === 'string';
     const text = (isQuickPrompt ? quickPrompt : draft).trim();
     const attachment = isQuickPrompt ? null : selectedAttachment;
+    if (isAiSupportConversation && aiFeedbackPhase !== 're_explain') {
+      setAiFeedbackPhase('agree');
+    }
     const messageText = attachment
       ? text || (attachment.type === 'image' ? '[Hình ảnh]' : `Đã gửi tệp: ${attachment.name}`)
       : text;
@@ -1938,6 +2039,7 @@ export function ConversationScreen() {
         id: `local-${Date.now()}`,
         text: messageText,
         time: 'Vừa xong',
+        timestampMs: Date.now(),
         mine: true,
         ...(isTeacher ? { state: 'sent' as const } : {}),
         replyToText: replyingTo?.text,
@@ -1948,6 +2050,49 @@ export function ConversationScreen() {
     clearDraft(sendingDraftKey);
     setReplyingTo(null);
     setSelectedAttachment(null);
+  };
+
+  const handleAiAgree = () => {
+    setAiFeedbackPhase('more');
+  };
+
+  const handleAiDisagree = () => {
+    setAiFeedbackPhase('disagree_reason');
+  };
+
+  const handleAiMoreYes = () => {
+    setAiFeedbackPhase('invite');
+  };
+
+  const handleAiMoreNo = () => {
+    setAiFeedbackPhase('ended');
+  };
+
+  const handleAiDisagreeReason = async (reason: string) => {
+    setAiFeedbackPhase('re_explain');
+    const reasonText = {
+      unclear: 'Tôi không hiểu câu trả lời vừa rồi, bạn có thể giải thích rõ hơn không?',
+      offtopic: 'Câu trả lời chưa đúng trọng tâm câu hỏi của tôi, bạn hãy trả lời lại đúng vào câu hỏi hơn.',
+      too_short: 'Câu trả lời còn quá ngắn, bạn hãy giải thích đầy đủ và chi tiết hơn.',
+    }[reason] || 'Bạn có thể giải thích thêm không?';
+    try {
+      await send(reasonText);
+    } catch { }
+  };
+
+  const handleAiDisagree2 = () => {
+    setAiFeedbackPhase('final_choice');
+  };
+
+  const handleAiFinalExplain = async () => {
+    setAiFeedbackPhase('re_explain');
+    try {
+      await send('Bạn có thể giải thích thêm một lần nữa với nhiều ví dụ và chi tiết hơn không?');
+    } catch { }
+  };
+
+  const handleAiFinalStaff = async () => {
+    await navigateToHumanSupport();
   };
 
   const setAttachmentFromDevice = (attachment: { name: string; uri: string; mimeType: string; size?: number; file?: Blob }) => {
@@ -2007,10 +2152,10 @@ export function ConversationScreen() {
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            quality: 0.85,
-            preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-          });
+          mediaTypes: ['images'],
+          quality: 0.85,
+          preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+        });
       if (result.canceled) return;
       const image = result.assets[0];
       const mimeType = image.mimeType || 'image/jpeg';
@@ -2099,6 +2244,7 @@ export function ConversationScreen() {
   };
 
   const toggleMessageReaction = async (msgId: string, emoji: string) => {
+    if (isAiSupportConversation) return;
     const type = getChatReactionType(emoji);
     if (!type) {
       Alert.alert('Không thể thả cảm xúc', 'Cảm xúc này chưa được hỗ trợ.');
@@ -2133,6 +2279,7 @@ export function ConversationScreen() {
   };
 
   const handleLikeHoverIn = (msgId: string) => {
+    if (isAiSupportConversation) return;
     if (reactionHoverTimerRef.current) {
       clearTimeout(reactionHoverTimerRef.current);
       reactionHoverTimerRef.current = null;
@@ -2243,14 +2390,20 @@ export function ConversationScreen() {
             <ChevronLeft size={21} color={colors.ink} />
           </Pressable>
           <View style={styles.chatHeaderAvatarWrap}>
-            <Image
-              source={getContactAvatarSource(
-                route.params.participantRole,
-                route.params.participantAdminRole,
-                route.params.participantAvatarUri,
-              )}
-              style={styles.chatHeaderAvatarImg}
-            />
+            {isAiSupportConversation ? (
+              <View style={styles.aiChatbotAvatar}>
+                <Bot size={22} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
+            ) : (
+              <Image
+                source={getContactAvatarSource(
+                  route.params.participantRole,
+                  route.params.participantAdminRole,
+                  route.params.participantAvatarUri,
+                )}
+                style={styles.chatHeaderAvatarImg}
+              />
+            )}
           </View>
           <View style={styles.chatHeaderCopy}>
             <Text numberOfLines={1} style={styles.chatHeaderName}>{conversationName}</Text>
@@ -2341,91 +2494,56 @@ export function ConversationScreen() {
           {user && user.role !== route.params.participantRole
             && (route.params.participantRole === 'student' || route.params.participantRole === 'teacher')
             && route.params.participantId ? (
-              <Pressable
-                onPress={() => {
-                  const callId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
-                  navigation.navigate('Call', {
-                    callId,
-                    conversationId: route.params.conversationId,
-                    conversationName,
-                    participantId: route.params.participantId!,
-                    participantRole: route.params.participantRole!,
-                    participantName: conversationName,
-                    direction: 'outgoing',
-                  });
-                }}
-                style={styles.chatHeaderAction}
-                accessibilityRole="button"
-                accessibilityLabel="Gọi thoại"
-              >
-                <Phone size={19} color={colors.muted} />
-              </Pressable>
-            ) : null}
+            <Pressable
+              onPress={() => {
+                const callId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+                navigation.navigate('Call', {
+                  callId,
+                  conversationId: route.params.conversationId,
+                  conversationName,
+                  participantId: route.params.participantId!,
+                  participantRole: route.params.participantRole!,
+                  participantName: conversationName,
+                  direction: 'outgoing',
+                });
+              }}
+              style={styles.chatHeaderAction}
+              accessibilityRole="button"
+              accessibilityLabel="Gọi thoại"
+            >
+              <Phone size={19} color={colors.muted} />
+            </Pressable>
+          ) : null}
           <Pressable onPress={() => setShowInfo(true)} style={styles.chatHeaderAction} accessibilityRole="button" accessibilityLabel="Thông tin liên hệ">
             <Info size={19} color={colors.muted} />
           </Pressable>
         </View>
-        {isAiSupportConversation && !isPreview ? (
+        {/* Chuyển sang nhân viên hỗ trợ khi cần thiết */}
+        {false ? (
           <View style={styles.aiSupportStatusCard}>
-            <View style={styles.aiSupportStatusCopy}>
-              <Text style={styles.aiSupportStatusTitle}>
-                {aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
-                  ? 'Đang trò chuyện với nhân viên hỗ trợ'
-                  : aiSupportStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
-                    ? 'Đã gửi yêu cầu hỗ trợ'
-                    : aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED
-                      ? 'Yêu cầu hỗ trợ đã hoàn tất'
-                      : 'Trợ lý AI sẵn sàng hỗ trợ'}
-              </Text>
-              <Text style={styles.aiSupportStatusMessage}>
-                {aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_ACTIVE
-                  ? 'Bạn có thể tiếp tục nhắn tin tại đây với nhân viên.'
-                  : aiSupportStatus === AI_SUPPORT_STATUS.WAITING_FOR_SUPPORT
-                    ? 'Nhân viên sẽ tiếp nhận và trả lời ngay trong cuộc trò chuyện này.'
-                    : aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED
-                      ? 'Bạn có thể tiếp tục trao đổi với Trợ lý AI.'
-                      : 'Nếu cần người hỗ trợ trực tiếp, hãy gửi yêu cầu tại đây.'}
-              </Text>
-              {aiSupportError ? <Text style={styles.aiSupportError}>{aiSupportError}</Text> : null}
-            </View>
-            {aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
-              || aiSupportStatus === AI_SUPPORT_STATUS.SUPPORT_RESOLVED
-              || aiSupportStatus === AI_SUPPORT_STATUS.CLOSED ? (
-                <Pressable
-                  onPress={() => { void changeAiSupportStatus(); }}
-                  disabled={aiSupportBusy}
-                  style={[styles.aiSupportAction, aiSupportBusy && styles.aiSupportActionDisabled]}
-                  accessibilityRole="button"
-                  accessibilityLabel={aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
-                    ? 'Chuyển sang nhân viên hỗ trợ'
-                    : 'Tiếp tục trò chuyện với Trợ lý AI'}
-                >
-                  {aiSupportBusy
-                    ? <ActivityIndicator size="small" color="#FFFFFF" />
-                    : aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
-                      ? <Headphones size={15} color="#FFFFFF" />
-                      : <MessageCircle size={15} color="#FFFFFF" />}
-                  <Text style={styles.aiSupportActionText}>
-                    {aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? 'Nhân viên' : 'Hỏi AI tiếp'}
-                  </Text>
-                </Pressable>
-              ) : null}
+            <Pressable
+              onPress={() => { void changeAiSupportStatus(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Chuyển sang nhân viên hỗ trợ"
+            >
+              <Text style={styles.aiSupportActionText}>Chuyển sang nhân viên hỗ trợ</Text>
+            </Pressable>
           </View>
         ) : null}
         {isSearching ? (
           <View>
-          <View style={styles.inlineSearch}>
-            <Search size={17} color={colors.muted} />
-            <TextInput value={searchText} onChangeText={setSearchText} placeholder="Tìm kiếm tin nhắn cũ" style={styles.inlineSearchInput} autoFocus />
-            <Pressable onPress={() => { setSearchText(''); setIsSearching(false); }} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
-              <X size={18} color={colors.muted} />
-            </Pressable>
-          </View>
+            <View style={styles.inlineSearch}>
+              <Search size={17} color={colors.muted} />
+              <TextInput value={searchText} onChangeText={setSearchText} placeholder="Tìm kiếm tin nhắn cũ" style={styles.inlineSearchInput} autoFocus />
+              <Pressable onPress={() => { setSearchText(''); setIsSearching(false); }} accessibilityRole="button" accessibilityLabel="Đóng tìm kiếm">
+                <X size={18} color={colors.muted} />
+              </Pressable>
+            </View>
             {searchText.trim() ? (
               <Text style={styles.searchStatus}>
                 {searchLoading ? 'Đang tìm trong cuộc trò chuyện…' : searchError || `${visibleMessages.length} kết quả`}
               </Text>
-        ) : null}
+            ) : null}
           </View>
         ) : null}
         {pinnedMessage ? (
@@ -2455,12 +2573,12 @@ export function ConversationScreen() {
           </View>
         ) : null}
         <View style={styles.threadSurface}>
-        <ScrollView
-          ref={threadRef}
+          <ScrollView
+            ref={threadRef}
             style={styles.threadScroll}
-          contentContainerStyle={styles.thread}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.thread}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             onScroll={(event) => {
               threadScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
             }}
@@ -2478,502 +2596,650 @@ export function ConversationScreen() {
               }
               threadRef.current?.scrollToEnd({ animated: true });
             }}
-        >
-          {resource.loading ? <LoadingSkeleton rows={2} /> : null}
-          {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
-          {!resource.loading && !resource.error && canLoadOlder ? (
-            <View style={styles.loadOlderWrap}>
-              <Pressable
-                onPress={() => { void loadOlderMessages(); }}
-                disabled={loadingOlder}
-                style={styles.loadOlderButton}
-                accessibilityRole="button"
-                accessibilityLabel="Xem tin nhắn cũ hơn"
-              >
-                {loadingOlder
-                  ? <ActivityIndicator size="small" color={colors.brand} />
-                  : <Text style={styles.loadOlderText}>Xem tin nhắn cũ hơn</Text>}
-              </Pressable>
-              {olderError ? <Text style={styles.loadOlderError}>{olderError}</Text> : null}
-            </View>
-          ) : null}
-          {!resource.loading && !resource.error && !thread.length ? <EmptyState title="Bắt đầu cuộc trò chuyện" message="Gửi lời chào đầu tiên nhé." /> : null}
-          {!resource.loading && !resource.error && isSearching && !visibleMessages.length ? (
-            <EmptyState title="Không tìm thấy tin nhắn" message="Thử từ khóa khác." />
-          ) : null}
-          {visibleMessages.length > 0 ? (
-            <View style={styles.dateDividerWrap}>
-              <View style={styles.dateDividerPill}>
-                <Text style={styles.dateDividerText}>
-                  {/^\d{1,2}:\d{2}$/.test(visibleMessages[visibleMessages.length - 1].time)
-                    ? `${visibleMessages[visibleMessages.length - 1].time} · `
-                    : ''}Hôm nay
-                </Text>
-              </View>
-            </View>
-          ) : null}
-          {!resource.loading && !resource.error && visibleMessages.map((message, index) => {
-            if (message.messageType === 'system') {
-              return (
-                <View key={message.id} style={styles.systemMessageRow}>
-                  <View style={styles.systemMessageCard}>
-                    <CalendarDays size={14} color={colors.brand} />
-                    <Text style={styles.systemMessageText}>{message.text}</Text>
-                    {message.time ? <Text style={styles.systemMessageTime}>{message.time}</Text> : null}
-                  </View>
-                </View>
-              );
-            }
-            if (message.callEvent) {
-              const call = message.callEvent;
-              const callColor = ['missed', 'rejected', 'busy', 'failed'].includes(call.status) ? '#DC2626' : '#16A34A';
-              const duration = call.durationSeconds > 0
-                ? ` · ${Math.floor(call.durationSeconds / 60)}:${String(call.durationSeconds % 60).padStart(2, '0')}`
-                : '';
-              return (
-                <View key={message.id} style={styles.callEventRow}>
-                  <View style={styles.callEventCard}>
-                    <Phone size={15} color={callColor} />
-                    <View style={styles.callEventCopy}>
-                      <Text style={[styles.callEventTitle, { color: callColor }]}>{message.text}{duration}</Text>
-                      <Text style={styles.callEventSubtitle}>
-                        {call.direction === 'outgoing' ? `Cuộc gọi đi${call.participantName ? ` · ${call.participantName}` : ''}` : `Cuộc gọi đến${call.participantName ? ` · ${call.participantName}` : ''}`}
-                        {message.time ? ` · ${message.time}` : ''}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            }
-            const isMine = message.mine;
-            const bubbleWidth = bubbleWidthsRef.current[message.id] || 0;
-            const menuAlignLeft = isMine
-              ? bubbleWidth >= windowWidth * 0.45
-              : bubbleWidth < windowWidth * 0.45;
-            const reactionPopupAlignLeft = !isMine && bubbleWidth < windowWidth * 0.45;
-            const previousMessage = visibleMessages[index - 1];
-            const nextMessage = visibleMessages[index + 1];
-            const continuesPreviousGroup = Boolean(
-              previousMessage
-              && previousMessage.mine === message.mine
-              && (message.mine || !previousMessage.senderName || !message.senderName || previousMessage.senderName === message.senderName),
-            );
-            const endsSenderGroup = !nextMessage
-              || nextMessage.mine !== message.mine
-              || (!message.mine && message.senderName && nextMessage.senderName && message.senderName !== nextMessage.senderName);
-            const isGroupedMessage = continuesPreviousGroup || !endsSenderGroup;
-            const reactionCounts = Array.from(new Set((message.reactions || []).map((reaction) => reaction.type)))
-              .map((type) => ({
-                type,
-                emoji: getChatReactionEmoji(type),
-                count: message.reactions?.filter((reaction) => reaction.type === type).length || 0,
-              }))
-              .filter((reaction) => reaction.emoji);
-            const isActive = optionsMenuMsgId === message.id || reactionPopupMsgId === message.id;
-            const isAiSupportAssistantMessage = isAiSupportConversation
-              && !message.mine
-              && message.senderId === 'ai_support'
-              && !message.recalled;
-            const aiReplyPresentation = isAiSupportAssistantMessage && !message.attachmentType
-              ? getAiSupportReplyPresentation(message.text)
-              : { content: message.text, suggestions: [] as string[] };
-            const promptChips = isAiSupportAssistantMessage
-              && !isPreview
-              && !isSearching
-              && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
-              ? lastAiWelcomeIndex === index && showAiWelcomeChips
-                ? aiWelcomeChips
-                : aiReplyPresentation.suggestions.map((label, suggestionIndex) => ({
-                  id: `suggestion-${suggestionIndex}`,
-                  label,
-                }))
-              : [];
-            const showReactionControls = hoverMsgId === message.id
-              || reactionPopupMsgId === message.id;
-            const showActions = optionsMenuMsgId === message.id
-              || (hoverMsgId === message.id && reactionPopupMsgId !== message.id);
-            const rowHoverProps: any = {
-              onMouseEnter: () => setHoverMsgId(message.id),
-              onMouseLeave: () => setHoverMsgId((cur) => (cur === message.id ? null : cur)),
-            };
-
-            const bubble = (
-              <View
-                style={[styles.bubbleWrap, !isMine && styles.bubbleWrapOther]}
-                onLayout={(event) => { bubbleWidthsRef.current[message.id] = event.nativeEvent.layout.width; }}
-              >
+          >
+            {resource.loading ? <LoadingSkeleton rows={2} /> : null}
+            {resource.error ? <ErrorState onRetry={resource.reload} /> : null}
+            {!resource.loading && !resource.error && canLoadOlder ? (
+              <View style={styles.loadOlderWrap}>
                 <Pressable
-                  onPress={() => setHoverMsgId((cur) => (cur === message.id ? null : message.id))}
-                  onLongPress={() => handleMessageMenu(message)}
-                  delayLongPress={350}
-                  style={[
-                styles.bubble,
-                    isMine ? styles.bubbleMine : styles.bubbleOther,
-                    message.attachmentType === 'image' && styles.imageMessageBubble,
-                    message.recalled && styles.recalledMessageBubble,
-                message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
-                pinnedId === message.id && styles.pinnedBubble,
-                  ]}
+                  onPress={() => { void loadOlderMessages(); }}
+                  disabled={loadingOlder}
+                  style={styles.loadOlderButton}
                   accessibilityRole="button"
-                  accessibilityLabel={isMine ? 'Tin nhắn của tôi' : 'Tin nhắn'}
+                  accessibilityLabel="Xem tin nhắn cũ hơn"
                 >
-                  {message.replyToText ? (
-                    <View style={isMine ? styles.replyPreviewMine : styles.replyPreviewOther}>
-                      <Text numberOfLines={1} style={isMine ? styles.replyPreviewTextMine : styles.replyPreviewTextOther}>↪ {message.replyToText}</Text>
-                    </View>
-                  ) : null}
-                  {message.recalled ? (
-                    <View style={styles.recalledMessageContent}>
-                      <RotateCcw size={12} color="#9CA3AF" />
-                      <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
-                    </View>
-                  ) : message.stickerId ? (
-                  <Image
-                    source={getChatStickerImage(message.stickerId)}
-                    style={styles.chatSticker}
-                    resizeMode="contain"
-                    accessibilityLabel={CHAT_STICKERS.find((sticker) => sticker.id === message.stickerId)?.name || 'Sticker'}
-                  />
-                  ) : message.sticker ? (
-                    <Text style={styles.sticker}>{message.sticker}</Text>
-                  ) : null}
-                  {pinnedId === message.id ? (
-                    <View style={styles.messagePinnedLabel}>
-                      <Pin size={10} color="#1D4ED8" />
-                      <Text style={styles.messagePinnedLabelText}>Đã ghim</Text>
-              </View>
-                  ) : null}
-                  {message.gifLabel ? (
-                    <View style={styles.chatGif}>
-                      <Text style={styles.chatGifText}>GIF</Text>
-                      <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.gifLabel}</Text>
-            </View>
-                  ) : null}
-                  {message.text && !message.recalled && message.attachmentType !== 'file' ? (
-                    message.attachmentType === 'image' ? (
-                      <View style={[styles.imageCaption, isMine ? styles.imageCaptionMine : styles.imageCaptionOther]}>
-                        <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{aiReplyPresentation.content}</Text>
-                      </View>
-                    ) : (
-                      <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{aiReplyPresentation.content}</Text>
-                    )
-                  ) : null}
-                  {message.attachmentName && !message.recalled ? (
-                    <Pressable
-                      onPress={() => { void openAttachment(message.attachmentUrl); }}
-                      accessibilityRole="button"
-                      accessibilityLabel={message.attachmentType === 'image' ? `Xem ảnh ${message.attachmentName}` : `Mở tệp ${message.attachmentName}`}
-                    >
-                      {message.attachmentType === 'image' && message.attachmentUrl ? (
-                        <Image source={getMobileImageSource(message.attachmentUrl)} style={styles.messageImageAttachment} resizeMode="contain" />
-                      ) : message.attachmentType !== 'image' ? (
-                        <View style={[styles.fileAttachmentCard, isMine ? styles.fileAttachmentCardMine : styles.fileAttachmentCardOther]}>
-                          <View style={[styles.fileTypeBadge, { backgroundColor: getChatAttachmentType(message.attachmentName).color }]}>
-                            <Text style={styles.fileTypeBadgeText}>{getChatAttachmentType(message.attachmentName).extension}</Text>
-                          </View>
-                          <View style={styles.fileAttachmentInfo}>
-                            <Text numberOfLines={1} style={styles.fileAttachmentName}>{message.attachmentName}</Text>
-                            <Text numberOfLines={1} style={styles.fileAttachmentType}>{getChatAttachmentType(message.attachmentName).label}</Text>
-                          </View>
-                        </View>
-                      ) : null}
-                    </Pressable>
-                  ) : null}
-                  {message.text && message.attachmentType === 'file' && !message.recalled ? (
-                    <Text style={[styles.fileAttachmentCaption, isMine ? styles.messageTextMine : styles.messageTextOther]}>{message.text}</Text>
-                  ) : null}
-                  {endsSenderGroup && message.time ? (
-                    <Text style={styles.messageBubbleTime}>{message.time}</Text>
-                  ) : null}
+                  {loadingOlder
+                    ? <ActivityIndicator size="small" color={colors.brand} />
+                    : <Text style={styles.loadOlderText}>Xem tin nhắn cũ hơn</Text>}
                 </Pressable>
+                {olderError ? <Text style={styles.loadOlderError}>{olderError}</Text> : null}
+              </View>
+            ) : null}
+            {!resource.loading && !resource.error && !thread.length ? <EmptyState title="Bắt đầu cuộc trò chuyện" message="Gửi lời chào đầu tiên nhé." /> : null}
+            {!resource.loading && !resource.error && isSearching && !visibleMessages.length ? (
+              <EmptyState title="Không tìm thấy tin nhắn" message="Thử từ khóa khác." />
+            ) : null}
+            {visibleMessages.length > 0 ? (
+              <View style={styles.dateDividerWrap}>
+                <View style={styles.dateDividerPill}>
+                  <Text style={styles.dateDividerText}>
+                    {/^\d{1,2}:\d{2}$/.test(visibleMessages[visibleMessages.length - 1].time)
+                      ? `${visibleMessages[visibleMessages.length - 1].time} · `
+                      : ''}Hôm nay
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            {!resource.loading && !resource.error && visibleMessages.map((message, index) => {
+              if (message.messageType === 'system') {
+                return (
+                  <View key={message.id} style={styles.systemMessageRow}>
+                    <View style={styles.systemMessageCard}>
+                      <CalendarDays size={14} color={colors.brand} />
+                      <Text style={styles.systemMessageText}>{message.text}</Text>
+                      {message.time ? <Text style={styles.systemMessageTime}>{message.time}</Text> : null}
+                    </View>
+                  </View>
+                );
+              }
+              if (message.callEvent) {
+                const call = message.callEvent;
+                const callColor = ['missed', 'rejected', 'busy', 'failed'].includes(call.status) ? '#DC2626' : '#16A34A';
+                const duration = call.durationSeconds > 0
+                  ? ` · ${Math.floor(call.durationSeconds / 60)}:${String(call.durationSeconds % 60).padStart(2, '0')}`
+                  : '';
+                return (
+                  <View key={message.id} style={styles.callEventRow}>
+                    <View style={styles.callEventCard}>
+                      <Phone size={15} color={callColor} />
+                      <View style={styles.callEventCopy}>
+                        <Text style={[styles.callEventTitle, { color: callColor }]}>{message.text}{duration}</Text>
+                        <Text style={styles.callEventSubtitle}>
+                          {call.direction === 'outgoing' ? `Cuộc gọi đi${call.participantName ? ` · ${call.participantName}` : ''}` : `Cuộc gọi đến${call.participantName ? ` · ${call.participantName}` : ''}`}
+                          {message.time ? ` · ${message.time}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }
+              const isMine = message.mine;
+              const bubbleWidth = bubbleWidthsRef.current[message.id] || 0;
+              const menuAlignLeft = isMine
+                ? bubbleWidth >= windowWidth * 0.45
+                : bubbleWidth < windowWidth * 0.45;
+              const reactionPopupAlignLeft = !isMine && bubbleWidth < windowWidth * 0.45;
+              const previousMessage = visibleMessages[index - 1];
+              const nextMessage = visibleMessages[index + 1];
+              const continuesPreviousGroup = Boolean(
+                previousMessage
+                && previousMessage.mine === message.mine
+                && (message.mine || !previousMessage.senderName || !message.senderName || previousMessage.senderName === message.senderName),
+              );
+              const endsSenderGroup = !nextMessage
+                || nextMessage.mine !== message.mine
+                || (!message.mine && message.senderName && nextMessage.senderName && message.senderName !== nextMessage.senderName);
+              const isGroupedMessage = continuesPreviousGroup || !endsSenderGroup;
+              const reactionCounts = Array.from(new Set((message.reactions || []).map((reaction) => reaction.type)))
+                .map((type) => ({
+                  type,
+                  emoji: getChatReactionEmoji(type),
+                  count: message.reactions?.filter((reaction) => reaction.type === type).length || 0,
+                }))
+                .filter((reaction) => reaction.emoji);
+              const isActive = optionsMenuMsgId === message.id || reactionPopupMsgId === message.id;
+              const isAiSupportAssistantMessage = isAiSupportConversation
+                && !message.mine
+                && message.senderId === 'ai_support'
+                && !message.recalled;
+              const aiReplyPresentation = isAiSupportAssistantMessage && !message.attachmentType
+                ? getAiSupportReplyPresentation(message.text)
+                : { content: message.text, suggestions: [] as string[] };
+              const promptChips = isAiSupportAssistantMessage
+                && !isPreview
+                && !isSearching
+                && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+                ? lastAiWelcomeIndex === index && showAiWelcomeChips
+                  ? aiWelcomeChips
+                  : aiReplyPresentation.suggestions.map((label, suggestionIndex) => ({
+                    id: `suggestion-${suggestionIndex}`,
+                    label,
+                  }))
+                : [];
+              const showReactionControls = hoverMsgId === message.id
+                || reactionPopupMsgId === message.id;
+              const showActions = optionsMenuMsgId === message.id
+                || (hoverMsgId === message.id && reactionPopupMsgId !== message.id);
+              const rowHoverProps: any = {
+                onMouseEnter: () => setHoverMsgId(message.id),
+                onMouseLeave: () => setHoverMsgId((cur) => (cur === message.id ? null : cur)),
+              };
 
-                {/* Bottom-right Corner: Reactions Badge + Like Button */}
-                {!message.recalled && (reactionCounts.length > 0 || showReactionControls) ? (
-                  <View style={styles.bubbleBottomRight}>
-                    {reactionCounts.map(({ type, emoji, count }) => (
+              const bubble = (
+                <View
+                  style={[styles.bubbleWrap, !isMine && styles.bubbleWrapOther]}
+                  onLayout={(event) => { bubbleWidthsRef.current[message.id] = event.nativeEvent.layout.width; }}
+                >
+                  <Pressable
+                    onPress={() => setHoverMsgId((cur) => (cur === message.id ? null : message.id))}
+                    onLongPress={() => handleMessageMenu(message)}
+                    delayLongPress={350}
+                    style={[
+                      styles.bubble,
+                      isMine ? styles.bubbleMine : styles.bubbleOther,
+                      isAiSupportAssistantMessage && styles.bubbleAiSupport,
+                      message.attachmentType === 'image' && styles.imageMessageBubble,
+                      message.recalled && styles.recalledMessageBubble,
+                      message.stickerId && !message.text && !message.attachmentName && !message.gifLabel ? styles.stickerBubble : null,
+                      pinnedId === message.id && styles.pinnedBubble,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={isMine ? 'Tin nhắn của tôi' : 'Tin nhắn'}
+                  >
+                    {message.replyToText && !isAiSupportConversation ? (
+                      <View style={isMine ? styles.replyPreviewMine : styles.replyPreviewOther}>
+                        <Text numberOfLines={1} style={isMine ? styles.replyPreviewTextMine : styles.replyPreviewTextOther}>↪ {message.replyToText}</Text>
+                      </View>
+                    ) : null}
+                    {message.recalled ? (
+                      <View style={styles.recalledMessageContent}>
+                        <RotateCcw size={12} color="#9CA3AF" />
+                        <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
+                      </View>
+                    ) : message.stickerId ? (
+                      <Image
+                        source={getChatStickerImage(message.stickerId)}
+                        style={styles.chatSticker}
+                        resizeMode="contain"
+                        accessibilityLabel={CHAT_STICKERS.find((sticker) => sticker.id === message.stickerId)?.name || 'Sticker'}
+                      />
+                    ) : message.sticker ? (
+                      <Text style={styles.sticker}>{message.sticker}</Text>
+                    ) : null}
+                    {pinnedId === message.id ? (
+                      <View style={styles.messagePinnedLabel}>
+                        <Pin size={10} color="#1D4ED8" />
+                        <Text style={styles.messagePinnedLabelText}>Đã ghim</Text>
+                      </View>
+                    ) : null}
+                    {message.gifLabel ? (
+                      <View style={styles.chatGif}>
+                        <Text style={styles.chatGifText}>GIF</Text>
+                        <Text style={isMine ? styles.messageTextMine : styles.messageTextOther}>{message.gifLabel}</Text>
+                      </View>
+                    ) : null}
+                    {message.text && !message.recalled && message.attachmentType !== 'file' ? (
+                      message.attachmentType === 'image' ? (
+                        <View style={[styles.imageCaption, isMine ? styles.imageCaptionMine : styles.imageCaptionOther]}>
+                          <MessageRichText text={aiReplyPresentation.content} mine={isMine} />
+                        </View>
+                      ) : (
+                        <MessageRichText text={aiReplyPresentation.content} mine={isMine} />
+                      )
+                    ) : null}
+                    {message.attachmentName && !message.recalled ? (
                       <Pressable
-                        key={type}
-                        onPress={() => { void toggleMessageReaction(message.id, emoji!); }}
-                        style={styles.reactionBadge}
+                        onPress={() => { void openAttachment(message.attachmentUrl); }}
                         accessibilityRole="button"
-                        accessibilityLabel={`Cảm xúc ${type}, ${count}`}
+                        accessibilityLabel={message.attachmentType === 'image' ? `Xem ảnh ${message.attachmentName}` : `Mở tệp ${message.attachmentName}`}
                       >
-                        <Text style={styles.reactionBadgeEmoji}>{emoji}</Text>
-                        {count > 1 ? <Text style={styles.reactionBadgeCount}>{count}</Text> : null}
-            </Pressable>
-          ))}
-
-                    {showReactionControls ? (
-                      <View
-                        style={styles.likeCornerContainer}
-                        // @ts-ignore web-only hover events
-                        onMouseEnter={() => handleLikeHoverIn(message.id)}
-                        onMouseLeave={handleLikeHoverOut}
-                      >
-                        {reactionPopupMsgId === message.id ? (
-                          <View
-                            style={[
-                              styles.reactionPopupBridge,
-                              {
-                                width: Math.min(174, windowWidth - 24),
-                                left: reactionPopupAlignLeft ? 0 : undefined,
-                                right: reactionPopupAlignLeft ? undefined : -10,
-                              },
-                            ]}
-                          >
-                            <View style={styles.reactionPopupBar}>
-                              {ALL_REACTIONS.map((emoji) => (
-                                <Pressable
-                                  key={emoji}
-                                  onPress={() => {
-                                    void toggleMessageReaction(message.id, emoji);
-                                    setReactionPopupMsgId(null);
-                                  }}
-                                  style={({ hovered, pressed }: any) => [
-                                    styles.reactionPopupEmojiBtn,
-                                    message.reaction === emoji && styles.reactionPopupEmojiBtnSelected,
-                                    (hovered || pressed) && styles.reactionPopupEmojiBtnHover,
-                                  ]}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Cảm xúc ${emoji}`}
-                                >
-                                  <Text style={styles.reactionPopupEmojiText}>{emoji}</Text>
-                                </Pressable>
-                              ))}
+                        {message.attachmentType === 'image' && message.attachmentUrl ? (
+                          <Image source={getMobileImageSource(message.attachmentUrl)} style={styles.messageImageAttachment} resizeMode="contain" />
+                        ) : message.attachmentType !== 'image' ? (
+                          <View style={[styles.fileAttachmentCard, isMine ? styles.fileAttachmentCardMine : styles.fileAttachmentCardOther]}>
+                            <View style={[styles.fileTypeBadge, { backgroundColor: getChatAttachmentType(message.attachmentName).color }]}>
+                              <Text style={styles.fileTypeBadgeText}>{getChatAttachmentType(message.attachmentName).extension}</Text>
+                            </View>
+                            <View style={styles.fileAttachmentInfo}>
+                              <Text numberOfLines={1} style={styles.fileAttachmentName}>{message.attachmentName}</Text>
+                              <Text numberOfLines={1} style={styles.fileAttachmentType}>{getChatAttachmentType(message.attachmentName).label}</Text>
                             </View>
                           </View>
                         ) : null}
+                      </Pressable>
+                    ) : null}
+                    {message.text && message.attachmentType === 'file' && !message.recalled ? (
+                      <Text style={[styles.fileAttachmentCaption, isMine ? styles.messageTextMine : styles.messageTextOther]}>{message.text}</Text>
+                    ) : null}
+                    {endsSenderGroup && message.time ? (
+                      <Text style={styles.messageBubbleTime}>{message.time}</Text>
+                    ) : null}
+                  </Pressable>
+
+                  {/* Bottom-right Corner: Reactions Badge + Like Button */}
+                  {!isAiSupportConversation && !message.recalled && (reactionCounts.length > 0 || showReactionControls) ? (
+                    <View style={styles.bubbleBottomRight}>
+                      {reactionCounts.map(({ type, emoji, count }) => (
                         <Pressable
-                          onPress={() => {
-                            void toggleMessageReaction(message.id, message.reaction ? message.reaction : '👍');
-                            setReactionPopupMsgId(null);
-                          }}
-                          onLongPress={() => setReactionPopupMsgId(message.id)}
-                          delayLongPress={280}
-                          style={[styles.likeCornerBtn, message.reaction ? styles.likeCornerBtnActive : null]}
+                          key={type}
+                          onPress={() => { void toggleMessageReaction(message.id, emoji!); }}
+                          style={styles.reactionBadge}
                           accessibilityRole="button"
-                          accessibilityLabel={message.reaction ? `Đã thả ${message.reaction}` : 'Thích'}
+                          accessibilityLabel={`Cảm xúc ${type}, ${count}`}
                         >
-                          {message.reaction ? (
-                            <Text style={styles.likeCornerEmojiText}>{message.reaction}</Text>
-                          ) : (
-                            <ThumbsUp size={12} color="#64748B" />
-                          )}
+                          <Text style={styles.reactionBadgeEmoji}>{emoji}</Text>
+                          {count > 1 ? <Text style={styles.reactionBadgeCount}>{count}</Text> : null}
                         </Pressable>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
-            );
+                      ))}
 
-            const actions = (
-              <View
-                style={[
-                  isMine ? styles.msgActionsMine : styles.msgActionsOther,
-                  !showActions && styles.msgActionsHidden,
-                  isActive && { zIndex: 999999 },
-                ]}
-                pointerEvents={showActions ? 'auto' : 'none'}
-              >
-                <View style={styles.actionBtnsPill}>
-                  <Pressable
-                    onPress={() => {
-                      setReplyingTo(message);
-                      setOptionsMenuMsgId(null);
-                    }}
-                    style={({ hovered }: any) => [styles.msgActionBtn, hovered && styles.msgActionBtnHover]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Trả lời"
-                  >
-                    <Reply size={13} color="#64748B" />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setOptionsMenuMsgId((cur) => (cur === message.id ? null : message.id));
-                      setReactionPopupMsgId(null);
-                    }}
-                    style={({ hovered }: any) => [
-                      styles.msgActionBtn,
-                      (hovered || optionsMenuMsgId === message.id) && styles.msgActionBtnHover,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Tùy chọn"
-                  >
-                    <MoreHorizontal size={13} color={optionsMenuMsgId === message.id ? '#1E293B' : '#64748B'} />
-                  </Pressable>
+                      {showReactionControls ? (
+                        <View
+                          style={styles.likeCornerContainer}
+                          // @ts-ignore web-only hover events
+                          onMouseEnter={() => handleLikeHoverIn(message.id)}
+                          onMouseLeave={handleLikeHoverOut}
+                        >
+                          {reactionPopupMsgId === message.id ? (
+                            <View
+                              style={[
+                                styles.reactionPopupBridge,
+                                {
+                                  width: Math.min(174, windowWidth - 24),
+                                  left: reactionPopupAlignLeft ? 0 : undefined,
+                                  right: reactionPopupAlignLeft ? undefined : -10,
+                                },
+                              ]}
+                            >
+                              <View style={styles.reactionPopupBar}>
+                                {ALL_REACTIONS.map((emoji) => (
+                                  <Pressable
+                                    key={emoji}
+                                    onPress={() => {
+                                      void toggleMessageReaction(message.id, emoji);
+                                      setReactionPopupMsgId(null);
+                                    }}
+                                    style={({ hovered, pressed }: any) => [
+                                      styles.reactionPopupEmojiBtn,
+                                      message.reaction === emoji && styles.reactionPopupEmojiBtnSelected,
+                                      (hovered || pressed) && styles.reactionPopupEmojiBtnHover,
+                                    ]}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Cảm xúc ${emoji}`}
+                                  >
+                                    <Text style={styles.reactionPopupEmojiText}>{emoji}</Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            </View>
+                          ) : null}
+                          <Pressable
+                            onPress={() => {
+                              void toggleMessageReaction(message.id, message.reaction ? message.reaction : '👍');
+                              setReactionPopupMsgId(null);
+                            }}
+                            onLongPress={() => setReactionPopupMsgId(message.id)}
+                            delayLongPress={280}
+                            style={[styles.likeCornerBtn, message.reaction ? styles.likeCornerBtnActive : null]}
+                            accessibilityRole="button"
+                            accessibilityLabel={message.reaction ? `Đã thả ${message.reaction}` : 'Thích'}
+                          >
+                            {message.reaction ? (
+                              <Text style={styles.likeCornerEmojiText}>{message.reaction}</Text>
+                            ) : (
+                              <ThumbsUp size={12} color="#64748B" />
+                            )}
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
+              );
 
-                {optionsMenuMsgId === message.id ? (
-                  <View
-                    nativeID="chat-options-menu"
-                    style={[
-                      isMine ? styles.optionsMenuCardMine : styles.optionsMenuCardOther,
-                      { width: Math.min(164, windowWidth - 32), left: menuAlignLeft ? 0 : undefined, right: menuAlignLeft ? undefined : 0 },
-                    ]}
-                  >
-                    {message.attachmentUrl && message.attachmentName && !message.recalled ? (
-                      <Pressable
-                        onPress={() => {
-                          setOptionsMenuMsgId(null);
-                          void downloadAttachment(message);
-                        }}
-                        style={({ pressed, hovered }: any) => [
-                          styles.optionsMenuItem,
-                          (pressed || hovered) && styles.optionsMenuItemPressed,
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityLabel="Tải tệp"
-                      >
-                        <Download size={15} color="#475569" />
-                        <Text style={styles.optionsMenuItemText}>Tải {message.attachmentType === 'image' ? 'ảnh' : 'tệp'}</Text>
-                      </Pressable>
-                    ) : null}
-                    {!message.recalled ? (
-                      <Pressable
-                        onPress={() => handleTogglePin(message.id)}
-                        style={({ pressed, hovered }: any) => [
-                          styles.optionsMenuItem,
-                          (pressed || hovered) && styles.optionsMenuItemPressed,
-                        ]}
-                        accessibilityRole="button"
-                      >
-                        {pinnedId === message.id ? <PinOff size={15} color="#475569" /> : <Pin size={15} color="#475569" />}
-                        <Text style={styles.optionsMenuItemText}>
-                          {pinnedId === message.id ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                    {!message.recalled && message.text ? (
-                      <Pressable
-                        onPress={() => handleCopyMessage(message.text)}
-                        style={({ pressed, hovered }: any) => [
-                          styles.optionsMenuItem,
-                          (pressed || hovered) && styles.optionsMenuItemPressed,
-                        ]}
-                        accessibilityRole="button"
-                      >
-                        <Copy size={15} color="#475569" />
-                        <Text style={styles.optionsMenuItemText}>Copy tin nhắn</Text>
-                      </Pressable>
-                    ) : null}
-                    {isMine && !message.recalled ? (
-                      <Pressable
-                        onPress={() => handleRecallMessage(message.id)}
-                        style={({ pressed, hovered }: any) => [
-                          styles.optionsMenuItem,
-                          (pressed || hovered) && styles.optionsMenuItemPressed,
-                        ]}
-                        accessibilityRole="button"
-                      >
-                        <RotateCcw size={15} color="#D97706" />
-                        <Text style={[styles.optionsMenuItemText, styles.optionsMenuItemAmber]}>Thu hồi</Text>
-                      </Pressable>
-                    ) : null}
+              const actions = isAiSupportConversation ? null : (
+                <View
+                  style={[
+                    isMine ? styles.msgActionsMine : styles.msgActionsOther,
+                    !showActions && styles.msgActionsHidden,
+                    isActive && { zIndex: 999999 },
+                  ]}
+                  pointerEvents={showActions ? 'auto' : 'none'}
+                >
+                  <View style={styles.actionBtnsPill}>
                     <Pressable
-                      onPress={() => handleDeleteForMe(message.id)}
-                      style={({ pressed, hovered }: any) => [
-                        styles.optionsMenuItem,
-                        styles.optionsMenuItemBorderTop,
-                        (pressed || hovered) && styles.optionsMenuItemPressed,
+                      onPress={() => {
+                        setReplyingTo(message);
+                        setOptionsMenuMsgId(null);
+                      }}
+                      style={({ hovered }: any) => [styles.msgActionBtn, hovered && styles.msgActionBtnHover]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Trả lời"
+                    >
+                      <Reply size={13} color="#64748B" />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setOptionsMenuMsgId((cur) => (cur === message.id ? null : message.id));
+                        setReactionPopupMsgId(null);
+                      }}
+                      style={({ hovered }: any) => [
+                        styles.msgActionBtn,
+                        (hovered || optionsMenuMsgId === message.id) && styles.msgActionBtnHover,
                       ]}
                       accessibilityRole="button"
+                      accessibilityLabel="Tùy chọn"
                     >
-                      <Trash2 size={15} color="#DC2626" />
-                      <Text style={[styles.optionsMenuItemText, styles.optionsMenuItemRed]}>Xóa chỉ ở phía tôi</Text>
+                      <MoreHorizontal size={13} color={optionsMenuMsgId === message.id ? '#1E293B' : '#64748B'} />
                     </Pressable>
                   </View>
-                ) : null}
-              </View>
-            );
 
-            if (isMine) {
+                  {optionsMenuMsgId === message.id ? (
+                    <View
+                      nativeID="chat-options-menu"
+                      style={[
+                        isMine ? styles.optionsMenuCardMine : styles.optionsMenuCardOther,
+                        { width: Math.min(164, windowWidth - 32), left: menuAlignLeft ? 0 : undefined, right: menuAlignLeft ? undefined : 0 },
+                      ]}
+                    >
+                      {message.attachmentUrl && message.attachmentName && !message.recalled ? (
+                        <Pressable
+                          onPress={() => {
+                            setOptionsMenuMsgId(null);
+                            void downloadAttachment(message);
+                          }}
+                          style={({ pressed, hovered }: any) => [
+                            styles.optionsMenuItem,
+                            (pressed || hovered) && styles.optionsMenuItemPressed,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel="Tải tệp"
+                        >
+                          <Download size={15} color="#475569" />
+                          <Text style={styles.optionsMenuItemText}>Tải {message.attachmentType === 'image' ? 'ảnh' : 'tệp'}</Text>
+                        </Pressable>
+                      ) : null}
+                      {!message.recalled ? (
+                        <Pressable
+                          onPress={() => handleTogglePin(message.id)}
+                          style={({ pressed, hovered }: any) => [
+                            styles.optionsMenuItem,
+                            (pressed || hovered) && styles.optionsMenuItemPressed,
+                          ]}
+                          accessibilityRole="button"
+                        >
+                          {pinnedId === message.id ? <PinOff size={15} color="#475569" /> : <Pin size={15} color="#475569" />}
+                          <Text style={styles.optionsMenuItemText}>
+                            {pinnedId === message.id ? 'Bỏ ghim tin nhắn' : 'Ghim tin nhắn'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      {!message.recalled && message.text ? (
+                        <Pressable
+                          onPress={() => handleCopyMessage(message.text)}
+                          style={({ pressed, hovered }: any) => [
+                            styles.optionsMenuItem,
+                            (pressed || hovered) && styles.optionsMenuItemPressed,
+                          ]}
+                          accessibilityRole="button"
+                        >
+                          <Copy size={15} color="#475569" />
+                          <Text style={styles.optionsMenuItemText}>Copy tin nhắn</Text>
+                        </Pressable>
+                      ) : null}
+                      {isMine && !message.recalled ? (
+                        <Pressable
+                          onPress={() => handleRecallMessage(message.id)}
+                          style={({ pressed, hovered }: any) => [
+                            styles.optionsMenuItem,
+                            (pressed || hovered) && styles.optionsMenuItemPressed,
+                          ]}
+                          accessibilityRole="button"
+                        >
+                          <RotateCcw size={15} color="#D97706" />
+                          <Text style={[styles.optionsMenuItemText, styles.optionsMenuItemAmber]}>Thu hồi</Text>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        onPress={() => handleDeleteForMe(message.id)}
+                        style={({ pressed, hovered }: any) => [
+                          styles.optionsMenuItem,
+                          styles.optionsMenuItemBorderTop,
+                          (pressed || hovered) && styles.optionsMenuItemPressed,
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <Trash2 size={15} color="#DC2626" />
+                        <Text style={[styles.optionsMenuItemText, styles.optionsMenuItemRed]}>Xóa chỉ ở phía tôi</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              );
+
+              if (isMine) {
+                return (
+                  <View
+                    key={message.id}
+                    style={[styles.messageRowMine, isGroupedMessage && styles.messageRowGrouped, isActive && styles.messageRowActive]}
+                    {...rowHoverProps}
+                  >
+                    <View style={[styles.messageMineContainer, isActive && { zIndex: 999999 }]}>
+                      <View style={[styles.bubbleAndActionsRowMine, isActive && { zIndex: 999999 }]}>
+                        {actions}
+                        {bubble}
+                      </View>
+                      {!isAiSupportConversation && endsSenderGroup ? (
+                        <View style={styles.msgFooterMine}>
+                          {!message.recipientRejected ? (
+                            <View style={styles.readStatusWrap}>
+                              <Clock size={11} color="#94A3B8" />
+                              <Text style={styles.readStatusText}>
+                                {message.state === 'read' ? 'Đã xem' : 'Chưa đọc'}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
+                      {message.recipientRejected && !message.recalled ? (
+                        <Text style={styles.messageRejectedNotice}>Người nhận từ chối tin nhắn.</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              }
+
               return (
                 <View
                   key={message.id}
-                  style={[styles.messageRowMine, isGroupedMessage && styles.messageRowGrouped, isActive && styles.messageRowActive]}
+                  style={[styles.messageRowOther, isGroupedMessage && styles.messageRowGrouped, isActive && styles.messageRowActive]}
                   {...rowHoverProps}
                 >
-                  <View style={[styles.messageMineContainer, isActive && { zIndex: 999999 }]}>
-                    <View style={[styles.bubbleAndActionsRowMine, isActive && { zIndex: 999999 }]}>
-                      {actions}
-                      {bubble}
-                    </View>
-                    {endsSenderGroup ? (
-                      <View style={styles.msgFooterMine}>
-                        {!message.recipientRejected ? (
-                          <View style={styles.readStatusWrap}>
-                            <Clock size={11} color="#94A3B8" />
-                            <Text style={styles.readStatusText}>
-                              {message.state === 'read' ? 'Đã xem' : 'Chưa đọc'}
-                            </Text>
-                          </View>
-                        ) : null}
+                  <View style={styles.otherAvatarWrap}>
+                    {(message.senderId === 'ai_support' || isAiSupportConversation) ? (
+                      <View style={styles.aiMessageAvatar}>
+                        <Bot size={16} color="#FFFFFF" strokeWidth={2.3} />
                       </View>
-                    ) : null}
-                    {message.recipientRejected && !message.recalled ? (
-                      <Text style={styles.messageRejectedNotice}>Người nhận từ chối tin nhắn.</Text>
+                    ) : (
+                      <Image
+                        source={(isGroupConversation || isAiSupportConversation) && message.senderAvatarUri
+                          ? getMobileImageSource(message.senderAvatarUri)
+                          : getContactAvatarSource(
+                            isGroupConversation || isAiSupportConversation ? message.senderRole : route.params.participantRole,
+                            isGroupConversation || isAiSupportConversation ? message.senderAdminRole : route.params.participantAdminRole,
+                            isGroupConversation || isAiSupportConversation ? undefined : route.params.participantAvatarUri,
+                          )}
+                        style={styles.otherAvatarImg}
+                      />
+                    )}
+                  </View>
+                  <View style={[styles.messageOtherContainer, isActive && { zIndex: 999999 }]}>
+                    <View style={[styles.bubbleAndActionsRowOther, isActive && { zIndex: 999999 }]}>
+                      {bubble}
+                      {actions}
+                    </View>
+                    {promptChips.length ? (
+                      <View style={styles.aiSupportPromptList}>
+                        {promptChips.map((prompt) => (
+                          <Pressable
+                            key={prompt.id}
+                            onPress={() => { void send(prompt.label); }}
+                            disabled={sending}
+                            style={[styles.aiSupportPromptButton, sending && styles.aiSupportPromptButtonDisabled]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Hỏi trợ lý: ${prompt.label}`}
+                          >
+                            <Text style={styles.aiSupportPromptText}>{prompt.label}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
                     ) : null}
                   </View>
                 </View>
               );
-            }
-
-            return (
-              <View
-                key={message.id}
-                style={[styles.messageRowOther, isGroupedMessage && styles.messageRowGrouped, isActive && styles.messageRowActive]}
-                {...rowHoverProps}
-              >
-                <View style={styles.otherAvatarWrap}>
-                  <Image
-                    source={(isGroupConversation || isAiSupportConversation) && message.senderAvatarUri
-                      ? getMobileImageSource(message.senderAvatarUri)
-                      : getContactAvatarSource(
-                          isGroupConversation || isAiSupportConversation ? message.senderRole : route.params.participantRole,
-                          isGroupConversation || isAiSupportConversation ? message.senderAdminRole : route.params.participantAdminRole,
-                          isGroupConversation || isAiSupportConversation ? undefined : route.params.participantAvatarUri,
-                        )}
-                    style={styles.otherAvatarImg}
-                  />
-                </View>
-                <View style={[styles.messageOtherContainer, isActive && { zIndex: 999999 }]}>
-                  <View style={[styles.bubbleAndActionsRowOther, isActive && { zIndex: 999999 }]}>
-                    {bubble}
-                    {actions}
+            })}
+            {((isAiSupportConversation && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE && (sending || aiAwaitingReply || peerTyping)) || (!isAiSupportConversation && (peerTyping || aiAwaitingReply))) ? (
+              <View style={styles.typingIndicator}>
+                <Text style={styles.typingIndicatorText}>
+                  {isAiSupportConversation && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
+                    ? 'AI đang trả lời'
+                    : `${route.params.conversationName || 'Đối phương'} đang nhập...`}
+                </Text>
+                {isAiSupportConversation && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE ? (
+                  <TypingDots color="#475569" size={5} />
+                ) : null}
+              </View>
+            ) : null}
+            {canShowEscalate && !peerTyping && !aiAwaitingReply ? (
+              <View style={styles.aiFeedbackContainer}>
+                {(!aiFeedbackPhase || aiFeedbackPhase === 'agree') ? (
+                  <View style={styles.aiFeedbackSection}>
+                    <Text style={styles.aiFeedbackTitle}>Bạn đồng ý câu trả lời này không?</Text>
+                    <View style={styles.aiFeedbackRow}>
+                      <Pressable
+                        onPress={handleAiAgree}
+                        style={({ pressed }) => [styles.aiFeedbackBtnAgree, pressed && { opacity: 0.8 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Đồng ý câu trả lời"
+                      >
+                        <Check size={14} color="#065F46" />
+                        <Text style={styles.aiFeedbackBtnAgreeText}>Có</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleAiDisagree}
+                        style={({ pressed }) => [styles.aiFeedbackBtnDisagree, pressed && { opacity: 0.8 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Không đồng ý câu trả lời"
+                      >
+                        <X size={14} color="#475569" />
+                        <Text style={styles.aiFeedbackBtnDisagreeText}>Không</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  {promptChips.length ? (
-                    <View style={styles.aiSupportPromptList}>
-                      {promptChips.map((prompt) => (
+                ) : null}
+
+                {aiFeedbackPhase === 'disagree_reason' ? (
+                  <View style={styles.aiFeedbackSection}>
+                    <Text style={styles.aiFeedbackTitle}>Bạn chưa hài lòng vì?</Text>
+                    <View style={styles.aiReasonCol}>
+                      {[
+                        { label: 'Tôi không hiểu chỗ này', value: 'unclear' },
+                        { label: 'Câu trả lời chưa đúng trọng tâm', value: 'offtopic' },
+                        { label: 'Nội dung còn ít quá', value: 'too_short' },
+                      ].map((r) => (
                         <Pressable
-                          key={prompt.id}
-                          onPress={() => { void send(prompt.label); }}
-                          disabled={sending}
-                          style={[styles.aiSupportPromptButton, sending && styles.aiSupportPromptButtonDisabled]}
+                          key={r.value}
+                          onPress={() => void handleAiDisagreeReason(r.value)}
+                          style={({ pressed }) => [styles.aiReasonBtn, pressed && { backgroundColor: '#EFF6FF' }]}
                           accessibilityRole="button"
-                          accessibilityLabel={`Hỏi trợ lý: ${prompt.label}`}
+                          accessibilityLabel={r.label}
                         >
-                          <Text style={styles.aiSupportPromptText}>{prompt.label}</Text>
+                          <MessageSquare size={13} color="#94A3B8" />
+                          <Text style={styles.aiReasonText}>{r.label}</Text>
                         </Pressable>
                       ))}
                     </View>
-                  ) : null}
-                </View>
+                  </View>
+                ) : null}
+
+                {aiFeedbackPhase === 're_explain' ? (
+                  <View style={styles.aiReExplainNotice}>
+                    <Text style={styles.aiReExplainText}>Trợ lý AI đang giải thích thêm cho bạn…</Text>
+                  </View>
+                ) : null}
+
+                {aiFeedbackPhase === 'disagree2' ? (
+                  <View style={styles.aiFeedbackSection}>
+                    <Text style={styles.aiFeedbackTitle}>Bạn có đồng ý với kết quả tiếp theo này không?</Text>
+                    <View style={styles.aiFeedbackRow}>
+                      <Pressable
+                        onPress={handleAiAgree}
+                        style={({ pressed }) => [styles.aiFeedbackBtnAgree, pressed && { opacity: 0.8 }]}
+                      >
+                        <Check size={14} color="#065F46" />
+                        <Text style={styles.aiFeedbackBtnAgreeText}>Có</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleAiDisagree2}
+                        style={({ pressed }) => [styles.aiFeedbackBtnDisagree, pressed && { opacity: 0.8 }]}
+                      >
+                        <X size={14} color="#475569" />
+                        <Text style={styles.aiFeedbackBtnDisagreeText}>Không</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
+
+                {aiFeedbackPhase === 'final_choice' ? (
+                  <View style={styles.aiFeedbackSection}>
+                    <Text style={styles.aiFeedbackTitle}>Bạn muốn?</Text>
+                    <View style={styles.aiReasonCol}>
+                      <Pressable
+                        onPress={() => void handleAiFinalExplain()}
+                        style={({ pressed }) => [styles.aiFinalExplainBtn, pressed && { opacity: 0.8 }]}
+                      >
+                        <Bot size={14} color="#1E40AF" />
+                        <Text style={styles.aiFinalExplainText}>Giải thích thêm 1 lần nữa</Text>
+                      </Pressable>
+                      <Pressable
+                        disabled={aiSupportBusy}
+                        onPress={() => void handleAiFinalStaff()}
+                        style={({ pressed }) => [styles.aiFinalStaffBtn, pressed && { opacity: 0.8 }, aiSupportBusy && { opacity: 0.5 }]}
+                      >
+                        {aiSupportBusy ? <ActivityIndicator size="small" color="#92400E" /> : <UserRound size={14} color="#92400E" />}
+                        <Text style={styles.aiFinalStaffText}>Gặp nhân viên trực tiếp</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
+
+                {aiFeedbackPhase === 'more' ? (
+                  <View style={styles.aiFeedbackSection}>
+                    <Text style={styles.aiFeedbackTitle}>Bạn cần hỗ trợ thêm câu hỏi nào nữa không?</Text>
+                    <View style={styles.aiFeedbackRow}>
+                      <Pressable
+                        onPress={handleAiMoreYes}
+                        style={({ pressed }) => [styles.aiFeedbackBtnAgree, pressed && { opacity: 0.8 }]}
+                      >
+                        <Check size={14} color="#065F46" />
+                        <Text style={styles.aiFeedbackBtnAgreeText}>Có</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleAiMoreNo}
+                        style={({ pressed }) => [styles.aiFeedbackBtnDisagree, pressed && { opacity: 0.8 }]}
+                      >
+                        <X size={14} color="#475569" />
+                        <Text style={styles.aiFeedbackBtnDisagreeText}>Không</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
+
+                {aiFeedbackPhase === 'invite' ? (
+                  <View style={styles.aiInviteNotice}>
+                    <Text style={styles.aiInviteText}>Mời bạn đặt câu hỏi.</Text>
+                  </View>
+                ) : null}
+
+                {aiFeedbackPhase === 'ended' ? (
+                  <View style={styles.aiEndedNotice}>
+                    <Text style={styles.aiEndedText}>Xin chào, hẹn gặp lại bạn.</Text>
+                  </View>
+                ) : null}
               </View>
-            );
-          })}
-          {peerTyping || aiAwaitingReply ? (
-            <View style={styles.typingIndicator}>
-              <Text style={styles.typingIndicatorText}>
-                {isAiSupportConversation && aiSupportStatus === AI_SUPPORT_STATUS.AI_ACTIVE
-                  ? 'Trợ lý AI đang trả lời…'
-                  : `${route.params.conversationName || 'Đối phương'} đang nhập...`}
-              </Text>
-            </View>
-          ) : null}
-        </ScrollView>
+            ) : null}
+          </ScrollView>
         </View>
-        {replyingTo ? (
+        {replyingTo && !isAiSupportConversation ? (
           <View style={styles.replyBar}>
             <Text numberOfLines={1} style={styles.replyBarText}>
               Trả lời: {replyingTo.recalled ? 'Tin nhắn đã được thu hồi' : replyingTo.text || replyingTo.attachmentName || (replyingTo.stickerId ? '[Sticker]' : 'Tin nhắn')}
@@ -2981,77 +3247,81 @@ export function ConversationScreen() {
             <Pressable onPress={() => setReplyingTo(null)} accessibilityRole="button" accessibilityLabel="Hủy trả lời"><Text style={styles.cancelReply}>×</Text></Pressable>
           </View>
         ) : null}
-        {selectedAttachment ? (
-          <View style={styles.replyBar}>
-            <Text numberOfLines={1} style={styles.replyBarText}>Tệp đã chọn: {selectedAttachment.name}</Text>
-            <Pressable onPress={() => setSelectedAttachment(null)} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.cancelReply}>×</Text></Pressable>
-          </View>
-        ) : null}
-        {superAdminReadOnly ? (
-          <View style={[styles.composerBar, styles.composerLocked]} accessibilityRole="text">
-            <Lock size={16} color="#94A3B8" />
-            <Text style={styles.composerLockedText}>Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này.</Text>
-          </View>
-        ) : (
-        <View style={styles.composerBar}>
-          <View style={styles.composerTools}>
-            <Pressable
-              onPress={() => setPicker('attachment')}
-              style={styles.composerIcon}
-              accessibilityRole="button"
-              accessibilityLabel="Gửi ảnh"
-            >
-              <ImagePlus size={19} color="#64748B" />
-            </Pressable>
-            <Pressable
-              onPress={() => isPreview ? setPicker('attachment') : void pickImage(true)}
-              style={styles.composerIcon}
-              accessibilityRole="button"
-              accessibilityLabel="Chụp ảnh"
-            >
-              <Camera size={19} color="#64748B" />
-            </Pressable>
-            <Pressable
-              onPress={() => isPreview ? setPicker('attachment') : void pickDocument()}
-              style={styles.composerIcon}
-              accessibilityRole="button"
-              accessibilityLabel="Đính kèm tệp"
-            >
-              <Paperclip size={19} color="#64748B" />
-            </Pressable>
-          </View>
-          <View style={styles.composerInputPill}>
-            <TextInput
-              value={draft}
-              onChangeText={handleDraftChange}
-              placeholder="Nhập tin nhắn..."
-              placeholderTextColor="#94A3B8"
-              style={styles.composerTextInput}
-              multiline
-              textAlignVertical="center"
-              maxLength={500}
-              returnKeyType="send"
-              submitBehavior="submit"
-              onSubmitEditing={() => { void send(); }}
-              onBlur={stopTyping}
-              accessibilityLabel="Nhập tin nhắn"
-            />
-            <Pressable onPress={() => setPicker('sticker')} style={styles.composerEmoji} accessibilityRole="button" accessibilityLabel="Mở bảng emoji, sticker và GIF">
-              <Smile size={19} color="#94A3B8" />
-            </Pressable>
-          </View>
-          <Pressable
-            onPress={() => { void send(); }}
-            disabled={sending || (!draft.trim() && !selectedAttachment)}
-            style={[styles.composerSendBtn, (sending || (!draft.trim() && !selectedAttachment)) && styles.composerSendBtnDisabled]}
-            accessibilityRole="button"
-            accessibilityLabel="Gửi tin nhắn"
-            accessibilityState={{ disabled: sending || (!draft.trim() && !selectedAttachment) }}
-          >
-            <Send size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
-        )}
+        {
+          selectedAttachment ? (
+            <View style={styles.replyBar}>
+              <Text numberOfLines={1} style={styles.replyBarText}>Tệp đã chọn: {selectedAttachment.name}</Text>
+              <Pressable onPress={() => setSelectedAttachment(null)} accessibilityRole="button" accessibilityLabel="Bỏ tệp đã chọn"><Text style={styles.cancelReply}>×</Text></Pressable>
+            </View>
+          ) : null
+        }
+        {
+          superAdminReadOnly ? (
+            <View style={[styles.composerBar, styles.composerLocked]} accessibilityRole="text">
+              <Lock size={16} color="#94A3B8" />
+              <Text style={styles.composerLockedText}>Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này.</Text>
+            </View>
+          ) : (
+            <View style={styles.composerBar}>
+              <View style={styles.composerTools}>
+                <Pressable
+                  onPress={() => setPicker('attachment')}
+                  style={styles.composerIcon}
+                  accessibilityRole="button"
+                  accessibilityLabel="Gửi ảnh"
+                >
+                  <ImagePlus size={19} color="#64748B" />
+                </Pressable>
+                <Pressable
+                  onPress={() => isPreview ? setPicker('attachment') : void pickImage(true)}
+                  style={styles.composerIcon}
+                  accessibilityRole="button"
+                  accessibilityLabel="Chụp ảnh"
+                >
+                  <Camera size={19} color="#64748B" />
+                </Pressable>
+                <Pressable
+                  onPress={() => isPreview ? setPicker('attachment') : void pickDocument()}
+                  style={styles.composerIcon}
+                  accessibilityRole="button"
+                  accessibilityLabel="Đính kèm tệp"
+                >
+                  <Paperclip size={19} color="#64748B" />
+                </Pressable>
+              </View>
+              <View style={styles.composerInputPill}>
+                <TextInput
+                  value={draft}
+                  onChangeText={handleDraftChange}
+                  placeholder="Nhập tin nhắn..."
+                  placeholderTextColor="#94A3B8"
+                  style={styles.composerTextInput}
+                  multiline
+                  textAlignVertical="center"
+                  maxLength={500}
+                  returnKeyType="send"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => { void send(); }}
+                  onBlur={stopTyping}
+                  accessibilityLabel="Nhập tin nhắn"
+                />
+                <Pressable onPress={() => setPicker('sticker')} style={styles.composerEmoji} accessibilityRole="button" accessibilityLabel="Mở bảng emoji, sticker và GIF">
+                  <Smile size={19} color="#94A3B8" />
+                </Pressable>
+              </View>
+              <Pressable
+                onPress={() => { void send(); }}
+                disabled={sending || (!draft.trim() && !selectedAttachment)}
+                style={[styles.composerSendBtn, (sending || (!draft.trim() && !selectedAttachment)) && styles.composerSendBtnDisabled]}
+                accessibilityRole="button"
+                accessibilityLabel="Gửi tin nhắn"
+                accessibilityState={{ disabled: sending || (!draft.trim() && !selectedAttachment) }}
+              >
+                <Send size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          )
+        }
         <Modal visible={picker !== null} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
           <View style={styles.pickerBackdrop}>
             <Pressable
@@ -3083,60 +3353,60 @@ export function ConversationScreen() {
                   <View style={[styles.pickerPanel, picker === 'sticker' && styles.stickerPickerPanel]}>
                     {picker === 'sticker' ? (
                       <>
-                      <TextInput
-                        value={stickerSearch}
-                        onChangeText={setStickerSearch}
-                        placeholder="Tìm sticker..."
-                        placeholderTextColor={colors.muted}
-                        style={styles.stickerSearch}
-                        accessibilityLabel="Tìm sticker"
-                      />
-                      <ScrollView horizontal style={styles.stickerCategoryScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerCategories}>
-                        {STICKER_CATEGORIES.map((item) => (
-                          <Pressable
-                            key={item.id}
-                            onPress={() => setStickerCategory(item.id)}
-                            style={[styles.stickerCategory, stickerCategory === item.id && styles.stickerCategoryActive]}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: stickerCategory === item.id }}
-                          >
-                            <Text style={[styles.stickerCategoryText, stickerCategory === item.id && styles.stickerCategoryTextActive]}>{item.label}</Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-                      <ScrollView style={styles.pickerContent} contentContainerStyle={styles.stickerSections} keyboardShouldPersistTaps="handled">
-                        {recentStickers.length > 0 ? (
-                          <View style={styles.stickerSection}>
-                            <Text style={styles.stickerSectionTitle}>Gần đây</Text>
-                            <View style={styles.stickerGrid}>
-                              {recentStickers.map((sticker) => (
-                                <Pressable key={`recent-${sticker.id}`} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
-                                  <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
-                                </Pressable>
-                              ))}
-                            </View>
-                          </View>
-                        ) : null}
-                        {STICKER_CATEGORIES.slice(1)
-                          .filter((item) => stickerCategory === 'all' || item.id === stickerCategory)
-                          .map((item) => {
-                            const stickers = visibleStickers.filter((sticker) => sticker.category === item.id);
-                            if (!stickers.length) return null;
-                            return (
-                              <View key={item.id} style={styles.stickerSection}>
-                                <Text style={styles.stickerSectionTitle}>{item.label}</Text>
-                                <View style={styles.stickerGrid}>
-                                  {stickers.map((sticker) => (
-                                    <Pressable key={sticker.id} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
-                                      <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
-                                    </Pressable>
-                                  ))}
-                                </View>
+                        <TextInput
+                          value={stickerSearch}
+                          onChangeText={setStickerSearch}
+                          placeholder="Tìm sticker..."
+                          placeholderTextColor={colors.muted}
+                          style={styles.stickerSearch}
+                          accessibilityLabel="Tìm sticker"
+                        />
+                        <ScrollView horizontal style={styles.stickerCategoryScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerCategories}>
+                          {STICKER_CATEGORIES.map((item) => (
+                            <Pressable
+                              key={item.id}
+                              onPress={() => setStickerCategory(item.id)}
+                              style={[styles.stickerCategory, stickerCategory === item.id && styles.stickerCategoryActive]}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: stickerCategory === item.id }}
+                            >
+                              <Text style={[styles.stickerCategoryText, stickerCategory === item.id && styles.stickerCategoryTextActive]}>{item.label}</Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                        <ScrollView style={styles.pickerContent} contentContainerStyle={styles.stickerSections} keyboardShouldPersistTaps="handled">
+                          {recentStickers.length > 0 ? (
+                            <View style={styles.stickerSection}>
+                              <Text style={styles.stickerSectionTitle}>Gần đây</Text>
+                              <View style={styles.stickerGrid}>
+                                {recentStickers.map((sticker) => (
+                                  <Pressable key={`recent-${sticker.id}`} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
+                                    <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
+                                  </Pressable>
+                                ))}
                               </View>
-                            );
-                          })}
-                        {!visibleStickers.length ? <Text style={styles.pickerEmpty}>{stickerSearch.trim() ? 'Không tìm thấy sticker phù hợp.' : 'Danh mục này chưa có sticker.'}</Text> : null}
-                      </ScrollView>
+                            </View>
+                          ) : null}
+                          {STICKER_CATEGORIES.slice(1)
+                            .filter((item) => stickerCategory === 'all' || item.id === stickerCategory)
+                            .map((item) => {
+                              const stickers = visibleStickers.filter((sticker) => sticker.category === item.id);
+                              if (!stickers.length) return null;
+                              return (
+                                <View key={item.id} style={styles.stickerSection}>
+                                  <Text style={styles.stickerSectionTitle}>{item.label}</Text>
+                                  <View style={styles.stickerGrid}>
+                                    {stickers.map((sticker) => (
+                                      <Pressable key={sticker.id} onPress={() => void sendSticker(sticker.id)} disabled={sending} style={styles.stickerTile} accessibilityRole="button" accessibilityLabel={`Gửi sticker: ${sticker.name}`}>
+                                        <Image source={getChatStickerImage(sticker.id)} style={styles.stickerImage} resizeMode="contain" />
+                                      </Pressable>
+                                    ))}
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          {!visibleStickers.length ? <Text style={styles.pickerEmpty}>{stickerSearch.trim() ? 'Không tìm thấy sticker phù hợp.' : 'Danh mục này chưa có sticker.'}</Text> : null}
+                        </ScrollView>
                       </>
                     ) : null}
                     {picker === 'emoji' ? (
@@ -3183,103 +3453,105 @@ export function ConversationScreen() {
             </View>
           </View>
         </Modal>
-        {teacherAttendanceModalVisible ? (
-          <Modal
-            visible
-            transparent
-            animationType="fade"
-            onRequestClose={() => setTeacherAttendanceModalVisible(false)}
-          >
-            <View style={styles.infoBackdrop}>
-              <View style={styles.teacherAttendanceModal}>
-                <View style={styles.teacherAttendanceModalHeader}>
-                  <View style={styles.teacherAttendanceModalIcon}><CheckCircle2 size={21} color="#FFFFFF" /></View>
-                  <View style={styles.teacherAttendanceModalHeading}>
-                    <Text style={styles.teacherAttendanceModalTitle}>ĐIỂM DANH &amp; CHẤM ĐIỂM</Text>
-                    <Text numberOfLines={2} style={styles.teacherAttendanceModalSubtitle}>
-                      {teacherAttendanceSchedule?.courseName || teacherAttendanceSchedule?.title}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setTeacherAttendanceModalVisible(false)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Đóng popup điểm danh"
-                    style={styles.teacherAttendanceModalClose}
-                  >
-                    <X size={20} color="#FFFFFF" />
-                  </Pressable>
-                </View>
-                <ScrollView contentContainerStyle={styles.teacherAttendanceModalBody} keyboardShouldPersistTaps="handled">
-                  <View style={styles.teacherAttendanceStudentBox}>
-                    <Text style={styles.teacherAttendanceFieldCaption}>Học viên</Text>
-                    <Text style={styles.teacherAttendanceStudentName}>{conversationName}</Text>
-                    <Text style={styles.teacherAttendanceProgress}>
-                      Tiến độ hiện tại: {teacherAttendanceCompleted}/{teacherAttendanceTotal} buổi
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.teacherAttendanceFieldLabel}>Đánh giá buổi học (0-10)</Text>
-                    <View style={styles.teacherAttendanceGradeRow}>
-                      <View style={styles.teacherAttendanceGradeStepper}>
-                        <Pressable
-                          onPress={() => setTeacherAttendanceGrade(String(Math.min(10, (Number(teacherAttendanceGrade.replace(',', '.')) || 0) + 1)))}
-                          style={styles.teacherAttendanceGradeStep}
-                          accessibilityRole="button"
-                          accessibilityLabel="Tăng điểm"
-                        >
-                          <Text style={styles.teacherAttendanceStepText}>⌃</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => setTeacherAttendanceGrade(String(Math.max(0, (Number(teacherAttendanceGrade.replace(',', '.')) || 0) - 1)))}
-                          style={styles.teacherAttendanceGradeStep}
-                          accessibilityRole="button"
-                          accessibilityLabel="Giảm điểm"
-                        >
-                          <Text style={styles.teacherAttendanceStepText}>⌄</Text>
-                        </Pressable>
-                      </View>
-                      <TextInput
-                        value={teacherAttendanceGrade}
-                        onChangeText={setTeacherAttendanceGrade}
-                        keyboardType="decimal-pad"
-                        accessibilityLabel="Điểm buổi học từ 0 đến 10"
-                        style={styles.teacherAttendanceGradeValue}
-                      />
-                      <Text style={styles.teacherAttendanceGradeMaximum}>/ 10</Text>
+        {
+          teacherAttendanceModalVisible ? (
+            <Modal
+              visible
+              transparent
+              animationType="fade"
+              onRequestClose={() => setTeacherAttendanceModalVisible(false)}
+            >
+              <View style={styles.infoBackdrop}>
+                <View style={styles.teacherAttendanceModal}>
+                  <View style={styles.teacherAttendanceModalHeader}>
+                    <View style={styles.teacherAttendanceModalIcon}><CheckCircle2 size={21} color="#FFFFFF" /></View>
+                    <View style={styles.teacherAttendanceModalHeading}>
+                      <Text style={styles.teacherAttendanceModalTitle}>ĐIỂM DANH &amp; CHẤM ĐIỂM</Text>
+                      <Text numberOfLines={2} style={styles.teacherAttendanceModalSubtitle}>
+                        {teacherAttendanceSchedule?.courseName || teacherAttendanceSchedule?.title}
+                      </Text>
                     </View>
-                  </View>
-                  <View>
-                    <Text style={styles.teacherAttendanceFieldLabel}>Ghi chú nhanh</Text>
-                    <TextInput
-                      value={teacherAttendanceNote}
-                      onChangeText={setTeacherAttendanceNote}
-                      placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
-                      multiline
-                      textAlignVertical="top"
-                      style={styles.teacherAttendanceNoteInput}
-                    />
-                  </View>
-                  <View style={styles.teacherAttendanceModalActions}>
                     <Pressable
                       onPress={() => setTeacherAttendanceModalVisible(false)}
-                      style={styles.teacherAttendanceCancelButton}
                       accessibilityRole="button"
+                      accessibilityLabel="Đóng popup điểm danh"
+                      style={styles.teacherAttendanceModalClose}
                     >
-                      <Text style={styles.teacherAttendanceCancelText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={confirmTeacherAttendance}
-                      style={styles.teacherAttendanceConfirmButton}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.teacherAttendanceConfirmText}>Xác nhận điểm danh</Text>
+                      <X size={20} color="#FFFFFF" />
                     </Pressable>
                   </View>
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-        ) : null}
+                  <ScrollView contentContainerStyle={styles.teacherAttendanceModalBody} keyboardShouldPersistTaps="handled">
+                    <View style={styles.teacherAttendanceStudentBox}>
+                      <Text style={styles.teacherAttendanceFieldCaption}>Học viên</Text>
+                      <Text style={styles.teacherAttendanceStudentName}>{conversationName}</Text>
+                      <Text style={styles.teacherAttendanceProgress}>
+                        Tiến độ hiện tại: {teacherAttendanceCompleted}/{teacherAttendanceTotal} buổi
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.teacherAttendanceFieldLabel}>Đánh giá buổi học (0-10)</Text>
+                      <View style={styles.teacherAttendanceGradeRow}>
+                        <View style={styles.teacherAttendanceGradeStepper}>
+                          <Pressable
+                            onPress={() => setTeacherAttendanceGrade(String(Math.min(10, (Number(teacherAttendanceGrade.replace(',', '.')) || 0) + 1)))}
+                            style={styles.teacherAttendanceGradeStep}
+                            accessibilityRole="button"
+                            accessibilityLabel="Tăng điểm"
+                          >
+                            <Text style={styles.teacherAttendanceStepText}>⌃</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setTeacherAttendanceGrade(String(Math.max(0, (Number(teacherAttendanceGrade.replace(',', '.')) || 0) - 1)))}
+                            style={styles.teacherAttendanceGradeStep}
+                            accessibilityRole="button"
+                            accessibilityLabel="Giảm điểm"
+                          >
+                            <Text style={styles.teacherAttendanceStepText}>⌄</Text>
+                          </Pressable>
+                        </View>
+                        <TextInput
+                          value={teacherAttendanceGrade}
+                          onChangeText={setTeacherAttendanceGrade}
+                          keyboardType="decimal-pad"
+                          accessibilityLabel="Điểm buổi học từ 0 đến 10"
+                          style={styles.teacherAttendanceGradeValue}
+                        />
+                        <Text style={styles.teacherAttendanceGradeMaximum}>/ 10</Text>
+                      </View>
+                    </View>
+                    <View>
+                      <Text style={styles.teacherAttendanceFieldLabel}>Ghi chú nhanh</Text>
+                      <TextInput
+                        value={teacherAttendanceNote}
+                        onChangeText={setTeacherAttendanceNote}
+                        placeholder="Ví dụ: Học tốt, nộp bài đầy đủ..."
+                        multiline
+                        textAlignVertical="top"
+                        style={styles.teacherAttendanceNoteInput}
+                      />
+                    </View>
+                    <View style={styles.teacherAttendanceModalActions}>
+                      <Pressable
+                        onPress={() => setTeacherAttendanceModalVisible(false)}
+                        style={styles.teacherAttendanceCancelButton}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.teacherAttendanceCancelText}>Hủy</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={confirmTeacherAttendance}
+                        style={styles.teacherAttendanceConfirmButton}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.teacherAttendanceConfirmText}>Xác nhận điểm danh</Text>
+                      </Pressable>
+                    </View>
+                  </ScrollView>
+                </View>
+              </View >
+            </Modal >
+          ) : null
+        }
         <Modal
           visible={Boolean(attendancePromptSchedule)}
           transparent
@@ -3310,7 +3582,7 @@ export function ConversationScreen() {
                   {[attendancePromptSchedule?.weekday, attendancePromptSchedule?.dateLabel].filter(Boolean).join(' · ')}
                 </Text>
                 <Text style={styles.attendancePromptTime}>
-                  Ca {attendancePromptSchedule?.startTime || '—'}{attendancePromptSchedule?.endTime ? ` - ${attendancePromptSchedule.endTime}` : ''} · Giờ Việt Nam (UTC+7)
+                  Ca {attendancePromptSchedule?.startTime || '-'}{attendancePromptSchedule?.endTime ? ` - ${attendancePromptSchedule.endTime}` : ''} · Giờ Việt Nam (UTC+7)
                 </Text>
               </View>
               <Text style={styles.attendancePromptMessage}>
@@ -3699,8 +3971,8 @@ export function ConversationScreen() {
                 && ['student', 'teacher'].includes(user.role)
                 && ['student', 'teacher'].includes(route.params.participantRole || '')
                 && user.role !== route.params.participantRole ? (
-                  <View style={{ width: '100%', marginTop: spacing.sm }}>
-                    <CommunicationPreferencesCard role={user.role} />
+                <View style={{ width: '100%', marginTop: spacing.sm }}>
+                  <CommunicationPreferencesCard role={user.role} />
                 </View>
               ) : null}
               <Pressable onPress={() => setShowInfo(false)} style={styles.infoClose} accessibilityRole="button">
@@ -3724,7 +3996,7 @@ export function ConversationScreen() {
                   accessibilityLabel="Đóng xếp lịch tuần"
                 >
                   <X size={20} color={colors.muted} />
-          </Pressable>
+                </Pressable>
               </View>
               <View style={styles.weekScheduleNavigator}>
                 <Pressable
@@ -3886,9 +4158,9 @@ export function ConversationScreen() {
               </ScrollView>
             </View>
           </View>
-        </Modal>
-      </AppScreen>
-    </KeyboardAvoidingView>
+        </Modal >
+      </AppScreen >
+    </KeyboardAvoidingView >
   );
 }
 
@@ -3910,10 +4182,10 @@ const styles = StyleSheet.create({
   aiSupportAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#C2410C' },
   aiSupportActionDisabled: { opacity: 0.6 },
   aiSupportActionText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
-  aiSupportPromptList: { alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingHorizontal: 4, paddingTop: spacing.xs },
-  aiSupportPromptButton: { maxWidth: '100%', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  aiSupportPromptList: { alignSelf: 'stretch', flexDirection: 'column', gap: 6, paddingTop: spacing.xs },
+  aiSupportPromptButton: { alignSelf: 'stretch', width: '100%', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#D4EDDA', alignItems: 'flex-start', justifyContent: 'center' },
   aiSupportPromptButtonDisabled: { opacity: 0.55 },
-  aiSupportPromptText: { color: '#065F46', fontSize: typography.micro, fontWeight: '700' },
+  aiSupportPromptText: { color: '#065F46', fontSize: 12.5, fontWeight: '700', textAlign: 'left', lineHeight: 18 },
   chatHeaderAction: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
   groupAddHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#EFF6FF' },
   groupDeleteHeaderAction: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FEF2F2' },
@@ -4031,6 +4303,7 @@ const styles = StyleSheet.create({
   unreadCountText: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '800' },
   chatHeaderAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   chatHeaderAvatarImg: { width: 38, height: 38, borderRadius: 19 },
+  aiChatbotAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
   conversationCopy: { flex: 1, gap: 3 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   title: { color: colors.ink, fontSize: typography.body, fontWeight: '700', flexShrink: 1 },
@@ -4094,6 +4367,7 @@ const styles = StyleSheet.create({
   bubble: { borderRadius: 9, paddingHorizontal: 14, paddingVertical: 12, position: 'relative', maxWidth: '100%', minWidth: 0, flexShrink: 1 },
   bubbleMine: { backgroundColor: '#E4F0FF', borderWidth: 1, borderColor: '#D1E1F2' },
   bubbleOther: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
+  bubbleAiSupport: { maxWidth: '92%', alignSelf: 'stretch' },
   imageMessageBubble: { paddingHorizontal: 0, paddingVertical: 0, backgroundColor: 'transparent', borderWidth: 0 },
   recalledMessageBubble: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#E4F0FF', borderWidth: 1, borderColor: '#D1E1F2', borderRadius: 9 },
   recalledMessageContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -4139,11 +4413,33 @@ const styles = StyleSheet.create({
   messageRowOther: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14 },
   otherAvatarWrap: { width: 34, height: 34, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   otherAvatarImg: { width: 32, height: 32, borderRadius: 16 },
+  aiMessageAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
   messageOtherContainer: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   bubbleAndActionsRowOther: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', zIndex: 100 },
   msgActionsOther: { position: 'relative', marginLeft: 6, zIndex: 200, flexShrink: 0 },
-  typingIndicator: { alignSelf: 'flex-start', marginTop: spacing.xs, marginLeft: 42, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  typingIndicatorText: { color: '#64748B', fontSize: typography.micro, fontStyle: 'italic' },
+  typingIndicator: { alignSelf: 'flex-start', marginTop: spacing.xs, marginLeft: 42, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  typingIndicatorText: { color: '#334155', fontSize: 12.5, fontWeight: '700' },
+  aiFeedbackContainer: { alignSelf: 'stretch', marginTop: 14, marginBottom: 8, paddingHorizontal: 12 },
+  aiFeedbackSection: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
+  aiFeedbackTitle: { fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'center' },
+  aiFeedbackRow: { alignSelf: 'stretch', flexDirection: 'row', gap: 10 },
+  aiFeedbackBtnAgree: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  aiFeedbackBtnAgreeText: { fontSize: 12, fontWeight: '800', color: '#065F46' },
+  aiFeedbackBtnDisagree: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  aiFeedbackBtnDisagreeText: { fontSize: 12, fontWeight: '800', color: '#475569' },
+  aiReasonCol: { alignSelf: 'stretch', flexDirection: 'column', gap: 6 },
+  aiReasonBtn: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
+  aiReasonText: { fontSize: 12, fontWeight: '700', color: '#334155' },
+  aiReExplainNotice: { alignSelf: 'stretch', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', alignItems: 'center' },
+  aiReExplainText: { fontSize: 12, fontWeight: '700', color: '#1D4ED8', textAlign: 'center' },
+  aiFinalExplainBtn: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
+  aiFinalExplainText: { fontSize: 12, fontWeight: '800', color: '#1E40AF' },
+  aiFinalStaffBtn: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB' },
+  aiFinalStaffText: { fontSize: 12, fontWeight: '800', color: '#92400E' },
+  aiInviteNotice: { alignSelf: 'stretch', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#DDD6FE', backgroundColor: '#F5F3FF', alignItems: 'center' },
+  aiInviteText: { fontSize: 12, fontWeight: '700', color: '#6D28D9', textAlign: 'center' },
+  aiEndedNotice: { alignSelf: 'stretch', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center' },
+  aiEndedText: { fontSize: 12, fontWeight: '700', color: '#64748B', textAlign: 'center' },
   sticker: { fontSize: 38, lineHeight: 46 },
   composerBar: { alignSelf: 'stretch', marginHorizontal: -spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
   composerLocked: { gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 14, backgroundColor: '#F1F5F9' },

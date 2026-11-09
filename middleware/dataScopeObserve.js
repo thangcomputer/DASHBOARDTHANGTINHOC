@@ -1,5 +1,5 @@
 /**
- * RBAC-S2 — Data Scope observe middleware.
+ * RBAC-S2 - Data Scope observe middleware.
  * Never alters HTTP outcome. Logs design scope vs optional dual-check hint.
  *
  * Placement: after authMiddleware (and branchFilter when present).

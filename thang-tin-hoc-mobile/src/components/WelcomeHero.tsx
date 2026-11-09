@@ -22,7 +22,7 @@ const VARIANTS = {
       'Kiến thức là hành trang theo bạn suốt đời.',
       'Chăm chỉ hôm nay là tự tin ngày mai.',
       'Không có gì là khó nếu bạn bắt đầu.',
-      'Thành thạo tin học — mở rộng cơ hội.',
+      'Thành thạo tin học - mở rộng cơ hội.',
       'Kiên trì là chìa khóa của thành công.',
     ],
   },
@@ -48,7 +48,7 @@ export type WelcomeChip = { icon?: LucideIcon; label?: string; live?: boolean };
 
 const WEEKDAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
-/** Giờ Việt Nam tính thủ công — Hermes không phải lúc nào cũng có đủ dữ liệu múi giờ cho Intl. */
+/** Giờ Việt Nam tính thủ công - Hermes không phải lúc nào cũng có đủ dữ liệu múi giờ cho Intl. */
 function vnNow() {
   const vn = new Date(Date.now() + 7 * 3600e3);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -67,13 +67,14 @@ function greetingFor(hour: number) {
 }
 
 /** Thẻ chào mừng Tổng quan (giống web): tên đầy đủ, hình hoạt hình theo vai trò, nút vào lớp trên đầu nhân vật. */
-export function WelcomeHero({ role = 'student', name, chips = [], joinUrl, joinHint, onJoin }: {
+export function WelcomeHero({ role = 'student', name, chips = [], joinUrl = '', joinHint = '', onJoin, showJoin = true }: {
   role?: 'student' | 'teacher';
   name: string;
   chips?: WelcomeChip[];
-  joinUrl: string;
-  joinHint: string;
-  onJoin: (url: string) => void;
+  joinUrl?: string;
+  joinHint?: string;
+  onJoin?: (url: string) => void;
+  showJoin?: boolean;
 }) {
   const variant = VARIANTS[role];
   const EyebrowIcon = variant.eyebrowIcon;
@@ -98,7 +99,7 @@ export function WelcomeHero({ role = 'student', name, chips = [], joinUrl, joinH
 
         <View style={styles.content}>
           <View style={styles.eyebrow}>
-            <EyebrowIcon size={12} color="#DC2626" />
+            <EyebrowIcon size={12} color={colors.brand} />
             <Text style={styles.eyebrowText}>{variant.eyebrow}</Text>
           </View>
           <Text style={styles.greeting}>{`${greetingFor(hour)} 👋`}</Text>
@@ -109,12 +110,12 @@ export function WelcomeHero({ role = 'student', name, chips = [], joinUrl, joinH
           </View>
           <View style={styles.chips}>
             <View style={styles.chip}>
-              <CalendarDays size={12} color="#EF4444" />
+              <CalendarDays size={12} color={colors.brand} />
               <Text style={styles.chipText}>{date}</Text>
             </View>
             {chips.filter((chip) => chip.label).map(({ icon: Icon, label, live }) => (
               <View key={label} style={[styles.chip, live && styles.chipLive]}>
-                {live ? <View style={styles.liveDot} /> : Icon ? <Icon size={12} color="#EF4444" /> : null}
+                {live ? <View style={styles.liveDot} /> : Icon ? <Icon size={12} color={colors.brand} /> : null}
                 <Text numberOfLines={1} style={[styles.chipText, styles.chipCourse, live && styles.chipLiveText]}>{label}</Text>
               </View>
             ))}
@@ -122,10 +123,11 @@ export function WelcomeHero({ role = 'student', name, chips = [], joinUrl, joinH
         </View>
       </View>
 
-      <View style={styles.figure}>
+      <View style={[styles.figure, !showJoin && styles.figureNoJoin]}>
+        {showJoin ? (
         <View style={styles.joinSlot}>
           {joinUrl ? (
-            <Pressable onPress={() => onJoin(joinUrl)} style={styles.joinActive} accessibilityRole="button" accessibilityLabel={variant.joinLabel}>
+            <Pressable onPress={() => onJoin?.(joinUrl)} style={styles.joinActive} accessibilityRole="button" accessibilityLabel={variant.joinLabel}>
               <Animated.View
                 pointerEvents="none"
                 style={[styles.joinPulse, {
@@ -143,6 +145,7 @@ export function WelcomeHero({ role = 'student', name, chips = [], joinUrl, joinH
             </View>
           ) : null}
         </View>
+        ) : null}
         <View style={styles.heroBox}>
           <View style={styles.shadow} />
           <Image source={variant.image} style={styles.hero} resizeMode="contain" accessibilityIgnoresInvertColors />
@@ -158,26 +161,26 @@ const styles = StyleSheet.create({
     minHeight: HERO_HEIGHT + JOIN_SPACE + 10,
     borderRadius: 26,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
-    backgroundColor: '#FFF7F5',
-    backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #FEF2F2 55%, #FFFBEB 100%)',
-    boxShadow: '0px 10px 24px rgba(185, 28, 28, 0.08)',
+    borderColor: '#E2F1EB',
+    backgroundColor: '#F4FBF8',
+    backgroundImage: 'linear-gradient(135deg, #FFFFFF 0%, #ECFDF5 55%, #F0FDF4 100%)',
+    boxShadow: '0px 10px 24px rgba(4, 120, 87, 0.08)',
   } as never,
   decor: { ...StyleSheet.absoluteFill, borderRadius: 26, overflow: 'hidden' },
   blob: {
-    position: 'absolute', right: -60, bottom: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(239, 68, 68, 0.14)',
-    backgroundImage: 'linear-gradient(135deg, rgba(239,68,68,0.20) 0%, rgba(251,146,60,0.14) 50%, rgba(252,211,77,0.22) 100%)',
+    position: 'absolute', right: -60, bottom: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(5, 150, 105, 0.12)',
+    backgroundImage: 'linear-gradient(135deg, rgba(5,150,105,0.18) 0%, rgba(16,185,129,0.14) 50%, rgba(245,158,11,0.18) 100%)',
   } as never,
   ring: { position: 'absolute', right: 18, bottom: -30, width: 140, height: 140, borderRadius: 70, borderWidth: 8, borderColor: 'rgba(255,255,255,0.7)' },
-  glow: { position: 'absolute', left: -40, top: -50, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(254, 202, 202, 0.35)' },
+  glow: { position: 'absolute', left: -40, top: -50, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(167, 243, 208, 0.35)' },
   content: { paddingVertical: spacing.lg, paddingLeft: spacing.lg, paddingRight: FIGURE_RIGHT + (FIGURE_WIDTH + HERO_WIDTH) / 2 + 6, gap: 4 },
   eyebrow: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.85)', borderWidth: 1, borderColor: '#FEE2E2',
+    borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.85)', borderWidth: 1, borderColor: '#E2F1EB',
   },
-  eyebrowText: { color: '#DC2626', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  eyebrowText: { color: colors.brand, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   greeting: { marginTop: 6, color: colors.muted, fontSize: 13, fontWeight: '700' },
-  name: { color: '#B91C1C', fontSize: 24, fontWeight: '900', lineHeight: 29 },
+  name: { color: colors.brandDark, fontSize: 24, fontWeight: '900', lineHeight: 29 },
   quoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   quote: { flex: 1, color: colors.muted, fontSize: 12, fontStyle: 'italic', lineHeight: 17 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
@@ -187,21 +190,22 @@ const styles = StyleSheet.create({
   },
   chipText: { color: '#475569', fontSize: 11, fontWeight: '800' },
   chipCourse: { flexShrink: 1 },
-  chipLive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+  chipLive: { backgroundColor: colors.brand, borderColor: colors.brand },
   chipLiveText: { color: '#FFFFFF' },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6EE7B7' },
   figure: { position: 'absolute', right: FIGURE_RIGHT, bottom: 0, width: FIGURE_WIDTH, alignItems: 'center' },
+  figureNoJoin: { bottom: 4 },
   joinSlot: { height: JOIN_SPACE, justifyContent: 'center', alignItems: 'center' },
   heroBox: { width: HERO_WIDTH, height: HERO_HEIGHT, alignItems: 'center' },
   shadow: { position: 'absolute', bottom: 2, width: 70, height: 8, borderRadius: 999, backgroundColor: 'rgba(15, 23, 42, 0.14)' },
   hero: { width: HERO_WIDTH, height: HERO_HEIGHT },
   joinActive: {
     flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
-    borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#DC2626',
-    backgroundImage: 'linear-gradient(180deg, #EF4444 0%, #B91C1C 100%)',
-    boxShadow: '0px 8px 16px rgba(185, 28, 28, 0.45)',
+    borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: colors.brand,
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 55%, #047857 100%)',
+    boxShadow: '0px 8px 16px rgba(4, 120, 87, 0.35)',
   } as never,
-  joinPulse: { ...StyleSheet.absoluteFill, borderRadius: 999, backgroundColor: 'rgba(248, 113, 113, 0.6)' },
+  joinPulse: { ...StyleSheet.absoluteFill, borderRadius: 999, backgroundColor: 'rgba(52, 211, 153, 0.6)' },
   joinActiveText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   joinIdle: {
     flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: FIGURE_WIDTH, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999,

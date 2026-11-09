@@ -103,7 +103,7 @@ const buildCaptureRoot = (source) => {
   return { container, clone };
 };
 
-/** Lấy template hóa đơn — ưu tiên bản đang hiển thị (modal) thay vì bản ẩn */
+/** Lấy template hóa đơn - ưu tiên bản đang hiển thị (modal) thay vì bản ẩn */
 const getInvoiceElement = () => {
   const all = document.querySelectorAll('#invoice-template');
   if (!all.length) return null;
@@ -172,7 +172,7 @@ const exportPDF = async (data = {}) => {
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
 
-    // Phủ kín trang A5 — nội dung đã đúng tỷ lệ khi chụp
+    // Phủ kín trang A5 - nội dung đã đúng tỷ lệ khi chụp
     pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
 
     pdf.setProperties({
@@ -284,7 +284,7 @@ export const printInvoice = () => {
 
 /**
  * Chụp phiếu thu đang hiện (#invoice-template) thành PNG blob.
- * Tách riêng — không đụng luồng In / Tải PDF.
+ * Tách riêng - không đụng luồng In / Tải PDF.
  */
 export async function captureInvoicePngBlob() {
   const element = getInvoiceElement();

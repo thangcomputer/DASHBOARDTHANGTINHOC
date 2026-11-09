@@ -7,15 +7,15 @@ const EXCLUDED_DIRS = ['node_modules', 'client', '.git', 'dist'];
 const MOVES = [
   { src: 'routes/authRoutes.js', dest: 'modules/auth/authRoutes.js' },
   { src: 'models/Employee.js', dest: 'modules/auth/models/Employee.js' },
-  
+
   { src: 'routes/branchRoutes.js', dest: 'modules/branch/branchRoutes.js' },
   { src: 'controllers/branchController.js', dest: 'modules/branch/branchController.js' },
   { src: 'models/Branch.js', dest: 'modules/branch/models/Branch.js' },
-  
+
   { src: 'routes/tenantRoutes.js', dest: 'modules/tenant/tenantRoutes.js' },
   { src: 'services/tenantService.js', dest: 'modules/tenant/tenantService.js' },
   { src: 'models/Tenant.js', dest: 'modules/tenant/models/Tenant.js' },
-  
+
   { src: 'routes/settingsRoutes.js', dest: 'modules/system/settingsRoutes.js' },
   { src: 'controllers/settingsController.js', dest: 'modules/system/settingsController.js' },
   { src: 'services/settingsCache.js', dest: 'modules/system/settingsCache.js' },
@@ -72,15 +72,15 @@ allFiles.forEach(filePath => {
 
   // Regex to match require('...') or require("...")
   const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-  
+
   content = content.replace(requireRegex, (match, importPath) => {
     // Only care about relative imports
     if (!importPath.startsWith('.')) return match;
-    
+
     // Determine absolute path of what was being imported
     const currentDir = path.dirname(filePath);
     let absImportPath = path.resolve(currentDir, importPath);
-    
+
     // Check if it resolves to a .js file or a directory with index.js (simplified)
     if (!absImportPath.endsWith('.js')) {
       absImportPath += '.js';
@@ -88,7 +88,7 @@ allFiles.forEach(filePath => {
 
     // Did this target file move?
     let newTargetAbs = fileMap.get(absImportPath);
-    
+
     // Wait, what if the FILE ITSELF moved, and it is importing something that DID NOT move?
     // We need the old directory of this file if it moved.
     // Let's find if filePath is a new file location
@@ -113,14 +113,14 @@ allFiles.forEach(filePath => {
       // But the import string in the file was written relative to the OLD dir.
       // So we must compute absImportPath relative to the OLD dir.
       if (fileWasMoved) {
-         let originalTargetAbs = path.resolve(oldFileDir, importPath);
-         if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
-         // Did the target move?
-         if (fileMap.has(originalTargetAbs)) {
-           actualTargetAbs = fileMap.get(originalTargetAbs);
-         } else {
-           actualTargetAbs = originalTargetAbs;
-         }
+        let originalTargetAbs = path.resolve(oldFileDir, importPath);
+        if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
+        // Did the target move?
+        if (fileMap.has(originalTargetAbs)) {
+          actualTargetAbs = fileMap.get(originalTargetAbs);
+        } else {
+          actualTargetAbs = originalTargetAbs;
+        }
       } else {
         // Neither moved, skip
         return match;
@@ -129,15 +129,15 @@ allFiles.forEach(filePath => {
 
     // Now compute the new relative path from currentDir to actualTargetAbs
     let newRelative = path.relative(currentDir, actualTargetAbs);
-    
+
     // Remove .js extension for consistency
     if (newRelative.endsWith('.js')) {
       newRelative = newRelative.slice(0, -3);
     }
-    
+
     // Normalize path separators to forward slashes
     newRelative = newRelative.replace(/\\/g, '/');
-    
+
     // Ensure it starts with ./ if it's in the same dir
     if (!newRelative.startsWith('.')) {
       newRelative = './' + newRelative;

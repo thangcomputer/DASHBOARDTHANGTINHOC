@@ -1,4 +1,4 @@
-/** LMS player full-screen (z-100) — báo cho chat/popup nổi lên trên. */
+/** LMS player full-screen (z-100) - báo cho chat/popup nổi lên trên. */
 export const LMS_PLAYER_OPEN_EVENT = 'cms:lms-player-open';
 export const LMS_PLAYER_BODY_CLASS = 'cms-lms-player-open';
 

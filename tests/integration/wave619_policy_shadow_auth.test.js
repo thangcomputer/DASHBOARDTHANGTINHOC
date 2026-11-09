@@ -1,5 +1,5 @@
 /**
- * Wave 6.19 — Policy SHADOW for LIVE /api/auth + final LIVE coverage freeze guards.
+ * Wave 6.19 - Policy SHADOW for LIVE /api/auth + final LIVE coverage freeze guards.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -30,10 +30,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : defaultAdmin,
-          permissions: opts.permissions ?? [],
-          role,
-        },
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : defaultAdmin,
+        permissions: opts.permissions ?? [],
+        role,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -79,7 +79,7 @@ test('Wave6.19 AUTH: all PUBLIC actions ALLOW for anon + any role (AUTH=PUBLIC)'
   }
 });
 
-test('Wave6.19 AUTH: login/refresh/logout/oauth/captcha are public — spoof body.role is operation param, ignored as actor', () => {
+test('Wave6.19 AUTH: login/refresh/logout/oauth/captcha are public - spoof body.role is operation param, ignored as actor', () => {
   for (const action of ['login', 'login_public', 'login_internal', 'refresh', 'logout', 'mfa_verify', 'check_role', 'google', 'zalo']) {
     assert.equal(assertAuth(`spoof-${action}`, ANON, action, SPOOF).legacy.decision, 'ALLOW');
   }
@@ -102,7 +102,7 @@ test('Wave6.19 AUTH: me/change-password/avatar require auth; self-scope; missing
 
 // ── MFA internal ─────────────────────────────────────────────────────────────
 
-test('Wave6.19 AUTH: MFA setup/enable/disable/status — internal admin|staff|hardcoded admin only', () => {
+test('Wave6.19 AUTH: MFA setup/enable/disable/status - internal admin|staff|hardcoded admin only', () => {
   const hard = buildSubject({ user: { id: 'admin', role: 'admin' }, actorDoc: null, userBranchId: null });
   const staff = sub({ role: 'staff', adminRole: 'STAFF' });
   const admin = sub({ role: 'admin', adminRole: 'SUPER_ADMIN' });
@@ -122,7 +122,7 @@ test('Wave6.19 AUTH: MFA setup/enable/disable/status — internal admin|staff|ha
 
 // ── Admin ops ────────────────────────────────────────────────────────────────
 
-test('Wave6.19 AUTH: admin generate-otp/reset-password/profile — role admin|staff; body.userId is target param', () => {
+test('Wave6.19 AUTH: admin generate-otp/reset-password/profile - role admin|staff; body.userId is target param', () => {
   const staff = sub({ role: 'staff', permissions: [] });
   const teacher = sub({ id: 't1', role: 'teacher', adminRole: null, permissions: Object.values(PERMISSIONS) });
   const student = sub({ id: 's1', role: 'student' });

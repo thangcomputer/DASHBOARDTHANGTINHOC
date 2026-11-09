@@ -1,7 +1,7 @@
 /**
  * Chặn STAFF thao tác giảng viên thuộc chi nhánh khác (sau branchFilter).
  * Yêu cầu route có param :id là teacherId.
- * Trusted scope: req.userBranchId từ JWT/DB — không tin branchId client.
+ * Trusted scope: req.userBranchId từ JWT/DB - không tin branchId client.
  */
 const Teacher = require('../models/Teacher');
 

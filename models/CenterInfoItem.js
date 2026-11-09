@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * CenterInfoItem — các mục nhập tay theo section (nhân sự, chi nhánh, MXH, …).
+ * CenterInfoItem - các mục nhập tay theo section (nhân sự, chi nhánh, MXH, …).
  */
 const mongoose = require('mongoose');
 

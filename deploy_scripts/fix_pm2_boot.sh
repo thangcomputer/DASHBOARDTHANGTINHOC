@@ -50,8 +50,8 @@ s = p.read_text(encoding="utf-8")
 old = """      if (isProd) throw new Error(msg);
       // eslint-disable-next-line no-console
       console.warn(`[validateEnv] WARNING: ${msg}`);"""
-new = """      // Do not brick boot — force legacy for this process
-      console.error(`[validateEnv] ${msg} — forcing ENABLE_CQRS_*=false`);
+new = """      // Do not brick boot - force legacy for this process
+      console.error(`[validateEnv] ${msg} - forcing ENABLE_CQRS_*=false`);
       process.env.ENABLE_CQRS = 'false';
       for (const k of ['ENABLE_CQRS_STUDENT_CREATE','ENABLE_CQRS_INVOICE','ENABLE_CQRS_TEACHER','ENABLE_CQRS_FINANCE']) {
         process.env[k] = 'false';
@@ -60,7 +60,7 @@ if old in s:
     p.write_text(s.replace(old, new), encoding="utf-8")
     print("patched OK")
 else:
-    print("pattern not found — skip (maybe already patched)")
+    print("pattern not found - skip (maybe already patched)")
 PY
   fi
 fi

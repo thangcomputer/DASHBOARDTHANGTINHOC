@@ -159,10 +159,10 @@ export default function StudentAttendanceConfirmModal({
             <p className="text-xs font-bold  tracking-wide text-slate-400">Giảng viên hướng dẫn</p>
             <p className="text-base font-bold text-slate-900">{teacherName}</p>
             <p className="text-sm text-slate-600">
-              {[weekday, dateLabel].filter(Boolean).join(' · ') || '—'}
+              {[weekday, dateLabel].filter(Boolean).join(' · ') || '-'}
             </p>
             <p className="text-sm font-semibold text-slate-800">
-              Ca {timeRange || '—'} · Giờ Việt Nam (UTC+7)
+              Ca {timeRange || '-'} · Giờ Việt Nam (UTC+7)
             </p>
           </div>
 
@@ -173,7 +173,7 @@ export default function StudentAttendanceConfirmModal({
           ) : resolved ? (
             <p className="text-sm text-slate-500 leading-relaxed">
               {rejected
-                ? 'Admin đã xử lý tranh chấp — buổi học này không được tính vào tiến độ.'
+                ? 'Admin đã xử lý tranh chấp - buổi học này không được tính vào tiến độ.'
                 : 'Buổi điểm danh đã được giải quyết. Bạn có thể đóng cửa sổ này.'}
             </p>
           ) : (

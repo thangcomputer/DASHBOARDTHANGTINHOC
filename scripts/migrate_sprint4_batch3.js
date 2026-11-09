@@ -14,11 +14,11 @@ const MOVES = [
   // Invoice
   { src: 'routes/invoiceRoutes.js', dest: 'modules/invoice/routes/invoiceRoutes.js' },
   { src: 'models/Invoice.js', dest: 'modules/invoice/models/Invoice.js' },
-  
+
   // Transaction
   { src: 'routes/transactionRoutes.js', dest: 'modules/transaction/routes/transactionRoutes.js' },
   { src: 'models/Transaction.js', dest: 'modules/transaction/models/Transaction.js' },
-  
+
   // Finance
   { src: 'routes/financeRoutes.js', dest: 'modules/finance/routes/financeRoutes.js' },
   { src: 'routes/biRoutes.js', dest: 'modules/finance/routes/biRoutes.js' },
@@ -29,12 +29,12 @@ const MOVES = [
   { src: 'services/ledgerService.js', dest: 'modules/finance/services/ledgerService.js' },
   { src: 'services/revenueAggregate.js', dest: 'modules/finance/services/revenueAggregate.js' },
   { src: 'services/biService.js', dest: 'modules/finance/services/biService.js' },
-  
+
   // Payment
   { src: 'routes/webhookRoutes.js', dest: 'modules/payment/routes/webhookRoutes.js' },
   { src: 'models/PaymentSession.js', dest: 'modules/payment/models/PaymentSession.js' },
   { src: 'models/SepayWebhookEvent.js', dest: 'modules/payment/models/SepayWebhookEvent.js' },
-  
+
   // Exam
   { src: 'routes/examResultRoutes.js', dest: 'modules/exam/routes/examResultRoutes.js' },
   { src: 'routes/proctorRoutes.js', dest: 'modules/exam/routes/proctorRoutes.js' },
@@ -47,10 +47,10 @@ const MOVES = [
   { src: 'services/examProgressService.js', dest: 'modules/exam/services/examProgressService.js' },
   { src: 'services/examSubjectCatalog.js', dest: 'modules/exam/services/examSubjectCatalog.js' },
   { src: 'services/proctorAuditService.js', dest: 'modules/exam/services/proctorAuditService.js' },
-  
+
   // Analytics
   { src: 'routes/analyticsRoutes.js', dest: 'modules/analytics/routes/analyticsRoutes.js' },
-  
+
   // Report
   { src: 'routes/monitoringRoutes.js', dest: 'modules/report/routes/monitoringRoutes.js' },
   { src: 'routes/systemLogRoutes.js', dest: 'modules/report/routes/systemLogRoutes.js' },
@@ -76,13 +76,13 @@ function ensureDir(dir) {
 DOMAINS.forEach(domain => {
   const domainDir = path.join(ROOT_DIR, 'modules', domain);
   ensureDir(domainDir);
-  
+
   // Create index.js
   const indexFile = path.join(domainDir, 'index.js');
   if (!fs.existsSync(indexFile)) {
     fs.writeFileSync(indexFile, '// Entry point for ' + domain + ' module\n', 'utf8');
   }
-  
+
   // Create placeholders
   FOLDERS.forEach(folder => {
     ensureDir(path.join(domainDir, folder));
@@ -132,14 +132,14 @@ allFiles.forEach(filePath => {
 
   // Regex to match require('...') or require("...")
   const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-  
+
   content = content.replace(requireRegex, (match, importPath) => {
     // Only care about relative imports
     if (!importPath.startsWith('.')) return match;
-    
+
     const currentDir = path.dirname(filePath);
     let absImportPath = path.resolve(currentDir, importPath);
-    
+
     if (!absImportPath.endsWith('.js')) {
       absImportPath += '.js';
     }
@@ -161,27 +161,27 @@ allFiles.forEach(filePath => {
       actualTargetAbs = newTargetAbs;
     } else {
       if (fileWasMoved) {
-         let originalTargetAbs = path.resolve(oldFileDir, importPath);
-         if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
-         
-         if (fileMap.has(originalTargetAbs)) {
-           actualTargetAbs = fileMap.get(originalTargetAbs);
-         } else {
-           actualTargetAbs = originalTargetAbs;
-         }
+        let originalTargetAbs = path.resolve(oldFileDir, importPath);
+        if (!originalTargetAbs.endsWith('.js')) originalTargetAbs += '.js';
+
+        if (fileMap.has(originalTargetAbs)) {
+          actualTargetAbs = fileMap.get(originalTargetAbs);
+        } else {
+          actualTargetAbs = originalTargetAbs;
+        }
       } else {
         return match;
       }
     }
 
     let newRelative = path.relative(currentDir, actualTargetAbs);
-    
+
     if (newRelative.endsWith('.js')) {
       newRelative = newRelative.slice(0, -3);
     }
-    
+
     newRelative = newRelative.replace(/\\/g, '/');
-    
+
     if (!newRelative.startsWith('.')) {
       newRelative = './' + newRelative;
     }

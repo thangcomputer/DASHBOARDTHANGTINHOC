@@ -280,7 +280,7 @@ export function useAdminDashboardState() {
     { refreshInterval: 60_000, revalidateOnFocus: false, dedupingInterval: 15_000 },
   );
 
-  // Finance from server — lấy đủ HV + mọi enrollment (không chỉ khóa chính / page 10)
+  // Finance from server - lấy đủ HV + mọi enrollment (không chỉ khóa chính / page 10)
   const financeFetcher = async ([, branch_id]) => {
     const params = {
       limit: 100,

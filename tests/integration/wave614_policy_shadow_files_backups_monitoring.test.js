@@ -1,5 +1,5 @@
 /**
- * Wave 6.14 — Policy SHADOW for LIVE files / backups / monitoring.
+ * Wave 6.14 - Policy SHADOW for LIVE files / backups / monitoring.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

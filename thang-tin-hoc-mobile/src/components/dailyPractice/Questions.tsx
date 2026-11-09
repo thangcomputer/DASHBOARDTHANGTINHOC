@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Check, GripVertical, Lock, X } from 'lucide-react-native';
 import type { DpAnswer, DpAnswerResult, DpQuestion, DpReveal } from '../../services/dailyPracticeApi';
@@ -238,7 +238,7 @@ export function MatchQuestion({ question, reveal, result, play, onChange }: Ques
             >
               <Chip label={right} selected={selected === right} />
             </Draggable>
-          )) : <Text style={styles.bankDone}>Đã ghép hết — bấm Kiểm tra nhé!</Text>}
+          )) : <Text style={styles.bankDone}>Đã ghép hết - bấm Kiểm tra nhé!</Text>}
         </View>
       ) : null}
     </View>
@@ -405,7 +405,7 @@ export function SortQuestion({ question, reveal, result, play, onChange }: Quest
             >
               <Chip label={item} selected={selected === item} />
             </Draggable>
-          )) : <Text style={styles.bankDone}>Đã phân loại hết — bấm Kiểm tra nhé!</Text>}
+          )) : <Text style={styles.bankDone}>Đã phân loại hết - bấm Kiểm tra nhé!</Text>}
         </View>
       ) : null}
     </View>

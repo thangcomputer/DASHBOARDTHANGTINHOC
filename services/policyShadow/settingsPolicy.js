@@ -33,7 +33,7 @@ function buildSubject({ user, actorDoc, userBranchId }) {
   };
 }
 
-/** Mirrors checkPermission — admin/staff + perm (SUPER bypass). */
+/** Mirrors checkPermission - admin/staff + perm (SUPER bypass). */
 function requireStaffPermission(subject, livePerm) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
@@ -87,7 +87,7 @@ function evaluatePublicRead() {
 
 /**
  * reset-data: middleware is SYSTEM_SETTINGS only.
- * SUPER_ADMIN + password are handler gates (400), not middleware 403 — do not DENY here.
+ * SUPER_ADMIN + password are handler gates (400), not middleware 403 - do not DENY here.
  */
 function evaluateLegacySettings(subject, action) {
   if (!ACTIONS.has(action)) {

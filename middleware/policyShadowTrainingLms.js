@@ -88,7 +88,7 @@ function policyShadowTrainingLms(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] training-lms evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] training-lms evaluation error - legacy still authoritative',
         );
         req.policyShadow = {
           action: `training_${action}`,
@@ -125,7 +125,7 @@ function policyShadowTrainingLms(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] training-lms shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] training-lms shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -137,7 +137,7 @@ function policyShadowTrainingLms(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected training-lms error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected training-lms error - fail closed to legacy only',
       );
     }
     return next();

@@ -49,22 +49,26 @@ import {
 import { useToast } from '../utils/useToast';
 
 const MOCK_COURSES = [
-  { _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0, 
+  {
+    _id: '1', title: 'Đào tạo Giảng viên Mới', progress: 0,
     videos: [{ title: 'Giới thiệu về Thắng Tin Học', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 635 }, { title: 'Tổng quan công việc', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 920 }],
     files: [{ title: 'Quy trình giảng dạy.PDF', type: 'PDF', size: '2 MB' }, { title: 'Sổ tay Giảng viên.DOCX', type: 'DOCX', size: '1 MB' }],
     notices: ['Chào mừng các bạn đến với TT', 'Hãy xem hết các video trước khi nhận lớp']
   },
-  { _id: '2', title: 'Kỹ năng Đứng lớp Chuyên sâu', progress: 45, 
+  {
+    _id: '2', title: 'Kỹ năng Đứng lớp Chuyên sâu', progress: 45,
     videos: [{ title: 'Xử lý tình huống học viên yếu', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 2412 }],
     files: [{ title: 'Quy trình xử lý.DOCX', type: 'DOCX', size: '500 KB' }],
     notices: ['Nhớ nộp bài thu hoạch trước 15/4 ngay sau khi xem video']
   },
-  { _id: '3', title: 'Khóa học Excel Nâng cao', progress: 100, 
+  {
+    _id: '3', title: 'Khóa học Excel Nâng cao', progress: 100,
     videos: [{ title: 'Hàm logic phức tạp', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 2100 }],
     files: [{ title: 'Bài tập thực hành.XLSX', type: 'EXCEL', size: '3.5 MB' }],
     notices: []
   },
-  { _id: '4', title: 'Bảo mật và An toàn thông tin', progress: 80, 
+  {
+    _id: '4', title: 'Bảo mật và An toàn thông tin', progress: 80,
     videos: [{ title: 'Bảo quản dữ liệu học viên', url: 'https://youtube.com/embed/dQw4w9WgXcQ', duration: 1210 }],
     files: [],
     notices: ['Bắt buộc hoàn thành trong tháng 4']
@@ -95,9 +99,9 @@ const CircularProgress = ({ progress, size = 112 }) => {
       </svg>
       <div className="absolute inset-0 flex items-center justify-center flex-col">
         {progress === 100 ? (
-           <CheckCircle2 size={isSmall ? 20 : 32} className="text-emerald-500" />
+          <CheckCircle2 size={isSmall ? 20 : 32} className="text-emerald-500" />
         ) : (
-           <span className={`${isSmall ? 'text-xs pb-1 inline-block' : 'text-xl pb-1'} font-black text-slate-800 tracking-tighter`}>{progress}%</span>
+          <span className={`${isSmall ? 'text-xs pb-1 inline-block' : 'text-xl pb-1'} font-black text-slate-800 tracking-tighter`}>{progress}%</span>
         )}
       </div>
     </div>
@@ -206,7 +210,7 @@ const YouTubePlayerSecure = ({
     || (effectiveDuration > 0 && displayWatched >= requiredWatchSeconds(effectiveDuration) && displayWatched > 0);
   seekUnlockedRef.current = seekUnlocked;
 
-  // Reset overlay chỉ khi đổi bài — tránh bật lại nút Play khi cập nhật tiến độ
+  // Reset overlay chỉ khi đổi bài - tránh bật lại nút Play khi cập nhật tiến độ
   useEffect(() => {
     const localSecs = parseInt(sessionStorage.getItem(`lms_watched_${lessonId}`) || '0', 10);
     const bestSecs = Math.max(Number(initialWatchedSeconds) || 0, localSecs);
@@ -258,7 +262,7 @@ const YouTubePlayerSecure = ({
 
   const requiredSeconds = effectiveDuration > 0 ? requiredWatchSeconds(effectiveDuration) : 0;
 
-  // ── Complete khi đủ threshold 2/3 (COMPLETION ≠ SEEK) — chờ player ready ──
+  // ── Complete khi đủ threshold 2/3 (COMPLETION ≠ SEEK) - chờ player ready ──
   useEffect(() => {
     if (!isReady || !effectiveDuration || !onEligibilityReached) return;
     if (eligibilitySentRef.current) return;
@@ -272,7 +276,7 @@ const YouTubePlayerSecure = ({
     }
   }, [isReady, displayWatched, effectiveDuration, totalDuration, onEligibilityReached]);
 
-  // ── Giám sát tab ẩn (không dùng window.blur — iframe YouTube fire blur khi rê/click) ──
+  // ── Giám sát tab ẩn (không dùng window.blur - iframe YouTube fire blur khi rê/click) ──
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -291,7 +295,7 @@ const YouTubePlayerSecure = ({
     };
   }, []);
 
-  // ── Khởi tạo YouTube Iframe API — chỉ remount khi đổi bài/video ──
+  // ── Khởi tạo YouTube Iframe API - chỉ remount khi đổi bài/video ──
   useEffect(() => {
     if (!videoId || isLocked) return;
     let cancelled = false;
@@ -401,7 +405,7 @@ const YouTubePlayerSecure = ({
       playerRef.current = null;
       isReadyRef.current = false;
     };
-  // eslint-disable-line react-hooks/exhaustive-deps -- remount only on video/lesson/lock
+    // eslint-disable-line react-hooks/exhaustive-deps -- remount only on video/lesson/lock
   }, [videoId, lessonId, isLocked]);
 
   // ── Đếm giây thực tế khi PLAYING + snap seek vượt maxPos ───────────────────
@@ -507,7 +511,7 @@ const YouTubePlayerSecure = ({
       setIsPlaying(true);
       setHasEnded(false);
       setPlayerError('');
-      // Không gọi preferMaxYouTubeQuality ở đây — pause/seek mỗi PLAYING gây giật
+      // Không gọi preferMaxYouTubeQuality ở đây - pause/seek mỗi PLAYING gây giật
       startCounting();
       if (!totalDuration || totalDuration === 0) {
         const dur = readYouTubeDuration(event.target);
@@ -692,7 +696,7 @@ const YouTubePlayerSecure = ({
         {!isTabActive && !overlayVisible && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 text-center px-4 rounded-none lg:rounded-2xl">
             <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/40 mb-4">
-               <AlertCircle size={32} className="text-amber-400" />
+              <AlertCircle size={32} className="text-amber-400" />
             </div>
             <h3 className="text-white text-lg font-bold mb-2">Đã tạm dừng tính thời gian</h3>
             <p className="text-slate-300 text-xs max-w-xs font-medium">Vui lòng giữ tương tác và không rời khỏi trình duyệt để hệ thống tiếp tục ghi nhận tiến độ.</p>
@@ -720,19 +724,17 @@ const YouTubePlayerSecure = ({
         )}
         {!overlayVisible && !hasEnded && (
           <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-1.5 justify-between pointer-events-none">
-            <span className={`text-[10px] px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${
-              antiSeekEnabled
+            <span className={`text-[10px] px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${antiSeekEnabled
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                 : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-            }`}>
+              }`}>
               {antiSeekEnabled ? 'Chống tua đang bật' : 'Tua tự do'}
             </span>
             {requiredSeconds > 0 || effectiveDuration > 0 ? (
-              <span className={`text-[10px] px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${
-                lessonCompleted || displayWatched >= requiredSeconds || seekUnlocked
+              <span className={`text-[10px] px-2.5 py-1 rounded-full border backdrop-blur-md font-bold ${lessonCompleted || displayWatched >= requiredSeconds || seekUnlocked
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                   : LMS_PLAYER_PROGRESS_BADGE_CLASS
-              }`}>
+                }`}>
                 {getPlayerCompletionBadgeText({
                   lessonCompleted,
                   displayWatched,
@@ -763,7 +765,7 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
         ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : fullyWatched ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
-      {/* Status Icon — tick chỉ khi xem đủ 100% */}
+      {/* Status Icon - tick chỉ khi xem đủ 100% */}
       <div className="mt-0.5 flex-shrink-0">
         {isCurrent ? (
           <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-600 flex items-center justify-center">
@@ -884,7 +886,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
     let alive = true;
     api.settings.getTrainingData()
       .then((res) => { if (alive && res?.success && res.data) setTrainingData(res.data); })
-      .catch(() => {});
+      .catch(() => { });
     return () => { alive = false; };
   }, [isAdmin, setTrainingData]);
 
@@ -905,7 +907,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
           }));
         } catch { /* ignore */ }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [isAdmin]);
 
@@ -964,7 +966,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
     let isMounted = true;
     lmsApiFetch('/progress/me').then(res => {
       if (res.success && isMounted) setCourseProgressMap(res.data || {});
-    }).catch(() => {});
+    }).catch(() => { });
     return () => { isMounted = false; };
   }, [isAdmin, mainTab, selectedCourse]);
 
@@ -1076,8 +1078,8 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
   const completeLessonOnServer = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return { success: false };
     const token = localStorage.getItem('teacher_access_token') ||
-                  (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
-                  localStorage.getItem('admin_access_token');
+      (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
+      localStorage.getItem('admin_access_token');
     const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
     const videoDuration = Math.floor(Number(totalDur) || Number(playerApiRef.current?.getDuration?.()) || 0);
     const payload = {
@@ -1102,7 +1104,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
     return httpRes.json().catch(() => ({ success: false }));
   }, [currentLesson, selectedCourse]);
 
-  // Complete khi đủ threshold — chỉ unlock bài sau khi SERVER completed
+  // Complete khi đủ threshold - chỉ unlock bài sau khi SERVER completed
   const handleEligibilityReached = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return;
     try {
@@ -1200,9 +1202,9 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
   const handleSaveProgress = useCallback((lessonId, watchedSeconds) => {
     if (!selectedCourse) return;
     const token = localStorage.getItem('teacher_access_token') ||
-                  (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
-                  localStorage.getItem('admin_access_token');
-                  
+      (localStorage.getItem('teacher_user') ? JSON.parse(localStorage.getItem('teacher_user')).token : '') ||
+      localStorage.getItem('admin_access_token');
+
     const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
     const videoDuration = Math.floor(Number(playerApiRef.current?.getDuration?.()) || 0);
     patchLessonWatchLocal(lessonId, watchedSeconds, videoDuration);
@@ -1222,7 +1224,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
     ? Math.round((lessons.filter(l => l.isCompleted).length / lessons.length) * 100)
     : 0;
 
-  // Player full-screen (z-100) — nhấc chat nổi lên trên lớp học
+  // Player full-screen (z-100) - nhấc chat nổi lên trên lớp học
   const isLmsFullscreenPlayer = Boolean(selectedCourse);
   useEffect(() => {
     if (!isLmsFullscreenPlayer) {
@@ -1283,11 +1285,10 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             { key: 'software', icon: Link2, label: 'Phần mềm', count: visibleTraining?.softwareLinks?.length || 0, tone: 'from-emerald-400 via-teal-500 to-cyan-700' },
           ].map(t => (
             <button key={t.key} onClick={() => setMainTab(t.key)}
-              className={`group relative flex min-h-[4.75rem] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-1 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 sm:min-h-[5.5rem] sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${
-                mainTab === t.key
+              className={`group relative flex min-h-[4.75rem] w-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border px-1 py-2 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 sm:min-h-[5.5rem] sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-left ${mainTab === t.key
                   ? 'border-red-500 bg-red-50 text-slate-800 shadow-md shadow-red-100'
                   : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-red-200'
-              }`}>
+                }`}>
               <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br ${t.tone} text-white shadow-lg ring-2 ring-white transition-transform duration-300 group-hover:scale-105 group-hover:rotate-2 sm:h-12 sm:w-12 sm:rounded-2xl`}>
                 <span className="absolute -right-3 -top-3 h-8 w-8 rounded-full bg-white/45 blur-md" aria-hidden="true" />
                 <t.icon size={16} strokeWidth={2.3} className="relative drop-shadow-md sm:h-6 sm:w-6" />
@@ -1314,194 +1315,194 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             </div>
           ) : courses.length === 0 ? (
             <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
-               <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
-               <p className="font-bold">Chưa có khóa học nào</p>
-               <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
+              <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
+              <p className="font-bold">Chưa có khóa học nào</p>
+              <p className="text-xs mt-1">Hệ thống chưa có khóa học nào được xuất bản.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {courses.map((course, idx) => {
-                 const gradients = [
-                    "from-red-600 to-red-800",
-                    "from-teal-500 to-emerald-600",
-                    "from-violet-600 to-fuchsia-600",
-                    "from-red-500 to-red-700"
-                 ];
-                 const bgClass = gradients[idx % gradients.length];
-                 const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
-                 const lessonCount = (course.lessons || course.videos || [1]).length;
-                 return (
-                 <div onClick={() => { 
+                const gradients = [
+                  "from-red-600 to-red-800",
+                  "from-teal-500 to-emerald-600",
+                  "from-violet-600 to-fuchsia-600",
+                  "from-red-500 to-red-700"
+                ];
+                const bgClass = gradients[idx % gradients.length];
+                const progress = courseProgressMap[course.id || course._id] || course.overallProgress || course.progress || 0;
+                const lessonCount = (course.lessons || course.videos || [1]).length;
+                return (
+                  <div onClick={() => {
                     setSelectedCourse(course);
                     setCourseTab('overview');
                     fetchLessons(course.id || course._id);
                   }} key={course.id || course._id} className="bg-white rounded-2xl border border-slate-100 shadow-md transition-all duration-200 cursor-pointer group flex flex-col overflow-hidden hover:shadow-xl lg:hover:-translate-y-1 lg:hover:shadow-xl">
-                    
+
                     <div className={`relative aspect-video bg-gradient-to-r ${bgClass} overflow-hidden`}>
-                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
-                       <div className="absolute top-4 right-4">
-                          {course.category && String(course.category).trim() && String(course.category).toUpperCase() !== 'MẶC ĐỊNH' ? (
-                            <span className="bg-white/20 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
-                              {course.category}
-                            </span>
-                          ) : null}
-                       </div>
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)] pointer-events-none" />
+                      <div className="absolute top-4 right-4">
+                        {course.category && String(course.category).trim() && String(course.category).toUpperCase() !== 'MẶC ĐỊNH' ? (
+                          <span className="bg-white/20 backdrop-blur-md text-white text-[10px] px-2.5 py-1 rounded-full font-medium uppercase tracking-wider">
+                            {course.category}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="p-5 flex-1 flex flex-col">
-                       <div className="flex items-start gap-3 mb-2">
-                         <div className="flex-1 min-w-0">
-                           <h3 className="font-bold text-slate-800 text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
-                          {course.title}
-                           </h3>
-                         </div>
-                         <div className="shrink-0 text-right min-w-[3rem]">
-                           <p className="text-sm font-bold text-slate-700">{progress}%</p>
-                         </div>
-                       </div>
-                       <div className="flex items-center gap-2 mb-3">
-                         <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
-                           <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
-                         </div>
-                       </div>
-                       <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
-                          {course.description || course.desc || 'Hoàn thành khóa học nội bộ này để nâng cao kỹ năng sư phạm và chuyên môn giảng dạy.'}
-                       </p>
-                       
-                       <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
-                          <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                             <Video size={14} className="text-slate-400" />
-                             <span>{lessonCount}  Bài học</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
-                             <span>Vào học</span>
-                             <ChevronRight size={14} />
-                          </div>
-                       </div>
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-slate-800 text-lg group-hover:text-red-600 transition-colors line-clamp-2 leading-snug">
+                            {course.title}
+                          </h3>
+                        </div>
+                        <div className="shrink-0 text-right min-w-[3rem]">
+                          <p className="text-sm font-bold text-slate-700">{progress}%</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/80">
+                          <div className="h-full rounded-full bg-red-600 border border-white/60 transition-all" style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1">
+                        {course.description || course.desc || 'Hoàn thành khóa học nội bộ này để nâng cao kỹ năng sư phạm và chuyên môn giảng dạy.'}
+                      </p>
+
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+                        <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                          <Video size={14} className="text-slate-400" />
+                          <span>{lessonCount}  Bài học</span>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-sm font-semibold text-red-600 group-hover:translate-x-1 transition-transform">
+                          <span>Vào học</span>
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
                     </div>
-                 </div>
-              );})}
+                  </div>
+                );
+              })}
             </div>
           )
         )}
 
         {/* GUIDES TAB */}
         {mainTab === 'guides' && (
-           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-             <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-               <FileText className="text-red-600" /> Quy trình & Hướng dẫn
-             </h2>
-             <div className="grid grid-cols-1 gap-4 w-full max-w-full">
-               {visibleTraining?.guides?.map((guide, idx) => {
-                 const gKey = guide.id ?? guide._id ?? `g-${idx}`;
-                 const descHtml = guide.desc || '';
-                 const plain = htmlToPlainText(descHtml);
-                 const hasHtml = /<[a-z][\s\S]*>/i.test(descHtml);
-                 const expanded = expandedGuideKey === gKey;
-                 const showToggle = plain.length > 120 || hasHtml;
-                 const emptyBody = !descHtml.trim() && !plain;
-                 return (
-                   <div
-                     key={gKey}
-                     className="p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-red-200 hover:bg-red-50/50 transition-all flex gap-4 sm:gap-5 items-start w-full"
-                   >
-                     <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center text-2xl shrink-0">{guide.icon || '📄'}</div>
-                     <div className="min-w-0 flex-1">
-                       <h3 className="font-bold text-slate-800">{guide.title}</h3>
-                       {emptyBody ? (
-                         <p className="text-xs text-slate-400 mt-1">Chưa có nội dung chi tiết.</p>
-                       ) : expanded && hasHtml ? (
-                         <div
-                           className="text-sm text-slate-600 mt-2 leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-red-600 [&_a]:underline"
-                           dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(descHtml) }}
-                         />
-                       ) : (
-                         <p className={`text-xs text-slate-500 mt-1 ${showToggle && !expanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
-                           {plain}
-                         </p>
-                       )}
-                       {showToggle ? (
-                         <button
-                           type="button"
-                           onClick={() => setExpandedGuideKey(expanded ? null : gKey)}
-                           className="text-[11px] font-bold text-red-600 hover:text-red-800 mt-1"
-                         >
-                           {expanded ? 'Thu gọn' : 'Xem thêm'}
-                         </button>
-                       ) : null}
-                     </div>
-                   </div>
-                 );
-               })}
-               {(!visibleTraining?.guides || visibleTraining.guides.length === 0) && (
-                 <p className="text-slate-400 text-sm">Chưa có quy trình nào.</p>
-               )}
-             </div>
-           </div>
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+              <FileText className="text-red-600" /> Quy trình & Hướng dẫn
+            </h2>
+            <div className="grid grid-cols-1 gap-4 w-full max-w-full">
+              {visibleTraining?.guides?.map((guide, idx) => {
+                const gKey = guide.id ?? guide._id ?? `g-${idx}`;
+                const descHtml = guide.desc || '';
+                const plain = htmlToPlainText(descHtml);
+                const hasHtml = /<[a-z][\s\S]*>/i.test(descHtml);
+                const expanded = expandedGuideKey === gKey;
+                const showToggle = plain.length > 120 || hasHtml;
+                const emptyBody = !descHtml.trim() && !plain;
+                return (
+                  <div
+                    key={gKey}
+                    className="p-5 sm:p-6 rounded-2xl border border-slate-100 hover:border-red-200 hover:bg-red-50/50 transition-all flex gap-4 sm:gap-5 items-start w-full"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center text-2xl shrink-0">{guide.icon || '📄'}</div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-slate-800">{guide.title}</h3>
+                      {emptyBody ? (
+                        <p className="text-xs text-slate-400 mt-1">Chưa có nội dung chi tiết.</p>
+                      ) : expanded && hasHtml ? (
+                        <div
+                          className="text-sm text-slate-600 mt-2 leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-red-600 [&_a]:underline"
+                          dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(descHtml) }}
+                        />
+                      ) : (
+                        <p className={`text-xs text-slate-500 mt-1 ${showToggle && !expanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
+                          {plain}
+                        </p>
+                      )}
+                      {showToggle ? (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedGuideKey(expanded ? null : gKey)}
+                          className="text-[11px] font-bold text-red-600 hover:text-red-800 mt-1"
+                        >
+                          {expanded ? 'Thu gọn' : 'Xem thêm'}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+              {(!visibleTraining?.guides || visibleTraining.guides.length === 0) && (
+                <p className="text-slate-400 text-sm">Chưa có quy trình nào.</p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* FILES TAB */}
         {mainTab === 'files' && (
-           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-             <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-               <Download className="text-red-600" /> Tài liệu Đào tạo
-             </h2>
-             <div className="space-y-3">
-               {visibleTraining?.files?.map((file, idx) => {
-                 const rawUrl = file.fileUrl || file.url || file.link || '';
-                 const displayName = file.fileOriginalName || file.title || 'tai-lieu';
-                 const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
-                   || /^https?:\/\//i.test(String(rawUrl));
-                 return (
-                 <div key={file.id || file._id || idx} className="p-4 rounded-xl border border-slate-100 hover:bg-red-50 hover:border-red-200 transition-all flex justify-between items-center gap-3">
-                   <div className="flex items-center gap-4 min-w-0">
-                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 ${
-                       isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-red-500' : 'bg-red-600')
-                     }`}>{isLink ? 'Link' : (file.fileType || 'FILE')}</div>
-                     <div className="min-w-0">
-                       <h3 className="font-bold text-slate-800 truncate">{file.title}</h3>
-                       <p className="text-xs text-slate-400">{isLink ? 'Liên kết ngoài' : (file.fileSize || 'N/A')}</p>
-                     </div>
-                   </div>
-                   {rawUrl ? (
-                     isLink ? (
-                       <a
-                         href={resolveMediaUrl(rawUrl)}
-                         target="_blank"
-                         rel="noreferrer"
-                         className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-bold transition-all shrink-0 inline-flex items-center gap-1.5 no-underline"
-                       >
-                         <ExternalLink size={14} /> Mở link
-                       </a>
-                     ) : (
-                     <button
-                       type="button"
-                       onClick={async (e) => {
-                         e.preventDefault();
-                         e.stopPropagation();
-                         try {
-                           await downloadMediaFile(rawUrl, displayName);
-                         } catch (err) {
-                           toast.error(err?.message || 'Không tải được tài liệu');
-                         }
-                       }}
-                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-all shrink-0"
-                     >
-                       Tải xuống
-                     </button>
-                     )
-                   ) : (
-                     <span className="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 cursor-not-allowed shrink-0">Chưa có file</span>
-                   )}
-                 </div>
-                 );
-               })}
-               {(!visibleTraining?.files || visibleTraining.files.length === 0) && (
-                 <p className="text-slate-400 text-sm">Chưa có tài liệu nào.</p>
-               )}
-             </div>
-           </div>
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+              <Download className="text-red-600" /> Tài liệu Đào tạo
+            </h2>
+            <div className="space-y-3">
+              {visibleTraining?.files?.map((file, idx) => {
+                const rawUrl = file.fileUrl || file.url || file.link || '';
+                const displayName = file.fileOriginalName || file.title || 'tai-lieu';
+                const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
+                  || /^https?:\/\//i.test(String(rawUrl));
+                return (
+                  <div key={file.id || file._id || idx} className="p-4 rounded-xl border border-slate-100 hover:bg-red-50 hover:border-red-200 transition-all flex justify-between items-center gap-3">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0 ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-red-500' : 'bg-red-600')
+                        }`}>{isLink ? 'Link' : (file.fileType || 'FILE')}</div>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-800 truncate">{file.title}</h3>
+                        <p className="text-xs text-slate-400">{isLink ? 'Liên kết ngoài' : (file.fileSize || 'N/A')}</p>
+                      </div>
+                    </div>
+                    {rawUrl ? (
+                      isLink ? (
+                        <a
+                          href={resolveMediaUrl(rawUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-bold transition-all shrink-0 inline-flex items-center gap-1.5 no-underline"
+                        >
+                          <ExternalLink size={14} /> Mở link
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            try {
+                              await downloadMediaFile(rawUrl, displayName);
+                            } catch (err) {
+                              toast.error(err?.message || 'Không tải được tài liệu');
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-all shrink-0"
+                        >
+                          Tải xuống
+                        </button>
+                      )
+                    ) : (
+                      <span className="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 cursor-not-allowed shrink-0">Chưa có file</span>
+                    )}
+                  </div>
+                );
+              })}
+              {(!visibleTraining?.files || visibleTraining.files.length === 0) && (
+                <p className="text-slate-400 text-sm">Chưa có tài liệu nào.</p>
+              )}
+            </div>
+          </div>
         )}
 
         {mainTab === 'software' && (
@@ -1555,7 +1556,7 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
       </div>
 
 
-      {/* ─── BODY: Udemy-style — cột trái scroll; video+tabs sticky; sidebar độc lập ─── */}
+      {/* ─── BODY: Udemy-style - cột trái scroll; video+tabs sticky; sidebar độc lập ─── */}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden" style={{ background: '#0b1018' }}>
 
         <div
@@ -1639,11 +1640,10 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             <div className="flex items-center justify-between">
               <h3 className="text-[11px] font-black  tracking-widest text-slate-300">Nội dung khóa học</h3>
               <span
-                className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                  overallProgress === 100
+                className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${overallProgress === 100
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
                     : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                }`}
+                  }`}
               >
                 {lessons.filter(l => l.isCompleted).length}/{lessons.length}  Bài
               </span>
@@ -1651,9 +1651,8 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
             {/* Mini progress bar */}
             <div className="h-1 bg-white/5 rounded-full mt-3 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-700 ${
-                  overallProgress === 100 ? 'bg-emerald-500' : 'bg-emerald-500'
-                }`}
+                className={`h-full rounded-full transition-all duration-700 ${overallProgress === 100 ? 'bg-emerald-500' : 'bg-emerald-500'
+                  }`}
                 style={{ width: `${overallProgress}%` }}
               />
             </div>
@@ -1699,13 +1698,11 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                               ? 'Có thể học sớm'
                               : undefined
                         }
-                        className={`flex items-start gap-3 px-4 py-3 transition-all relative ${
-                          !lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-                        } ${
-                          isCurrent
+                        className={`flex items-start gap-3 px-4 py-3 transition-all relative ${!lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                          } ${isCurrent
                             ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
                             : 'border-l-4 border-transparent hover:bg-white/[0.04]'
-                        }`}
+                          }`}
                       >
                         <div className="mt-0.5 flex-shrink-0">
                           {isCurrent ? (
@@ -1724,9 +1721,8 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${
-                            isCurrent ? 'text-emerald-400 font-bold' : fullyWatched ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
-                          }`}>
+                          <h4 className={`text-[12px] leading-snug line-clamp-2 normal-case ${isCurrent ? 'text-emerald-400 font-bold' : fullyWatched ? 'text-slate-500 font-semibold' : 'text-slate-300 font-semibold'
+                            }`}>
                             {formatLessonDisplayTitle(lesson.title, idx)}
                           </h4>
                           <LessonSidebarMeta lesson={lesson} isCurrent={isCurrent} />
@@ -1752,7 +1748,8 @@ const TeacherTrainingLMS = ({ isAdmin = false }) => {
 
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .custom-scrollbar-dark::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar-dark::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar-dark::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }

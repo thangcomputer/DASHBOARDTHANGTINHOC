@@ -110,8 +110,8 @@ async function main() {
     course: thang.course || 'khóa học test',
     status: 'completed',
     paymentStatus: 'paid',
-    note: '[SIM] Đã điểm danh — thử Hủy điểm danh',
-    topic: '[SIM] Đã điểm danh — thử Hủy điểm danh',
+    note: '[SIM] Đã điểm danh - thử Hủy điểm danh',
+    topic: '[SIM] Đã điểm danh - thử Hủy điểm danh',
     branchId: thang.branchId || teacher.branchId || null,
     branchCode: thang.branchCode || teacher.branchCode || '',
   });
@@ -162,8 +162,8 @@ async function main() {
     course: lan.course || 'khóa học test',
     status: 'scheduled',
     paymentStatus: 'pending',
-    note: '[SIM] Quá hạn — thử Điểm danh bù',
-    topic: '[SIM] Quá hạn — thử Điểm danh bù',
+    note: '[SIM] Quá hạn - thử Điểm danh bù',
+    topic: '[SIM] Quá hạn - thử Điểm danh bù',
     branchId: lan.branchId || teacher.branchId || null,
     branchCode: lan.branchCode || teacher.branchCode || '',
   });

@@ -1,4 +1,4 @@
-# Service Precheck — Sprint 4.3 Batch 3
+# Service Precheck - Sprint 4.3 Batch 3
 
 ## Scope
 Batch 3 focuses exclusively on transactional and highly-complex domains:

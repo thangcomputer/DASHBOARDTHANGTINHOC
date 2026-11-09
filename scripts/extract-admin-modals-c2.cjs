@@ -70,7 +70,7 @@ ${body}
   );
 }
 
-// 3) TeacherPayoutModal — inner return JSX (lines 1695-1934)
+// 3) TeacherPayoutModal - inner return JSX (lines 1695-1934)
 {
   const body = slice(1695, 1934);
   let file = `import React from 'react';
@@ -101,7 +101,7 @@ ${body}
   write('TeacherPayoutModal.jsx', file);
 }
 
-// 4) AddTeacherModal — inner content lines 1954-2060
+// 4) AddTeacherModal - inner content lines 1954-2060
 {
   let body = slice(1954, 2060);
   body = body
@@ -126,7 +126,7 @@ ${body}
   );
 }
 
-// 5) EditTeacherModal — lines 2065-2283
+// 5) EditTeacherModal - lines 2065-2283
 {
   let body = slice(2065, 2283);
   body = body
@@ -158,7 +158,7 @@ ${body}
   );
 }
 
-// 6) ResetPasswordOtpModal — self-contained
+// 6) ResetPasswordOtpModal - self-contained
 write(
   'ResetPasswordOtpModal.jsx',
   `import React, { useState, useEffect, useRef } from 'react';

@@ -54,7 +54,7 @@ function policyShadowNotification(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] notification evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] notification evaluation error - legacy still authoritative',
         );
         req.policyShadow = {
           action: `notification_${action}`,
@@ -91,7 +91,7 @@ function policyShadowNotification(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] notification shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] notification shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -103,7 +103,7 @@ function policyShadowNotification(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected notification error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected notification error - fail closed to legacy only',
       );
     }
     return next();

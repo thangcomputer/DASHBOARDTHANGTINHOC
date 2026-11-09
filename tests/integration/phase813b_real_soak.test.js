@@ -1,5 +1,5 @@
 /**
- * Phase 8.13B — Soak evidence accounting (not fake production traffic).
+ * Phase 8.13B - Soak evidence accounting (not fake production traffic).
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
@@ -177,7 +177,7 @@ describe('Phase 8.13B real soak accounting', { concurrency: false }, () => {
   it('artifact from soak script exists when previously executed', () => {
     const artifact = path.join(__dirname, '../../artifacts/rbac-soak-813b.json');
     if (!fs.existsSync(artifact)) {
-      // harness may not have been run in this CI shard — skip soft
+      // harness may not have been run in this CI shard - skip soft
       return;
     }
     const j = JSON.parse(fs.readFileSync(artifact, 'utf8'));

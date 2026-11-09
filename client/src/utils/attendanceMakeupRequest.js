@@ -5,7 +5,7 @@
 import { buildStudentDetailDeepLinkToken } from './messageRichTextUtils';
 
 export function formatScheduleDateLabel(dateRaw) {
-  const s = String(dateRaw || '').slice(0, 10) || '—';
+  const s = String(dateRaw || '').slice(0, 10) || '-';
   try {
     const d = new Date(dateRaw);
     if (!Number.isNaN(d.getTime())) {
@@ -30,8 +30,8 @@ export function getMakeupSessionSummary({ student, schedule } = {}) {
   const total = Number(student?.totalSessions ?? 0) || (done + remaining) || 0;
   const sessionNo = done + 1;
   const dateLabel = formatScheduleDateLabel(schedule?.date);
-  const start = schedule?.startTime || '—';
-  const end = schedule?.endTime || '—';
+  const start = schedule?.startTime || '-';
+  const end = schedule?.endTime || '-';
   return {
     name,
     course,
@@ -70,7 +70,7 @@ export function buildAttendanceMakeupDraft({ student, schedule, teacherName } = 
     '- Admin sẽ liên hệ học viên để xác nhận học viên đã học buổi này chưa.',
     '- Chỉ khi học viên đồng ý đã học, buổi này mới được tính cho giảng viên.',
     '',
-    'Lý do: Quá hạn cửa sổ điểm danh 1 giờ của giảng viên — nhờ Admin xử lý điểm danh bù.',
+    'Lý do: Quá hạn cửa sổ điểm danh 1 giờ của giảng viên - nhờ Admin xử lý điểm danh bù.',
   ].filter((line) => line !== null).join('\n');
 }
 

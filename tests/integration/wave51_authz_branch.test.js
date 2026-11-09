@@ -1,5 +1,5 @@
 /**
- * Wave 5.1 — negative HTTP-style authorization + branch isolation.
+ * Wave 5.1 - negative HTTP-style authorization + branch isolation.
  * Exercises authz middleware stacks (status codes match live routes: 403 deny, next = allow).
  */
 const test = require('node:test');

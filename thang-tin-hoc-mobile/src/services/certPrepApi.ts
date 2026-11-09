@@ -1,6 +1,6 @@
-/**
+﻿/**
  * certPrepApi.ts
- * Mobile CertPrep API — tương đương certPrepApi.js của web app.
+ * Mobile CertPrep API - tương đương certPrepApi.js của web app.
  * Ôn thi MOS/IC3: catalog, levels, tests, sessions.
  */
 import { mobileApiRequest } from './apiClient';

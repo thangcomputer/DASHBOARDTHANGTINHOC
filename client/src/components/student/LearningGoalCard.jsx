@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Check, ChevronRight, Flame, Gamepad2, Info, PlayCircle, Target } from 'lucide-react';
+import { Check, Flame, Gamepad2, PlayCircle, Target } from 'lucide-react';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
@@ -20,15 +20,7 @@ function percent(value, target) {
   return Math.min(100, Math.round((value / target) * 100));
 }
 
-function ProgressBar({ value, tone }) {
-  return (
-    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-      <div className={`h-full rounded-full transition-all duration-500 ${tone}`} style={{ width: `${value}%` }} />
-    </div>
-  );
-}
-
-/** Thẻ tiến độ mục tiêu học trên Tổng quan học viên. */
+/** Thẻ tiến độ mục tiêu học trên Tổng quan học viên - Thiết kế tinh gọn, hiện đại. */
 export default function LearningGoalCard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -79,130 +71,147 @@ export default function LearningGoalCard() {
     return (
       <section className="flex h-full min-w-0 flex-col justify-center gap-3 overflow-hidden rounded-2xl border border-red-100 bg-gradient-to-r from-red-50 to-white p-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-white"><Target size={22} /></span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white shadow-xs">
+            <Target size={20} />
+          </span>
           <div>
             <p className="text-sm font-black text-slate-900">Bạn chưa đặt mục tiêu học</p>
             <p className="text-xs text-slate-500">Đặt mục tiêu để theo dõi số giờ học mỗi ngày.</p>
           </div>
         </div>
-        <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-primary self-start">Đặt mục tiêu</button>
+        <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-primary self-start !py-1.5 !px-3 text-xs">
+          Đặt mục tiêu
+        </button>
       </section>
     );
   }
 
   const todayPct = percent(progress.todayMinutes, progress.dailyTargetMinutes);
   const periodPct = percent(progress.periodMinutes, progress.periodTargetMinutes);
+  const todayDone = todayPct >= 100;
+  const questionsDone = (progress.todayQuestions || 0) >= MISSION_QUESTIONS;
+  const videosDone = (progress.todayVideos || 0) >= MISSION_VIDEOS;
+  const completedMissions = [questionsDone, videosDone].filter(Boolean).length;
 
   return (
-    <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-white"><Target size={22} /></span>
-          <div>
-            <p className="text-sm font-black text-slate-900">
-              Mục tiêu: {goal.hoursPerDay} giờ/ngày · {periodLabel(goal.period)}
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      {/* 1. Tiêu đề + Nút Đổi */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+            <Target size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-black text-slate-900 truncate">
+              Mục tiêu: {goal.hoursPerDay} giờ/ngày
             </p>
-            <p className="flex items-center gap-1 text-xs text-slate-500">
-              <CalendarDays size={12} />
-              {goal.expired ? 'Mục tiêu đã kết thúc' : `Còn ${progress.daysLeft} ngày · ngày ${progress.daysElapsed}/${progress.totalDays}`}
+            <p className="text-xs font-semibold text-slate-500 truncate">
+              {goal.expired ? 'Đã kết thúc' : `${periodLabel(goal.period)} · Còn ${progress.daysLeft} ngày`}
             </p>
           </div>
         </div>
-        <button type="button" onClick={openLearningGoal} className="cms-btn cms-btn-outline shrink-0 !px-3 !py-1.5 text-xs">
-          {goal.expired ? 'Đặt mục tiêu mới' : 'Đổi mục tiêu'}
+        <button
+          type="button"
+          onClick={openLearningGoal}
+          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition"
+        >
+          {goal.expired ? 'Đặt mới' : 'Đổi'}
         </button>
       </div>
 
-      <div className="mt-4 flex min-w-0 flex-1 flex-col gap-3">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="flex shrink-0 items-center gap-1 font-bold text-slate-600"><Flame size={13} className="text-orange-500" /> Hôm nay</span>
-            <span className="text-right font-bold text-slate-900">{formatStudyMinutes(progress.todayMinutes)} / {goal.hoursPerDay} giờ</span>
-          </div>
-          <ProgressBar value={todayPct} tone={todayPct >= 100 ? 'bg-emerald-500' : 'bg-orange-500'} />
-          {todayPct >= 100 && <p className="text-[11px] font-bold text-emerald-600">Đã đạt mục tiêu hôm nay!</p>}
+      {/* 2. Tiến độ hôm nay (Thanh chính gọn gàng) */}
+      <div className="mt-3.5 space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 font-bold text-slate-700">
+            <Flame size={14} className={todayDone ? 'text-emerald-500' : 'text-orange-500'} />
+            <span>Hôm nay</span>
+          </span>
+          <span className="font-extrabold text-slate-900">
+            {formatStudyMinutes(progress.todayMinutes)} / {goal.hoursPerDay} giờ
+            <span className={`ml-1 font-bold ${todayDone ? 'text-emerald-600' : 'text-slate-400'}`}>
+              ({todayPct}%)
+            </span>
+          </span>
         </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="shrink-0 font-bold text-slate-600">Cả {periodLabel(goal.period)}</span>
-            <span className="text-right font-bold text-slate-900">{formatStudyMinutes(progress.periodMinutes)} · {periodPct}%</span>
-          </div>
-          <ProgressBar value={periodPct} tone="bg-red-500" />
+        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              todayDone ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-400 to-red-500'
+            }`}
+            style={{ width: `${todayPct}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+          <span>Chu kỳ: {formatStudyMinutes(progress.periodMinutes)} ({periodPct}%)</span>
+          {todayDone && <span className="font-bold text-emerald-600">✓ Đã đạt hôm nay</span>}
         </div>
       </div>
 
-      <div className="mt-4 border-t border-slate-100 pt-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-xs font-black text-slate-700">Nhiệm vụ hôm nay</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black tabular-nums text-slate-600">
-            {[(progress.todayQuestions || 0) >= MISSION_QUESTIONS, (progress.todayVideos || 0) >= MISSION_VIDEOS].filter(Boolean).length}/2 hoàn thành
+      {/* 3. Nhiệm vụ hôm nay (2 thẻ mini dạng pill) */}
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mb-2 flex items-center justify-between text-xs">
+          <span className="font-black text-slate-800">Nhiệm vụ hôm nay</span>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+            {completedMissions}/2 hoàn thành
           </span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <MissionTile
-            icon={Gamepad2}
-            title="Luyện tập"
-            value={progress.todayQuestions || 0}
-            target={MISSION_QUESTIONS}
-            unit="câu"
-            gradient="from-sky-400 to-blue-600"
-            bar="bg-sky-500"
+          {/* Luyện tập */}
+          <button
+            type="button"
             onClick={() => navigate('/student/daily-practice')}
-          />
-          <MissionTile
-            icon={PlayCircle}
-            title="Xem video"
-            value={progress.todayVideos || 0}
-            target={MISSION_VIDEOS}
-            unit="video"
-            gradient="from-violet-400 to-purple-600"
-            bar="bg-violet-500"
+            className={`flex items-center gap-2 rounded-xl border p-2 text-left transition active:scale-98 ${
+              questionsDone
+                ? 'border-emerald-200 bg-emerald-50/60'
+                : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/70'
+            }`}
+          >
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+              questionsDone ? 'bg-emerald-500 text-white' : 'bg-sky-100 text-sky-600'
+            }`}>
+              {questionsDone ? <Check size={14} strokeWidth={3} /> : <Gamepad2 size={15} />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-slate-900 truncate">Luyện tập</p>
+              <p className={`text-[11px] font-bold truncate ${
+                questionsDone ? 'text-emerald-700' : 'text-slate-500'
+              }`}>
+                {progress.todayQuestions || 0}/{MISSION_QUESTIONS} câu
+              </p>
+            </div>
+          </button>
+
+          {/* Xem video */}
+          <button
+            type="button"
             onClick={openVideoMission}
-          />
+            className={`flex items-center gap-2 rounded-xl border p-2 text-left transition active:scale-98 ${
+              videosDone
+                ? 'border-emerald-200 bg-emerald-50/60'
+                : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/70'
+            }`}
+          >
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+              videosDone ? 'bg-emerald-500 text-white' : 'bg-purple-100 text-purple-600'
+            }`}>
+              {videosDone ? <Check size={14} strokeWidth={3} /> : <PlayCircle size={15} />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-slate-900 truncate">Xem video</p>
+              <p className={`text-[11px] font-bold truncate ${
+                videosDone ? 'text-emerald-700' : 'text-slate-500'
+              }`}>
+                {progress.todayVideos || 0}/{MISSION_VIDEOS} video
+              </p>
+            </div>
+          </button>
         </div>
-        <p className="mt-2 text-[11px] text-slate-400">
-          Cả {periodLabel(goal.period)}: {progress.periodQuestions || 0} câu · {progress.periodVideos || 0} video
-        </p>
       </div>
-      <p className="mt-2 flex items-start gap-1 text-[11px] leading-snug text-slate-400">
-        <Info size={12} className="mt-px shrink-0" />
-        Chỉ tính giờ khi bạn đang học ở trang bài học, ôn thi, tài liệu hoặc video, xem video đang phát, hoặc có thao tác trong 3 phút gần nhất.
+
+      {/* 4. Ghi chú siêu gọn nhẹ */}
+      <p className="mt-2.5 text-[11px] text-slate-400 font-medium leading-tight">
+        * Giờ học tính khi bạn làm bài, ôn thi hoặc xem video.
       </p>
     </section>
-  );
-}
-
-function MissionTile({ icon: Icon, title, value, target, unit, gradient, bar, onClick }) {
-  const done = value >= target;
-  const pct = percent(value, target);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group relative flex min-w-0 items-center gap-2.5 overflow-hidden rounded-2xl border p-2.5 text-left transition !shadow-none ${done ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white' : 'border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/30'}`}
-    >
-      <span className="relative shrink-0">
-        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-[inset_0_2px_3px_rgba(255,255,255,0.35),0_6px_14px_rgba(15,23,42,0.15)] ${done ? 'from-emerald-400 to-emerald-600' : gradient}`}>
-          <Icon size={22} aria-hidden="true" />
-        </span>
-        {done && (
-          <span className="cms-goal-pop absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-emerald-600 ring-2 ring-emerald-500">
-            <Check size={12} strokeWidth={3.5} aria-hidden="true" />
-          </span>
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center justify-between gap-1">
-          <span className="truncate text-sm font-black text-slate-900">{title}</span>
-          {!done && <ChevronRight size={14} className="shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
-        </span>
-        <span className={`block text-[11px] font-bold ${done ? 'text-emerald-600' : 'text-slate-500'}`}>
-          {done ? `Hoàn thành · ${value} ${unit}` : `${value}/${target} ${unit}`}
-        </span>
-        <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <span className={`block h-full rounded-full transition-all duration-500 ${done ? 'bg-emerald-500' : bar}`} style={{ width: `${pct}%` }} />
-        </span>
-      </span>
-    </button>
   );
 }

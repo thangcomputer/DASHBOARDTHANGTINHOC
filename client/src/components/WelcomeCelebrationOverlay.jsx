@@ -4,7 +4,7 @@ import { formatHoaHong, STAR_BONUS_MIN_STARS, STAR_BONUS_MIN_STUDENTS } from '..
 import { setLoginOverlay } from '../utils/loginOverlayGate';
 
 /**
- * Pháo hoa chào mừng / hoàn thành khóa / thưởng sao GV — canvas trên overlay (pointer-events: none).
+ * Pháo hoa chào mừng / hoàn thành khóa / thưởng sao GV - canvas trên overlay (pointer-events: none).
  */
 export default function WelcomeCelebrationOverlay({
   open,
@@ -24,7 +24,7 @@ export default function WelcomeCelebrationOverlay({
   const flashesRef = useRef([]);
 
   useEffect(() => {
-    // LMS / layout đều dùng component này — đăng ký gate khi mở
+    // LMS / layout đều dùng component này - đăng ký gate khi mở
     setLoginOverlay('welcome-celebration-ui', Boolean(open));
     return () => setLoginOverlay('welcome-celebration-ui', false);
   }, [open]);
@@ -375,7 +375,7 @@ export default function WelcomeCelebrationOverlay({
 
           <div className="px-6 sm:px-8 py-6 sm:py-7 text-center space-y-4">
             <p className="text-[15px] leading-relaxed text-slate-600">
-              Thanh toán thành công — toàn bộ bài học đã được mở khóa. Hãy bắt đầu học ngay hôm nay!
+              Thanh toán thành công - toàn bộ bài học đã được mở khóa. Hãy bắt đầu học ngay hôm nay!
             </p>
             <button
               type="button"
@@ -508,7 +508,7 @@ export default function WelcomeCelebrationOverlay({
       : 'Chào mừng học viên mới';
 
   const body = isCourseComplete
-    ? `Bạn đã hoàn thành khóa ${courseName || 'học'} tại Trung tâm Tin học Thắng Tin Học. Đây là cột mốc đáng tự hào — hãy tiếp tục luyện tập để vững kiến thức lâu dài.`
+    ? `Bạn đã hoàn thành khóa ${courseName || 'học'} tại Trung tâm Tin học Thắng Tin Học. Đây là cột mốc đáng tự hào - hãy tiếp tục luyện tập để vững kiến thức lâu dài.`
     : isTeacher
       ? 'Bạn đã chính thức trở thành giảng viên của Trung tâm Tin học Thắng Tin Học. Chúc bạn đồng hành và truyền cảm hứng thật nhiều trên hành trình phía trước.'
       : 'Bạn đã chính thức trở thành học viên của Trung tâm Tin học Thắng Tin Học. Chúc bạn học tập hiệu quả và đạt nhiều thành quả đáng tự hào.';
@@ -521,7 +521,7 @@ export default function WelcomeCelebrationOverlay({
     : [
       'Mỗi ngày một chút, bền bỉ sẽ thành công.',
       'Luyện thêm một buổi, vững vàng từng bước chân.',
-      'Học đều hôm nay — tự tin ngày mai.',
+      'Học đều hôm nay - tự tin ngày mai.',
     ];
 
   return (
@@ -598,7 +598,7 @@ export default function WelcomeCelebrationOverlay({
         </div>
       </div>
 
-      {/* 3. Pháo hoa TRÊN cùng — không chặn click */}
+      {/* 3. Pháo hoa TRÊN cùng - không chặn click */}
       <canvas
         ref={canvasRef}
         className="pointer-events-none absolute inset-0 z-20"

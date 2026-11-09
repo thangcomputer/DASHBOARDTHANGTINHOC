@@ -1,5 +1,5 @@
 /**
- * Compatibility wrapper — LIVE messaging ACL.
+ * Compatibility wrapper - LIVE messaging ACL.
  * CANONICAL authority: services/messagingPolicy.js
  * Delegates send checks to MessagingPolicy (which uses messagingPairing).
  */

@@ -1,5 +1,5 @@
 /**
- * Form builder service — CRUD form + submissions.
+ * Form builder service - CRUD form + submissions.
  */
 const FormDefinition = require('../models/FormDefinition');
 const FormSubmission = require('../models/FormSubmission');

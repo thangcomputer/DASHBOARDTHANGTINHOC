@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Assignment,
   AssignmentSubmission,
   DemoEnrollment,
@@ -438,7 +438,7 @@ export async function getStudentExamResults(user: DemoUser): Promise<DemoGradeRe
       id: text(result._id || result.id, `exam-${index}`),
       courseName: text(result.subject, 'Kết quả kiểm tra'),
       assessment: 'Kết quả kiểm tra',
-      score: scoreParts.join(' · ') || '—',
+      score: scoreParts.join(' · ') || '-',
       status: result.passed === true ? 'Đạt' : 'Chưa đạt',
       date: text(result.date || result.createdAt) || undefined,
       feedback: feedbackParts.join(' · ') || undefined,

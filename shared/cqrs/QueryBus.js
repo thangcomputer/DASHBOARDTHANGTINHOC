@@ -17,18 +17,18 @@ class QueryBus {
   async dispatch(query) {
     const queryName = query.constructor.name;
     const handler = this.registry.resolve(queryName);
-    
+
     for (const hook of this.hooks) if (hook.beforeExecute) await hook.beforeExecute(query);
-    
+
     const start = Date.now();
     try {
       // Phase 2: RetryPolicy (read only)
       const result = await retryExecutor.execute(async () => {
-         return await handler.execute(query);
+        return await handler.execute(query);
       });
       const duration = Date.now() - start;
       Metrics.observe('query_duration', {}, duration);
-      
+
       for (const hook of this.hooks) if (hook.afterExecute) await hook.afterExecute(query, result);
       return result;
     } catch (err) {

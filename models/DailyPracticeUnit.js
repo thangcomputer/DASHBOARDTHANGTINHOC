@@ -5,18 +5,18 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
   topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyPracticeTopic', required: true },
   title: { type: String, required: true, trim: true, maxlength: 80 },
   description: { type: String, default: '', trim: true, maxlength: 240 },
-  /** Ảnh minh họa chặng (URL) — hiện cạnh lộ trình kiểu Duolingo. */
+  /** Ảnh minh họa chặng (URL) - hiện cạnh lộ trình kiểu Duolingo. */
   imageUrl: { type: String, default: '', trim: true, maxlength: 500 },
   sortOrder: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
   /** Buổi video nên xem trước khi luyện chặng này. */
   lessonUnitId: { type: mongoose.Schema.Types.ObjectId, ref: 'LessonUnit', default: null },
-  /** Video riêng của chặng — popup danh sách phát. */
+  /** Video riêng của chặng - popup danh sách phát. */
   videos: {
     type: [{
       title: { type: String, required: true, trim: true, maxlength: 120 },
       url: { type: String, default: '', trim: true, maxlength: 500 },
-      /** Nội dung chữ (bài học) — dùng khi không chỉ có video. */
+      /** Nội dung chữ (bài học) - dùng khi không chỉ có video. */
       content: { type: String, default: '', trim: true, maxlength: 5000 },
       /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
       checks: {
@@ -54,21 +54,21 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
             title: { type: String, required: true, trim: true, maxlength: 120 },
             url: { type: String, default: '', trim: true, maxlength: 500 },
             content: { type: String, default: '', trim: true, maxlength: 5000 },
-      /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-      checks: {
-        type: [{
-          atSec: { type: Number, default: 0 },
-          kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
-          prompt: { type: String, default: '', trim: true, maxlength: 300 },
-          choices: { type: [String], default: [] },
-          answer: { type: String, default: '', trim: true, maxlength: 200 },
-          criteria: { type: String, default: '', trim: true, maxlength: 500 },
-          shortHint: { type: String, default: '', trim: true, maxlength: 160 },
-          paidHint: { type: String, default: '', trim: true, maxlength: 300 },
-          hintCostXp: { type: Number, default: 5 },
-        }],
-        default: [],
-      },
+            /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+            checks: {
+              type: [{
+                atSec: { type: Number, default: 0 },
+                kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+                prompt: { type: String, default: '', trim: true, maxlength: 300 },
+                choices: { type: [String], default: [] },
+                answer: { type: String, default: '', trim: true, maxlength: 200 },
+                criteria: { type: String, default: '', trim: true, maxlength: 500 },
+                shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+                paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+                hintCostXp: { type: Number, default: 5 },
+              }],
+              default: [],
+            },
           }],
           default: [],
         },
@@ -77,21 +77,21 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
             title: { type: String, required: true, trim: true, maxlength: 120 },
             url: { type: String, default: '', trim: true, maxlength: 500 },
             content: { type: String, default: '', trim: true, maxlength: 5000 },
-      /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-      checks: {
-        type: [{
-          atSec: { type: Number, default: 0 },
-          kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
-          prompt: { type: String, default: '', trim: true, maxlength: 300 },
-          choices: { type: [String], default: [] },
-          answer: { type: String, default: '', trim: true, maxlength: 200 },
-          criteria: { type: String, default: '', trim: true, maxlength: 500 },
-          shortHint: { type: String, default: '', trim: true, maxlength: 160 },
-          paidHint: { type: String, default: '', trim: true, maxlength: 300 },
-          hintCostXp: { type: Number, default: 5 },
-        }],
-        default: [],
-      },
+            /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+            checks: {
+              type: [{
+                atSec: { type: Number, default: 0 },
+                kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+                prompt: { type: String, default: '', trim: true, maxlength: 300 },
+                choices: { type: [String], default: [] },
+                answer: { type: String, default: '', trim: true, maxlength: 200 },
+                criteria: { type: String, default: '', trim: true, maxlength: 500 },
+                shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+                paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+                hintCostXp: { type: Number, default: 5 },
+              }],
+              default: [],
+            },
           }],
           default: [],
         },
@@ -100,21 +100,21 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
             title: { type: String, required: true, trim: true, maxlength: 120 },
             url: { type: String, default: '', trim: true, maxlength: 500 },
             content: { type: String, default: '', trim: true, maxlength: 5000 },
-      /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-      checks: {
-        type: [{
-          atSec: { type: Number, default: 0 },
-          kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
-          prompt: { type: String, default: '', trim: true, maxlength: 300 },
-          choices: { type: [String], default: [] },
-          answer: { type: String, default: '', trim: true, maxlength: 200 },
-          criteria: { type: String, default: '', trim: true, maxlength: 500 },
-          shortHint: { type: String, default: '', trim: true, maxlength: 160 },
-          paidHint: { type: String, default: '', trim: true, maxlength: 300 },
-          hintCostXp: { type: Number, default: 5 },
-        }],
-        default: [],
-      },
+            /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+            checks: {
+              type: [{
+                atSec: { type: Number, default: 0 },
+                kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+                prompt: { type: String, default: '', trim: true, maxlength: 300 },
+                choices: { type: [String], default: [] },
+                answer: { type: String, default: '', trim: true, maxlength: 200 },
+                criteria: { type: String, default: '', trim: true, maxlength: 500 },
+                shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+                paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+                hintCostXp: { type: Number, default: 5 },
+              }],
+              default: [],
+            },
           }],
           default: [],
         },
@@ -122,28 +122,28 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
     }],
     default: undefined,
   },
-  /** @deprecated — ưu tiên pathNodes. */
+  /** @deprecated - ưu tiên pathNodes. */
   stepVideos: {
     learn: {
       type: [{
         title: { type: String, required: true, trim: true, maxlength: 120 },
         url: { type: String, default: '', trim: true, maxlength: 500 },
         content: { type: String, default: '', trim: true, maxlength: 5000 },
-      /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-      checks: {
-        type: [{
-          atSec: { type: Number, default: 0 },
-          kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
-          prompt: { type: String, default: '', trim: true, maxlength: 300 },
-          choices: { type: [String], default: [] },
-          answer: { type: String, default: '', trim: true, maxlength: 200 },
-          criteria: { type: String, default: '', trim: true, maxlength: 500 },
-          shortHint: { type: String, default: '', trim: true, maxlength: 160 },
-          paidHint: { type: String, default: '', trim: true, maxlength: 300 },
-          hintCostXp: { type: Number, default: 5 },
-        }],
-        default: [],
-      },
+        /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+        checks: {
+          type: [{
+            atSec: { type: Number, default: 0 },
+            kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+            prompt: { type: String, default: '', trim: true, maxlength: 300 },
+            choices: { type: [String], default: [] },
+            answer: { type: String, default: '', trim: true, maxlength: 200 },
+            criteria: { type: String, default: '', trim: true, maxlength: 500 },
+            shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+            paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+            hintCostXp: { type: Number, default: 5 },
+          }],
+          default: [],
+        },
       }],
       default: [],
     },
@@ -152,21 +152,21 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
         title: { type: String, required: true, trim: true, maxlength: 120 },
         url: { type: String, default: '', trim: true, maxlength: 500 },
         content: { type: String, default: '', trim: true, maxlength: 5000 },
-      /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-      checks: {
-        type: [{
-          atSec: { type: Number, default: 0 },
-          kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
-          prompt: { type: String, default: '', trim: true, maxlength: 300 },
-          choices: { type: [String], default: [] },
-          answer: { type: String, default: '', trim: true, maxlength: 200 },
-          criteria: { type: String, default: '', trim: true, maxlength: 500 },
-          shortHint: { type: String, default: '', trim: true, maxlength: 160 },
-          paidHint: { type: String, default: '', trim: true, maxlength: 300 },
-          hintCostXp: { type: Number, default: 5 },
-        }],
-        default: [],
-      },
+        /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+        checks: {
+          type: [{
+            atSec: { type: Number, default: 0 },
+            kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+            prompt: { type: String, default: '', trim: true, maxlength: 300 },
+            choices: { type: [String], default: [] },
+            answer: { type: String, default: '', trim: true, maxlength: 200 },
+            criteria: { type: String, default: '', trim: true, maxlength: 500 },
+            shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+            paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+            hintCostXp: { type: Number, default: 5 },
+          }],
+          default: [],
+        },
       }],
       default: [],
     },
@@ -175,21 +175,21 @@ const dailyPracticeUnitSchema = new mongoose.Schema({
         title: { type: String, required: true, trim: true, maxlength: 120 },
         url: { type: String, default: '', trim: true, maxlength: 500 },
         content: { type: String, default: '', trim: true, maxlength: 5000 },
-      /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
-      checks: {
-        type: [{
-          atSec: { type: Number, default: 0 },
-          kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
-          prompt: { type: String, default: '', trim: true, maxlength: 300 },
-          choices: { type: [String], default: [] },
-          answer: { type: String, default: '', trim: true, maxlength: 200 },
-          criteria: { type: String, default: '', trim: true, maxlength: 500 },
-          shortHint: { type: String, default: '', trim: true, maxlength: 160 },
-          paidHint: { type: String, default: '', trim: true, maxlength: 300 },
-          hintCostXp: { type: Number, default: 5 },
-        }],
-        default: [],
-      },
+        /** Mốc dừng video: chọn, nhập chữ, hoặc chụp màn hình cho AI chấm. */
+        checks: {
+          type: [{
+            atSec: { type: Number, default: 0 },
+            kind: { type: String, enum: ['choice', 'text', 'screen'], default: 'choice' },
+            prompt: { type: String, default: '', trim: true, maxlength: 300 },
+            choices: { type: [String], default: [] },
+            answer: { type: String, default: '', trim: true, maxlength: 200 },
+            criteria: { type: String, default: '', trim: true, maxlength: 500 },
+            shortHint: { type: String, default: '', trim: true, maxlength: 160 },
+            paidHint: { type: String, default: '', trim: true, maxlength: 300 },
+            hintCostXp: { type: Number, default: 5 },
+          }],
+          default: [],
+        },
       }],
       default: [],
     },

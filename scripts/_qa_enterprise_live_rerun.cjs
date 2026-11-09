@@ -1,5 +1,5 @@
 /**
- * QA Enterprise LIVE re-run — evidence from running API/DB/Socket/FE.
+ * QA Enterprise LIVE re-run - evidence from running API/DB/Socket/FE.
  * Usage: node scripts/_qa_enterprise_live_rerun.cjs
  * Does NOT claim PASS without HTTP/DB evidence. No product code changes.
  */
@@ -18,7 +18,7 @@ const startedAt = new Date().toISOString();
 function record(tc) {
   cases.push(tc);
   const icon = tc.result === 'PASS' ? 'PASS' : tc.result === 'FAIL' ? 'FAIL' : tc.result;
-  console.log(`[${icon}] ${tc.id} — ${tc.name} | ${tc.actual || ''}`);
+  console.log(`[${icon}] ${tc.id} - ${tc.name} | ${tc.actual || ''}`);
 }
 
 function req(method, urlPath, { token, body, cookie, csrfToken, timeout = 20000 } = {}) {
@@ -211,19 +211,20 @@ async function main() {
   record({
     id: 'AUTH-CONC-01', module: 'Authentication', name: `Concurrent JWT /auth/me (${actors.length})`,
     expected: 'all 200',
-    actual: `ok=${meOk} fail=${actors.length - meOk} avgMs=${Math.round(wall / Math.max(actors.length, 1))} wall=${wall}ms`,
+    actual: `ok=${meOk} fail=${actors.length - meOk
+      } avgMs = ${Math.round(wall / Math.max(actors.length, 1))} wall = ${wall}ms`,
     result: meOk === actors.length ? 'PASS' : 'FAIL',
     severity: 'Critical', api: 'GET /api/auth/me',
   });
 
-  // Password+CAPTCHA concurrent — expect FAIL without bypass
+  // Password+CAPTCHA concurrent - expect FAIL without bypass
   const loginTry = await mut('POST', '/api/auth/login', {
     body: { identifier: superAdmin?.phone || '0999000001', password: 'Test@123456', role: 'admin' },
   });
   record({
     id: 'AUTH-LOGIN-01', module: 'Authentication', name: 'Password login Super Admin (no captcha)',
     expected: '200 accessToken OR captcha challenge documented',
-    actual: `status=${loginTry.status} msg=${loginTry.json?.message || loginTry.raw?.slice?.(0, 120) || ''}`,
+    actual: `status = ${loginTry.status} msg = ${loginTry.json?.message || loginTry.raw?.slice?.(0, 120) || ''}`,
     result: loginTry.status === 200 && loginTry.json?.data?.accessToken ? 'PASS' : 'FAIL',
     severity: 'High',
     impact: 'Smoke scripts không login được; automation cần CAPTCHA_BYPASS test-only',
@@ -242,22 +243,22 @@ async function main() {
   record({
     id: 'BRANCH-01', module: 'Multi Branch', name: 'Staff CN1 không thấy HV CN2/CN3',
     expected: 'leaked=0',
-    actual: `status=${staffList.status} total=${staffList.json?.total ?? staffRows.length} leaked=${leaked.length}`,
+    actual: `status = ${staffList.status} total = ${staffList.json?.total ?? staffRows.length} leaked = ${leaked.length}`,
     result: staffList.status === 200 && leaked.length === 0 ? 'PASS' : 'FAIL',
     severity: 'Critical', api: 'GET /api/students',
   });
 
   if (hvCn2) {
-    const crossPay = await mut('PUT', `/api/students/${hvCn2._id}/pay`, {
+    const crossPay = await mut('PUT', `/ api / students / ${hvCn2._id} / pay`, {
       token: tokAdmin1,
       body: { note: 'QA cross-branch should 403' },
     });
     record({
       id: 'RBAC-01', module: 'RBAC', name: 'Admin CN1 không pay HV CN2',
       expected: '403',
-      actual: `status=${crossPay.status} msg=${crossPay.json?.message || ''}`,
+      actual: `status = ${crossPay.status} msg = ${crossPay.json?.message || ''}`,
       result: crossPay.status === 403 ? 'PASS' : 'FAIL',
-      severity: 'Critical', api: `PUT /api/students/${hvCn2._id}/pay`,
+      severity: 'Critical', api: `PUT / api / students / ${hvCn2._id} / pay`,
     });
   } else {
     record({ id: 'RBAC-01', module: 'RBAC', name: 'Admin CN1 không pay HV CN2', result: 'FAIL', actual: 'missing hvCn2', severity: 'Critical' });
@@ -267,7 +268,7 @@ async function main() {
   record({
     id: 'RBAC-02', module: 'RBAC', name: 'Super Admin list students',
     expected: '200',
-    actual: `status=${superList.status}`,
+    actual: `status = ${superList.status}`,
     result: superList.status === 200 ? 'PASS' : 'FAIL',
     severity: 'High', api: 'GET /api/students',
   });
@@ -288,7 +289,7 @@ async function main() {
   let stillExists = null;
   let deletedAt = null;
   if (tempId) {
-    const del = await mut('DELETE', `/api/courses/${tempId}`, { token: tokSuper });
+    const del = await mut('DELETE', `/ api / courses / ${tempId}`, { token: tokSuper });
     delStatus = del.status;
     stillExists = await Course.findById(tempId).lean();
     deletedAt = stillExists?.deletedAt || null;
@@ -298,12 +299,12 @@ async function main() {
   record({
     id: 'COURSE-01', module: 'Course', name: 'DELETE course = soft-delete (không hard delete)',
     expected: 'document còn + deletedAt/archived; ledger không đụng',
-    actual: `api=${delStatus} exists=${!!stillExists} deletedAt=${deletedAt} status=${stillExists?.status || 'GONE'}`,
+    actual: `api = ${delStatus} exists = ${!!stillExists} deletedAt = ${deletedAt} status = ${stillExists?.status || 'GONE'} `,
     result: softOk ? 'PASS' : 'FAIL',
     severity: 'Critical',
     api: 'DELETE /api/courses/:id',
     impact: hardOk
-      ? 'Hard delete — mất lịch sử catalog; rủi ro báo cáo/enrollment orphan'
+      ? 'Hard delete - mất lịch sử catalog; rủi ro báo cáo/enrollment orphan'
       : 'Delete thất bại hoặc hành vi không rõ',
     fixHint: 'Đổi findByIdAndDelete → status=archived + deletedAt; filter catalog',
     database: 'courses',
@@ -312,15 +313,15 @@ async function main() {
   // ── PAYMENT + REFUND ────────────────────────────────────────────────
   let payStudent = null;
   if (hvCn1) {
-    // clone unpaid enrollment student for safe refund — use CN1 student with unpaid 2nd course or create
+    // clone unpaid enrollment student for safe refund - use CN1 student with unpaid 2nd course or create
     payStudent = await Student.findOne({ name: /^QA HV CN1/, 'enrollments.paid': false }).lean();
   }
   // Create disposable student for pay/refund
-  const phonePay = `0961${String(Date.now()).slice(-7)}`;
+  const phonePay = `0961${String(Date.now()).slice(-7)} `;
   const createPay = await mut('POST', '/api/students', {
     token: tokSuper,
     body: {
-      name: `QA LIVE PAY ${phonePay.slice(-6)}`,
+      name: `QA LIVE PAY ${phonePay.slice(-6)} `,
       phone: phonePay,
       zalo: phonePay,
       course: 'Excel MOS',
@@ -334,7 +335,7 @@ async function main() {
   const payId = createPay.json?.data?._id || createPay.json?.data?.id;
   const beforeInvoices = payId ? await Invoice.countDocuments({ studentId: payId }) : 0;
   const payRes = payId
-    ? await mut('PUT', `/api/students/${payId}/pay`, { token: tokSuper, body: { note: 'QA live pay' } })
+    ? await mut('PUT', `/ api / students / ${payId}/pay`, { token: tokSuper, body: { note: 'QA live pay' } })
     : { status: 0, json: {} };
   const afterPay = payId ? await Student.findById(payId).lean() : null;
   const ledgerAfterPay = LedgerEntry && payId
@@ -353,7 +354,7 @@ async function main() {
     actual: `ledgerPaymentRows=${ledgerAfterPay}`,
     result: ledgerAfterPay === null ? 'FAIL' : (ledgerAfterPay >= 1 ? 'PASS' : 'FAIL'),
     severity: 'Critical',
-    impact: 'Doanh thu tài chính chưa SoT qua ledger — báo cáo dễ lệch student.paid',
+    impact: 'Doanh thu tài chính chưa SoT qua ledger - báo cáo dễ lệch student.paid',
     fixHint: 'Gọi ledgerService.settlePayment trong route pay',
     database: 'ledgerentries',
   });
@@ -376,7 +377,7 @@ async function main() {
     result: partialOk ? 'PASS' : 'FAIL',
     severity: 'Critical',
     api: 'PUT /api/students/:id/refund',
-    impact: 'Không hỗ trợ hoàn một phần — finance/ERP lệch yêu cầu',
+    impact: 'Không hỗ trợ hoàn một phần - finance/ERP lệch yêu cầu',
     fixHint: 'Nhận body.amount; giảm paidAmount; post ledger refund; giữ invoice',
   });
 
@@ -585,7 +586,7 @@ async function main() {
     database: 'systemlogs',
   });
 
-  // Grade history — live API check (assignment grade)
+  // Grade history - live API check (assignment grade)
   const asgPutSrc = fs.readFileSync(path.join(__dirname, '../routes/assignmentRoutes.js'), 'utf8');
   record({
     id: 'GRADE-HIST-01', module: 'Assignment', name: 'Grade history old→new trong assignment routes',
@@ -608,7 +609,7 @@ async function main() {
     severity: 'Medium', api: 'GET /api/bi/overview',
   });
 
-  // Upload smoke (message image already covered in G6) — files stats
+  // Upload smoke (message image already covered in G6) - files stats
   const files = await req('GET', '/api/files/stats', { token: tokSuper });
   record({
     id: 'UPLOAD-01', module: 'Upload', name: 'Files stats API',
@@ -630,7 +631,7 @@ async function main() {
     actual: `pendingApprox=${pending} probe=${publicPending}`,
     result: 'PASS',
     severity: 'Medium',
-    note: 'Smoke schema only — chưa E2E approve flow trong run này',
+    note: 'Smoke schema only - chưa E2E approve flow trong run này',
   });
 
   // Stack mismatch
@@ -640,14 +641,14 @@ async function main() {
     actual: 'MongoDB connected; prisma/=0; redis=disabled',
     result: 'PASS',
     severity: 'Low',
-    note: 'Không FAIL product — FAIL brief giả định Postgres/Prisma',
+    note: 'Không FAIL product - FAIL brief giả định Postgres/Prisma',
   });
 
   // UI full matrix
   record({
     id: 'UI-01', module: 'UI E2E', name: 'Playwright toàn bộ màn Admin/Staff/GV/HV',
     expected: 'Full UI matrix',
-    actual: 'NOT RUN full matrix trong suite này — xem docs/QA_UI_GOLDEN_PATHS_REPORT.md (7 paths PASS lần trước). Cần regression UI lại.',
+    actual: 'NOT RUN full matrix trong suite này - xem docs/QA_UI_GOLDEN_PATHS_REPORT.md (7 paths PASS lần trước). Cần regression UI lại.',
     result: 'FAIL',
     severity: 'High',
     impact: 'Không đủ bằng chứng Pass UI toàn hệ thống cho go-live',
@@ -664,7 +665,7 @@ async function main() {
 
   // Cleanup pay student
   if (payId) {
-    await mut('DELETE', `/api/students/${payId}`, { token: tokSuper }).catch(() => {});
+    await mut('DELETE', `/api/students/${payId}`, { token: tokSuper }).catch(() => { });
   }
 
   await mongoose.disconnect();
@@ -721,7 +722,7 @@ async function main() {
     md += `# ${mod}\n\n`;
     md += `**Verdict:** ${info.fail ? 'FAIL' : 'PASS'} (pass=${info.pass} fail=${info.fail})\n\n`;
     for (const c of info.cases) {
-      md += `## ${c.id} — ${c.name}\n`;
+      md += `## ${c.id} - ${c.name}\n`;
       md += `- Result: **${c.result}**\n`;
       md += `- UI: ${c.module === 'UI E2E' ? c.result : 'N/A (API/DB evidence)'}\n`;
       md += `- API: ${c.api ? c.result : 'N/A'}\n`;
@@ -744,11 +745,11 @@ async function main() {
 
   md += `## Critical bugs\n\n`;
   for (const c of criticalFails) {
-    md += `- **${c.id}** ${c.name} — ${c.actual}\n`;
+    md += `- **${c.id}** ${c.name} - ${c.actual}\n`;
   }
   md += `\n## High bugs\n\n`;
   for (const c of highFails) {
-    md += `- **${c.id}** ${c.name} — ${c.actual}\n`;
+    md += `- **${c.id}** ${c.name} - ${c.actual}\n`;
   }
 
   fs.writeFileSync(path.join(__dirname, '../docs/QA_ENTERPRISE_LIVE_RERUN.md'), md);

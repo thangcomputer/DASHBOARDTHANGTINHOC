@@ -34,14 +34,14 @@ function notDeletedFilter(includeDeleted = false) {
   return { deletedAt: null };
 }
 
-// ─── GET /api/courses/stats/summary — đặt trước /:id ───────────────────────────
-router.get('/stats/summary',courseController.get_stats_summary);
+// ─── GET /api/courses/stats/summary - đặt trước /:id ───────────────────────────
+router.get('/stats/summary', courseController.get_stats_summary);
 
 // ─── GET /api/courses ─────────────────────────────────────────────────────────
-router.get('/',courseController.get_root);
+router.get('/', courseController.get_root);
 
 // ─── GET /api/courses/:id ─────────────────────────────────────────────────────
-router.get('/:id',courseController.get_id);
+router.get('/:id', courseController.get_id);
 
 function calcEffectivePrice(price, discountPercent) {
   return calculateDiscountPrice(price, discountPercent);
@@ -63,21 +63,21 @@ async function inferExamSubjects(body) {
 }
 
 // ─── POST /api/courses ────────────────────────────────────────────────────────
-router.post('/', courseWriteGuard,courseController.post_root);
+router.post('/', courseWriteGuard, courseController.post_root);
 
 // ─── PUT /api/courses/:id ─────────────────────────────────────────────────────
-router.put('/:id', courseWriteGuard,courseController.put_id);
+router.put('/:id', courseWriteGuard, courseController.put_id);
 
 // ─── PATCH /api/courses/:id/price ─────────────────────────────────────────────
-router.patch('/:id/price', courseWriteGuard,courseController.patch_id_price);
+router.patch('/:id/price', courseWriteGuard, courseController.patch_id_price);
 
-// ─── DELETE /api/courses/:id — soft-delete (không đụng ledger / enrollment) ───
-router.delete('/:id', courseWriteGuard,courseController.delete_id);
+// ─── DELETE /api/courses/:id - soft-delete (không đụng ledger / enrollment) ───
+router.delete('/:id', courseWriteGuard, courseController.delete_id);
 
-// ─── POST /api/courses/:id/restore — khôi phục soft-delete ───────────────────
-router.post('/:id/restore', courseWriteGuard,courseController.post_id_restore);
+// ─── POST /api/courses/:id/restore - khôi phục soft-delete ───────────────────
+router.post('/:id/restore', courseWriteGuard, courseController.post_id_restore);
 
-// ─── POST /api/courses/seed — chỉ non-production ─────────────────────────────
-router.post('/seed', courseWriteGuard,courseController.post_seed);
+// ─── POST /api/courses/seed - chỉ non-production ─────────────────────────────
+router.post('/seed', courseWriteGuard, courseController.post_seed);
 
 module.exports = router;

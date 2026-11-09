@@ -1,4 +1,4 @@
-# Course Service Review — Sprint 4.3 Batch 2
+# Course Service Review - Sprint 4.3 Batch 2
 
 ## Domain: `course`
 

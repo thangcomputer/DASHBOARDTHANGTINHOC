@@ -1,5 +1,5 @@
 /**
- * Phase 8.21/8.22 — Canonical messaging identity (LIVE only).
+ * Phase 8.21/8.22 - Canonical messaging identity (LIVE only).
  * Transport role for conversationId remains: admin | staff | teacher | student.
  * Display identity NEVER collapses ADMIN_STAFF/SUPPORT/HIGH onto SUPER_ADMIN by role alone.
  */
@@ -29,7 +29,7 @@ function resolveDisplayRole(user = {}) {
   if (user.adminRole === 'STAFF' || user.role === 'staff') return DISPLAY_ROLE.ADMIN_STAFF;
   if (user.role === 'teacher') return DISPLAY_ROLE.TEACHER;
   if (user.role === 'student') return DISPLAY_ROLE.STUDENT;
-  // JWT admin without adminRole — only elevate when id is literal root
+  // JWT admin without adminRole - only elevate when id is literal root
   if (user.role === 'admin' && id === 'admin') return DISPLAY_ROLE.LEGACY_ROOT;
   if (user.role === 'admin') return DISPLAY_ROLE.UNKNOWN;
   return DISPLAY_ROLE.UNKNOWN;
@@ -56,7 +56,7 @@ function resolveMessagingIdentity(user = {}) {
 }
 
 /**
- * Phase 8.22 — Never elevate to SUPER by transport role alone.
+ * Phase 8.22 - Never elevate to SUPER by transport role alone.
  * SUPER/LEGACY_ROOT only when id==="admin" OR adminRole===SUPER_ADMIN.
  */
 function assertDisplayIdentitySafe(identity = {}) {
@@ -169,7 +169,7 @@ function attachIdentitiesToPlain(plain, senderIdentity, receiverIdentity) {
 
 /**
  * Batch enrich messages for history/sync/realtime (no DB schema change).
- * Lookup by participant ID — never by transport role "admin" alone.
+ * Lookup by participant ID - never by transport role "admin" alone.
  */
 async function enrichMessageIdentities(messages = []) {
   const list = Array.isArray(messages) ? messages : [];

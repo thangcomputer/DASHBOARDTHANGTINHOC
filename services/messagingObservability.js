@@ -1,5 +1,5 @@
 /**
- * Phase 9 — Messaging observability helpers.
+ * Phase 9 - Messaging observability helpers.
  * Reuses shared correlationContext + pino logger.
  * NEVER logs JWT, passwords, or message body.
  */
@@ -63,7 +63,7 @@ function resetCountersForTests() {
 }
 
 /**
- * Structured policy / delivery log — identifiers only.
+ * Structured policy / delivery log - identifiers only.
  */
 function logMessagingEvent(level, event, fields = {}) {
   const corr = getCorrelation();

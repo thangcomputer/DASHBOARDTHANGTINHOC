@@ -1,5 +1,5 @@
 /**
- * Phase 7.19 — Controlled cutover + production activation for /api/settings
+ * Phase 7.19 - Controlled cutover + production activation for /api/settings
  *
  * LIVE: auth (when required) → policyShadowSettings → settingsCutoverGate → handler.
  * public_read: bank/payment/web (no auth)
@@ -67,10 +67,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -379,7 +379,7 @@ test('Phase7.19 rollback: remove settings → LEGACY; prior stay POLICY; restore
 test('Phase7.19 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'schedules', 'messages',
   ];
   for (const fam of legacyFamilies) {
@@ -451,8 +451,8 @@ test('Phase7.19 side-effect audit: gate/policy/shadow have no mutations', () => 
 test('Phase7.19 functional smoke: public_read authz; destructive mutations NOT EXECUTED', () => {
   assert.equal(parity('public_read', buildSubject({ user: {}, actorDoc: null })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — PUT/upload/reset-data/exam-subjects mutation',
-    'NOT EXECUTED — PUT/upload/reset-data/exam-subjects mutation',
+    'NOT EXECUTED - PUT/upload/reset-data/exam-subjects mutation',
+    'NOT EXECUTED - PUT/upload/reset-data/exam-subjects mutation',
   );
 });
 

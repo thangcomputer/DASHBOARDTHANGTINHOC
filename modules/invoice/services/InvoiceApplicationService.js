@@ -25,13 +25,13 @@ class InvoiceApplicationService {
       if (from || to) {
         filter.createdAt = {};
         if (from) filter.createdAt.$gte = new Date(from);
-        if (to)   filter.createdAt.$lte = new Date(to);
+        if (to) filter.createdAt.$lte = new Date(to);
       }
       if (search) {
         const safeSearch = sanitizeRegex(search);
         filter.$or = [
-          { hoTen:    { $regex: safeSearch, $options: 'i' } },
-          { khoaHoc:  { $regex: safeSearch, $options: 'i' } },
+          { hoTen: { $regex: safeSearch, $options: 'i' } },
+          { khoaHoc: { $regex: safeSearch, $options: 'i' } },
           { maHoaDon: { $regex: safeSearch, $options: 'i' } },
         ];
       }
@@ -81,7 +81,7 @@ class InvoiceApplicationService {
     try {
       const invoice = await invoiceRepository.findById(data.id)
         .populate('hocVien', 'name course phone zalo address');
-      
+
       if (!invoice) {
         return { _status: 404, _body: { success: false, message: 'Không tìm thấy hóa đơn' } };
       }
@@ -107,22 +107,22 @@ class InvoiceApplicationService {
 
       // Tạo mã hóa đơn
       const count = await invoiceRepository.count();
-      const now   = new Date();
-      const maHD  = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
+      const now = new Date();
+      const maHD = `HD${now.getFullYear().toString().slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}-${String(count + 1).padStart(4, '0')}`;
 
       const invoice = await invoiceRepository.create({
         maHoaDon: maHD,
-        hocVien:  student._id,
-        hoTen:    student.name,     // Student schema: name (không phải hoTen)
-        khoaHoc:  student.course,   // Student schema: course (không phải khoaHoc)
-        hocPhi:   student.price,    // Student schema: price (không phải hocPhi)
-        ghiChu:   ghiChu || '',
-        status:   'issued',
+        hocVien: student._id,
+        hoTen: student.name,     // Student schema: name (không phải hoTen)
+        khoaHoc: student.course,   // Student schema: course (không phải khoaHoc)
+        hocPhi: student.price,    // Student schema: price (không phải hocPhi)
+        ghiChu: ghiChu || '',
+        status: 'issued',
       });
 
-      // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid — dùng PUT /students/:id/pay.
+      // C4: Tạo HĐ thủ công ≠ thu tiền. Không set student.paid - dùng PUT /students/:id/pay.
 
-      // Sinh PDF nền (uploads/invoices) — không chặn response
+      // Sinh PDF nền (uploads/invoices) - không chặn response
       // skipSideEffects=true khi gọi từ CQRS handler (outbox đảm nhận PDF async)
       if (!data.skipSideEffects) {
         enqueueInvoicePdf({ invoiceId: invoice._id.toString() }).catch((err) => {
@@ -155,11 +155,11 @@ class InvoiceApplicationService {
 
       const pdfBuffer = generateInvoicePDF({
         maHoaDon: invoice.maHoaDon,
-        hoTen:    invoice.hoTen,
-        khoaHoc:  invoice.khoaHoc,
-        hocPhi:   invoice.hocPhi,
+        hoTen: invoice.hoTen,
+        khoaHoc: invoice.khoaHoc,
+        hocPhi: invoice.hocPhi,
         ngayXuat: invoice.ngayXuat || invoice.createdAt,
-        ghiChu:   invoice.ghiChu,
+        ghiChu: invoice.ghiChu,
       });
 
       if (res) {
@@ -181,11 +181,13 @@ class InvoiceApplicationService {
         return { _status: 404, _body: { success: false, message: 'Không tìm thấy hóa đơn' } };
       }
       const job = await enqueueInvoicePdf({ invoiceId: invoice._id.toString() });
-      return { _status: 200, _body: {
-        success: true,
-        message: 'Đã xếp hàng sinh PDF hóa đơn',
-        data: { jobId: job.id, mode: job.mode, maHoaDon: invoice.maHoaDon },
-      } };
+      return {
+        _status: 200, _body: {
+          success: true,
+          message: 'Đã xếp hàng sinh PDF hóa đơn',
+          data: { jobId: job.id, mode: job.mode, maHoaDon: invoice.maHoaDon },
+        }
+      };
     } catch (error) {
       logger.error('[INVOICE] pdf/queue:', error);
       return { _status: 500, _body: { success: false, message: error.message } };
@@ -202,10 +204,12 @@ class InvoiceApplicationService {
 
       const email = (data.body?.email || invoice.hocVien?.email || '').trim();
       if (!email) {
-        return { _status: 400, _body: {
-          success: false,
-          message: 'Học viên chưa có email. Truyền body.email hoặc cập nhật hồ sơ học viên.',
-        } };
+        return {
+          _status: 400, _body: {
+            success: false,
+            message: 'Học viên chưa có email. Truyền body.email hoặc cập nhật hồ sơ học viên.',
+          }
+        };
       }
 
       const job = await enqueueInvoiceEmail({
@@ -213,11 +217,13 @@ class InvoiceApplicationService {
         email,
       });
 
-      return { _status: 200, _body: {
-        success: true,
-        message: `Đã xếp hàng gửi hóa đơn tới ${email}`,
-        data: { jobId: job.id, mode: job.mode, email },
-      } };
+      return {
+        _status: 200, _body: {
+          success: true,
+          message: `Đã xếp hàng gửi hóa đơn tới ${email}`,
+          data: { jobId: job.id, mode: job.mode, email },
+        }
+      };
     } catch (error) {
       logger.error('[INVOICE] email:', error);
       return { _status: 500, _body: { success: false, message: error.message } };
@@ -234,11 +240,13 @@ class InvoiceApplicationService {
       if (!allowHardDeleteFinance()) {
         invoice.status = 'void';
         await invoice.save();
-        return { _status: 200, _body: {
-          success: true,
-          message: `Đã void hóa đơn ${invoice.maHoaDon} (không xóa chứng từ)`,
-          data: invoice,
-        } };
+        return {
+          _status: 200, _body: {
+            success: true,
+            message: `Đã void hóa đơn ${invoice.maHoaDon} (không xóa chứng từ)`,
+            data: invoice,
+          }
+        };
       }
       await invoiceRepository.deleteById(data.id);
       return { _status: 200, _body: { success: true, message: `Đã xóa hóa đơn ${invoice.maHoaDon}` } };

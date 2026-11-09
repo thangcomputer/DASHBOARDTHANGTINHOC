@@ -1,5 +1,5 @@
 /**
- * WebSettingsTab.jsx — Cài đặt Web (Logo, Favicon, Loading Screen)
+ * WebSettingsTab.jsx - Cài đặt Web (Logo, Favicon, Loading Screen)
  * Bố cục gọn: 1 card nhận diện + 1 card loading.
  */
 import { useState, useEffect, useRef } from 'react';
@@ -76,11 +76,10 @@ function FaviconRow({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed text-[11px] font-semibold transition disabled:opacity-50 whitespace-nowrap ${
-              isRose
+            className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed text-[11px] font-semibold transition disabled:opacity-50 whitespace-nowrap ${isRose
                 ? 'border-rose-300 text-rose-700 hover:bg-white'
                 : 'border-slate-300 text-slate-600 hover:bg-white'
-            }`}
+              }`}
           >
             {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
             {uploading ? 'Upload…' : 'Tải lên'}
@@ -89,9 +88,8 @@ function FaviconRow({
             type="url"
             value={value}
             onChange={onChange}
-            className={`flex-1 min-w-0 border rounded-lg px-2 py-1.5 text-[11px] font-mono outline-none bg-white ${
-              isRose ? 'border-rose-100 focus:border-rose-400' : 'border-slate-200 focus:border-blue-400'
-            }`}
+            className={`flex-1 min-w-0 border rounded-lg px-2 py-1.5 text-[11px] font-mono outline-none bg-white ${isRose ? 'border-rose-100 focus:border-rose-400' : 'border-slate-200 focus:border-blue-400'
+              }`}
             placeholder="URL…"
           />
           {value ? (
@@ -99,7 +97,7 @@ function FaviconRow({
               type="button"
               onClick={onClear}
               className="text-[11px] text-red-500 hover:underline flex items-center gap-0.5 flex-shrink-0"
-              title="Xóa — dùng mặc định"
+              title="Xóa - dùng mặc định"
             >
               <X size={12} />
             </button>
@@ -587,11 +585,10 @@ export default function WebSettingsTab() {
               key={ls.id}
               type="button"
               onClick={() => setConfig((prev) => ({ ...prev, loadingStyle: ls.id }))}
-              className={`relative rounded-xl border p-2.5 text-left transition-all ${
-                config.loadingStyle === ls.id
+              className={`relative rounded-xl border p-2.5 text-left transition-all ${config.loadingStyle === ls.id
                   ? 'border-red-500 bg-red-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
-              }`}
+                }`}
             >
               {config.loadingStyle === ls.id && (
                 <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center">

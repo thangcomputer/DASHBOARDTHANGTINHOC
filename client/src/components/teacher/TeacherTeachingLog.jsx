@@ -261,15 +261,14 @@ export default function TeacherTeachingLog({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setTab(selected ? 'all' : id)}
-                  className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition sm:text-xs ${
-                    selected
+                  className={`flex min-h-9 min-w-0 items-center justify-center gap-1 rounded-xl border px-1 text-xs font-extrabold transition sm:text-xs ${selected
                       ? cancelled
                         ? 'border-rose-700 bg-rose-700 text-white shadow-sm'
                         : 'border-red-800 bg-red-800 text-white shadow-sm'
                       : cancelled
                         ? 'border-rose-200 bg-rose-50 text-rose-700'
                         : 'border-slate-200 bg-white text-slate-500'
-                  }`}
+                    }`}
                 >
                   <span>{label}</span>
                   {count !== undefined ? (
@@ -295,11 +294,10 @@ export default function TeacherTeachingLog({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setTab(selected ? 'all' : id)}
-                  className={`flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-extrabold transition sm:text-xs ${
-                    selected
+                  className={`flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-extrabold transition sm:text-xs ${selected
                       ? orange ? 'border-orange-700 bg-orange-700 text-white' : 'border-red-700 bg-red-700 text-white'
                       : orange ? 'border-orange-200 bg-orange-50 text-orange-800' : 'border-red-200 bg-red-50 text-red-700'
-                  }`}
+                    }`}
                 >
                   <span className="truncate">{label}</span>
                   <span className={`min-w-5 rounded-full px-1 text-center text-xs ${selected ? 'bg-white/20 text-white' : orange ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-700'}`}>
@@ -331,7 +329,7 @@ export default function TeacherTeachingLog({
                 const time = sch.endTime
                   ? `${startTime} – ${sch.endTime}`
                   : startTime;
-                const studentName = sch.studentName || sch.student?.name || '—';
+                const studentName = sch.studentName || sch.student?.name || '-';
                 const makeupRequestSent = variant === 'teacher'
                   && Boolean(getMakeupPending(getMakeupKey(sch)));
                 const canOpenAttendance = !awaitingConfirmation
@@ -344,14 +342,12 @@ export default function TeacherTeachingLog({
                 return (
                   <li
                     key={scheduleKey(sch)}
-                    className={`rounded-2xl border p-2.5 sm:p-3 ${
-                      cancelled ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200 bg-white'
-                    }`}
+                    className={`rounded-2xl border p-2.5 sm:p-3 ${cancelled ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200 bg-white'
+                      }`}
                   >
                     <div className="flex items-start gap-2">
-                      <div className={`flex min-h-12 w-[42px] shrink-0 flex-col items-center justify-center rounded-xl ${
-                        cancelled ? 'bg-rose-50' : 'bg-blue-50'
-                      }`}>
+                      <div className={`flex min-h-12 w-[42px] shrink-0 flex-col items-center justify-center rounded-xl ${cancelled ? 'bg-rose-50' : 'bg-blue-50'
+                        }`}>
                         {date ? (
                           <>
                             <span className={`text-xs font-extrabold leading-3 ${cancelled ? 'text-rose-700' : 'text-blue-600'}`}>
@@ -367,7 +363,7 @@ export default function TeacherTeachingLog({
                         <p className="text-xs font-black leading-[17px] text-slate-900 sm:text-sm">{title}</p>
                         <div className="flex items-center gap-1 text-xs leading-[15px] text-slate-500 sm:text-xs">
                           <Clock3 size={13} className="shrink-0" />
-                          <span>{formatScheduleDateVi(sch.date) || '—'} · {time || '—'}</span>
+                          <span>{formatScheduleDateVi(sch.date) || '-'} · {time || '-'}</span>
                         </div>
                         <div className="flex items-center gap-1 text-xs leading-[15px] text-slate-500 sm:text-xs">
                           <Users size={13} className="shrink-0" />
@@ -391,11 +387,10 @@ export default function TeacherTeachingLog({
                           type="button"
                           onClick={() => openAttendanceFor(sch)}
                           disabled={makeupRequestSent}
-                          className={`inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-extrabold ${
-                            makeupRequestSent
+                          className={`inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-extrabold ${makeupRequestSent
                               ? 'cursor-not-allowed bg-slate-100 text-slate-500'
                               : `text-white ${kind === 'overdue_attendance' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-700 hover:bg-red-800'}`
-                          }`}
+                            }`}
                           title={makeupRequestSent
                             ? 'Yêu cầu đã gửi Admin'
                             : kind === 'overdue_attendance' ? 'Mở yêu cầu điểm danh bù' : 'Mở hồ sơ học viên để điểm danh'}
@@ -440,8 +435,8 @@ export default function TeacherTeachingLog({
               type="button"
               onClick={() => setTab(item.id)}
               className={`px-3 h-9 rounded-xl text-xs sm:text-xs font-bold transition ${tab === item.id
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50'
                 }`}
             >
               {item.label}
@@ -477,8 +472,8 @@ export default function TeacherTeachingLog({
               const attendanceLabel = makeupRequestSent
                 ? 'Đã gửi Admin'
                 : kind === 'overdue_attendance'
-                ? 'Điểm danh bù'
-                : 'Điểm danh';
+                  ? 'Điểm danh bù'
+                  : 'Điểm danh';
               const studentNote = String(sch.studentNote || '').trim();
               return (
                 <li
@@ -508,15 +503,14 @@ export default function TeacherTeachingLog({
                         type="button"
                         onClick={() => openAttendanceFor(sch)}
                         disabled={makeupRequestSent}
-                        className={`inline-flex items-center gap-1 text-xs font-black tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 ${
-                          makeupRequestSent ? 'cursor-not-allowed text-slate-500' : `hover:underline ${tone}`
-                        }`}
+                        className={`inline-flex items-center gap-1 text-xs font-black tracking-wide px-1.5 py-0.5 rounded-md underline-offset-2 ${makeupRequestSent ? 'cursor-not-allowed text-slate-500' : `hover:underline ${tone}`
+                          }`}
                         title={
                           makeupRequestSent
                             ? 'Yêu cầu đã gửi Admin'
                             : kind === 'overdue_attendance'
-                            ? 'Mở yêu cầu điểm danh bù'
-                            : `Mở hồ sơ học viên — ${attendanceLabel}`
+                              ? 'Mở yêu cầu điểm danh bù'
+                              : `Mở hồ sơ học viên - ${attendanceLabel}`
                         }
                       >
                         {makeupRequestSent ? 'Đã gửi Admin' : meta.shortLabel || meta.label}

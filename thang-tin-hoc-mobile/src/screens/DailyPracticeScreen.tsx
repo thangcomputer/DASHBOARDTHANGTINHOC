@@ -5,7 +5,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronRight, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Globe,
+  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Globe,
   HelpCircle, Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
   ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, X, XCircle, Zap,
   type LucideIcon,
@@ -14,7 +14,7 @@ import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppStackParamList } from '../navigation/types';
-import { AppHeader, AppScreen } from '../components/ui';
+import { AppScreen } from '../components/ui';
 import { Mascot, type MascotMood } from '../components/dailyPractice/Mascot';
 import { DropletMark, PathITBackdrop, PathMascotBuddy, PathSnakeConnector, StageBuddiesOverlay } from '../components/dailyPractice/PathDecor';
 import { DragProvider } from '../components/dailyPractice/DragKit';
@@ -26,7 +26,7 @@ import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/v
 import { useAuth } from '../app/AuthContext';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from '../components/dailyPractice/Questions';
 import { useGameSounds, type GameSound } from '../components/dailyPractice/useGameSounds';
-import { getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
+import { getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
 import { getMobileImageSource } from '../services/apiClient';
 import {
   DAILY_PRACTICE_STATS_EVENT, DP_DIFFICULTIES, DP_PLAN_XP_CAP, DP_PLANS, DP_TOPIC_COLORS, DP_TYPES,
@@ -35,7 +35,7 @@ import {
   type DpNodeState, type DpAnswer, type DpAnswerResult, type DpDifficulty, type DpNextStep, type DpPathNode, type DpPathResult, type DpPathStep, type DpPathUnit, type DpPathVideo, type DpPlanType, type DpStepKey,
   type DpRelatedLesson, type DpReveal, type DpSession, type DpStats, type DpSummary, type DpTopic, type DpTopicPath, type DpXpCheckout, type DpXpPack,
 } from '../services/dailyPracticeApi';
-import { colors, spacing } from '../theme/tokens';
+import { colors, radius, spacing } from '../theme/tokens';
 
 const TOPIC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen, monitor: Monitor, 'file-text': FileText, sheet: Sheet, presentation: Presentation, globe: Globe,
@@ -87,10 +87,11 @@ function useShake(trigger: unknown) {
 
 // ── Màn chọn ─────────────────────────────────────────────────────────────────
 const MODES: Array<{ id: PracticeMode; label: string; icon: LucideIcon }> = [
-  { id: 'path', label: 'Theo lộ trình', icon: Route },
+  { id: 'path', label: 'Lộ trình', icon: Route },
   { id: 'free', label: 'Luyện tự do', icon: Shuffle },
+  { id: 'goal', label: 'Mục tiêu', icon: Target },
 ];
-type PracticeMode = 'path' | 'free';
+type PracticeMode = 'path' | 'free' | 'goal';
 
 const GOAL_KEY_PREFIX = 'daily_practice_goal_v1';
 const WEEK_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -106,15 +107,15 @@ function DailyPracticeGoalPanel({
   onWatchVideo?: () => void;
   onGoPractice?: () => void;
 }) {
-  const storageKey = `${GOAL_KEY_PREFIX}:${userId || 'guest'}`;
+  const storageKey = `${GOAL_KEY_PREFIX}:${userId || 'guest'} `;
   const [goal, setGoal] = useState<{ dailyTarget: number; pace: 'self' | 'guided' }>({ dailyTarget: 1, pace: 'self' });
   const [goalData, setGoalData] = useState<LearningGoalData | null>(null);
 
   useEffect(() => {
-    getLearningGoal().then(setGoalData).catch(() => {});
+    getLearningGoal().then(setGoalData).catch(() => { });
     const sub1 = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (next: LearningGoalData) => {
       if (next) setGoalData(next);
-      else getLearningGoal().then(setGoalData).catch(() => {});
+      else getLearningGoal().then(setGoalData).catch(() => { });
     });
     const sub2 = DeviceEventEmitter.addListener(STUDY_MINUTE_EVENT, (res: { todayMinutes?: number }) => {
       const todayMinutes = Number(res?.todayMinutes);
@@ -177,8 +178,8 @@ function DailyPracticeGoalPanel({
       <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FEF2F2' }]}>
-              <Target size={17} color="#DC2626" />
+            <View style={[styles.goalIconBox, { backgroundColor: colors.brandSoft }]}>
+              <Target size={17} color={colors.brand} />
             </View>
             <View>
               <Text style={styles.goalCardTitle}>Mục tiêu hôm nay</Text>
@@ -186,17 +187,32 @@ function DailyPracticeGoalPanel({
             </View>
           </View>
           <View style={[styles.goalBadge, todayProgress >= 100 ? { backgroundColor: '#ECFDF5' } : { backgroundColor: '#F1F5F9' }]}>
-            <Text style={[styles.goalBadgeText, { color: todayProgress >= 100 ? '#047857' : '#334155' }]}>{`${todayProgress}%`}</Text>
+            <Text style={[styles.goalBadgeText, { color: todayProgress >= 100 ? '#047857' : '#334155' }]}>{`${todayProgress}% `}</Text>
           </View>
         </View>
 
         <View style={[styles.pathTrack, { height: 8 }]}>
-          <View style={[styles.pathFill, { width: `${todayProgress}%`, backgroundColor: todayProgress >= 100 ? '#10B981' : '#EF4444' }]} />
+          <View style={[styles.pathFill, { width: `${todayProgress}% `, backgroundColor: todayProgress >= 100 ? '#10B981' : '#EF4444' }]} />
         </View>
 
         <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
-          <Text style={[styles.goalInfoTitle, { color: '#1E3A8A' }]}>Kế hoạch học tập</Text>
-          <Text style={[styles.goalInfoSub, { color: '#1D4ED8' }]}>Chọn số bài mỗi ngày để xây dựng thói quen học tập đều đặn.</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.goalInfoTitle, { color: '#1E3A8A' }]}>Kế hoạch học tập</Text>
+            <Pressable
+              onPress={() => DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT)}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand }}>
+                {goalData?.goal?.expired ? 'Đặt lại mục tiêu' : goalData?.goal ? 'Đổi mục tiêu' : 'Đặt mục tiêu'}
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.goalInfoSub, { color: '#1D4ED8', marginTop: 2 }]}>
+            {goalData?.goal
+              ? `Mục tiêu giờ học: ${goalData.goal.hoursPerDay} giờ/ngày · ${periodLabel(goalData.goal.period)}${goalData.goal.expired ? ' (Đã kết thúc)' : ''}`
+              : 'Chọn số bài mỗi ngày để xây dựng thói quen học tập đều đặn.'}
+          </Text>
         </View>
 
         <View style={{ gap: 6 }}>
@@ -225,14 +241,14 @@ function DailyPracticeGoalPanel({
           <Calendar size={15} color="#64748B" />
           <Text style={styles.goalFooterText}>
             {'Đã hoàn thành '}
-            <Text style={{ fontWeight: '800', color: '#0F172A' }}>{`${todaySessions}/${goal.dailyTarget}`}</Text>
+            <Text style={{ fontWeight: '600', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text >
             {' lượt bài hôm nay'}
-          </Text>
-        </View>
-      </View>
+          </Text >
+        </View >
+      </View >
 
-      {/* Nhiệm vụ hôm nay — Đồng bộ Web & Image 1 + 6 */}
-      <View style={styles.goalCard}>
+      {/* Nhiệm vụ hôm nay - Đồng bộ Web & Image 1 + 6 */}
+      < View style={styles.goalCard} >
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
             <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB' }]}>
@@ -303,10 +319,10 @@ function DailyPracticeGoalPanel({
         <Text style={styles.missionFooterText}>
           {`Cả ${periodLabel(period)}: ${periodQuestions} câu · ${periodVideos} video`}
         </Text>
-      </View>
+      </View >
 
       {/* Chuỗi luyện tập */}
-      <View style={styles.goalCard}>
+      < View style={styles.goalCard} >
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
             <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED' }]}>
@@ -319,7 +335,7 @@ function DailyPracticeGoalPanel({
           </View>
           <View style={styles.inline}>
             <Flame size={14} color="#EA580C" fill="#FB923C" />
-            <Text style={{ fontSize: 13, fontWeight: '800', color: '#EA580C' }}>{`${streak} ngày`}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#EA580C' }}>{`${streak} ngày`}</Text>
           </View>
         </View>
 
@@ -339,14 +355,14 @@ function DailyPracticeGoalPanel({
                       : { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
                 ]}
               >
-                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
                 <Flame size={15} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
               </View>
             );
           })}
         </View>
-      </View>
-    </View>
+      </View >
+    </View >
   );
 }
 
@@ -419,7 +435,7 @@ function HomeView({
     : stats?.streakState === 'lost'
       ? `Cùng bắt đầu lại nào!${stats.lostStreak ? ` Bạn vừa lỡ chuỗi ${stats.lostStreak} ngày` : ''}`
       : stats?.streakState === 'at_risk'
-        ? `Duy trì chuỗi học ${stats.streak} ngày — hôm nay bạn chưa luyện tập!`
+        ? `Duy trì chuỗi học ${stats.streak} ngày - hôm nay bạn chưa luyện tập!`
         : 'Chào bạn! Cùng luyện tập vài phút để nâng cao kỹ năng nhé.';
 
   const heroSub = mode === 'path'
@@ -427,163 +443,103 @@ function HomeView({
     : 'Ôn tập trắc nghiệm tự do không tính XP, giúp bạn củng cố kiến thức bất cứ lúc nào.';
 
   return (
-    <View style={styles.gapLg}>
-      {/* Tiêu đề trang giống Web App */}
-      <View style={{ gap: 2 }}>
-        <Text style={styles.pageEyebrow}>LỘ TRÌNH KỸ NĂNG · THẮNG TIN HỌC</Text>
-        <Text style={styles.pageMainTitle}>Luyện tập hằng ngày</Text>
-        <Text style={styles.muted}>
-          Luyện theo từng chặng để củng cố kiến thức và tích lũy XP. Chế độ luyện tự do giúp bạn ôn tập nhanh mọi lúc.
-        </Text>
+    <View style={styles.gapMd}>
+      {/* Top Gamification Bar: Title + Streak Pill + XP Pill */}
+      <View style={styles.topGamifiedBar}>
+        <View style={styles.topTitleRow}>
+          <Sparkles size={18} color={colors.brand} />
+          <Text style={styles.topPageTitle}>Luyện tập</Text>
+        </View>
+        <View style={styles.topBadgesRow}>
+          <View style={styles.streakBadgePill}>
+            <Flame size={15} color="#EA580C" fill="#FB923C" />
+            <Text style={styles.streakBadgeText}>{`${stats?.streak || 0} ngày`}</Text>
+          </View>
+          <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.xpBadgePill} accessibilityRole="button">
+            <Zap size={14} color="#D97706" fill="#F59E0B" />
+            <Text style={styles.xpBadgeText}>{`${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP`}</Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* Dark Hero Banner đồng bộ DailyPracticeHero.jsx */}
-      <View style={[styles.heroDark, isWide && { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-        <View style={[styles.heroDarkLeft, isWide && { flex: 1, paddingRight: 16 }]}>
-          <View style={styles.heroMascotWrap}>
-            <Mascot mood={mascotMood} size={96} />
-          </View>
-          <View style={styles.flex}>
-            <View style={styles.heroStreakPill}>
-              <Flame size={13} color="#FDBA74" />
-              <Text style={styles.heroStreakPillText}>
-                {`Chuỗi luyện tập · ${stats?.streak || 0} ngày`}
-              </Text>
-              {!stats?.playedToday && (stats?.todayPlayers || 0) > 0 ? (
-                <Text style={styles.heroStreakSocialText}>{`· ${stats?.todayPlayers} bạn đã luyện`}</Text>
-              ) : null}
+      {/* Thẻ Mascot động viên chuẩn phong cách DewSkill - gọn gàng, tươi sáng */}
+      <View style={styles.mascotMotivationCard}>
+        <View style={styles.mascotWrapCompact}>
+          <Mascot mood={mascotMood} size={54} />
+        </View>
+        <View style={styles.mascotContent}>
+          <Text style={styles.mascotHeadline} numberOfLines={1}>
+            {stats?.playedToday ? 'Đã hoàn thành hôm nay 🎉' : 'Tiếp tục chuỗi luyện tập 🔥'}
+          </Text>
+          <Text style={styles.mascotSub} numberOfLines={1}>
+            {`${activeTopicTitle} · ${totalUnits ? `${completedUnits}/${totalUnits} chặng` : 'Khám phá ngay'}`}
+          </Text>
+          {totalUnits > 0 ? (
+            <View style={styles.mascotProgressTrack}>
+              <View style={[styles.mascotProgressFill, { width: `${Math.min(100, Math.round((completedUnits / totalUnits) * 100))}%` }]} />
             </View>
-            <Text style={styles.heroDarkTitle}>{heroHeadline}</Text>
-            <Text style={styles.heroDarkSub}>{heroSub}</Text>
-            <Pressable
-              onPress={() => { play('tap'); onQuickStart(activePathTopic); }}
-              disabled={starting}
-              style={styles.heroWhiteBtn}
-              accessibilityRole="button"
-            >
-              {starting ? <ActivityIndicator size="small" color="#B91C1C" /> : <Play size={16} color="#B91C1C" fill="#B91C1C" />}
-              <Text style={styles.heroWhiteBtnText}>
-                {stats?.playedToday
-                  ? 'Tiếp tục luyện tập'
-                  : mode === 'path'
-                    ? 'Xem lộ trình bên dưới'
-                    : 'Bắt đầu luyện tập'}
-              </Text>
-            </Pressable>
-          </View>
+          ) : null}
         </View>
-
-        {stats ? (
-          <View style={[styles.heroDarkStatsCol, isWide && { width: 320 }]}>
-            <View style={styles.heroDarkStatsGrid}>
-              <View style={styles.heroGlassBox}>
-                <View style={styles.inline}>
-                  <Flame size={15} color="#FB923C" />
-                  <Text style={styles.heroGlassVal}>{stats.streak || 0}</Text>
-                </View>
-                <Text style={styles.heroGlassLbl}>Ngày liên tiếp</Text>
-                <Text style={styles.heroGlassMeta}>{`Kỷ lục ${stats.bestStreak || 0}`}</Text>
-              </View>
-              <View style={styles.heroGlassBox}>
-                <View style={styles.inline}>
-                  <Target size={15} color="#34D399" />
-                  <Text style={styles.heroGlassVal}>{`+${stats.todayXp || 0}`}</Text>
-                </View>
-                <Text style={styles.heroGlassLbl}>XP luyện hôm nay</Text>
-                <Text style={styles.heroGlassMeta}>{`${stats.todaySessions || 0} lượt hoàn thành`}</Text>
-              </View>
-              <View style={styles.heroGlassBox}>
-                <View style={styles.inline}>
-                  <Zap size={15} color="#FBBF24" />
-                  <Text style={styles.heroGlassVal}>{(stats.xpTotal || 0).toLocaleString('vi-VN')}</Text>
-                </View>
-                <Text style={styles.heroGlassLbl}>XP luyện</Text>
-                <Text style={styles.heroGlassMeta}>{`Mỗi ngày bù về ${stats.dailyAllowanceXp ?? 50} XP`}</Text>
-              </View>
-            </View>
-            <Text style={styles.heroDarkCaption}>
-              {'XP luyện để chơi và mở gợi ý. '}
-              {(stats.purchasedXp || 0) > 0 ? `Trong đó XP đã mua: ${(stats.purchasedXp || 0).toLocaleString('vi-VN')}. ` : ''}
-              {'XP học bài nằm ở thẻ Học bài.'}
-            </Text>
-          </View>
-        ) : null}
+        <Pressable
+          onPress={() => { play('tap'); onQuickStart(activePathTopic); }}
+          disabled={starting}
+          style={styles.mascotQuickCta}
+          accessibilityRole="button"
+        >
+          {starting ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+              <Text style={styles.mascotQuickCtaText}>Luyện</Text>
+            </>
+          )}
+        </Pressable>
       </View>
 
-      {/* 4 Quick Stat Cards đồng bộ DailyPracticeQuickStats.jsx */}
-      <View style={styles.quickStatGrid}>
-        <View style={styles.quickStatCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#F0F9FF' }]}><BookOpen size={18} color="#0284C7" /></View>
-          <View style={styles.flex}>
-            <Text style={styles.statLabel}>Môn / chủ đề</Text>
-            <Text numberOfLines={1} style={styles.quickStatValue}>{activeTopicTitle}</Text>
-          </View>
-        </View>
-        <View style={styles.quickStatCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#F5F3FF' }]}><Route size={18} color="#7C3AED" /></View>
-          <View style={styles.flex}>
-            <Text style={styles.statLabel}>Tiến độ lộ trình</Text>
-            <Text numberOfLines={1} style={styles.quickStatValue}>{totalUnits ? `${completedUnits}/${totalUnits} chặng` : 'Đang cập nhật'}</Text>
-          </View>
-        </View>
-        <View style={styles.quickStatCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#FFF7ED' }]}><Flame size={18} color="#EA580C" /></View>
-          <View style={styles.flex}>
-            <Text style={styles.statLabel}>Chuỗi hiện tại</Text>
-            <Text numberOfLines={1} style={styles.quickStatValue}>{`${stats?.streak || 0} ngày`}</Text>
-          </View>
-        </View>
-        <View style={styles.quickStatCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#FFFBEB' }]}><Trophy size={18} color="#D97706" /></View>
-          <View style={styles.flex}>
-            <Text style={styles.statLabel}>XP luyện</Text>
-            <Text numberOfLines={1} style={styles.quickStatValue}>{`${(stats?.xpTotal || 0).toLocaleString('vi-VN')} XP`}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Banner hết XP luyện tập — chỉ hiện khi xpEmpty hoặc xpTotal <= 0 giống Web */}
+      {/* Banner hết XP luyện tập - chỉ hiện khi xpEmpty hoặc xpTotal <= 0 */}
       {stats && (stats.xpEmpty || (stats.xpTotal || 0) <= 0) ? (
         <View style={styles.xpEmptyBanner}>
           <View style={[styles.inline, { flex: 1 }]}>
             <View style={styles.xpEmptyIconWrap}>
-              <Zap size={20} color="#FFFFFF" />
+              <Zap size={18} color="#FFFFFF" />
             </View>
             <View style={styles.flex}>
-              <Text style={styles.xpEmptyTitle}>Bạn đã hết XP luyện hôm nay</Text>
+              <Text style={styles.xpEmptyTitle}>Hết XP luyện tập</Text>
               <Text style={styles.xpEmptyDesc}>
-                {`Mỗi ngày hệ thống tự bù về ${stats.dailyAllowanceXp ?? 50} XP lúc 0h. Muốn luyện tiếp ngay, bạn có thể mua thêm gói XP.`}
+                {`Hệ thống tự bù về ${stats.dailyAllowanceXp ?? 50} XP lúc 0h hằng ngày.`}
               </Text>
             </View>
           </View>
           <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.xpEmptyBuyBtn} accessibilityRole="button">
-            <ShoppingBag size={16} color="#FFFFFF" />
+            <ShoppingBag size={14} color="#FFFFFF" />
             <Text style={styles.xpEmptyBuyBtnText}>Mua XP</Text>
           </Pressable>
         </View>
       ) : null}
 
-      {/* Layout 2 cột trên màn hình rộng (trái: Lộ trình / Tự do, phải: Mục tiêu & Nhiệm vụ) */}
-      <View style={isWide ? { flexDirection: 'row', alignItems: 'flex-start', gap: 20 } : styles.gapLg}>
-        <View style={[styles.gapMd, isWide && { flex: 8, minWidth: 0 }]}>
-          <View style={styles.modeTabs} accessibilityRole="tablist">
-            {MODES.map(({ id, label, icon: Icon }) => {
-              const active = mode === id;
-              return (
-                <Pressable
-                  key={id}
-                  onPress={() => { play('tap'); onModeChange(id); }}
-                  style={[styles.modeTab, active && styles.modeTabActive]}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                >
-                  <Icon size={16} color={active ? '#DC2626' : '#64748B'} />
-                  <Text style={[styles.modeTabText, active && { color: '#DC2626' }]}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+      {/* Segmented Mode Tabs: Lộ trình | Luyện tự do | Mục tiêu */}
+      <View style={styles.modeTabs} accessibilityRole="tablist">
+        {MODES.map(({ id, label, icon: Icon }) => {
+          const active = mode === id;
+          return (
+            <Pressable
+              key={id}
+              onPress={() => { play('tap'); onModeChange(id); }}
+              style={[styles.modeTab, active && styles.modeTabActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <Icon size={15} color={active ? colors.brandDark : colors.muted} />
+              <Text style={[styles.modeTabText, active && styles.modeTabTextActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
+      {/* Nội dung chính tương ứng từng Tab */}
+      <View style={isWide ? { flexDirection: 'row', alignItems: 'flex-start', gap: 20 } : undefined}>
+        <View style={[styles.gapMd, isWide && { flex: 8, minWidth: 0 }]}>
           {mode === 'path' ? (
             <PathView
               topics={pathTopics}
@@ -613,7 +569,7 @@ function HomeView({
           {mode === 'free' && topics.length ? (
             <View style={[styles.card, { gap: 14 }]}>
               <View style={styles.freeModeNotice}>
-                <Text style={styles.freeModeNoticeBold}>Chế độ luyện tự do — Ôn tập không tính XP: </Text>
+                <Text style={styles.freeModeNoticeBold}>Chế độ luyện tự do - Ôn tập không tính XP: </Text>
                 <Text style={styles.freeModeNoticeText}>
                   Chỉ gồm câu hỏi trắc nghiệm để bạn ôn nhanh. Không cộng và không trừ XP; muốn nhận XP và mở khóa bài học hãy chuyển sang tab Theo lộ trình.
                 </Text>
@@ -670,24 +626,43 @@ function HomeView({
               </Pressable>
             </View>
           ) : null}
+
+          {mode === 'goal' ? (
+            <DailyPracticeGoalPanel
+              stats={stats}
+              userId={user?.id}
+              onWatchVideo={() => {
+                play('tap');
+                onModeChange('path');
+                setContinueVideo(true);
+              }}
+              onGoPractice={() => {
+                play('tap');
+                onModeChange('path');
+                onQuickStart(activePathTopic);
+              }}
+            />
+          ) : null}
         </View>
 
-        <View style={isWide ? { flex: 4, minWidth: 290 } : undefined}>
-          <DailyPracticeGoalPanel
-            stats={stats}
-            userId={user?.id}
-            onWatchVideo={() => {
-              play('tap');
-              onModeChange('path');
-              setContinueVideo(true);
-            }}
-            onGoPractice={() => {
-              play('tap');
-              onModeChange('path');
-              onQuickStart(activePathTopic);
-            }}
-          />
-        </View>
+        {isWide && mode !== 'goal' ? (
+          <View style={{ flex: 4, minWidth: 290 }}>
+            <DailyPracticeGoalPanel
+              stats={stats}
+              userId={user?.id}
+              onWatchVideo={() => {
+                play('tap');
+                onModeChange('path');
+                setContinueVideo(true);
+              }}
+              onGoPractice={() => {
+                play('tap');
+                onModeChange('path');
+                onQuickStart(activePathTopic);
+              }}
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -696,9 +671,9 @@ function HomeView({
 // ── Lộ trình ─────────────────────────────────────────────────────────────────
 const STEP_LABELS: Partial<Record<DpStepKey, string>> = { learn: 'Dễ', practice: 'Vừa', challenge: 'Khó' };
 const STEP_HINTS: Partial<Record<DpStepKey, string>> = {
-  learn: 'Câu hỏi mức dễ — làm xong mới mở cấp Vừa',
-  practice: 'Câu hỏi mức vừa — làm xong mới mở cấp Khó',
-  challenge: 'Câu hỏi mức khó — qua cấp này để mở chặng tiếp theo',
+  learn: 'Câu hỏi mức dễ - làm xong mới mở cấp Vừa',
+  practice: 'Câu hỏi mức vừa - làm xong mới mở cấp Khó',
+  challenge: 'Câu hỏi mức khó - qua cấp này để mở chặng tiếp theo',
 };
 
 /** Danh sách video của chặng (unit + từng cấp) để hiện & mở video. */
@@ -818,7 +793,8 @@ function StepNode({ step, isNext, unitProgress, color, selected, onPress }: {
         <Animated.Text style={[styles.nodeBubble, { color: color.to, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }] }]}>
           BẮT ĐẦU
         </Animated.Text>
-      ) : null}
+      ) : null
+      }
       <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
         {isNext ? <ProgressRing size={box} progress={unitProgress} color={color.from} /> : null}
         <Pressable
@@ -842,13 +818,13 @@ function StepNode({ step, isNext, unitProgress, color, selected, onPress }: {
           <Icon size={big ? 30 : 26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={2.8} />
           {step.state === 'completed' && big ? <View style={styles.nodeCrown}><Crown size={20} color="#F59E0B" fill="#FCD34D" /></View> : null}
         </Pressable>
-      </View>
+      </View >
       <Text style={[styles.nodeLabel, locked && { color: '#94A3B8' }]}>{STEP_LABELS[step.key] || step.label}</Text>
-    </View>
+    </View >
   );
 }
 
-/** Nút video của chặng (🎬) — bấm mở popup trình phát Thắng Tin Học. */
+/** Nút video của chặng (🎬) - bấm mở popup trình phát Thắng Tin Học. */
 function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { from: string; to: string }; onPress: () => void }) {
   const locked = video.state === 'locked';
   return (
@@ -882,7 +858,7 @@ function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { fro
   );
 }
 
-/** Một nút trên lộ trình — popover 3 nấc Dễ / Vừa / Khó (hoặc nút Học). */
+/** Một nút trên lộ trình - popover 3 nấc Dễ / Vừa / Khó (hoặc nút Học). */
 function PracticeHubNode({ node, color, isNext, selected, onPress }: {
   node: DpPathNode;
   color: { from: string; to: string };
@@ -915,7 +891,8 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
         <Animated.Text style={[styles.nodeBubble, { color: color.to, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }] }]}>
           BẮT ĐẦU
         </Animated.Text>
-      ) : null}
+      ) : null
+      }
       <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
         {isNext ? <ProgressRing size={box} progress={progress} color={color.from} /> : null}
         <Pressable
@@ -956,9 +933,9 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
             ))}
           </View>
         </Pressable>
-      </View>
+      </View >
       <Text style={[styles.nodeLabel, locked && { color: '#94A3B8' }]}>{node.label}</Text>
-    </View>
+    </View >
   );
 }
 
@@ -978,7 +955,7 @@ function LevelHubPopover({ node, color, starting, onClose, onStartStep }: {
       <View style={[styles.popoverArrow, { backgroundColor: color.from }]} />
       <Pressable onPress={onClose} style={styles.popoverClose} accessibilityRole="button" accessibilityLabel="Đóng"><X size={16} color="rgba(255,255,255,0.85)" /></Pressable>
       <Text style={styles.popoverTitle}>{node.label}</Text>
-      <Text style={styles.popoverMeta}>Làm lần lượt 3 nấc — xong nấc trước mới mở nấc sau</Text>
+      <Text style={styles.popoverMeta}>Làm lần lượt 3 nấc - xong nấc trước mới mở nấc sau</Text>
       {(node.levels || []).map((step, index) => {
         const locked = step.state === 'locked';
         const done = step.state === 'completed';
@@ -1137,7 +1114,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
           setPassedKeys(new Set(res.passedCheckIds));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { alive = false; };
   }, [unit.id]);
 
@@ -1364,7 +1341,7 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
                       {cheer ? (
                         <View style={{ alignItems: 'center', padding: 14, gap: 6 }}>
                           <Mascot mood="celebrate" size={60} />
-                          <Text style={{ fontSize: 15, fontWeight: '900', color: '#059669' }}>Chính xác! +5 XP</Text>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: '#059669' }}>Chính xác! +5 XP</Text>
                           <Text style={{ fontSize: 12, color: '#64748B' }}>Đang tiếp tục video…</Text>
                         </View>
                       ) : (
@@ -1587,7 +1564,7 @@ function CourseFinaleMonument({ current, play, onOpenCeremony }: {
       <Text style={styles.finaleDoneTitle}>
         {courseDone
           ? `Chúc mừng hoàn thành khóa học ${current.topic.name}!`
-          : `Cúp Vàng Vinh Danh — ${current.topic.name}`}
+          : `Cúp Vàng Vinh Danh - ${current.topic.name}`}
       </Text>
       <Text style={styles.finaleDoneSub}>
         {courseDone
@@ -1930,7 +1907,7 @@ function PathView({
                 </View>
                 <Text style={[styles.muted, { marginTop: 6 }]}>
                   {current.next
-                    ? `Tiếp theo: Chặng ${nextUnit?.index} · ${current.next.unitTitle} — ${current.next.stepLabel}`
+                    ? `Tiếp theo: Chặng ${nextUnit?.index} · ${current.next.unitTitle} - ${current.next.stepLabel}`
                     : 'Bạn đã hoàn thành toàn bộ lộ trình chủ đề này 🎉 Luyện lại bất kỳ bước nào để giữ phong độ.'}
                 </Text>
               </View>
@@ -2059,41 +2036,48 @@ function PathView({
             </View>
           </View>
         </>
-      ) : null}
-      {trophyCeremonyOpen && current ? (
-        <CourseTrophyCeremonyModal
-          current={current}
-          play={play}
-          onClose={() => setTrophyCeremonyOpen(false)}
-        />
-      ) : null}
-      {lessonOpen ? (
-        <PathLessonModal
-          unit={lessonOpen.unit}
-          step={lessonOpen.step}
-          color={unitColor(lessonOpen.unit.index)}
-          play={play}
-          onClose={() => setLessonOpen(null)}
-          onCompleted={onPathChanged}
-          onOpenVideo={(videoId) => setVideoOpen({ unit: lessonOpen.unit, videoId })}
-        />
-      ) : null}
-      {videoOpen ? (
-        <PathVideoModal
-          unit={videoOpen.unit}
-          initialVideoId={videoOpen.videoId}
-          color={unitColor(videoOpen.unit.index)}
-          userId={String(user?.id || '')}
-          play={play}
-          onClose={() => setVideoOpen(null)}
-          onWatched={async (videoId) => {
-            await dailyPracticeApi.videoWatched(videoOpen.unit.id, videoId);
-            onPathChanged();
-          }}
-          onOpenLesson={watch}
-        />
-      ) : null}
-    </View>
+      ) : null
+      }
+      {
+        trophyCeremonyOpen && current ? (
+          <CourseTrophyCeremonyModal
+            current={current}
+            play={play}
+            onClose={() => setTrophyCeremonyOpen(false)}
+          />
+        ) : null
+      }
+      {
+        lessonOpen ? (
+          <PathLessonModal
+            unit={lessonOpen.unit}
+            step={lessonOpen.step}
+            color={unitColor(lessonOpen.unit.index)}
+            play={play}
+            onClose={() => setLessonOpen(null)}
+            onCompleted={onPathChanged}
+            onOpenVideo={(videoId) => setVideoOpen({ unit: lessonOpen.unit, videoId })}
+          />
+        ) : null
+      }
+      {
+        videoOpen ? (
+          <PathVideoModal
+            unit={videoOpen.unit}
+            initialVideoId={videoOpen.videoId}
+            color={unitColor(videoOpen.unit.index)}
+            userId={String(user?.id || '')}
+            play={play}
+            onClose={() => setVideoOpen(null)}
+            onWatched={async (videoId) => {
+              await dailyPracticeApi.videoWatched(videoOpen.unit.id, videoId);
+              onPathChanged();
+            }}
+            onOpenLesson={watch}
+          />
+        ) : null
+      }
+    </View >
   );
 }
 
@@ -2154,7 +2138,7 @@ function PathResultCard({ result }: { result: DpPathResult }) {
   );
 }
 
-// ── Mua thêm XP (VietQR + Polling + Sandbox — đồng bộ BuyXpModal.jsx) ────────
+// ── Mua thêm XP (VietQR + Polling + Sandbox - đồng bộ BuyXpModal.jsx) ────────
 const DEFAULT_XP_PACKS: DpXpPack[] = [
   { id: 'xp_100', xp: 100, priceVnd: 10000, label: '100 XP · 10.000đ' },
   { id: 'xp_300', xp: 300, priceVnd: 25000, label: '300 XP · 25.000đ' },
@@ -2189,7 +2173,7 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
             onPurchased();
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 3000);
     return () => clearInterval(timer);
   }, [sessionKey, onPurchased, paid, play]);
@@ -2432,7 +2416,7 @@ function QuitConfirm({ stats, answered, total, busy, play, onStay, onQuit }: {
             {left > 0 ? (
               <View style={styles.quitProgress}>
                 <Zap size={13} color="#F59E0B" fill="#FCD34D" />
-                <Text style={styles.quitProgressText}>{`Đã làm ${answered}/${total} câu — chỉ còn ${left} câu nữa thôi!`}</Text>
+                <Text style={styles.quitProgressText}>{`Đã làm ${answered}/${total} câu - chỉ còn ${left} câu nữa thôi!`}</Text>
               </View>
             ) : null}
           </View>
@@ -2780,6 +2764,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
   /** Điều hướng đến màn mua gói khi free hết XP. */
   onBuyXp: () => void;
 }) {
+  const [showReview, setShowReview] = useState(false);
   const pathResult = summary.path || null;
   const nextStep = pathResult?.passed ? pathResult.next : null;
   const good = summary.stars >= 2;
@@ -2826,7 +2811,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
         </View>
       </View>
 
-      {/* Banner hết XP free — chặn mở bài mới, kích thích mua gói */}
+      {/* Banner hết XP free - chặn mở bài mới, kích thích mua gói */}
       {summary.xpCapReached ? (
         <View style={styles.resultCapBanner}>
           <View style={styles.xpCapBannerTop}>
@@ -2849,15 +2834,43 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
       {summary.relatedLesson ? <RelatedLessonCard lesson={summary.relatedLesson} /> : null}
 
       {summary.review.length ? (
-        <View style={styles.card}>
-          <View style={styles.inline}><Sparkles size={16} color="#F59E0B" /><Text style={styles.sectionTitle}>Xem lại câu chưa đúng</Text></View>
-          {summary.review.map((item) => (
-            <View key={item.id} style={styles.reviewItem}>
-              <Text style={styles.reviewPrompt}>{item.prompt}</Text>
-              <Text style={styles.reviewAnswer}>{`✓ ${item.correctAnswer.text}`}</Text>
-              {item.explanation ? <Text style={styles.reviewExplain}>{item.explanation}</Text> : null}
+        <View style={styles.reviewAccordionCard}>
+          <Pressable
+            onPress={() => setShowReview((prev) => !prev)}
+            style={({ pressed }) => [styles.reviewToggleBtn, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showReview }}
+          >
+            <View style={styles.reviewToggleLeft}>
+              <View style={styles.reviewToggleIconBox}>
+                <Sparkles size={16} color="#D97706" />
+              </View>
+              <View style={styles.reviewToggleTitleWrap}>
+                <Text style={styles.reviewToggleTitle}>Xem lại câu chưa đúng</Text>
+                <Text style={styles.reviewToggleSub}>
+                  {showReview
+                    ? `Đang hiện ${summary.review.length} câu cần ôn lại`
+                    : `Bấm để xem lại đáp án (${summary.review.length} câu)`}
+                </Text>
+              </View>
             </View>
-          ))}
+            <View style={styles.reviewToggleAction}>
+              <Text style={styles.reviewToggleActionText}>{showReview ? 'Thu gọn' : 'Xem lại'}</Text>
+              {showReview ? <ChevronUp size={16} color="#B45309" /> : <ChevronDown size={16} color="#B45309" />}
+            </View>
+          </Pressable>
+
+          {showReview ? (
+            <View style={styles.reviewListBody}>
+              {summary.review.map((item, idx) => (
+                <View key={item.id || idx} style={styles.reviewItem}>
+                  <Text style={styles.reviewPrompt}>{item.prompt}</Text>
+                  <Text style={styles.reviewAnswer}>{`✓ ${item.correctAnswer.text}`}</Text>
+                  {item.explanation ? <Text style={styles.reviewExplain}>{item.explanation}</Text> : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -2872,7 +2885,7 @@ function ResultView({ summary, play, starting, onReplay, onHome, onNextStep, onB
             <Text numberOfLines={1} style={styles.primaryText}>{`Tiếp: ${nextStep.stepLabel}`}</Text>
           </Pressable>
         ) : capReached && nextStep ? (
-          /* Có bài tiếp nhưng hết XP — hiện nút mua thay nút tiếp */
+          /* Có bài tiếp nhưng hết XP - hiện nút mua thay nút tiếp */
           <Pressable onPress={onBuyXp} style={[styles.primary, styles.flex, { backgroundColor: '#7C3AED' } as never]} accessibilityRole="button">
             <Crown size={17} color="#FFFFFF" />
             <Text style={styles.primaryText}>Mua gói để tiếp</Text>
@@ -2892,7 +2905,17 @@ type PracticePick =
   | { mode: 'free'; topicId: string; difficulty: DpDifficulty }
   | { mode: 'path'; unitId: string; nodeKey: string; step: DpStepKey; testOut: boolean; review?: boolean };
 
-/** Luyện tập hằng ngày kiểu trò chơi — cùng API, luật chơi với web. */
+/** Luyện tập hằng ngày kiểu trò chơi - cùng API, luật chơi với web. */
+function shuffleList<T>(list: T[]): T[] {
+  if (!Array.isArray(list)) return [];
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 export function DailyPracticeScreen() {
   const route = useRoute<RouteProp<AppStackParamList, 'DailyPractice'>>();
   const linkedTopicId = route.params?.topicId || '';
@@ -2958,7 +2981,10 @@ export function DailyPracticeScreen() {
       setStakePrompt(null);
       setLastPick(pick);
       setSummary(null);
-      setSession(data);
+      setSession({
+        ...data,
+        questions: shuffleList(data.questions),
+      });
       scrollRef.current?.scrollTo({ y: 0, animated: false });
     } catch (err) {
       const status = (err as { status?: number })?.status;
@@ -3028,7 +3054,6 @@ export function DailyPracticeScreen() {
 
   return (
     <AppScreen scroll={false}>
-      <AppHeader title="Luyện tập hằng ngày" icon={Gamepad2} />
       <ScrollView ref={scrollRef} scrollEnabled={scrollEnabled} contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
         {session ? (
           <PlayView
@@ -3123,130 +3148,209 @@ export function DailyPracticeScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, paddingBottom: 120 },
-  relatedCard: { gap: spacing.md, padding: spacing.md, borderRadius: 22, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  relatedCard: { gap: spacing.md, padding: spacing.md, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.brandSoft },
   relatedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  relatedIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DC2626' },
-  relatedEyebrow: { color: '#DC2626', fontSize: 12, fontWeight: '800' },
-  relatedTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
+  relatedIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand },
+  relatedEyebrow: { color: colors.brand, fontSize: 12, fontWeight: '600' },
+  relatedTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   flex: { flex: 1, minWidth: 0 },
   center: { textAlign: 'center' },
   gapMd: { gap: spacing.md },
   gapLg: { gap: spacing.lg },
   row: { flexDirection: 'row', gap: spacing.sm },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  muted: { color: colors.muted, fontSize: 13, lineHeight: 18 },
-  socialInline: { color: '#059669', fontWeight: '800' },
-  error: { color: '#92400E', backgroundColor: '#FFFBEB', padding: 12, borderRadius: 12, fontSize: 13, fontWeight: '700' },
-  errorInline: { color: '#DC2626', fontSize: 13, fontWeight: '700', marginTop: 8 },
+  muted: { color: colors.muted, fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  socialInline: { color: '#059669', fontWeight: '600' },
+  error: { color: '#92400E', backgroundColor: '#FFFBEB', padding: 12, borderRadius: 12, fontSize: 13, fontWeight: '600' },
+  errorInline: { color: '#DC2626', fontSize: 13, fontWeight: '600', marginTop: 8 },
   hero: {
-    padding: spacing.lg, borderRadius: 26, borderWidth: 1, borderColor: '#FEE2E2', gap: spacing.md, backgroundColor: '#FEF2F2',
-    backgroundImage: 'linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 50%, #FFFBEB 100%)',
+    padding: spacing.lg, borderRadius: 26, borderWidth: 1, borderColor: colors.line, gap: spacing.md, backgroundColor: colors.brandSoft,
+    backgroundImage: 'linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 50%, #F0FDF4 100%)',
   } as never,
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  eyebrow: { color: '#DC2626', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-  heroTitle: { color: colors.ink, fontSize: 18, fontWeight: '900', marginTop: 2 },
+  eyebrow: { color: colors.brand, fontSize: 12, fontWeight: '600' },
+  heroTitle: { color: colors.ink, fontSize: 18, fontWeight: '700', marginTop: 2 },
   statsRow: { flexDirection: 'row', gap: 6 },
   stat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.85)' },
   statIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  statValue: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  statLabel: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  statValue: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  statLabel: { color: colors.muted, fontSize: 12, fontWeight: '400' },
   empty: { alignItems: 'center', gap: 6, padding: spacing.xl, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
-  emptyTitle: { color: colors.ink, fontSize: 15, fontWeight: '800', textAlign: 'center' },
-  sectionTitle: { color: '#334155', fontSize: 14, fontWeight: '900' },
+  emptyTitle: { color: colors.ink, fontSize: 15, fontWeight: '600', textAlign: 'center' },
+  sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   topicGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   topic: { width: '48%', flexGrow: 1, padding: 12, borderRadius: 18, borderWidth: 2, gap: 4 },
   topicIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  topicName: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  topicDesc: { color: colors.muted, fontSize: 12 },
+  topicName: { color: colors.ink, fontSize: 15, fontWeight: '600' },
+  topicDesc: { color: colors.muted, fontSize: 13, fontWeight: '400' },
   topicCheck: { position: 'absolute', top: 10, right: 10 },
   level: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 16, borderWidth: 2, gap: 2 },
   starsRow: { flexDirection: 'row', gap: 2 },
-  levelLabel: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  levelMeta: { color: '#94A3B8', fontSize: 12, fontWeight: '700' },
+  levelLabel: { color: colors.ink, fontSize: 15, fontWeight: '600' },
+  levelMeta: { color: '#64748B', fontSize: 12, fontWeight: '400' },
   primary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, paddingHorizontal: 18, borderRadius: 14,
-    backgroundColor: colors.brand, backgroundImage: 'linear-gradient(180deg, #F05252 0%, #DC2626 55%, #B91C1C 100%)',
-    boxShadow: '0px 6px 14px rgba(185, 28, 28, 0.28)',
+    backgroundColor: colors.brand, backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 55%, #047857 100%)',
+    boxShadow: '0px 6px 14px rgba(4, 120, 87, 0.28)',
   } as never,
-  primaryBig: { minHeight: 54 },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  primaryBig: { minHeight: 52 },
+  primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   secondary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, paddingHorizontal: 14, borderRadius: 14,
     borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
   },
-  secondaryText: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  secondaryText: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   disabled: { opacity: 0.55 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   quitBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
   },
-  quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '800' },
+  quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '600' },
   quitBackdrop: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   quitCard: { width: '100%', maxWidth: 380, borderRadius: 28, overflow: 'hidden', backgroundColor: colors.surface, boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)' },
   quitHero: {
     alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: spacing.lg, gap: 6, backgroundColor: '#F0F9FF',
     backgroundImage: 'linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 50%, #F1F5F9 100%)',
   } as never,
-  quitTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  quitText: { color: '#475569', fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  quitTitle: { color: colors.ink, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  quitText: { color: '#475569', fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '400' },
   quitProgress: {
     flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: 999, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
   },
-  quitProgressText: { color: '#B45309', fontSize: 12, fontWeight: '900' },
+  quitProgressText: { color: '#B45309', fontSize: 12, fontWeight: '600' },
   quitActions: { gap: spacing.sm, padding: spacing.lg },
   progressTrack: { flex: 1, height: 14, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: '#10B981' },
   xpPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
-  xpText: { color: '#B45309', fontSize: 14, fontWeight: '900' },
+  xpText: { color: '#B45309', fontSize: 13, fontWeight: '600' },
   card: { padding: spacing.lg, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, gap: 10 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  badgeDark: { color: '#FFFFFF', backgroundColor: '#0F172A', fontSize: 12, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
-  badge: { fontSize: 12, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
+  badgeDark: { color: '#FFFFFF', backgroundColor: '#0F172A', fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
+  badge: { fontSize: 12, fontWeight: '600', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
   promptRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  prompt: { color: colors.ink, fontSize: 19, fontWeight: '800', lineHeight: 28 },
-  instruction: { color: '#94A3B8', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  prompt: { color: colors.ink, fontSize: 16, fontWeight: '600', lineHeight: 24 },
+  instruction: { color: '#64748B', fontSize: 13, fontWeight: '400', marginTop: 2 },
   image: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#F8FAFC' },
   hintBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
-  hintText: { flex: 1, color: '#92400E', fontSize: 13, fontWeight: '700' },
+  hintText: { flex: 1, color: '#92400E', fontSize: 13, fontWeight: '400' },
   answerArea: { marginTop: 4 },
   feedback: { padding: spacing.md, borderRadius: 22, gap: spacing.md, borderWidth: 1 },
   feedbackOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   feedbackBad: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   feedbackRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   feedbackTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  feedbackTitle: { fontSize: 18, fontWeight: '900' },
-  feedbackXp: { color: '#D97706', fontSize: 14, fontWeight: '900' },
-  feedbackAnswer: { color: '#334155', fontSize: 14, fontWeight: '800', marginTop: 2 },
-  feedbackExplain: { color: '#475569', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  feedbackTitle: { fontSize: 16, fontWeight: '700' },
+  feedbackXp: { color: '#D97706', fontSize: 14, fontWeight: '600' },
+  feedbackAnswer: { color: '#334155', fontSize: 14, fontWeight: '600', marginTop: 2 },
+  feedbackExplain: { color: '#475569', fontSize: 13, marginTop: 4, lineHeight: 19, fontWeight: '400' },
   confettiLayer: { position: 'absolute', left: '50%', top: '40%', width: 0, height: 0, zIndex: 20 },
   confetti: { position: 'absolute', width: 8, height: 12, borderRadius: 2 },
   resultCard: { alignItems: 'center', padding: spacing.xl, borderRadius: 26, borderWidth: 1, gap: 6, overflow: 'hidden' },
   resultGood: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
   resultSoft: { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' },
   starsBig: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  resultTitle: { color: colors.ink, fontSize: 22, fontWeight: '900', marginTop: 6 },
+  resultTitle: { color: colors.ink, fontSize: 20, fontWeight: '700', marginTop: 6 },
   resultStats: { flexDirection: 'row', gap: 8, marginTop: spacing.md, alignSelf: 'stretch' },
   resultStat: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF' },
-  resultValue: { fontSize: 20, fontWeight: '900' },
-  reviewItem: { padding: 10, borderRadius: 12, backgroundColor: '#F8FAFC', gap: 3 },
-  reviewPrompt: { color: colors.ink, fontSize: 14, fontWeight: '800' },
-  reviewAnswer: { color: '#047857', fontSize: 13, fontWeight: '800' },
-  reviewExplain: { color: colors.muted, fontSize: 12 },
-  modeTabs: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 16, backgroundColor: '#F1F5F9' },
-  modeTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12 },
-  modeTabActive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.line },
-  modeTabText: { color: '#64748B', fontSize: 14, fontWeight: '900' },
+  resultValue: { fontSize: 20, fontWeight: '700' },
+  reviewAccordionCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  reviewToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#FFFBEB',
+    gap: 10,
+  },
+  reviewToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  reviewToggleIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  reviewToggleTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  reviewToggleTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  reviewToggleSub: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#B45309',
+  },
+  reviewToggleAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    flexShrink: 0,
+  },
+  reviewToggleActionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45309',
+  },
+  reviewListBody: {
+    padding: 12,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#FEEBC8',
+    backgroundColor: '#FFFCF7',
+  },
+  reviewItem: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 3,
+  },
+  reviewPrompt: { color: colors.ink, fontSize: 14, fontWeight: '600', lineHeight: 19 },
+  reviewAnswer: { color: '#047857', fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  reviewExplain: { color: colors.muted, fontSize: 12, fontWeight: '400', lineHeight: 17 },
+  modeTabs: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 16, backgroundColor: '#EDF5F1', borderWidth: 1, borderColor: colors.line },
+  modeTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 12 },
+  modeTabActive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.line, boxShadow: '0px 2px 5px rgba(15, 23, 42, 0.05)' },
+  modeTabText: { color: colors.muted, fontSize: 14, fontWeight: '500' },
+  modeTabTextActive: { color: colors.brandDark, fontWeight: '600' },
   chipRow: { gap: 8, paddingRight: spacing.sm },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 16, borderWidth: 2 },
   chipIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  chipName: { color: colors.ink, fontSize: 13, fontWeight: '900' },
-  chipMeta: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  pathEyebrow: { fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
+  chipName: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  chipMeta: { color: colors.muted, fontSize: 12, fontWeight: '400' },
+  pathEyebrow: { fontSize: 12, fontWeight: '600' },
   pathTrack: { flex: 1, height: 12, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   pathFill: { height: '100%', borderRadius: 999 },
-  pathCount: { color: '#334155', fontSize: 13, fontWeight: '900' },
+  pathCount: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   pathTimeline: {
     borderRadius: 22,
     borderWidth: 1,
@@ -3278,7 +3382,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  unitStageNumText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  unitStageNumText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   unitStageCard: {
     flex: 1,
     minWidth: 0,
@@ -3289,23 +3393,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(15,23,42,0.06)',
   },
   unitStageMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  unitStageEyebrow: { color: '#64748B', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.6 },
+  unitStageEyebrow: { color: '#64748B', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
   unitStagePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  unitStagePillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  unitStagePillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   unitStageActivePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: '#FBBF24' },
-  unitStageActivePillText: { color: '#78350F', fontSize: 11, fontWeight: '900' },
-  unitStageTitleCenter: { color: colors.ink, fontSize: 17, fontWeight: '900', textAlign: 'center', maxWidth: 280 },
-  unitStageDescCenter: { color: colors.muted, fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 300 },
+  unitStageActivePillText: { color: '#78350F', fontSize: 11, fontWeight: '600' },
+  unitStageTitleCenter: { color: colors.ink, fontSize: 16, fontWeight: '600', textAlign: 'center', maxWidth: 280 },
+  unitStageDescCenter: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 300, fontWeight: '400' },
   unitStageProgressRowCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, width: '100%', maxWidth: 260 },
-  unitStageTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
-  unitStageDesc: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  unitStageTitle: { color: colors.ink, fontSize: 16, fontWeight: '600', marginTop: 2 },
+  unitStageDesc: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 2, fontWeight: '400' },
   unitStageProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   unitStageTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: '#E2E8F0', overflow: 'hidden' },
   unitStageFill: { height: '100%', borderRadius: 999 },
-  unitStageCount: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  unitStageCount: { color: '#64748B', fontSize: 12, fontWeight: '600' },
   unitStageActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 8 },
   unitStageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999 },
-  unitStageBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  unitStageBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   unitStageTestOut: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3315,7 +3419,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#1E293B',
   },
-  unitStageTestOutText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  unitStageTestOutText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   nodeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, paddingVertical: 4, paddingRight: spacing.md },
   nodeRowItem: { flexDirection: 'row', alignItems: 'flex-end' },
   nodeRowDash: { width: 14, height: 3, borderRadius: 999, marginBottom: 28, marginHorizontal: 2 },
@@ -3356,7 +3460,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.1)',
   },
   unitBannerMiniBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.25)' },
-  unitBannerMiniBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  unitBannerMiniBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   unitBannerNotch: {
     position: 'absolute',
     bottom: -10,
@@ -3368,10 +3472,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  unitEyebrow: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1.8 },
-  unitTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  unitDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 18, textAlign: 'center' },
-  unitProgressText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '800', marginTop: 2 },
+  unitEyebrow: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  unitTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  unitDesc: { color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 19, textAlign: 'center', fontWeight: '400' },
+  unitProgressText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500', marginTop: 2 },
   unitActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 10 },
   unitVideoChip: {
     flexDirection: 'row',
@@ -3384,9 +3488,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  unitBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  unitBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   unitTestOut: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FFFFFF' },
-  unitTestOutText: { color: '#334155', fontSize: 12, fontWeight: '900' },
+  unitTestOutText: { color: '#334155', fontSize: 12, fontWeight: '600' },
   nodeColumn: { alignItems: 'center', alignSelf: 'center', gap: 22, paddingVertical: spacing.xs, zIndex: 1 },
   nodeSlot: { alignItems: 'center', gap: spacing.sm },
   connector: { position: 'absolute', top: -24, left: '50%', width: 0, height: 0 },
@@ -3399,7 +3503,7 @@ const styles = StyleSheet.create({
   decorSparkle: { position: 'absolute', opacity: 0.6 },
   mascotShadow: { position: 'absolute', bottom: -2, alignSelf: 'center', width: 64, height: 12, borderRadius: 999 },
   unitLockChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.2)' },
-  unitLockText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.6 },
+  unitLockText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   nodeWrap: { alignItems: 'center' },
   node: { alignItems: 'center', justifyContent: 'center' },
   nodeCrown: { position: 'absolute', top: -10, right: -2 },
@@ -3413,13 +3517,13 @@ const styles = StyleSheet.create({
   popover: { width: 270, padding: spacing.md, borderRadius: 18, gap: 2, marginTop: 6 },
   popoverArrow: { position: 'absolute', top: -7, left: 127, width: 16, height: 16, transform: [{ rotate: '45deg' }] },
   popoverClose: { position: 'absolute', top: 6, right: 6, padding: 6, zIndex: 2 },
-  popoverTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
-  popoverMeta: { color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '800' },
-  popoverHint: { color: 'rgba(255,255,255,0.82)', fontSize: 13, marginTop: 2 },
+  popoverTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  popoverMeta: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '600' },
+  popoverHint: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2, fontWeight: '400' },
   popoverButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, marginTop: 10, borderRadius: 12, backgroundColor: '#FFFFFF',
   },
-  popoverButtonText: { fontSize: 14, fontWeight: '900', letterSpacing: 0.6 },
+  popoverButtonText: { fontSize: 14, fontWeight: '600' },
   hubPopover: { width: '100%', maxWidth: 340, alignSelf: 'center', gap: 8 },
   hubLevelRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, paddingHorizontal: 10, paddingVertical: 10, borderRadius: 12,
@@ -3427,50 +3531,50 @@ const styles = StyleSheet.create({
   },
   hubLevelRowLocked: { opacity: 0.6, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.1)' },
   hubLevelIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  hubLevelTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
-  hubLevelHint: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 1 },
-  hubLevelXp: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', marginTop: 2 },
+  hubLevelTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  hubLevelHint: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 1, fontWeight: '400' },
+  hubLevelXp: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', marginTop: 2 },
   hubLevelBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: '#FFFFFF' },
-  hubLevelBtnText: { color: '#1E293B', fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
+  hubLevelBtnText: { color: '#1E293B', fontSize: 12, fontWeight: '600' },
   comboChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#F97316' },
-  comboText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  comboText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   nodeBubble: {
     marginBottom: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, overflow: 'hidden', backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: colors.line, fontSize: 12, fontWeight: '900', letterSpacing: 0.8,
+    borderWidth: 1, borderColor: colors.line, fontSize: 12, fontWeight: '600',
   },
-  nodeLabel: { marginTop: 8, color: '#334155', fontSize: 13, fontWeight: '900' },
+  nodeLabel: { marginTop: 8, color: '#334155', fontSize: 13, fontWeight: '600' },
   pathResult: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 22, borderWidth: 1 },
   pathResultOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   pathResultBad: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
   pathResultIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  pathResultTitle: { fontSize: 14, fontWeight: '900' },
+  pathResultTitle: { fontSize: 14, fontWeight: '600' },
   xpCapWrap: { gap: 6, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A' },
   xpCapRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   xpCapLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  xpCapLabel: { color: '#B45309', fontSize: 12, fontWeight: '800' },
+  xpCapLabel: { color: '#B45309', fontSize: 12, fontWeight: '600' },
   xpCapLabelFull: { color: '#DC2626' },
-  xpCapPct: { color: '#B45309', fontSize: 12, fontWeight: '900' },
+  xpCapPct: { color: '#B45309', fontSize: 12, fontWeight: '600' },
   xpCapTrack: { height: 8, borderRadius: 999, backgroundColor: '#FEF3C7', overflow: 'hidden' },
   xpCapFill: { height: '100%', borderRadius: 999 },
   xpCapHint: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  xpCapHintBold: { color: '#B45309', fontWeight: '900' },
+  xpCapHintBold: { color: '#B45309', fontWeight: '600' },
   xpCapBanner: {
     padding: spacing.md, borderRadius: 20, borderWidth: 1.5, borderColor: '#FECACA', backgroundColor: '#FEF2F2', gap: 10,
   },
   xpCapBannerTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  xpCapBannerTitle: { color: '#991B1B', fontSize: 15, fontWeight: '900' },
+  xpCapBannerTitle: { color: '#991B1B', fontSize: 15, fontWeight: '700' },
   xpCapBannerDesc: { color: '#475569', fontSize: 13, lineHeight: 18 },
-  xpCapBannerBold: { color: '#991B1B', fontWeight: '900' },
+  xpCapBannerBold: { color: '#991B1B', fontWeight: '600' },
   xpCapBannerPlans: { gap: 6, paddingVertical: 4 },
   xpCapPlanRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   xpCapPlanText: { color: '#334155', fontSize: 13 },
-  xpCapPlanBold: { color: '#0F172A', fontWeight: '900' },
-  xpCapPlanBadge: { color: '#059669', fontWeight: '900', fontSize: 12 },
+  xpCapPlanBold: { color: '#0F172A', fontWeight: '600' },
+  xpCapPlanBadge: { color: '#059669', fontWeight: '600', fontSize: 12 },
   xpCapBannerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44,
     borderRadius: 12, backgroundColor: '#DC2626',
   },
-  xpCapBannerBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  xpCapBannerBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   resultCapBanner: {
     padding: spacing.md, borderRadius: 18, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB', gap: 8,
   },
@@ -3479,34 +3583,34 @@ const styles = StyleSheet.create({
     flexBasis: '48%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10,
     borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
   },
-  quickStatValue: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  quickStatValue: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   quickBuyBtn: {
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#FFFBEB',
     borderWidth: 1, borderColor: '#FDE68A',
   },
-  quickBuyBtnText: { color: '#B45309', fontSize: 11, fontWeight: '900' },
+  quickBuyBtnText: { color: '#B45309', fontSize: 11, fontWeight: '600' },
   lessonModalHead: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.lg },
-  lessonModalEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
-  lessonModalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 2 },
+  lessonModalEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  lessonModalTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', marginTop: 2 },
   lessonModalClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' },
   lessonVideoCallout: {
     flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16,
     borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2',
   },
-  lessonVideoCalloutTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  lessonVideoCalloutTitle: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   lessonBodyBox: { gap: 8, padding: 14, borderRadius: 16, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
   lessonBodyText: { color: '#334155', fontSize: 14, lineHeight: 21 },
   lessonCheckCard: { padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF' },
-  lessonCheckPrompt: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  lessonCheckPrompt: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   lessonCheckOpt: {
     flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12,
     borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
   },
   lessonCheckOptLetter: {
     width: 24, height: 24, borderRadius: 8, textAlign: 'center', lineHeight: 24,
-    backgroundColor: '#E2E8F0', color: '#334155', fontSize: 12, fontWeight: '900', overflow: 'hidden',
+    backgroundColor: '#E2E8F0', color: '#334155', fontSize: 12, fontWeight: '600', overflow: 'hidden',
   },
-  lessonCheckOptText: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  lessonCheckOptText: { color: colors.ink, fontSize: 14, fontWeight: '500' },
   lessonVideoFrameWrap: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -3549,8 +3653,7 @@ const styles = StyleSheet.create({
   videoGateTime: {
     color: '#B45309',
     fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.6,
+    fontWeight: '600',
   },
   videoGateCloseBtn: {
     padding: 4,
@@ -3566,13 +3669,13 @@ const styles = StyleSheet.create({
   videoGateMissedText: {
     color: '#B91C1C',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   videoGatePrompt: {
     color: '#0F172A',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 19,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   videoGateChoiceBtn: {
     paddingHorizontal: 12,
@@ -3585,8 +3688,8 @@ const styles = StyleSheet.create({
   },
   videoGateChoiceText: {
     color: '#1E293B',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
   videoGateChoiceTextActive: {
     color: '#FFFFFF',
@@ -3615,13 +3718,13 @@ const styles = StyleSheet.create({
   videoGateHintText: {
     flex: 1,
     color: '#92400E',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '400',
   },
   videoGateErrorText: {
     color: '#DC2626',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   videoGateActionsRow: {
     flexDirection: 'row',
@@ -3638,8 +3741,8 @@ const styles = StyleSheet.create({
   },
   videoGateSubmitBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
+    fontSize: 13,
+    fontWeight: '600',
   },
   videoGateCancelBtn: {
     paddingHorizontal: 12,
@@ -3650,7 +3753,7 @@ const styles = StyleSheet.create({
   videoGateCancelBtnText: {
     color: '#475569',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   videoGateHintBtn: {
     paddingHorizontal: 12,
@@ -3661,7 +3764,7 @@ const styles = StyleSheet.create({
   videoGateHintBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   videoGateScreenPickBtn: {
     flexDirection: 'row',
@@ -3677,7 +3780,7 @@ const styles = StyleSheet.create({
   videoGateScreenPickText: {
     color: '#1E293B',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   videoGateUploadProgress: {
     gap: 6,
@@ -3697,18 +3800,18 @@ const styles = StyleSheet.create({
   videoGateUploadText: {
     color: '#475569',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '500',
     textAlign: 'center',
   },
   videoGateFootNote: {
     color: '#64748B',
-    fontSize: 10.5,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '400',
   },
   lessonPendingNote: {
     color: '#64748B',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '400',
     lineHeight: 18,
     marginTop: -2,
   },
@@ -3734,7 +3837,7 @@ const styles = StyleSheet.create({
   lessonFootCloseBtnText: {
     color: '#334155',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   lessonFootDoneBtn: {
     flexDirection: 'row',
@@ -3751,7 +3854,7 @@ const styles = StyleSheet.create({
   lessonFootDoneBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   finaleLockedCard: {
     alignItems: 'center', gap: 6, padding: spacing.lg, borderRadius: 24, borderWidth: 2, borderStyle: 'dashed',
@@ -3761,8 +3864,8 @@ const styles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A',
   },
-  finaleLockedEyebrow: { color: '#D97706', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  finaleLockedTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', textAlign: 'center' },
+  finaleLockedEyebrow: { color: '#D97706', fontSize: 11, fontWeight: '600' },
+  finaleLockedTitle: { color: colors.ink, fontSize: 16, fontWeight: '700', textAlign: 'center' },
   finaleDoneCard: {
     alignItems: 'center', gap: 10, padding: spacing.xl, borderRadius: 28, borderWidth: 2, borderColor: '#FCD34D',
     backgroundColor: '#FFFBEB', overflow: 'hidden',
@@ -3772,7 +3875,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 5,
     borderRadius: 999, backgroundColor: '#D97706',
   },
-  finaleBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  finaleBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   finaleStageRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 14, marginVertical: 6 },
   finaleCupWrap: { alignItems: 'center' },
   finaleCrownBadge: {
@@ -3792,32 +3895,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row', gap: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999,
     backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FDE68A', marginTop: -10,
   },
-  finaleDoneTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  finaleDoneSub: { color: '#475569', fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 380 },
+  finaleDoneTitle: { color: colors.ink, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  finaleDoneSub: { color: '#475569', fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 380, fontWeight: '400' },
   finaleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, paddingHorizontal: 22,
     borderRadius: 16, backgroundColor: '#D97706', marginTop: 4,
     backgroundImage: 'linear-gradient(180deg, #F59E0B 0%, #D97706 55%, #B45309 100%)',
   } as never,
-  finaleBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  finaleBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   finaleModalCard: {
     maxWidth: 460, padding: spacing.xl, alignItems: 'center', gap: 10, backgroundColor: '#FFFBEB',
     borderWidth: 2, borderColor: '#FCD34D',
   },
-  finaleModalTopic: { color: '#B45309', fontSize: 16, fontWeight: '900', textAlign: 'center' },
+  finaleModalTopic: { color: '#B45309', fontSize: 16, fontWeight: '700', textAlign: 'center' },
   finaleStatsRow: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginVertical: 4 },
   finaleStatBox: {
     flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 14, backgroundColor: '#FFFFFF',
     borderWidth: 1, borderColor: '#FDE68A',
   },
-  finaleStatVal: { color: '#B45309', fontSize: 15, fontWeight: '900' },
-  finaleStatLbl: { color: '#64748B', fontSize: 11, fontWeight: '800', marginTop: 2 },
+  finaleStatVal: { color: '#B45309', fontSize: 15, fontWeight: '700' },
+  finaleStatLbl: { color: '#64748B', fontSize: 11, fontWeight: '500', marginTop: 2 },
   pathTrophyResult: {
     flexDirection: 'row', alignItems: 'center', gap: 12, padding: spacing.lg, borderRadius: 24,
     borderWidth: 2, borderColor: '#FCD34D', backgroundColor: '#FFFBEB',
   },
-  pathTrophyEyebrow: { color: '#B45309', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
-  pathTrophyTitle: { color: colors.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
+  pathTrophyEyebrow: { color: '#B45309', fontSize: 11, fontWeight: '600' },
+  pathTrophyTitle: { color: colors.ink, fontSize: 16, fontWeight: '700', marginTop: 2 },
   buyXpHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 10, padding: spacing.lg,
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
@@ -3826,26 +3929,26 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
   },
-  buyXpTitle: { color: colors.ink, fontSize: 17, fontWeight: '900' },
+  buyXpTitle: { color: colors.ink, fontSize: 17, fontWeight: '700' },
   buyXpTransferBox: {
     alignSelf: 'stretch', padding: 12, borderRadius: 14, backgroundColor: '#FFFBEB',
     borderWidth: 1, borderColor: '#FDE68A', gap: 4, alignItems: 'center',
   },
-  buyXpTransferLine: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  buyXpCode: { color: '#B45309', fontSize: 13, fontWeight: '900', marginTop: 2 },
+  buyXpTransferLine: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  buyXpCode: { color: '#B45309', fontSize: 13, fontWeight: '600', marginTop: 2 },
   buyXpPackCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18,
     borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
   },
   buyXpPackBolt: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  buyXpPackTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  buyXpPackPrice: { color: '#DC2626', fontSize: 16, fontWeight: '900' },
+  buyXpPackTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
+  buyXpPackPrice: { color: colors.brand, fontSize: 15, fontWeight: '700' },
   stakeGrid2Col: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginTop: 8 },
   stakeColBox: {
     flex: 1, padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF',
     borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', gap: 2,
   },
-  stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   playWrap: { gap: spacing.lg, paddingTop: 20, maxWidth: 760, width: '100%', alignSelf: 'center' },
   topBarCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
@@ -3853,9 +3956,9 @@ const styles = StyleSheet.create({
     boxShadow: '0px 4px 12px rgba(15, 23, 42, 0.04)',
   } as never,
   topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  topBarStepTitle: { flex: 1, color: '#475569', fontSize: 13, fontWeight: '800', marginRight: 8 },
-  topBarCount: { color: '#334155', fontSize: 12, fontWeight: '900' },
-  xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '800' },
+  topBarStepTitle: { flex: 1, color: '#475569', fontSize: 13, fontWeight: '600', marginRight: 8 },
+  topBarCount: { color: '#334155', fontSize: 12, fontWeight: '600' },
+  xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '500' },
   playQuestionCard: {
     padding: spacing.xl, borderRadius: 26, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
     gap: 14, boxShadow: '0px 10px 28px rgba(15, 23, 42, 0.06)',
@@ -3866,10 +3969,10 @@ const styles = StyleSheet.create({
   questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
   questionLabelBadge: {
     paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: '#FEF2F2',
-    borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 12, fontWeight: '900',
-    textTransform: 'uppercase', letterSpacing: 0.6, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 11, fontWeight: '600',
+    textTransform: 'uppercase', overflow: 'hidden',
   },
-  instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '700' },
+  instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '400' },
   playCardFooter: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     paddingTop: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: '#F1F5F9',
@@ -3878,103 +3981,197 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
   },
-  hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '900' },
-  selectAnswerHint: { color: '#94A3B8', fontSize: 13, fontWeight: '700' },
-  pageEyebrow: { color: '#DC2626', fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
-  pageMainTitle: { color: colors.ink, fontSize: 24, fontWeight: '900' },
-  heroDark: {
-    padding: spacing.lg,
-    borderRadius: 26,
-    backgroundColor: '#0F172A',
-    backgroundImage: 'linear-gradient(135deg, #0F172A 0%, #1E293B 55%, #7F1D1D 100%)',
-    gap: spacing.md,
-  } as never,
-  heroDarkLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  heroMascotWrap: { padding: 4, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)' },
-  heroStreakPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '600' },
+  selectAnswerHint: { color: '#94A3B8', fontSize: 13, fontWeight: '400' },
+  pageEyebrow: { color: colors.brand, fontSize: 12, fontWeight: '600' },
+  topGamifiedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+    marginBottom: 2,
   },
-  heroStreakPillText: { color: '#FEF3C7', fontSize: 12, fontWeight: '900' },
-  heroStreakSocialText: { color: '#FCD34D', fontSize: 12, fontWeight: '700' },
-  heroDarkTitle: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', marginTop: 4 },
-  heroDarkSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 19, marginTop: 2 },
-  heroWhiteBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10,
-    borderRadius: 14, backgroundColor: '#FFFFFF', alignSelf: 'flex-start', marginTop: 10,
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.2)',
-  } as never,
-  heroWhiteBtnText: { color: '#B91C1C', fontSize: 13, fontWeight: '900' },
-  heroDarkStatsCol: { gap: 8, marginTop: 4 },
-  heroDarkStatsGrid: { flexDirection: 'row', gap: 6 },
-  heroGlassBox: {
-    flex: 1, padding: 8, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  topTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
-  heroGlassVal: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
-  heroGlassLbl: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '800', marginTop: 2 },
-  heroGlassMeta: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 1 },
-  heroDarkCaption: { color: 'rgba(255,255,255,0.75)', fontSize: 12, lineHeight: 17 },
+  topPageTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  topBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  streakBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  streakBadgeText: {
+    color: '#C2410C',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  xpBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brandSoft,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  xpBadgeText: {
+    color: colors.brandDark,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mascotMotivationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    backgroundImage: 'linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 65%, #F0FDF4 100%)',
+    borderWidth: 1,
+    borderColor: colors.line,
+    boxShadow: '0px 4px 14px rgba(5, 150, 105, 0.08), inset 0px 1px 0px rgba(255, 255, 255, 0.8)',
+  } as never,
+  mascotWrapCompact: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderWidth: 1,
+    borderColor: '#E2F1EB',
+    flexShrink: 0,
+  },
+  mascotContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  mascotHeadline: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.ink,
+    lineHeight: 19,
+  },
+  mascotSub: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: colors.muted,
+  },
+  mascotProgressTrack: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#E2F1EB',
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  mascotProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.brand,
+  },
+  mascotQuickCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: colors.brand,
+    backgroundImage: 'linear-gradient(180deg, #10B981 0%, #059669 100%)',
+    boxShadow: '0px 3px 8px rgba(4, 120, 87, 0.25)',
+  } as never,
+  mascotQuickCtaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   xpEmptyBanner: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-    padding: spacing.md, borderRadius: 20, backgroundColor: '#FEF2F2',
-    borderWidth: 1.5, borderColor: '#FECACA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: spacing.md,
+    borderRadius: 18,
+    backgroundColor: colors.brandSoft,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
-  xpEmptyIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#DC2626', alignItems: 'center', justifyContent: 'center' },
-  xpEmptyTitle: { color: '#991B1B', fontSize: 14, fontWeight: '900' },
-  xpEmptyDesc: { color: '#7F1D1D', fontSize: 12, lineHeight: 17, marginTop: 2 },
+  xpEmptyIconWrap: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  xpEmptyTitle: { color: colors.brandDark, fontSize: 14, fontWeight: '600' },
+  xpEmptyDesc: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 2 },
   xpEmptyBuyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 12, backgroundColor: '#DC2626',
+    borderRadius: 12, backgroundColor: colors.brand,
   },
-  xpEmptyBuyBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  xpEmptyBuyBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   goalCard: {
     padding: spacing.md, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF', gap: 10,
   },
   goalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   goalIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  goalCardTitle: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  goalCardSub: { color: colors.muted, fontSize: 12 },
+  goalCardTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
+  goalCardSub: { color: colors.muted, fontSize: 13 },
   goalBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  goalBadgeText: { fontSize: 12, fontWeight: '900' },
+  goalBadgeText: { fontSize: 12, fontWeight: '600' },
   goalInfoBox: { padding: 8, borderRadius: 12, borderWidth: 1 },
-  goalInfoTitle: { fontSize: 12, fontWeight: '900' },
-  goalInfoSub: { fontSize: 11, marginTop: 1 },
-  goalLabelSmall: { color: '#64748B', fontSize: 12, fontWeight: '800' },
-  goalValueSmall: { color: colors.ink, fontSize: 12, fontWeight: '900' },
+  goalInfoTitle: { fontSize: 13, fontWeight: '600' },
+  goalInfoSub: { fontSize: 12, marginTop: 1 },
+  goalLabelSmall: { color: '#64748B', fontSize: 12, fontWeight: '500' },
+  goalValueSmall: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   goalTargetBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7,
     borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
   },
-  goalTargetBtnActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
-  goalTargetBtnText: { color: colors.ink, fontSize: 13, fontWeight: '900' },
+  goalTargetBtnActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  goalTargetBtnText: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   goalFooterBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
   goalFooterText: { color: '#64748B', fontSize: 12 },
   questItemBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   questCheckCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  questItemTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  questItemDesc: { color: colors.muted, fontSize: 12 },
+  questItemTitle: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  questItemDesc: { color: colors.muted, fontSize: 13 },
   questItemTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   weekCell: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   freeModeNotice: {
     padding: 10, borderRadius: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
   },
-  freeModeNoticeBold: { color: '#1E40AF', fontSize: 12, fontWeight: '900' },
-  freeModeNoticeText: { color: '#1E3A8A', fontSize: 12, lineHeight: 17 },
+  freeModeNoticeBold: { color: '#1E40AF', fontSize: 13, fontWeight: '600' },
+  freeModeNoticeText: { color: '#1E3A8A', fontSize: 13, lineHeight: 18 },
   unitHeaderOuter: { width: '100%', maxWidth: 440, alignSelf: 'center', marginBottom: 12 },
   unitHeaderBanner: {
     flexDirection: 'row', alignItems: 'stretch', borderRadius: 18, overflow: 'hidden',
   },
   unitHeaderLeft: { flex: 1, padding: 14, gap: 3 },
-  unitHeaderEyebrow: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
-  unitHeaderTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  unitHeaderEyebrow: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+  unitHeaderTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   unitHeaderDesc: { color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 18 },
   unitHeaderProgressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   unitHeaderProgressTrack: { flex: 1, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
   unitHeaderProgressFill: { height: '100%', borderRadius: 999, backgroundColor: '#FFFFFF' },
-  unitHeaderProgressCount: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '900' },
+  unitHeaderProgressCount: { color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '600' },
   unitHeaderRight: {
     width: 64, borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)',
@@ -4018,12 +4215,12 @@ const styles = StyleSheet.create({
     borderColor: '#10B981',
   },
   missionRowTitle: {
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '600',
   },
   missionRowSub: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '400',
     marginTop: 1,
   },
   missionRowTrack: {
@@ -4038,8 +4235,8 @@ const styles = StyleSheet.create({
   },
   missionFooterText: {
     color: '#64748B',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '500',
     marginTop: 6,
     textAlign: 'center',
   },

@@ -1,12 +1,12 @@
 /**
- * Room-scoped Socket.IO emits — tránh io.emit toàn cục (cross-branch leak).
+ * Room-scoped Socket.IO emits - tránh io.emit toàn cục (cross-branch leak).
  * Rooms: userId, ALL_ADMIN, ALL_STAFF, ALL_SUPPORT, branch_{id}, teacher_{id}, student_{id}
  *
  * Fail-closed: thiếu branchId → chỉ ALL_ADMIN (không fan-out ALL_STAFF/ALL_SUPPORT/global).
  */
 const logger = require('../config/logger');
 
-/** Authenticated role rooms — không gồm socket chưa register / guest */
+/** Authenticated role rooms - không gồm socket chưa register / guest */
 const AUTHENTICATED_ROLE_ROOMS = [
   'ALL_ADMIN',
   'ALL_STAFF',
@@ -34,7 +34,7 @@ function emitBranch(io, branchId, event, payload) {
   }
   logger.warn(
     { event, reason: 'missing_branchId' },
-    '[realtime] emitBranch fail-closed — ALL_ADMIN only',
+    '[realtime] emitBranch fail-closed - ALL_ADMIN only',
   );
   io.to('ALL_ADMIN').emit(event, payload);
 }
@@ -53,7 +53,7 @@ function emitUsers(io, userIds, event, payload) {
 
 /**
  * System-wide to authenticated role rooms only.
- * Dùng cho settings TENANT/GLOBAL và SYSTEM_RESET — không io.emit(*) toàn socket.
+ * Dùng cho settings TENANT/GLOBAL và SYSTEM_RESET - không io.emit(*) toàn socket.
  * Payload phải không chứa secret.
  */
 function emitSystemWide(io, event, payload) {
@@ -94,7 +94,7 @@ function emitFinanceEvent(io, { branchId, userIds } = {}, event, payload) {
   emitUsers(io, userIds, event, payload);
 }
 
-/** Normalize user/ref id — tránh String(populatedDoc) === "[object Object]". */
+/** Normalize user/ref id - tránh String(populatedDoc) === "[object Object]". */
 function asRoomId(value) {
   if (value == null || value === '') return '';
   if (typeof value === 'object') {

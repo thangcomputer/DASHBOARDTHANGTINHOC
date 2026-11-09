@@ -1,21 +1,21 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  dashboardthangtinhoc — Seed Test Accounts
+ *  dashboardthangtinhoc - Seed Test Accounts
  *  Tạo 20 tài khoản test vào MongoDB: 10 HV + 5 GV + 5 Admin chi nhánh
  *  Chạy: node tests/seed_test_accounts.js
  * ═══════════════════════════════════════════════════════════════════════
  */
-const path     = require('path');
+const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
-const bcrypt   = require('bcryptjs');
-const Student  = require('../models/Student');
-const Teacher  = require('../models/Teacher');
+const bcrypt = require('bcryptjs');
+const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
 const { TEST_ACCOUNTS } = require('./config');
 
 async function seed() {
   console.log('═══════════════════════════════════════════════');
-  console.log('  🌱 SEED TEST ACCOUNTS — dashboardthangtinhoc');
+  console.log('  🌱 SEED TEST ACCOUNTS - dashboardthangtinhoc');
   console.log('═══════════════════════════════════════════════');
 
   await mongoose.connect(process.env.MONGODB_URI);
@@ -32,14 +32,14 @@ async function seed() {
   const deletedStudents = await Student.deleteMany({
     $or: [
       { phone: { $in: cleanupPhones } },
-      { zalo:  { $in: cleanupZalos } },
-      { name:  { $regex: /^HỌC VIÊN TEST/ } },
+      { zalo: { $in: cleanupZalos } },
+      { name: { $regex: /^HỌC VIÊN TEST/ } },
     ]
   });
   const deletedTeachers = await Teacher.deleteMany({
     $or: [
       { phone: { $in: cleanupPhones } },
-      { name:  { $regex: /^(GIẢNG VIÊN TEST|ADMIN CHI NHÁNH TEST)/ } },
+      { name: { $regex: /^(GIẢNG VIÊN TEST|ADMIN CHI NHÁNH TEST)/ } },
     ]
   });
 
@@ -83,7 +83,7 @@ async function seed() {
   // ── Verify ────────────────────────────────────────────────────
   const verifyStudents = await Student.find({ name: { $regex: /^HỌC VIÊN TEST/ } }).select('name phone zalo').lean();
   const verifyTeachers = await Teacher.find({ name: { $regex: /^GIẢNG VIÊN TEST/ } }).select('name phone role').lean();
-  const verifyAdmins   = await Teacher.find({ name: { $regex: /^ADMIN CHI NHÁNH TEST/ } }).select('name phone role adminRole').lean();
+  const verifyAdmins = await Teacher.find({ name: { $regex: /^ADMIN CHI NHÁNH TEST/ } }).select('name phone role adminRole').lean();
 
   console.log('\n═══ VERIFICATION ═══');
   console.log(`Students:  ${verifyStudents.length}/20`);
@@ -99,7 +99,7 @@ async function seed() {
   const accountMap = {
     students: verifyStudents.map(s => ({ _id: s._id.toString(), name: s.name, phone: s.phone })),
     teachers: verifyTeachers.map(t => ({ _id: t._id.toString(), name: t.name, phone: t.phone })),
-    admins:   verifyAdmins.map(a => ({ _id: a._id.toString(), name: a.name, phone: a.phone })),
+    admins: verifyAdmins.map(a => ({ _id: a._id.toString(), name: a.name, phone: a.phone })),
   };
 
   const fs = require('fs');
@@ -112,7 +112,7 @@ async function seed() {
 
   await mongoose.disconnect();
   console.log('═══════════════════════════════════════════════');
-  console.log('  ✅ SEED COMPLETED — Ready for testing!');
+  console.log('  ✅ SEED COMPLETED - Ready for testing!');
   console.log('═══════════════════════════════════════════════');
 }
 

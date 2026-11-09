@@ -47,7 +47,7 @@ class NotificationService {
         };
 
         if (receiversArr.includes('GLOBAL')) {
-          // Deprecate GLOBAL fan-out — route to admin/staff/support role rooms
+          // Deprecate GLOBAL fan-out - route to admin/staff/support role rooms
           io.to('ALL_ADMIN').emit('RECEIVE_NOTIFICATION', socketData);
           io.to('ALL_STAFF').emit('RECEIVE_NOTIFICATION', socketData);
           io.to('ALL_SUPPORT').emit('RECEIVE_NOTIFICATION', socketData);
@@ -95,7 +95,7 @@ class NotificationService {
   }
 
   /**
-   * Xóa thông báo ghi chú lịch khi học viên xóa ghi chú — chuông GV mất realtime.
+   * Xóa thông báo ghi chú lịch khi học viên xóa ghi chú - chuông GV mất realtime.
    */
   static async retractStudentScheduleNotes(io, {
     scheduleId,

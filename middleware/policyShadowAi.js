@@ -59,7 +59,7 @@ function policyShadowAi(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] ai evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] ai evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `ai_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -95,7 +95,7 @@ function policyShadowAi(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] ai shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] ai shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -108,7 +108,7 @@ function policyShadowAi(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected ai error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected ai error - fail closed to legacy only',
       );
     }
     return next();

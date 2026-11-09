@@ -36,7 +36,7 @@ function buildMessages(topic, difficulty, types, count) {
       role: 'system',
       content: [
         'Bạn là giáo viên tin học văn phòng tại Việt Nam, soạn câu hỏi luyện tập dạng trò chơi cho học viên.',
-        'Chỉ trả về JSON {"questions":[...]} — không giải thích thêm.',
+        'Chỉ trả về JSON {"questions":[...]} - không giải thích thêm.',
         'Mọi nội dung bằng tiếng Việt có dấu, ngắn gọn, chính xác về kiến thức, phù hợp phiên bản phổ biến (Windows 10/11, Office 2016+).',
         'Mỗi câu có "hint" (gợi ý không lộ thẳng đáp án) và "explanation" (giải thích ngắn vì sao đúng).',
         'Với "fill": chỗ trống viết dạng {{từ}} ngay trong "text" (1–4 chỗ trống), "distractors" là từ gây nhiễu không trùng đáp án.',
@@ -48,12 +48,12 @@ function buildMessages(topic, difficulty, types, count) {
     },
     {
       role: 'user',
-      content: `Chủ đề: ${topic.name}${topic.description ? ` — ${topic.description}` : ''}\nĐộ khó: ${DIFFICULTY_LABEL[difficulty]}\nSố câu: ${count}\nDạng câu được dùng: ${types.join(', ')} (trộn đều các dạng).`,
+      content: `Chủ đề: ${topic.name}${topic.description ? ` - ${topic.description}` : ''}\nĐộ khó: ${DIFFICULTY_LABEL[difficulty]}\nSố câu: ${count}\nDạng câu được dùng: ${types.join(', ')} (trộn đều các dạng).`,
     },
   ];
 }
 
-/** AI soạn nháp câu hỏi (status draft) — admin duyệt rồi mới xuất bản cho học viên. */
+/** AI soạn nháp câu hỏi (status draft) - admin duyệt rồi mới xuất bản cho học viên. */
 async function generateDrafts({ topicId, difficulty, types, count, unitId } = {}, userId = null) {
   if (!mongoose.Types.ObjectId.isValid(String(topicId || ''))) throw httpError(400, 'Chủ đề không hợp lệ');
   if (!rules.DIFFICULTIES.includes(difficulty)) throw httpError(400, 'Độ khó không hợp lệ');

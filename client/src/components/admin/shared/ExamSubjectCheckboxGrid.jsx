@@ -3,9 +3,9 @@ import { getExamSubjectGroupLabel, getExamSubjectOptions } from '../../../utils/
 
 /**
  * @param {object} props
- * @param {number} [props.columns=3] — số cột desktop (mobile tự về 2)
- * @param {boolean} [props.dense] — chip thấp hơn, nhóm sát hơn
- * @param {boolean} [props.hideLabel] — ẩn label "Môn học"
+ * @param {number} [props.columns=3] - số cột desktop (mobile tự về 2)
+ * @param {boolean} [props.dense] - chip thấp hơn, nhóm sát hơn
+ * @param {boolean} [props.hideLabel] - ẩn label "Môn học"
  */
 export default function ExamSubjectCheckboxGrid({
   catalog,

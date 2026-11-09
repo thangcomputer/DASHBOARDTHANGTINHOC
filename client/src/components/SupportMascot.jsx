@@ -1,5 +1,5 @@
 /**
- * Nhân vật hỗ trợ hoạt hình (Bảng tin — Hỗ trợ nhanh).
+ * Nhân vật hỗ trợ hoạt hình (Bảng tin - Hỗ trợ nhanh).
  */
 import React, { useId } from 'react';
 

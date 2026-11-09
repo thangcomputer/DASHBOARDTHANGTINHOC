@@ -42,7 +42,7 @@ function enrollmentMatches(enr, course, enrollmentId) {
 
 /**
  * Cập nhật completedSessions trên root + enrollment khớp khóa.
- * Math.max theo số buổi đích — gọi nhiều lần (API + socket) không cộng đôi.
+ * Math.max theo số buổi đích - gọi nhiều lần (API + socket) không cộng đôi.
  */
 export function applyAttendanceProgressToStudents(prev, payload, options = {}) {
   const list = Array.isArray(prev) ? prev : [];
@@ -144,11 +144,11 @@ export function applyAttendanceProgressToStudents(prev, payload, options = {}) {
       const lockEnrollment = (enrollment) => (
         (enrollmentId || course) && enrollmentMatches(enrollment, course, enrollmentId)
           ? {
-              ...enrollment,
-              can_check_in: false,
-              remaining_cooldown_hours: 12,
-              last_attendance_at: patched.last_attendance_at,
-            }
+            ...enrollment,
+            can_check_in: false,
+            remaining_cooldown_hours: 12,
+            last_attendance_at: patched.last_attendance_at,
+          }
           : enrollment
       );
       if (Array.isArray(patched.enrollments)) {

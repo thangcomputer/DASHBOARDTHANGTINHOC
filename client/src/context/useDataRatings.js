@@ -53,7 +53,7 @@ export function starsFromRating(r) {
 
 /**
  * Tính avg/count từ document GV (có thể kèm ratings từ API list).
- * Dùng trực tiếp object trong bảng Admin — không phụ thuộc TeachersContext stale.
+ * Dùng trực tiếp object trong bảng Admin - không phụ thuộc TeachersContext stale.
  */
 export function computeTeacherRating(teacher) {
   if (!teacher) return { avg: 0, count: 0, ratings: [] };
@@ -159,7 +159,7 @@ export function useDataRatings({ students, teachers, setTeachers, triggerBackgro
         evalId ? `/teacher?evaluationId=${encodeURIComponent(evalId)}` : '/teacher',
       );
       if (typeof refreshTeachers === 'function') {
-        Promise.resolve(refreshTeachers()).catch(() => {});
+        Promise.resolve(refreshTeachers()).catch(() => { });
       }
       triggerBackgroundSync();
     } catch (err) {

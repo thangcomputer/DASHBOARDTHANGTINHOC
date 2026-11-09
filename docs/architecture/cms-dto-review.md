@@ -1,4 +1,4 @@
-# Cms DTO Review — Sprint 4.4 Batch 4
+# Cms DTO Review - Sprint 4.4 Batch 4
 
 ## DTO & Validation Extraction Complete
 - **Zod Validators**: Generated inside `dto/validators/` with `passthrough()` for zero-regression backward compatibility.

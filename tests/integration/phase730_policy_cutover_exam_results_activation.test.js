@@ -1,5 +1,5 @@
 /**
- * Phase 7.30 — Controlled cutover + production activation for /api/exam-results
+ * Phase 7.30 - Controlled cutover + production activation for /api/exam-results
  *
  * LIVE: auth → branchFilter → policyShadowExamResult → examResultsCutoverGate → handler.
  * Legacy list/create/update authz remains handler-owned; delete permission in gate.
@@ -69,10 +69,10 @@ function sub(opts = {}) {
     actorDoc: role === 'teacher' || role === 'student'
       ? { role, adminRole: null, permissions: [] }
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
-          permissions: opts.permissions ?? PERMS,
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : 'STAFF',
+        permissions: opts.permissions ?? PERMS,
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -407,8 +407,8 @@ test('Phase7.30 side-effect audit', () => {
 test('Phase7.30 functional smoke: list authz; mutations NOT EXECUTED', () => {
   assert.equal(parity('list', sub({ id: STUDENT_A, role: 'student' })).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — exam-results create/update/delete production mutations',
-    'NOT EXECUTED — exam-results create/update/delete production mutations',
+    'NOT EXECUTED - exam-results create/update/delete production mutations',
+    'NOT EXECUTED - exam-results create/update/delete production mutations',
   );
 });
 

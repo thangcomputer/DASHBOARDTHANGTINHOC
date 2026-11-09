@@ -32,16 +32,16 @@ async function login(identifier, password, roleType) {
   try {
     const csrfRes = await axios.get(`${API_URL}/api/auth/csrf-token`);
     const csrfToken = csrfRes.data.csrfToken;
-    
+
     let endpoint = '/api/auth/login';
     let payload = { identifier, password, role: roleType };
-    
+
     if (roleType === 'admin') {
       endpoint = '/api/auth/login/internal';
       payload = { identifier, password };
     }
-    
-    const res = await axios.post(`${API_URL}${endpoint}`, 
+
+    const res = await axios.post(`${API_URL}${endpoint}`,
       payload,
       { headers: { 'Cookie': `csrf_token=${csrfToken}`, 'x-csrf-token': csrfToken } }
     );
@@ -72,7 +72,7 @@ async function runTests() {
   const sendNotification = async (auth, payload) => {
     try {
       const res = await axios.post(`${API_URL}/api/notifications`, payload, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${auth.token}`,
           'Cookie': `csrf_token=${auth.csrfToken}`,
           'x-csrf-token': auth.csrfToken
@@ -163,13 +163,13 @@ async function runTests() {
       'x-csrf-token': tokens.branchAdmin.csrfToken
     };
     const listRes = await axios.get(`${API_URL}/api/notifications?limit=10`, { headers: authH });
-    
+
     if (listRes.data.success) {
       addResult('System', 'Admin Staff', 'Fetch Notif', 'List', 'Passed', 'High', 'Lấy danh sách thành công');
-      
+
       if (listRes.data.data.length > 0) {
         const firstNotifId = listRes.data.data[0].id;
-        
+
         // Mark Read
         const readRes = await axios.put(`${API_URL}/api/notifications/mark-read`, { notificationId: firstNotifId }, { headers: authH });
         if (readRes.data.success) {
@@ -177,7 +177,7 @@ async function runTests() {
         } else {
           addResult('Admin Staff', 'System', 'Read Notif', 'Mark Read', 'Failed', 'High', 'Mark read lỗi');
         }
-        
+
         // Check Badge Count
         const countRes = await axios.get(`${API_URL}/api/notifications/count`, { headers: authH });
         if (countRes.data.success) {

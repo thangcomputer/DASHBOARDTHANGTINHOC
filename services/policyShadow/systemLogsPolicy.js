@@ -1,7 +1,7 @@
 /**
  * Policy shadow for LIVE /api/system-logs (Wave 6.16).
  * Legacy: authMiddleware + isAdmin (role admin|staff).
- * VIEW_LOGS exists in constants but is UNUSED on these routes — do not invent wiring.
+ * VIEW_LOGS exists in constants but is UNUSED on these routes - do not invent wiring.
  * Platform-wide list (action allowlist is DATA filter, not HTTP deny by branch/tenant).
  */
 const ACTIONS = new Set(['list', 'create', 'delete']);
@@ -18,7 +18,7 @@ function buildSubject({ user, actorDoc, userBranchId }) {
   };
 }
 
-/** Mirrors isAdmin — JWT role admin OR staff. */
+/** Mirrors isAdmin - JWT role admin OR staff. */
 function evaluateIsAdmin(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
@@ -49,7 +49,7 @@ function evaluateLegacySystemLog(subject, action, ctx = {}) {
       dataScope: 'platform',
     };
   }
-  // create: body.action allowlist is business 400 after authz — not HTTP 403
+  // create: body.action allowlist is business 400 after authz - not HTTP 403
   return {
     ...base,
     reason: `${base.reason}_system_log`,
@@ -65,7 +65,7 @@ function evaluatePolicySystemLog(subject, action, ctx = {}, _untrusted = {}) {
   void _untrusted.bodyTenantId;
   void _untrusted.bodyUserId;
   void _untrusted.queryBranchId;
-  // body.action is operation allowlist param — not actor identity
+  // body.action is operation allowlist param - not actor identity
   void _untrusted.bodyAction;
   const legacy = evaluateLegacySystemLog(subject, action, ctx);
   if (legacy.decision === 'DENY') {

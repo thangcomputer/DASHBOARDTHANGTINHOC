@@ -76,8 +76,8 @@ const CountdownTimer = ({ deadline }) => {
   useEffect(() => {
     if (!deadline) return;
     const calc = () => {
-      const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
-      const d = new Date(new Date(deadline).toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
+      const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
+      const d = new Date(new Date(deadline).toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
       d.setHours(23, 59, 59, 999);
       const diff = d.getTime() - now.getTime();
       if (diff <= 0) return 'Đã hết hạn';
@@ -179,7 +179,7 @@ const LessonItem = ({ lesson, index, isCurrent, onClick }) => {
         ${isCurrent ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : fullyWatched ? 'bg-slate-50 border-l-4 border-l-transparent' : 'bg-white hover:bg-slate-50 border-l-4 border-l-transparent'}
       `}
     >
-      {/* Status Icon — tick chỉ khi xem đủ 100% (không dùng cửa ≥67%) */}
+      {/* Status Icon - tick chỉ khi xem đủ 100% (không dùng cửa ≥67%) */}
       <div className="mt-0.5 flex-shrink-0">
         {isCurrent ? (
           <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-600 flex items-center justify-center">
@@ -398,9 +398,9 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       if (res.success) {
         const fileUrl = res.fileUrl;
         const submitRes = await api.assignments.submit(assignmentObj._id, {
-           studentId: student?.id || session?.id,
-           teacherId: assignmentObj.teacherId || student?.teacherId || undefined,
-           submittedFileUrl: fileUrl
+          studentId: student?.id || session?.id,
+          teacherId: assignmentObj.teacherId || student?.teacherId || undefined,
+          submittedFileUrl: fileUrl
         });
 
         if (submitRes.success) {
@@ -445,13 +445,13 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     [student?.examProgress, examScoreSubjectIds, examSubjectsCatalog]
   );
 
-  /** Bài tập chưa nộp — đã nộp/chấm điểm thì không tính badge tab */
+  /** Bài tập chưa nộp - đã nộp/chấm điểm thì không tính badge tab */
   const pendingAssignmentCount = useMemo(() => {
     const list = trainingData?.assignments || [];
     return list.filter((a, idx) => !a.mySubmission && !localSubmissions[idx]).length;
   }, [trainingData?.assignments, localSubmissions]);
 
-  // Lấy tiến độ khóa học từ server (TrainingProgress) — không dùng localStorage SoT
+  // Lấy tiến độ khóa học từ server (TrainingProgress) - không dùng localStorage SoT
   useEffect(() => {
     if (isAdmin) return;
     let cancelled = false;
@@ -539,7 +539,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     deepLinkRef.current = null;
   }, [lessons]);
 
-  // Load lessons khi chọn khoá học — ưu tiên API server (completed/unlocked)
+  // Load lessons khi chọn khoá học - ưu tiên API server (completed/unlocked)
   useEffect(() => {
     if (!selectedCourse) return;
     const courseId = courseKey(selectedCourse);
@@ -570,12 +570,12 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             || res.data[0];
           setCurrentLesson(firstActive);
         } else {
-          // Fallback cấu trúc từ props — completed chỉ từ server khi có API
+          // Fallback cấu trúc từ props - completed chỉ từ server khi có API
           let list = [];
           (selectedCourse.chapters || [{ title: 'Danh mục', lessons: selectedCourse.lessons || selectedCourse.videos || [] }]).forEach((chap) => {
             (chap.lessons || []).forEach((l) => {
               const lId = l.id || l._id || `${courseId}-${list.length}`;
-              // Offline fallback: chỉ mở bài 1 — không tin UI state để mở tuần tự
+              // Offline fallback: chỉ mở bài 1 - không tin UI state để mở tuần tự
               list.push({
                 ...l,
                 chapterTitle: chap.title,
@@ -658,7 +658,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
     }
   }, [courses, selectedCourse]);
 
-  // Complete chỉ khi SERVER xác nhận — flush progress trước, gửi videoDuration để FE/BE cùng threshold
+  // Complete chỉ khi SERVER xác nhận - flush progress trước, gửi videoDuration để FE/BE cùng threshold
   const completeLessonOnServer = useCallback(async (actualWatched, totalDur) => {
     if (!currentLesson || !selectedCourse) return { success: false };
     const lessonId = currentLesson._id || currentLesson.id;
@@ -702,7 +702,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       }
       const courseId = selectedCourse._id || selectedCourse.id;
       await fetchLessons(courseId);
-      
+
       try {
         const prog = await lmsApiFetch('/progress/me');
         if (prog?.success && prog.data) setCourseProgressMap(prog.data);
@@ -710,7 +710,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
       return true;
     } catch {
       toast.error('Lỗi mạng khi ghi nhận hoàn thành');
-      return false; 
+      return false;
     }
   }, [currentLesson, selectedCourse, toast, completeLessonOnServer, fetchLessons, setCurrentLesson]);
 
@@ -849,7 +849,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
   const ownedProbeRef = useRef(new Set());
 
-  // Sau reload: xác minh quyền sở hữu từ API lessons (meta.owned) — server là nguồn tin cậy
+  // Sau reload: xác minh quyền sở hữu từ API lessons (meta.owned) - server là nguồn tin cậy
   useEffect(() => {
     if (!courses.length) return undefined;
     let cancelled = false;
@@ -881,7 +881,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   const selectedCoursePending = !selectedCourseOwned && Boolean(pendingByCourseId[selectedCourseId]);
   const selectedCourseHasProgress = selectedCourse ? courseProgressOf(selectedCourse) > 0 : false;
   const canContinueLearning = selectedCourseOwned || selectedCourseHasProgress;
-  // Player full-screen (z-100) — nhấc chat/popup tin·lịch lên trên lớp học
+  // Player full-screen (z-100) - nhấc chat/popup tin·lịch lên trên lớp học
   const isLmsFullscreenPlayer = Boolean(selectedCourse) && selectedCourseOwned;
   useEffect(() => {
     if (!isLmsFullscreenPlayer) {
@@ -1101,11 +1101,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
 
           {price > 0 ? (
             <div className="absolute top-3 left-3 z-[1]" title={owned ? 'Khóa đã mua' : 'Khóa có phí'}>
-              <span className={`inline-flex items-center justify-center w-9 h-9 aspect-square shrink-0 rounded-full shadow-md border ${
-                owned
+              <span className={`inline-flex items-center justify-center w-9 h-9 aspect-square shrink-0 rounded-full shadow-md border ${owned
                   ? 'bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-600 border-amber-200/90 text-amber-950 shadow-amber-400/40'
                   : 'bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 border-amber-200/80 text-amber-950'
-              }`}>
+                }`}>
                 <Crown size={16} className="shrink-0" fill="currentColor" aria-hidden="true" />
                 <span className="sr-only">{owned ? 'Đã mua' : 'Khóa VIP'}</span>
               </span>
@@ -1161,11 +1160,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
             </div>
 
             <span
-              className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black  tracking-wide shadow-sm transition-all ${
-                owned
+              className={`inline-flex items-center gap-1 shrink-0 min-h-9 px-3 rounded-xl text-[11px] font-black  tracking-wide shadow-sm transition-all ${owned
                   ? 'bg-emerald-600 text-white group-hover:bg-emerald-700 group-hover:shadow-md'
                   : 'bg-red-600 text-white group-hover:bg-red-700 group-hover:shadow-md'
-              }`}
+                }`}
             >
               {owned ? 'Vào học' : 'Xem / Mua'}
               <ChevronRight size={14} className="opacity-90 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
@@ -1188,605 +1186,602 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
   if (!selectedCourse) {
     return (
       <>
-      <div className="w-full animate-in fade-in duration-500 min-h-full">
-        {/* Header */}
-        <div className={`flex items-start justify-between gap-3 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) && !isAdmin && !onBack ? 'hidden' : 'mb-5'}`}>
-          <div className="flex gap-3 min-w-0">
-            {onBack && (
-              <button type="button" onClick={onBack} className="w-10 h-10 flex flex-shrink-0 items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm mt-0.5">
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            <div className={`min-w-0 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) ? 'hidden' : ''}`}>
-              <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-snug">
-                {hideTabBar
-                  ? ({
-                    courses: 'Video học tập',
-                    files: 'Tài liệu & phần mềm',
-                    software: 'Tài liệu & phần mềm',
-                    assignments: 'Bài tập về nhà',
-                    exams: 'Điểm thi',
-                  }[mainTab] || 'Tài liệu học tập')
-                  : 'Tài liệu học tập'}
-              </h1>
-              <p className="text-slate-500 font-medium mt-1 text-xs sm:text-sm leading-relaxed">
-                {hideTabBar
-                  ? ({
-                    courses: 'Xem video bài giảng theo khóa học của bạn',
-                    files: 'Tải tài liệu học tập và phần mềm kèm hướng dẫn cài đặt',
-                    software: 'Tải tài liệu học tập và phần mềm kèm hướng dẫn cài đặt',
-                    assignments: 'Hoàn thành và nộp bài tập về nhà',
-                    exams: 'Theo dõi kết quả các bài thi của bạn',
-                  }[mainTab] || 'Xem nội dung học tập')
-                  : 'Xem video bài giảng và hoàn thành bài tập về nhà để nắm vững kiến thức'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${showAdminPanel ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
-              >
-                <BarChart2 size={16} /> <span className="hidden sm:inline">Xem tiến độ</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Admin Progress Panel */}
-        {isAdmin && showAdminPanel && courses.length > 0 && (
-          <div className="mb-6">
-            <AdminProgressPanel courseId={courses[0]?._id} />
-          </div>
-        )}
-
-        {/* Tabs — ẩn khi vào từ menu riêng (Video / Tài liệu / Bài tập / Điểm thi) */}
-        {!hideTabBar && (
-        <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-2 w-full mb-5 relative z-10">
-          {[
-            { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
-            { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
-            { key: 'assignments', icon: BookOpen, label: 'Bài tập về nhà', count: pendingAssignmentCount },
-            { key: 'exams', icon: Award, label: 'Điểm thi', count: (student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length },
-          ].map(t => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setMainTab(t.key)}
-              title={t.label}
-              aria-label={t.label}
-              className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
-                ? 'bg-red-500 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-            >
-              <t.icon size={15} className="shrink-0" aria-hidden="true" />
-              <span className="text-[11px] leading-tight text-center line-clamp-2 min-h-[2.1rem]">
-                {t.label}
-              </span>
-              {t.count > 0 && (
-                <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
-                  {t.count}
-                </span>
+        <div className="w-full animate-in fade-in duration-500 min-h-full">
+          {/* Header */}
+          <div className={`flex items-start justify-between gap-3 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) && !isAdmin && !onBack ? 'hidden' : 'mb-5'}`}>
+            <div className="flex gap-3 min-w-0">
+              {onBack && (
+                <button type="button" onClick={onBack} className="w-10 h-10 flex flex-shrink-0 items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm mt-0.5">
+                  <ArrowLeft size={18} />
+                </button>
               )}
-            </button>
-          ))}
-        </div>
-        )}
-        {hideTabBar && ['files', 'software', 'assignments'].includes(mainTab) && (
-          <div className="mb-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
-            {[
-              { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
-              { key: 'software', icon: LinkIcon, label: 'Phần mềm', count: trainingData?.softwareLinks?.length || 0 },
-              { key: 'assignments', icon: BookOpen, label: 'Bài tập', count: pendingAssignmentCount },
-            ].map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                role="tab"
-                aria-selected={mainTab === t.key}
-                onClick={() => setMainTab(t.key)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <t.icon size={15} /> {t.label}
-                {t.count > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-black text-slate-600">{t.count}</span>}
-              </button>
-            ))}
+              <div className={`min-w-0 ${hideTabBar && ['courses', 'files', 'software', 'assignments'].includes(mainTab) ? 'hidden' : ''}`}>
+                <h1 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-bold text-slate-800 tracking-tight leading-snug">
+                  {hideTabBar
+                    ? ({
+                      courses: 'Video học tập',
+                      files: 'Tài liệu & phần mềm',
+                      software: 'Tài liệu & phần mềm',
+                      assignments: 'Bài tập về nhà',
+                      exams: 'Điểm thi',
+                    }[mainTab] || 'Tài liệu học tập')
+                    : 'Tài liệu học tập'}
+                </h1>
+                <p className="text-slate-500 font-medium mt-1 text-xs sm:text-sm leading-relaxed">
+                  {hideTabBar
+                    ? ({
+                      courses: 'Xem video bài giảng theo khóa học của bạn',
+                      files: 'Tải tài liệu học tập và phần mềm kèm hướng dẫn cài đặt',
+                      software: 'Tải tài liệu học tập và phần mềm kèm hướng dẫn cài đặt',
+                      assignments: 'Hoàn thành và nộp bài tập về nhà',
+                      exams: 'Theo dõi kết quả các bài thi của bạn',
+                    }[mainTab] || 'Xem nội dung học tập')
+                    : 'Xem video bài giảng và hoàn thành bài tập về nhà để nắm vững kiến thức'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPanel(!showAdminPanel)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${showAdminPanel ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
+                >
+                  <BarChart2 size={16} /> <span className="hidden sm:inline">Xem tiến độ</span>
+                </button>
+              )}
+            </div>
           </div>
-        )}
-        {hideTabBar && <div className="mb-5 border-b border-slate-200" />}
 
-        {mainTab === 'courses' && (
-          <>
-          <div className="mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-end">
-            <label className="flex flex-col gap-1 min-w-0 sm:min-w-[9.5rem] flex-1">
-              <span className="text-[10px] font-bold  tracking-wide text-slate-500">Trạng thái học</span>
-              <CmsSelect
-                value={courseFilterStatus}
-                onChange={(e) => setCourseFilterStatus(e.target.value)}
-                className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
-              >
-                <option value="all">Tất cả</option>
-                <option value="done">Đã học xong</option>
-                <option value="learning">Đang học</option>
-                <option value="new">Chưa học</option>
-              </CmsSelect>
-            </label>
-            <label className="flex flex-col gap-1 min-w-0 sm:min-w-[8.5rem] flex-1">
-              <span className="text-[10px] font-bold  tracking-wide text-slate-500">Học phí</span>
-              <CmsSelect
-                value={courseFilterPrice}
-                onChange={(e) => setCourseFilterPrice(e.target.value)}
-                className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
-              >
-                <option value="all">Tất cả</option>
-                <option value="paid">Có phí</option>
-                <option value="free">Miễn phí</option>
-              </CmsSelect>
-            </label>
-            <label className="flex flex-col gap-1 min-w-0 sm:min-w-[10rem] flex-1">
-              <span className="text-[10px] font-bold  tracking-wide text-slate-500">Môn học</span>
-              <CmsSelect
-                value={courseFilterSubject}
-                onChange={(e) => setCourseFilterSubject(e.target.value)}
-                className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
-              >
-                <option value="all">Tất cả môn</option>
-                {courseSubjectOptions.map((s) => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
-              </CmsSelect>
-            </label>
-            {hasActiveCourseFilters && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCourseFilterStatus('all');
-                  setCourseFilterPrice('all');
-                  setCourseFilterSubject('all');
-                }}
-                className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50"
-              >
-                <X size={14} aria-hidden="true" /> Xóa lọc
-              </button>
-            )}
-          </div>
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="bg-gray-100 animate-pulse rounded-[32px] h-64" />
-              ))}
-            </div>
-          ) : courses.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
-              <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
-              <p className="font-bold">Chưa có khóa học nào</p>
-              <p className="text-xs mt-1">Chưa có video đào tạo phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
-            </div>
-          ) : filteredCourses.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
-              <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
-              <p className="font-bold">Không có khóa khớp bộ lọc</p>
-              <p className="text-xs mt-1">Thử đổi trạng thái, học phí hoặc môn học.</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {freeFilteredCourses.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Gift size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
-                    <h2 className="text-sm font-black  tracking-wide text-slate-700">Khóa miễn phí</h2>
-                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full tabular-nums">{freeFilteredCourses.length}</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                    {freeFilteredCourses.map((course, idx) => renderVideoCourseCard(course, idx))}
-                  </div>
-                </section>
-              )}
-              {paidFilteredCourses.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-2 mb-3 pt-1 border-t border-slate-200/80">
-                    <Crown size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
-                    <h2 className="text-sm font-black  tracking-wide text-slate-700">Khóa có phí</h2>
-                    <span className="text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full tabular-nums">{paidFilteredCourses.length}</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                    {paidFilteredCourses.map((course, idx) => renderVideoCourseCard(course, idx))}
-                  </div>
-                </section>
-              )}
+          {/* Admin Progress Panel */}
+          {isAdmin && showAdminPanel && courses.length > 0 && (
+            <div className="mb-6">
+              <AdminProgressPanel courseId={courses[0]?._id} />
             </div>
           )}
-          </>
-        )}
 
-        {/* FILES TAB */}
-        {mainTab === 'files' && (
-          <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-              <Download className="text-green-600" /> Tài liệu Khóa học
-            </h2>
-            <div className="space-y-3">
-              {trainingData?.files?.map((file, idx) => {
-                const fKey = file.id ?? `f-${idx}`;
-                const descHtml = file.desc || '';
-                const plain = htmlToPlainText(descHtml);
-                const defaultNote = 'Tài liệu đính kèm từ Admin.';
-                const hasHtml = /<[a-z][\s\S]*>/i.test(descHtml);
-                const expanded = expandedFileDescKey === fKey;
-                const showToggle = plain.length > 120 || hasHtml;
-                const rawUrl = file.fileUrl || file.url || file.link || '';
-                const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
-                  || /^https?:\/\//i.test(String(rawUrl));
-                return (
-                  <div key={fKey} className="p-4 rounded-xl border border-slate-100 hover:bg-green-50/50 hover:border-green-200 transition-all flex flex-col md:flex-row justify-between md:items-start gap-4 group">
-                    <div className="flex items-start gap-4 min-w-0 flex-1">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${
-                        isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-rose-500' : 'bg-green-500')
-                      }`}>
-                        {isLink ? 'Link' : (file.fileType || 'FILE')}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-slate-800 text-base leading-tight group-hover:text-green-700 transition-colors">{file.title}</h3>
-                        {!descHtml && !plain ? (
-                          <p className="text-[12px] text-slate-500 mt-1 mb-1">{defaultNote}</p>
-                        ) : expanded && hasHtml ? (
-                          <div
-                            className="text-[12px] text-slate-600 mt-1 mb-1 max-h-[240px] overflow-y-auto leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-green-600 [&_a]:underline"
-                            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(descHtml) }}
-                          />
-                        ) : (
-                          <p className={`text-[12px] text-slate-500 mt-1 mb-1 ${showToggle && !expanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
-                            {plain || defaultNote}
-                          </p>
-                        )}
-                        {showToggle ? (
-                          <button
-                            type="button"
-                            onClick={() => setExpandedFileDescKey(expanded ? null : fKey)}
-                            className="text-[11px] font-bold text-green-600 hover:text-green-800 mt-0.5"
-                          >
-                            {expanded ? 'Thu gọn' : 'Xem thêm mô tả / lưu ý'}
-                          </button>
-                        ) : null}
-                        <p className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 w-fit rounded mt-1">
-                          {isLink ? 'Liên kết ngoài' : (file.fileSize || 'N/A')}
-                        </p>
-                      </div>
-                    </div>
-                    {!rawUrl ? (
-                      <span className="w-full md:w-auto px-5 py-2.5 rounded-[10px] text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 text-center shrink-0 self-center md:self-start">Chưa có file</span>
-                    ) : isLink ? (
-                      <a
-                        href={resolveMediaUrl(rawUrl)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full md:w-auto px-5 py-2.5 bg-sky-600 text-white border border-transparent rounded-[10px] text-sm font-bold hover:bg-sky-700 hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start no-underline"
-                      >
-                        <ExternalLink size={16} /> Mở link
-                      </a>
-                    ) : (() => {
-                      const href = buildMediaDownloadUrl(
-                        rawUrl,
-                        file.fileOriginalName || file.title,
-                      );
-                      if (!href) {
-                        return (
-                          <span className="w-full md:w-auto px-5 py-2.5 rounded-[10px] text-sm font-bold text-amber-700 border border-amber-200 bg-amber-50 text-center shrink-0 self-center md:self-start">
-                            Link lỗi — Admin upload lại
-                          </span>
-                        );
-                      }
-                      return (
-                        <button
-                          type="button"
-                          className="w-full md:w-auto px-5 py-2.5 bg-red-600 text-white border border-transparent rounded-[10px] text-sm font-bold hover:bg-red-700 hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start"
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            try {
-                              await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
-                            } catch (err) {
-                              toast.error(err?.message || 'Không tải được tài liệu');
-                            }
-                          }}
-                        >
-                          <Download size={16} /> Tải về
-                        </button>
-                      );
-                    })()}
-                  </div>
-                );
-              })}
-              {(!trainingData?.files || trainingData.files.length === 0) && (
-                <div className="col-span-full py-16 text-center text-slate-400">
-                  <FileBox size={40} className="mx-auto mb-3 opacity-40" />
-                  <p className="font-bold">Chưa có tài liệu</p>
-                  <p className="text-xs mt-1">Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* SOFTWARE LINKS TAB */}
-        {mainTab === 'software' && (
-          <SoftwareLinksTable
-            items={trainingData?.softwareLinks || []}
-            title=""
-          />
-        )}
-
-        {/* ASSIGNMENTS TAB */}
-        {mainTab === 'assignments' && (
-          <div className="cms-card !p-4 sm:!p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
-              <BookOpen className="text-green-600" /> Bài tập được giao
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-              {trainingData?.assignments?.map((a, idx) => {
-                const submission = a.mySubmission || localSubmissions[idx];
-                let targetDate = null;
-                let isLate = false;
-                if (a.deadline) {
-                  const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
-                  targetDate = new Date(new Date(a.deadline).toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
-                  targetDate.setHours(23, 59, 59, 999);
-                  isLate = now.getTime() > targetDate.getTime();
-                }
-                const aKey = a._id || a.id || `a-${idx}`;
-                const aDesc = a.description || '';
-                const aPlain = htmlToPlainText(aDesc);
-                const aHasHtml = /<[a-z][\s\S]*>/i.test(aDesc);
-                const aExpanded = expandedAssignKey === aKey;
-                const aShowToggle = aPlain.length > 160 || aHasHtml;
-                const aDefault = 'Hoàn thành và nộp file bài tập theo đúng định dạng được yêu cầu (.zip, .rar, .pdf).';
-                const isAdminAssign = ['admin', 'staff'].includes(String(a.assignedByRole || '').toLowerCase());
-                const isTeacherAssign = String(a.assignedByRole || '').toLowerCase() === 'teacher'
-                  || (!a.assignedByRole && !!a.teacherId);
-                const assignerLabel = isAdminAssign
-                  ? 'Admin giao'
-                  : (isTeacherAssign ? 'Giáo viên' : (a.assignedByName ? String(a.assignedByName) : 'Giáo viên'));
-                const teacherName = String(a.assignedByName || '').trim();
-                return (
-                  <div
-                    key={aKey}
-                    id={`lms-assignment-${aKey}`}
-                    className={`cms-glass-card min-w-0 h-full p-3 sm:p-4 rounded-2xl border transition-all flex gap-3 items-start ${
-                      focusAssignmentId && String(aKey) === String(focusAssignmentId)
-                        ? 'border-orange-300 bg-orange-50/60 ring-2 ring-orange-200'
-                        : 'border-slate-100 bg-slate-50/40'
+          {/* Tabs - ẩn khi vào từ menu riêng (Video / Tài liệu / Bài tập / Điểm thi) */}
+          {!hideTabBar && (
+            <div className="grid grid-cols-4 gap-2 border-b border-slate-200 pb-2 w-full mb-5 relative z-10">
+              {[
+                { key: 'courses', icon: PlayCircle, label: 'Video học tập', count: courses.length },
+                { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
+                { key: 'assignments', icon: BookOpen, label: 'Bài tập về nhà', count: pendingAssignmentCount },
+                { key: 'exams', icon: Award, label: 'Điểm thi', count: (student.examProgress || []).filter(ep => ep.status && ep.status !== 'chua_thi').length },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setMainTab(t.key)}
+                  title={t.label}
+                  aria-label={t.label}
+                  className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-sm font-semibold transition-all ${mainTab === t.key
+                    ? 'bg-red-500 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
-                  >
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
-                      <FileUp size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col gap-2 mb-2">
-                        <h3 className="font-bold text-slate-800 text-base leading-tight flex items-center gap-2 flex-wrap">
-                          <span className="line-clamp-2 min-w-0">{a.title}</span>
-                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black  tracking-wide border ${
-                            isAdminAssign
-                              ? 'bg-violet-100 text-violet-700 border-violet-200'
-                              : 'bg-red-100 text-red-700 border-red-200'
-                          }`}>
-                            {assignerLabel}
-                          </span>
-                        </h3>
-                        {!isAdminAssign && teacherName && teacherName.toLowerCase() !== 'giảng viên' && (
-                          <p className="text-[11px] text-slate-500 font-medium -mt-1">
-                            Giao bởi: {teacherName}
-                          </p>
-                        )}
-                        {!submission && a.deadline && (
-                          <div className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border flex items-center gap-1.5 whitespace-nowrap w-fit ${isLate ? 'bg-red-50 text-red-600 border-red-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
-                            <Timer size={13} className={isLate ? '' : 'animate-pulse'} />
-                            <CountdownTimer deadline={a.deadline} />
-                          </div>
-                        )}
-                      </div>
-                      {!aDesc && !aPlain ? (
-                        <p className="text-xs text-slate-600 mb-3 line-clamp-2">{aDefault}</p>
-                      ) : aExpanded && aHasHtml ? (
-                        <div
-                          className="text-xs text-slate-600 mb-3 max-h-[220px] overflow-y-auto leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_b]:font-semibold [&_a]:text-green-600"
-                          dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(aDesc) }}
-                        />
-                      ) : (
-                        <p className={`text-xs text-slate-600 mb-3 ${aShowToggle && !aExpanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
-                          {aPlain || aDefault}
-                        </p>
-                      )}
-                      {aShowToggle ? (
-                        <button
-                          type="button"
-                          onClick={() => setExpandedAssignKey(aExpanded ? null : aKey)}
-                          className="text-[11px] font-bold text-green-600 hover:text-green-800 -mt-1 mb-3"
-                        >
-                          {aExpanded ? 'Thu gọn' : 'Xem thêm hướng dẫn'}
-                        </button>
-                      ) : null}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <a href={a.fileUrl || '#'} target="_blank" className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-semibold text-sm transition-all shadow-sm">
-                          <LinkIcon size={15} /> Tải đề bài
-                        </a>
-                        {(() => {
-                          if (!submission) {
-                            return (
-                              <label className={`flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition-all shadow-sm ${uploadingAssignId === idx ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
-                                {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <UploadCloud size={16} />}
-                                {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp bài tập'}
-                                <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx} />
-                              </label>
-                            );
-                          }
-                          const isGraded = submission.status === 'graded';
-                          const feedback = String(submission.teacherFeedback || '').trim();
-                          return (
-                            <>
-                              {isGraded ? (
-                                <div className={`flex flex-col gap-1.5 px-4 py-2.5 border rounded-xl font-semibold text-sm shadow-sm ${getGradeBadgeClasses(submission.grade)}`}>
-                                  <div className="flex items-center justify-center gap-2">
-                                    <CheckCircle2 size={16} className={getGradeIconClasses(submission.grade)} />
-                                    Điểm: {submission.grade}/10
-                                  </div>
-                                  {feedback ? (
-                                    <p className="text-left text-[11px] font-medium leading-relaxed opacity-90 border-t border-black/5 pt-1.5 mt-0.5">
-                                      <span className="font-bold">Góp ý GV: </span>
-                                      {feedback}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-400 border border-slate-200 rounded-xl font-semibold text-sm cursor-not-allowed shadow-inner opacity-80">
-                                  <CheckCircle2 size={16} />
-                                  Đã nộp bài
-                                </div>
-                              )}
-                              <label className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${isGraded ? 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed opacity-60' : uploadingAssignId === idx ? 'bg-orange-50 border border-orange-200 text-orange-600 cursor-not-allowed opacity-50' : 'bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 cursor-pointer shadow-sm'}`}>
-                                {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> : <RefreshCw size={16} />}
-                                {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp lại'}
-                                <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx || isGraded} />
-                              </label>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {(!trainingData?.assignments || trainingData.assignments.length === 0) && (
-                <div className="text-center py-12 text-slate-400">
-                  <CheckCircle2 size={32} className="mx-auto mb-2 text-slate-200" />
-                  <p className="text-sm">Hiện tại bạn không có bài tập nào cần nộp.</p>
-                </div>
-              )}
+                >
+                  <t.icon size={15} className="shrink-0" aria-hidden="true" />
+                  <span className="text-[11px] leading-tight text-center line-clamp-2 min-h-[2.1rem]">
+                    {t.label}
+                  </span>
+                  {t.count > 0 && (
+                    <span className={`absolute top-1.5 right-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none ${mainTab === t.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
-          </div>
-        )}
+          )}
+          {hideTabBar && ['files', 'software', 'assignments'].includes(mainTab) && (
+            <div className="mb-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist">
+              {[
+                { key: 'files', icon: FileBox, label: 'Tài liệu', count: trainingData?.files?.length || 0 },
+                { key: 'software', icon: LinkIcon, label: 'Phần mềm', count: trainingData?.softwareLinks?.length || 0 },
+                { key: 'assignments', icon: BookOpen, label: 'Bài tập', count: pendingAssignmentCount },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={mainTab === t.key}
+                  onClick={() => setMainTab(t.key)}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-all ${mainTab === t.key ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <t.icon size={15} /> {t.label}
+                  {t.count > 0 && <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-black text-slate-600">{t.count}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {hideTabBar && <div className="mb-5 border-b border-slate-200" />}
 
-        {/* EXAMS TAB */}
-        {mainTab === 'exams' && (() => {
-          const examSubjects = examScoreRows;
-
-          const renderEssayCell = (sub) => {
-            if (sub.essayScore != null) {
-              return (
-                <span className={`font-bold px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs ${sub.essayScore >= 5 ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-red-700 bg-red-50 border border-red-100'}`}>
-                  {sub.essayScore}/10
-                </span>
-              );
-            }
-            if (sub.thucHanh === 'da_nop') {
-              return <span className="text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs">Chờ chấm</span>;
-            }
-            if (sub.thucHanh === 'chua_nop' || !sub.thucHanh) {
-              return <span className="text-gray-400 font-medium text-[10px] sm:text-xs">Chưa làm</span>;
-            }
-            return <span className="text-gray-600 font-medium text-[10px] sm:text-xs break-words">{sub.thucHanh}</span>;
-          };
-
-          const renderResultCell = (sub) => {
-            const displayStatus = getExamProgressDisplayStatus(sub);
-            if (displayStatus === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">Đạt</span>;
-            if (displayStatus === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">Không đạt</span>;
-            if (displayStatus === 'cho_nop') return <span className="text-blue-600 font-black text-[10px] sm:text-xs">Chờ nộp</span>;
-            if (displayStatus === 'cho_cham') return <span className="text-amber-600 font-black text-[10px] sm:text-xs">Chờ chấm</span>;
-            if (sub.status === 'dang_khoa') return <span className="text-orange-500 font-bold text-[10px] sm:text-xs">Đang khóa</span>;
-            return <span className="text-gray-400 font-bold text-[10px] sm:text-xs">Chưa thi</span>;
-          };
-
-          return (
-            <div className="bg-white rounded-2xl p-3 sm:p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[280px]">
-              <div className="flex items-center justify-between mb-3 sm:mb-6">
-                <h2 className="text-sm sm:text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <Award className="text-green-600 shrink-0" size={18} aria-hidden="true" />
-                  Bảng Điểm Tổng Hợp
-                </h2>
-              </div>
-
-              {/* Mobile: card rows — hiện đủ mọi cột */}
-              <div className="sm:hidden space-y-2.5">
-                {examSubjects.map((sub, idx) => {
-                  const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '—';
-                  return (
-                    <article key={sub.id} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
-                      <div className="flex items-start gap-2.5 mb-2.5">
-                        <span className="text-[10px] font-black text-slate-400 tabular-nums shrink-0 pt-0.5">
-                          {String(idx + 1).padStart(2, '0')}
-                        </span>
-                        <h3 className="text-xs font-bold text-slate-800 leading-snug flex-1 min-w-0 break-words">
-                          {sub.label}
-                        </h3>
-                        <div className="shrink-0 text-right">{renderResultCell(sub)}</div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
-                          <p className="font-bold  tracking-wide text-slate-400 mb-0.5">Trắc nghiệm</p>
-                          <p className="font-bold text-slate-700 tabular-nums break-words">{trScore}</p>
-                        </div>
-                        <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
-                          <p className="font-bold  tracking-wide text-slate-400 mb-0.5 leading-tight">Tự luận / Thực hành</p>
-                          <div className="mt-0.5">{renderEssayCell(sub)}</div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-                {examSubjects.length === 0 && (
-                  <p className="text-center text-xs text-slate-400 py-8">Chưa có dữ liệu điểm thi.</p>
+          {mainTab === 'courses' && (
+            <>
+              <div className="mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-end">
+                <label className="flex flex-col gap-1 min-w-0 sm:min-w-[9.5rem] flex-1">
+                  <span className="text-[10px] font-bold  tracking-wide text-slate-500">Trạng thái học</span>
+                  <CmsSelect
+                    value={courseFilterStatus}
+                    onChange={(e) => setCourseFilterStatus(e.target.value)}
+                    className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="done">Đã học xong</option>
+                    <option value="learning">Đang học</option>
+                    <option value="new">Chưa học</option>
+                  </CmsSelect>
+                </label>
+                <label className="flex flex-col gap-1 min-w-0 sm:min-w-[8.5rem] flex-1">
+                  <span className="text-[10px] font-bold  tracking-wide text-slate-500">Học phí</span>
+                  <CmsSelect
+                    value={courseFilterPrice}
+                    onChange={(e) => setCourseFilterPrice(e.target.value)}
+                    className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="paid">Có phí</option>
+                    <option value="free">Miễn phí</option>
+                  </CmsSelect>
+                </label>
+                <label className="flex flex-col gap-1 min-w-0 sm:min-w-[10rem] flex-1">
+                  <span className="text-[10px] font-bold  tracking-wide text-slate-500">Môn học</span>
+                  <CmsSelect
+                    value={courseFilterSubject}
+                    onChange={(e) => setCourseFilterSubject(e.target.value)}
+                    className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                  >
+                    <option value="all">Tất cả môn</option>
+                    {courseSubjectOptions.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </CmsSelect>
+                </label>
+                {hasActiveCourseFilters && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCourseFilterStatus('all');
+                      setCourseFilterPrice('all');
+                      setCourseFilterSubject('all');
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    <X size={14} aria-hidden="true" /> Xóa lọc
+                  </button>
                 )}
               </div>
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="bg-gray-100 animate-pulse rounded-[32px] h-64" />
+                  ))}
+                </div>
+              ) : courses.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
+                  <p className="font-bold">Chưa có khóa học nào</p>
+                  <p className="text-xs mt-1">Chưa có video đào tạo phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
+                </div>
+              ) : filteredCourses.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <BookOpen size={48} className="mx-auto mb-4 text-slate-200" />
+                  <p className="font-bold">Không có khóa khớp bộ lọc</p>
+                  <p className="text-xs mt-1">Thử đổi trạng thái, học phí hoặc môn học.</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {freeFilteredCourses.length > 0 && (
+                    <section>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Gift size={16} className="text-emerald-600 shrink-0" aria-hidden="true" />
+                        <h2 className="text-sm font-black  tracking-wide text-slate-700">Khóa miễn phí</h2>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full tabular-nums">{freeFilteredCourses.length}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                        {freeFilteredCourses.map((course, idx) => renderVideoCourseCard(course, idx))}
+                      </div>
+                    </section>
+                  )}
+                  {paidFilteredCourses.length > 0 && (
+                    <section>
+                      <div className="flex items-center gap-2 mb-3 pt-1 border-t border-slate-200/80">
+                        <Crown size={16} className="text-amber-500 shrink-0" aria-hidden="true" />
+                        <h2 className="text-sm font-black  tracking-wide text-slate-700">Khóa có phí</h2>
+                        <span className="text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full tabular-nums">{paidFilteredCourses.length}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                        {paidFilteredCourses.map((course, idx) => renderVideoCourseCard(course, idx))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
-              {/* Tablet/desktop: bảng chữ nhỏ, cho phép xuống dòng */}
-              <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-200">
-                <table className="w-full text-left text-[11px] md:text-[13px] table-fixed">
-                  <thead className="bg-[#f8fafc] border-b border-gray-200">
-                    <tr>
-                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 w-10 md:w-14 text-center  tracking-wide leading-tight">STT</th>
-                      <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500  tracking-wide leading-tight">Tên môn thi</th>
-                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[18%]">Trắc nghiệm</th>
-                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[22%]">Tự luận / Thực hành</th>
-                      <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[16%]">Kết quả</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {examSubjects.map((sub, idx) => {
-                      const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '—';
-                      return (
-                        <tr key={sub.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-2 md:px-4 py-2.5 md:py-3 font-bold text-slate-400 text-center tabular-nums align-top">
-                            {String(idx + 1).padStart(2, '0')}
-                          </td>
-                          <td className="px-2 md:px-4 py-2.5 md:py-3 font-bold text-slate-800 break-words whitespace-normal align-top leading-snug">
-                            {sub.label}
-                          </td>
-                          <td className="px-2 md:px-3 py-2.5 md:py-3 font-bold text-center text-slate-600 tabular-nums align-top whitespace-normal break-words">
-                            {trScore}
-                          </td>
-                          <td className="px-2 md:px-3 py-2.5 md:py-3 text-center align-top whitespace-normal break-words">
-                            {renderEssayCell(sub)}
-                          </td>
-                          <td className="px-2 md:px-3 py-2.5 md:py-3 text-center align-top whitespace-normal break-words">
-                            {renderResultCell(sub)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          {/* FILES TAB */}
+          {mainTab === 'files' && (
+            <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                <Download className="text-green-600" /> Tài liệu Khóa học
+              </h2>
+              <div className="space-y-3">
+                {trainingData?.files?.map((file, idx) => {
+                  const fKey = file.id ?? `f-${idx}`;
+                  const descHtml = file.desc || '';
+                  const plain = htmlToPlainText(descHtml);
+                  const defaultNote = 'Tài liệu đính kèm từ Admin.';
+                  const hasHtml = /<[a-z][\s\S]*>/i.test(descHtml);
+                  const expanded = expandedFileDescKey === fKey;
+                  const showToggle = plain.length > 120 || hasHtml;
+                  const rawUrl = file.fileUrl || file.url || file.link || '';
+                  const isLink = String(file.fileType || file.type || '').toUpperCase() === 'LINK'
+                    || /^https?:\/\//i.test(String(rawUrl));
+                  return (
+                    <div key={fKey} className="p-4 rounded-xl border border-slate-100 hover:bg-green-50/50 hover:border-green-200 transition-all flex flex-col md:flex-row justify-between md:items-start gap-4 group">
+                      <div className="flex items-start gap-4 min-w-0 flex-1">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-sm ${isLink ? 'bg-sky-500' : (file.fileType === 'PDF' ? 'bg-rose-500' : 'bg-green-500')
+                          }`}>
+                          {isLink ? 'Link' : (file.fileType || 'FILE')}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-slate-800 text-base leading-tight group-hover:text-green-700 transition-colors">{file.title}</h3>
+                          {!descHtml && !plain ? (
+                            <p className="text-[12px] text-slate-500 mt-1 mb-1">{defaultNote}</p>
+                          ) : expanded && hasHtml ? (
+                            <div
+                              className="text-[12px] text-slate-600 mt-1 mb-1 max-h-[240px] overflow-y-auto leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold [&_a]:text-green-600 [&_a]:underline"
+                              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(descHtml) }}
+                            />
+                          ) : (
+                            <p className={`text-[12px] text-slate-500 mt-1 mb-1 ${showToggle && !expanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
+                              {plain || defaultNote}
+                            </p>
+                          )}
+                          {showToggle ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedFileDescKey(expanded ? null : fKey)}
+                              className="text-[11px] font-bold text-green-600 hover:text-green-800 mt-0.5"
+                            >
+                              {expanded ? 'Thu gọn' : 'Xem thêm mô tả / lưu ý'}
+                            </button>
+                          ) : null}
+                          <p className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 w-fit rounded mt-1">
+                            {isLink ? 'Liên kết ngoài' : (file.fileSize || 'N/A')}
+                          </p>
+                        </div>
+                      </div>
+                      {!rawUrl ? (
+                        <span className="w-full md:w-auto px-5 py-2.5 rounded-[10px] text-sm font-bold text-slate-400 border border-slate-100 bg-slate-50 text-center shrink-0 self-center md:self-start">Chưa có file</span>
+                      ) : isLink ? (
+                        <a
+                          href={resolveMediaUrl(rawUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full md:w-auto px-5 py-2.5 bg-sky-600 text-white border border-transparent rounded-[10px] text-sm font-bold hover:bg-sky-700 hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start no-underline"
+                        >
+                          <ExternalLink size={16} /> Mở link
+                        </a>
+                      ) : (() => {
+                        const href = buildMediaDownloadUrl(
+                          rawUrl,
+                          file.fileOriginalName || file.title,
+                        );
+                        if (!href) {
+                          return (
+                            <span className="w-full md:w-auto px-5 py-2.5 rounded-[10px] text-sm font-bold text-amber-700 border border-amber-200 bg-amber-50 text-center shrink-0 self-center md:self-start">
+                              Link lỗi - Admin upload lại
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            className="w-full md:w-auto px-5 py-2.5 bg-red-600 text-white border border-transparent rounded-[10px] text-sm font-bold hover:bg-red-700 hover:shadow-md transition-all shrink-0 flex items-center justify-center gap-2 self-center md:self-start"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              try {
+                                await downloadMediaFile(rawUrl, file.fileOriginalName || file.title);
+                              } catch (err) {
+                                toast.error(err?.message || 'Không tải được tài liệu');
+                              }
+                            }}
+                          >
+                            <Download size={16} /> Tải về
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
+                {(!trainingData?.files || trainingData.files.length === 0) && (
+                  <div className="col-span-full py-16 text-center text-slate-400">
+                    <FileBox size={40} className="mx-auto mb-3 opacity-40" />
+                    <p className="font-bold">Chưa có tài liệu</p>
+                    <p className="text-xs mt-1">Chưa có tài liệu phù hợp với môn bạn đang học. Liên hệ Admin nếu bạn nghĩ đây là lỗi.</p>
+                  </div>
+                )}
               </div>
             </div>
-          );
-        })()}
+          )}
 
-      </div>
-      {videoPayModal}
-      {videoPurchaseCelebrationModal}
+          {/* SOFTWARE LINKS TAB */}
+          {mainTab === 'software' && (
+            <SoftwareLinksTable
+              items={trainingData?.softwareLinks || []}
+              title=""
+            />
+          )}
+
+          {/* ASSIGNMENTS TAB */}
+          {mainTab === 'assignments' && (
+            <div className="cms-card !p-4 sm:!p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2.5">
+                <BookOpen className="text-green-600" /> Bài tập được giao
+              </h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                {trainingData?.assignments?.map((a, idx) => {
+                  const submission = a.mySubmission || localSubmissions[idx];
+                  let targetDate = null;
+                  let isLate = false;
+                  if (a.deadline) {
+                    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
+                    targetDate = new Date(new Date(a.deadline).toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
+                    targetDate.setHours(23, 59, 59, 999);
+                    isLate = now.getTime() > targetDate.getTime();
+                  }
+                  const aKey = a._id || a.id || `a-${idx}`;
+                  const aDesc = a.description || '';
+                  const aPlain = htmlToPlainText(aDesc);
+                  const aHasHtml = /<[a-z][\s\S]*>/i.test(aDesc);
+                  const aExpanded = expandedAssignKey === aKey;
+                  const aShowToggle = aPlain.length > 160 || aHasHtml;
+                  const aDefault = 'Hoàn thành và nộp file bài tập theo đúng định dạng được yêu cầu (.zip, .rar, .pdf).';
+                  const isAdminAssign = ['admin', 'staff'].includes(String(a.assignedByRole || '').toLowerCase());
+                  const isTeacherAssign = String(a.assignedByRole || '').toLowerCase() === 'teacher'
+                    || (!a.assignedByRole && !!a.teacherId);
+                  const assignerLabel = isAdminAssign
+                    ? 'Admin giao'
+                    : (isTeacherAssign ? 'Giáo viên' : (a.assignedByName ? String(a.assignedByName) : 'Giáo viên'));
+                  const teacherName = String(a.assignedByName || '').trim();
+                  return (
+                    <div
+                      key={aKey}
+                      id={`lms-assignment-${aKey}`}
+                      className={`cms-glass-card min-w-0 h-full p-3 sm:p-4 rounded-2xl border transition-all flex gap-3 items-start ${focusAssignmentId && String(aKey) === String(focusAssignmentId)
+                          ? 'border-orange-300 bg-orange-50/60 ring-2 ring-orange-200'
+                          : 'border-slate-100 bg-slate-50/40'
+                        }`}
+                    >
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-green-100 to-indigo-100 flex items-center justify-center text-green-600 shrink-0 border border-green-200 shadow-inner">
+                        <FileUp size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col gap-2 mb-2">
+                          <h3 className="font-bold text-slate-800 text-base leading-tight flex items-center gap-2 flex-wrap">
+                            <span className="line-clamp-2 min-w-0">{a.title}</span>
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black  tracking-wide border ${isAdminAssign
+                                ? 'bg-violet-100 text-violet-700 border-violet-200'
+                                : 'bg-red-100 text-red-700 border-red-200'
+                              }`}>
+                              {assignerLabel}
+                            </span>
+                          </h3>
+                          {!isAdminAssign && teacherName && teacherName.toLowerCase() !== 'giảng viên' && (
+                            <p className="text-[11px] text-slate-500 font-medium -mt-1">
+                              Giao bởi: {teacherName}
+                            </p>
+                          )}
+                          {!submission && a.deadline && (
+                            <div className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border flex items-center gap-1.5 whitespace-nowrap w-fit ${isLate ? 'bg-red-50 text-red-600 border-red-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+                              <Timer size={13} className={isLate ? '' : 'animate-pulse'} />
+                              <CountdownTimer deadline={a.deadline} />
+                            </div>
+                          )}
+                        </div>
+                        {!aDesc && !aPlain ? (
+                          <p className="text-xs text-slate-600 mb-3 line-clamp-2">{aDefault}</p>
+                        ) : aExpanded && aHasHtml ? (
+                          <div
+                            className="text-xs text-slate-600 mb-3 max-h-[220px] overflow-y-auto leading-relaxed break-words [&_p]:mb-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_b]:font-semibold [&_a]:text-green-600"
+                            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(aDesc) }}
+                          />
+                        ) : (
+                          <p className={`text-xs text-slate-600 mb-3 ${aShowToggle && !aExpanded ? 'line-clamp-2' : ''} whitespace-pre-wrap`}>
+                            {aPlain || aDefault}
+                          </p>
+                        )}
+                        {aShowToggle ? (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedAssignKey(aExpanded ? null : aKey)}
+                            className="text-[11px] font-bold text-green-600 hover:text-green-800 -mt-1 mb-3"
+                          >
+                            {aExpanded ? 'Thu gọn' : 'Xem thêm hướng dẫn'}
+                          </button>
+                        ) : null}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <a href={a.fileUrl || '#'} target="_blank" className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-semibold text-sm transition-all shadow-sm">
+                            <LinkIcon size={15} /> Tải đề bài
+                          </a>
+                          {(() => {
+                            if (!submission) {
+                              return (
+                                <label className={`flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition-all shadow-sm ${uploadingAssignId === idx ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
+                                  {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <UploadCloud size={16} />}
+                                  {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp bài tập'}
+                                  <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx} />
+                                </label>
+                              );
+                            }
+                            const isGraded = submission.status === 'graded';
+                            const feedback = String(submission.teacherFeedback || '').trim();
+                            return (
+                              <>
+                                {isGraded ? (
+                                  <div className={`flex flex-col gap-1.5 px-4 py-2.5 border rounded-xl font-semibold text-sm shadow-sm ${getGradeBadgeClasses(submission.grade)}`}>
+                                    <div className="flex items-center justify-center gap-2">
+                                      <CheckCircle2 size={16} className={getGradeIconClasses(submission.grade)} />
+                                      Điểm: {submission.grade}/10
+                                    </div>
+                                    {feedback ? (
+                                      <p className="text-left text-[11px] font-medium leading-relaxed opacity-90 border-t border-black/5 pt-1.5 mt-0.5">
+                                        <span className="font-bold">Góp ý GV: </span>
+                                        {feedback}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-400 border border-slate-200 rounded-xl font-semibold text-sm cursor-not-allowed shadow-inner opacity-80">
+                                    <CheckCircle2 size={16} />
+                                    Đã nộp bài
+                                  </div>
+                                )}
+                                <label className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${isGraded ? 'bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed opacity-60' : uploadingAssignId === idx ? 'bg-orange-50 border border-orange-200 text-orange-600 cursor-not-allowed opacity-50' : 'bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 cursor-pointer shadow-sm'}`}>
+                                  {uploadingAssignId === idx ? <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /> : <RefreshCw size={16} />}
+                                  {uploadingAssignId === idx ? 'Đang tải...' : 'Nộp lại'}
+                                  <input type="file" className="hidden" accept=".zip,.rar,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => handleFileChange(a, idx, e.target.files[0])} disabled={uploadingAssignId === idx || isGraded} />
+                                </label>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!trainingData?.assignments || trainingData.assignments.length === 0) && (
+                  <div className="text-center py-12 text-slate-400">
+                    <CheckCircle2 size={32} className="mx-auto mb-2 text-slate-200" />
+                    <p className="text-sm">Hiện tại bạn không có bài tập nào cần nộp.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* EXAMS TAB */}
+          {mainTab === 'exams' && (() => {
+            const examSubjects = examScoreRows;
+
+            const renderEssayCell = (sub) => {
+              if (sub.essayScore != null) {
+                return (
+                  <span className={`font-bold px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs ${sub.essayScore >= 5 ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-red-700 bg-red-50 border border-red-100'}`}>
+                    {sub.essayScore}/10
+                  </span>
+                );
+              }
+              if (sub.thucHanh === 'da_nop') {
+                return <span className="text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs">Chờ chấm</span>;
+              }
+              if (sub.thucHanh === 'chua_nop' || !sub.thucHanh) {
+                return <span className="text-gray-400 font-medium text-[10px] sm:text-xs">Chưa làm</span>;
+              }
+              return <span className="text-gray-600 font-medium text-[10px] sm:text-xs break-words">{sub.thucHanh}</span>;
+            };
+
+            const renderResultCell = (sub) => {
+              const displayStatus = getExamProgressDisplayStatus(sub);
+              if (displayStatus === 'dat') return <span className="text-emerald-600 font-black text-[10px] sm:text-xs">Đạt</span>;
+              if (displayStatus === 'khong_dat') return <span className="text-red-600 font-black text-[10px] sm:text-xs leading-tight">Không đạt</span>;
+              if (displayStatus === 'cho_nop') return <span className="text-blue-600 font-black text-[10px] sm:text-xs">Chờ nộp</span>;
+              if (displayStatus === 'cho_cham') return <span className="text-amber-600 font-black text-[10px] sm:text-xs">Chờ chấm</span>;
+              if (sub.status === 'dang_khoa') return <span className="text-orange-500 font-bold text-[10px] sm:text-xs">Đang khóa</span>;
+              return <span className="text-gray-400 font-bold text-[10px] sm:text-xs">Chưa thi</span>;
+            };
+
+            return (
+              <div className="bg-white rounded-2xl p-3 sm:p-6 shadow-sm border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[280px]">
+                <div className="flex items-center justify-between mb-3 sm:mb-6">
+                  <h2 className="text-sm sm:text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <Award className="text-green-600 shrink-0" size={18} aria-hidden="true" />
+                    Bảng Điểm Tổng Hợp
+                  </h2>
+                </div>
+
+                {/* Mobile: card rows - hiện đủ mọi cột */}
+                <div className="sm:hidden space-y-2.5">
+                  {examSubjects.map((sub, idx) => {
+                    const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '-';
+                    return (
+                      <article key={sub.id} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
+                        <div className="flex items-start gap-2.5 mb-2.5">
+                          <span className="text-[10px] font-black text-slate-400 tabular-nums shrink-0 pt-0.5">
+                            {String(idx + 1).padStart(2, '0')}
+                          </span>
+                          <h3 className="text-xs font-bold text-slate-800 leading-snug flex-1 min-w-0 break-words">
+                            {sub.label}
+                          </h3>
+                          <div className="shrink-0 text-right">{renderResultCell(sub)}</div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                          <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
+                            <p className="font-bold  tracking-wide text-slate-400 mb-0.5">Trắc nghiệm</p>
+                            <p className="font-bold text-slate-700 tabular-nums break-words">{trScore}</p>
+                          </div>
+                          <div className="rounded-lg bg-white border border-slate-100 px-2.5 py-2 min-w-0">
+                            <p className="font-bold  tracking-wide text-slate-400 mb-0.5 leading-tight">Tự luận / Thực hành</p>
+                            <div className="mt-0.5">{renderEssayCell(sub)}</div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                  {examSubjects.length === 0 && (
+                    <p className="text-center text-xs text-slate-400 py-8">Chưa có dữ liệu điểm thi.</p>
+                  )}
+                </div>
+
+                {/* Tablet/desktop: bảng chữ nhỏ, cho phép xuống dòng */}
+                <div className="hidden sm:block overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-left text-[11px] md:text-[13px] table-fixed">
+                    <thead className="bg-[#f8fafc] border-b border-gray-200">
+                      <tr>
+                        <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500 w-10 md:w-14 text-center  tracking-wide leading-tight">STT</th>
+                        <th className="px-2 md:px-4 py-2.5 md:py-3 font-black text-slate-500  tracking-wide leading-tight">Tên môn thi</th>
+                        <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[18%]">Trắc nghiệm</th>
+                        <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[22%]">Tự luận / Thực hành</th>
+                        <th className="px-2 md:px-3 py-2.5 md:py-3 font-black text-slate-500 text-center  tracking-wide leading-tight w-[16%]">Kết quả</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {examSubjects.map((sub, idx) => {
+                        const trScore = sub.tracNghiem ? `${sub.tracNghiem.score}/${sub.tracNghiem.total}` : '-';
+                        return (
+                          <tr key={sub.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-2 md:px-4 py-2.5 md:py-3 font-bold text-slate-400 text-center tabular-nums align-top">
+                              {String(idx + 1).padStart(2, '0')}
+                            </td>
+                            <td className="px-2 md:px-4 py-2.5 md:py-3 font-bold text-slate-800 break-words whitespace-normal align-top leading-snug">
+                              {sub.label}
+                            </td>
+                            <td className="px-2 md:px-3 py-2.5 md:py-3 font-bold text-center text-slate-600 tabular-nums align-top whitespace-normal break-words">
+                              {trScore}
+                            </td>
+                            <td className="px-2 md:px-3 py-2.5 md:py-3 text-center align-top whitespace-normal break-words">
+                              {renderEssayCell(sub)}
+                            </td>
+                            <td className="px-2 md:px-3 py-2.5 md:py-3 text-center align-top whitespace-normal break-words">
+                              {renderResultCell(sub)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+        </div>
+        {videoPayModal}
+        {videoPurchaseCelebrationModal}
       </>
     );
   }
@@ -1840,10 +1835,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                   adminDurationSeconds={previewLesson.adminDurationSeconds || previewLesson.duration || 0}
                   antiSeekEnabled={false}
                   lessonCompleted={false}
-                  onSaveProgress={() => {}}
-                  onWatchProgress={() => {}}
-                  onVideoEnded={() => {}}
-                  onEligibilityReached={() => {}}
+                  onSaveProgress={() => { }}
+                  onWatchProgress={() => { }}
+                  onVideoEnded={() => { }}
+                  onEligibilityReached={() => { }}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-white/70 text-sm font-semibold px-6 text-center">
@@ -1862,11 +1857,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                     key={t.key}
                     type="button"
                     onClick={() => setCatalogInfoTab(t.key)}
-                    className={`flex-1 min-w-[7.5rem] min-h-11 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${
-                      catalogInfoTab === t.key
+                    className={`flex-1 min-w-[7.5rem] min-h-11 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${catalogInfoTab === t.key
                         ? 'text-red-600 border-b-2 border-red-600 bg-red-50/40'
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                    }`}
+                      }`}
                   >
                     {t.label}
                   </button>
@@ -1879,44 +1873,42 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                       const playable = canPlayPreview(lesson);
                       const isActive = previewLesson && String(previewLesson._id) === String(lesson._id);
                       return (
-                      <li key={lesson._id || idx}>
-                        <button
-                          type="button"
-                          disabled={!playable}
-                          onClick={() => {
-                            if (!playable) {
-                              toast.error('Bài này cần thanh toán khóa học');
-                              return;
-                            }
-                            setCurrentLesson(lesson);
-                          }}
-                          className={`w-full flex items-center gap-3 py-2.5 px-1 text-left rounded-lg transition-colors ${
-                            playable
-                              ? `cursor-pointer hover:bg-slate-50 ${isActive ? 'bg-red-50/70' : ''}`
-                              : 'opacity-70 cursor-not-allowed'
-                          }`}
-                        >
-                          {playable ? (
-                            <PlayCircle size={16} className={`shrink-0 ${isActive ? 'text-red-600' : 'text-red-500'}`} />
-                          ) : (
-                            <Lock size={16} className="text-slate-400 shrink-0" />
-                          )}
-                          <span className={`flex-1 text-sm font-semibold truncate ${isActive ? 'text-red-700' : 'text-slate-700'}`}>
-                            {idx + 1}. {lesson.title}
-                          </span>
-                          {lesson.isPreview || playable ? (
-                            <span className={`text-[10px] font-black  px-2.5 py-1 rounded-full border shrink-0 ${
-                              isActive
-                                ? 'bg-red-600 text-white border-red-600'
-                                : 'bg-pink-50 text-pink-700 border-pink-200'
-                            }`}>
-                              {isActive ? 'Đang xem' : 'Xem thử'}
+                        <li key={lesson._id || idx}>
+                          <button
+                            type="button"
+                            disabled={!playable}
+                            onClick={() => {
+                              if (!playable) {
+                                toast.error('Bài này cần thanh toán khóa học');
+                                return;
+                              }
+                              setCurrentLesson(lesson);
+                            }}
+                            className={`w-full flex items-center gap-3 py-2.5 px-1 text-left rounded-lg transition-colors ${playable
+                                ? `cursor-pointer hover:bg-slate-50 ${isActive ? 'bg-red-50/70' : ''}`
+                                : 'opacity-70 cursor-not-allowed'
+                              }`}
+                          >
+                            {playable ? (
+                              <PlayCircle size={16} className={`shrink-0 ${isActive ? 'text-red-600' : 'text-red-500'}`} />
+                            ) : (
+                              <Lock size={16} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className={`flex-1 text-sm font-semibold truncate ${isActive ? 'text-red-700' : 'text-slate-700'}`}>
+                              {idx + 1}. {lesson.title}
                             </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-slate-400 shrink-0">Có phí</span>
-                          )}
-                        </button>
-                      </li>
+                            {lesson.isPreview || playable ? (
+                              <span className={`text-[10px] font-black  px-2.5 py-1 rounded-full border shrink-0 ${isActive
+                                  ? 'bg-red-600 text-white border-red-600'
+                                  : 'bg-pink-50 text-pink-700 border-pink-200'
+                                }`}>
+                                {isActive ? 'Đang xem' : 'Xem thử'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-slate-400 shrink-0">Có phí</span>
+                            )}
+                          </button>
+                        </li>
                       );
                     })}
                     {lessons.length === 0 && (
@@ -2002,11 +1994,10 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
               <button
                 type="button"
                 onClick={() => (canContinueLearning ? enterCourseLearning() : startVideoCheckout(selectedCourse))}
-                className={`w-full min-h-12 rounded-xl text-white font-bold text-sm ${
-                  canContinueLearning
+                className={`w-full min-h-12 rounded-xl text-white font-bold text-sm ${canContinueLearning
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-red-600 hover:bg-red-700'
-                }`}
+                  }`}
               >
                 {canContinueLearning
                   ? 'Tiếp tục học'
@@ -2065,7 +2056,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
         </div>
       </div>
 
-      {/* ─── BODY: Udemy-style — cột trái scroll; video+tabs sticky; sidebar độc lập ─── */}
+      {/* ─── BODY: Udemy-style - cột trái scroll; video+tabs sticky; sidebar độc lập ─── */}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden" style={{ background: '#0b1018' }}>
 
         {/* ══ LEFT COLUMN ══ */}
@@ -2205,14 +2196,14 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                           if (!lesson.isUnlocked) return;
                           setCurrentLesson(lesson);
                         }}
-                          title={
+                        title={
                           lesson.paywallLocked
                             ? 'Cần thanh toán khóa học để xem bài này'
                             : !lesson.isUnlocked
-                            ? `Hoàn thành bài trước (≥67%) để mở bài này`
-                            : (lesson.allowEarlyAccess && !lesson.prerequisiteCompleted && !lesson.isCompleted)
-                              ? 'Có thể học sớm'
-                              : undefined
+                              ? `Hoàn thành bài trước (≥67%) để mở bài này`
+                              : (lesson.allowEarlyAccess && !lesson.prerequisiteCompleted && !lesson.isCompleted)
+                                ? 'Có thể học sớm'
+                                : undefined
                         }
                         className={`flex items-start gap-3 px-4 py-3 transition-all relative ${!lesson.isUnlocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
                           } ${isCurrent
@@ -2220,7 +2211,7 @@ const StudentTrainingLMS = ({ trainingDataProp, onBack, initialMainTab = null, h
                             : 'border-l-4 border-transparent hover:bg-white/[0.04]'
                           }`}
                       >
-                        {/* Status icon — tick chỉ khi 100%; đang xem → đang học */}
+                        {/* Status icon - tick chỉ khi 100%; đang xem → đang học */}
                         <div className="mt-0.5 flex-shrink-0">
                           {isCurrent ? (
                             <div className="w-[18px] h-[18px] rounded-full border-2 border-emerald-500 flex items-center justify-center">

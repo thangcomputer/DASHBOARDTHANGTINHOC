@@ -129,7 +129,7 @@ export default function TeacherStudentWeekSlotSheet({
       return;
     }
     if (saved?.locked) {
-      toast.info('Buổi đã điểm danh — không đổi giờ từ đây.');
+      toast.info('Buổi đã điểm danh - không đổi giờ từ đây.');
       return;
     }
     if (saved?.otherCourse) {
@@ -138,7 +138,7 @@ export default function TeacherStudentWeekSlotSheet({
     }
     if (nextStart) {
       if (isWeekSlotElapsed(dateKey, nextStart, slotEnd(nextStart))) {
-        toast.error('Ca này đã kết thúc — chỉ xếp khung giờ hiện tại trở đi.');
+        toast.error('Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
         return;
       }
       const conflict = findTeacherScheduleConflict({
@@ -173,7 +173,7 @@ export default function TeacherStudentWeekSlotSheet({
     });
     const remaining = Number(progress.remaining ?? 0);
     if (newCreates.length > remaining) {
-      toast.error(`Chỉ còn ${remaining} buổi — đang chọn thêm ${newCreates.length} ca.`);
+      toast.error(`Chỉ còn ${remaining} buổi - đang chọn thêm ${newCreates.length} ca.`);
       return;
     }
 
@@ -212,7 +212,7 @@ export default function TeacherStudentWeekSlotSheet({
         const extra = extraSlotOption(saved?.own);
         const endTime = WEEK_SLOT_OPTIONS.find((o) => o.value === next)?.end || extra?.end || endTimeFromStart(next);
         if (isWeekSlotElapsed(dateKey, next, endTime)) {
-          throw new Error('Ca này đã kết thúc — chỉ xếp khung giờ hiện tại trở đi.');
+          throw new Error('Ca này đã kết thúc - chỉ xếp khung giờ hiện tại trở đi.');
         }
 
         const conflict = findTeacherScheduleConflict({
@@ -337,7 +337,7 @@ export default function TeacherStudentWeekSlotSheet({
 
         <div className="px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0">
           <p className="text-xs text-slate-500 font-medium">
-            Khóa: <span className="font-bold text-red-700">{activeStudent.course || '—'}</span>
+            Khóa: <span className="font-bold text-red-700">{activeStudent.course || '-'}</span>
             {' · '}
             {progress.displayDone}/{progress.totalSessions} buổi
           </p>
@@ -391,7 +391,7 @@ export default function TeacherStudentWeekSlotSheet({
 
         <div className="px-4 sm:px-5 py-3 border-t border-slate-100 shrink-0">
           <p className="text-[11px] text-slate-400 text-center font-medium mb-2">
-            Chọn giờ trước — chỉ lưu và nhắn tin khi bấm Xếp lịch ngay.
+            Chọn giờ trước - chỉ lưu và nhắn tin khi bấm Xếp lịch ngay.
           </p>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl bg-white border-2 border-red-600 text-red-600 text-sm font-bold hover:bg-red-50">
@@ -433,14 +433,13 @@ function DaySlotRow({ label, dateKey, student, schedules, teacherId, saved, valu
     );
   } else if (past || lockedDone) {
     const labelText = own
-      ? (extra?.label || WEEK_SLOT_OPTIONS.find((o) => o.value === value)?.label || value || '—')
-      : '—';
+      ? (extra?.label || WEEK_SLOT_OPTIONS.find((o) => o.value === value)?.label || value || '-')
+      : '-';
     control = (
-      <div className={`flex-1 min-h-11 px-3 rounded-xl border text-xs font-bold flex items-center ${
-        String(own?.status) === 'completed'
+      <div className={`flex-1 min-h-11 px-3 rounded-xl border text-xs font-bold flex items-center ${String(own?.status) === 'completed'
           ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
           : 'bg-slate-50 border-slate-100 text-slate-500'
-      }`}>
+        }`}>
         {labelText}
       </div>
     );
@@ -452,15 +451,14 @@ function DaySlotRow({ label, dateKey, student, schedules, teacherId, saved, valu
         disabled={!canCreate}
         title={!value && !gate.canSchedule ? (gate.reason || 'Không xếp thêm được') : undefined}
         onChange={(e) => onChange(dateKey, e.target.value)}
-        className={`flex-1 min-h-11 px-2 rounded-xl border text-sm font-semibold outline-none cursor-pointer ${
-          dirty
+        className={`flex-1 min-h-11 px-2 rounded-xl border text-sm font-semibold outline-none cursor-pointer ${dirty
             ? 'bg-amber-50 border-amber-300 text-amber-900'
             : value
               ? 'bg-amber-50/70 border-amber-200 text-amber-800'
               : 'bg-white border-slate-200 text-slate-700'
-        }`}
+          }`}
       >
-        <option value="">— Chọn giờ —</option>
+        <option value="">- Chọn giờ -</option>
         {options.map((opt) => {
           const meta = weekSlotSelectMeta(opt, dateKey, {
             schedules,

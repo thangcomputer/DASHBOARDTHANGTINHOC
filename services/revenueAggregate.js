@@ -1,5 +1,5 @@
 /**
- * Enrollment revenue helpers — projection / legacy.
+ * Enrollment revenue helpers - projection / legacy.
  * P4: KPI doanh thu chính KHÔNG dùng file này khi FINANCE_LEDGER_SOT=true (mặc định).
  * Dùng services/ledgerService.sumFinancialRevenue cho Dashboard/BI/Analytics.
  * Các hàm dưới đây phục vụ breakdown theo khóa / danh sách thu còn hiệu lực.

@@ -1,8 +1,8 @@
 const PERMISSIONS = require('./permissions');
 
 /**
- * Phase 8.8 — FUTURE compatibility mapping (LIVE lowercase → enterprise domain:action).
- * Phase RBAC-S1 — expanded CRUD codes for design matrix parity (shadow only).
+ * Phase 8.8 - FUTURE compatibility mapping (LIVE lowercase → enterprise domain:action).
+ * Phase RBAC-S1 - expanded CRUD codes for design matrix parity (shadow only).
  *
  * NOT LIVE authorization authority.
  * LIVE remains constants/permissions.js + middleware/auth.js + livePermissionAdapter.
@@ -50,12 +50,12 @@ const legacyPermissionMapping = {
     PERMISSIONS.FINANCE_PAYMENT_CREATE,
     PERMISSIONS.FINANCE_REFUND_APPROVE,
   ],
-  /** MUST NOT be FINANCE_VIEW — privilege boundary vs manage_finance */
+  /** MUST NOT be FINANCE_VIEW - privilege boundary vs manage_finance */
   view_branch_revenue: [PERMISSIONS.FINANCE_BRANCH_REVENUE_VIEW],
   system_settings: [PERMISSIONS.SETTINGS_VIEW, PERMISSIONS.SETTINGS_UPDATE],
   manage_blog: [PERMISSIONS.CMS_PUBLISH],
   manage_training: [PERMISSIONS.COURSE_UPDATE, PERMISSIONS.EXAM_MANAGE],
-  /** DISTINCT from manage_training — dedicated student_training:manage (Phase 8.10) */
+  /** DISTINCT from manage_training - dedicated student_training:manage (Phase 8.10) */
   manage_student_training: [PERMISSIONS.STUDENT_TRAINING_MANAGE],
   /** DISTINCT from exam:manage and student_training:manage */
   manage_cert_prep: [PERMISSIONS.CERT_PREP_MANAGE],

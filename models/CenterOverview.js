@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * CenterOverview — singleton trang Tổng quan «Thông tin trung tâm» (nhập tay).
+ * CenterOverview - singleton trang Tổng quan «Thông tin trung tâm» (nhập tay).
  */
 const mongoose = require('mongoose');
 

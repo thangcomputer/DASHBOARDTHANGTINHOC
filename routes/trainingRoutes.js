@@ -33,7 +33,7 @@ const VideoCoursePurchase = require('../models/VideoCoursePurchase');
 /**
  * LIVE mount: server.js → app.use('/api/training-lms', trainingRoutes)
  *
- * Phase 7.13 — Controlled cutover for /api/training-lms ONLY (not /api/training).
+ * Phase 7.13 - Controlled cutover for /api/training-lms ONLY (not /api/training).
  * Flow: auth → policyShadowTrainingLms(action) → trainingLmsCutoverGate(action) → handler
  * Legacy fallback: auth-only pass-through; lms_admin_progress → checkPermission(MANAGE_TRAINING).
  */
@@ -208,7 +208,7 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
         return res.status(403).json({ success: false, message: 'Khóa học này không thuộc chuyên môn của bạn' });
       }
     }
-    
+
     // Normalize lessons from course structure
     let lessons = [];
     if (course.lessons && course.lessons.length > 0) lessons = course.lessons;
@@ -236,7 +236,7 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
     const watchedSecondsMap = {};
     progress.forEach(p => { watchedSecondsMap[String(p.lessonId)] = p.watchedSeconds || 0; });
 
-    // 3. ACCESS / SEEK / COMPLETION — independent (see lessonLearningPolicy)
+    // 3. ACCESS / SEEK / COMPLETION - independent (see lessonLearningPolicy)
     const role = String(req.user.role || '').toLowerCase();
     let owned = true;
     if (role === 'student' && coursePriceOf(course) > 0) {
@@ -308,7 +308,7 @@ router.get('/courses/:id/lessons', lmsGuard('lms_lessons'), async (req, res) => 
   }
 });
 
-// Hoàn thành bài học — SoT: TrainingProgress + ACCESS/COMPLETION độc lập với SEEK
+// Hoàn thành bài học - SoT: TrainingProgress + ACCESS/COMPLETION độc lập với SEEK
 router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
@@ -407,7 +407,7 @@ router.post('/complete-lesson', lmsGuard('lms_complete_lesson'), async (req, res
       );
     }
 
-    // COMPLETION: ALWAYS require 2/3 — independent of antiSeek / allowEarlyAccess
+    // COMPLETION: ALWAYS require 2/3 - independent of antiSeek / allowEarlyAccess
     // Duration SoT: resolveEffectiveDuration(admin, YouTube client report)
     const completion = evaluateCompletionRequirement({
       watchedSeconds: credited,
@@ -488,7 +488,7 @@ function mapLessonForTeacherUi(lesson, index, progress) {
     id: String(lesson._id || lesson.id || `ls-${index}`),
     title: lesson.title || `Bài ${index + 1}`,
     url,
-    duration: duration || '—',
+    duration: duration || '-',
     completed: progress?.status === 'completed',
     watchedSeconds: Math.max(0, Number(progress?.watchedSeconds) || 0),
     antiSeek: isLessonAntiSeekEnabled(lesson),
@@ -611,7 +611,7 @@ router.get('/teacher/overview', lmsGuard('lms_teacher_overview'), async (req, re
   }
 });
 
-// ⏱ Lưu tiến độ xem tạm thời (auto-save mỗi 30s — chống F5 reset bộ đếm)
+// ⏱ Lưu tiến độ xem tạm thời (auto-save mỗi 30s - chống F5 reset bộ đếm)
 // Cho phép tăng watchedSeconds cả khi status=completed (để % lên 100% sau cửa ≥67%)
 router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res) => {
   try {
@@ -674,7 +674,7 @@ router.post('/save-watch-progress', lmsGuard('lms_save_watch'), async (req, res)
     });
 
     if (existing?.status === 'completed') {
-      // Chỉ cập nhật giây xem (không đụng status) — để UI hiện 100% khi xem hết
+      // Chỉ cập nhật giây xem (không đụng status) - để UI hiện 100% khi xem hết
       if (nextWatched > (Number(existing.watchedSeconds) || 0)) {
         await TrainingProgress.updateOne(
           { userId, lessonId },
@@ -762,13 +762,13 @@ function mapQaDoc(doc) {
   const o = doc.toObject ? doc.toObject() : { ...doc };
   const thread = Array.isArray(o.thread)
     ? o.thread.map((m) => ({
-        id: String(m._id || m.id || ''),
-        authorId: String(m.authorId || ''),
-        authorName: m.authorName || '',
-        authorRole: m.authorRole || '',
-        body: m.body || '',
-        createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-      }))
+      id: String(m._id || m.id || ''),
+      authorId: String(m.authorId || ''),
+      authorName: m.authorName || '',
+      authorRole: m.authorRole || '',
+      body: m.body || '',
+      createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+    }))
     : [];
   return {
     ...o,
@@ -919,7 +919,7 @@ router.get('/qa', lmsGuard('lms_qa_list'), async (req, res) => {
   }
 });
 
-// POST /qa — ask a question
+// POST /qa - ask a question
 router.post('/qa', lmsGuard('lms_qa_create'), async (req, res) => {
   try {
     const userId = String(req.user.id || req.user._id || '');
@@ -1039,7 +1039,7 @@ function pushQaThread(doc, { authorId, authorName, authorRole, body }) {
   });
 }
 
-// POST /qa/:id/answer — admin/teacher/staff answer (first + follow-ups)
+// POST /qa/:id/answer - admin/teacher/staff answer (first + follow-ups)
 router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
   try {
     const userId = String(req.user.id || req.user._id || '');
@@ -1113,7 +1113,7 @@ router.post('/qa/:id/answer', lmsGuard('lms_qa_answer'), async (req, res) => {
   }
 });
 
-// POST /qa/:id/reply — học viên/GV hỏi thêm sau khi đã có trả lời (đối thoại)
+// POST /qa/:id/reply - học viên/GV hỏi thêm sau khi đã có trả lời (đối thoại)
 router.post('/qa/:id/reply', lmsGuard('lms_qa_create'), async (req, res) => {
   try {
     const userId = String(req.user.id || req.user._id || '');
@@ -1246,7 +1246,7 @@ router.get('/reviews', lmsGuard('lms_qa_list'), async (req, res) => {
   }
 });
 
-// POST /reviews — HV/GV đánh giá khóa học → thông báo admin
+// POST /reviews - HV/GV đánh giá khóa học → thông báo admin
 router.post('/reviews', lmsGuard('lms_qa_create'), async (req, res) => {
   try {
     const userId = String(req.user.id || req.user._id || '');

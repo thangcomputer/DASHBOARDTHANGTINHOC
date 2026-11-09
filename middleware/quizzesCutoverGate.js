@@ -1,5 +1,5 @@
 /**
- * Phase 7.22 — Controlled cutover gate for LIVE /api/quizzes ONLY.
+ * Phase 7.22 - Controlled cutover gate for LIVE /api/quizzes ONLY.
  *
  * LEGACY (default):
  *   - teacher_list/create/delete/student_list/get/submit → auth already applied; pass-through
@@ -94,7 +94,7 @@ function quizzesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] quizzes authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] quizzes authority helper failed - Legacy gate',
       );
     }
 
@@ -139,7 +139,7 @@ function quizzesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] quizzes Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] quizzes Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

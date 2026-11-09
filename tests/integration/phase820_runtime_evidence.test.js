@@ -1,5 +1,5 @@
 /**
- * Phase 8.20 — Controlled RUNTIME evidence collection tests.
+ * Phase 8.20 - Controlled RUNTIME evidence collection tests.
  * Does NOT invent production traffic. Does NOT enable flags permanently.
  */
 const { describe, it } = require('node:test');

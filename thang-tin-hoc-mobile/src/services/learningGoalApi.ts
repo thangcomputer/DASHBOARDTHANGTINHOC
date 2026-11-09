@@ -1,4 +1,4 @@
-import { mobileApiRequest } from './apiClient';
+﻿import { mobileApiRequest } from './apiClient';
 
 export type LearningGoalPeriod = 'week' | 'month' | 'quarter';
 
@@ -33,7 +33,7 @@ export const LEARNING_GOAL_PERIODS: Array<{ id: LearningGoalPeriod; label: strin
 ];
 export const LEARNING_GOAL_HOURS = [1, 2, 3, 4, 5];
 
-/** Mức độ theo số giờ/ngày — đồng bộ màu với web. */
+/** Mức độ theo số giờ/ngày - đồng bộ màu với web. */
 export const LEARNING_GOAL_LEVELS: Record<number, { label: string; color: string; soft: string }> = {
   1: { label: 'Nhẹ nhàng', color: '#10B981', soft: '#ECFDF5' },
   2: { label: 'Vừa sức', color: '#0EA5E9', soft: '#F0F9FF' },
@@ -43,11 +43,11 @@ export const LEARNING_GOAL_LEVELS: Record<number, { label: string; color: string
 };
 
 const MOTIVATION: Record<number, string> = {
-  1: 'Mỗi ngày một chút — đều đặn là chìa khóa.',
+  1: 'Mỗi ngày một chút - đều đặn là chìa khóa.',
   2: 'Nhịp học vừa sức, dễ duy trì lâu dài.',
-  3: 'Tập trung tốt — bạn sẽ thấy tiến bộ rõ rệt.',
-  4: 'Cam kết cao — hãy chia nhỏ thành nhiều buổi.',
-  5: 'Thử thách bứt phá — nhớ nghỉ ngơi hợp lý nhé!',
+  3: 'Tập trung tốt - bạn sẽ thấy tiến bộ rõ rệt.',
+  4: 'Cam kết cao - hãy chia nhỏ thành nhiều buổi.',
+  5: 'Thử thách bứt phá - nhớ nghỉ ngơi hợp lý nhé!',
 };
 
 export function goalMotivation(hours: number) {
@@ -124,7 +124,7 @@ export type LearningLeaderboard = {
   };
 };
 
-/** Bảng xếp hạng tuần (toàn trung tâm) — cùng API với web. */
+/** Bảng xếp hạng tuần (toàn trung tâm) - cùng API với web. */
 export async function getLearningLeaderboard() {
   const payload = await mobileApiRequest<{ data?: LearningLeaderboard }>('/lesson-practice/my/learning-leaderboard');
   if (!payload.data) throw new Error('Không tải được bảng xếp hạng');

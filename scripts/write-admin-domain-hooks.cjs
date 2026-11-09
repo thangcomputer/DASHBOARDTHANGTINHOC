@@ -278,7 +278,7 @@ export function useAdminStudents({ activeTab, setDeleteModal, sTrainingTabRef })
           \`Đã nhập \${questions.length} câu hỏi từ Excel.\${skipped ? \` (\${skipped} dòng trống đã bỏ qua)\` : ''}\`,
         );
         if (errors.length) {
-          toast.error(\`\${errors.length} dòng lỗi: \${errors.slice(0, 2).join(' — ')}\${errors.length > 2 ? '…' : ''}\`);
+          toast.error(\`\${errors.length} dòng lỗi: \${errors.slice(0, 2).join(' - ')}\${errors.length > 2 ? '…' : ''}\`);
         }
       } catch {
         toast.error('Không đọc được file. Dùng mẫu .xlsx và thử lại.');

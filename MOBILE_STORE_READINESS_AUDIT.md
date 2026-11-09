@@ -49,22 +49,22 @@ The findings above preserve the pre-remediation snapshot. Current remediation an
 
 | Finding | Current status |
 |---|---|
-| A01 Account deletion | BLOCKED — backend deletion API and retention policy decision required. |
-| A02 Chat UGC safety | BLOCKED — backend report/block/moderation API required. |
-| A03 Privacy, terms, support | PARTIAL — settings only show owner-supplied valid HTTPS URLs; canonical URLs still need configuration. |
-| A04 Notification permission | FIXED IN APP — registration no longer prompts automatically; explicit settings action requests permission. Physical-device behavior not tested. |
-| A05 Push release configuration | BLOCKED — EAS project and APNs/FCM credentials are not configured. |
-| A06 Payments / course access | BLOCKED — product classification and platform billing review required; existing behavior intentionally unchanged. |
-| A07 Dependencies | OPEN — current `npm audit --omit=dev`: 14 vulnerabilities (13 moderate, 1 high); `xlsx` high advisories have no upstream fix. |
-| A08 Expo dependency health | PARTIAL — required SDK packages/patch versions and `expo-asset` were aligned; Expo Doctor is 19/20 because `react-native-webrtc` is untested on New Architecture. |
-| A09 API resilience | PARTIAL — shared client now bounds requests to 20 seconds and maps errors to safe user-facing messages; every screen's offline/error state is not fully validated. |
-| A10 Production data integrity | FIXED IN APP — removed the synthetic primary enrollment fallback; automated regression test passes. |
-| A11 App Store release config | PARTIAL — EAS production uses remote auto-increment and Android App Bundle; native version output still needs build verification. |
-| A12 Android target API | BLOCKED — no generated Gradle project or AAB inspected; target API 36 not verified. |
-| A13 Native compliance | BLOCKED — no signed native artifacts, privacy-manifest archive review, or 16 KB page-size test. |
-| A14 Mock and preview data | OPEN — no release-build end-to-end exclusion audit completed; teacher finance estimate still needs product-owner validation. |
-| A15 Accessibility and device UX | OPEN — device-level matrix remains unrun. |
-| A16 Store review accounts | PARTIAL — non-secret reviewer guide drafted; dedicated accounts still need to be provisioned. |
+| A01 Account deletion | BLOCKED - backend deletion API and retention policy decision required. |
+| A02 Chat UGC safety | BLOCKED - backend report/block/moderation API required. |
+| A03 Privacy, terms, support | PARTIAL - settings only show owner-supplied valid HTTPS URLs; canonical URLs still need configuration. |
+| A04 Notification permission | FIXED IN APP - registration no longer prompts automatically; explicit settings action requests permission. Physical-device behavior not tested. |
+| A05 Push release configuration | BLOCKED - EAS project and APNs/FCM credentials are not configured. |
+| A06 Payments / course access | BLOCKED - product classification and platform billing review required; existing behavior intentionally unchanged. |
+| A07 Dependencies | OPEN - current `npm audit --omit=dev`: 14 vulnerabilities (13 moderate, 1 high); `xlsx` high advisories have no upstream fix. |
+| A08 Expo dependency health | PARTIAL - required SDK packages/patch versions and `expo-asset` were aligned; Expo Doctor is 19/20 because `react-native-webrtc` is untested on New Architecture. |
+| A09 API resilience | PARTIAL - shared client now bounds requests to 20 seconds and maps errors to safe user-facing messages; every screen's offline/error state is not fully validated. |
+| A10 Production data integrity | FIXED IN APP - removed the synthetic primary enrollment fallback; automated regression test passes. |
+| A11 App Store release config | PARTIAL - EAS production uses remote auto-increment and Android App Bundle; native version output still needs build verification. |
+| A12 Android target API | BLOCKED - no generated Gradle project or AAB inspected; target API 36 not verified. |
+| A13 Native compliance | BLOCKED - no signed native artifacts, privacy-manifest archive review, or 16 KB page-size test. |
+| A14 Mock and preview data | OPEN - no release-build end-to-end exclusion audit completed; teacher finance estimate still needs product-owner validation. |
+| A15 Accessibility and device UX | OPEN - device-level matrix remains unrun. |
+| A16 Store review accounts | PARTIAL - non-secret reviewer guide drafted; dedicated accounts still need to be provisioned. |
 
 Validation completed: mobile TypeScript check, targeted regression suite (21/21), Android JavaScript export, and backend JavaScript syntax checks. The Android export is not a native build. No native signed build or device test was run, so this is not store-readiness certification.
 

@@ -6,5 +6,5 @@ export const QUESTION_TYPES = [
 ];
 
 export function questionTypeLabel(type) {
-  return QUESTION_TYPES.find((t) => t.value === type)?.label || type || '—';
+  return QUESTION_TYPES.find((t) => t.value === type)?.label || type || '-';
 }

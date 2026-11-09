@@ -44,7 +44,7 @@ export function getExamSubjectInitials(meta) {
   if (short && short.length <= 3 && !/\s/.test(short)) return short.toUpperCase();
   const label = String(meta?.label || '').trim();
   if (label) {
-    const words = label.split(/[\s()\-–—/&,+]+/).filter((w) => /[a-zA-Z0-9]/.test(w));
+    const words = label.split(/[\s()/&,+\u2013\u2014-]+/).filter((w) => /[a-zA-Z0-9]/.test(w));
     if (words.length >= 2) {
       return words.slice(0, 2).map((w) => (w.match(/[a-zA-Z0-9]/) || [''])[0]).join('').toUpperCase().slice(0, 3);
     }
@@ -188,7 +188,7 @@ export function isExamUnlockedForSubject(enrollments, subjectId, catalog, fallba
 
 /**
  * Yêu cầu webcam theo khóa: chỉ khi enrollment/root được admin bật tường minh (=== true).
- * Mặc định tắt — không bắt camera khi chưa cấu hình.
+ * Mặc định tắt - không bắt camera khi chưa cấu hình.
  */
 export function requireWebcamForSubject(enrollments, subjectId, catalog, fallbackRequire = false) {
   const list = findEnrollmentsForSubject(enrollments, subjectId, catalog);
@@ -257,7 +257,7 @@ export function examMilestone(subjectIds, subjectId, completedSessions, totalSes
   return { requiredSessions, meetsMilestone: idx >= 0 && done >= requiredSessions };
 }
 
-/** Mở khóa khóa học, đang thi, hoặc đủ mốc buổi — khớp nút Phòng thi. */
+/** Mở khóa khóa học, đang thi, hoặc đủ mốc buổi - khớp nút Phòng thi. */
 export function canStartCertificationSubject({
   student,
   enrollments,

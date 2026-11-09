@@ -51,7 +51,7 @@ async function main() {
     socket.on("connect", () => {
       clearTimeout(timer);
       // Attempt register if server expects it (legacy pattern).
-      try { socket.emit("register", {}); } catch {}
+      try { socket.emit("register", {}); } catch { }
       socket.close();
       resolve({ ok: true, socketId: socket.id });
     });

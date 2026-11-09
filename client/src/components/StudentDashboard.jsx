@@ -72,7 +72,7 @@ function parseScheduleLogTimestamp(dateVal, timeStr) {
   return d.getTime();
 }
 
-/** Lịch sắp tới / đang diễn ra / chờ điểm danh — không gồm buổi đã hoàn thành. */
+/** Lịch sắp tới / đang diễn ra / chờ điểm danh - không gồm buổi đã hoàn thành. */
 function buildPendingScheduleLogs(schedules, student) {
   if (!student) return [];
   const pendingLogs = [];
@@ -150,7 +150,7 @@ const StudentDashboard = () => {
     const courses = enrichEnrollmentsWithTeachers(getActiveClientEnrollments(student), teachers);
 
     const namesFromCourses = uniqueTeacherNames(courses);
-    
+
     // Properly handle populated vs unpopulated `teacherId`
     // Backend có thể trả `teacherId` dạng mảng (nhiều môn / nhiều GV)
     const rawTeacherId = student.teacherId;
@@ -363,7 +363,7 @@ const StudentDashboard = () => {
         merged.sort((a, b) => new Date(b.deadline || b.createdAt || 0) - new Date(a.deadline || a.createdAt || 0));
         setMyAssignments(merged);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [enrollments, viewStudent?.course, studentData?.course, STUDENT_ID, freePortalApiLocked]);
 
   useEffect(() => {
@@ -540,7 +540,7 @@ const StudentDashboard = () => {
           return next;
         });
       }
-    }).catch(() => {}).finally(() => {
+    }).catch(() => { }).finally(() => {
       if (!cancelled) setMilestoneEvalsReady(true);
     });
     return () => { cancelled = true; };
@@ -550,7 +550,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     if (!milestoneEvalsReady) return undefined;
     if (!viewStudent?.id || !viewStudent?.teacherId) return undefined;
-    // Đang mở modal — không schedule mở thêm (tránh popup GV trùng sau khi gửi bước trung tâm)
+    // Đang mở modal - không schedule mở thêm (tránh popup GV trùng sau khi gửi bước trung tâm)
     if (activeMilestone) return undefined;
 
     const studentId = String(STUDENT_ID || viewStudent.id || viewStudent._id);
@@ -655,36 +655,36 @@ const StudentDashboard = () => {
 
   return (
     <div className="bg-transparent font-sans h-full">
-      {/* Popup thông báo — hiện 1 lần/ngày */}
+      {/* Popup thông báo - hiện 1 lần/ngày */}
       <PopupBanner role="student" />
       <ExpiredPackageBanner />
 
       {/* Modal đóng học phí (tự động qua SePay) */}
       {noteModalSched && (
-         <StudentNoteModal 
-           schedule={noteModalSched} 
-           onClose={() => setNoteModalSched(null)} 
-           onSubmit={async (noteText) => {
-             const targetId = String(noteModalSched._id || noteModalSched.id || '');
-             const nextNote = String(noteText || '').trim();
-             setNoteModalSched(null);
-             if (targetId && typeof setSchedulesLocal === 'function') {
-               setSchedulesLocal((prev) => (prev || []).map((s) => (
-                 String(s._id || s.id) === targetId
-                   ? { ...s, studentNote: nextNote, hasUnreadStudentNote: Boolean(nextNote) }
-                   : s
-               )));
-             }
-             try {
-               await api.schedules.update(targetId, {
-                 studentNote: nextNote,
-                 hasUnreadStudentNote: Boolean(nextNote),
-               });
-             } catch(e) {
-               console.error('Lỗi khi gửi Note:', e);
-             }
-           }} 
-         />
+        <StudentNoteModal
+          schedule={noteModalSched}
+          onClose={() => setNoteModalSched(null)}
+          onSubmit={async (noteText) => {
+            const targetId = String(noteModalSched._id || noteModalSched.id || '');
+            const nextNote = String(noteText || '').trim();
+            setNoteModalSched(null);
+            if (targetId && typeof setSchedulesLocal === 'function') {
+              setSchedulesLocal((prev) => (prev || []).map((s) => (
+                String(s._id || s.id) === targetId
+                  ? { ...s, studentNote: nextNote, hasUnreadStudentNote: Boolean(nextNote) }
+                  : s
+              )));
+            }
+            try {
+              await api.schedules.update(targetId, {
+                studentNote: nextNote,
+                hasUnreadStudentNote: Boolean(nextNote),
+              });
+            } catch (e) {
+              console.error('Lỗi khi gửi Note:', e);
+            }
+          }}
+        />
       )}
 
       {showTuitionModal && (
@@ -705,7 +705,7 @@ const StudentDashboard = () => {
 
       {/* Modal Nộp bài tập */}
       {activeAssignment && (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50 min-w-0">
               <h3 className="font-bold text-base sm:text-lg text-slate-800 flex items-center gap-2 min-w-0">
@@ -724,7 +724,7 @@ const StudentDashboard = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">Link bài làm hoặc Tải file lên</label>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <input 
+                    <input
                       type="url"
                       placeholder="HTTPS://drive.google.com/... hoặc link file"
                       className="flex-1 border-2 border-slate-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-300 font-medium"
@@ -780,8 +780,8 @@ const StudentDashboard = () => {
 
         {/* Topbar removed - using DashboardLayout header */}
         <div className="pt-4"></div> {/* Temporary empty div to keep spacing if needed, or better: remove and use margin */}
-        
-        {/* ═══ CONTENT — Switch based on hash ═══ */}
+
+        {/* ═══ CONTENT - Switch based on hash ═══ */}
         {freeHashLocked ? (
           <FreeFeatureLock />
         ) : sectionHash === 'schedule' ? (
@@ -859,7 +859,7 @@ const StudentDashboard = () => {
             studyLogs={scoreLogs}
           />
         )}
-                  </div>
+      </div>
 
       {activeMilestone && (
         <MilestoneEvaluationModal
@@ -912,7 +912,7 @@ const StudentDashboard = () => {
                   : 0;
                 setTeacherRatingData({ avg, count, ratings: res.data });
               }
-            }).catch(() => {});
+            }).catch(() => { });
           }}
         />
       )}

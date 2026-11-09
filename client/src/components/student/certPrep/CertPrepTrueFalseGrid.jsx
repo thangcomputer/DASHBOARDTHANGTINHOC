@@ -27,15 +27,13 @@ export default function CertPrepTrueFalseGrid({
   };
 
   return (
-    <div className={`overflow-x-auto rounded-2xl border ${
-      exam ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white'
-    }`}
+    <div className={`overflow-x-auto rounded-2xl border ${exam ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white'
+      }`}
     >
       <table className="w-full min-w-[360px] text-sm">
         <thead>
-          <tr className={`text-xs font-black  tracking-wide ${
-            exam ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'
-          }`}
+          <tr className={`text-xs font-black  tracking-wide ${exam ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'
+            }`}
           >
             <th className="px-4 py-3 text-left">Nhận định</th>
             <th className="px-3 py-3 text-center w-[88px]">Yes</th>
@@ -91,7 +89,7 @@ export default function CertPrepTrueFalseGrid({
                     type="button"
                     disabled={disabled}
                     aria-pressed={chosen === false}
-                    aria-label={`No — nhận định ${idx + 1}`}
+                    aria-label={`No - nhận định ${idx + 1}`}
                     onClick={() => setValue(row.id, false)}
                     className={`min-h-9 min-w-[3.25rem] px-3 rounded-lg text-xs font-black border transition disabled:opacity-50 ${pillClass(chosen === false, 'no')}`}
                   >

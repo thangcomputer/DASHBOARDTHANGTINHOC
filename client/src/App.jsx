@@ -1,17 +1,17 @@
 import { Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useState, useEffect, useCallback, lazy, Suspense }  from 'react';
-import { SocketProvider }                    from './context/SocketContext';
-import { StudentsProvider }                  from './context/StudentsContext';
-import { TeachersProvider }                  from './context/TeachersContext';
-import { ScheduleProvider }                  from './context/ScheduleContext';
-import { FinanceProvider }                   from './context/FinanceContext';
-import { DataProvider }                      from './context/DataContext';
-import { ToastProvider }                     from './utils/toast.jsx';
-import ErrorBoundary                         from './components/ErrorBoundary';
-import LoginPage                             from './components/LoginPage';
-import FreePortalPage                        from './components/FreePortalPage';
-import AdminLoginPage                        from './components/AdminLoginPage';
-import RegistrationForm                      from './components/RegistrationForm';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { SocketProvider } from './context/SocketContext';
+import { StudentsProvider } from './context/StudentsContext';
+import { TeachersProvider } from './context/TeachersContext';
+import { ScheduleProvider } from './context/ScheduleContext';
+import { FinanceProvider } from './context/FinanceContext';
+import { DataProvider } from './context/DataContext';
+import { ToastProvider } from './utils/toast.jsx';
+import ErrorBoundary from './components/ErrorBoundary';
+import LoginPage from './components/LoginPage';
+import FreePortalPage from './components/FreePortalPage';
+import AdminLoginPage from './components/AdminLoginPage';
+import RegistrationForm from './components/RegistrationForm';
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard'));
 const StudentDashboard = lazy(() => import('./components/StudentDashboard'));
@@ -43,24 +43,24 @@ const LessonPracticeCatalogPage = lazy(() => import('./components/student/lesson
 const LessonPracticeUnitsPage = lazy(() => import('./components/student/lessonPractice/LessonPracticeUnitsPage'));
 const LessonPracticePlayerPage = lazy(() => import('./components/student/lessonPractice/LessonPracticePlayerPage'));
 const DailyPracticePage = lazy(() => import('./components/student/dailyPractice/DailyPracticePage'));
-import DashboardLayout                       from './components/DashboardLayout';
-import StudentLearningAccessGate             from './components/student/StudentLearningAccessGate';
-import { SelfStudyLock }                      from './components/student/subscription/SubscriptionGate';
+import DashboardLayout from './components/DashboardLayout';
+import StudentLearningAccessGate from './components/student/StudentLearningAccessGate';
+import { SelfStudyLock } from './components/student/subscription/SubscriptionGate';
 import FreeFeatureLock, { FreeHiddenRoute } from './components/student/dailyPractice/FreeFeatureLock';
 import api, { clearTokens, NetworkOfflineError } from './services/api';
 import { getDeviceFingerprint } from './utils/deviceFingerprint';
 import { useIsDesktopExamDevice } from './utils/examDevice';
-import { BranchProvider }                    from './context/BranchContext';
-import LoadingScreen                         from './components/LoadingScreen';
-import PopupBanner                           from './components/PopupBanner';
-import StudyHeartbeat                        from './components/student/StudyHeartbeat';
-import OfflineBanner                         from './components/OfflineBanner';
-import { ModalProvider, useModal }           from './utils/Modal.jsx';
-import SecurityGuard                         from './components/SecurityGuard';
-import FaviconSwitcher                       from './components/FaviconSwitcher';
-import { unlockAudio }                       from './utils/sound';
-import { getMessagingRole }                  from './lib/messagingRoles';
-import { hasPermission, PERMISSIONS }        from './constants/permissions';
+import { BranchProvider } from './context/BranchContext';
+import LoadingScreen from './components/LoadingScreen';
+import PopupBanner from './components/PopupBanner';
+import StudyHeartbeat from './components/student/StudyHeartbeat';
+import OfflineBanner from './components/OfflineBanner';
+import { ModalProvider, useModal } from './utils/Modal.jsx';
+import SecurityGuard from './components/SecurityGuard';
+import FaviconSwitcher from './components/FaviconSwitcher';
+import { unlockAudio } from './utils/sound';
+import { getMessagingRole } from './lib/messagingRoles';
+import { hasPermission, PERMISSIONS } from './constants/permissions';
 import { clearStorageKeepingPreferences } from './utils/logoutStorage';
 import './App.css';
 
@@ -71,13 +71,13 @@ const loadSession = () => {
     // Lấy link prefix của URL hiện tại để đoán Role đang định truy cập
     // ví dụ /admin/... -> ưu tiên tìm admin_user
     const path = window.location.pathname;
-    const priorityRole = path.startsWith('/admin') ? 'admin' 
-                       : path.startsWith('/teacher') ? 'teacher' 
-                       : path.startsWith('/student') ? 'student' 
-                       : null;
+    const priorityRole = path.startsWith('/admin') ? 'admin'
+      : path.startsWith('/teacher') ? 'teacher'
+        : path.startsWith('/student') ? 'student'
+          : null;
 
     const roles = ['admin', 'staff', 'teacher', 'student'];
-    
+
     // 1. Kiểm tra role ưu tiên theo URL trước
     if (priorityRole === 'admin') {
       for (const r of ['admin', 'staff']) {
@@ -120,10 +120,10 @@ const Guard = ({ allowedRoles, session, children }) => {
 
   const isBanned = session?.isLocked === true || session?.exam_status === 'failed' || ['locked', 'failed', 'suspended'].includes(sStatus);
   const isInactive = session?.role === 'teacher' && sStatus === 'inactive';
-  // GV pending/locked: vào /teacher/test xem tiến trình — không kick ra login
+  // GV pending/locked: vào /teacher/test xem tiến trình - không kick ra login
   const mustKick = !!(session && !isOnTeacherTest && !isTeacherExamOnly && (isBanned || isInactive) && session.role !== 'admin');
 
-  // Dọn phiên server khi bị kick — tránh báo “đăng nhập máy khác” khi vào lại
+  // Dọn phiên server khi bị kick - tránh báo “đăng nhập máy khác” khi vào lại
   useEffect(() => {
     if (!mustKick || !session) return;
     const deviceId = localStorage.getItem('cms_device_id_v1') || getDeviceFingerprint();
@@ -241,15 +241,15 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
   const go = useCallback((page, data) => {
     const routes = {
       register: '/dangkykhoahoc',
-      login:    '/login',
-      admin:    '/admin',
-      teacher:  '/teacher',
-      student:  '/student',
-      finance:  '/teacher/finance',
-      inbox:    session?.role === 'student' ? '/student/inbox'
-              : session?.role === 'admin'   ? '/admin/inbox'
-              :                               '/teacher/inbox',
-      test:     '/teacher/test',
+      login: '/login',
+      admin: '/admin',
+      teacher: '/teacher',
+      student: '/student',
+      finance: '/teacher/finance',
+      inbox: session?.role === 'student' ? '/student/inbox'
+        : session?.role === 'admin' ? '/admin/inbox'
+          : '/teacher/inbox',
+      test: '/teacher/test',
     };
     nav(routes[page] || '/', { state: data });
   }, [nav, session]);
@@ -276,8 +276,8 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
   return (
     <Suspense fallback={<LoadingScreen />}><Routes>
       {/* ═══ Public ═══ */}
-      <Route path="/"            element={<LoginPage onLogin={onLogin} />} />
-      <Route path="/login"       element={<LoginPage onLogin={onLogin} />} />
+      <Route path="/" element={<LoginPage onLogin={onLogin} />} />
+      <Route path="/login" element={<LoginPage onLogin={onLogin} />} />
       <Route path="/DANGNHAPMIENPHI" element={<FreePortalPage onLogin={onLogin} />} />
       <Route path="/admin/login" element={<AdminLoginPage onLogin={onLogin} />} />
       <Route path="/dangkykhoahoc" element={<RegistrationForm onNavigate={go} />} />
@@ -285,11 +285,11 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
 
       {/* ═══ Admin ═══ */}
       <Route element={
-      <Guard allowedRoles={['admin', 'staff']} session={session}>
+        <Guard allowedRoles={['admin', 'staff']} session={session}>
           <DashboardLayout role="admin" session={session} onLogout={onLogout} />
         </Guard>
       }>
-        <Route path="/admin"       element={<ErrorBoundary inline><AdminDashboard onNavigate={go} /></ErrorBoundary>} />
+        <Route path="/admin" element={<ErrorBoundary inline><AdminDashboard onNavigate={go} /></ErrorBoundary>} />
         <Route path="/admin/notifications" element={
           <ErrorBoundary inline><NotificationCenterPage role="admin" session={session} /></ErrorBoundary>
         } />
@@ -339,11 +339,11 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         <Route path="/admin/inbox" element={
           <PermissionGuard session={session} permission={PERMISSIONS.MANAGE_MESSAGES}>
             <ErrorBoundary inline>
-              <Inbox 
-                currentUserId={session?.id} 
-                currentUserName={session?.name} 
-                currentUserRole={getMessagingRole(session)} 
-                onNavigate={go} 
+              <Inbox
+                currentUserId={session?.id}
+                currentUserName={session?.name}
+                currentUserRole={getMessagingRole(session)}
+                onNavigate={go}
               />
             </ErrorBoundary>
           </PermissionGuard>
@@ -379,12 +379,12 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
           <DashboardLayout role="teacher" session={session} onLogout={onLogout} />
         </Guard>
       }>
-        <Route path="/teacher"         element={<ErrorBoundary inline><TeacherDashboard onNavigate={go} /></ErrorBoundary>} />
+        <Route path="/teacher" element={<ErrorBoundary inline><TeacherDashboard onNavigate={go} /></ErrorBoundary>} />
         <Route path="/teacher/finance" element={<ErrorBoundary inline><TeacherFinanceAndTraining onNavigate={go} /></ErrorBoundary>} />
         <Route path="/teacher/notifications" element={
           <ErrorBoundary inline><NotificationCenterPage role="teacher" session={session} /></ErrorBoundary>
         } />
-        <Route path="/teacher/inbox"   element={
+        <Route path="/teacher/inbox" element={
           <ErrorBoundary inline>
             <Inbox currentUserId={session?.id} currentUserName={session?.name} currentUserRole={getMessagingRole(session)} onNavigate={go} />
           </ErrorBoundary>
@@ -404,7 +404,7 @@ function AppRoutes({ session, isAuthLoading, onLogin, onLogout }) {
         <Route path="/teacher/support" element={
           <ErrorBoundary inline><SupportEntryPage /></ErrorBoundary>
         } />
-        <Route path="/teacher/test"    element={
+        <Route path="/teacher/test" element={
           <ErrorBoundary>
             <TeacherTest teacherName={session?.name || 'Giảng Viên'} onBack={() => nav('/teacher')} />
           </ErrorBoundary>
@@ -554,7 +554,7 @@ function GlobalApiErrorHandler() {
 }
 
 function App() {
-  const [session, setSession]           = useState(null);
+  const [session, setSession] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -581,7 +581,7 @@ function App() {
 
       try {
         const res = await api.auth.me();
-        
+
         if (res.success && res.data) {
           // /me cũ có thể thiếu key gender → không xóa gender đã có trong session
           const freshUser = {
@@ -675,11 +675,11 @@ function App() {
     // (VD: Đã từng login Admin thì xóa admin_user khi login Teacher)
     const roles = ['admin', 'staff', 'teacher', 'student'];
     roles.forEach(r => {
-       if (r !== account.role) {
-         localStorage.removeItem(`${r}_user`);
-         localStorage.removeItem(`${r}_access_token`);
-         localStorage.removeItem(`${r}_refresh_token`);
-       }
+      if (r !== account.role) {
+        localStorage.removeItem(`${r}_user`);
+        localStorage.removeItem(`${r}_access_token`);
+        localStorage.removeItem(`${r}_refresh_token`);
+      }
     });
 
     saveSession(account);
@@ -731,45 +731,45 @@ function App() {
 
   return (
     <ErrorBoundary>
-        <LoadingScreen />
-        <OfflineBanner />
-        <SocketProvider
-          userId={session ? (session.id || session._id) : ''}
-          role={getMessagingRole(session) || session?.role || ''}
-          adminRole={session?.adminRole || ''}
-          name={session?.name || ''}
-          token={session?.token || session?.accessToken || ''}
-        >
-          <ModalProvider>
-            <SecurityGuard />
-            <FaviconSwitcher />
-            <StudentsProvider user={session}>
+      <LoadingScreen />
+      <OfflineBanner />
+      <SocketProvider
+        userId={session ? (session.id || session._id) : ''}
+        role={getMessagingRole(session) || session?.role || ''}
+        adminRole={session?.adminRole || ''}
+        name={session?.name || ''}
+        token={session?.token || session?.accessToken || ''}
+      >
+        <ModalProvider>
+          <SecurityGuard />
+          <FaviconSwitcher />
+          <StudentsProvider user={session}>
             <TeachersProvider user={session}>
-            <ScheduleProvider user={session}>
-            <FinanceProvider user={session}>
-            <DataProvider key={session?.id || 'guest'} user={session} onLogout={handleLogout}>
-                <BranchProvider session={session}>
-                <ToastProvider>
-                    <GlobalApiErrorHandler />
-                      <AppRoutes
-                        session={session}
-                        onSessionChange={handleSessionChange}
-                        isAuthLoading={isAuthLoading}
-                        onLogin={handleLogin}
-                        onLogout={handleLogout}
-                    />
-                    {/* Popup thông báo — Nhân viên (cùng cấu hình với tab Popup) */}
-                    {session?.role === 'staff' && <PopupBanner role="staff" />}
-                    {session?.role === 'student' && <StudyHeartbeat />}
-                </ToastProvider>
-                </BranchProvider>
-            </DataProvider>
-            </FinanceProvider>
-            </ScheduleProvider>
+              <ScheduleProvider user={session}>
+                <FinanceProvider user={session}>
+                  <DataProvider key={session?.id || 'guest'} user={session} onLogout={handleLogout}>
+                    <BranchProvider session={session}>
+                      <ToastProvider>
+                        <GlobalApiErrorHandler />
+                        <AppRoutes
+                          session={session}
+                          onSessionChange={handleSessionChange}
+                          isAuthLoading={isAuthLoading}
+                          onLogin={handleLogin}
+                          onLogout={handleLogout}
+                        />
+                        {/* Popup thông báo - Nhân viên (cùng cấu hình với tab Popup) */}
+                        {session?.role === 'staff' && <PopupBanner role="staff" />}
+                        {session?.role === 'student' && <StudyHeartbeat />}
+                      </ToastProvider>
+                    </BranchProvider>
+                  </DataProvider>
+                </FinanceProvider>
+              </ScheduleProvider>
             </TeachersProvider>
-            </StudentsProvider>
-          </ModalProvider>
-        </SocketProvider>
+          </StudentsProvider>
+        </ModalProvider>
+      </SocketProvider>
     </ErrorBoundary>
   );
 }

@@ -27,7 +27,7 @@ export function resolveStudentSession(session) {
   return stored?.role === 'student' ? (stored || session) : session;
 }
 
-/** Khớp middleware — freePortal chưa có khóa 1 kèm 1 thì `/api/schedules` luôn 403. */
+/** Khớp middleware - freePortal chưa có khóa 1 kèm 1 thì `/api/schedules` luôn 403. */
 export function isStudentSchedulesApiBlocked(session) {
   const source = resolveStudentSession(session);
   if (source?.role !== 'student' || source?.freePortal !== true) return false;

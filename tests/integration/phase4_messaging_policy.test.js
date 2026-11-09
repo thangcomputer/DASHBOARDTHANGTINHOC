@@ -1,5 +1,5 @@
 /**
- * Phase 4 — Canonical MessagingPolicy lock.
+ * Phase 4 - Canonical MessagingPolicy lock.
  * Authority: MESSAGING_BUSINESS_DECISIONS.md + pairing 8.24 + contacts 8.24B.
  * No DB required for structural / discover / identity tests.
  */
@@ -72,7 +72,7 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(staffDiscover.targetProductRole, PRODUCT_ROLES.STAFF);
   });
 
-  it('discover matrix — student', () => {
+  it('discover matrix - student', () => {
     assert.equal(canDiscoverContacts(actors.student, actors.studentB).allowed, false);
     assert.equal(canDiscoverContacts(actors.student, actors.teacher, { assigned: true }).allowed, true);
     assert.equal(canDiscoverContacts(actors.student, actors.teacher, { assigned: false }).allowed, false);
@@ -83,7 +83,7 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canDiscoverContacts(actors.student, actors.super).allowed, false);
   });
 
-  it('discover matrix — teacher', () => {
+  it('discover matrix - teacher', () => {
     assert.equal(canDiscoverContacts(actors.teacher, actors.teacherB).allowed, false);
     assert.equal(canDiscoverContacts(actors.teacher, actors.student, { assigned: true }).allowed, true);
     assert.equal(canDiscoverContacts(actors.teacher, actors.support).allowed, true);
@@ -92,7 +92,7 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canDiscoverContacts(actors.teacher, actors.super).allowed, false);
   });
 
-  it('discover matrix — staff / support / elevated', () => {
+  it('discover matrix - staff / support / elevated', () => {
     assert.equal(canDiscoverContacts(actors.staff, actors.support).allowed, true);
     assert.equal(canDiscoverContacts(actors.staff, actors.student, { sameBranch: true }).allowed, true);
     assert.equal(canDiscoverContacts(actors.staff, actors.student, { sameBranch: false }).allowed, false);
@@ -109,14 +109,14 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canDiscoverContacts(actors.high, actors.super).allowed, true);
   });
 
-  it('structural send — dual-layer C1 (send allow, discover deny SUPER); HIGH↔student deny both', () => {
+  it('structural send - dual-layer C1 (send allow, discover deny SUPER); HIGH↔student deny both', () => {
     assert.equal(canSendStructurally(actors.student, actors.super).allowed, true);
     assert.equal(canSendStructurally(actors.student, actors.high).allowed, false);
     assert.equal(canDiscoverContacts(actors.student, actors.super).allowed, false);
     assert.equal(canDiscoverContacts(actors.student, actors.high).allowed, false);
   });
 
-  it('structural send — deny peer same role; allow approved pairs', () => {
+  it('structural send - deny peer same role; allow approved pairs', () => {
     assert.equal(canSendStructurally(actors.student, actors.studentB).allowed, false);
     assert.equal(canSendStructurally(actors.teacher, actors.teacherB).allowed, false);
     assert.equal(canSendStructurally(actors.student, actors.teacher).allowed, true);
@@ -152,7 +152,7 @@ describe('Phase 4 MessagingPolicy', { concurrency: false }, () => {
     assert.equal(canSendStructurally(actors.student, actors.super).allowed, true);
   });
 
-  it('conversation view/read — participant vs STAFF on admin_admin', () => {
+  it('conversation view/read - participant vs STAFF on admin_admin', () => {
     const legacy = buildConversationId('admin', 'admin', 'student', IDS.studentA);
     assert.equal(canViewConversation(actors.super, legacy).allowed, true);
     assert.equal(canViewConversation(actors.high, legacy).allowed, true);

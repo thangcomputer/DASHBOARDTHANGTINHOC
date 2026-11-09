@@ -1,7 +1,7 @@
 /**
- * Backup service — export MongoDB collections as gzip JSON (khong can mongodump).
+ * Backup service - export MongoDB collections as gzip JSON (khong can mongodump).
  * Chi Super Admin. Phase 9: create / list / download / delete / retention.
- * Restore co chu y ghi de DB — khong nam trong module nay.
+ * Restore co chu y ghi de DB - khong nam trong module nay.
  */
 const fs = require('fs');
 const path = require('path');

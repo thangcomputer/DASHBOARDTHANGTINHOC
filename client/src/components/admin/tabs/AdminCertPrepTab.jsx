@@ -501,7 +501,7 @@ export default function AdminCertPrepTab() {
               <h3 className="font-bold">Preview đề · {previewTestQs.test.name}</h3>
               <button type="button" aria-label="Đóng" onClick={() => setPreviewTestQs(null)} className="w-10 h-10 rounded-xl hover:bg-slate-50"><X size={18} /></button>
             </div>
-            <p className="text-xs text-amber-700 font-bold ">Admin preview — không tạo session</p>
+            <p className="text-xs text-amber-700 font-bold ">Admin preview - không tạo session</p>
             <div className="max-h-[70dvh] overflow-y-auto space-y-3">
               {previewTestQs.questions.length ? previewTestQs.questions.map((q) => (
                 <CertPrepQuestionPreview key={q._id || q.id} question={q} />

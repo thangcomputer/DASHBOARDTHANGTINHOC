@@ -1,5 +1,5 @@
 /**
- * Workflow engine (Phase 13) — dinh nghia san + instance + side effects.
+ * Workflow engine (Phase 13) - dinh nghia san + instance + side effects.
  */
 const WorkflowInstance = require('../models/WorkflowInstance');
 const Teacher = require('../models/Teacher');

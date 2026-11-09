@@ -1,4 +1,4 @@
-# LMS THẮNG TIN HỌC — REMEDIATION PROGRESS
+# LMS THẮNG TIN HỌC - REMEDIATION PROGRESS
 
 ## Current baseline
 
@@ -6,7 +6,7 @@
 - Current commit: `61c9b5a9cb19758d57df376b3c1f4a69f5a1ef4e` ("fix: show AI assistant online", 2026-09-14)
 - Node version: v24.18.0
 - MongoDB configuration: `MONGODB_URI=mongodb://127.0.0.1:27017/dashboardthangtinhoc` (standalone by default; `?replicaSet=rs0` only needed for CQRS strangler flags, which are all `false` in `.env.example`)
-- Deployment mode: `NODE_ENV=development` by default in `.env.example`; production is a separate VPS deploy (see `deploy_scripts/`, `VPS_*` vars) — not exercised in this session
+- Deployment mode: `NODE_ENV=development` by default in `.env.example`; production is a separate VPS deploy (see `deploy_scripts/`, `VPS_*` vars) - not exercised in this session
 - Backup status: `BACKUP_CRON` / `BACKUP_SCHEDULE` / `BACKUP_KEEP` are commented out (disabled) by default in `.env.example`; not modified this phase
 - Test status (2026-09-16, this session): `node tests/run.js unit` -> 330 tests, 329 pass, 1 pre-existing failure (`tests/unit/high_admin_teacher_manage_actions.test.js`, unrelated string-match assertion vs `AdminTeachersTab.jsx` label text -- reproduced identically on a clean `git stash` of this session's changes, i.e. pre-existing on the branch tip, not caused by Phase 1 work)
 

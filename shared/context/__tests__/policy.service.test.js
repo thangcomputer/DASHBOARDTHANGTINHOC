@@ -5,7 +5,7 @@ const SUPER_ADMIN = { roleCode: 'SUPER_ADMIN', tenantId: 'T1', assignedBranches:
 const STAFF = { id: 'staff-1', tenantId: 'T1', assignedBranches: ['B1'], isBlocked: false };
 
 describe('PolicyService Orchestrator', () => {
-  test('All policies allow — returns allowed: true', () => {
+  test('All policies allow - returns allowed: true', () => {
     // Resource has userId matching STAFF.id → ownership passes
     const result = PolicyService.evaluate(
       STAFF,
@@ -17,7 +17,7 @@ describe('PolicyService Orchestrator', () => {
     expect(result.failedPolicy).toBeUndefined();
   });
 
-  test('Null subject — returns denied with PreCheck failure', () => {
+  test('Null subject - returns denied with PreCheck failure', () => {
     const result = PolicyService.evaluate(null, {}, {});
     expect(result.allowed).toBe(false);
     expect(result.failedPolicy).toBe('PreCheck');
@@ -68,12 +68,12 @@ describe('PolicyService Orchestrator', () => {
     expect(result.reason).toContain('blocked');
   });
 
-  test('Null resource — policies handle gracefully and pass', () => {
+  test('Null resource - policies handle gracefully and pass', () => {
     const result = PolicyService.evaluate(STAFF, null, {});
     expect(result.allowed).toBe(true);
   });
 
-  test('Missing context — defaults to empty object, policies pass', () => {
+  test('Missing context - defaults to empty object, policies pass', () => {
     // Resource must match STAFF's id so ownership policy passes
     const result = PolicyService.evaluate(STAFF, { tenantId: 'T1', branchId: 'B1', userId: STAFF.id });
     expect(result.allowed).toBe(true);

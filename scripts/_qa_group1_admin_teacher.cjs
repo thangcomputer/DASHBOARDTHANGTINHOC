@@ -1,5 +1,5 @@
 /**
- * QA Group 1 — Admin ↔ Teacher (API E2E against local)
+ * QA Group 1 - Admin ↔ Teacher (API E2E against local)
  * Usage: node scripts/_qa_group1_admin_teacher.cjs
  * Does not print secrets. Creates a throwaway teacher and cleans up when possible.
  */
@@ -13,7 +13,7 @@ const results = [];
 function record(tc) {
   results.push(tc);
   const icon = tc.result === 'PASS' ? 'PASS' : tc.result === 'FAIL' ? 'FAIL' : tc.result;
-  console.log(`[${icon}] ${tc.id} — ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
+  console.log(`[${icon}] ${tc.id} - ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
 }
 
 function req(method, path, { token, body, cookie, csrfToken } = {}) {
@@ -200,7 +200,7 @@ async function main() {
       result: res.status === 403 ? 'PASS' : 'FAIL',
       severity: 'High',
       api: 'POST /api/auth/login/public',
-      note: 'Default create status=inactive — Admin phải kích hoạt trước',
+      note: 'Default create status=inactive - Admin phải kích hoạt trước',
     });
   }
 
@@ -296,7 +296,7 @@ async function main() {
       && schedules.json.data.every((s) => String(s.teacherId?._id || s.teacherId) === String(teacherId) || schedules.json.data.length === 0);
     record({
       id: 'G1-10',
-      name: 'GV xem lịch — chỉ lịch của mình (IDOR fix)',
+      name: 'GV xem lịch - chỉ lịch của mình (IDOR fix)',
       roleAct: 'teacher',
       roleRecv: '-',
       expected: '200 + mọi item teacherId = self',
@@ -332,7 +332,7 @@ async function main() {
       result: analytics.status === 403 ? 'PASS' : 'FAIL',
       severity: 'Critical',
       api: 'GET /api/analytics/revenue',
-      fix: analytics.status === 0 ? 'Server ECONNRESET — kiểm tra unhandled error analyticsRoutes' : '',
+      fix: analytics.status === 0 ? 'Server ECONNRESET - kiểm tra unhandled error analyticsRoutes' : '',
     });
     // ensure server still alive
     const h2 = await req('GET', '/healthz');
@@ -420,7 +420,7 @@ async function main() {
       actual: `specialty=${teacherView.json?.data?.specialty} address=${teacherView.json?.data?.address}`,
       result:
         teacherView.json?.data?.specialty === 'Excel QA'
-        && teacherView.json?.data?.address === 'QA Address 1'
+          && teacherView.json?.data?.address === 'QA Address 1'
           ? 'PASS'
           : 'FAIL',
       severity: 'High',
@@ -432,7 +432,7 @@ async function main() {
   // --- Training / LMS read for teacher ---
   {
     const training = await req('GET', '/api/settings/training-data', { token: teacherAccess });
-    // endpoint may differ — try common paths
+    // endpoint may differ - try common paths
     const alt = training.status === 404
       ? await req('GET', '/api/settings', { token: teacherAccess })
       : training;
@@ -477,7 +477,7 @@ async function main() {
         roleAct: 'teacher',
         roleRecv: 'student',
         expected: '403',
-        actual: 'FAIL — không tạo được HV fixture',
+        actual: 'FAIL - không tạo được HV fixture',
         result: 'FAIL',
         severity: 'High',
         api: 'POST /api/schedules',
@@ -489,7 +489,7 @@ async function main() {
       const res = await mut('POST', '/api/schedules', {
         token: teacherAccess,
         body: {
-          teacherId: '000000000000000000000099', // try spoof — server should force self
+          teacherId: '000000000000000000000099', // try spoof - server should force self
           studentId: sid,
           date: dateStr,
           startTime: '09:00',
@@ -498,14 +498,14 @@ async function main() {
       });
       record({
         id: 'G1-18',
-        name: 'GV tạo lịch — không spoof teacherId khác + chỉ HV được gán',
+        name: 'GV tạo lịch - không spoof teacherId khác + chỉ HV được gán',
         roleAct: 'teacher',
         roleRecv: 'student',
         expected: '403 nếu HV chưa gán; nếu gán thì 201 với teacherId=self',
         actual: `status=${res.status} msg=${res.json?.message || ''} tid=${res.json?.data?.teacherId}`,
         result:
           res.status === 403
-          || (res.status === 201 && String(res.json?.data?.teacherId?._id || res.json?.data?.teacherId) === String(teacherId))
+            || (res.status === 201 && String(res.json?.data?.teacherId?._id || res.json?.data?.teacherId) === String(teacherId))
             ? 'PASS'
             : 'FAIL',
         severity: 'Critical',
@@ -541,7 +541,7 @@ async function main() {
     const withOld = await req('GET', `/api/teachers/${teacherId}`, { token: teacherAccess });
     record({
       id: 'G1-20',
-      name: 'Sau khi khóa — JWT cũ còn gọi API được không',
+      name: 'Sau khi khóa - JWT cũ còn gọi API được không',
       roleAct: 'teacher',
       roleRecv: '-',
       expected: '401/403 (nên revoke / check status trên mọi request)',
@@ -611,14 +611,14 @@ async function main() {
     });
   }
 
-  // Features covered by G3/G5 API smoke — ghi nhận cross-coverage
+  // Features covered by G3/G5 API smoke - ghi nhận cross-coverage
   record({
     id: 'G1-24',
     name: 'Upload tài liệu / tạo bài kiểm tra / điểm danh (API smoke)',
     roleAct: 'teacher',
     roleRecv: 'student',
     expected: 'Covered by G3 (schedule/attendance/grade) + G5 (exam-results)',
-    actual: 'PASS — cross-covered; xem scripts/_qa_group3 + _qa_groups_4_to_8',
+    actual: 'PASS - cross-covered; xem scripts/_qa_group3 + _qa_groups_4_to_8',
     result: 'PASS',
     severity: 'Medium',
   });
@@ -635,7 +635,7 @@ function printSummary() {
   console.log(`PASS=${pass} FAIL=${fail} SKIP=${skip} TOTAL=${results.length}`);
   console.log(`Completion (excl SKIP)=${((pass / Math.max(1, pass + fail)) * 100).toFixed(1)}%`);
   if (critFails.length) {
-    console.log('\nCRITICAL FAILURES — stop before Group 2:');
+    console.log('\nCRITICAL FAILURES - stop before Group 2:');
     critFails.forEach((f) => {
       console.log(`- ${f.id} ${f.name}`);
       console.log(`  actual: ${f.actual}`);

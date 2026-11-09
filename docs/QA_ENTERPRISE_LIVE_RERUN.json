@@ -67,7 +67,7 @@
           "actual": "MongoDB connected; prisma/=0; redis=disabled",
           "result": "PASS",
           "severity": "Low",
-          "note": "Không FAIL product — FAIL brief giả định Postgres/Prisma"
+          "note": "Không FAIL product - FAIL brief giả định Postgres/Prisma"
         }
       ]
     },
@@ -187,7 +187,7 @@
           "result": "FAIL",
           "severity": "Critical",
           "api": "DELETE /api/courses/:id",
-          "impact": "Hard delete — mất lịch sử catalog; rủi ro báo cáo/enrollment orphan",
+          "impact": "Hard delete - mất lịch sử catalog; rủi ro báo cáo/enrollment orphan",
           "fixHint": "Đổi findByIdAndDelete → status=archived + deletedAt; filter catalog",
           "database": "courses"
         }
@@ -215,7 +215,7 @@
           "actual": "ledgerPaymentRows=null",
           "result": "FAIL",
           "severity": "Critical",
-          "impact": "Doanh thu tài chính chưa SoT qua ledger — báo cáo dễ lệch student.paid",
+          "impact": "Doanh thu tài chính chưa SoT qua ledger - báo cáo dễ lệch student.paid",
           "fixHint": "Gọi ledgerService.settlePayment trong route pay",
           "database": "ledgerentries"
         },
@@ -228,7 +228,7 @@
           "result": "FAIL",
           "severity": "Critical",
           "api": "PUT /api/students/:id/refund",
-          "impact": "Không hỗ trợ hoàn một phần — finance/ERP lệch yêu cầu",
+          "impact": "Không hỗ trợ hoàn một phần - finance/ERP lệch yêu cầu",
           "fixHint": "Nhận body.amount; giảm paidAmount; post ledger refund; giữ invoice"
         },
         {
@@ -438,7 +438,7 @@
           "actual": "pendingApprox=0 probe=0",
           "result": "PASS",
           "severity": "Medium",
-          "note": "Smoke schema only — chưa E2E approve flow trong run này"
+          "note": "Smoke schema only - chưa E2E approve flow trong run này"
         }
       ]
     },
@@ -451,7 +451,7 @@
           "module": "UI E2E",
           "name": "Playwright toàn bộ màn Admin/Staff/GV/HV",
           "expected": "Full UI matrix",
-          "actual": "NOT RUN full matrix trong suite này — xem docs/QA_UI_GOLDEN_PATHS_REPORT.md (7 paths PASS lần trước). Cần regression UI lại.",
+          "actual": "NOT RUN full matrix trong suite này - xem docs/QA_UI_GOLDEN_PATHS_REPORT.md (7 paths PASS lần trước). Cần regression UI lại.",
           "result": "FAIL",
           "severity": "High",
           "impact": "Không đủ bằng chứng Pass UI toàn hệ thống cho go-live"
@@ -595,7 +595,7 @@
       "result": "FAIL",
       "severity": "Critical",
       "api": "DELETE /api/courses/:id",
-      "impact": "Hard delete — mất lịch sử catalog; rủi ro báo cáo/enrollment orphan",
+      "impact": "Hard delete - mất lịch sử catalog; rủi ro báo cáo/enrollment orphan",
       "fixHint": "Đổi findByIdAndDelete → status=archived + deletedAt; filter catalog",
       "database": "courses"
     },
@@ -617,7 +617,7 @@
       "actual": "ledgerPaymentRows=null",
       "result": "FAIL",
       "severity": "Critical",
-      "impact": "Doanh thu tài chính chưa SoT qua ledger — báo cáo dễ lệch student.paid",
+      "impact": "Doanh thu tài chính chưa SoT qua ledger - báo cáo dễ lệch student.paid",
       "fixHint": "Gọi ledgerService.settlePayment trong route pay",
       "database": "ledgerentries"
     },
@@ -630,7 +630,7 @@
       "result": "FAIL",
       "severity": "Critical",
       "api": "PUT /api/students/:id/refund",
-      "impact": "Không hỗ trợ hoàn một phần — finance/ERP lệch yêu cầu",
+      "impact": "Không hỗ trợ hoàn một phần - finance/ERP lệch yêu cầu",
       "fixHint": "Nhận body.amount; giảm paidAmount; post ledger refund; giữ invoice"
     },
     {
@@ -780,7 +780,7 @@
       "actual": "pendingApprox=0 probe=0",
       "result": "PASS",
       "severity": "Medium",
-      "note": "Smoke schema only — chưa E2E approve flow trong run này"
+      "note": "Smoke schema only - chưa E2E approve flow trong run này"
     },
     {
       "id": "STACK-01",
@@ -790,14 +790,14 @@
       "actual": "MongoDB connected; prisma/=0; redis=disabled",
       "result": "PASS",
       "severity": "Low",
-      "note": "Không FAIL product — FAIL brief giả định Postgres/Prisma"
+      "note": "Không FAIL product - FAIL brief giả định Postgres/Prisma"
     },
     {
       "id": "UI-01",
       "module": "UI E2E",
       "name": "Playwright toàn bộ màn Admin/Staff/GV/HV",
       "expected": "Full UI matrix",
-      "actual": "NOT RUN full matrix trong suite này — xem docs/QA_UI_GOLDEN_PATHS_REPORT.md (7 paths PASS lần trước). Cần regression UI lại.",
+      "actual": "NOT RUN full matrix trong suite này - xem docs/QA_UI_GOLDEN_PATHS_REPORT.md (7 paths PASS lần trước). Cần regression UI lại.",
       "result": "FAIL",
       "severity": "High",
       "impact": "Không đủ bằng chứng Pass UI toàn hệ thống cho go-live"

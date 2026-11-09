@@ -98,7 +98,7 @@ function policyShadowAssignment(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] assignment evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] assignment evaluation error - legacy still authoritative',
         );
         req.policyShadow = {
           action: `assignment_${action}`,
@@ -140,7 +140,7 @@ function policyShadowAssignment(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] assignment shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] assignment shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -152,7 +152,7 @@ function policyShadowAssignment(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected assignment error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected assignment error - fail closed to legacy only',
       );
     }
     return next();

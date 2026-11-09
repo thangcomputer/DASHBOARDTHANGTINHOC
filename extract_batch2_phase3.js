@@ -10,7 +10,7 @@ function getRelativeFromServicesDir(originalDir, importPath) {
 
 function extractDomain({ domain, routeFile, serviceName, controllerName }) {
   if (!fs.existsSync(routeFile)) {
-    console.log(`⚠️ Skipping ${domain} — route file not found: ${routeFile}`);
+    console.log(`⚠️ Skipping ${domain} - route file not found: ${routeFile}`);
     return;
   }
   const routesDir = path.dirname(routeFile);
@@ -152,7 +152,7 @@ function extractDomain({ domain, routeFile, serviceName, controllerName }) {
 
   let newRouteCode = code;
   const controllerVar = controllerName.charAt(0).toLowerCase() + controllerName.slice(1);
-  
+
   for (const { methodName, block } of routes) {
     const handlerIdx = block.indexOf('async (req, res)');
     if (handlerIdx === -1) continue;

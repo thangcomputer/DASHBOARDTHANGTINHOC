@@ -10,8 +10,8 @@ const { getMessagingRole } = require('../utils/messagingRoles');
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:5000';
 
 const ACCOUNTS = {
-  admin:   { identifier: process.env.ADMIN_IDENTIFIER || 'admin', password: process.env.ADMIN_PASSWORD || 'admin123', roleHint: 'admin' },
-  staff:   { identifier: process.env.STAFF_IDENTIFIER || '0920000010', password: process.env.STAFF_PASSWORD || 'Test@123', roleHint: 'admin' },
+  admin: { identifier: process.env.ADMIN_IDENTIFIER || 'admin', password: process.env.ADMIN_PASSWORD || 'admin123', roleHint: 'admin' },
+  staff: { identifier: process.env.STAFF_IDENTIFIER || '0920000010', password: process.env.STAFF_PASSWORD || 'Test@123', roleHint: 'admin' },
   teacher: { identifier: process.env.TEACHER_IDENTIFIER || '0910000010', password: process.env.TEACHER_PASSWORD || 'Test@123', roleHint: 'teacher' },
   student: { identifier: process.env.STUDENT_IDENTIFIER || '0900000010', password: process.env.STUDENT_PASSWORD || 'Test@123', roleHint: 'student' },
 };
@@ -204,13 +204,13 @@ async function run() {
 
   for (const s of Object.values(sockets)) s.close();
 
-  console.log(`\nTổng: ${results.length} cặp | OK: ${results.length - failed.length} | Lỗi: ${failed.length}`);
+  console.log(`\nTổng: ${results.length} cặp | OK: ${results.length - failed.length} | Lỗi: ${failed.length} `);
   if (duped.length) console.log(`⚠ Trùng tin: ${duped.length} cặp`);
   if (failed.length) {
     console.log('\n❌ ROLEPLAY FAILED');
     process.exit(1);
   }
-  console.log('\n✅ ROLEPLAY PASSED — không trùng, không lọt, gửi/nhận OK');
+  console.log('\n✅ ROLEPLAY PASSED - không trùng, không lọt, gửi/nhận OK');
 }
 
 run().catch((e) => {

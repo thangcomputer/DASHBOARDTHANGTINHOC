@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Thông tin trung tâm — nhập tay, độc lập Branch/HR/Settings.
- * GET /api/center-info — mọi user đã login (chỉ published)
- * /api/center-info/manage/* — Super Admin hoặc manage_center_info
+ * Thông tin trung tâm - nhập tay, độc lập Branch/HR/Settings.
+ * GET /api/center-info - mọi user đã login (chỉ published)
+ * /api/center-info/manage/* - Super Admin hoặc manage_center_info
  */
 const express = require('express');
 const path = require('path');
@@ -183,9 +183,9 @@ router.get('/', authMiddleware, async (req, res) => {
     const publishedOnly = overview.status === 'published';
     const items = publishedOnly
       ? await CenterInfoItem.find({
-          status: 'published',
-          isActive: true,
-        }).sort({ section: 1, sortOrder: 1, createdAt: 1 }).lean()
+        status: 'published',
+        isActive: true,
+      }).sort({ section: 1, sortOrder: 1, createdAt: 1 }).lean()
       : [];
 
     const bySection = {};

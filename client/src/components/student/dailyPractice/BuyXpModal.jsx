@@ -9,7 +9,7 @@ import { gameSounds } from '../../../utils/sound';
 
 const POLL_MS = 3000;
 
-/** Modal mua XP luyện tập — chuyển khoản VietQR, SePay tự cộng. */
+/** Modal mua XP luyện tập - chuyển khoản VietQR, SePay tự cộng. */
 export default function BuyXpModal({ packs = [], onClose, onPaid }) {
   const [packId, setPackId] = useState(packs[0]?.id || '');
   const [busy, setBusy] = useState(false);

@@ -352,7 +352,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
     }
   }, [requireWebcam, phase, bankTotal, questionsLoading, beginOrResumeExam, punishKey, progressEntry, refuseLockedExam, student, examStartAllowed]);
 
-  // Persist attempt while in test (answers / nav / timer) — no reshuffle
+  // Persist attempt while in test (answers / nav / timer) - no reshuffle
   useEffect(() => {
     if (phase !== 'test' || !questions.length) return;
     saveCertificationAttempt(attemptKey, {
@@ -439,7 +439,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
     clearCertificationAttempt(attemptKey);
     clearLiveExamAttempt(STUDENT_ID, subjectId);
     if (!examAttemptToken) {
-      // Chưa có token (mất phiên) — vẫn phải chốt rớt lượt đang mở.
+      // Chưa có token (mất phiên) - vẫn phải chốt rớt lượt đang mở.
       try {
         const res = await api.students.abandonExamAttempt(STUDENT_ID, {
           subjectId,
@@ -456,7 +456,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
       const res = await api.students.forfeitExamAttempt(STUDENT_ID, { attemptToken: examAttemptToken });
       let data = res?.data || {};
       if (String(data.status || '') !== 'khong_dat') {
-        // Lượt đã nộp trắc nghiệm (đang làm thực hành) — vẫn phải chốt RỚT
+        // Lượt đã nộp trắc nghiệm (đang làm thực hành) - vẫn phải chốt RỚT
         const fallback = await api.students
           .abandonExamAttempt(STUDENT_ID, { subjectId, reason: 'Vi phạm quy chế thi' })
           .catch(() => null);
@@ -1092,7 +1092,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
       {/* Simple result header */}
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-4 md:px-8 py-4 flex items-center gap-4">
         <ExamBrandLogo resolvedUrl={webLogoUrl} className="h-7 w-auto max-w-[140px] flex-shrink-0" />
-        <span className="text-white font-bold text-sm">Kết quả — {meta.label}</span>
+        <span className="text-white font-bold text-sm">Kết quả - {meta.label}</span>
       </div>
       <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-4">
         {/* Score */}
@@ -1137,7 +1137,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
         )}
         {passed && !meta.essayRequired && (
           <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-5 text-center">
-            <p className="text-emerald-800 font-bold text-sm">Môn này chỉ yêu cầu trắc nghiệm — bạn đã hoàn thành.</p>
+            <p className="text-emerald-800 font-bold text-sm">Môn này chỉ yêu cầu trắc nghiệm - bạn đã hoàn thành.</p>
           </div>
         )}
         {/* Nếu rớt: thông báo khóa 7 ngày */}
@@ -1155,7 +1155,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
   );
 
   // ══════════════════════════════════════════════════════
-  // TEST — Main Layout
+  // TEST - Main Layout
   // ══════════════════════════════════════════════════════
   if (phase === 'test' && TOTAL < 1) {
     return (
@@ -1192,7 +1192,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
         }}
       />
 
-      {/* ══════════ HEADER — 1 hàng: thoát/SBD/giờ | logo | giám sát+camera ══════════ */}
+      {/* ══════════ HEADER - 1 hàng: thoát/SBD/giờ | logo | giám sát+camera ══════════ */}
       <header className="relative z-20 shrink-0 px-2 pt-1.5 pb-1.5 md:px-4 md:pt-2 md:pb-2">
         <div className="relative mx-auto max-w-[min(100%,90rem)] rounded-xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 shadow-[0_16px_50px_-18px_rgba(15,23,42,0.5)] overflow-hidden md:rounded-2xl">
           <div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] bg-[size:24px_24px]" />
@@ -1259,7 +1259,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
         </div>
       </header>
 
-      {/* ══════════ MAIN — gói trong 100dvh, không cuộn trang ══════════ */}
+      {/* ══════════ MAIN - gói trong 100dvh, không cuộn trang ══════════ */}
       <div className="relative z-10 flex min-h-0 flex-1 flex-col px-3 pb-1.5 pt-0.5 md:px-6 md:pb-2">
         <div className="mx-auto grid min-h-0 w-full max-w-[min(100%,90rem)] flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-12 lg:gap-4 xl:gap-5">
           <main className="order-1 flex min-h-0 flex-col lg:order-2 lg:col-span-8 xl:col-span-9">
@@ -1426,7 +1426,7 @@ const StudentTest = ({ subjectId, studentSbd = '11111', studentName = 'THIÊN TR
                               </div>
                             ) : (
                               <p className="mt-3 text-center text-[11px] font-semibold text-amber-600">
-                                Chưa có đề — liên hệ giáo viên
+                                Chưa có đề - liên hệ giáo viên
                               </p>
                             )}
                           </div>

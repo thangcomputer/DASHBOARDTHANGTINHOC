@@ -17,7 +17,7 @@ Establish **one canonical MessagingPolicy** as the LIVE messaging authorization 
 
 | File | Role |
 |---|---|
-| `services/messagingPolicy.js` | **NEW — CANONICAL** |
+| `services/messagingPolicy.js` | **NEW - CANONICAL** |
 | `services/chatAccessService.js` | WRAPPER → MessagingPolicy |
 | `services/directMessageService.js` | WIRE send ACL via `assertCanDirectMessage` |
 | `server.js` | typing/read → `canViewConversation` / `canMarkRead` |
@@ -28,8 +28,8 @@ Establish **one canonical MessagingPolicy** as the LIVE messaging authorization 
 
 ## Files Not Changed
 
-- `services/messagingPairing.js` (SEND engine — delegated)
-- `utils/messagingRoles.js` (transport + access — delegated)
+- `services/messagingPairing.js` (SEND engine - delegated)
+- `utils/messagingRoles.js` (transport + access - delegated)
 - `routes/messageRoutes.js` contacts matrix (Phase 6)
 - Message / Conversation schemas
 - Frontend policy duplication (Phase 7)
@@ -92,7 +92,7 @@ sendCanonicalMessage (REST + Socket)  ← UNCHANGED pipeline body
 
 ## Results
 
-- SUPPORT ≠ STAFF at product layer while sharing transport `staff` — verified
+- SUPPORT ≠ STAFF at product layer while sharing transport `staff` - verified
 - Discover matrix encodes 8.24B (student no SUPER/HIGH; dual-layer send still structural-allow)
 - REST + Socket DM both enter `sendCanonicalMessage` → `assertCanDirectMessage` → MessagingPolicy
 - Socket typing/read enter MessagingPolicy conversation access
@@ -108,21 +108,21 @@ sendCanonicalMessage (REST + Socket)  ← UNCHANGED pipeline body
 ## Branch Verification
 
 - Discover: student/staff cross-branch DENY when `sameBranch: false`
-- Full DB branch scope on send remains in pairing (unchanged) — **NOT retested with live Mongo in Phase 4**
+- Full DB branch scope on send remains in pairing (unchanged) - **NOT retested with live Mongo in Phase 4**
 
 ## Tenant Verification
 
-- `tenantId` normalized on identity; **not enforced** on live DM (documented freeze) — **NOT TESTED** as deny path
+- `tenantId` normalized on identity; **not enforced** on live DM (documented freeze) - **NOT TESTED** as deny path
 
 ## Socket Verification
 
 - Static wiring: `message:send` → `sendCanonicalMessage`; typing/read → MessagingPolicy
-- Live multi-socket isolation E2E — **NOT TESTED** this phase (Phase 5+)
+- Live multi-socket isolation E2E - **NOT TESTED** this phase (Phase 5+)
 
 ## REST Verification
 
 - Static: `POST /api/messages` still uses `sendCanonicalMessage` which now calls policy wrapper
-- Live HTTP matrix E2E — **NOT TESTED** this phase
+- Live HTTP matrix E2E - **NOT TESTED** this phase
 
 ## Performance Considerations
 
@@ -135,8 +135,8 @@ sendCanonicalMessage (REST + Socket)  ← UNCHANGED pipeline body
 
 ## Known Risks
 
-1. Contacts route still has **inline** discover matrix (duplicate until Phase 6) — Policy pure function is source for tests; route not yet calling it
-2. `canStartConversation` deep-link path (`allowSendWithoutDiscover`) needs DB pairing — not exercised in unit suite
+1. Contacts route still has **inline** discover matrix (duplicate until Phase 6) - Policy pure function is source for tests; route not yet calling it
+2. `canStartConversation` deep-link path (`allowSendWithoutDiscover`) needs DB pairing - not exercised in unit suite
 3. Group conversation access still membership-gated outside policy (`GROUP_REQUIRES_MEMBERSHIP_CHECK`)
 4. Unrelated dirty tree files (redis/cache/rbac artifacts) must not be mixed into messaging commits
 

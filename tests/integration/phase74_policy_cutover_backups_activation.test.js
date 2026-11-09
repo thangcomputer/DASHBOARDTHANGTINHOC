@@ -1,5 +1,5 @@
 /**
- * Phase 7.4 — Production activation + verification for /api/backups ONLY.
+ * Phase 7.4 - Production activation + verification for /api/backups ONLY.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -44,10 +44,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: null,
   });
 }
@@ -169,7 +169,7 @@ test('Phase7.4 all five backup actions resolve POLICY authority under activation
   }
 });
 
-test('Phase7.4 role parity under activation: SUPER ALLOW; others DENY — MATCH', () => {
+test('Phase7.4 role parity under activation: SUPER ALLOW; others DENY - MATCH', () => {
   const matrix = [
     [{ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' }, 'ALLOW'],
     [{ role: 'admin', adminRole: 'SUPER_ADMIN' }, 'ALLOW'],
@@ -267,12 +267,12 @@ test('Phase7.4 functional smoke: non-destructive authz paths documented; mutatio
   for (const action of ['stats', 'list', 'download']) {
     assert.equal(parity(action, superS).policy.decision, 'ALLOW');
   }
-  // Destructive create/delete: authz verified only — no backupService calls in this suite
+  // Destructive create/delete: authz verified only - no backupService calls in this suite
   assert.equal(parity('create', superS).policy.decision, 'ALLOW');
   assert.equal(parity('delete', superS).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — destructive production operation',
-    'NOT EXECUTED — destructive production operation',
+    'NOT EXECUTED - destructive production operation',
+    'NOT EXECUTED - destructive production operation',
   );
 });
 

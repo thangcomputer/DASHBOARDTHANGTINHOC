@@ -155,7 +155,7 @@ export const DataProvider = ({ children, user, onLogout }) => {
   triggerBackgroundSyncRef.current = triggerBackgroundSync;
 
   // Messages: vẫn useDataMessaging (staffs / SUPER_ADMIN mailbox / onReadAck).
-  // MessagesContext chưa mount ở App — tránh double socket/SWR cho đến khi migrate đủ API.
+  // MessagesContext chưa mount ở App - tránh double socket/SWR cho đến khi migrate đủ API.
   const {
     messages, groups, setGroups,
     sendMessage, syncMessages, toggleMessageReaction, recallMessage,
@@ -311,14 +311,14 @@ export const useData = () => {
   return ctx;
 };
 
-/** Chỉ subscribe state (students/schedules/…) — actions ổn định hơn qua useDataActions */
+/** Chỉ subscribe state (students/schedules/…) - actions ổn định hơn qua useDataActions */
 export const useDataState = () => {
   const ctx = useContext(DataStateContext);
   if (!ctx) throw new Error('useDataState must be inside DataProvider');
   return ctx;
 };
 
-/** Chỉ subscribe actions — ít re-render hơn khi chỉ data list đổi */
+/** Chỉ subscribe actions - ít re-render hơn khi chỉ data list đổi */
 export const useDataActions = () => {
   const ctx = useContext(DataActionsContext);
   if (!ctx) throw new Error('useDataActions must be inside DataProvider');

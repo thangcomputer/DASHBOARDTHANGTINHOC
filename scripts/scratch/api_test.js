@@ -34,7 +34,7 @@ async function test() {
     const contacts = res.data.data;
     const hasStudentA = contacts.some(c => c.phone === '222222');
     const hasStudentB = contacts.some(c => c.phone === '555555');
-    
+
     if (hasStudentA && !hasStudentB) {
       log('✅ Branch Isolation: Staff sees Student A, but NOT Student B.');
     } else {
@@ -63,17 +63,17 @@ async function test() {
         content: 'Cross branch leak attempt',
         isGroup: false
       });
-    } catch(err) {
+    } catch (err) {
       if (err.response && err.response.status === 403) {
         crossBranchBlocked = true;
       }
     }
-    
+
     if (crossBranchBlocked) {
-       log('✅ Cross-Branch Protection: Staff ONL blocked from messaging Student CS1.');
+      log('✅ Cross-Branch Protection: Staff ONL blocked from messaging Student CS1.');
     } else {
-       log('❌ Cross-Branch Protection FAILED: Staff ONL could message Student CS1.');
-       return;
+      log('❌ Cross-Branch Protection FAILED: Staff ONL could message Student CS1.');
+      return;
     }
 
     // 4. Student A checks messages
@@ -122,10 +122,10 @@ async function test() {
       log(`Student B requesting convId: ${bConvId}`);
       res = await studentB.get(`/messages/${bConvId}`);
       if (res.data.data.some(m => m.content === 'System Broadcast Test' && m.senderName === 'Phòng Giáo Vụ')) {
-         log('✅ Broadcast Success: Student B received broadcast from "Phòng Giáo Vụ".');
+        log('✅ Broadcast Success: Student B received broadcast from "Phòng Giáo Vụ".');
       } else {
-         log('❌ Broadcast received but content/sender mismatch.');
-         return;
+        log('❌ Broadcast received but content/sender mismatch.');
+        return;
       }
     } else {
       log('❌ Broadcast Failed: Student B did not receive any conversation.');

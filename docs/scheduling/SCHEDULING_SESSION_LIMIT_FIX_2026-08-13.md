@@ -1,4 +1,4 @@
-# SCHEDULING SESSION LIMIT — FIX
+# SCHEDULING SESSION LIMIT - FIX
 
 Date: 2026-08-13  
 Status: PASS WITH CONDITIONS
@@ -18,9 +18,9 @@ Status: PASS WITH CONDITIONS
 - `docs/scheduling/SCHEDULING_SESSION_LIMIT_AUDIT_2026-08-13.md`
 - `docs/scheduling/SCHEDULING_SESSION_LIMIT_FIX_2026-08-13.md`
 - `services/schedulingValidation.js` **(new SoT)**
-- `routes/scheduleRoutes.js` — POST create + PUT reschedule wire-in
+- `routes/scheduleRoutes.js` - POST create + PUT reschedule wire-in
 - `client/src/utils/schedulingLimits.js` **(new UX helpers)**
-- `client/src/components/teacher/TeacherScheduleModal.jsx` — progress + disable
+- `client/src/components/teacher/TeacherScheduleModal.jsx` - progress + disable
 - `tests/unit/scheduling_validation.test.js`
 - `tests/unit/scheduling_limits_client.test.js`
 
@@ -58,7 +58,7 @@ node --test tests/unit/scheduling_validation.test.js tests/unit/scheduling_limit
 ## 7. Residual risks
 
 1. **Race:** two concurrent creates at 11/12 may both pass count before insert (no Mongo transaction added per scope). Recommend unique partial index or transactional create in a later phase.
-2. **CQRS mirror** `modules/attendance/*` not mounted; not updated — residual if remounted without this service.
+2. **CQRS mirror** `modules/attendance/*` not mounted; not updated - residual if remounted without this service.
 3. **Timezone:** `dayRange` still uses server local `setHours` (pre-existing).
 4. **Auto `enrollment.status = completed` on last attendance** not changed in this phase (unlock path may already set course completion elsewhere).
 
@@ -69,4 +69,4 @@ No migration. No Auth/RBAC/Messaging/Finance/C4 changes.
 
 ## 9. Final verdict
 
-**PASS WITH CONDITIONS** — student session cap + daily limit + teacher overlap conflict enforced on live create/reschedule; race/CQRS/timezone residual documented.
+**PASS WITH CONDITIONS** - student session cap + daily limit + teacher overlap conflict enforced on live create/reschedule; race/CQRS/timezone residual documented.

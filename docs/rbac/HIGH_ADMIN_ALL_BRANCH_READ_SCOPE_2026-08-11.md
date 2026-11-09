@@ -1,11 +1,11 @@
-# HIGH_ADMIN — cho phép `?branch_id=all` chỉ trong read của 5 module
+# HIGH_ADMIN - cho phép `?branch_id=all` chỉ trong read của 5 module
 
 Date: 2026-08-11
 
 ## Root cause
 
-1. **Frontend** — `HIGH_ADMIN` bị chặn không cho chọn “Tất cả chi nhánh”, đồng thời một số request GET/read trong 5 module lại **omit** `branch_id` khi `selectedBranchId === 'all'`.
-2. **Backend** — `middleware/auth.js:branchFilter` với `HIGH_ADMIN` không xử lý đúng trường hợp `branch_id=all` cho scope read; thay vào đó nó fallback về branch của tài khoản (`user.branchId`) → dẫn tới không “all-branch” trong tenant.
+1. **Frontend** - `HIGH_ADMIN` bị chặn không cho chọn “Tất cả chi nhánh”, đồng thời một số request GET/read trong 5 module lại **omit** `branch_id` khi `selectedBranchId === 'all'`.
+2. **Backend** - `middleware/auth.js:branchFilter` với `HIGH_ADMIN` không xử lý đúng trường hợp `branch_id=all` cho scope read; thay vào đó nó fallback về branch của tài khoản (`user.branchId`) → dẫn tới không “all-branch” trong tenant.
 
 ## Phạm vi (bắt buộc)
 
@@ -20,7 +20,7 @@ Chỉ mở rộng khi đồng thời thỏa:
    - Giảng viên (Teachers)
    - Học viên (Students)
    - Tài chính (Finance)
-   - **Báo cáo doanh thu (Analytics)** — `/api/analytics/*` (HIGH xem ops/Ledger giống Super khi `branch_id=all`)
+   - **Báo cáo doanh thu (Analytics)** - `/api/analytics/*` (HIGH xem ops/Ledger giống Super khi `branch_id=all`)
 
 Ngoài điều kiện trên: **fail-closed** (không bypass `branchFilter`).
 
@@ -59,8 +59,8 @@ Ngoài điều kiện trên: **fail-closed** (không bypass `branchFilter`).
 - `client/src/components/admin/hooks/useAdminDashboardState.jsx`
 - `client/src/components/admin/hooks/useAdminTeachers.jsx`
 - `client/src/services/api.js`
-- `middleware/auth.js` — allowlist gồm `analytics` (HIGH báo cáo doanh thu = Super khi `branch_id=all`)
-- `client/src/components/RevenueAnalyticsTab.jsx` — HIGH dùng UI đa chi nhánh như Super
+- `middleware/auth.js` - allowlist gồm `analytics` (HIGH báo cáo doanh thu = Super khi `branch_id=all`)
+- `client/src/components/RevenueAnalyticsTab.jsx` - HIGH dùng UI đa chi nhánh như Super
 - `tests/integration/wave_repair_authz.test.js`
 - `docs/rbac/HIGH_ADMIN_ALL_BRANCH_READ_SCOPE_2026-08-11.md`
 

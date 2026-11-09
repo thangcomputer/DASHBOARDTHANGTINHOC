@@ -1,7 +1,7 @@
 import { AI_SUPPORT_PEER, isAiSupportConversationId } from '../utils/aiSupport';
 
 /**
- * Tổng tin chưa đọc của những hội thoại Hộp thư thực sự hiển thị cho người xem — để badge
+ * Tổng tin chưa đọc của những hội thoại Hộp thư thực sự hiển thị cho người xem - để badge
  * không báo tin mà người dùng không mở được (cùng quy tắc lọc trong Inbox.jsx):
  * - bỏ Trợ lý AI;
  * - SUPER_ADMIN: chỉ thấy hội thoại với HIGH_ADMIN, không thấy nhóm;

@@ -66,8 +66,8 @@ Flow:
 ## Recipient Identity Rules
 
 - Server loads peer from Teacher/Student DB (hint may prefer Student lookup first).
-- `productRole` from `resolveProductRole` / adminRole — **never** from client.
-- `transportRole` from `getMessagingRole` — SUPPORT → `staff`.
+- `productRole` from `resolveProductRole` / adminRole - **never** from client.
+- `transportRole` from `getMessagingRole` - SUPPORT → `staff`.
 - Wrong client `receiverRole: 'teacher'` for Support id still resolves SUPPORT + staff.
 - Unknown id → `MESSAGING_RECIPIENT_NOT_FOUND` (no send).
 
@@ -78,7 +78,7 @@ Flow:
 | Support A | SUPPORT | staff |
 | Staff A | STAFF | staff |
 
-**PASS** — transport shared; product distinct; delivery targets exact user id / socket.
+**PASS** - transport shared; product distinct; delivery targets exact user id / socket.
 
 ## REST Delivery Verification
 
@@ -129,7 +129,7 @@ Both paths call `sendCanonicalMessage` → `assertCanDirectMessage` → `canSend
 ## Tenant Isolation
 
 ```text
-ENFORCED (Phase 5.1) — fail-closed
+ENFORCED (Phase 5.1) - fail-closed
 code: MESSAGING_TENANT_MISMATCH
 path: MessagingPolicy.canSendMessage (+ canDiscoverContacts)
 ```
@@ -140,14 +140,14 @@ See `PHASE_5_BLOCKER.md` (**CLOSED**) and `PHASE_5_1_REPORT.md`.
 
 ## Conversation Identity
 
-- Support A / B distinct — **PASS**
-- `admin_admin` legacy preserved — **PASS**
-- Format unchanged — **PASS**
+- Support A / B distinct - **PASS**
+- `admin_admin` legacy preserved - **PASS**
+- Format unchanged - **PASS**
 
 ## Typing / Read Verification
 
 - Phase 4 wiring unchanged (`canMarkRead` / `canViewConversation`).
-- Peer rooms still user-id scoped (not ALL_STAFF) — static prior locks still **PASS**.
+- Peer rooms still user-id scoped (not ALL_STAFF) - static prior locks still **PASS**.
 - No redesign this phase.
 
 ## Test Matrix
@@ -179,19 +179,19 @@ See `PHASE_5_BLOCKER.md` (**CLOSED**) and `PHASE_5_1_REPORT.md`.
 
 ## Environment Failures
 
-- Live API suite `tests/messaging-isolation.test.js` requires running API + `test_account_ids.json` — not used as PASS evidence.
+- Live API suite `tests/messaging-isolation.test.js` requires running API + `test_account_ids.json` - not used as PASS evidence.
 - Live Socket.IO multi-client E2E not run in this phase harness.
 
 ## Security Findings
 
 1. **Tenant DM ACL missing** → BLOCKER doc.
-2. Private DM notify path does not emit to ALL_STAFF / ALL_SUPPORT — verified harness + static.
+2. Private DM notify path does not emit to ALL_STAFF / ALL_SUPPORT - verified harness + static.
 3. Client role hint cannot force wrong productRole for SUPPORT.
-4. Inactive Support (`status=inactive`) still **ALLOW** send under current pairing — classified **ALLOW (current)**; product may later DENY (not invented here).
+4. Inactive Support (`status=inactive`) still **ALLOW** send under current pairing - classified **ALLOW (current)**; product may later DENY (not invented here).
 
 ## Performance Findings
 
-- One peer DB lookup per send: `resolveCanonicalRecipient` then `assertMessagingPairAllowed({ resolved })` — **no duplicate lookup**.
+- One peer DB lookup per send: `resolveCanonicalRecipient` then `assertMessagingPairAllowed({ resolved })` - **no duplicate lookup**.
 - Branch code lookups inside `sendCanonicalMessage` for sender/receiver branchCode remain as before (pre-existing).
 
 ## Debugging Improvements

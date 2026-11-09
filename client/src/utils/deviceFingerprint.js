@@ -1,5 +1,5 @@
 /**
- * deviceFingerprint.js — Tạo fingerprint định danh máy tính (không cần thư viện ngoài)
+ * deviceFingerprint.js - Tạo fingerprint định danh máy tính (không cần thư viện ngoài)
  *
  * Trước đây fingerprint dựa trên canvas/WebGL/userAgent và cache theo sessionStorage
  * nên có thể thay đổi giữa các phiên → gây false-positive "đăng nhập máy khác".

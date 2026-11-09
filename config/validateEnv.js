@@ -2,7 +2,7 @@
  * Fail-fast validation for required secrets and production invariants.
  * Call immediately after dotenv.config().
  *
- * CQRS without replica set must NOT brick the whole API — force legacy off instead of throw.
+ * CQRS without replica set must NOT brick the whole API - force legacy off instead of throw.
  */
 
 const CQRS_FLAG_KEYS = [
@@ -102,7 +102,7 @@ function validateEnv() {
   }
 
   // SESSION_SECRET: required and validated in production only (not yet wired into
-  // server.js session middleware — see REMEDIATION_PROGRESS.md Phase 2 deferred findings).
+  // server.js session middleware - see REMEDIATION_PROGRESS.md Phase 2 deferred findings).
   // Outside production, only reject it if someone explicitly sets a known-insecure value.
   if (isProd) {
     assertStrongSecret('SESSION_SECRET', process.env.SESSION_SECRET, minLen);
@@ -150,14 +150,14 @@ function validateEnv() {
     if (!(process.env.S3_BUCKET || '').trim()) throw new Error('S3_BUCKET is required for s3 storage');
   }
 
-  // Wave 6.1: production CQRS needs explicit allow — otherwise force legacy
+  // Wave 6.1: production CQRS needs explicit allow - otherwise force legacy
   if (isProd && cqrsFlagsEnabled()) {
     const allow =
       String(process.env.ALLOW_CQRS_IN_PRODUCTION || '').toLowerCase() === 'true'
       || process.env.ALLOW_CQRS_IN_PRODUCTION === '1';
     if (!allow) {
       forceDisableCqrs(
-        'CQRS flags on in production without ALLOW_CQRS_IN_PRODUCTION — forcing ENABLE_CQRS_*=false (legacy boot).',
+        'CQRS flags on in production without ALLOW_CQRS_IN_PRODUCTION - forcing ENABLE_CQRS_*=false (legacy boot).',
       );
     }
   }
@@ -167,7 +167,7 @@ function validateEnv() {
     const uri = process.env.MONGODB_URI || '';
     if (!mongoUriLooksLikeReplicaSet(uri)) {
       forceDisableCqrs(
-        'CQRS flags require MongoDB replica set but MONGODB_URI has none — forcing ENABLE_CQRS_*=false so API can boot. '
+        'CQRS flags require MongoDB replica set but MONGODB_URI has none - forcing ENABLE_CQRS_*=false so API can boot. '
         + 'Later: add ?replicaSet=rs0 or mongodb+srv://, then re-enable flags. See docs/architecture/cqrs-phase-a-rollout.md',
       );
     }

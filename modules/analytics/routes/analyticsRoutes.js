@@ -1,5 +1,5 @@
 /**
- * analyticsRoutes.js — Báo cáo Doanh thu & Thống kê đa chi nhánh
+ * analyticsRoutes.js - Báo cáo Doanh thu & Thống kê đa chi nhánh
  * P0: KPI doanh thu chính = Ledger sumFinancialRevenue (net = payment − refund).
  */
 const express = require('express');
@@ -18,7 +18,7 @@ router.get('/revenue', guard, analyticsController.get_revenue);
 // GET /api/analytics/enrollment?period=1m&branchId=all
 router.get('/enrollment', guard, analyticsController.get_enrollment);
 
-// GET /api/analytics/branches — Tổng quan từng chi nhánh (all-time)
+// GET /api/analytics/branches - Tổng quan từng chi nhánh (all-time)
 router.get('/branches', guard, analyticsController.get_branches);
 
 module.exports = router;

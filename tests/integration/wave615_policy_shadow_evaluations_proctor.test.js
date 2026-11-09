@@ -1,5 +1,5 @@
 /**
- * Wave 6.15 — Policy SHADOW for LIVE /api/evaluations + /api/proctor.
+ * Wave 6.15 - Policy SHADOW for LIVE /api/evaluations + /api/proctor.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -35,10 +35,10 @@ function evalSub(opts = {}) {
     actorDoc: opts.role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole ?? 'STAFF',
-          permissions: opts.permissions ?? [],
-          role: opts.role ?? 'staff',
-        },
+        adminRole: opts.adminRole ?? 'STAFF',
+        permissions: opts.permissions ?? [],
+        role: opts.role ?? 'staff',
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -49,10 +49,10 @@ function procSub(opts = {}) {
     actorDoc: opts.role === 'student'
       ? null
       : {
-          adminRole: opts.adminRole ?? 'STAFF',
-          permissions: opts.permissions ?? [],
-          role: opts.role ?? 'staff',
-        },
+        adminRole: opts.adminRole ?? 'STAFF',
+        permissions: opts.permissions ?? [],
+        role: opts.role ?? 'staff',
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -99,7 +99,7 @@ test('Wave6.15 EVAL: admin_list admin/staff ALLOW; teacher/student DENY; VIEW_EV
   assert.equal(assertEval('stud', student, 'admin_list').legacy.decision, 'DENY');
 });
 
-test('Wave6.15 EVAL: teacher_ratings auth-only — any role ALLOW (weak Legacy)', () => {
+test('Wave6.15 EVAL: teacher_ratings auth-only - any role ALLOW (weak Legacy)', () => {
   const student = evalSub({ id: STUDENT_A, role: 'student' });
   const teacher = evalSub({ id: TEACHER_A, role: 'teacher', adminRole: null });
   assert.equal(assertEval('s', student, 'teacher_ratings').legacy.decision, 'ALLOW');

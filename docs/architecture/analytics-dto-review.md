@@ -1,4 +1,4 @@
-# Analytics DTO Review — Sprint 4.4 Batch 3
+# Analytics DTO Review - Sprint 4.4 Batch 3
 
 ## DTO & Validation Extraction Complete
 - **Zod Validators**: Generated inside `dto/validators/` with `passthrough()` for zero-regression backward compatibility.

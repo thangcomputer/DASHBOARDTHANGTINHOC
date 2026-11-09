@@ -6,11 +6,11 @@ Date: 2026-08-11
 
 **CONFIRMED (runtime + user UI)**
 
-### A — Backend
+### A - Backend
 
 `loadSuperAdminDocs()` only queries Teacher documents. Root SUPER (`id=admin`) often has no Teacher doc → HIGH `HIGH_SEES_ALL` gets empty SUPER candidates.
 
-### B — Floating Messenger
+### B - Floating Messenger
 
 Elevated viewers skipped `GET /contacts` and used presence-only directory → offline SUPER hidden.
 

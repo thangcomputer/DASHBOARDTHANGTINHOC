@@ -2,7 +2,7 @@
  * Policy shadow for LIVE /api/analytics (Wave 6.12).
  * Middleware: checkAnyPermission(MANAGE_FINANCE, VIEW_BRANCH_REVENUE) + branchFilter.
  * Branch/tenant are DATA SCOPE (not HTTP DENY) for revenue/enrollment.
- * GET /branches: handler IGNORES branchFilter (weak legacy — mirrored as ALLOW after perm).
+ * GET /branches: handler IGNORES branchFilter (weak legacy - mirrored as ALLOW after perm).
  * Does NOT touch ledger/aggregation formulas.
  */
 const {
@@ -15,7 +15,7 @@ const ACTIONS = new Set(['revenue', 'enrollment', 'branches']);
 
 /** Actions that apply req.branchFilter (+ optional query branch) as DATA filter. */
 const DATA_FILTER_ACTIONS = new Set(['revenue', 'enrollment']);
-/** Handler ignores branchFilter — returns all-branch aggregates (P2 preserved). */
+/** Handler ignores branchFilter - returns all-branch aggregates (P2 preserved). */
 const HANDLER_IGNORES_BRANCH_FILTER = new Set(['branches']);
 
 function buildSubject({ user, actorDoc, userBranchId }) {
@@ -91,7 +91,7 @@ function evaluatePolicyAnalytics(subject, action, ctx = {}, _untrusted = {}) {
   void _untrusted.clientRole;
   void _untrusted.clientAdminRole;
   void _untrusted.clientPermissions;
-  // query branchId is a DATA FILTER param when unbound — not actor identity
+  // query branchId is a DATA FILTER param when unbound - not actor identity
   void ctx.trustedBranchFilter;
   void ctx.queryBranch;
   const legacy = evaluateLegacyAnalytics(subject, action, ctx);

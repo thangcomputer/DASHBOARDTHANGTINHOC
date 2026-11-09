@@ -57,8 +57,8 @@ async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
   let enr = schedule?.enrollmentId
     ? enrs.find((e) => String(e._id) === String(schedule.enrollmentId))
     : courseKey
-    ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
-    : null;
+      ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
+      : null;
   if (!enr) {
     enr = enrs.find((e) => !['cancelled', 'refunded'].includes(String(e.status || '').toLowerCase()))
       || enrs[0];
@@ -75,15 +75,15 @@ async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
         enrollmentId: schedule.enrollmentId,
       });
     } else {
-    const rows = await Schedule.aggregate([
-      { $match: { studentId: sid, status: 'completed' } },
-      { $group: { _id: '$course', completed: { $sum: 1 } } },
-    ]);
-    rows.forEach((r) => {
-      const key = normCourseName(r._id);
-      if (courseKey && key !== courseKey) return;
-      calendarCompleted += Number(r.completed) || 0;
-    });
+      const rows = await Schedule.aggregate([
+        { $match: { studentId: sid, status: 'completed' } },
+        { $group: { _id: '$course', completed: { $sum: 1 } } },
+      ]);
+      rows.forEach((r) => {
+        const key = normCourseName(r._id);
+        if (courseKey && key !== courseKey) return;
+        calendarCompleted += Number(r.completed) || 0;
+      });
     }
   }
 
@@ -117,7 +117,7 @@ async function resolveSessionOrdinalForSchedule(studentDoc, schedule) {
 async function refreshScheduleSessionPreview(schedule) {
   if (!schedule) return schedule;
   // Ca đã completed: sessionOrdinalPreview = buổi vừa tính (finalDone).
-  // Không đẩy lên done+1 — đó là buổi kế tiếp, làm thông báo GV hiện 2 khi HV vừa xác nhận buổi 1.
+  // Không đẩy lên done+1 - đó là buổi kế tiếp, làm thông báo GV hiện 2 khi HV vừa xác nhận buổi 1.
   if (String(schedule.status || '') === 'completed') return schedule;
   const sid = schedule.studentId?._id || schedule.studentId;
   if (!sid) return schedule;
@@ -143,7 +143,7 @@ async function refreshScheduleSessionPreview(schedule) {
       await Schedule.updateOne(
         { _id: id },
         { $set: { sessionOrdinalPreview: nextOrdinal, sessionTotalPreview: nextTotal } },
-      ).catch(() => {});
+      ).catch(() => { });
     }
   }
   return schedule;
@@ -185,10 +185,10 @@ async function syncEnrollmentProgressAfterAttendance(studentId, {
     let idx = enrollmentId
       ? student.enrollments.findIndex((e) => String(e._id) === String(enrollmentId))
       : courseKey
-      ? student.enrollments.findIndex(
-        (e) => normCourseName(e.courseName || e.course) === courseKey,
-      )
-      : -1;
+        ? student.enrollments.findIndex(
+          (e) => normCourseName(e.courseName || e.course) === courseKey,
+        )
+        : -1;
     if (idx < 0) {
       idx = student.enrollments.findIndex(
         (e) => !['cancelled', 'refunded'].includes(String(e.status || '').toLowerCase()),
@@ -279,7 +279,7 @@ async function maybeNotifyOverdueAttendance(io, schedule) {
   await NotificationService.notifyAdmins(
     io,
     '⏰ GV chưa điểm danh buổi học',
-    `HV ${studentName} · GV ${teacherName} · ${course} · ${timeRange} — Quá hạn điểm danh.`,
+    `HV ${studentName} · GV ${teacherName} · ${course} · ${timeRange} - Quá hạn điểm danh.`,
     {
       dedupeKey,
       type: 'attendance_overdue',
@@ -369,7 +369,7 @@ async function completeScheduleAttendance({
   note,
   io = null,
   forceAdminMakeup = false,
-  /** Kết thúc sau khi HV đồng ý / Admin duyệt tranh chấp — bỏ qua cửa sổ giờ. */
+  /** Kết thúc sau khi HV đồng ý / Admin duyệt tranh chấp - bỏ qua cửa sổ giờ. */
   forceFinalizeConfirm = false,
   confirmOutcome = null, // 'accepted' | 'admin_approved'
 }) {
@@ -386,7 +386,7 @@ async function completeScheduleAttendance({
     throw attendanceError('Buổi học đã được điểm danh.', ATTENDANCE_CODES.ALREADY_COMPLETED, 409);
   }
   if (state.state === 'CANCELLED') {
-    throw attendanceError('Buổi học đã hủy — không thể điểm danh.', ATTENDANCE_CODES.CANCELLED, 409);
+    throw attendanceError('Buổi học đã hủy - không thể điểm danh.', ATTENDANCE_CODES.CANCELLED, 409);
   }
 
   let attendanceMethod = 'teacher';
@@ -432,12 +432,12 @@ async function completeScheduleAttendance({
       const enr = schedule.enrollmentId
         ? enrs.find((e) => String(e._id) === String(schedule.enrollmentId))
         : courseKey
-        ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
-        : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
+          ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
+          : enrs.find((e) => String(e.status || '').toLowerCase() === 'active') || enrs[0];
       const enrStatus = String(enr?.status || '').toLowerCase();
       if (enr && ['cancelled', 'refunded', 'completed'].includes(enrStatus)) {
         throw attendanceError(
-          'Enrollment không còn active — không thể điểm danh buổi mới.',
+          'Enrollment không còn active - không thể điểm danh buổi mới.',
           ATTENDANCE_CODES.ENROLLMENT_COMPLETED,
           409,
         );
@@ -519,7 +519,7 @@ async function completeScheduleAttendance({
     ? Number(schedule.attendancePendingGrade)
     : undefined;
 
-  // Sync tiến độ trước — số buổi nhật ký = completedSessions SAU điểm danh (gồm ghi nhận trước)
+  // Sync tiến độ trước - số buổi nhật ký = completedSessions SAU điểm danh (gồm ghi nhận trước)
   const student = await syncEnrollmentProgressAfterAttendance(
     updated.studentId || schedule.studentId,
     {
@@ -527,7 +527,7 @@ async function completeScheduleAttendance({
       enrollmentId: updated.enrollmentId || schedule.enrollmentId || null,
       logDate: updated.date || schedule.date || new Date(),
       ...(Number.isFinite(gradeForLog) ? { grade: gradeForLog } : {}),
-      // chưa ghi note — ghi sau khi biết số buổi thật
+      // chưa ghi note - ghi sau khi biết số buổi thật
     },
   );
 
@@ -539,8 +539,8 @@ async function completeScheduleAttendance({
     const enr = (updated.enrollmentId || schedule.enrollmentId)
       ? enrs.find((e) => String(e._id) === String(updated.enrollmentId || schedule.enrollmentId))
       : courseKey
-      ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
-      : null;
+        ? enrs.find((e) => normCourseName(e.courseName || e.course) === courseKey)
+        : null;
     if (enr) {
       finalDone = Math.max(finalDone, Number(enr.completedSessions) || 0);
       if (Number(enr.totalSessions) > 0) finalTotal = Number(enr.totalSessions);
@@ -590,7 +590,7 @@ async function completeScheduleAttendance({
     await Schedule.updateOne(
       { _id: scheduleId },
       { $set: { sessionOrdinalPreview: finalDone, sessionTotalPreview: finalTotal } },
-    ).catch(() => {});
+    ).catch(() => { });
     updated.sessionOrdinalPreview = finalDone;
     updated.sessionTotalPreview = finalTotal;
   }
@@ -632,10 +632,10 @@ async function requestStudentAttendanceConfirm({
   }
   const confirm = String(schedule.studentConfirmStatus || 'none');
   if (confirm === 'pending') {
-    throw attendanceError('Đã gửi xác nhận — đang chờ học viên.', 'ATTENDANCE_AWAITING_STUDENT', 409);
+    throw attendanceError('Đã gửi xác nhận - đang chờ học viên.', 'ATTENDANCE_AWAITING_STUDENT', 409);
   }
   if (confirm === 'disputed') {
-    throw attendanceError('Buổi đang tranh chấp — chờ Admin xử lý.', 'ATTENDANCE_DISPUTED', 409);
+    throw attendanceError('Buổi đang tranh chấp - chờ Admin xử lý.', 'ATTENDANCE_DISPUTED', 409);
   }
   if (['accepted', 'admin_approved'].includes(confirm) || schedule.status === 'completed') {
     throw attendanceError('Buổi học đã được điểm danh.', ATTENDANCE_CODES.ALREADY_COMPLETED, 409);
@@ -660,7 +660,7 @@ async function requestStudentAttendanceConfirm({
       const enrStatus = String(enr?.status || '').toLowerCase();
       if (enr && ['cancelled', 'refunded', 'completed'].includes(enrStatus)) {
         throw attendanceError(
-          'Enrollment không còn active — không thể điểm danh buổi mới.',
+          'Enrollment không còn active - không thể điểm danh buổi mới.',
           ATTENDANCE_CODES.ENROLLMENT_COMPLETED,
           409,
         );
@@ -719,7 +719,7 @@ async function requestStudentAttendanceConfirm({
   if (!updated) {
     const again = await Schedule.findById(scheduleId).lean();
     if (again && String(again.studentConfirmStatus) === 'pending') {
-      throw attendanceError('Đã gửi xác nhận — đang chờ học viên.', 'ATTENDANCE_AWAITING_STUDENT', 409);
+      throw attendanceError('Đã gửi xác nhận - đang chờ học viên.', 'ATTENDANCE_AWAITING_STUDENT', 409);
     }
     throw attendanceError('Không thể gửi xác nhận điểm danh', 'ATTENDANCE_UPDATE_FAILED', 500);
   }
@@ -826,7 +826,7 @@ async function resolveAttendanceDispute({ schedule, actor, decision }) {
           attendanceDisputeResolvedAt: new Date(),
           attendanceDisputeResolvedBy: who,
           note: [
-            `Admin từ chối điểm danh — ${who} · ${new Date().toLocaleString('vi-VN')}`,
+            `Admin từ chối điểm danh - ${who} · ${new Date().toLocaleString('vi-VN')}`,
             String(schedule.note || '').trim(),
           ].filter(Boolean).join(' | '),
         },

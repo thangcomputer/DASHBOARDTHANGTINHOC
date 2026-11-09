@@ -1,5 +1,5 @@
 /**
- * Shared VPS SSH config — credentials via env only (never commit passwords).
+ * Shared VPS SSH config - credentials via env only (never commit passwords).
  *
  * Required:
  *   VPS_HOST

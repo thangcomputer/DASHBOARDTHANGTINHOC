@@ -26,8 +26,8 @@ export default function CertPrepResultSummary({ result }) {
       </p>
       <CertPrepResultStats result={result} />
       <div className="text-sm text-slate-600 space-y-1 pt-2">
-        <p>Bắt đầu: {formatDateTime(result.startedAt) || '—'}</p>
-        <p>Nộp bài: {formatDateTime(result.submittedAt) || '—'}</p>
+        <p>Bắt đầu: {formatDateTime(result.startedAt) || '-'}</p>
+        <p>Nộp bài: {formatDateTime(result.submittedAt) || '-'}</p>
         <p>Thời gian làm: {formatDuration(result.durationSeconds)}</p>
         <p>Thời gian giới hạn: {result.timeLimitMinutes} phút</p>
       </div>

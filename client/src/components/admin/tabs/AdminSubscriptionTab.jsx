@@ -244,9 +244,9 @@ function CodesCard({ reloadKey }) {
                     <span className={`rounded-md px-2 py-0.5 text-[11px] font-black ${STATUS_META[row.status]?.tone || ''}`}>{STATUS_META[row.status]?.label || row.status}</span>
                   </td>
                   <td className="py-2 pr-2 text-xs text-slate-600">
-                    {row.usedByName ? `${row.usedByName} · ${formatExpiryDate(row.usedAt)}` : '—'}
+                    {row.usedByName ? `${row.usedByName} · ${formatExpiryDate(row.usedAt)}` : '-'}
                   </td>
-                  <td className="py-2 pr-2 text-xs text-slate-500">{[row.batchId, row.note].filter(Boolean).join(' · ') || '—'}</td>
+                  <td className="py-2 pr-2 text-xs text-slate-500">{[row.batchId, row.note].filter(Boolean).join(' · ') || '-'}</td>
                   <td className="py-2 text-right">
                     <div className="inline-flex gap-1">
                       <button type="button" onClick={() => copy(row.code)} aria-label="Sao chép mã" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 !shadow-none"><Copy size={14} /></button>

@@ -1,5 +1,5 @@
 /**
- * Request metrics middleware — gan sau routes co the, nhung truoc handler ket thuc.
+ * Request metrics middleware - gan sau routes co the, nhung truoc handler ket thuc.
  * Dung res.on('finish') de do latency.
  */
 const { metricsCollector } = require('../services/metricsCollector');

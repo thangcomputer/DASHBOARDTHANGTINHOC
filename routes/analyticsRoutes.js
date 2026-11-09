@@ -1,5 +1,5 @@
 /**
- * analyticsRoutes.js — Báo cáo Doanh thu & Thống kê đa chi nhánh
+ * analyticsRoutes.js - Báo cáo Doanh thu & Thống kê đa chi nhánh
  * P0: KPI + timeSeries + byBranch doanh thu = Ledger (net = payment − refund).
  * Enrollment chỉ dùng cho metrics đăng ký (ops), không thay Ledger cho financial revenue.
  */
@@ -28,11 +28,11 @@ const {
 } = require('../utils/vnTimezone');
 
 /**
- * Phase 7.27 — Controlled cutover for LIVE /api/analytics ONLY.
+ * Phase 7.27 - Controlled cutover for LIVE /api/analytics ONLY.
  *
  * Flow: auth → branchFilter (DATA SCOPE) → policyShadowAnalytics → analyticsCutoverGate → handler
  * Legacy MANAGE_FINANCE|VIEW_BRANCH_REVENUE gate retained inside analyticsCutoverGate.
- * Aggregation remains handler-owned. modules/analytics twin is unmounted — not migrated.
+ * Aggregation remains handler-owned. modules/analytics twin is unmounted - not migrated.
  */
 const guard = (action) => [
   authMiddleware,
@@ -41,13 +41,13 @@ const guard = (action) => [
   analyticsCutoverGate(action),
 ];
 
-/** Enrollment/ops period helper — same calendar semantics as revenue. */
+/** Enrollment/ops period helper - same calendar semantics as revenue. */
 function getPeriodRange(period) {
   const { start, end } = getAnalyticsPeriodRange(period);
   return { start, end };
 }
 
-/** Enrollment/ops series only — VN calendar keys (not financial SoT). */
+/** Enrollment/ops series only - VN calendar keys (not financial SoT). */
 function generateTimeSeries(docs, startDate, endDate, field = 'paidAt', valueField = 'amount') {
   const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
   const bucketSize = days > 60 ? 'month' : 'day';
@@ -253,7 +253,7 @@ router.get('/enrollment', guard('enrollment'), async (req, res) => {
   }
 });
 
-// GET /api/analytics/branches — Tổng quan từng chi nhánh (all-time)
+// GET /api/analytics/branches - Tổng quan từng chi nhánh (all-time)
 router.get('/branches', guard('branches'), async (req, res) => {
   try {
     const branches = await Branch.find({ isActive: { $ne: false } }).lean();

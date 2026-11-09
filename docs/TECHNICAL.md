@@ -1,4 +1,4 @@
-# DashboardThangTinHoc — Tài liệu kỹ thuật
+# DashboardThangTinHoc - Tài liệu kỹ thuật
 
 Tài liệu này dành cho đội kỹ thuật bảo trì lâu dài. Phần cài đặt nhanh và biến môi trường xem [README.md](../README.md).
 
@@ -19,7 +19,7 @@ Tài liệu này dành cho đội kỹ thuật bảo trì lâu dài. Phần cài
 8. [Models MongoDB](#8-models-mongodb)
 9. [Luồng nghiệp vụ chính](#9-luồng-nghiệp-vụ-chính)
 10. [State management (React Context)](#10-state-management-react-context)
-11. [Socket.io — sự kiện realtime](#11-socketio--sự-kiện-realtime)
+11. [Socket.io - sự kiện realtime](#11-socketio--sự-kiện-realtime)
 12. [Bảng tra cứu: sửa lỗi vào file nào](#12-bảng-tra-cứu-sửa-lỗi-vào-file-nào)
 13. [Chạy local & deploy VPS](#13-chạy-local--deploy-vps)
 14. [Quy ước code & lưu ý vận hành](#14-quy-ước-code--lưu-ý-vận-hành)
@@ -45,7 +45,7 @@ Tài liệu này dành cho đội kỹ thuật bảo trì lâu dài. Phần cài
 └────────────────────────────┬─────────────────────────────────────┘
                              │
 ┌────────────────────────────▼─────────────────────────────────────┐
-│  MongoDB (Mongoose)     │  Redis (tuỳ chọn — blacklist/cache/BullMQ) │
+│  MongoDB (Mongoose)     │  Redis (tuỳ chọn - blacklist/cache/BullMQ) │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -163,7 +163,7 @@ Component → DataContext.fn() → api.js (apiFetch)
 | `/student/exam/:subjectId` | student | `StudentTest.jsx` | Fullscreen, chống gian lận |
 | `/student/inbox` | student | `Inbox.jsx` | |
 
-**Menu sidebar:** `client/src/components/AppSidebar.jsx` — `MENU_CONFIG` theo role, kiểm tra `hasPermission()`.
+**Menu sidebar:** `client/src/components/AppSidebar.jsx` - `MENU_CONFIG` theo role, kiểm tra `hasPermission()`.
 
 **Sau đăng nhập:** `App.jsx` redirect `{ admin: '/admin', staff: '/admin', teacher: '/teacher', student: '/student' }`.
 
@@ -175,8 +175,8 @@ Component → DataContext.fn() → api.js (apiFetch)
 
 | Role | Mô tả | Dashboard |
 |------|-------|-----------|
-| `admin` | Super Admin (`id === 'admin'`) | `/admin` — full quyền |
-| `staff` | Nhân viên chi nhánh, `adminRole: STAFF` | `/admin` — theo `permissions[]` |
+| `admin` | Super Admin (`id === 'admin'`) | `/admin` - full quyền |
+| `staff` | Nhân viên chi nhánh, `adminRole: STAFF` | `/admin` - theo `permissions[]` |
 | `teacher` | Giảng viên | `/teacher` |
 | `student` | Học viên | `/student` |
 
@@ -204,7 +204,7 @@ Kiểm tra FE: `hasPermission(session, PERMISSIONS.XXX)`.
 ### 5.3 Trạng thái Giảng viên
 
 Helper: `client/src/constants/teacherStatus.js`  
-Schema: `models/Teacher.js` — field `status`
+Schema: `models/Teacher.js` - field `status`
 
 ```
 inactive  → Mới tạo, "Chưa cấp quyền", KHÔNG đăng nhập được
@@ -212,12 +212,12 @@ inactive  → Mới tạo, "Chưa cấp quyền", KHÔNG đăng nhập được
 pending   → Được login, làm bài test + nộp thực hành
     ↓ Admin: "Cấp quyền giảng dạy"
 active    → Giảng dạy bình thường
-locked    → Trượt thi / bị khóa — có thể cấp thi lại
+locked    → Trượt thi / bị khóa - có thể cấp thi lại
 ```
 
-API liên quan: `routes/teacherRoutes.js` — `POST /`, `PATCH /:id`, `POST /:id/approve`.
+API liên quan: `routes/teacherRoutes.js` - `POST /`, `PATCH /:id`, `POST /:id/approve`.
 
-**Lưu ý:** DB có thể lưu `Pending` / `pending` lẫn lộn — luôn dùng helper `normalizeTeacherStatus()`, `isTeacherActive()`, `isTeacherPending()` thay vì so sánh chuỗi thô.
+**Lưu ý:** DB có thể lưu `Pending` / `pending` lẫn lộn - luôn dùng helper `normalizeTeacherStatus()`, `isTeacherActive()`, `isTeacherPending()` thay vì so sánh chuỗi thô.
 
 ---
 
@@ -230,13 +230,13 @@ API liên quan: `routes/teacherRoutes.js` — `POST /`, `PATCH /:id`, `POST /:id
 | Login, refresh, logout | `routes/authRoutes.js` |
 | Verify token mỗi request | `middleware/auth.js` |
 | Blacklist khi logout | `middleware/tokenBlacklist.js` |
-| Lưu token FE | `client/src/services/api.js` — `{role}_access_token`, `{role}_refresh_token`, `{role}_user` |
+| Lưu token FE | `client/src/services/api.js` - `{role}_access_token`, `{role}_refresh_token`, `{role}_user` |
 
 Cơ chế:
 
 - Access token TTL: `JWT_EXPIRES_IN` (mặc định 8h)
 - Refresh token rotation + reuse detection
-- `tokenVersion` trên Student/Teacher — login mới vô hiệu phiên cũ
+- `tokenVersion` trên Student/Teacher - login mới vô hiệu phiên cũ
 - Socket.io: JWT trong `socket.handshake.auth.token` (`server.js`)
 
 ### 6.2 Middleware role
@@ -251,7 +251,7 @@ Cơ chế:
 
 ### 6.3 Chi nhánh
 
-`middleware/branchFilter.js` — Staff chỉ thấy dữ liệu chi nhánh mình. Lỗi filter → **500**, không leak dữ liệu chéo chi nhánh.
+`middleware/branchFilter.js` - Staff chỉ thấy dữ liệu chi nhánh mình. Lỗi filter → **500**, không leak dữ liệu chéo chi nhánh.
 
 ---
 
@@ -305,7 +305,7 @@ OpenAPI chi tiết: [openapi.yaml](./openapi.yaml). ERD: [ERD.md](./ERD.md).
 | `Schedule.js` | Buổi học trên lịch |
 | `Message.js` | Tin nhắn chat |
 | `Course.js` | Danh mục khóa + giá |
-| `Branch.js` | Chi nhánh (CS1, CS2…) — `tenantId` |
+| `Branch.js` | Chi nhánh (CS1, CS2…) - `tenantId` |
 | `Tenant.js` | Tổ chức multi-tenant |
 | `FileAsset.js` | Registry file upload |
 | `BackupJob.js` | Lịch sử backup |
@@ -399,15 +399,15 @@ TeacherDashboard / StudentDashboard (#schedule)
 
 | Context | File | Vai trò |
 |---------|------|---------|
-| **DataContext** | `context/DataContext.jsx` | **Trung tâm** — students, teachers, schedules, messages, CRUD |
+| **DataContext** | `context/DataContext.jsx` | **Trung tâm** - students, teachers, schedules, messages, CRUD |
 | SocketContext | `context/SocketContext.jsx` | Kết nối realtime, online |
 | BranchContext | `context/BranchContext.jsx` | Chi nhánh đang chọn |
 | MessagesContext | `context/MessagesContext.jsx` | Cache chat, SWR |
 | StudentsContext / TeachersContext / … | `context/*.jsx` | Tách module (refactor dần) |
 
-**Debug “danh sách không cập nhật”:** kiểm tra theo thứ tự — API response → `DataContext` setState → socket listener có chạy không.
+**Debug “danh sách không cập nhật”:** kiểm tra theo thứ tự - API response → `DataContext` setState → socket listener có chạy không.
 
-### Component lớn (monolith — cần cẩn thận khi sửa)
+### Component lớn (monolith - cần cẩn thận khi sửa)
 
 | Component | Dòng ước lượng | Nội dung |
 |-----------|----------------|----------|
@@ -419,7 +419,7 @@ TeacherDashboard / StudentDashboard (#schedule)
 
 ---
 
-## 11. Socket.io — sự kiện realtime
+## 11. Socket.io - sự kiện realtime
 
 Định nghĩa server: `server.js` (phần `io.on('connection')`).
 
@@ -450,11 +450,11 @@ Client lắng nghe: `SocketContext.jsx` + `DataContext.jsx`.
 
 | Triệu chứng | Kiểm tra / sửa |
 |-------------|----------------|
-| Crash `null.id` / `undefined.id` | `DataContext.jsx`, `AdminDashboard.jsx`, `AppSidebar.jsx` — guard mảng/object |
+| Crash `null.id` / `undefined.id` | `DataContext.jsx`, `AdminDashboard.jsx`, `AppSidebar.jsx` - guard mảng/object |
 | GV không login được | `Teacher.status` trong DB; `authRoutes.js` chặn `inactive` |
 | Staff không thấy menu | `session.permissions` + `AppSidebar.jsx` + `permissions.js` |
 | Chat không gửi / sai thread | `messageRoutes.js`, `messagingRoles.js`, `buildConversationId` |
-| QR sai số tiền | `RegistrationForm.jsx` — `effectivePrice` |
+| QR sai số tiền | `RegistrationForm.jsx` - `effectivePrice` |
 | Thanh toán không nhận | `webhookRoutes.js`, Sepay env, polling payment-session |
 | Token hết hạn liên tục | `api.js` refresh flow; `tokenBlacklist.js` |
 | Dữ liệu lẫn chi nhánh | `branchFilter.js`, `branchId` trên document |
@@ -542,18 +542,18 @@ MongoDB dùng `_id`; FE thường map sang `id` qua `lib/entityMaps.js`. Khi deb
 
 - Màu thương hiệu: `tailwind.config.js` → `colors.brand` (`navy`, `zalo`, `shell`)
 - Class dùng chung: `.btn-primary`, `.btn-primary-blue`, `.input-field` trong `index.css`
-- Nhiều component vẫn dùng hex Tailwind trực tiếp — ưu tiên chuyển dần sang `brand-*` khi sửa file đó
+- Nhiều component vẫn dùng hex Tailwind trực tiếp - ưu tiên chuyển dần sang `brand-*` khi sửa file đó
 
 ### 14.4 Encoding file (Windows)
 
 Một số file `.js`/`.jsx` trên Windows có thể bị lưu **UTF-16 LE** (byte `FF FE` đầu file) → Node/Vite báo lỗi trên Linux.
 
-- Kiểm tra: `Format-Hex -Path file.js -Count 4` — chuẩn UTF-8 không BOM bắt đầu `2F 2A` (`/*`) hoặc `69 6D` (`import`)
+- Kiểm tra: `Format-Hex -Path file.js -Count 4` - chuẩn UTF-8 không BOM bắt đầu `2F 2A` (`/*`) hoặc `69 6D` (`import`)
 - Sửa: ghi lại file UTF-8 no BOM (Node script hoặc VS Code “Save with Encoding”)
 
 File từng gặp vấn đề: `client/src/lib/messagingRoles.js`.
 
-### 14.5 Secrets — không commit
+### 14.5 Secrets - không commit
 
 - `.env`, credentials VPS
 - Script deploy có mật khẩu hardcode (ví dụ `rebuild_frontend.cjs` nếu có)

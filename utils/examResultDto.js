@@ -1,5 +1,5 @@
 /**
- * ExamResult writable DTOs — explicit allowlist (no req.body spread).
+ * ExamResult writable DTOs - explicit allowlist (no req.body spread).
  */
 const CREATE_FIELDS = [
   'type',

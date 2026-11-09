@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   DemoSoftwareLink,
   DemoTeacherTrainingOverview,
   DemoTrainingCourse,
@@ -290,7 +290,7 @@ export async function getTeacherTrainingOverview(user: DemoUser): Promise<DemoTe
         return {
           id: asText(lessonRecord.id || lessonRecord._id, `${id}-lesson-${lessonIndex + 1}`),
           title: asText(lessonRecord.title, `Bài ${lessonIndex + 1}`),
-          duration: asText(lessonRecord.duration, '—'),
+          duration: asText(lessonRecord.duration, '-'),
           completed: lessonRecord.completed === true,
           url: asText(lessonRecord.url),
           watchedSeconds: Math.max(0, asNumber(lessonRecord.watchedSeconds)),

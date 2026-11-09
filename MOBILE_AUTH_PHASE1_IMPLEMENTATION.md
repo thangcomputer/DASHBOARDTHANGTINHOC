@@ -1,4 +1,4 @@
-# MOBILE AUTH MULTI-DEVICE — PHASE 1 IMPLEMENTATION
+# MOBILE AUTH MULTI-DEVICE - PHASE 1 IMPLEMENTATION
 
 **Trạng thái:** Đã thêm nền tảng code additive; chưa production-ready, chưa bật flag, chưa kết nối database để kiểm thử, chưa deploy.  
 **Ngày thực hiện:** 2026-10-24  
@@ -22,20 +22,20 @@
 
 ## 2. File đã thay đổi
 
-- `.env.example` — thêm `MOBILE_MULTI_SESSION_AUTH=false`; không sửa `.env` hay secret.
-- `middleware/auth.js` — kiểm tra session cho access token có `sid`; token legacy không `sid` giữ đường validation cũ.
-- `middleware/socketAuth.js` — xác minh `sid`, session và trạng thái account khi Socket.IO handshake; token legacy giữ kiểm tra version cũ.
-- `routes/authRoutes.js` — thêm mobile login, dual-path refresh, logout/revoke theo session và API xem/thu hồi session.
-- `server.js` — join room `session:<sid>`; session socket không ghi đè presence record web theo mô hình presence một socket/user hiện tại.
+- `.env.example` - thêm `MOBILE_MULTI_SESSION_AUTH=false`; không sửa `.env` hay secret.
+- `middleware/auth.js` - kiểm tra session cho access token có `sid`; token legacy không `sid` giữ đường validation cũ.
+- `middleware/socketAuth.js` - xác minh `sid`, session và trạng thái account khi Socket.IO handshake; token legacy giữ kiểm tra version cũ.
+- `routes/authRoutes.js` - thêm mobile login, dual-path refresh, logout/revoke theo session và API xem/thu hồi session.
+- `server.js` - join room `session:<sid>`; session socket không ghi đè presence record web theo mô hình presence một socket/user hiện tại.
 
 ## 3. File mới
 
-- `config/mobileMultiSessionAuth.js` — feature flag; chỉ giá trị `true` không phân biệt hoa/thường mới bật.
-- `models/AuthSession.js` — schema và index khai báo cho collection riêng.
-- `services/mobileAuthSessionService.js` — thao tác tạo, đọc, validate, rotate, revoke, revoke-all, liệt kê và touch session.
-- `tests/unit/mobile_auth_session_service.test.js` — kiểm tra service với model giả lập, không database.
-- `tests/unit/mobile_auth_session_routes.test.js` — kiểm tra flag OFF và từ chối admin/staff.
-- `MOBILE_AUTH_PHASE1_IMPLEMENTATION.md` — báo cáo này.
+- `config/mobileMultiSessionAuth.js` - feature flag; chỉ giá trị `true` không phân biệt hoa/thường mới bật.
+- `models/AuthSession.js` - schema và index khai báo cho collection riêng.
+- `services/mobileAuthSessionService.js` - thao tác tạo, đọc, validate, rotate, revoke, revoke-all, liệt kê và touch session.
+- `tests/unit/mobile_auth_session_service.test.js` - kiểm tra service với model giả lập, không database.
+- `tests/unit/mobile_auth_session_routes.test.js` - kiểm tra flag OFF và từ chối admin/staff.
+- `MOBILE_AUTH_PHASE1_IMPLEMENTATION.md` - báo cáo này.
 
 ## 4. AuthSession schema và index
 

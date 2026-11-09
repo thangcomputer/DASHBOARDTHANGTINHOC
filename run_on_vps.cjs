@@ -1,5 +1,5 @@
 /**
- * run_on_vps.cjs — git pull + pm2 restart on VPS.
+ * run_on_vps.cjs - git pull + pm2 restart on VPS.
  * Credentials: VPS_HOST / VPS_PASSWORD (or VPS_SSH_KEY_PATH) in .env
  */
 const { NodeSSH } = require('node-ssh');

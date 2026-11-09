@@ -1,5 +1,5 @@
 /**
- * Bộ mã quyền — CommonJS mirror của client/src/constants/permissions.js
+ * Bộ mã quyền - CommonJS mirror của client/src/constants/permissions.js
  * Không đổi giá trị key đã lưu DB.
  */
 const PERMISSIONS = {
@@ -23,7 +23,7 @@ const PERMISSIONS = {
   MANAGE_CENTER_INFO: 'manage_center_info',
 };
 
-/** Enum các adminRole — dùng chung thay vì hard-code string */
+/** Enum các adminRole - dùng chung thay vì hard-code string */
 const ADMIN_ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   HIGH_ADMIN: 'HIGH_ADMIN',
@@ -31,7 +31,7 @@ const ADMIN_ROLES = {
   SUPPORT: 'SUPPORT',
 };
 
-/** Quyền mặc định khi tạo HIGH_ADMIN — có thể điều chỉnh sau */
+/** Quyền mặc định khi tạo HIGH_ADMIN - có thể điều chỉnh sau */
 const HIGH_ADMIN_DEFAULT_PERMISSIONS = [
   'manage_students', 'view_teachers', 'manage_teachers', 'manage_schedule',
   'manage_messages', 'manage_finance', 'view_branch_revenue',

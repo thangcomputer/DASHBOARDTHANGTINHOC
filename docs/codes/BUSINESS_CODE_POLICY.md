@@ -1,8 +1,8 @@
 # BUSINESS CODE POLICY
 
-**Phase:** B — Design  
+**Phase:** B - Design  
 **Date:** 2026-08-11  
-**Status:** DESIGN ONLY — chưa implement  
+**Status:** DESIGN ONLY - chưa implement  
 **Depends on:** [`CODE_STANDARDIZATION_PHASE_A_AUDIT_2026-08-11.md`](../CODE_STANDARDIZATION_PHASE_A_AUDIT_2026-08-11.md)
 
 ---
@@ -27,13 +27,13 @@ Class / `LH…`: **không** tạo (PHASE A: không có entity Class).
 1. Business code **không** phải FK. Quan hệ chỉ dùng `_id` / `studentId` / `teacherId` / `employeeId` / `courseId` / `enrollmentId`.
 2. **Không** suy luận `HV000001 ↔ GV000001` hay map số thứ tự giữa namespace.
 3. **Không** encode branch/tenant vào mã (`CS1-HV…` bị cấm trừ khi owner approve sau).
-4. Sequence **global** per entity type (OPTION A — recommended).
+4. Sequence **global** per entity type (OPTION A - recommended).
 5. Sinh mã **chỉ backend**; client không authoritative.
 6. Không `Date.now()`, không `countDocuments()` để cấp số.
 7. Unique per collection; không tái sử dụng mã đã cấp.
 8. Immutable sau khi gán (không đổi mã khi rename / đổi branch).
 9. Một Student = **một** `studentCode` dù N enrollment / N teacher / N course.
-10. **Messaging / Socket / JWT / RBAC / Auth:** zero touch — code không vào conversationId, pairing, policy.
+10. **Messaging / Socket / JWT / RBAC / Auth:** zero touch - code không vào conversationId, pairing, policy.
 
 ---
 
@@ -43,7 +43,7 @@ Class / `LH…`: **không** tạo (PHASE A: không có entity Class).
 |-------|-------|------|
 | DB | `_id` | Primary identity / FK |
 | Business | `courseCode` | Human / ops reference |
-| URL | `slug` | Routing — **giữ nguyên**, không thay bằng courseCode |
+| URL | `slug` | Routing - **giữ nguyên**, không thay bằng courseCode |
 
 Tương tự: Student/Teacher/Employee chỉ thêm business field; `_id` không đổi.
 
@@ -95,7 +95,7 @@ Client POST create (không gửi code)
   → UI / QR chỉ hiển thị code từ response
 ```
 
-Ignore / strip client-supplied business codes trên create (fail-closed hoặc silent ignore — recommend **ignore + log**).
+Ignore / strip client-supplied business codes trên create (fail-closed hoặc silent ignore - recommend **ignore + log**).
 
 ---
 
@@ -129,7 +129,7 @@ Student HV000001
 | `messagingPolicy` / pairing / DM | Không đọc/ghi business codes |
 | `conversationId` | Không đổi |
 | `studentMatchesTeacher` | ObjectId only |
-| Badge UI `HV`/`GV` | Role label — không phải `studentCode` |
+| Badge UI `HV`/`GV` | Role label - không phải `studentCode` |
 
 PHASE C: **không** mở các file Messaging listed trong master prompt.
 

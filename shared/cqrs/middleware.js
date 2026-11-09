@@ -33,7 +33,7 @@ function assertFinanceCqrs() {
 }
 
 /**
- * Hard gate — only for routes that are CQRS-only (no legacy).
+ * Hard gate - only for routes that are CQRS-only (no legacy).
  * Prefer requireStudentCreateCqrsSoft on POST /students so legacy can run when flag is off.
  */
 function makeMiddleware(checker, kind) {
@@ -72,7 +72,7 @@ module.exports = {
   requireFinanceCqrs: makeMiddleware(isFinanceCqrs, 'finance'),
   requireTeacherCqrs: makeMiddleware(isTeacherCqrs, 'teacher'),
   requireInvoiceCqrs: makeMiddleware(isInvoiceCqrs, 'invoice'),
-  /** @deprecated Prefer requireStudentCreateCqrsSoft — hard gate breaks create when flag=false */
+  /** @deprecated Prefer requireStudentCreateCqrsSoft - hard gate breaks create when flag=false */
   requireStudentCreateCqrs: requireStudentCreateCqrsSoft,
   requireStudentCreateCqrsSoft,
   requireStudentCreateCqrsHard: makeMiddleware(isStudentCreateCqrs, 'student'),

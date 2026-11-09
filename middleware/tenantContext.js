@@ -1,5 +1,5 @@
 /**
- * tenantContext — gan req.tenant / req.tenantScope tu header/query.
+ * tenantContext - gan req.tenant / req.tenantScope tu header/query.
  * Super Admin: X-Tenant-Id hoac ?tenant_id=
  * Khac: khong scope (dung branchFilter nhu cu)
  */

@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
-  ChevronLeft,
-  ChevronRight,
   Flame,
   Lock,
   Medal,
@@ -10,6 +8,7 @@ import {
   Trophy,
 } from 'lucide-react-native';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
+import { colors } from '../theme/tokens';
 
 type LmsHistoryItem = {
   id: string;
@@ -75,8 +74,6 @@ type LmsLeaderboardResponse = {
   me: LmsRankItem | null;
 };
 
-const WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-
 const REASON_LABELS: Record<string, string> = {
   welcome: 'Chào mừng thành viên mới',
   section_completed: 'Hoàn thành phần học',
@@ -102,16 +99,9 @@ function formatWhen(value?: string) {
   }
 }
 
-function shiftMonth(month?: string, delta = 0) {
-  if (!month) return '';
-  const [year, mon] = String(month).split('-').map(Number);
-  const date = new Date(Date.UTC(year, (mon || 1) - 1 + delta, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 export function LmsProgressCard() {
   const [data, setData] = useState<LmsProgressData | null>(null);
-  const [tab, setTab] = useState<'history' | 'calendar' | 'badges' | 'rank'>('history');
+  const [tab, setTab] = useState<'history' | 'badges' | 'rank'>('history');
   const [period, setPeriod] = useState<'week' | 'month' | 'all'>('week');
   const [board, setBoard] = useState<LmsLeaderboardResponse | null>(null);
   const [celebratingLevel, setCelebratingLevel] = useState<number | null>(null);
@@ -137,21 +127,21 @@ export function LmsProgressCard() {
           lastStudyDay: raw.lastStudyDay || '',
           history: Array.isArray(raw.history)
             ? raw.history.map((h: any) => ({
-                id: String(h._id || h.id || Math.random()),
-                amount: Number(h.amount || 0),
-                reason: String(h.reason || ''),
-                label: String(h.label || REASON_LABELS[h.reason] || 'Hoàn thành bài học'),
-                at: String(h.at || h.createdAt || ''),
-              }))
+              id: String(h._id || h.id || Math.random()),
+              amount: Number(h.amount || 0),
+              reason: String(h.reason || ''),
+              label: String(h.label || REASON_LABELS[h.reason] || 'Hoàn thành bài học'),
+              at: String(h.at || h.createdAt || ''),
+            }))
             : [],
           calendar: raw.calendar || null,
           badges: Array.isArray(raw.badges)
             ? raw.badges.map((b: any) => ({
-                key: String(b.key || b.id || ''),
-                title: String(b.title || b.label || ''),
-                description: String(b.description || b.desc || ''),
-                earned: Boolean(b.earned || b.unlocked),
-              }))
+              key: String(b.key || b.id || ''),
+              title: String(b.title || b.label || ''),
+              description: String(b.description || b.desc || ''),
+              earned: Boolean(b.earned || b.unlocked),
+            }))
             : [],
         };
         if (prevLevelRef.current !== null && next.level > prevLevelRef.current) {
@@ -177,27 +167,27 @@ export function LmsProgressCard() {
           period: nextPeriod,
           top: Array.isArray(raw.top)
             ? raw.top.map((item: any) => ({
-                studentId: String(item.studentId || item._id || ''),
-                rank: Number(item.rank || 0),
-                name: String(item.name || 'Học viên'),
-                avatar: String(item.avatar || ''),
-                level: Number(item.level || 1),
-                title: String(item.title || ''),
-                xp: Number(item.xp || 0),
-                isMe: Boolean(item.isMe),
-              }))
+              studentId: String(item.studentId || item._id || ''),
+              rank: Number(item.rank || 0),
+              name: String(item.name || 'Học viên'),
+              avatar: String(item.avatar || ''),
+              level: Number(item.level || 1),
+              title: String(item.title || ''),
+              xp: Number(item.xp || 0),
+              isMe: Boolean(item.isMe),
+            }))
             : [],
           me: raw.me
             ? {
-                studentId: String(raw.me.studentId || ''),
-                rank: Number(raw.me.rank || 0),
-                name: String(raw.me.name || 'Bạn'),
-                avatar: String(raw.me.avatar || ''),
-                level: Number(raw.me.level || 1),
-                title: String(raw.me.title || ''),
-                xp: Number(raw.me.xp || 0),
-                isMe: true,
-              }
+              studentId: String(raw.me.studentId || ''),
+              rank: Number(raw.me.rank || 0),
+              name: String(raw.me.name || 'Bạn'),
+              avatar: String(raw.me.avatar || ''),
+              level: Number(raw.me.level || 1),
+              title: String(raw.me.title || ''),
+              xp: Number(raw.me.xp || 0),
+              isMe: true,
+            }
             : null,
         });
       }
@@ -219,13 +209,6 @@ export function LmsProgressCard() {
   const into = data.xpIntoLevel || 0;
   const need = data.xpForNextLevel || 100;
   const progressPct = data.atMaxLevel || !need ? 100 : Math.min(100, Math.max(4, Math.round((into / need) * 100)));
-
-  const tabs = [
-    { id: 'history' as const, label: 'Lịch sử' },
-    { id: 'calendar' as const, label: 'Lịch' },
-    { id: 'badges' as const, label: 'Huy hiệu' },
-    { id: 'rank' as const, label: 'Hạng' },
-  ];
 
   return (
     <View style={styles.card}>
@@ -269,7 +252,11 @@ export function LmsProgressCard() {
       </View>
 
       <View style={styles.tabBar}>
-        {tabs.map(({ id, label }) => {
+        {([
+          { id: 'history' as const, label: 'Lịch sử' },
+          { id: 'badges' as const, label: 'Huy hiệu' },
+          { id: 'rank' as const, label: 'Hạng' },
+        ]).map(({ id, label }) => {
           const active = tab === id;
           return (
             <Pressable
@@ -303,81 +290,6 @@ export function LmsProgressCard() {
                 </View>
               ))}
             </View>
-          )
-        ) : null}
-
-        {tab === 'calendar' ? (
-          data.calendar ? (
-            <View style={styles.calendarWrap}>
-              <View style={styles.calendarNavRow}>
-                <Pressable
-                  onPress={() => void loadMe(shiftMonth(data.calendar?.month, -1))}
-                  style={styles.calendarNavBtn}
-                  hitSlop={8}
-                >
-                  <ChevronLeft size={16} color="#475569" />
-                  <Text style={styles.calendarNavText}>Trước</Text>
-                </Pressable>
-                <Text style={styles.calendarMonthText}>{data.calendar.month}</Text>
-                <Pressable
-                  onPress={() => void loadMe(shiftMonth(data.calendar?.month, 1))}
-                  style={styles.calendarNavBtn}
-                  hitSlop={8}
-                >
-                  <Text style={styles.calendarNavText}>Sau</Text>
-                  <ChevronRight size={16} color="#475569" />
-                </Pressable>
-              </View>
-
-              <View style={styles.calendarHeaderRow}>
-                {WEEKDAYS.map((label) => (
-                  <Text key={label} style={styles.calendarWeekdayText}>
-                    {label}
-                  </Text>
-                ))}
-              </View>
-
-              <View style={styles.calendarGrid}>
-                {(data.calendar.days || []).map((cell, idx) => {
-                  if (!cell) {
-                    return <View key={`pad-${idx}`} style={styles.calendarCellWrap} />;
-                  }
-                  return (
-                    <View key={cell.key || `day-${idx}`} style={styles.calendarCellWrap}>
-                      <View
-                        style={[
-                          styles.calendarDayCircle,
-                          cell.studied
-                            ? styles.calendarDayStudied
-                            : cell.today
-                              ? styles.calendarDayToday
-                              : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.calendarDayNumber,
-                            cell.studied
-                              ? styles.calendarDayNumberStudied
-                              : cell.today
-                                ? styles.calendarDayNumberToday
-                                : null,
-                          ]}
-                        >
-                          {cell.day}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-
-              <Text style={styles.calendarFooter}>
-                Tháng này {data.calendar.studiedCount || 0} ngày có học. Chuỗi {data.streak || 0} ngày, kỷ lục {data.bestStreak || 0} ngày. Mốc 60 và 100 ngày đang theo dõi, chưa có thưởng.
-              </Text>
-            </View>
-          ) : (
-            <Text style={styles.emptyHint}>Chưa có dữ liệu lịch học bài.</Text>
           )
         ) : null}
 
@@ -502,7 +414,7 @@ export function LmsProgressCard() {
           </View>
         ) : null}
       </View>
-    </View>
+    </View >
   );
 }
 
@@ -670,89 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
   },
-  calendarWrap: {
-    gap: 10,
-  },
-  calendarNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  calendarNavBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  calendarNavText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  calendarMonthText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#334155',
-  },
-  calendarHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  calendarWeekdayText: {
-    width: '14.2%',
-    textAlign: 'center',
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#94A3B8',
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  calendarCellWrap: {
-    width: '14.285%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 2,
-  },
-  calendarDayCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarDayStudied: {
-    backgroundColor: '#F97316',
-  },
-  calendarDayToday: {
-    backgroundColor: '#FFEDD5',
-  },
-  calendarDayNumber: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  calendarDayNumberStudied: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-  },
-  calendarDayNumberToday: {
-    color: '#C2410C',
-    fontWeight: '900',
-  },
-  calendarFooter: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    lineHeight: 16,
-    marginTop: 4,
-  },
   badgeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -860,14 +689,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.brandSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rankAvatarText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#B91C1C',
+    color: colors.brandDark,
   },
   rankName: {
     flex: 1,

@@ -1,5 +1,5 @@
 /**
- * Phase 6 — Contacts discovery orchestration.
+ * Phase 6 - Contacts discovery orchestration.
  * Policy authority: MessagingPolicy.canDiscoverContacts (pure).
  * This module: load candidates + map + filter. No second matrix.
  */
@@ -256,7 +256,7 @@ async function loadCandidateDocs(actorUser, { queryBranchId } = {}) {
       Teacher.find({ role: 'teacher', status: { $in: ['Active', 'active'] }, ...branchFilter }, CONTACT_SELECT).lean(),
       loadHighAdminDocs(),
     ]);
-    // HIGH: GV + admin + staff + support — không load học viên
+    // HIGH: GV + admin + staff + support - không load học viên
     const supers = await ensureRootSuperAdminAmongDocs(supersRaw);
     pushTeachers(supers, { elevated: 'SUPER_ADMIN' });
     pushTeachers(highs.filter((h) => String(h._id) !== userId), { elevated: 'HIGH_ADMIN' });
@@ -448,7 +448,7 @@ async function listDiscoverableContacts(actorUser, options = {}) {
 
 module.exports = {
   listDiscoverableContacts,
-  /** WRAPPER — re-export of MessagingPolicy.canDiscoverContacts (no second matrix). */
+  /** WRAPPER - re-export of MessagingPolicy.canDiscoverContacts (no second matrix). */
   canDiscoverContacts,
   /** Test/helper: in-memory root SUPER ensure (no DB write). */
   ensureRootSuperAdminAmongDocs,

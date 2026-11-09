@@ -58,7 +58,7 @@ function policyShadowSettings(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] settings evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] settings evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `settings_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -93,7 +93,7 @@ function policyShadowSettings(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] settings shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] settings shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -105,7 +105,7 @@ function policyShadowSettings(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected settings error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected settings error - fail closed to legacy only',
       );
     }
     return next();

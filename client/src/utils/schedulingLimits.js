@@ -1,5 +1,5 @@
 /**
- * Client-side scheduling limit helpers (UX only — backend remains SoT).
+ * Client-side scheduling limit helpers (UX only - backend remains SoT).
  * Keep MAX in sync with services/schedulingValidation.js
  */
 
@@ -21,7 +21,7 @@ function localDateKey(raw) {
     return `${y}-${m}-${day}`;
   }
   const s = String(raw).trim();
-  // YYYY-MM-DD thuần — không slice ISO UTC (tránh lệch ngày đêm VN)
+  // YYYY-MM-DD thuần - không slice ISO UTC (tránh lệch ngày đêm VN)
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '';

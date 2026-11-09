@@ -124,7 +124,7 @@ async function run() {
   const admin = await login({ identifier: adminIdentifier, password: adminPassword, roleHint: 'admin' });
   console.log(`✅ login admin: ${admin.id} (${admin.role}) adminRole=${admin.adminRole || ''}`);
 
-  // Contacts requires DB — so fail here with a clear message if DB is down
+  // Contacts requires DB - so fail here with a clear message if DB is down
   let adminContacts;
   try {
     adminContacts = await getContacts(admin);

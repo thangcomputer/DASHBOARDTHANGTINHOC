@@ -1,5 +1,5 @@
 /**
- * Wave 6.13 — Policy SHADOW for LIVE /api/tenants.
+ * Wave 6.13 - Policy SHADOW for LIVE /api/tenants.
  * Legacy: authMiddleware + isSuperAdmin (no permission taxonomy).
  */
 const test = require('node:test');
@@ -33,10 +33,10 @@ function subject(opts = {}) {
     actorDoc: opts.actorDoc === null
       ? null
       : {
-          adminRole: opts.adminRole ?? 'STAFF',
-          permissions: opts.permissions ?? [],
-          role: opts.role ?? 'admin',
-        },
+        adminRole: opts.adminRole ?? 'STAFF',
+        permissions: opts.permissions ?? [],
+        role: opts.role ?? 'admin',
+      },
     userBranchId: opts.userBranchId === undefined ? BRANCH_A : opts.userBranchId,
   });
 }
@@ -115,7 +115,7 @@ test('Wave6.13: teacher/student DENY; missing actor DENY', () => {
   assert.equal(assertMatch('miss', missing, 'list').legacy.decision, 'DENY');
 });
 
-test('Wave6.13: no invented manage_tenants — permissions ignored for gate', () => {
+test('Wave6.13: no invented manage_tenants - permissions ignored for gate', () => {
   const staff = subject({
     role: 'staff',
     adminRole: 'STAFF',
@@ -140,7 +140,7 @@ test('Wave6.13: same/cross tenant ALLOW for SUPER (no ownership gate)', () => {
   );
 });
 
-test('Wave6.13: branch ignored for HTTP — SUPER ALLOW A/B; STAFF DENY regardless', () => {
+test('Wave6.13: branch ignored for HTTP - SUPER ALLOW A/B; STAFF DENY regardless', () => {
   const superDb = subject({
     adminRole: 'SUPER_ADMIN',
     permissions: [],

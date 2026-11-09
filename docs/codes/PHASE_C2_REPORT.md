@@ -1,4 +1,4 @@
-# PHASE C2 REPORT — Business Code Foundation
+# PHASE C2 REPORT - Business Code Foundation
 
 **Date:** 2026-08-11  
 **Messaging files touched:** **NONE**
@@ -9,7 +9,7 @@
 
 ```text
 Application code changed: YES
-Database changed: YES (LOCAL/DEV only — 127.0.0.1:27018)
+Database changed: YES (LOCAL/DEV only - 127.0.0.1:27018)
 Messaging changed: NO
 Payment runtime changed: YES (fail-closed + legacy match; session-first unchanged)
 Financial history changed: NO (Invoice/Ledger/Payroll untouched)
@@ -17,7 +17,7 @@ Financial history changed: NO (Invoice/Ledger/Payroll untouched)
 Production audit: BLOCKED
 Migration: PASS (local) / BLOCKED (production)
 Payment compatibility: PASS (unit + local design)
-Unique indexes: BLOCKED (not created — await prod clean verify)
+Unique indexes: BLOCKED (not created - await prod clean verify)
 Rollback: VERIFIED (procedure documented; not exercised on prod)
 ```
 
@@ -66,7 +66,7 @@ Local execute used: `--execute --allow-non-prod` only.
 
 ## Remaining risks
 
-1. Production data not audited — duplicates unknown.  
+1. Production data not audited - duplicates unknown.  
 2. Unique indexes still deferred.  
 3. Reserved codes abandoned if user cancels QR → sequence gaps (acceptable).  
 4. Open PaymentSession.ref values left unchanged (by design).  
@@ -77,6 +77,6 @@ Local execute used: `--execute --allow-non-prod` only.
 ## Next
 
 ```text
-STOP — await owner approval for next phase
+STOP - await owner approval for next phase
 (prod audit → prod migration → unique indexes)
 ```

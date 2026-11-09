@@ -1,5 +1,5 @@
 /**
- * Phase 7.10 — Controlled cutover gate for /api/builder ONLY.
+ * Phase 7.10 - Controlled cutover gate for /api/builder ONLY.
  *
  * LEGACY (default):
  *   - admin actions → existing isAdmin
@@ -41,7 +41,7 @@ function denyBuilder(res, statusHint, reason) {
   });
 }
 
-/** Legacy path for this action — admin routes use isAdmin; public/auth-only pass through. */
+/** Legacy path for this action - admin routes use isAdmin; public/auth-only pass through. */
 function legacyBuilderGate(action, req, res, next) {
   if (ADMIN_ACTIONS.has(action)) {
     return isAdmin(req, res, next);
@@ -70,7 +70,7 @@ function builderCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] builder authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] builder authority helper failed - Legacy gate',
       );
     }
 
@@ -115,7 +115,7 @@ function builderCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] builder Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] builder Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;
@@ -135,7 +135,7 @@ function builderCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] builder Policy ALLOW — Legacy gate skipped',
+        '[POLICY_CUTOVER] builder Policy ALLOW - Legacy gate skipped',
       );
       return next();
     }

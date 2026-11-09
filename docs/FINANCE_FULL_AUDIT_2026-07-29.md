@@ -1,10 +1,10 @@
-# AUDIT TOÀN BỘ LUỒNG TÀI CHÍNH — QUANLYCMS
+# AUDIT TOÀN BỘ LUỒNG TÀI CHÍNH - QUANLYCMS
 
 **Ngày:** 2026-07-29  
 **Vai trò:** Senior Software Architect · Backend · Financial System Auditor  
 **Phạm vi:** Payment · Refund · Ledger · Invoice · CreditNote · Enrollment · Student · BI · API · Race · DB · Frontend · Security  
 **Nguyên tắc audit:** LedgerEntry = Source of Truth duy nhất. Không giả định code đúng.  
-**Hành động:** **CHỈ ĐỌC CODE — không sửa.**
+**Hành động:** **CHỈ ĐỌC CODE - không sửa.**
 
 ---
 
@@ -12,24 +12,24 @@
 
 | Câu hỏi | Trả lời |
 |---------|---------|
-| Ledger đã là SoT trên **mọi** đường ghi tiền? | **Không** — nhiều path ghi Student/Invoice trước, Ledger best-effort |
+| Ledger đã là SoT trên **mọi** đường ghi tiền? | **Không** - nhiều path ghi Student/Invoice trước, Ledger best-effort |
 | BI headline (net/refund/profit) đọc Ledger? | **Có** (`biService`, `/finance/summary`, analytics `/revenue`) |
-| Dashboard admin (`/students/stats`) đọc Ledger? | **Không** — vẫn `sumPaidRevenue` (enrollment) |
-| Có Mongo transaction trên finance? | **Không** — zero `startSession` / `withTransaction` trong repo |
-| Idempotency key còn `Date.now()`? | **Không** (đã sửa P0) — nhưng một số key vẫn yếu |
+| Dashboard admin (`/students/stats`) đọc Ledger? | **Không** - vẫn `sumPaidRevenue` (enrollment) |
+| Có Mongo transaction trên finance? | **Không** - zero `startSession` / `withTransaction` trong repo |
+| Idempotency key còn `Date.now()`? | **Không** (đã sửa P0) - nhưng một số key vẫn yếu |
 | Production-ready đối soát từng đồng? | **Không** |
 
 **Điểm vỡ SoT lớn nhất:** *mutate cache → tạo Invoice → try settlePayment/postRefund catch nuốt lỗi* → UI “đã thu/đã hoàn” trong khi sổ cái thiếu dòng.
 
 ---
 
-# PHẦN A — CHI TIẾT TỪNG BUG
+# PHẦN A - CHI TIẾT TỪNG BUG
 
 ---
 
 ## CRITICAL
 
-### C1 — Admin Pay: ghi Student/Invoice trước Ledger; lỗi Ledger bị nuốt
+### C1 - Admin Pay: ghi Student/Invoice trước Ledger; lỗi Ledger bị nuốt
 
 | Mục | Nội dung |
 |-----|----------|
@@ -51,7 +51,7 @@
 
 ---
 
-### C2 — Student Refund: clear cache trước Ledger; lỗi Ledger bị nuốt
+### C2 - Student Refund: clear cache trước Ledger; lỗi Ledger bị nuốt
 
 | Mục | Nội dung |
 |-----|----------|
@@ -65,7 +65,7 @@
 
 ---
 
-### C3 — SePay PaymentSession: đánh dấu paid không ghi Ledger/Invoice
+### C3 - SePay PaymentSession: đánh dấu paid không ghi Ledger/Invoice
 
 | Mục | Nội dung |
 |-----|----------|
@@ -79,14 +79,14 @@
 
 ---
 
-### C4 — POST Invoice thủ công: set `paid=true` không Ledger / không `paidAmount`
+### C4 - POST Invoice thủ công: set `paid=true` không Ledger / không `paidAmount`
 
 | Mục | Nội dung |
 |-----|----------|
 | **Mức độ** | Critical |
 | **Vị trí** | `routes/invoiceRoutes.js` · `POST /` · ~103–132 |
 | **Business Rule bị vi phạm** | Invoice là chứng từ, không phải SoT; không được cấp paid không qua Ledger |
-| **Root Cause** | Tạo Invoice → nếu `!student.paid` thì `paid:true` — không `settlePayment`, không `paidAmount` |
+| **Root Cause** | Tạo Invoice → nếu `!student.paid` thì `paid:true` - không `settlePayment`, không `paidAmount` |
 | **Hậu quả** | HĐ orphan (không Ledger); HV “đã TT”; enrollment KPI / stats phình |
 | **Cách tái hiện** | `POST /api/invoices` với HV chưa thu → `paid=true`, Ledger rỗng |
 | **Hướng sửa** | Bắt buộc `settlePayment` hoặc cấm side-effect `paid` trên create invoice |
@@ -95,21 +95,21 @@
 
 ## HIGH
 
-### H1 — Race Admin Pay (check-then-act, không atomic)
+### H1 - Race Admin Pay (check-then-act, không atomic)
 
 | Mục | Nội dung |
 |-----|----------|
 | **Mức độ** | High |
 | **Vị trí** | `studentRoutes.js` `PUT /:id/pay` ~1147–1170; enrollment pay ~1832–1854 |
 | **Business Rule** | Idempotent admin pay; không double PAYMENT |
-| **Root Cause** | `if (student.paid) return 409` rồi mutate — không `findOneAndUpdate({paid:false})` |
+| **Root Cause** | `if (student.paid) return 409` rồi mutate - không `findOneAndUpdate({paid:false})` |
 | **Hậu quả** | Double-click / 2 tab → 2 Invoice + 2 PAYMENT (key khác vì `maHoaDon` khác) |
 | **Tái hiện** | 2 request song song `PUT .../pay` HV unpaid |
 | **Hướng sửa** | Atomic claim; một `idempotencyKey` ổn định theo `studentId` lần thu đầu |
 
 ---
 
-### H2 — Race Admin Pay × SePay student webhook
+### H2 - Race Admin Pay × SePay student webhook
 
 | Mục | Nội dung |
 |-----|----------|
@@ -123,7 +123,7 @@
 
 ---
 
-### H3 — Cancel enrollment + refundAmount chỉ cần `manage_students`
+### H3 - Cancel enrollment + refundAmount chỉ cần `manage_students`
 
 | Mục | Nội dung |
 |-----|----------|
@@ -137,7 +137,7 @@
 
 ---
 
-### H4 — `/api/students/stats` doanh thu từ Enrollment, không Ledger
+### H4 - `/api/students/stats` doanh thu từ Enrollment, không Ledger
 
 | Mục | Nội dung |
 |-----|----------|
@@ -151,7 +151,7 @@
 
 ---
 
-### H5 — BI byCourse + trend.revenue vẫn enrollment
+### H5 - BI byCourse + trend.revenue vẫn enrollment
 
 | Mục | Nội dung |
 |-----|----------|
@@ -165,7 +165,7 @@
 
 ---
 
-### H6 — Analytics `/enrollment` gọi “revenue” từ enrollment
+### H6 - Analytics `/enrollment` gọi “revenue” từ enrollment
 
 | Mục | Nội dung |
 |-----|----------|
@@ -176,7 +176,7 @@
 
 ---
 
-### H7 — Lương GV: Transaction trước, Ledger salary nuốt lỗi
+### H7 - Lương GV: Transaction trước, Ledger salary nuốt lỗi
 
 | Mục | Nội dung |
 |-----|----------|
@@ -190,7 +190,7 @@
 
 ---
 
-### H8 — Cancel Transaction không void SALARY Ledger
+### H8 - Cancel Transaction không void SALARY Ledger
 
 | Mục | Nội dung |
 |-----|----------|
@@ -201,7 +201,7 @@
 
 ---
 
-### H9 — Enrollment pay / cancel thiếu `branchFilter` / `assertStudentBranchAccess`
+### H9 - Enrollment pay / cancel thiếu `branchFilter` / `assertStudentBranchAccess`
 
 | Mục | Nội dung |
 |-----|----------|
@@ -212,7 +212,7 @@
 
 ---
 
-### H10 — CreditNote fail sau REFUND thành công chỉ warn
+### H10 - CreditNote fail sau REFUND thành công chỉ warn
 
 | Mục | Nội dung |
 |-----|----------|
@@ -224,7 +224,7 @@
 
 ---
 
-### H11 — GET full-detail backfill Invoice side-effect (không Ledger)
+### H11 - GET full-detail backfill Invoice side-effect (không Ledger)
 
 | Mục | Nội dung |
 |-----|----------|
@@ -235,7 +235,7 @@
 
 ---
 
-### H12 — PUT student generic có thể set `paid` không qua pay API
+### H12 - PUT student generic có thể set `paid` không qua pay API
 
 | Mục | Nội dung |
 |-----|----------|
@@ -248,18 +248,18 @@
 
 ## MEDIUM
 
-### M1 — Không có MongoDB multi-document transaction trên mọi finance path
+### M1 - Không có MongoDB multi-document transaction trên mọi finance path
 
 | Mục | Nội dung |
 |-----|----------|
 | **Mức độ** | Medium (nền tảng Critical khi kết hợp C1–C2) |
-| **Vị trí** | Toàn repo — grep `startSession` / `withTransaction` = **0** |
+| **Vị trí** | Toàn repo - grep `startSession` / `withTransaction` = **0** |
 | **Hậu quả** | Không atomic Invoice+Ledger+Student |
 | **Hướng sửa** | Transaction hoặc transactional outbox |
 
 ---
 
-### M2 — Cancel: soft-cancel trước; nếu Ledger refund fail → khóa đã hủy, tiền chưa hoàn trên sổ
+### M2 - Cancel: soft-cancel trước; nếu Ledger refund fail → khóa đã hủy, tiền chưa hoàn trên sổ
 
 | Mục | Nội dung |
 |-----|----------|
@@ -270,7 +270,7 @@
 
 ---
 
-### M3 — Hủy hoàn 0 không giảm `student.paidAmount` cache
+### M3 - Hủy hoàn 0 không giảm `student.paidAmount` cache
 
 | Mục | Nội dung |
 |-----|----------|
@@ -281,7 +281,7 @@
 
 ---
 
-### M4 — Partial refund không chỉnh enrollment `paid`/`price`
+### M4 - Partial refund không chỉnh enrollment `paid`/`price`
 
 | Mục | Nội dung |
 |-----|----------|
@@ -292,7 +292,7 @@
 
 ---
 
-### M5 — Student Finance Card `paidCashIn` = active enrollment paid, không phải Σ Ledger PAYMENT
+### M5 - Student Finance Card `paidCashIn` = active enrollment paid, không phải Σ Ledger PAYMENT
 
 | Mục | Nội dung |
 |-----|----------|
@@ -304,7 +304,7 @@
 
 ---
 
-### M6 — Discount/Coupon/Adjustment không vào Net/Profit
+### M6 - Discount/Coupon/Adjustment không vào Net/Profit
 
 | Mục | Nội dung |
 |-----|----------|
@@ -315,7 +315,7 @@
 
 ---
 
-### M7 — SePay thiếu `gatewayTxnId` → mất lớp unique webhook event
+### M7 - SePay thiếu `gatewayTxnId` → mất lớp unique webhook event
 
 | Mục | Nội dung |
 |-----|----------|
@@ -326,7 +326,7 @@
 
 ---
 
-### M8 — `maHoaDon` / `maChungTu` bằng `countDocuments()` — race duplicate
+### M8 - `maHoaDon` / `maChungTu` bằng `countDocuments()` - race duplicate
 
 | Mục | Nội dung |
 |-----|----------|
@@ -337,7 +337,7 @@
 
 ---
 
-### M9 — BI cache 90s không invalidate khi `revenue:updated`
+### M9 - BI cache 90s không invalidate khi `revenue:updated`
 
 | Mục | Nội dung |
 |-----|----------|
@@ -348,7 +348,7 @@
 
 ---
 
-### M10 — AdminFinanceTab: strip Ledger + debt/listed enrollment (dual-read)
+### M10 - AdminFinanceTab: strip Ledger + debt/listed enrollment (dual-read)
 
 | Mục | Nội dung |
 |-----|----------|
@@ -359,7 +359,7 @@
 
 ---
 
-### M11 — Frontend stale SWR key `admin_finance` vs `admin_finance_v2`
+### M11 - Frontend stale SWR key `admin_finance` vs `admin_finance_v2`
 
 | Mục | Nội dung |
 |-----|----------|
@@ -370,7 +370,7 @@
 
 ---
 
-### M12 — voidLedgerEntry không atomic (void rồi mới reversal)
+### M12 - voidLedgerEntry không atomic (void rồi mới reversal)
 
 | Mục | Nội dung |
 |-----|----------|
@@ -382,37 +382,37 @@
 
 ## LOW
 
-### L1 — PaymentSession TTL 24h xóa session đã paid
+### L1 - PaymentSession TTL 24h xóa session đã paid
 
 | **Vị trí** | `models/PaymentSession.js` | **Hậu quả** | Mất audit session-only |
 
-### L2 — `settlePayment` amount ≤ 0 silent no-op
+### L2 - `settlePayment` amount ≤ 0 silent no-op
 
 | **Vị trí** | `ledgerService.js` | **Hậu quả** | Caller tưởng đã settle |
 
-### L3 — Invoice stats cộng cả HĐ void
+### L3 - Invoice stats cộng cả HĐ void
 
 | **Vị trí** | `invoiceRoutes.js` `/stats` | **Hậu quả** | KPI invoice (không phải Ledger) lệch |
 
-### L4 — BI `studentsUnpaid` alias = `refundCount`
+### L4 - BI `studentsUnpaid` alias = `refundCount`
 
 | **Vị trí** | `biService.js` | **Hậu quả** | Nhãn KPI gây hiểu nhầm |
 
-### L5 — BI ACL yếu hơn finance (`admin`/`staff` role vs permission)
+### L5 - BI ACL yếu hơn finance (`admin`/`staff` role vs permission)
 
 | **Vị trí** | `biRoutes.js` | **Hậu quả** | Staff xem BI không cần `view_branch_revenue` |
 
-### L6 — Notify dùng `student.price` không phải amount thực thu
+### L6 - Notify dùng `student.price` không phải amount thực thu
 
 | **Vị trí** | pay notify paths | **Hậu quả** | Thông báo sai số |
 
-### L7 — Refund idempotency key gắn `oldPaidAmount`
+### L7 - Refund idempotency key gắn `oldPaidAmount`
 
 | **Vị trí** | `PUT /:id/refund` key | **Hậu quả** | Re-pay rồi hoàn cùng số có thể no-op idempotent sai ngữ cảnh |
 
 ---
 
-# PHẦN B — TÓM TẮT THEO YÊU CẦU
+# PHẦN B - TÓM TẮT THEO YÊU CẦU
 
 ### 1. Bug Critical
 
@@ -481,7 +481,7 @@ H1 Race admin pay · H2 Admin×SePay · H3 Cancel+refund ACL · H4 `/students/st
 | `PUT .../enrollments/:id/pay` | Tương tự non-atomic claim |
 | `POST /invoices` | Không idempotent; set paid side-effect |
 | `POST /webhooks/sepay` session | Claim session OK nhưng không ledger key |
-| `PUT /students/:id/refund` | Key theo amount+oldPaid — yếu khi re-pay |
+| `PUT /students/:id/refund` | Key theo amount+oldPaid - yếu khi re-pay |
 | `PUT teachers/.../pay-*` | Có key Transaction; Ledger salary fail vẫn 200 |
 | Generic `PUT /students/:id` | Không idempotent finance |
 
@@ -521,7 +521,7 @@ H1 Race admin pay · H2 Admin×SePay · H3 Cancel+refund ACL · H4 `/students/st
 
 ---
 
-# PHẦN C — MA TRẬN LUỒNG vs SoT
+# PHẦN C - MA TRẬN LUỒNG vs SoT
 
 | Luồng | Invoice | Ledger | Cache Student/Enr | Atomic? | SoT OK? |
 |-------|---------|--------|-------------------|---------|---------|
@@ -530,17 +530,17 @@ H1 Race admin pay · H2 Admin×SePay · H3 Cancel+refund ACL · H4 `/students/st
 | Enrollment pay | Có | Best-effort | Trước | Không | **Không** |
 | Student refund | Giữ | Best-effort sau | Trước | Không | **Không** |
 | Cancel + refund>0 | Giữ | Best-effort | Cancel trước | Không | **Một phần** |
-| Cancel + refund=0 | — | Không REFUND (đúng giữ tiền) | paid=false | Không | Cache `paidAmount` lệch |
+| Cancel + refund=0 | - | Không REFUND (đúng giữ tiền) | paid=false | Không | Cache `paidAmount` lệch |
 | SePay student | Có | Best-effort | Atomic claim | Claim OK | Ledger fail → **Không** |
 | SePay session | Không | **Không** | Session only | Claim OK | **Không** |
 | Manual Invoice | Có | **Không** | paid=true | Không | **Không** |
-| Teacher salary | — | Best-effort sau Tx | Tx confirmed | Không | **Không** nếu salary fail |
-| BI headline | — | Có | — | — | **Có** |
-| `/students/stats` | — | **Không** | Enrollment | — | **Không** |
+| Teacher salary | - | Best-effort sau Tx | Tx confirmed | Không | **Không** nếu salary fail |
+| BI headline | - | Có | - | - | **Có** |
+| `/students/stats` | - | **Không** | Enrollment | - | **Không** |
 
 ---
 
-# PHẦN D — ƯU TIÊN SỬA (khi được phép code)
+# PHẦN D - ƯU TIÊN SỬA (khi được phép code)
 
 1. **C1–C2–C3–C4** fail-closed + session settle  
 2. **H4 + H5** thống nhất SoT read  

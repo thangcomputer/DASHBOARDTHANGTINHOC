@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Award, BookOpen, Calendar, CheckCircle, CheckCircle2, ChevronRight, ClipboardList, Flame, Gamepad2,
-  PlayCircle, Trophy, Video, XCircle,
+  Award, BookOpen, Calendar, CheckCircle, CheckCircle2, ChevronRight, ClipboardList, Clock, ExternalLink,
+  Flame, Gamepad2, PlayCircle, Trophy, Video, XCircle,
 } from 'lucide-react';
-import LearningGoalCard from './LearningGoalCard';
-import LmsProgressCard from './LmsProgressCard';
+import LmsGoalMergedCard from './LmsGoalMergedCard';
 import LearningLeaderboardCard from './LearningLeaderboardCard';
 import WelcomeHero from '../WelcomeHero';
-import { openClassRoom } from '../classRoom/ClassRoom';
 import { getGradeTextClasses, getGradePillClasses, getGradeLabel } from '../../utils/gradeColors';
 import api from '../../services/api';
 import lessonPracticeApi from '../../services/lessonPracticeApi';
@@ -57,7 +55,7 @@ function deadlineMs(item) {
   return Number.isFinite(t) && t > 0 ? t : Number.MAX_SAFE_INTEGER;
 }
 
-/** Một dòng trong "Việc cần làm hôm nay" — bấm là tới đúng việc. */
+/** Một dòng trong "Việc cần làm hôm nay" - bấm là tới đúng việc. */
 function TaskRow({ icon: Icon, tone, title, sub, cta, onClick }) {
   return (
     <button
@@ -102,13 +100,12 @@ function StudyLogRow({ item }) {
 
   return (
     <div className={`flex items-start gap-2.5 px-3.5 py-3 ${isCancelled || isOverdue ? 'bg-red-50/30' : isPastPending ? 'bg-orange-50/40' : ''}`}>
-      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${
-        isCancelled || isOverdue ? 'bg-red-100 text-red-600'
-          : isPastPending ? 'bg-orange-100 text-orange-700'
-            : isHomework ? 'bg-purple-100 text-purple-600'
-              : isQuiz ? 'bg-amber-100 text-amber-600'
-                : 'bg-emerald-100 text-emerald-600'
-      }`}
+      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${isCancelled || isOverdue ? 'bg-red-100 text-red-600'
+        : isPastPending ? 'bg-orange-100 text-orange-700'
+          : isHomework ? 'bg-purple-100 text-purple-600'
+            : isQuiz ? 'bg-amber-100 text-amber-600'
+              : 'bg-emerald-100 text-emerald-600'
+        }`}
       >
         {isCancelled ? <XCircle size={15} aria-hidden="true" />
           : isPastPending ? <Calendar size={15} aria-hidden="true" />
@@ -134,11 +131,10 @@ function StudyLogRow({ item }) {
           ) : (
             <span className={`text-xs font-extrabold tabular-nums ${getGradeTextClasses(item.grade)}`}>{item.grade} / 10</span>
           )}
-          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-extrabold ${
-            isQuiz
-              ? (isPassed ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-600')
-              : getGradePillClasses(item.grade)
-          }`}
+          <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-extrabold ${isQuiz
+            ? (isPassed ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'border border-red-200 bg-red-50 text-red-600')
+            : getGradePillClasses(item.grade)
+            }`}
           >
             {isQuiz ? (isPassed ? 'ĐẠT' : 'CHƯA ĐẠT') : (getGradeLabel(item.grade) || 'TB')}
           </span>
@@ -175,7 +171,7 @@ export default function StudentOverviewTab({
     let cancelled = false;
     meetClassApi.mine()
       .then((res) => { if (!cancelled) setMeetClasses(res.data || []); })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, []);
 
@@ -235,7 +231,7 @@ export default function StudentOverviewTab({
   }, []);
 
   useEffect(() => {
-    const load = () => dailyPracticeApi.student.overview().then(setPractice).catch(() => {});
+    const load = () => dailyPracticeApi.student.overview().then(setPractice).catch(() => { });
     load();
     window.addEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
     return () => window.removeEventListener(LEARNING_GOAL_CHANGED_EVENT, load);
@@ -263,16 +259,6 @@ export default function StudentOverviewTab({
   const liveMeet = meetCardsPre.find((item) => item.live);
   const isLiveSchedule = Boolean(ongoingSchedule);
   const isLiveMeet = Boolean(liveMeet);
-  const isLive = isLiveSchedule || isLiveMeet;
-  const joinUrl = (
-    ongoingSchedule?.linkHoc
-    || liveMeet?.linkHoc
-    || nextSchedule?.linkHoc
-    || viewStudent?.joinClassUrl
-    || viewStudent?.linkHoc
-    || viewStudent?.online_meeting_url
-    || ''
-  ).trim();
   const sessionRange = nextSchedule
     ? `${nextSchedule.startTime || ''}${nextSchedule.endTime ? `–${nextSchedule.endTime}` : ''}`
     : '';
@@ -286,8 +272,53 @@ export default function StudentOverviewTab({
           ? [{ icon: Calendar, label: `Meet ${meetCardsPre[0].slotLabel} · ${formatDayLabel(meetCardsPre[0].day)}` }]
           : [];
 
-  // ── Khóa học của tôi: một chỗ duy nhất cho tiến độ ────────────────────────
+  // ── Khóa học hiện tại ──────────────────────────────────────────────────
   const currentCourseName = activeCourseName || viewStudent?.course || '';
+
+  // ── Lịch học hôm nay: tổng hợp lịch 1 kèm 1 và lịch Meet hôm nay ────────
+  const todayKey = clockForMeet.day;
+  const today1on1Schedules = useMemo(() => {
+    return (mySchedules || [])
+      .filter((s) => s.status !== 'cancelled' && normalizeScheduleDate(s.date) === todayKey)
+      .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
+  }, [mySchedules, todayKey]);
+
+  const todayMeetClasses = useMemo(() => {
+    return meetCardsPre.filter((item) => item.day === todayKey);
+  }, [meetCardsPre, todayKey]);
+
+  const todayClasses = useMemo(() => {
+    const list = [];
+    today1on1Schedules.forEach((s) => {
+      const live = isScheduleOngoingNow(s);
+      const meetLink = s.linkHoc || s.meetingUrl || viewStudent?.linkHoc || viewStudent?.joinClassUrl || viewStudent?.online_meeting_url || '';
+      list.push({
+        id: s._id || s.id || `1on1-${s.date}-${s.startTime}`,
+        type: '1on1',
+        title: s.title || s.subject || s.content || s.courseName || currentCourseName || 'Buổi học 1 kèm 1',
+        time: s.startTime && s.endTime ? `${s.startTime} – ${s.endTime}` : (s.startTime || 'Trong ngày'),
+        dateLabel: formatDayLabel(s.date) || 'Hôm nay',
+        meetLink: String(meetLink || '').trim(),
+        live,
+        teacher: s.teacherName || s.teacher || viewStudent?.teacher || '',
+      });
+    });
+    todayMeetClasses.forEach((m) => {
+      list.push({
+        id: m.id || `meet-${m.day}-${m.startTime}`,
+        type: 'meet',
+        title: m.title || m.courseName || (m.slotLabel ? `Lớp Google Meet · ${m.slotLabel}` : 'Lớp Google Meet'),
+        time: m.startTime && m.endTime ? `${m.startTime} – ${m.endTime}` : (m.slotLabel || 'Trong ngày'),
+        dateLabel: formatDayLabel(m.day) || 'Hôm nay',
+        meetLink: String(m.linkHoc || '').trim(),
+        live: m.live,
+        teacher: m.teacherName || m.teacher || '',
+      });
+    });
+    return list.sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0));
+  }, [today1on1Schedules, todayMeetClasses, currentCourseName, viewStudent]);
+
+  // ── Khóa học của tôi: một chỗ duy nhất cho tiến độ ────────────────────────
   const videoCourse = (viewStudent?.courseId && videoCourses.byId.get(String(viewStudent.courseId)))
     || videoCourses.byName.get(normalizeCourseName(currentCourseName))
     || null;
@@ -351,7 +382,7 @@ export default function StudentOverviewTab({
       tone: lost ? 'bg-gradient-to-b from-slate-400 to-slate-600' : 'bg-gradient-to-b from-orange-400 to-red-600',
       title: atRisk ? `Giữ chuỗi ${practiceStats.streak} ngày` : lost ? 'Lấy lại chuỗi luyện tập' : 'Luyện tập hằng ngày',
       sub: atRisk ? 'Chuỗi về 0 lúc nửa đêm nếu chưa luyện' : '10 câu · khoảng 5 phút',
-      cta: 'Chơi ngay',
+      cta: 'Làm ngay',
       onClick: () => navigate('/student/daily-practice'),
     });
   }
@@ -366,11 +397,7 @@ export default function StudentOverviewTab({
           role="student"
           name={studentData.name}
           chips={heroChips}
-          joinUrl={isLive ? joinUrl : ''}
-          onJoin={isLiveSchedule && !(ongoingSchedule?.linkHoc || '').trim() && (ongoingSchedule?._id || ongoingSchedule?.id)
-            ? () => openClassRoom(ongoingSchedule._id || ongoingSchedule.id)
-            : undefined}
-          joinHint={(freePortalCourse || studentData?.freePortal === true) && !isLive && !nextSchedule && !meetCards.length ? '' : (isLive && !joinUrl ? 'Chưa có link Meet' : isLive ? '' : nextSchedule ? 'Chưa đến giờ học' : meetCards.length ? 'Chưa đến giờ Meet' : 'Chưa có lịch học')}
+          showJoin={false}
         />
       </header>
 
@@ -399,96 +426,182 @@ export default function StudentOverviewTab({
 
       <div className="cms-sd-page !pt-0 cms-sd-stack lg:!gap-3">
         <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-12 lg:gap-3">
-        {/* Cột trái: khóa học → việc cần làm → hoạt động gần đây */}
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3">
-          {/* Khóa học của tôi */}
-          <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                <BookOpen size={18} className="text-red-600" aria-hidden="true" /> Khóa học của tôi
-              </h3>
-              {enrollments.length > 1 && (
-                <select
-                  value={currentCourseName}
-                  onChange={(e) => setActiveCourseName(e.target.value)}
-                  className="max-w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-red-300"
-                  aria-label="Chọn khóa học"
-                >
-                  {enrollments.map((c) => {
-                    const name = c.courseName || c.name;
-                    return <option key={c.enrollmentId || c.id || name} value={name}>{name}</option>;
-                  })}
-                </select>
-              )}
-            </div>
-            <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
-            {!freePortalCourse && (
-            <div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+          {/* Cột trái: Lịch học hôm nay → khóa học (nếu có) → việc cần làm → hoạt động gần đây */}
+          <div className="flex min-w-0 flex-col gap-4 lg:col-span-7 lg:gap-3">
+            {/* Lịch học hôm nay */}
+            <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                  <Calendar size={18} className="text-red-600" aria-hidden="true" /> Lịch học hôm nay
+                </h3>
+                {todayClasses.some((c) => c.live) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span>Đang diễn ra</span>
+                  </span>
+                )}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-slate-600">
-                <span><span className="text-slate-900">{done}/{total}</span> {unit} · {pct}%</span>
-                <span>Còn {Math.max(0, total - done)} {unit}</span>
-                {viewStudent?.avgGrade != null && viewStudent.avgGrade !== '' && <span>Điểm TB <span className="text-slate-900">{viewStudent.avgGrade}</span>/10</span>}
-                {!isVideoCourse && viewStudent?.teacher && <span className="truncate">GV: {viewStudent.teacher}</span>}
-              </div>
-              {videoCourses.error && <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>}
-            </div>
-            )}
-            {!freePortalCourse && (
-            <button type="button" onClick={courseCta.onClick} className="cms-btn cms-btn-primary self-start">
-              <PlayCircle size={16} aria-hidden="true" /> <span className="max-w-[260px] truncate">{courseCta.label}</span>
-            </button>
-            )}
-          </section>
 
-          {/* Việc cần làm hôm nay — ngay dưới thẻ khóa học */}
-          <section className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-              <CheckCircle2 size={18} className="text-red-600" aria-hidden="true" /> Việc cần làm hôm nay
-            </h3>
-            {tasks.length ? (
-              <div className="grid min-w-0 grid-cols-1 gap-2.5 md:grid-cols-2">
-                {tasks.map(({ key, ...task }) => <TaskRow key={key} {...task} />)}
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
-                <CheckCircle2 size={26} className="shrink-0 text-emerald-500" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-emerald-700">Hôm nay bạn đã hoàn thành hết việc!</p>
-                  <p className="text-xs text-emerald-600">Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ.</p>
+              {todayClasses.length > 0 ? (
+                <div className="space-y-2.5">
+                  {todayClasses.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-3.5 transition-all ${item.live ? 'border-emerald-300 bg-emerald-50/50 shadow-xs' : 'border-slate-200 bg-slate-50/60'
+                        }`}
+                    >
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-sm font-black text-slate-900 truncate">
+                          {item.title}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 font-semibold">
+                          <span className="flex items-center gap-1">
+                            <Clock size={13} className="text-slate-400" />
+                            {item.time}
+                          </span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Calendar size={13} className="text-slate-400" />
+                            {item.dateLabel}
+                          </span>
+                          {item.teacher && (
+                            <>
+                              <span>·</span>
+                              <span className="text-slate-500">GV: {item.teacher}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {item.meetLink ? (
+                          <a
+                            href={item.meetLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-98"
+                          >
+                            <Video size={15} />
+                            <span>Vào lớp Meet</span>
+                            <ExternalLink size={13} />
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                            <Clock size={13} /> Chưa có link Meet
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
-          </section>
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                    <Calendar size={20} />
+                  </div>
+                  <p className="mt-2 text-sm font-bold text-slate-700">Hôm nay không có lịch</p>
+                  {nextSchedule ? (
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      Lịch tới: <strong className="text-slate-800">{nextSchedule.title || nextSchedule.subject || 'Buổi học'}</strong> · {sessionRange} ({formatDayLabel(nextSchedule.date)})
+                    </p>
+                  ) : meetCardsPre[0] ? (
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      Lịch Meet tới: <strong className="text-slate-800">{meetCardsPre[0].title || 'Lớp Meet'}</strong> · {meetCardsPre[0].startTime}–{meetCardsPre[0].endTime} ({formatDayLabel(meetCardsPre[0].day)})
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-400">Bạn có thể tự ôn luyện hoặc làm bài tập hôm nay nhé!</p>
+                  )}
+                </div>
+              )}
+            </section>
 
-          {/* Hoạt động gần đây */}
-          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+            {/* Khóa học của tôi - Ẩn khi là tài khoản miễn phí */}
+            {!freePortalCourse && Boolean(currentCourseName) && (
+              <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                    <BookOpen size={18} className="text-red-600" aria-hidden="true" /> Khóa học của tôi
+                  </h3>
+                  {enrollments.length > 1 && (
+                    <select
+                      value={currentCourseName}
+                      onChange={(e) => setActiveCourseName(e.target.value)}
+                      className="max-w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-red-300"
+                      aria-label="Chọn khóa học"
+                    >
+                      {enrollments.map((c) => {
+                        const name = c.courseName || c.name;
+                        return <option key={c.enrollmentId || c.id || name} value={name}>{name}</option>;
+                      })}
+                    </select>
+                  )}
+                </div>
+                <p className="line-clamp-2 text-base font-black text-slate-800">{currentCourseName || 'Chưa có khóa học'}</p>
+                <div>
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-slate-600">
+                    <span><span className="text-slate-900">{done}/{total}</span> {unit} · {pct}%</span>
+                    <span>Còn {Math.max(0, total - done)} {unit}</span>
+                    {viewStudent?.avgGrade != null && viewStudent.avgGrade !== '' && <span>Điểm TB <span className="text-slate-900">{viewStudent.avgGrade}</span>/10</span>}
+                    {!isVideoCourse && viewStudent?.teacher && <span className="truncate">GV: {viewStudent.teacher}</span>}
+                  </div>
+                  {videoCourses.error && <p className="mt-1 text-xs font-semibold text-amber-700">Không đồng bộ được tiến độ bài học: {videoCourses.error}</p>}
+                </div>
+                <button type="button" onClick={courseCta.onClick} className="cms-btn cms-btn-primary self-start">
+                  <PlayCircle size={16} aria-hidden="true" /> <span className="max-w-[260px] truncate">{courseCta.label}</span>
+                </button>
+              </section>
+            )}
+
+            {/* Việc cần làm hôm nay - ngay dưới thẻ khóa học */}
+            <section className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
-                <ClipboardList size={18} className="text-emerald-500" aria-hidden="true" /> Hoạt động gần đây
+                <CheckCircle2 size={18} className="text-red-600" aria-hidden="true" /> Việc cần làm hôm nay
               </h3>
-              <button type="button" onClick={() => navigate('/student#schedule')} className="flex items-center gap-0.5 text-xs font-black text-red-600 !shadow-none">
-                Xem nhật ký đầy đủ <ChevronRight size={14} aria-hidden="true" />
-              </button>
-            </div>
-            {recentActivity.length ? (
-              <div className="divide-y divide-slate-100">
-                {recentActivity.map((item, idx) => <StudyLogRow key={`${item.type}-${item.date}-${idx}`} item={item} />)}
-              </div>
-            ) : (
-              <p className="px-4 py-8 text-center text-xs font-semibold text-slate-400">Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</p>
-            )}
-          </section>
-        </div>
+              {tasks.length ? (
+                <div className="grid min-w-0 grid-cols-1 gap-2.5 md:grid-cols-2">
+                  {tasks.map(({ key, ...task }) => <TaskRow key={key} {...task} />)}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                  <CheckCircle2 size={26} className="shrink-0 text-emerald-500" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-emerald-700">Hôm nay bạn đã hoàn thành hết việc!</p>
+                    <p className="text-xs text-emerald-600">Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ.</p>
+                  </div>
+                </div>
+              )}
+            </section>
 
-        {/* Cột phải: mục tiêu + bảng xếp hạng, nằm ngay đầu trang */}
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3">
-          <LmsProgressCard />
-          <LearningGoalCard />
-          <LearningLeaderboardCard />
-        </div>
+            {/* Hoạt động gần đây - Đã ẩn trên Web và Mobile theo yêu cầu */}
+            {false && (
+              <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                  <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                    <ClipboardList size={18} className="text-emerald-500" aria-hidden="true" /> Hoạt động gần đây
+                  </h3>
+                  <button type="button" onClick={() => navigate('/student#schedule')} className="flex items-center gap-0.5 text-xs font-black text-red-600 !shadow-none">
+                    Xem nhật ký đầy đủ <ChevronRight size={14} aria-hidden="true" />
+                  </button>
+                </div>
+                {recentActivity.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {recentActivity.map((item, idx) => <StudyLogRow key={`${item.type}-${item.date}-${idx}`} item={item} />)}
+                  </div>
+                ) : (
+                  <p className="px-4 py-8 text-center text-xs font-semibold text-slate-400">Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</p>
+                )}
+              </section>
+            )}
+          </div>
+
+          {/* Cột phải: mục tiêu + bảng xếp hạng, nằm ngay đầu trang */}
+          <div className="flex min-w-0 flex-col gap-4 lg:col-span-5 lg:gap-3">
+            <LmsGoalMergedCard />
+            <LearningLeaderboardCard />
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 /**
- * LoadingScreen.jsx — 4 kiểu loading screen toàn màn hình
+ * LoadingScreen.jsx - 4 kiểu loading screen toàn màn hình
  * Được render bọc App khi khởi tạo, tuỳ vào loadingStyle từ API.
  */
 import { useEffect, useState } from 'react';
@@ -21,7 +21,7 @@ export default function LoadingScreen({ onReady }) {
           setLogoUrl(res.data.logoUrl || '');
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         setTimeout(() => {
           setShow(false);
@@ -113,8 +113,8 @@ export default function LoadingScreen({ onReady }) {
           </div>
           <p className="text-indigo-300 text-sm font-medium tracking-wider">Thắng Tin Học</p>
           <div className="flex gap-1">
-            {[0,1,2].map(i => (
-              <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i*0.15}s` }} />
+            {[0, 1, 2].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
             ))}
           </div>
         </div>

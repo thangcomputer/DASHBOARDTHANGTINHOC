@@ -25,7 +25,7 @@ function buildSubject({ user, actorDoc, userBranchId }) {
   };
 }
 
-/** Mirrors isAdmin — JWT role admin OR staff. */
+/** Mirrors isAdmin - JWT role admin OR staff. */
 function evaluateIsAdmin(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };

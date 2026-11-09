@@ -1,5 +1,5 @@
 /**
- * Phase 7.3 — Controlled Policy-primary cutover prep/verification for /api/backups ONLY.
+ * Phase 7.3 - Controlled Policy-primary cutover prep/verification for /api/backups ONLY.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -33,10 +33,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -162,7 +162,7 @@ test('Phase7.3 authority: OFF / missing allowlist / monitoring-only / malformed 
 
 // ── Role parity (all actions) ────────────────────────────────────────────────
 
-test('Phase7.3 roles: SUPER ALLOW; HIGH/STAFF/SUPPORT/teacher/student/missing DENY — all actions MATCH', () => {
+test('Phase7.3 roles: SUPER ALLOW; HIGH/STAFF/SUPPORT/teacher/student/missing DENY - all actions MATCH', () => {
   const roles = [
     [{ id: 'admin', role: 'admin', adminRole: 'SUPER_ADMIN' }, 'ALLOW'],
     [{ role: 'admin', adminRole: 'SUPER_ADMIN' }, 'ALLOW'],

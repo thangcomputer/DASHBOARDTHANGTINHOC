@@ -1,6 +1,6 @@
 /**
  * Policy shadow evaluator for GET /api/quizzes/admin/all.
- * READ-ONLY decision — does not authorize HTTP.
+ * READ-ONLY decision - does not authorize HTTP.
  *
  * Reproduces live legacy rules:
  * - checkPermission(MANAGE_TRAINING)
@@ -118,7 +118,7 @@ function evaluateLegacyQuizAdminRead(subject) {
 }
 
 /**
- * Policy shadow — must MATCH evaluateLegacyQuizAdminRead.
+ * Policy shadow - must MATCH evaluateLegacyQuizAdminRead.
  * Ignores untrusted client branch/tenant/role hints.
  */
 function evaluatePolicyQuizAdminRead(subject, _untrusted = {}) {

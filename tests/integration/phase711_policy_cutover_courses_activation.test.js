@@ -1,5 +1,5 @@
 /**
- * Phase 7.11 — Controlled cutover + production activation for /api/courses
+ * Phase 7.11 - Controlled cutover + production activation for /api/courses
  *
  * Reads: PUBLIC (list/get/stats). Writes: auth + internal token + SYSTEM_SETTINGS.
  * No branch/tenant HTTP authz. Ownership none. Mass-assignment preserved in handlers.
@@ -58,10 +58,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
     tokenAudience: opts.tokenAudience !== undefined ? opts.tokenAudience : 'internal',
   });
@@ -222,7 +222,7 @@ test('Phase7.11 internal token required for writes; public token DENY', () => {
   assert.equal(legacy.reason, 'internal_token_required');
 });
 
-test('Phase7.11 branch/tenant are data filters only — not HTTP authz on courses', () => {
+test('Phase7.11 branch/tenant are data filters only - not HTTP authz on courses', () => {
   const ok = sub({
     role: 'staff',
     permissions: [PERMISSIONS.SYSTEM_SETTINGS],
@@ -392,16 +392,16 @@ test('Phase7.11 rollback: remove courses → LEGACY; prior families stay POLICY;
   const parsed = parseDotEnvFile();
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('courses'));
-      assert.ok(restoredRoutes.includes('builder'));
-      assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('courses'));
+    assert.ok(restoredRoutes.includes('builder'));
+    assert.ok(restoredRoutes.includes('backups'));
   }
 });
 
 test('Phase7.11 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'training', 'quizzes', 'assignments', 'evaluations',  'proctor',
+    'training', 'quizzes', 'assignments', 'evaluations', 'proctor',
     'files', 'blog', 'feed', 'schedules', 'messages', 'notifications',
   ];
   for (const fam of legacyFamilies) {
@@ -418,8 +418,8 @@ test('Phase7.11 functional smoke: list/get/stats authz PASS; mutations NOT EXECU
     assert.equal(parity(action, anon).policy.decision, 'ALLOW');
   }
   assert.equal(
-    'NOT EXECUTED — create/update/price/delete/restore/seed production mutation',
-    'NOT EXECUTED — create/update/price/delete/restore/seed production mutation',
+    'NOT EXECUTED - create/update/price/delete/restore/seed production mutation',
+    'NOT EXECUTED - create/update/price/delete/restore/seed production mutation',
   );
   assert.ok(ACTIONS.has('seed'));
   assert.ok(WRITE_ACTIONS.has('delete'));
@@ -436,7 +436,7 @@ test('Phase7.11 static final authority + CQRS OFF + only courses uses gate', () 
   if (env) assert.ok(/POLICY_CUTOVER_ROUTES\s*=\s*backups,monitoring,tenants,system-logs,ai,workflows,builder,courses(,training(,training-lms(,branches(,notifications(,blog(,feed(,files(,settings(,messages(,schedules(,quizzes(,assignments(,proctor(,evaluations(,bi(,analytics(,staff(,employees(,exam-results(,teachers)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?\s*$/m.test(env));
   if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 
   assert.ok(gate.includes("getAuthorizationAuthority('courses')"));
   assert.ok(gate.includes('legacyCourseGate'));

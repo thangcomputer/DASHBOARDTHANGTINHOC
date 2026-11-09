@@ -1,5 +1,5 @@
 /**
- * Wave 6.1 — Policy shadow soak matrix + CQRS config freeze.
+ * Wave 6.1 - Policy shadow soak matrix + CQRS config freeze.
  * READ-ONLY validation. Policy remains shadow-only; CQRS must stay OFF.
  */
 const test = require('node:test');
@@ -263,7 +263,7 @@ for (const c of BRANCH_CASES) {
 
 // ── Client spoof matrix ──────────────────────────────────────────────────────
 
-test('Wave6.1 spoof: body/query/params/tenant hints ignored — cross-branch still DENY MATCH', () => {
+test('Wave6.1 spoof: body/query/params/tenant hints ignored - cross-branch still DENY MATCH', () => {
   const subject = subjectOf({
     permissions: [PERMISSIONS.MANAGE_TEACHERS],
     userBranchId: BRANCH_A,
@@ -308,7 +308,7 @@ test('Wave6.1 resource: missing teacher → MATCH DENY (branch layer)', () => {
   assert.equal(legacy.reason, 'teacher_not_found');
 });
 
-test('Wave6.1 resource: teacher Branch A / B / null — MATCH legacy', () => {
+test('Wave6.1 resource: teacher Branch A / B / null - MATCH legacy', () => {
   const subject = subjectOf({
     permissions: [PERMISSIONS.MANAGE_TEACHERS],
     userBranchId: BRANCH_A,
@@ -318,7 +318,7 @@ test('Wave6.1 resource: teacher Branch A / B / null — MATCH legacy', () => {
   assert.equal(assertMatch('null', subject, { branchId: null }).legacy.decision, 'ALLOW');
 });
 
-test('Wave6.1 resource: client input alone cannot authorize — needs MANAGE_TEACHERS', () => {
+test('Wave6.1 resource: client input alone cannot authorize - needs MANAGE_TEACHERS', () => {
   const subject = subjectOf({
     permissions: [PERMISSIONS.VIEW_TEACHERS],
     userBranchId: BRANCH_A,
@@ -562,7 +562,7 @@ test('Wave6.1 config: production validateEnv forces CQRS off without ALLOW opt-i
     delete process.env.MASTER_ADMIN_PASSWORD;
     delete process.env.ALLOW_CQRS_IN_PRODUCTION;
     const originalError = console.error;
-    console.error = () => {};
+    console.error = () => { };
     try {
       validateEnv();
     } finally {

@@ -38,7 +38,7 @@ async function main() {
     const loginOk = r.status === 200 && j.success && (!!token || j.mfaRequired || j.data?.mfaRequired);
     ok('POST /auth/login (admin)', loginOk, 'status=' + r.status + (j.mfaRequired ? ' mfaRequired' : ''));
     if (!token && (j.mfaRequired || j.data?.mfaRequired)) {
-      // MFA bật — không có access token; các GET phía dưới sẽ skip auth checks
+      // MFA bật - không có access token; các GET phía dưới sẽ skip auth checks
       token = null;
     }
   } catch (e) {
@@ -63,7 +63,7 @@ async function main() {
       const r = await fetch(BASE + path, { headers: h });
       const t = await r.text();
       let j = null;
-      try { j = JSON.parse(t); } catch (_) {}
+      try { j = JSON.parse(t); } catch (_) { }
       const pass = r.status >= 200 && r.status < 400;
       ok(name || ('GET ' + path), pass, 'status=' + r.status + (j && j.success === false ? ' msg=' + (j.message || '') : ''));
       return { r, j };

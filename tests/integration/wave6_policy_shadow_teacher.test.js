@@ -1,5 +1,5 @@
 /**
- * Wave 6 — Policy SHADOW for teacher score/approve/reject.
+ * Wave 6 - Policy SHADOW for teacher score/approve/reject.
  * Asserts MATCH with legacy; never fail-open.
  */
 const test = require('node:test');
@@ -212,7 +212,7 @@ test('Shadow: hardcoded admin id → MATCH ALLOW', () => {
 
 // ── Spoofing ─────────────────────────────────────────────────────────────────
 
-test('Shadow: spoofed body/query branchId ignored — still DENY cross-branch', () => {
+test('Shadow: spoofed body/query branchId ignored - still DENY cross-branch', () => {
   const subject = staffSubject();
   const resource = { branchId: BRANCH_B };
   const policy = evaluatePolicyTeacherWrite(subject, resource, 'score', {
@@ -246,7 +246,7 @@ test('Shadow: Policy evaluation throw → comparison ERROR; legacy decision stil
     comparison = 'ERROR';
   }
   assert.equal(comparison, 'ERROR');
-  // Legacy still ALLOW — would authorize HTTP; policy error must not flip to open without legacy
+  // Legacy still ALLOW - would authorize HTTP; policy error must not flip to open without legacy
   assert.equal(legacy.decision, 'ALLOW');
 });
 

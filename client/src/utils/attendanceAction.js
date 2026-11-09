@@ -1,13 +1,13 @@
 /**
- * Single FE resolver — mirrors services/attendanceWindow.js (grace 60m default).
+ * Single FE resolver - mirrors services/attendanceWindow.js (grace 60m default).
  */
 
 export const ATTENDANCE_GRACE_MINUTES = Number(
   import.meta.env?.VITE_ATTENDANCE_GRACE_MINUTES
-    || import.meta.env?.VITE_ATTENDANCE_LATE_GRACE_MINUTES,
+  || import.meta.env?.VITE_ATTENDANCE_LATE_GRACE_MINUTES,
 ) || 60;
 
-/** Khớp services/attendanceWindow.js — GV bấm điểm danh sau giờ học + 15 phút. */
+/** Khớp services/attendanceWindow.js - GV bấm điểm danh sau giờ học + 15 phút. */
 export const ATTENDANCE_UNLOCK_DELAY_MINUTES = 15;
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -127,7 +127,7 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
       canAdminMakeup: false,
       canRequestCorrection: false,
       reason: t < startAt.getTime()
-        ? 'Chưa đến giờ học — điểm danh sau 15 phút kể từ giờ bắt đầu'
+        ? 'Chưa đến giờ học - điểm danh sau 15 phút kể từ giờ bắt đầu'
         : 'Điểm danh sau 15 phút kể từ giờ bắt đầu buổi học',
       remainingGraceMs: 0,
       startAt,
@@ -160,7 +160,7 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
       canLateAttend: true,
       canAdminMakeup: false,
       canRequestCorrection: false,
-      reason: 'Buổi học đã kết thúc — còn hạn điểm danh',
+      reason: 'Buổi học đã kết thúc - còn hạn điểm danh',
       remainingGraceMs: Math.max(0, graceEndAt.getTime() - t),
       endAt,
       graceEndAt,
@@ -174,7 +174,7 @@ export function getAttendanceAction(schedule, _attendance, now = new Date()) {
     canLateAttend: false,
     canAdminMakeup: true,
     canRequestCorrection: true,
-    reason: 'Đã quá thời gian điểm danh — cần Admin điểm danh bù',
+    reason: 'Đã quá thời gian điểm danh - cần Admin điểm danh bù',
     remainingGraceMs: 0,
     endAt,
     graceEndAt,

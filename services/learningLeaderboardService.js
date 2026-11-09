@@ -30,12 +30,13 @@ function vnWeek(now = new Date()) {
   };
 }
 
-/** "Nguyễn Văn An" → "Nguyễn V. An" — đủ nhận ra nhau mà không lộ họ tên đầy đủ. */
+/** "Nguyễn Văn An" → "Nguyễn V. An" - đủ nhận ra nhau mà không lộ họ tên đầy đủ. */
 function shortName(fullName) {
   const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length <= 2) return parts.join(' ') || 'Học viên';
   const middle = parts.slice(1, -1).map((part) => `${part[0].toUpperCase()}.`).join(' ');
-  return `${parts[0]} ${middle} ${parts[parts.length - 1]}`;
+  return `${parts[0]} ${middle} ${parts[parts.length - 1]
+    } `;
 }
 
 function scoreRow(goal, logs) {
@@ -66,7 +67,7 @@ async function weekGoals(week, filter = {}) {
     .lean();
 }
 
-/** XP luyện tập hằng ngày trong tuần — hiển thị kèm, không dùng để xếp hạng. */
+/** XP luyện tập hằng ngày trong tuần - hiển thị kèm, không dùng để xếp hạng. */
 async function weekXp(week, studentIds) {
   if (!studentIds.length) return new Map();
   const dailyPracticeService = require('./dailyPracticeService');

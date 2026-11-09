@@ -20,7 +20,7 @@ function storageKey(userId) {
   return `${LOGIN_ALERT_STORAGE_PREFIX}_v2_${userId}`;
 }
 
-/** Logout dùng localStorage.clear() — giữ lại cờ đã xem popup. */
+/** Logout dùng localStorage.clear() - giữ lại cờ đã xem popup. */
 export function snapshotLoginAlertStorage() {
   const out = {};
   try {
@@ -215,7 +215,7 @@ export default function LoginInboxAlertPopup({ role, userId, adminRole = '', blo
       if (!skipMsgSync && typeof syncRef.current === 'function') {
         try { await syncRef.current(userId); } catch { /* ignore */ }
       }
-      // Đợi React cập nhật messages — tránh đếm nhầm lời chào AI.
+      // Đợi React cập nhật messages - tránh đếm nhầm lời chào AI.
       await new Promise((r) => setTimeout(r, 400));
       if (cancelled) return;
       let unread = readUnread();

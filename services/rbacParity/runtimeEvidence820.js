@@ -1,5 +1,5 @@
 /**
- * Phase 8.20 — Controlled RUNTIME evidence collection pipeline (NON-AUTHORITATIVE).
+ * Phase 8.20 - Controlled RUNTIME evidence collection pipeline (NON-AUTHORITATIVE).
  *
  * Does NOT enable feature flags.
  * Does NOT promote Enterprise.
@@ -253,7 +253,7 @@ function evaluateRuntimeEvidenceCollection(opts = {}) {
     },
     note: (
       'hookEvents may count observe+dual-check hooks per HTTP call. '
-      + 'uniqueRuntimeRequests uses correlation/request IDs only — never invented. '
+      + 'uniqueRuntimeRequests uses correlation/request IDs only - never invented. '
       + 'ENTERPRISE_PRIMARY_READY remains NO in Phase 8.20.'
     ),
   };

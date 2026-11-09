@@ -1,4 +1,4 @@
-# AVATAR_GENDER_SYNC — 2026-08-11
+# AVATAR_GENDER_SYNC - 2026-08-11
 
 Phase: **AVATAR-GENDER-SYNC-1**  
 Mode: Implementation + Test + Report  
@@ -27,9 +27,9 @@ Scope: Avatar / Gender consistency only
 - `client/src/components/teacher/TeacherStudentCard.jsx`
 - `client/src/components/teacher/TeacherStudentsTab.jsx`
 - `client/src/components/teacher/TeacherOverviewTab.jsx`
-- `client/src/components/admin/tabs/AdminStudentsTab.jsx` (đã truyền gender — giữ)
+- `client/src/components/admin/tabs/AdminStudentsTab.jsx` (đã truyền gender - giữ)
 - `client/src/components/admin/tabs/AdminTeachersTab.jsx`
-- `client/src/components/StudentDetailModal.jsx` (đã truyền gender — giữ)
+- `client/src/components/StudentDetailModal.jsx` (đã truyền gender - giữ)
 - `client/src/components/FloatingMessenger.jsx` / `Inbox.jsx` / `StaffManagementTab.jsx` / `FeedBoard.jsx`
 - `client/src/context/useDataMessaging.js` / `FloatingMessengerContext.jsx`
 - `services/messagingContactsService.js` (CONTACT_SELECT đã có `gender`)
@@ -136,7 +136,7 @@ Admin Students + Student Detail: giữ wiring cũ (đã đúng).
 
 ## 11. Messaging metadata
 
-- `messagingContactsService` **đã** select + map `gender` — không đổi discover/permission.
+- `messagingContactsService` **đã** select + map `gender` - không đổi discover/permission.
 - FE `resolveAvatarUrl(user)` đọc `user.gender` khi contacts/conversation đã có.
 - Không đổi pairing / send matrix / socket.
 
@@ -173,7 +173,7 @@ phase822_messaging_identity_lock (defaultAvatars STAFF-before-admin)
 → PASS
 
 phase821 test L notifyUser ALL_STAFF
-→ FAIL (pre-existing, ngoài scope avatar — REPORT ONLY)
+→ FAIL (pre-existing, ngoài scope avatar - REPORT ONLY)
 ```
 
 ---
@@ -192,10 +192,10 @@ phase821 test L notifyUser ALL_STAFF
 
 ## 17. Out-of-scope / REPORT ONLY
 
-- Art pack male/female PNG riêng (chưa có) — mapping tạm trung tính theo role.
-- `DataContext.updateUserAvatar` ghi `thvp_user` (có thể lệch role session) — bug cũ, không sửa trong phase này.
-- Import student CSV vẫn default gender → male khi thiếu (`studentRoutes` import) — không đụng.
-- Phase 821 test L `notifyUser` — unrelated.
+- Art pack male/female PNG riêng (chưa có) - mapping tạm trung tính theo role.
+- `DataContext.updateUserAvatar` ghi `thvp_user` (có thể lệch role session) - bug cũ, không sửa trong phase này.
+- Import student CSV vẫn default gender → male khi thiếu (`studentRoutes` import) - không đụng.
+- Phase 821 test L `notifyUser` - unrelated.
 
 ---
 

@@ -1,4 +1,4 @@
-# Mapper Boundary Review — Sprint 4.4 Batch 3
+# Mapper Boundary Review - Sprint 4.4 Batch 3
 
 ## Compliance
 - Mappers successfully generated for transactional domains.

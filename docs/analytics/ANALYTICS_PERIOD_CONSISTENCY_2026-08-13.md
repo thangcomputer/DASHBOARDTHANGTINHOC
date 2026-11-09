@@ -64,7 +64,7 @@ node --test tests/unit/analytics_revenue_sot.test.js
 
 ## Residual
 
-- Enrollment `totalFee` vẫn có thể ≠ Ledger KPI trong cùng kỳ (khác SoT) — đúng by design.
+- Enrollment `totalFee` vẫn có thể ≠ Ledger KPI trong cùng kỳ (khác SoT) - đúng by design.
 - `/analytics/branches` vẫn all-time; không dùng trong báo cáo theo kỳ này.
 
 ## Verdict

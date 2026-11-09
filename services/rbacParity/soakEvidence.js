@@ -1,9 +1,9 @@
 /**
- * Phase 8.13 — Soak evidence channels (NON-AUTHORITATIVE).
+ * Phase 8.13 - Soak evidence channels (NON-AUTHORITATIVE).
  *
  * STATIC / SYNTHETIC / RUNTIME are NEVER mixed into one readiness number.
  * Production-like soak requires RUNTIME traffic with flags enabled in a real process.
- * Test harness must tag SYNTHETIC (forced) or RUNTIME_HARNESS via opts — never claim
+ * Test harness must tag SYNTHETIC (forced) or RUNTIME_HARNESS via opts - never claim
  * production soak from tests alone.
  */
 const { PERMISSIONS: LIVE } = require('../../constants/permissions');
@@ -118,7 +118,7 @@ function recordSoakObservation({
 
 /**
  * Static catalog gate parity (not request traffic).
- * Canonical staff actors — MATCH count for mapped gates; UNSUPPORTED for legacy-only.
+ * Canonical staff actors - MATCH count for mapped gates; UNSUPPORTED for legacy-only.
  */
 function computeAndRecordStaticParity() {
   // Reset STATIC bucket only
@@ -304,7 +304,7 @@ function isSoakWindowActive(env = process.env) {
   return window === 'true' || window === '1' || window === 'yes' || window === 'on';
 }
 
-/** Phase 8.20C aliases — same implementation, no duplicate logic. */
+/** Phase 8.20C aliases - same implementation, no duplicate logic. */
 const snapshotRuntimeEvidence = snapshotSoakWindow;
 const deltaRuntimeEvidence = deltaSoakWindow;
 

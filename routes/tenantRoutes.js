@@ -7,7 +7,7 @@ const tenantService = require('../services/tenantService');
 const Branch = require('../models/Branch');
 
 /**
- * Phase 7.6 — Controlled cutover for /api/tenants ONLY.
+ * Phase 7.6 - Controlled cutover for /api/tenants ONLY.
  *
  * Default / not allowlisted:
  *   auth → policyShadowTenant → Legacy isSuperAdmin (via tenantsCutoverGate) → handler

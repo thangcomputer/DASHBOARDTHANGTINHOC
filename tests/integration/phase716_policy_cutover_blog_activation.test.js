@@ -1,5 +1,5 @@
 /**
- * Phase 7.16 — Controlled cutover + production activation for /api/blog
+ * Phase 7.16 - Controlled cutover + production activation for /api/blog
  *
  * LIVE: router.use(auth); list auth-only + audience data filter;
  * get audience/draft HTTP 403; manage_* → MANAGE_BLOG.
@@ -63,10 +63,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -364,7 +364,7 @@ test('Phase7.16 rollback: remove blog → LEGACY; prior stay POLICY; restore →
 test('Phase7.16 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations', 
+    'employees', 'exam-results', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'files', 'feed', 'schedules', 'messages', 'settings',
   ];
   for (const fam of legacyFamilies) {
@@ -432,8 +432,8 @@ test('Phase7.16 functional smoke: list/get authz; mutations NOT EXECUTED', () =>
   const student = sub({ id: 's1', role: 'student' });
   assert.equal(parity('list', student).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/update/publish/hide/delete/upload production mutation',
-    'NOT EXECUTED — create/update/publish/hide/delete/upload production mutation',
+    'NOT EXECUTED - create/update/publish/hide/delete/upload production mutation',
+    'NOT EXECUTED - create/update/publish/hide/delete/upload production mutation',
   );
   assert.ok(MANAGE_ACTIONS.has('manage_publish'));
 });

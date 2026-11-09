@@ -1,5 +1,5 @@
 /**
- * Local fullstack QA — doanh thu vào/ra + hủy khóa.
+ * Local fullstack QA - doanh thu vào/ra + hủy khóa.
  * Usage: node scripts/_qa_local_finance_revenue_flow.cjs
  */
 require('dotenv').config();
@@ -14,7 +14,7 @@ const results = [];
 
 function ok(id, name, pass, actual) {
   results.push({ id, name, pass: !!pass, actual: String(actual) });
-  console.log(`${pass ? '✅ PASS' : '❌ FAIL'}  ${id} — ${name}`);
+  console.log(`${pass ? '✅ PASS' : '❌ FAIL'}  ${id} - ${name}`);
   console.log(`         ${actual}`);
 }
 
@@ -136,8 +136,8 @@ async function main() {
   card = await getStudentFinanceCard(sid);
   ok('IN-07', 'Card sau 2 khóa: registered=A+B, paid=A+B, net=A+B',
     card.registeredFee === PRICE_A + PRICE_B
-      && card.paidCashIn === PRICE_A + PRICE_B
-      && card.netCollected === PRICE_A + PRICE_B,
+    && card.paidCashIn === PRICE_A + PRICE_B
+    && card.netCollected === PRICE_A + PRICE_B,
     `reg=${card.registeredFee} paid=${card.paidCashIn} net=${card.netCollected}`);
 
   const netAfterIn = (await sumFinancialRevenue({ studentId: sid })).net;
@@ -171,8 +171,8 @@ async function main() {
 
   ok('OUT-08', 'Card: Đã TT = B, active=B, net=B',
     card.paidCashIn === PRICE_B
-      && card.activeCourseValue === PRICE_B
-      && card.netCollected === PRICE_B,
+    && card.activeCourseValue === PRICE_B
+    && card.netCollected === PRICE_B,
     `paidCashIn=${card.paidCashIn} active=${card.activeCourseValue} net=${card.netCollected}`);
 
   // ─── 4) Hủy khóa B, hoàn = 0 → net KHÔNG tụt thêm ─────────────────────────
@@ -202,9 +202,9 @@ async function main() {
 
   ok('OUT-01', 'Hủy B hoàn 0 → cancelled, paid=false, refunded=0',
     cancelB0.status === 200
-      && enrBAfter?.status === 'cancelled'
-      && enrBAfter?.paid === false
-      && Number(enrBAfter?.refundedAmount || 0) === 0,
+    && enrBAfter?.status === 'cancelled'
+    && enrBAfter?.paid === false
+    && Number(enrBAfter?.refundedAmount || 0) === 0,
     `api=${cancelB0.status} status=${enrBAfter?.status} paid=${enrBAfter?.paid} refunded=${enrBAfter?.refundedAmount}`);
 
   ok('OUT-02', 'Hủy không hoàn → không thêm REFUND (vẫn 1 dòng hoàn A)',
@@ -251,8 +251,8 @@ async function main() {
 
   ok('RE-04', 'Card: Đã TT = A (khóa đăng ký lại); net = A+B; còn đóng = giá C chưa thu',
     card.paidCashIn === PRICE_A
-      && card.netCollected === PRICE_A + PRICE_B
-      && card.outstanding === 100000,
+    && card.netCollected === PRICE_A + PRICE_B
+    && card.outstanding === 100000,
     `paidCashIn=${card.paidCashIn} net=${card.netCollected} outstanding=${card.outstanding} active=${card.activeCourseValue}`);
 
   // ─── 5) Double-cancel A ──────────────────────────────────────────────────

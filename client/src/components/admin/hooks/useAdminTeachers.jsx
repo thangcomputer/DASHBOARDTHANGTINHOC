@@ -252,7 +252,7 @@ export function useAdminTeachers({
           ? ` (gồm thưởng sao ${Number(starBonusAmount).toLocaleString('vi-VN')}đ)`
           : '';
         toast.success(
-          `Thanh toán ${paidSessions || 0} buổi — ${Number(totalAmount).toLocaleString('vi-VN')}đ`
+          `Thanh toán ${paidSessions || 0} buổi - ${Number(totalAmount).toLocaleString('vi-VN')}đ`
           + ` cho ${payoutModal.teacherName}${bonusPart}`
         );
         setPayoutModal(null);
@@ -280,7 +280,7 @@ export function useAdminTeachers({
 
   const markFileReviewed = async (id) => {
     try {
-      // Chỉ đánh dấu đã xem — kích hoạt giảng dạy qua bước "Cấp quyền giảng dạy"
+      // Chỉ đánh dấu đã xem - kích hoạt giảng dạy qua bước "Cấp quyền giảng dạy"
       await api.teachers.reviewPractical(id);
       toast.success('Đã kiểm tra bài thực hành. Tiếp theo: Cấp quyền giảng dạy.');
       fetchTeachers();
@@ -324,7 +324,7 @@ export function useAdminTeachers({
           `Đã nhập ${normalized.length} câu cho phần đã chọn (thay thế câu cũ cùng phần).${skipped ? ` (${skipped} dòng trống)` : ''}`,
         );
         if (errors.length) {
-          toast.error(`${errors.length} dòng lỗi: ${errors.slice(0, 2).join(' — ')}${errors.length > 2 ? '…' : ''}`);
+          toast.error(`${errors.length} dòng lỗi: ${errors.slice(0, 2).join(' - ')}${errors.length > 2 ? '…' : ''}`);
         }
       } catch {
         toast.error('Không đọc được file. Dùng mẫu .XLSX Giảng viên và thử lại.');

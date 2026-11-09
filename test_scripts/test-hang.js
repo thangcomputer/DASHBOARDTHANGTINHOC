@@ -9,12 +9,12 @@ async function test() {
   const student = await Student.findOne({ email: 'student@test.com' });
   console.log('Found student:', student._id);
   const doc = student.toObject();
-  
+
   console.log('Calling applyEnrollmentStats...');
   const start = Date.now();
   await applyEnrollmentStats(doc, student._id.toString(), Schedule);
   console.log('Done in', Date.now() - start, 'ms');
-  
+
   process.exit(0);
 }
 

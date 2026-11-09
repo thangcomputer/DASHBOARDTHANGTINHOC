@@ -89,7 +89,7 @@ export default function AdminMeetClassTab() {
 
   const addStudent = (student) => {
     if (student?.freePortal !== true) {
-      toast.error(`${student.name || 'Học viên'} không phải tài khoản miễn phí — không dùng gói Meet online`);
+      toast.error(`${student.name || 'Học viên'} không phải tài khoản miễn phí - không dùng gói Meet online`);
       return;
     }
     const sub = student?.subscription;
@@ -162,7 +162,7 @@ export default function AdminMeetClassTab() {
         <h2 className="mb-1 flex items-center gap-2 text-base font-black text-slate-900">
           <Video size={18} className="text-red-600" /> Xếp lịch Meet
         </h2>
-        <p className="mb-4 text-sm font-semibold text-slate-500">Dán link Google Meet. Chỉ tài khoản miễn phí đã mua gói Meet — không gồm học viên đăng ký khóa học truyền thống.</p>
+        <p className="mb-4 text-sm font-semibold text-slate-500">Dán link Google Meet. Chỉ tài khoản miễn phí đã mua gói Meet - không gồm học viên đăng ký khóa học truyền thống.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs font-bold text-slate-600">
             Ngày

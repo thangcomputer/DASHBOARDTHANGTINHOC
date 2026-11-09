@@ -1,5 +1,5 @@
 /**
- * Phase 8.13B — Controlled LOCAL RBAC soak window.
+ * Phase 8.13B - Controlled LOCAL RBAC soak window.
  *
  * Drives real HTTP → Express → checkPermission / checkAnyPermission
  * (LIVE auth middleware) with observe + dual-check flags ON.
@@ -30,7 +30,7 @@ const { getParityMetricsSnapshot, resetParityMetricsForTests } = require('../ser
 
 const ARTIFACT = path.join(__dirname, '..', 'artifacts', 'rbac-soak-813b.json');
 
-/** Fixture actors — trusted server-side identities only (no client spoof). */
+/** Fixture actors - trusted server-side identities only (no client spoof). */
 const ACTORS = {
   SUPER: {
     id: '507f1f77bcf86cd799439011',
@@ -171,7 +171,7 @@ function buildApp() {
   const app = express();
   app.use(express.json());
 
-  // Inject trusted actor from header (soak harness only — not production auth)
+  // Inject trusted actor from header (soak harness only - not production auth)
   app.use((req, res, next) => {
     const key = req.headers['x-soak-actor'];
     const actor = ACTORS[key];
@@ -310,7 +310,7 @@ async function runMatrix(server) {
   await hit('SUPPORT', 'GET', '/soak/teachers/stats', 200);
   await hit('ROOT', 'GET', '/soak/finance/payment'.replace('payment', 'revenue'), 200);
   await hit('ROOT', 'GET', '/soak/finance/revenue', 200);
-  // JWT admin without adminRole — LIVE may ALLOW if permissions present;
+  // JWT admin without adminRole - LIVE may ALLOW if permissions present;
   // Enterprise shadow DENY (CONDITIONAL) → REAL RUNTIME ROLE_MISMATCH (do not auto-fix).
   await hit('ADMIN_NO_ROLE', 'GET', '/soak/hr/list', null);
 
@@ -389,7 +389,7 @@ async function main() {
   } finally {
     restoreTeacher();
     await new Promise((r) => server.close(r));
-    // Disable soak flags — restore previous process env
+    // Disable soak flags - restore previous process env
     if (prev.observe === undefined) delete process.env.RBAC_PARITY_OBSERVE_ENABLED;
     else process.env.RBAC_PARITY_OBSERVE_ENABLED = prev.observe;
     if (prev.dual === undefined) delete process.env.RBAC_DUAL_CHECK_ENABLED;

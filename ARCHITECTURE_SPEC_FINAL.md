@@ -1,5 +1,5 @@
 # 📘 Final Software Architecture Specification (SAS v2.0)
-## DASHBOARDTHANGTINHOC — Education Management ERP/LMS
+## DASHBOARDTHANGTINHOC - Education Management ERP/LMS
 ### Chief Architect Approval | Pragmatic Enterprise Architecture Standard
 
 This document establishes the official architectural standards, module boundaries, coding guidelines, and scalability patterns for the **DASHBOARDTHANGTINHOC** project. All future development and refactoring MUST strictly adhere to this specification.

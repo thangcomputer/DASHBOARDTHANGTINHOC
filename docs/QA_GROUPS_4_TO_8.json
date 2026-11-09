@@ -115,7 +115,7 @@
     {
       "id": "G7-02",
       "name": "Email/SMS/Push channels",
-      "actual": "PASS partial — welcome + OTP + password + invoice email/Zalo queue; SMS gateway riêng không có (Zalo OA thay); push FCM chưa",
+      "actual": "PASS partial - welcome + OTP + password + invoice email/Zalo queue; SMS gateway riêng không có (Zalo OA thay); push FCM chưa",
       "result": "PASS",
       "severity": "Medium"
     },
@@ -136,7 +136,7 @@
     {
       "id": "G8-03",
       "name": "API SoT sau thao tác (paid + role isolation)",
-      "actual": "PASS — G8-01 paid sync + G8-02 JWT isolation đã verify (localStorage không còn SoT LMS/exam)",
+      "actual": "PASS - G8-01 paid sync + G8-02 JWT isolation đã verify (localStorage không còn SoT LMS/exam)",
       "result": "PASS",
       "severity": "Medium"
     },

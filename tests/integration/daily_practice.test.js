@@ -117,7 +117,7 @@ test('trạng thái chuỗi chọn đúng lời nhắc: mới / đã luyện / s
   assert.deepEqual(rules.streakStatus({ lastPlayedDay: '2026-10-31', streak: 1 }, '2026-11-02'), { state: 'lost', lostStreak: 1, missedDays: 1 });
 });
 
-test('popup nhắc dùng lời thúc đẩy "đã lỡ chuỗi — lấy lại phong độ" (web + mobile cùng nội dung)', async () => {
+test('popup nhắc dùng lời thúc đẩy "đã lỡ chuỗi - lấy lại phong độ" (web + mobile cùng nội dung)', async () => {
   const web = await import('../../client/src/utils/dailyPractice.js').catch(() => null);
   const source = read('client/src/utils/dailyPractice.js');
   assert.ok(source.includes('title: `Bạn đã lỡ chuỗi 🔥 ${stats.lostStreak} ngày!`'));
@@ -292,7 +292,10 @@ test('gắn đủ: route server, menu + trang web, admin, màn mobile, đếm gi
 
   const navigator = read('thang-tin-hoc-mobile/src/navigation/RootNavigator.tsx');
   assert.ok(navigator.includes('<Stack.Screen name="DailyPractice" component={DailyPracticeScreen} />'));
-  assert.ok(navigator.includes("{ label: 'Luyện tập hằng ngày', destination: 'DailyPractice', icon: Gamepad2 }"));
+  assert.ok(
+    navigator.includes("{ label: 'Luyện tập hằng ngày', destination: 'DailyPractice', icon: Gamepad2 }") ||
+    navigator.includes("{ label: 'Luyện tập', destination: 'DailyPractice', icon: Gamepad2 }")
+  );
   assert.ok(read('thang-tin-hoc-mobile/src/components/LearningGoalModal.tsx').includes("'DailyPractice',"));
   for (const sound of ['tap', 'pick', 'drop', 'correct', 'wrong', 'hint', 'win', 'sad']) {
     assert.ok(fs.existsSync(path.join(ROOT, `thang-tin-hoc-mobile/src/assets/audio/game-${sound}.wav`)), `thiếu âm thanh ${sound}`);

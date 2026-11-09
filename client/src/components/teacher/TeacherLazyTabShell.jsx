@@ -38,7 +38,7 @@ export function TeacherLazyProfileTab(props) {
 }
 
 export function TeacherLazyOverviewTab(props) {
-  // Tổng quan cuộn theo shell (overflow-y-auto) — không dùng flex-1/min-h-0 để tránh cắt nội dung.
+  // Tổng quan cuộn theo shell (overflow-y-auto) - không dùng flex-1/min-h-0 để tránh cắt nội dung.
   return (
     <div className="animate-in fade-in duration-300 w-full min-w-0">
       <Suspense fallback={<TabFallback />}>

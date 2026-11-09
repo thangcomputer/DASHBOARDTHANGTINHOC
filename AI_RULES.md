@@ -1,4 +1,4 @@
-# AI_RULES.md — Luật làm việc với codebase DashboardThangTinHoc
+# AI_RULES.md - Luật làm việc với codebase DashboardThangTinHoc
 
 Mọi agent/Cursor khi sửa code **phải** tuân thủ file này. Mục tiêu: tiến dần enterprise, không đập đi xây lại.
 
@@ -53,7 +53,7 @@ tests/                    # integration / e2e
 
 ## 5. Bảo mật (bắt buộc với mọi thay đổi auth/API)
 
-- Secrets chỉ trong `.env` — **cấm** hardcode password, API key, SSH.
+- Secrets chỉ trong `.env` - **cấm** hardcode password, API key, SSH.
 - Deploy script: dùng `VPS_HOST` / `VPS_USER` / `VPS_PASSWORD` hoặc `VPS_SSH_KEY_PATH`.
 - Production: không fallback `admin123` (xem `utils/adminPassword.js`).
 - Mọi route ghi dữ liệu: `authMiddleware` + kiểm tra role/branch khi cần.
@@ -91,27 +91,27 @@ tests/                    # integration / e2e
 - Không commit `.env`, secret, `client/dist` nếu không cần.
 - Không `--no-verify` trừ khi user yêu cầu.
 
-## 11. Roadmap — thứ tự ưu tiên (không nhảy cóc)
+## 11. Roadmap - thứ tự ưu tiên (không nhảy cóc)
 
 Chỉ làm giai đoạn sau khi nền tảng trước **ổn định và đã test**:
 
 1. Audit / debt map (đã có AI_RULES + gap map)
-2. Security hardening (JWT/refresh, CSRF double-submit, Super Admin MFA TOTP, XSS sanitize — ổn định)
+2. Security hardening (JWT/refresh, CSRF double-submit, Super Admin MFA TOTP, XSS sanitize - ổn định)
 3. Clean architecture (AdminDashboard/DataContext đã tách shell + domain hooks)
 4. Database optimization (schema indexes + ensureIndexes lúc boot)
-5. Cache (Redis query cache + blacklist — optional qua REDIS_URL; memory fallback)
-6. Queue (BullMQ khi có REDIS_URL; inline fallback) — OTP/Zalo/email, PDF hóa đơn
+5. Cache (Redis query cache + blacklist - optional qua REDIS_URL; memory fallback)
+6. Queue (BullMQ khi có REDIS_URL; inline fallback) - OTP/Zalo/email, PDF hóa đơn
 7. Notification center (API list/count/dismiss/broadcast + trang Trung tâm thông báo)
 8. File center (FileAsset registry, /api/files, admin Quản lý file, purge hết hạn)
-9. Backup (export Mongo gzip, Super Admin, cron, /admin/backups — không restore ghi đè qua UI)
+9. Backup (export Mongo gzip, Super Admin, cron, /admin/backups - không restore ghi đè qua UI)
 10. Monitoring (metrics request, health chi tiết, alerts, /admin/monitoring)
 11. AI Center (OpenAI-compatible, quiz/notification/summarize, fallback khi chưa có key)
-12. BI Dashboard (KPI đa chiều, so sánh kỳ, export CSV, /admin/bi — bổ sung analytics doanh thu)
+12. BI Dashboard (KPI đa chiều, so sánh kỳ, export CSV, /admin/bi - bổ sung analytics doanh thu)
 13. Workflow (duyệt GV / mở khóa thi / chi lương, instance + lịch sử, /admin/workflows)
 14. Form/Report builder (form động + submissions, report CSV từ nguồn hệ thống, /admin/builder)
 15–16. Multi-tenant (Tenant bọc Branch, X-Tenant-Id, Super Admin switcher, /admin/tenants)
 17–18. DevOps / Testing (CI lint+test+client build+smoke-api, Docker Compose, smoke scripts)
-19. Docs (ERD, OpenAPI — `docs/ERD.md`, `docs/openapi.yaml`)
+19. Docs (ERD, OpenAPI - `docs/ERD.md`, `docs/openapi.yaml`)
 20. Final review (`docs/ROADMAP_REVIEW.md`)
 
 **Cấm** bắt đầu AI Center / Multi-tenant / Workflow engine khi Phase 2–3 chưa xong phần critical.

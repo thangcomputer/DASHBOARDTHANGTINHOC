@@ -79,7 +79,7 @@ function evaluateList(subject) {
 }
 
 /**
- * GET /posts/:slugOrId — ctx.post, ctx.manageQuery ('1' or not).
+ * GET /posts/:slugOrId - ctx.post, ctx.manageQuery ('1' or not).
  */
 function evaluateGet(subject, ctx) {
   const auth = evaluateAuthOnly(subject);

@@ -1,5 +1,5 @@
 /**
- * Nhật ký hệ thống — chỉ các hành động nghiệp vụ cần theo dõi.
+ * Nhật ký hệ thống - chỉ các hành động nghiệp vụ cần theo dõi.
  */
 const SYSTEM_LOG_VISIBLE_ACTIONS = [
   'THÊM HỌC VIÊN',

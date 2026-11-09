@@ -1,5 +1,5 @@
 /**
- * Seed lộ trình «Windows cơ bản» — chặng + nút Học bài/Luyện + câu hỏi để test end-to-end.
+ * Seed lộ trình «Windows cơ bản» - chặng + nút Học bài/Luyện + câu hỏi để test end-to-end.
  *
  *   node scripts/seed_windows_basic_path.js
  *   node scripts/seed_windows_basic_path.js --reset   # xóa chặng/câu cũ của chủ đề rồi tạo lại
@@ -41,7 +41,7 @@ function defaultNodes(lessons = []) {
   ];
 }
 
-/** Nội dung theo tiêu đề chặng — dùng để HV test Học bài → Luyện → Thử thách. */
+/** Nội dung theo tiêu đề chặng - dùng để HV test Học bài → Luyện → Thử thách. */
 const UNITS = [
   {
     title: 'Bắt đầu',

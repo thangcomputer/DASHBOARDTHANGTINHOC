@@ -197,7 +197,7 @@ function splitHandoffSummary(text) {
   return { head, transcript: rest, footer: '' };
 }
 
-// Keep contact/messaging roles canonical — do NOT collapse staff→admin (splits threads).
+// Keep contact/messaging roles canonical - do NOT collapse staff→admin (splits threads).
 const normalizeRole = (role) => (role === 'support' ? 'staff' : role);
 const entityId = (value) => String(value?._id || value?.id || value || '');
 
@@ -473,7 +473,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
   );
   const [contacts, setContacts] = useState([]);
   const [contactsLoaded, setContactsLoaded] = useState(false);
-  const [seedContact, setSeedContact] = useState(null); // navigation intent — gated by resolveMessagingDeepLink
+  const [seedContact, setSeedContact] = useState(null); // navigation intent - gated by resolveMessagingDeepLink
   const [hiddenList, setHiddenList] = useState([]);
   const [pinnedConversationIds, setPinnedConversationIds] = useState(() => new Set());
   const [pinningConversationId, setPinningConversationId] = useState(null);
@@ -590,7 +590,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
           toast.info(`Đã dọn ${deleted} tin nhắn từ tài khoản đã xóa`);
         }
       } catch {
-        /* ignore — client filter vẫn ẩn ghost */
+        /* ignore - client filter vẫn ẩn ghost */
       }
     })();
     return () => { cancelled = true; };
@@ -836,7 +836,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     return null;
   }, [peerProfile]);
 
-  // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local —
+  // Đóng hội thoại chỉ khi peer chắc chắn ghost (không dùng students/teachers/staffs local -
   // Admin/Staff thường students=[], GV chỉ có teachers=[self] → trước đây kill nhầm mọi chat).
   useEffect(() => {
     if (!activeConv || activeConv.isGroup || activeConv.isAiHandoff) return;
@@ -856,7 +856,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     setMessages([]);
   }, [activeConv, contactsLoaded, contacts, students, teachers, staffs]);
   const [pendingImage, setPendingImage] = useState(null);
-  // Ghim chỉ lấy từ tin của hội thoại đang mở — tránh dính ghim sang người khác khi đổi chat.
+  // Ghim chỉ lấy từ tin của hội thoại đang mở - tránh dính ghim sang người khác khi đổi chat.
   useEffect(() => {
     const convId = activeConv?.id ? String(activeConv.id) : '';
     if (!convId) {
@@ -975,7 +975,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
 
     const seenConvIds = new Set();
     const contactIdSet = new Set(uniqueContacts.map((c) => String(c.id)));
-    // SUPER: chỉ peers trong GET /contacts (HIGH_ADMIN) — không leak activity từ students/teachers local.
+    // SUPER: chỉ peers trong GET /contacts (HIGH_ADMIN) - không leak activity từ students/teachers local.
     const isListedPeer = (peerId) => {
       const id = String(peerId || '');
       if (!id) return false;
@@ -1212,7 +1212,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   }, [currentUserId, syncMessages]);
 
-  // ─── Helper tra cứu tên người gửi — resolve by senderId, never role==="admin" alone ──
+  // ─── Helper tra cứu tên người gửi - resolve by senderId, never role==="admin" alone ──
   const resolveSenderName = useCallback((msg) => {
     if (!msg) return 'Người dùng';
     if (String(msg.senderId) === String(currentUserId)) return currentUserName || 'Người dùng';
@@ -2361,7 +2361,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
     }
   };
 
-  // Auto-select from navigation — Phase 7: never invent unauthorized peers
+  // Auto-select from navigation - Phase 7: never invent unauthorized peers
   const hasAutoSelected = useRef(false);
   const draftAppliedKey = useRef('');
   const lastDeepLinkId = useRef('');
@@ -2419,7 +2419,7 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
       return;
     }
 
-    // Peer is an authorized contact — wait for seedContact merge into conversations
+    // Peer is an authorized contact - wait for seedContact merge into conversations
     const inContacts = (contacts || []).some((c) => String(c?.id) === String(selectId));
     if (inContacts) return;
     // Teacher→assigned-student deep link: wait for trusted seed merge
@@ -3826,96 +3826,96 @@ const Inbox = ({ currentUserId = 'admin', currentUserName = 'Admin', currentUser
                     Chỉ Admin Super được gửi tin nhắn trong cuộc trò chuyện này.
                   </div>
                 ) : (
-                <div className="flex items-center gap-2 relative max-w-4xl mx-auto">
-                  <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
-                  <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
+                  <div className="flex items-center gap-2 relative max-w-4xl mx-auto">
+                    <input type="file" ref={fileInputRef} accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.mp4,.webm,.mp3,.wav" className="hidden" onChange={handleFileUpload} />
+                    <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleFileUpload} />
 
-                  <div className="cms-chat-attachment-tools flex items-center gap-1.5">
-                    <button
-                      onClick={() => imageInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Gửi ảnh (tối đa 10MB, lưu 10 ngày)"
-                    >
-                      {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
-                    </button>
-                    <ScreenCaptureButton
-                      size={20}
-                      disabled={isUploading || !activeConv}
-                      buttonClassName="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      className="cms-chat-capture-control"
-                      title="Chụp màn hình"
-                      onCaptured={stageScreenshotForSend}
-                      onError={(msg) => toast.error(msg)}
-                    />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Đính kèm tài liệu Word, Excel, PowerPoint, PDF hoặc ZIP (tối đa 10MB, lưu 10 ngày)"
-                    >
-                      <Paperclip size={20} />
-                    </button>
-                  </div>
-
-                  <div className="flex-1 relative flex min-w-0 flex-col justify-end">
-                    {pendingImage && (
-                      <div className="mb-2 p-2 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-200">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <img
-                            src={resolveMediaUrl(pendingImage.url)}
-                            alt="Preview"
-                            className="w-10 h-10 object-cover rounded-lg border border-blue-200 shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-800 truncate">Ảnh từ bộ nhớ tạm (Clipboard)</p>
-                            <p className="text-[11px] text-blue-600 font-semibold truncate">{pendingImage.fileName}</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setPendingImage(null)}
-                          className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition shrink-0"
-                          title="Bỏ chọn ảnh"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    )}
-                    <div className="relative flex w-full min-w-0 items-center gap-1">
-                      <input
-                        ref={inputRef}
-                        value={newMsg}
-                        onChange={e => {
-                          setNewMsg(e.target.value);
-                          startInboxTyping();
-                        }}
-                        onFocus={startInboxTyping}
-                        onBlur={stopInboxTyping}
-                        onKeyDown={handleKeyPress}
-                        onPaste={handlePaste}
-                        className="cms-input cms-chat-composer-input min-w-0 flex-1 pl-4 pr-4"
-                        placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
+                    <div className="cms-chat-attachment-tools flex items-center gap-1.5">
+                      <button
+                        onClick={() => imageInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Gửi ảnh (tối đa 10MB, lưu 10 ngày)"
+                      >
+                        {isUploading ? <span className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full inline-block animate-spin" /> : <Image size={20} />}
+                      </button>
+                      <ScreenCaptureButton
+                        size={20}
+                        disabled={isUploading || !activeConv}
+                        buttonClassName="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="cms-chat-capture-control"
+                        title="Chụp màn hình"
+                        onCaptured={stageScreenshotForSend}
+                        onError={(msg) => toast.error(msg)}
                       />
-                      <StickerPicker
-                        key={activeConv?.id || 'no-conversation'}
-                        inline
-                        buttonClassName="border border-slate-200 bg-white"
-                        disabled={isUploading || Boolean(pendingImage) || !activeConv}
-                        onPickEmoji={handleEmojiInsert}
-                        onSendSticker={handleStickerSend}
-                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-sm rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Đính kèm tài liệu Word, Excel, PowerPoint, PDF hoặc ZIP (tối đa 10MB, lưu 10 ngày)"
+                      >
+                        <Paperclip size={20} />
+                      </button>
                     </div>
+
+                    <div className="flex-1 relative flex min-w-0 flex-col justify-end">
+                      {pendingImage && (
+                        <div className="mb-2 p-2 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <img
+                              src={resolveMediaUrl(pendingImage.url)}
+                              alt="Preview"
+                              className="w-10 h-10 object-cover rounded-lg border border-blue-200 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">Ảnh từ bộ nhớ tạm (Clipboard)</p>
+                              <p className="text-[11px] text-blue-600 font-semibold truncate">{pendingImage.fileName}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPendingImage(null)}
+                            className="w-7 h-7 rounded-lg bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition shrink-0"
+                            title="Bỏ chọn ảnh"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                      <div className="relative flex w-full min-w-0 items-center gap-1">
+                        <input
+                          ref={inputRef}
+                          value={newMsg}
+                          onChange={e => {
+                            setNewMsg(e.target.value);
+                            startInboxTyping();
+                          }}
+                          onFocus={startInboxTyping}
+                          onBlur={stopInboxTyping}
+                          onKeyDown={handleKeyPress}
+                          onPaste={handlePaste}
+                          className="cms-input cms-chat-composer-input min-w-0 flex-1 pl-4 pr-4"
+                          placeholder={pendingImage ? "Nhập thêm Lời nhắn (nếu có) rồi nhấn Enter..." : "Nhập tin nhắn..."}
+                        />
+                        <StickerPicker
+                          key={activeConv?.id || 'no-conversation'}
+                          inline
+                          buttonClassName="border border-slate-200 bg-white"
+                          disabled={isUploading || Boolean(pendingImage) || !activeConv}
+                          onPickEmoji={handleEmojiInsert}
+                          onSendSticker={handleStickerSend}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleSend()}
+                      disabled={!newMsg.trim() && !pendingImage}
+                      className="cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send"
+                      title="Gửi tin nhắn"
+                    >
+                      <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={!newMsg.trim() && !pendingImage}
-                    className="cms-btn cms-btn-primary cms-btn-icon cms-chat-composer-send"
-                    title="Gửi tin nhắn"
-                  >
-                    <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
-                  </button>
-                </div>
                 )}
               </div>
             </>

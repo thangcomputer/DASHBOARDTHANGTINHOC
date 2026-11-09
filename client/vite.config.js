@@ -44,7 +44,7 @@ function camXucAnimationStatic() {
 }
 
 // Dev proxy MUST use IPv6 loopback on Windows when another process
-// (e.g. Challenge.exe) steals 127.0.0.1:5000 — Node often listens on [::]:5000 only.
+// (e.g. Challenge.exe) steals 127.0.0.1:5000 - Node often listens on [::]:5000 only.
 const DEV_API = process.env.VITE_DEV_API_PROXY || 'http://[::1]:5000'
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url))
 
@@ -93,7 +93,7 @@ export default defineConfig({
             if (id.includes('recharts')) {
               return 'vendor-chart';
             }
-            // Heavy libs — chỉ tải khi user xuất Excel/PDF
+            // Heavy libs - chỉ tải khi user xuất Excel/PDF
             if (id.includes('node_modules/xlsx')) {
               return 'vendor-xlsx';
             }

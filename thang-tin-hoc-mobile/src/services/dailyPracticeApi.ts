@@ -1,4 +1,4 @@
-import { DeviceEventEmitter } from 'react-native';
+﻿import { DeviceEventEmitter } from 'react-native';
 import { mobileApiRequest } from './apiClient';
 
 export const DAILY_PRACTICE_STATS_EVENT = 'cms:daily-practice-stats';
@@ -278,7 +278,7 @@ export type DpSummary = {
   xpCapReached?: boolean;
 };
 
-/** Video bài giảng admin gắn với chủ đề — mở đúng môn → buổi → mục. */
+/** Video bài giảng admin gắn với chủ đề - mở đúng môn → buổi → mục. */
 export type DpRelatedLesson = {
   subjectId: string;
   subjectName: string;
@@ -331,7 +331,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   return payload.data;
 }
 
-/** Luyện tập hằng ngày — cùng API với web. */
+/** Luyện tập hằng ngày - cùng API với web. */
 export const dailyPracticeApi = {
   overview: () => call<{ topics: DpTopic[]; stats: DpStats }>('/overview').then((data) => {
     emitDailyPracticeStats(data);
@@ -422,8 +422,8 @@ export function practiceFinishXpDisplay(summary: Partial<DpSummary> = {}) {
       prefix: '',
       positive: true,
       caption: summary.reviewMode
-        ? 'Ôn lại — không cộng và không trừ XP'
-        : 'Luyện tự do — không tính XP',
+        ? 'Ôn lại - không cộng và không trừ XP'
+        : 'Luyện tự do - không tính XP',
     };
   }
   const net = Number(summary.gainedXp) || 0;
@@ -455,7 +455,7 @@ export function practiceFinishXpDisplay(summary: Partial<DpSummary> = {}) {
     prefix: '',
     positive: passed,
     caption: summary.recovery
-      ? 'Chưa đạt điểm vượt — không mất thêm XP'
+      ? 'Chưa đạt điểm vượt - không mất thêm XP'
       : 'Ví XP không đổi sau lượt này',
   };
 }
@@ -466,12 +466,12 @@ export type DpPlanType = 'free' | '1m' | '3m' | '6m' | '12m' | 'lifetime';
 
 /** Giới hạn XP/ngày theo từng gói (tất cả các gói mua đều là 300 XP mỗi ngày, gói Free là 60 XP). */
 export const DP_PLAN_XP_CAP: Record<DpPlanType, number> = {
-  free:     60,   // Miễn phí — 60 XP/ngày, chỉ ôn bài cũ khi hết
-  '1m':     300,  // 1 tháng  — 300 XP/ngày, mở bài mới
-  '3m':     300,  // 3 tháng  — 300 XP/ngày, mở bài mới
-  '6m':     300,  // 6 tháng  — 300 XP/ngày, mở bài mới
-  '12m':    300,  // 1 năm    — 300 XP/ngày, mở bài mới
-  lifetime: 300,  // Vĩnh viễn — 300 XP/ngày, mở bài mới
+  free:     60,   // Miễn phí - 60 XP/ngày, chỉ ôn bài cũ khi hết
+  '1m':     300,  // 1 tháng  - 300 XP/ngày, mở bài mới
+  '3m':     300,  // 3 tháng  - 300 XP/ngày, mở bài mới
+  '6m':     300,  // 6 tháng  - 300 XP/ngày, mở bài mới
+  '12m':    300,  // 1 năm    - 300 XP/ngày, mở bài mới
+  lifetime: 300,  // Vĩnh viễn - 300 XP/ngày, mở bài mới
 };
 
 export const DP_PLANS: Array<{
@@ -550,7 +550,7 @@ export const DP_TOPIC_COLORS: Record<string, { from: string; to: string; soft: s
   slate: { from: '#94A3B8', to: '#334155', soft: '#F8FAFC' },
 };
 
-/** Mỗi chặng lộ trình một màu (xoay vòng) — giống các "phần" của Duolingo; cùng bảng màu với web. */
+/** Mỗi chặng lộ trình một màu (xoay vòng) - giống các "phần" của Duolingo; cùng bảng màu với web. */
 export const DP_UNIT_COLORS: Array<{ from: string; to: string; soft: string }> = [
   { from: '#4ADE80', to: '#16A34A', soft: '#F0FDF4' },
   { from: '#60A5FA', to: '#2563EB', soft: '#EFF6FF' },
@@ -568,7 +568,7 @@ const COMFORT = ['Chưa đúng rồi', 'Tiếc quá!', 'Gần đúng rồi đó'
 export const randomPraise = () => PRAISE[Math.floor(Math.random() * PRAISE.length)];
 export const randomComfort = () => COMFORT[Math.floor(Math.random() * COMFORT.length)];
 
-/** Lời nhắc theo trạng thái chuỗi — cùng nội dung với web. */
+/** Lời nhắc theo trạng thái chuỗi - cùng nội dung với web. */
 export function reminderCopy(stats: DpStats, topicCount: number) {
   const streak = stats.streak || 0;
   const missed = stats.missedDays || 0;
@@ -577,7 +577,7 @@ export function reminderCopy(stats: DpStats, topicCount: number) {
       mood: 'sad' as const,
       badge: 'BẠN ĐÃ LỠ CHUỖI',
       title: `Bạn đã lỡ chuỗi 🔥 ${stats.lostStreak} ngày!`,
-      text: `Đã ${missed} ngày bạn chưa luyện tập. Đừng để công sức trôi đi — luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
+      text: `Đã ${missed} ngày bạn chưa luyện tập. Đừng để công sức trôi đi - luyện tập ngay bây giờ để lấy lại phong độ, chỉ 5 phút thôi!`,
       cta: 'Lấy lại phong độ ngay',
     };
   }
@@ -586,7 +586,7 @@ export function reminderCopy(stats: DpStats, topicCount: number) {
       mood: 'sad' as const,
       badge: 'ĐỪNG BỎ CUỘC',
       title: 'Lâu rồi bạn chưa luyện tập!',
-      text: `Đã ${missed} ngày rồi đó. Kiến thức sẽ quên dần nếu không ôn — làm ngay 10 câu để lấy lại phong độ nhé!`,
+      text: `Đã ${missed} ngày rồi đó. Kiến thức sẽ quên dần nếu không ôn - làm ngay 10 câu để lấy lại phong độ nhé!`,
       cta: 'Lấy lại phong độ ngay',
     };
   }
@@ -595,7 +595,7 @@ export function reminderCopy(stats: DpStats, topicCount: number) {
       mood: 'thinking' as const,
       badge: 'CHUỖI SẮP MẤT',
       title: `Chuỗi 🔥 ${streak} ngày sắp mất!`,
-      text: 'Hôm nay bạn chưa luyện tập — chuỗi sẽ về 0 lúc nửa đêm. Làm ngay 10 câu để giữ lửa!',
+      text: 'Hôm nay bạn chưa luyện tập - chuỗi sẽ về 0 lúc nửa đêm. Làm ngay 10 câu để giữ lửa!',
       cta: 'Giữ chuỗi ngay',
     };
   }
@@ -610,7 +610,7 @@ export function reminderCopy(stats: DpStats, topicCount: number) {
 
 export function resultMessage(stars: number) {
   if (stars >= 3) return { title: 'Hoàn hảo!', text: 'Bạn nắm chủ đề này rất chắc. Thử độ khó cao hơn nhé!' };
-  if (stars === 2) return { title: 'Rất tốt!', text: 'Chỉ sai vài câu — xem lại phần giải thích để nhớ lâu hơn.' };
+  if (stars === 2) return { title: 'Rất tốt!', text: 'Chỉ sai vài câu - xem lại phần giải thích để nhớ lâu hơn.' };
   if (stars === 1) return { title: 'Cố lên!', text: 'Bạn đang tiến bộ. Ôn lại các câu sai rồi chơi lại nhé.' };
   return { title: 'Đừng nản nhé!', text: 'Ai cũng bắt đầu từ đây. Thử độ khó Dễ để làm quen trước.' };
 }

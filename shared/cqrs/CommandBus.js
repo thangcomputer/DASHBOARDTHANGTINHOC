@@ -22,7 +22,7 @@ class CommandBus {
     const req = RequestContext.getContext();
     const isReqEmpty = !req || Object.keys(req).length === 0;
     const fallbackReq = { method: 'CMD', url: commandName + Date.now() + Math.random(), userId: 'sys', tenantId: 'sys' };
-    
+
     // Phase 4: Idempotency Integration
     return await idempotencyManager.execute(isReqEmpty ? fallbackReq : req, async () => {
       // Phase 1: TransactionManager Integration
@@ -30,7 +30,7 @@ class CommandBus {
         // Automatically create TransactionContext
         return await TransactionContext.run(tx, async () => {
           for (const hook of this.hooks) if (hook.beforeExecute) await hook.beforeExecute(command);
-          
+
           const start = Date.now();
           let result;
           try {
@@ -38,14 +38,14 @@ class CommandBus {
             const duration = Date.now() - start;
             Metrics.observe('execution_duration', {}, duration);
             Metrics.inc('transaction_total', { status: 'success', command: commandName });
-            
+
             for (const hook of this.hooks) if (hook.afterExecute) await hook.afterExecute(command, result);
             return result;
           } catch (err) {
             const duration = Date.now() - start;
             Metrics.observe('execution_duration', {}, duration);
             Metrics.inc('transaction_total', { status: 'rollback', command: commandName, reason: err.name || 'Error' });
-            
+
             for (const hook of this.hooks) if (hook.onError) await hook.onError(command, err);
             throw err;
           }

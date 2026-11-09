@@ -66,7 +66,7 @@ export default function TeacherRatingDetailModal({
                   {dateLabel ? <p className="text-[11px] text-slate-400 font-medium mt-0.5">{dateLabel}</p> : null}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-2xl font-black text-amber-600 tabular-nums leading-none">{stars || '—'}</p>
+                  <p className="text-2xl font-black text-amber-600 tabular-nums leading-none">{stars || '-'}</p>
                   <div className="flex gap-0.5 justify-end mt-1">
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star
@@ -88,13 +88,12 @@ export default function TeacherRatingDetailModal({
                     return (
                       <span
                         key={cat}
-                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                          opt.score >= 4
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${opt.score >= 4
                             ? 'bg-emerald-100 text-emerald-700'
                             : opt.score >= 3
                               ? 'bg-amber-100 text-amber-700'
                               : 'bg-rose-100 text-rose-700'
-                        }`}
+                          }`}
                       >
                         {catData.label}: {opt.label}
                       </span>

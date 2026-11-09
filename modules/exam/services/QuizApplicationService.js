@@ -262,8 +262,8 @@ class QuizApplicationService {
             ? '⚠️ Học viên thoát giữa giờ trắc nghiệm'
             : '📝 Học viên đã nộp trắc nghiệm';
           const content = isForfeit
-            ? `${student.name || 'Học viên'} — "${quiz.title}": RỚT (thoát giữa giờ).`
-            : `${student.name || 'Học viên'} — "${quiz.title}": ${score}% (${correctCount}/${totalQuestions} câu) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
+            ? `${student.name || 'Học viên'} - "${quiz.title}": RỚT (thoát giữa giờ).`
+            : `${student.name || 'Học viên'} - "${quiz.title}": ${score}% (${correctCount}/${totalQuestions} câu) · ${status === 'passed' ? 'ĐẠT' : 'CHƯA ĐẠT'}.`;
           await NotificationService.send(io, {
             type: 'COURSE',
             title,

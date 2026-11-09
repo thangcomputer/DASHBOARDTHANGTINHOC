@@ -136,14 +136,14 @@ async function recordStudyActivity(studentId, { questions = 0, videos = 0 } = {}
   }
 }
 
-/** Gọi sau khi nghiệp vụ chính đã xong — lỗi ghi nhật ký học không được làm hỏng bài nộp. */
+/** Gọi sau khi nghiệp vụ chính đã xong - lỗi ghi nhật ký học không được làm hỏng bài nộp. */
 function trackStudyActivity(studentId, counts) {
-  recordStudyActivity(studentId, counts).catch(() => {});
+  recordStudyActivity(studentId, counts).catch(() => { });
 }
 
 /**
  * Cộng phút học từ một lượt luyện tập hằng ngày (từ lúc bắt đầu đến khi hoàn thành).
- * Dùng cho mục tiêu «X giờ/ngày» — khác heartbeat từng phút khi xem bài giảng.
+ * Dùng cho mục tiêu «X giờ/ngày» - khác heartbeat từng phút khi xem bài giảng.
  */
 async function recordStudyDuration(studentId, seconds, now = new Date()) {
   assertStudentId(studentId);
@@ -166,7 +166,7 @@ async function recordStudyDuration(studentId, seconds, now = new Date()) {
 }
 
 function trackStudyDuration(studentId, seconds) {
-  recordStudyDuration(studentId, seconds).catch(() => {});
+  recordStudyDuration(studentId, seconds).catch(() => { });
 }
 
 /** Đếm số câu có trả lời trong mảng hoặc object đáp án. */

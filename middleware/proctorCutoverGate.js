@@ -1,5 +1,5 @@
 /**
- * Phase 7.24 — Controlled cutover gate for LIVE /api/proctor ONLY.
+ * Phase 7.24 - Controlled cutover gate for LIVE /api/proctor ONLY.
  *
  * LEGACY (default):
  *   - events_ingest / events_me → auth already applied; pass-through
@@ -72,7 +72,7 @@ function proctorCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] proctor authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] proctor authority helper failed - Legacy gate',
       );
     }
 
@@ -117,7 +117,7 @@ function proctorCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] proctor Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] proctor Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

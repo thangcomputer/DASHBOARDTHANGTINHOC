@@ -1,8 +1,8 @@
-# PHASE C3.4 — PRODUCTION TARGET DISCOVERY + READ-ONLY VERIFICATION
+# PHASE C3.4 - PRODUCTION TARGET DISCOVERY + READ-ONLY VERIFICATION
 
 **Date:** 2026-08-11  
 **Mode:** READ-ONLY ONLY / ZERO WRITE / ZERO MIGRATION / ZERO CODE CHANGE  
-**Predecessors:** C3 → C3.1 → C3.2 → C3.3 (all BLOCKED — production URI unavailable)
+**Predecessors:** C3 → C3.1 → C3.2 → C3.3 (all BLOCKED - production URI unavailable)
 
 ---
 
@@ -40,13 +40,13 @@ No write operation performed.
 
 | File | Present | Production Mongo evidence |
 |------|---------|---------------------------|
-| `.env` | YES | `host=127.0.0.1` `port=27018` `database=dashboardthangtinhoc` `replicaSet=rs0` → **LOCAL/DEV — REJECTED** |
-| `.env.production` | NO | — |
-| `.env.prod` | NO | — |
-| `.env.deploy` | NO | — |
-| `.env.staging` | NO | — |
-| `ecosystem.config.cjs` | YES | `NODE_ENV=production` only — **not** Mongo production proof |
-| Docker / deploy / CI | YES | localhost / `mongo:27017` / CI DB — **not** production |
+| `.env` | YES | `host=127.0.0.1` `port=27018` `database=dashboardthangtinhoc` `replicaSet=rs0` → **LOCAL/DEV - REJECTED** |
+| `.env.production` | NO | - |
+| `.env.prod` | NO | - |
+| `.env.deploy` | NO | - |
+| `.env.staging` | NO | - |
+| `ecosystem.config.cjs` | YES | `NODE_ENV=production` only - **not** Mongo production proof |
+| Docker / deploy / CI | YES | localhost / `mongo:27017` / CI DB - **not** production |
 
 ```text
 PRODUCTION_TARGET_CONFIRMED = NO
@@ -69,15 +69,15 @@ Because no production target was confirmed, the following were **not** run:
 | Production target | **BLOCKED** | Discovery |
 | Production identity | **BLOCKED** | No connection |
 | Read-only | **UNKNOWN** | No connection |
-| Student–Course production audits | **BLOCKED** | — |
-| Counters / duplicates | **BLOCKED** | — |
+| Student–Course production audits | **BLOCKED** | - |
+| Counters / duplicates | **BLOCKED** | - |
 | Payment compatibility | **REVIEW** | CODE-LEVEL fail-closed known; PRODUCTION-DATA UNKNOWN |
 | Multi-course | **PASS** | CODE-LEVEL only |
 | Teacher assignment | **PASS** | CODE-LEVEL only |
 | Messaging isolation | **PASS** | CODE-LEVEL only |
-| Unique index readiness | **BLOCKED** | — |
+| Unique index readiness | **BLOCKED** | - |
 | Backup | **UNKNOWN** | No owner attestation |
-| Migration readiness | **BLOCKED** | — |
+| Migration readiness | **BLOCKED** | - |
 
 **Distinction:** CODE-LEVEL PASS ≠ PRODUCTION-DATA PASS.
 
@@ -202,6 +202,6 @@ C4:
 BLOCKED
 ========================================
 
-CASE A — Production URI unavailable.
-STOP — DO NOT START C4.
+CASE A - Production URI unavailable.
+STOP - DO NOT START C4.
 ```

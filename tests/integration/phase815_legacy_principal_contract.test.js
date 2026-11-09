@@ -1,5 +1,5 @@
 /**
- * Phase 8.15 — LEGACY_PRINCIPAL contract for bare JWT admin/staff.
+ * Phase 8.15 - LEGACY_PRINCIPAL contract for bare JWT admin/staff.
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');

@@ -1,5 +1,5 @@
 /**
- * Phase 7.13 — Controlled cutover + production activation for /api/training-lms
+ * Phase 7.13 - Controlled cutover + production activation for /api/training-lms
  *
  * LIVE mount: server.js → trainingRoutes (NOT teachingGuideRoutes /api/training).
  * Actions: auth-only reads/writes; lms_lessons teacher specialty; lms_admin_progress MANAGE_TRAINING.
@@ -71,11 +71,11 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-          subjectIds: opts.subjectIds,
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+        subjectIds: opts.subjectIds,
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -249,7 +249,7 @@ test('Phase7.13 lms_lessons: teacher specialty DENY; missing course ALLOW→hand
   );
 });
 
-test('Phase7.13 teacher overview specialty is DATA FILTER — HTTP ALLOW', () => {
+test('Phase7.13 teacher overview specialty is DATA FILTER - HTTP ALLOW', () => {
   const teacher = sub({ id: 't1', role: 'teacher' });
   assert.equal(parity('lms_teacher_overview', teacher).policy.decision, 'ALLOW');
 });
@@ -403,16 +403,16 @@ test('Phase7.13 rollback: remove training-lms → LEGACY; prior stay POLICY; res
   const parsed = parseDotEnvFile();
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('training-lms'));
-      assert.ok(restoredRoutes.includes('training'));
-      assert.ok(restoredRoutes.includes('courses'));
+    assert.ok(restoredRoutes.includes('training-lms'));
+    assert.ok(restoredRoutes.includes('training'));
+    assert.ok(restoredRoutes.includes('courses'));
   }
 });
 
 test('Phase7.13 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'quizzes', 'assignments', 'evaluations',  'proctor',
+    'quizzes', 'assignments', 'evaluations', 'proctor',
     'files', 'blog', 'feed', 'schedules', 'messages', 'notifications',
   ];
   for (const fam of legacyFamilies) {
@@ -477,8 +477,8 @@ test('Phase7.13 functional smoke: authz only; mutations NOT EXECUTED', () => {
   assert.equal(parity('lms_courses', staff).policy.decision, 'ALLOW');
   assert.equal(parity('lms_progress_me', staff).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — complete-lesson/save-watch/admin-progress production mutation',
-    'NOT EXECUTED — complete-lesson/save-watch/admin-progress production mutation',
+    'NOT EXECUTED - complete-lesson/save-watch/admin-progress production mutation',
+    'NOT EXECUTED - complete-lesson/save-watch/admin-progress production mutation',
   );
 });
 

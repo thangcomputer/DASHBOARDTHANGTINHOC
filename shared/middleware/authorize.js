@@ -39,7 +39,7 @@ const _legacyResolvePermissions = async (user) => {
     return user.permissions;
   }
 
-  // Last resort — load from Teacher model
+  // Last resort - load from Teacher model
   try {
     const dbUser = await Teacher.findById(user.id || user._id).select('adminRole permissions').lean();
     if (!dbUser) return [];
@@ -85,7 +85,7 @@ const _auditDenial = (user, permission, reason, failedPolicy, req) => {
         tenantId: user?.tenantId || null,
       },
       req
-    ).catch(() => {});
+    ).catch(() => { });
   } catch {
     // Never throw from audit side effect
   }
@@ -116,7 +116,7 @@ const _evaluate = async (user, permission, req) => {
     return { allowed: false, reason: `Missing required permission: ${permission}`, usedLegacy: false };
   }
 
-  // RBAC passed — run Policy checks (contextual rules)
+  // RBAC passed - run Policy checks (contextual rules)
   const resource = req?.resource || null;
   const context = req?.policyContext || {};
   const policyResult = PolicyService.evaluate(user, resource, context);
@@ -138,7 +138,7 @@ const _evaluate = async (user, permission, req) => {
 // =========================================================
 
 /**
- * Authorize — require exact permission.
+ * Authorize - require exact permission.
  *
  * @param {string} permission
  */
@@ -169,7 +169,7 @@ const authorize = (permission) => {
 };
 
 /**
- * AuthorizeAny — user must hold AT LEAST ONE of the listed permissions.
+ * AuthorizeAny - user must hold AT LEAST ONE of the listed permissions.
  *
  * @param {string[]} permissions
  */
@@ -195,7 +195,7 @@ const authorizeAny = (...permissions) => {
           });
         }
       } else {
-        // RBAC passed — run Policy check
+        // RBAC passed - run Policy check
         const policyResult = PolicyService.evaluate(req.currentUser, req.resource || null, req.policyContext || {});
         if (!policyResult.allowed) {
           _auditDenial(req.currentUser, permList, policyResult.reason, policyResult.failedPolicy, req);
@@ -216,7 +216,7 @@ const authorizeAny = (...permissions) => {
 };
 
 /**
- * AuthorizeAll — user must hold ALL of the listed permissions.
+ * AuthorizeAll - user must hold ALL of the listed permissions.
  *
  * @param {string[]} permissions
  */
@@ -242,7 +242,7 @@ const authorizeAll = (...permissions) => {
           });
         }
       } else {
-        // RBAC passed — run Policy check
+        // RBAC passed - run Policy check
         const policyResult = PolicyService.evaluate(req.currentUser, req.resource || null, req.policyContext || {});
         if (!policyResult.allowed) {
           _auditDenial(req.currentUser, permList, policyResult.reason, policyResult.failedPolicy, req);
@@ -263,7 +263,7 @@ const authorizeAll = (...permissions) => {
 };
 
 /**
- * AuthorizeRole — legacy role check, preserved for backward compat.
+ * AuthorizeRole - legacy role check, preserved for backward compat.
  * TODO: Migrate callers to authorize(permission) and remove in future sprint.
  *
  * @param {...string} roleCodes

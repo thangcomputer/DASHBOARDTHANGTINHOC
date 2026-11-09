@@ -26,7 +26,7 @@ async function main() {
     if (preview.names?.length) {
       preview.names.forEach((name) => console.log('  -', name));
     }
-    console.log('[cleanup] Dry-run — không xóa DB. Bỏ --dry-run để dọn thật.');
+    console.log('[cleanup] Dry-run - không xóa DB. Bỏ --dry-run để dọn thật.');
     await mongoose.disconnect();
     return;
   }

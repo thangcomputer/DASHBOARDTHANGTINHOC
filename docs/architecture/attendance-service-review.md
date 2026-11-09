@@ -1,4 +1,4 @@
-# Attendance Service Review — Sprint 4.3 Batch 2
+# Attendance Service Review - Sprint 4.3 Batch 2
 
 ## Domain: `attendance`
 

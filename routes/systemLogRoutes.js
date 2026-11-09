@@ -10,7 +10,7 @@ const {
 } = require('../constants/systemLogActions');
 
 /**
- * Phase 7.7 — Controlled cutover for /api/system-logs ONLY.
+ * Phase 7.7 - Controlled cutover for /api/system-logs ONLY.
  *
  * Default / not allowlisted:
  *   auth → policyShadowSystemLog → Legacy isAdmin (via systemLogsCutoverGate) → handler
@@ -29,7 +29,7 @@ const guard = (action) => [
   systemLogsCutoverGate(action),
 ];
 
-// GET /api/system-logs — chỉ các hành động trong allowlist
+// GET /api/system-logs - chỉ các hành động trong allowlist
 router.get('/', guard('list'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -61,7 +61,7 @@ router.get('/', guard('list'), async (req, res) => {
   }
 });
 
-// POST /api/system-logs — ghi tay (xuất báo cáo client-side, …)
+// POST /api/system-logs - ghi tay (xuất báo cáo client-side, …)
 router.post('/', guard('create'), async (req, res) => {
   try {
     const action = String(req.body?.action || '').trim();

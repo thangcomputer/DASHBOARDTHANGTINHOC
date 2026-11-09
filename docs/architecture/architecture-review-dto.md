@@ -1,4 +1,4 @@
-# Architecture Review — DTO & Dependencies (Sprint 4.4)
+# Architecture Review - DTO & Dependencies (Sprint 4.4)
 
 ## 1. Mapper Layer Strategy (Phase 5)
 Currently, Domain Models (Mongoose Documents) are constructed ad-hoc inside Application Services.

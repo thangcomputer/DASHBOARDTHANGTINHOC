@@ -1,5 +1,5 @@
 /**
- * Blog / Tin tức trung tâm — mọi role đọc; Admin/Staff (manage_blog) đăng bài.
+ * Blog / Tin tức trung tâm - mọi role đọc; Admin/Staff (manage_blog) đăng bài.
  */
 const express = require('express');
 const path = require('path');
@@ -39,7 +39,7 @@ function slugify(raw) {
 async function uniqueSlug(base, excludeId) {
   let slug = slugify(base);
   let n = 0;
-  for (;;) {
+  for (; ;) {
     const candidate = n === 0 ? slug : `${slug}-${n}`;
     const q = { slug: candidate, deletedAt: null };
     if (excludeId) q._id = { $ne: excludeId };
@@ -145,7 +145,7 @@ function sortSpec(sortKey) {
 async function uniqueTopicSlug(base, excludeId) {
   let slug = slugify(base).slice(0, 80) || `chu-de-${Date.now()}`;
   let n = 0;
-  for (;;) {
+  for (; ;) {
     const candidate = n === 0 ? slug : `${slug}-${n}`;
     const q = { slug: candidate };
     if (excludeId) q._id = { $ne: excludeId };
@@ -247,7 +247,7 @@ const upload = multer({
 });
 
 /**
- * Phase 7.16 — Controlled cutover for /api/blog ONLY.
+ * Phase 7.16 - Controlled cutover for /api/blog ONLY.
  * Flow: router.use(auth) → policyShadowBlog → blogCutoverGate → handler
  * Legacy fallback: list/get pass-through; manage_* → checkPermission(MANAGE_BLOG).
  */
@@ -262,7 +262,7 @@ router.get('/topics', policyShadowBlog('list'), blogCutoverGate('list'), async (
   }
 });
 
-// ─── GET /api/blog/posts — danh sách public (đã xuất bản) ───────────────────
+// ─── GET /api/blog/posts - danh sách public (đã xuất bản) ───────────────────
 router.get('/posts', policyShadowBlog('list'), blogCutoverGate('list'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -307,7 +307,7 @@ router.get('/posts', policyShadowBlog('list'), blogCutoverGate('list'), async (r
   }
 });
 
-// ─── GET /api/blog/posts/:slugOrId — chi tiết ────────────────────────────────
+// ─── GET /api/blog/posts/:slugOrId - chi tiết ────────────────────────────────
 router.get('/posts/:slugOrId', policyShadowBlog('get'), blogCutoverGate('get'), async (req, res) => {
   try {
     const key = req.params.slugOrId;
@@ -339,7 +339,7 @@ router.get('/posts/:slugOrId', policyShadowBlog('get'), blogCutoverGate('get'), 
 
     // Tăng view (public)
     if (doc.status === 'published') {
-      BlogPost.updateOne({ _id: doc._id }, { $inc: { viewCount: 1 } }).catch(() => {});
+      BlogPost.updateOne({ _id: doc._id }, { $inc: { viewCount: 1 } }).catch(() => { });
       doc.viewCount = (doc.viewCount || 0) + 1;
     }
 

@@ -66,7 +66,7 @@ export function htmlToPlainText(html) {
 const PURIFY_CONFIG = {
   USE_PROFILES: { html: true },
   ADD_ATTR: ['target', 'rel'],
-  /** Cho phép ảnh data: (nội dung cũ) — ảnh mới nên upload /uploads. */
+  /** Cho phép ảnh data: (nội dung cũ) - ảnh mới nên upload /uploads. */
   ADD_DATA_URI_TAGS: ['img'],
   FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
 };

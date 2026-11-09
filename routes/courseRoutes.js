@@ -1,5 +1,5 @@
 const express = require('express');
-const Course  = require('../models/Course');
+const Course = require('../models/Course');
 const { authMiddleware } = require('../middleware/auth');
 const { sanitizeRegex } = require('../middleware/sanitizeRegex');
 const logger = require('../config/logger');
@@ -18,7 +18,7 @@ const { calculateDiscountPrice, effectiveCoursePrice } = require('../utils/cours
 const router = express.Router();
 
 /**
- * Phase 7.11 — Controlled cutover for /api/courses ONLY.
+ * Phase 7.11 - Controlled cutover for /api/courses ONLY.
  *
  * Public reads: policyShadowCourse → coursesCutoverGate → handler
  * Writes: auth → policyShadowCourse → coursesCutoverGate
@@ -51,14 +51,14 @@ function notDeletedFilter(includeDeleted = false) {
   return { deletedAt: null };
 }
 
-// ─── GET /api/courses/stats/summary — đặt trước /:id ───────────────────────────
+// ─── GET /api/courses/stats/summary - đặt trước /:id ───────────────────────────
 router.get('/stats/summary', courseReadGuard('stats'), async (req, res) => {
   try {
     const data = await cache.wrap(COURSE_STATS_KEY, COURSE_TTL, async () => {
       const alive = { deletedAt: null };
-      const total      = await Course.countDocuments(alive);
-      const published  = await Course.countDocuments({ ...alive, status: 'published' });
-      const featured   = await Course.countDocuments({ ...alive, featured: true });
+      const total = await Course.countDocuments(alive);
+      const published = await Course.countDocuments({ ...alive, status: 'published' });
+      const featured = await Course.countDocuments({ ...alive, featured: true });
       const categories = await Course.aggregate([
         { $match: alive },
         { $group: { _id: '$category', count: { $sum: 1 } } },
@@ -228,8 +228,8 @@ router.put('/:id', courseWriteGuard('update'), async (req, res) => {
     }
     if (body.price !== undefined || body.discountPercent !== undefined) {
       course ||= await Course.findById(req.params.id).lean();
-      const price  = Number(body.price ?? course?.price ?? 0);
-      const pct    = Number(body.discountPercent ?? course?.discountPercent ?? 0);
+      const price = Number(body.price ?? course?.price ?? 0);
+      const pct = Number(body.discountPercent ?? course?.discountPercent ?? 0);
       body.discountPrice = calcEffectivePrice(price, pct);
     }
     if (body.examSubjects !== undefined) {
@@ -283,7 +283,7 @@ router.patch('/:id/price', courseWriteGuard('price'), async (req, res) => {
   }
 });
 
-// ─── DELETE /api/courses/:id — soft-delete (không đụng ledger / enrollment) ───
+// ─── DELETE /api/courses/:id - soft-delete (không đụng ledger / enrollment) ───
 router.delete('/:id', courseWriteGuard('delete'), async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
@@ -356,7 +356,7 @@ router.delete('/:id', courseWriteGuard('delete'), async (req, res) => {
   }
 });
 
-// ─── POST /api/courses/:id/restore — khôi phục soft-delete ───────────────────
+// ─── POST /api/courses/:id/restore - khôi phục soft-delete ───────────────────
 router.post('/:id/restore', courseWriteGuard('restore'), async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
@@ -382,7 +382,7 @@ router.post('/:id/restore', courseWriteGuard('restore'), async (req, res) => {
   }
 });
 
-// ─── POST /api/courses/seed — chỉ non-production ─────────────────────────────
+// ─── POST /api/courses/seed - chỉ non-production ─────────────────────────────
 router.post('/seed', courseWriteGuard('seed'), async (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ success: false, message: 'Seed không được phép trên production' });
@@ -461,7 +461,7 @@ router.post('/seed', courseWriteGuard('seed'), async (req, res) => {
       {
         name: 'Chỉnh Sửa Ảnh Canva Nâng Cao',
         category: 'do-hoa',
-        description: 'Thiết kế chuyên nghiệp với Canva — poster, banner, social media content.',
+        description: 'Thiết kế chuyên nghiệp với Canva - poster, banner, social media content.',
         shortDescription: 'Thiết kế poster, banner chuyên nghiệp bằng Canva',
         price: 1999000,
         totalSessions: 8,

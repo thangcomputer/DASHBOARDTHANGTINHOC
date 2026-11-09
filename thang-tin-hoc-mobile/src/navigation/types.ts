@@ -49,6 +49,7 @@ export type AppStackParamList = {
   CertPrepPlayer: { sessionId: string; testTitle: string };
   CertPrepResult: { sessionId: string; testTitle: string };
   DailyPractice: { topicId?: string; watch?: 'stage'; practice?: 'stage' } | undefined;
+  Support: undefined;
 };
 
 export type MainTabsParamList = {
@@ -63,7 +64,8 @@ export type MainTabsParamList = {
     resumeSectionId?: string;
   } | undefined;
   Feed: { postId?: string; commentId?: string; parentCommentId?: string } | undefined;
-  Support: undefined;
+  DailyPractice?: { topicId?: string; watch?: 'stage'; practice?: 'stage' } | undefined;
+  Support?: undefined;
   Notifications: undefined;
   Profile: undefined;
   Students: undefined;
@@ -72,6 +74,6 @@ export type MainTabsParamList = {
 
 export function getTabItems(role: UserRole) {
   return role === 'student'
-    ? ['Schedule', 'Messages', 'Feed', 'Home', 'CourseVideos', 'Support', 'Profile'] as const
+    ? ['Schedule', 'Messages', 'Feed', 'Home', 'CourseVideos', 'DailyPractice', 'Profile'] as const
     : ['Schedule', 'Messages', 'Feed', 'Home', 'Finance', 'Support', 'Profile'] as const;
 }

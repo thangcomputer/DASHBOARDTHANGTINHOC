@@ -1,6 +1,6 @@
 /**
  * Policy shadow for LIVE assignment routes (Wave 6.7).
- * Mirrors routes/assignmentRoutes.js — including weak delete (role-only).
+ * Mirrors routes/assignmentRoutes.js - including weak delete (role-only).
  */
 const { studentMatchesTeacher } = require('../enrollmentService');
 const {
@@ -108,7 +108,7 @@ function evaluateAssignmentUpdate(subject, ctx) {
   return { decision: 'ALLOW', reason: 'assignment_update_ok', statusHint: 200 };
 }
 
-/** Legacy delete: role gate only — no MANAGE_STUDENTS, no ownership (preserved). */
+/** Legacy delete: role gate only - no MANAGE_STUDENTS, no ownership (preserved). */
 function evaluateAssignmentDelete(subject) {
   if (!subject?.id) {
     return { decision: 'DENY', reason: 'unauthenticated', statusHint: 401 };
@@ -139,7 +139,7 @@ function evaluateSubmit(subject, ctx) {
   const assignment = ctx.assignment;
   const bodyStudentId = ctx.bodyStudentId;
   if (assignment?.studentId && bodyStudentId
-      && String(assignment.studentId) !== String(bodyStudentId)) {
+    && String(assignment.studentId) !== String(bodyStudentId)) {
     return { decision: 'DENY', reason: 'assignment_not_for_student', statusHint: 403 };
   }
   if (role === 'student' && !assignment?.studentId) {

@@ -1,5 +1,5 @@
 /**
- * Phase 7.21 — Controlled cutover gate for LIVE /api/schedules ONLY.
+ * Phase 7.21 - Controlled cutover gate for LIVE /api/schedules ONLY.
  *
  * LEGACY (default):
  *   All actions → auth (+ branchFilter on list/stats) already applied; pass-through.
@@ -147,7 +147,7 @@ function schedulesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] schedules authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] schedules authority helper failed - Legacy gate',
       );
     }
 
@@ -192,7 +192,7 @@ function schedulesCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] schedules Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] schedules Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { RefreshCw, X } from 'lucide-react-native';
 import { PrimaryButton } from './ui';
@@ -132,7 +132,7 @@ export function CoursePaymentModal({
                 <Text style={styles.muted}>{`Đang tự động kiểm tra thanh toán… (${seconds}s)`}</Text>
               </View>
               {__DEV__ ? (
-                <PrimaryButton title={simulating ? 'Đang giả lập thanh toán…' : 'Đã thanh toán (test — chỉ dev)'} onPress={handleSimulate} loading={simulating} variant="secondary" />
+                <PrimaryButton title={simulating ? 'Đang giả lập thanh toán…' : 'Đã thanh toán (test - chỉ dev)'} onPress={handleSimulate} loading={simulating} variant="secondary" />
               ) : null}
             </>
           )}

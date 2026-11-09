@@ -69,7 +69,7 @@ function policyShadowBI(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] bi evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] bi evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `bi_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -107,7 +107,7 @@ function policyShadowBI(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] bi shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] bi shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -119,7 +119,7 @@ function policyShadowBI(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected bi error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected bi error - fail closed to legacy only',
       );
     }
     return next();

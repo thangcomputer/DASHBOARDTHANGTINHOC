@@ -53,9 +53,9 @@ async function loginTeacher(page) {
   await page.waitForURL(/\/teacher/, { timeout: 45000 });
   await page.waitForTimeout(800);
   const skip = page.getByRole('button', { name: 'Bỏ qua' });
-  if (await skip.count()) await skip.first().click({ timeout: 2000 }).catch(() => {});
+  if (await skip.count()) await skip.first().click({ timeout: 2000 }).catch(() => { });
   const closeGuide = page.getByRole('button', { name: 'Đóng' });
-  if (await closeGuide.count()) await closeGuide.first().click({ timeout: 2000 }).catch(() => {});
+  if (await closeGuide.count()) await closeGuide.first().click({ timeout: 2000 }).catch(() => { });
 }
 
 async function goStudentsTab(page) {
@@ -146,7 +146,7 @@ async function main() {
         modalVisible,
         confirmCount,
       });
-      // đóng modal — không confirm để giữ data cho lần sau
+      // đóng modal - không confirm để giữ data cho lần sau
       const dong = page.getByRole('button', { name: /^Đóng$/i }).first();
       if (await dong.count()) await dong.click();
       else await page.keyboard.press('Escape');
@@ -199,7 +199,7 @@ async function main() {
       hasGui: await guiBtn.count(),
     });
     if (await guiBtn.count()) {
-      // không gửi thật — đóng bằng Hủy
+      // không gửi thật - đóng bằng Hủy
       const huy = page.getByRole('button', { name: /^Hủy$/i }).first();
       if (await huy.count()) await huy.click();
     }
@@ -221,7 +221,7 @@ async function main() {
   } catch (e) {
     result.ok = false;
     result.error = String(e.message || e);
-    await page.screenshot({ path: path.join(OUT_DIR, '99-error.png'), fullPage: true }).catch(() => {});
+    await page.screenshot({ path: path.join(OUT_DIR, '99-error.png'), fullPage: true }).catch(() => { });
   }
 
   result.consoleErrors = consoleErrors.slice(0, 30);

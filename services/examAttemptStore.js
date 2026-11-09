@@ -46,7 +46,7 @@ function claimStudentAttempt(StudentModel, {
 }
 
 /**
- * Hủy lượt thi còn mở (chưa chốt điểm) không cần attemptToken —
+ * Hủy lượt thi còn mở (chưa chốt điểm) không cần attemptToken -
  * dùng khi học viên tải lại trang / đóng tab / mở lượt mới.
  */
 function claimStudentOpenAttempt(StudentModel, {

@@ -1,5 +1,5 @@
 /**
- * QA Group 3 — Teacher ↔ Student (API E2E)
+ * QA Group 3 - Teacher ↔ Student (API E2E)
  * node scripts/_qa_group3_teacher_student.cjs
  */
 require('dotenv').config();
@@ -11,7 +11,7 @@ const BASE = process.env.QA_API_BASE || 'http://127.0.0.1:5000';
 const results = [];
 const record = (tc) => {
   results.push(tc);
-  console.log(`[${tc.result}] ${tc.id} — ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
+  console.log(`[${tc.result}] ${tc.id} - ${tc.name}${tc.actual ? ` | ${tc.actual}` : ''}`);
 };
 
 function req(method, path, { token, body, cookie, csrfToken } = {}) {
@@ -174,7 +174,7 @@ async function main() {
     actual: `status=${spoof.status} tid=${spoofTid}`,
     result:
       spoof.status === 403
-      || (spoof.status === 201 && String(spoofTid) === String(teacherId))
+        || (spoof.status === 201 && String(spoofTid) === String(teacherId))
         ? 'PASS'
         : 'FAIL',
     severity: 'Critical',
@@ -217,7 +217,7 @@ async function main() {
     actual: `status=${att.status} msg=${att.json?.message || ''}`,
     result: att.status === 201 || att.status === 400 ? 'PASS' : 'FAIL',
     severity: 'High',
-    note: att.status === 400 ? 'cooldown/validation — acceptable' : '',
+    note: att.status === 400 ? 'cooldown/validation - acceptable' : '',
   });
 
   // Grade via student PUT as teacher
@@ -239,7 +239,7 @@ async function main() {
     severity: 'High',
   });
 
-  // Chat / messages smoke — đúng path conversations/:userId (không có GET /conversations)
+  // Chat / messages smoke - đúng path conversations/:userId (không có GET /conversations)
   const contacts = await req('GET', '/api/messages/contacts', { token: tTok });
   const conv = await req('GET', `/api/messages/conversations/${teacherId}`, { token: tTok });
   record({
@@ -251,7 +251,7 @@ async function main() {
     api: 'GET /api/messages/contacts + /conversations/:userId',
   });
 
-  // Training content — teacher cannot upload admin training file
+  // Training content - teacher cannot upload admin training file
   const uploadDeny = await mut('POST', '/api/settings/upload-training-file', { token: tTok, body: {} });
   record({
     id: 'G3-09', name: 'GV không upload training admin',

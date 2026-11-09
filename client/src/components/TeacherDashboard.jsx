@@ -57,13 +57,13 @@ const TeacherDashboard = () => {
   const timeAgo = (isoStr) => {
     if (!isoStr) return 'Chưa có dữ liệu';
     const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
-    if (diff < 60)       return `${diff}s trước`;
-    if (diff < 3600)     return `${Math.floor(diff / 60)}p trước`;
-    if (diff < 86400)    return `${Math.floor(diff / 3600)}h trước`;
+    if (diff < 60) return `${diff}s trước`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}p trước`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h trước`;
     return `${Math.floor(diff / 86400)} ngày trước`;
   };
 
-  // Đánh trượt học viên — lưu server + thông báo admin & học viên
+  // Đánh trượt học viên - lưu server + thông báo admin & học viên
   const lockStudentExam = async (student) => {
     const reason = 'Vi phạm quy chế giám sát thi';
     try {
@@ -95,7 +95,7 @@ const TeacherDashboard = () => {
   const [lateReason, setLateReason] = useState('');
   const dismissedAttendanceIdsRef = useRef(new Set());
 
-  // Active Attendance Checker — NO auto popup on load (spec).
+  // Active Attendance Checker - NO auto popup on load (spec).
   // Only surface a soft count; overdue never opens "Điểm danh ngay".
   useEffect(() => {
     const scan = () => {
@@ -125,7 +125,7 @@ const TeacherDashboard = () => {
         if (mode === 'checkin' || mode === 'late') count += 1;
       }
       setPendingAttendanceCount(count);
-      // Do not auto setPendingAttendanceSchedule — teacher opens from schedule UI
+      // Do not auto setPendingAttendanceSchedule - teacher opens from schedule UI
     };
 
     scan();
@@ -263,12 +263,12 @@ const TeacherDashboard = () => {
     return {
       ...s,
       displayName: getDisplayName(s),
-      // Giữ avatar upload từ API — không ghi đè bằng initials (tránh fallback cartoon mặc định)
+      // Giữ avatar upload từ API - không ghi đè bằng initials (tránh fallback cartoon mặc định)
       color: (typeof studentId === 'number' ? studentId : (String(studentId).charCodeAt(0) || 0)) % 2 === 1 ? 'bg-purple-500' : 'bg-red-500',
     };
   }), [getStudentsByTeacher, TEACHER_ID]);
-  const teacherName = (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name)) 
-    ? currentTeacher.name 
+  const teacherName = (currentTeacher?.name && !/^\d+$/.test(currentTeacher.name))
+    ? currentTeacher.name
     : currentTeacher?.email || currentTeacher?.phone || session.name || 'Giảng viên';
 
   const [gradeInputs, setGradeInputs] = useState({});
@@ -278,7 +278,7 @@ const TeacherDashboard = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  // Hash có thể kèm query (#students?studentId=…) — chỉ lấy tên tab
+  // Hash có thể kèm query (#students?studentId=…) - chỉ lấy tên tab
   const hashRaw = location.hash?.replace('#', '') || '';
 
   const currentHashForSoftware = (location.hash || '').replace('#', '').split(/[?#]/)[0];
@@ -288,7 +288,7 @@ const TeacherDashboard = () => {
     let alive = true;
     const load = () => api.settings.getTrainingData()
       .then((res) => { if (alive && res?.success && res.data) setTrainingData(res.data); })
-      .catch(() => {});
+      .catch(() => { });
     load();
     const onRefresh = () => { settingsRefreshTick.current += 1; load(); };
     const onData = (p) => { if (!p || p.type === 'settings') onRefresh(); };
@@ -320,7 +320,7 @@ const TeacherDashboard = () => {
     );
   }, [students, navigate, location.pathname]);
 
-  // Deep-link / mặc đầu: chỉ theo hash + danh sách HV — không đè khi GV vừa chọn tay
+  // Deep-link / mặc đầu: chỉ theo hash + danh sách HV - không đè khi GV vừa chọn tay
   useEffect(() => {
     const params = new URLSearchParams(hashQuery);
     const enrollmentKeyParam = params.get('enrollmentKey');
@@ -456,9 +456,9 @@ const TeacherDashboard = () => {
 
   // ── MÀN HÌNH CHỜ DUYỆT ── chỉ hiện nút Bài Test
   // ⭐ Fix: Chuyển sang logic "Pessimistic" (Coi là pending nếu KHÔNG PHẢI là active)
-  const isPending = String(session?.status || '').toLowerCase() !== 'active' && 
-                    String(currentTeacher?.status || '').toLowerCase() !== 'active';
-  
+  const isPending = String(session?.status || '').toLowerCase() !== 'active' &&
+    String(currentTeacher?.status || '').toLowerCase() !== 'active';
+
   if (session.role === 'teacher' && isPending) {
     return (
       <div className="bg-transparent flex items-center justify-center p-6 h-full">
@@ -522,30 +522,26 @@ const TeacherDashboard = () => {
                   return steps.map((s, i) => (
                     <div
                       key={i}
-                      className={`flex items-center gap-4 p-4 rounded-2xl transition-all border-2 ${
-                        s.done ? 'bg-green-50 border-green-100' :
-                        s.active ? 'bg-red-50 border-red-200 animate-pulse' :
-                        'bg-gray-50 border-transparent'
-                      }`}
+                      className={`flex items-center gap-4 p-4 rounded-2xl transition-all border-2 ${s.done ? 'bg-green-50 border-green-100' :
+                          s.active ? 'bg-red-50 border-red-200 animate-pulse' :
+                            'bg-gray-50 border-transparent'
+                        }`}
                     >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 shadow-sm ${
-                        s.done ? 'bg-green-500 text-white' :
-                        s.active ? 'bg-red-500 text-white' :
-                        'bg-gray-200 text-gray-400'
-                      }`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 shadow-sm ${s.done ? 'bg-green-500 text-white' :
+                          s.active ? 'bg-red-500 text-white' :
+                            'bg-gray-200 text-gray-400'
+                        }`}>
                         {s.done ? '✓' : s.step}
                       </div>
                       <div className="flex-1">
-                        <p className={`text-sm font-bold ${
-                          s.done ? 'text-green-800' :
-                          s.active ? 'text-red-800' :
-                          'text-gray-600'
-                        }`}>{s.label}</p>
-                        <p className={`text-xs ${
-                          s.done ? 'text-green-600/70' :
-                          s.active ? 'text-red-500 font-medium' :
-                          'text-gray-400'
-                        }`}>{s.sub}</p>
+                        <p className={`text-sm font-bold ${s.done ? 'text-green-800' :
+                            s.active ? 'text-red-800' :
+                              'text-gray-600'
+                          }`}>{s.label}</p>
+                        <p className={`text-xs ${s.done ? 'text-green-600/70' :
+                            s.active ? 'text-red-500 font-medium' :
+                              'text-gray-400'
+                          }`}>{s.sub}</p>
                       </div>
                     </div>
                   ));
@@ -555,16 +551,15 @@ const TeacherDashboard = () => {
               {/* Nút tác vụ */}
               <button
                 onClick={() => navigate('/teacher/test')}
-                className={`w-full py-4 rounded-2xl font-black text-base transition-all flex items-center justify-center gap-3 shadow-lg ${
-                  (currentTeacher?.testScore != null && !!currentTeacher?.practicalFile)
-                  ? 'bg-gradient-to-r from-slate-700 to-slate-800 text-white hover:from-black'
-                  : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 shadow-red-500/30'
-                }`}
+                className={`w-full py-4 rounded-2xl font-black text-base transition-all flex items-center justify-center gap-3 shadow-lg ${(currentTeacher?.testScore != null && !!currentTeacher?.practicalFile)
+                    ? 'bg-gradient-to-r from-slate-700 to-slate-800 text-white hover:from-black'
+                    : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 shadow-red-500/30'
+                  }`}
               >
                 <BookOpen size={20} />
                 {currentTeacher?.testScore == null ? 'Làm bài thi ngay' :
-                 !currentTeacher?.practicalFile ? 'Tiếp tục nộp bài thực hành' :
-                 'Xem lại bài thi'}
+                  !currentTeacher?.practicalFile ? 'Tiếp tục nộp bài thực hành' :
+                    'Xem lại bài thi'}
                 <ChevronRight size={20} />
               </button>
               <p className="text-xs text-center text-gray-400">Liên hệ Admin: <strong className="text-gray-600">093-5758-462</strong> nếu cần hỗ trợ</p>
@@ -578,7 +573,7 @@ const TeacherDashboard = () => {
 
   return (
     <div className={`bg-transparent flex flex-col min-w-0 w-full ${currentHash === 'students' ? 'h-full min-h-0' : ''}`}>
-      {/* Popup thông báo — hiện 1 lần/ngày */}
+      {/* Popup thông báo - hiện 1 lần/ngày */}
       <PopupBanner role="teacher" />
 
       <div className={`min-w-0 w-full flex flex-col ${currentHash === 'students' ? 'flex-1 min-h-0' : ''}`}>
@@ -587,7 +582,7 @@ const TeacherDashboard = () => {
 
         {/* ═══ CONTENT ═══ */}
         {currentHash === 'training' ? (
-           <TeacherTrainingLMS onBack={() => window.location.hash = ''} />
+          <TeacherTrainingLMS onBack={() => window.location.hash = ''} />
         ) : currentHash === 'software-links' ? (
           <div className="cms-sd cms-sd-page bg-slate-50 min-h-full py-2 sm:py-4">
             <SoftwareLinksTable
@@ -666,12 +661,12 @@ const TeacherDashboard = () => {
           onSubmit={handleScheduleSubmit}
         />
       )}
-      {/* ─ ACTIVE ATTENDANCE MODAL (one schedule; closable — does not lock dashboard) ─ */}
+      {/* ─ ACTIVE ATTENDANCE MODAL (one schedule; closable - does not lock dashboard) ─ */}
       {pendingAttendanceSchedule && (() => {
         const s = pendingAttendanceSchedule;
         const mode = s._promptMode || 'late';
         const actionMeta = getAttendanceAction(s, null, new Date());
-        const endLabel = s.endTime || '—';
+        const endLabel = s.endTime || '-';
         const graceLabel = formatGraceRemaining(actionMeta.remainingGraceMs);
         let headerTitle = 'Xác nhận hoàn thành buổi học';
         let headerSub = 'Buổi học đã kết thúc. Vui lòng xác nhận kết quả.';
@@ -694,139 +689,139 @@ const TeacherDashboard = () => {
           headerBg = 'bg-slate-700';
         }
         return (
-        <div
-          className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) dismissAttendancePrompt();
-          }}
-        >
-          <div className="bg-white rounded-[24px] w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200">
-            <div className={`${headerBg} p-6 text-white flex items-start gap-4`}>
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-                <Clock size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-black text-lg">{headerTitle}</h3>
-                <p className="text-white/85 text-sm mt-1">{headerSub}</p>
-                {pendingAttendanceCount > 1 && (
-                  <p className="text-white/75 text-xs mt-2">
-                    Bạn có {pendingAttendanceCount} buổi chưa xác nhận — đang xem lần lượt.
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={dismissAttendancePrompt}
-                className="text-white/90 hover:text-white text-sm font-bold px-2 py-1 rounded-lg hover:bg-white/10"
-                aria-label="Đóng"
-              >
-                Đóng
-              </button>
-            </div>
-
-            <div className="p-8 space-y-6">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <div className="grid gap-2">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                    <span className="text-slate-500 text-sm font-semibold">Học viên</span>
-                    <span className="font-bold text-slate-800 text-base">{s.studentName}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                    <span className="text-slate-500 text-sm font-semibold">Khóa học</span>
-                    <span className="font-bold text-blue-700">{s.course}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                    <span className="text-slate-500 text-sm font-semibold">Thời gian</span>
-                    <span className="font-black text-slate-800 tracking-wide bg-white px-2 py-1 rounded-md shadow-sm border border-slate-100">
-                      {s.startTime} - {s.endTime}
-                    </span>
-                  </div>
-                  {(mode === 'late' || mode === 'expired') && (
-                    <div className="flex justify-between items-center pt-1">
-                      <span className="text-slate-500 text-sm font-semibold">Kết thúc lúc</span>
-                      <span className="font-semibold text-slate-800">{endLabel}</span>
-                    </div>
-                  )}
-                  {mode === 'late' && (
-                    <div className="flex justify-between items-center pt-1">
-                      <span className="text-slate-500 text-sm font-semibold">Còn lại để bổ sung</span>
-                      <span className="font-semibold text-amber-700">{graceLabel}</span>
-                    </div>
+          <div
+            className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) dismissAttendancePrompt();
+            }}
+          >
+            <div className="bg-white rounded-[24px] w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200">
+              <div className={`${headerBg} p-6 text-white flex items-start gap-4`}>
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                  <Clock size={24} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-black text-lg">{headerTitle}</h3>
+                  <p className="text-white/85 text-sm mt-1">{headerSub}</p>
+                  {pendingAttendanceCount > 1 && (
+                    <p className="text-white/75 text-xs mt-2">
+                      Bạn có {pendingAttendanceCount} buổi chưa xác nhận - đang xem lần lượt.
+                    </p>
                   )}
                 </div>
-              </div>
-
-              {mode === 'late' && (
-                <div>
-                  <label className="text-xs font-black text-slate-700  tracking-widest block mb-2">
-                    Lý do điểm danh bổ sung
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={lateReason}
-                    onChange={(e) => setLateReason(e.target.value)}
-                    placeholder="Ví dụ: Quên điểm danh, sự cố hệ thống..."
-                    className="w-full border-2 border-amber-200 focus:border-amber-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-3 pt-1">
-                {mode === 'expired' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      toast.info('Correction request chưa mở (cần RBAC/Admin workflow). Liên hệ Admin/Staff để duyệt điểm danh ngoài cửa sổ.');
-                    }}
-                    className="w-full py-4 text-white font-black bg-slate-700 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 text-lg"
-                  >
-                    Gửi yêu cầu điểm danh bổ sung
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleActiveAttend}
-                    disabled={mode === 'late' && !lateReason.trim()}
-                    className="w-full py-4 text-white font-black bg-blue-600 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-lg"
-                  >
-                    <CheckCircle size={22} /> {primaryLabel}
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={dismissAttendancePrompt}
-                  className="w-full py-3 text-slate-600 font-bold bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-50 transition-all"
+                  className="text-white/90 hover:text-white text-sm font-bold px-2 py-1 rounded-lg hover:bg-white/10"
+                  aria-label="Đóng"
                 >
                   Đóng
                 </button>
+              </div>
 
-                {mode !== 'expired' && (
-                <div className="border border-red-100 bg-red-50/50 rounded-2xl p-4">
-                  <label className="text-xs font-black text-red-800  tracking-widest block mb-2">Học viên không học?</label>
-                  <textarea
-                    rows={2}
-                    value={noShowReason}
-                    onChange={(e) => setNoShowReason(e.target.value)}
-                    placeholder="Bắt buộc nhập lý do (VD: HS xin nghỉ, GV bận đột xuất...)"
-                    className="w-full border-2 border-red-200 focus:border-red-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white mb-3"
-                  />
+              <div className="p-8 space-y-6">
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div className="grid gap-2">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                      <span className="text-slate-500 text-sm font-semibold">Học viên</span>
+                      <span className="font-bold text-slate-800 text-base">{s.studentName}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                      <span className="text-slate-500 text-sm font-semibold">Khóa học</span>
+                      <span className="font-bold text-blue-700">{s.course}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                      <span className="text-slate-500 text-sm font-semibold">Thời gian</span>
+                      <span className="font-black text-slate-800 tracking-wide bg-white px-2 py-1 rounded-md shadow-sm border border-slate-100">
+                        {s.startTime} - {s.endTime}
+                      </span>
+                    </div>
+                    {(mode === 'late' || mode === 'expired') && (
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-slate-500 text-sm font-semibold">Kết thúc lúc</span>
+                        <span className="font-semibold text-slate-800">{endLabel}</span>
+                      </div>
+                    )}
+                    {mode === 'late' && (
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-slate-500 text-sm font-semibold">Còn lại để bổ sung</span>
+                        <span className="font-semibold text-amber-700">{graceLabel}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {mode === 'late' && (
+                  <div>
+                    <label className="text-xs font-black text-slate-700  tracking-widest block mb-2">
+                      Lý do điểm danh bổ sung
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={lateReason}
+                      onChange={(e) => setLateReason(e.target.value)}
+                      placeholder="Ví dụ: Quên điểm danh, sự cố hệ thống..."
+                      className="w-full border-2 border-amber-200 focus:border-amber-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-3 pt-1">
+                  {mode === 'expired' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toast.info('Correction request chưa mở (cần RBAC/Admin workflow). Liên hệ Admin/Staff để duyệt điểm danh ngoài cửa sổ.');
+                      }}
+                      className="w-full py-4 text-white font-black bg-slate-700 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 text-lg"
+                    >
+                      Gửi yêu cầu điểm danh bổ sung
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleActiveAttend}
+                      disabled={mode === 'late' && !lateReason.trim()}
+                      className="w-full py-4 text-white font-black bg-blue-600 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-lg"
+                    >
+                      <CheckCircle size={22} /> {primaryLabel}
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={handleActiveNoShow}
-                    disabled={!noShowReason.trim()}
-                    className="w-full py-3 text-red-600 font-bold bg-white border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    onClick={dismissAttendancePrompt}
+                    className="w-full py-3 text-slate-600 font-bold bg-white border-2 border-slate-200 rounded-xl hover:bg-slate-50 transition-all"
                   >
-                    Báo học viên không học
+                    Đóng
                   </button>
+
+                  {mode !== 'expired' && (
+                    <div className="border border-red-100 bg-red-50/50 rounded-2xl p-4">
+                      <label className="text-xs font-black text-red-800  tracking-widest block mb-2">Học viên không học?</label>
+                      <textarea
+                        rows={2}
+                        value={noShowReason}
+                        onChange={(e) => setNoShowReason(e.target.value)}
+                        placeholder="Bắt buộc nhập lý do (VD: HS xin nghỉ, GV bận đột xuất...)"
+                        className="w-full border-2 border-red-200 focus:border-red-400 rounded-xl px-4 py-3 text-sm outline-none resize-none bg-white mb-3"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleActiveNoShow}
+                        disabled={!noShowReason.trim()}
+                        className="w-full py-3 text-red-600 font-bold bg-white border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        Báo học viên không học
+                      </button>
+                    </div>
+                  )}
                 </div>
-                )}
               </div>
             </div>
           </div>
-        </div>
         );
       })()}
 

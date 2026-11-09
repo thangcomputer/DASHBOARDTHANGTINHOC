@@ -1,10 +1,10 @@
 /**
  * Cache-aside: Redis khi co REDIS_URL, khong thi in-memory Map (TTL).
- * Khong throw — loi Redis luon fallback memory / miss.
+ * Khong throw - loi Redis luon fallback memory / miss.
  */
 const { getRedis, isRedisReady } = require('../config/redis');
 
-/** Chỉ gọi Redis khi client ready — tránh treo khi REDIS_URL set nhưng Redis down. */
+/** Chỉ gọi Redis khi client ready - tránh treo khi REDIS_URL set nhưng Redis down. */
 function readyRedis() {
   const redis = getRedis();
   if (!redis || !isRedisReady()) return null;

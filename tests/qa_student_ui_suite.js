@@ -28,14 +28,14 @@ function addResult(moduleName, func, result, severity, desc) {
   try {
     // 1. Đăng nhập
     await page.goto(`${FRONTEND_URL}/login`);
-    
+
     // Đăng nhập bằng Student A
     // Vai trò mặc định là Học viên, nhưng cứ click để chắc chắn
     await page.click('button[role="tab"]:has-text("Học viên")');
     await page.fill('input[type="text"], input[name="identifier"], input[placeholder*="SĐT"]', testData.studentA.phone);
     await page.fill('input[type="password"]', testData.studentA.password);
     await page.click('button[type="submit"]');
-    
+
     try {
       await page.waitForURL('**/student**', { timeout: 10000 });
       addResult('Auth', 'Login UI', 'Passed', 'High', 'Đăng nhập UI thành công vào Student Portal');
@@ -49,7 +49,7 @@ function addResult(moduleName, func, result, severity, desc) {
     await page.reload();
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
-    
+
     const scheduleText = (await page.textContent('body')).toLowerCase();
     if (scheduleText.includes('lịch học') || scheduleText.includes('thời khóa biểu')) {
       addResult('Schedule', 'Read UI', 'Passed', 'High', 'Học viên xem được lịch học thành công');
@@ -66,7 +66,7 @@ function addResult(moduleName, func, result, severity, desc) {
     } else {
       addResult('Security', 'Admin Access UI', 'Failed', 'Critical', 'Student truy cập được trang Admin: ' + currentUrl);
     }
-    
+
     await page.goto(`${FRONTEND_URL}/teacher`);
     await page.waitForTimeout(2000);
     currentUrl = page.url();
@@ -75,16 +75,16 @@ function addResult(moduleName, func, result, severity, desc) {
     } else {
       addResult('Security', 'Teacher Access UI', 'Failed', 'Critical', 'Student truy cập được trang Teacher: ' + currentUrl);
     }
-    
+
     // 4. Kiểm tra Tài liệu (Materials)
     await page.goto(`${FRONTEND_URL}/student#materials`);
     await page.reload();
     await page.waitForTimeout(2000);
     const materialText = (await page.textContent('body')).toLowerCase();
     if (materialText.includes('tài liệu') || materialText.includes('bài tập')) {
-       addResult('Materials', 'View UI', 'Passed', 'Medium', 'Truy cập tab Tài liệu thành công');
+      addResult('Materials', 'View UI', 'Passed', 'Medium', 'Truy cập tab Tài liệu thành công');
     } else {
-       addResult('Materials', 'View UI', 'Failed', 'Medium', 'Không tải được tab Tài liệu');
+      addResult('Materials', 'View UI', 'Failed', 'Medium', 'Không tải được tab Tài liệu');
     }
 
     // 5. Kiểm tra Hồ sơ
@@ -93,9 +93,9 @@ function addResult(moduleName, func, result, severity, desc) {
     await page.waitForTimeout(2000);
     const profileText = (await page.textContent('body')).toLowerCase();
     if (profileText.includes('học viên của gv chính') || profileText.includes('0777777001')) {
-       addResult('Profile', 'View UI', 'Passed', 'Medium', 'Tải hồ sơ Student thành công');
+      addResult('Profile', 'View UI', 'Passed', 'Medium', 'Tải hồ sơ Student thành công');
     } else {
-       addResult('Profile', 'View UI', 'Failed', 'Medium', 'Lỗi hiển thị hồ sơ');
+      addResult('Profile', 'View UI', 'Failed', 'Medium', 'Lỗi hiển thị hồ sơ');
     }
 
   } catch (error) {

@@ -321,7 +321,7 @@ async function applyEnrollmentStats(doc, studentId, Schedule) {
         },
       },
     ]);
-    // Gom theo tên khóa đã chuẩn hóa (trim / hoa thường / bỏ dấu) — tránh lệch
+    // Gom theo tên khóa đã chuẩn hóa (trim / hoa thường / bỏ dấu) - tránh lệch
     // "khóa học test" vs "Khóa học test" làm điểm danh bù không tăng tiến độ.
     sessionByCourse = {};
     rows.forEach((r) => {

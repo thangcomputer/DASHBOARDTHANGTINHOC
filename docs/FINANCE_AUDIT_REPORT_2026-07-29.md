@@ -2,7 +2,7 @@
 
 **Ngày:** 2026-07-29  
 **Phạm vi:** Finance · Revenue · Payment · Refund · Teacher Salary · Student Payment · Dashboard · Statistics · Report · Audit Log · Transaction · Invoice  
-**Phương pháp:** Đọc mã nguồn (read-only), đối chiếu luồng ghi sổ / aggregate / UI — **không sửa code trong lần audit này**.  
+**Phương pháp:** Đọc mã nguồn (read-only), đối chiếu luồng ghi sổ / aggregate / UI - **không sửa code trong lần audit này**.  
 **Kết luận tổng:** **Module Tài chính CHƯA đạt yêu cầu Production.** Có lệch có hệ thống giữa Ledger (sổ đúng hướng) và Dashboard/BI/Analytics (cộng theo `enrollment.paid` + `price`, không trừ hoàn / không loại cancelled).
 
 ---
@@ -16,7 +16,7 @@ Hệ thống đang vận hành **nhiều sổ song song**, không có một Sour
 | A. Student flags | `Student.paid`, `paidAmount`, `enrollments[].paid/price/status` | Dashboard, BI, Analytics (`revenueAggregate`) |
 | B. Ledger | `LedgerEntry` (payment / refund / adjustment) | Một phần refund UI, reconciliation helper |
 | C. Invoice | `Invoice.hocPhi` | Hóa đơn, tab Tài chính chi tiết HV (ưu tiên) |
-| D. Teacher Transaction | `Transaction` (lương GV) | Chi lương — **không** nằm trong Ledger học phí |
+| D. Teacher Transaction | `Transaction` (lương GV) | Chi lương - **không** nằm trong Ledger học phí |
 
 Policy trong `services/ledgerService.js` tuyên bố SoT = Ledger, nhưng KPI thực tế dùng `services/revenueAggregate.js` (Student).
 
@@ -40,7 +40,7 @@ Profit:    chưa có công thức trong code
 | Thanh toán thành công nhiều lần | SePay có claim atomic `paid:false→true`; admin pay **không** atomic | Rủi ro race (High) |
 | Thất bại / chờ / hủy | Session pending không cộng Ledger | OK cho session |
 | Chuyển khoản / QR SePay → HV đã có | Cộng Student + Invoice + Ledger | OK |
-| QR → PaymentSession | Chỉ `session.status=paid` — **không** Student/Invoice/Ledger | **Critical gap** |
+| QR → PaymentSession | Chỉ `session.status=paid` - **không** Student/Invoice/Ledger | **Critical gap** |
 | Manual `POST /invoices` | Có thể set `paid=true` **không** `paidAmount`/Ledger | **High** |
 
 ---
@@ -51,7 +51,7 @@ Profit:    chưa có công thức trong code
 |------------|---------|----------|
 | Hoàn 100% / 50% (`PUT /students/:id/refund`) | Giảm `paidAmount`; `postRefund`; giữ Invoice | Ledger OK; **KPI enrollment vẫn full price** nếu `paid` còn true |
 | Hủy khóa + hoàn | Soft-cancel + `postRefund`; **không clear `enr.paid`** | Ledger OK; **BI vẫn cộng** |
-| Hoàn nhiều lần | Idempotency key có `Date.now()` | **Critical** — retry có thể cộng refund trùng |
+| Hoàn nhiều lần | Idempotency key có `Date.now()` | **Critical** - retry có thể cộng refund trùng |
 | Trả lương / thưởng GV | `Transaction` riêng | Chi phí tách đúng hướng, nhưng **hard-delete được**, không vào Ledger học phí |
 | Chi phí vận hành | Không thấy module OPEX chung trong Ledger | Chưa có |
 
@@ -103,7 +103,7 @@ net = payments − refunds   // adjustments bị bỏ qua trong net
 Không trừ refund. Không trừ lương GV. Không có profit API.
 ```
 
-**StudentDetailModal (sau chỉnh UI gần đây):** ưu tiên cộng Invoice thu; hiện “Đã hoàn” riêng — gần đúng hướng hiển thị HV, **không** đồng bộ với BI.
+**StudentDetailModal (sau chỉnh UI gần đây):** ưu tiên cộng Invoice thu; hiện “Đã hoàn” riêng - gần đúng hướng hiển thị HV, **không** đồng bộ với BI.
 
 ---
 
@@ -169,8 +169,8 @@ Không trừ refund. Không trừ lương GV. Không có profit API.
 | Ba sổ lệch | Student / Ledger / Invoice |
 | Invoice không có `branchId` | Filter chi nhánh trên Invoice stats dễ về 0 |
 | Refund không bắt buộc link Payment gốc | Có thể hoàn “mồ côi” về mặt quan hệ |
-| Orphan risk | Invoice/Payment gắn `hocVien`; khi soft-cancel enrollment vẫn giữ — tốt; hard delete Invoice — xấu |
-| `paidAmount` mutate trực tiếp | Vi phạm nguyên tắc “không sửa số dư — chỉ sinh bút toán” |
+| Orphan risk | Invoice/Payment gắn `hocVien`; khi soft-cancel enrollment vẫn giữ - tốt; hard delete Invoice - xấu |
+| `paidAmount` mutate trực tiếp | Vi phạm nguyên tắc “không sửa số dư - chỉ sinh bút toán” |
 
 ---
 
@@ -178,7 +178,7 @@ Không trừ refund. Không trừ lương GV. Không có profit API.
 
 | API | Vấn đề |
 |-----|--------|
-| `/api/students/stats`, analytics, BI overview | Dùng `sumPaidRevenue` — lệch sau refund/cancel |
+| `/api/students/stats`, analytics, BI overview | Dùng `sumPaidRevenue` - lệch sau refund/cancel |
 | `PUT /refund`, cancel enrollment | Idempotency yếu; ledger lỗi bị nuốt |
 | `DELETE .../enrollments/:id` | Thiếu branch guard |
 | Invoice list/stats + branchFilter | Schema thiếu branch |
@@ -215,7 +215,7 @@ Không trừ refund. Không trừ lương GV. Không có profit API.
 
 | ID | Bug | File (tham chiếu) |
 |----|-----|-------------------|
-| C1 | Dashboard/BI/Analytics bỏ qua Ledger & refund — vẫn cộng `enrollment.price` khi `paid=true` | `services/revenueAggregate.js` ~44–49 |
+| C1 | Dashboard/BI/Analytics bỏ qua Ledger & refund - vẫn cộng `enrollment.price` khi `paid=true` | `services/revenueAggregate.js` ~44–49 |
 | C2 | Cancel enrollment giữ `paid=true` → KPI không giảm dù đã hoàn | `routes/studentRoutes.js` ~1776–1816 |
 | C3 | Partial refund không chỉnh `enr.price`/`paid` → KPI full tuition | `routes/studentRoutes.js` ~1114–1118 |
 | C4 | Student save trước, Ledger sau; lỗi Ledger chỉ `warn` → lệch sổ | `studentRoutes` pay/refund/cancel; webhooks |
@@ -268,7 +268,7 @@ Không trừ refund. Không trừ lương GV. Không có profit API.
 
 1. **Sửa `revenueAggregate`:** loại `status==='cancelled'`; net theo Ledger hoặc trừ `refundedAmount`; partial refund giảm amount ghi nhận.  
 2. **Cancel paid enrollment:** set `paid=false` **hoặc** luôn exclude cancelled khỏi aggregate; gắn `reversesEntryId`.  
-3. **Idempotency ổn định:** bỏ `Date.now()` — dùng `refund:{studentId}:{enrollmentId}` / `refund:{studentId}:{amount}:{sourceRef}`.  
+3. **Idempotency ổn định:** bỏ `Date.now()` - dùng `refund:{studentId}:{enrollmentId}` / `refund:{studentId}:{amount}:{sourceRef}`.  
 4. **Mongo transaction / outbox:** Student + Ledger cùng atomic; thất bại thì rollback hoặc retry queue.  
 5. **PaymentSession SePay:** bắt buộc settle Student + Invoice + Ledger khi convert / khi paid.  
 6. **Credit note:** khi hoàn, sinh chứng từ điều chỉnh (không xóa HĐ gốc).  
@@ -303,4 +303,4 @@ và không còn đường pay/refund nào mutate tiền mà thiếu Ledger + Aud
 
 ---
 
-*Báo cáo này chỉ audit — không chứa thay đổi code sửa sổ. Các commit kèm theo cùng ngày là UI/finance hiển thị HV + cho phép đăng ký lại khóa cancelled + invoice preview — chưa đóng các Critical C1–C5 ở tầng aggregate.*
+*Báo cáo này chỉ audit - không chứa thay đổi code sửa sổ. Các commit kèm theo cùng ngày là UI/finance hiển thị HV + cho phép đăng ký lại khóa cancelled + invoice preview - chưa đóng các Critical C1–C5 ở tầng aggregate.*

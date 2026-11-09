@@ -1,6 +1,6 @@
-/**
+﻿/**
  * CertPrepScreens.tsx
- * Màn hình ôn thi MOS/IC3 — tương đương CertPrepCatalogPage, CertPrepLevelPage,
+ * Màn hình ôn thi MOS/IC3 - tương đương CertPrepCatalogPage, CertPrepLevelPage,
  * CertPrepStudentPlayer, CertPrepResult của web app.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -295,7 +295,7 @@ export function CertPrepLevelScreen() {
             </View>
             <View style={styles.testCardMeta}>
               <Text style={styles.testCardMetaText}>
-                {test.questionCount} câu • {test.timeLimitMinutes ?? '—'} phút
+                {test.questionCount} câu • {test.timeLimitMinutes ?? '-'} phút
               </Text>
             </View>
             <View style={styles.testCardActions}>

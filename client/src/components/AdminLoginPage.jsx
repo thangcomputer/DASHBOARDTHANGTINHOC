@@ -42,14 +42,14 @@ const AdminLoginPage = ({ onLogin }) => {
           setDynamicLogo(url.startsWith('http') ? url : `${API}${url}`);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [API]);
 
   const [userInputCaptcha, setUserInputCaptcha] = useState('');
   const [captchaId, setCaptchaId] = useState('');
   const [captchaSvg, setCaptchaSvg] = useState('');
 
-  // CAPTCHA do server sinh — dùng 1 lần, phải làm mới sau mỗi lần gửi
+  // CAPTCHA do server sinh - dùng 1 lần, phải làm mới sau mỗi lần gửi
   const generateCaptcha = React.useCallback(async () => {
     setUserInputCaptcha('');
     try {
@@ -72,7 +72,7 @@ const AdminLoginPage = ({ onLogin }) => {
 
   const handleLogin = async (e, forceDevice = false) => {
     if (e?.preventDefault) e.preventDefault();
-    
+
     // 1. Kiểm tra trường trống
     const canonicalPhone = normalizePhone(phone);
     if (!canonicalPhone || !isValidVNPhone(canonicalPhone) || !password) {
@@ -141,7 +141,7 @@ const AdminLoginPage = ({ onLogin }) => {
         setError(data.message || 'Tài khoản hoặc mật khẩu không đúng');
         toast.error('Truy cập bị từ chối!');
         setPassword('');
-        generateCaptcha(); // CAPTCHA dùng 1 lần — cấp mã mới cho lần thử tiếp theo
+        generateCaptcha(); // CAPTCHA dùng 1 lần - cấp mã mới cho lần thử tiếp theo
       }
     } catch (err) {
       console.error('[AdminLogin]', err);
@@ -150,7 +150,7 @@ const AdminLoginPage = ({ onLogin }) => {
           ? 'Máy chủ trả về dữ liệu không hợp lệ (kiểm tra API đang chạy và proxy vite)'
           : 'Lỗi kết nối hệ thống bảo mật',
       );
-      toast.error('Không kết nối được máy chủ — chạy backend (port 5000) và npm run dev client');
+      toast.error('Không kết nối được máy chủ - chạy backend (port 5000) và npm run dev client');
     } finally {
       setLoading(false);
     }

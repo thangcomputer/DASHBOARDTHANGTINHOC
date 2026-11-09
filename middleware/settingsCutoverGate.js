@@ -1,7 +1,7 @@
 /**
- * Phase 7.19 — Controlled cutover gate for LIVE /api/settings ONLY.
+ * Phase 7.19 - Controlled cutover gate for LIVE /api/settings ONLY.
  *
- * LEGACY (default) — action-aware:
+ * LEGACY (default) - action-aware:
  *   - public_read → pass-through (no auth)
  *   - auth_only → pass-through (auth already applied)
  *   - system_read / system_write / reset → checkPermission(SYSTEM_SETTINGS)
@@ -98,7 +98,7 @@ function settingsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] settings authority helper failed — Legacy gate',
+        '[POLICY_CUTOVER] settings authority helper failed - Legacy gate',
       );
     }
 
@@ -143,7 +143,7 @@ function settingsCutoverGate(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_CUTOVER] settings Policy unsafe — fallback Legacy',
+        '[POLICY_CUTOVER] settings Policy unsafe - fallback Legacy',
       );
       req.authzAuthority = AUTHORITY.LEGACY;
       req.policyAuthoritative = false;

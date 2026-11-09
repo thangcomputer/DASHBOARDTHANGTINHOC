@@ -71,7 +71,7 @@ function policyShadowStaff(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] staff evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] staff evaluation error - legacy still authoritative',
         );
         req.policyShadow = { action: `staff_${action}`, comparison: 'ERROR', error: evalErr.message };
         return next();
@@ -107,7 +107,7 @@ function policyShadowStaff(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] staff shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] staff shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -119,7 +119,7 @@ function policyShadowStaff(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected staff error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected staff error - fail closed to legacy only',
       );
     }
     return next();

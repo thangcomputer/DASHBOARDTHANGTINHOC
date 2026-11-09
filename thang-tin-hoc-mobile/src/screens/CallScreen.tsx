@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DeviceEventEmitter, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Mic, MicOff, PhoneOff } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -25,7 +25,7 @@ type CallPayload = {
 };
 
 function getCallErrorMessage(code?: string) {
-  if (code === 'USER_BUSY') return 'Máy bận — người này đang trong một cuộc gọi khác.';
+  if (code === 'USER_BUSY') return 'Máy bận - người này đang trong một cuộc gọi khác.';
   if (code === 'CALL_RATE_LIMITED') return 'Bạn đã gọi quá nhiều lần. Vui lòng thử lại sau.';
   if (code === 'CALL_NOT_ALLOWED') return 'Bạn không có quyền gọi trong cuộc trò chuyện này.';
   if (code === 'CALL_NOT_AVAILABLE') return 'Cuộc gọi không còn khả dụng.';

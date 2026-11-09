@@ -1,5 +1,5 @@
 /**
- * Phase 4 — Canonical MessagingPolicy (LIVE messaging only).
+ * Phase 4 - Canonical MessagingPolicy (LIVE messaging only).
  *
  * Authority freeze (MESSAGING_BUSINESS_DECISIONS.md):
  *   canDiscoverContacts ← contact-visibility-824b
@@ -7,10 +7,10 @@
  *   transportRole never implies productRole (SUPPORT → transport staff)
  *
  * Existing modules:
- *   messagingPairing     — SEND engine (delegated)
- *   messagingRoles       — transport + conversation access (delegated)
- *   chatAccessService    — compatibility wrapper → this module
- *   messageRoutes /contacts — still owns DB queries (Phase 6 migrates to this)
+ *   messagingPairing     - SEND engine (delegated)
+ *   messagingRoles       - transport + conversation access (delegated)
+ *   chatAccessService    - compatibility wrapper → this module
+ *   messageRoutes /contacts - still owns DB queries (Phase 6 migrates to this)
  */
 'use strict';
 
@@ -89,7 +89,7 @@ function normalizeIdentity(user = {}) {
 }
 
 /**
- * Phase 5.1 — authoritative tenant for messaging.
+ * Phase 5.1 - authoritative tenant for messaging.
  * Prefer explicit tenantId on identity; else Branch.tenantId via branchId.
  * Never trusts client spoof fields alone (caller must pass server identity).
  * @returns {Promise<string|null>}
@@ -113,7 +113,7 @@ async function resolveAuthoritativeTenantId(identity = {}) {
   if (branch.tenantId != null && branch.tenantId !== '') {
     return String(branch.tenantId);
   }
-  // Production Branches often lack tenantId — isolate by branch so same-CN DMs still work.
+  // Production Branches often lack tenantId - isolate by branch so same-CN DMs still work.
   // Cross-branch still yields different keys. Missing Branch doc remains DENY above.
   return `branch:${branchId}`;
 }
@@ -226,7 +226,7 @@ function softAlignScopedTenants(actorTenantId, recipientTenantId) {
 /**
  * SUPPORT / HIGH / SUPER are org-wide helpdesk (pairing freeze).
  * Either side may inherit missing/synthetic tenant from the other when one
- * party is org-wide — so TEACHER/STUDENT without branch still discover SUPPORT.
+ * party is org-wide - so TEACHER/STUDENT without branch still discover SUPPORT.
  * Real Tenant ObjectId mismatches still DENY.
  */
 function alignMessagingTenants(actorTenantId, recipientTenantId, actorProduct, peerProduct) {
@@ -335,7 +335,7 @@ function isElevated(pr) {
 }
 
 /**
- * Phase 8.24B contact visibility — pure decision given resolved identities + context.
+ * Phase 8.24B contact visibility - pure decision given resolved identities + context.
  * Context may include: { assigned?: boolean, sameBranch?: boolean|null, allowUnknownBranch?: boolean }
  * Fail closed when required relationship is unknown.
  */
@@ -386,7 +386,7 @@ function canDiscoverContacts(actor, target, context = {}) {
     });
   }
 
-  // Phase 5.1: tenant before product discover (fail-closed; uses identity tenantId only — no Branch I/O here)
+  // Phase 5.1: tenant before product discover (fail-closed; uses identity tenantId only - no Branch I/O here)
   const alignedDiscover = alignMessagingTenants(a.tenantId, t.tenantId, a.productRole, t.productRole);
   const tenantGate = assertTenantIsolation(
     alignedDiscover.actorTenantId,
@@ -712,7 +712,7 @@ function canSendStructurally(actor, target) {
 }
 
 /**
- * Phase 5 — Canonical recipient resolution surface.
+ * Phase 5 - Canonical recipient resolution surface.
  * Engine: messagingPairing.resolveCanonicalPeer (KEEP).
  * Never trusts client role/branch/tenant as authority.
  *
@@ -878,7 +878,7 @@ async function canSendMessage(actor, recipientIdOrUser, clientReceiverRoleHint =
     });
   }
 
-  // Phase AI: Trợ lý ảo — không có tenant/branch; pairing đã kiểm tra HV/GV
+  // Phase AI: Trợ lý ảo - không có tenant/branch; pairing đã kiểm tra HV/GV
   const isAiSupportRecipient = resolved.recipient?.productRole === PRODUCT_ROLES.AI_SUPPORT
     || String(resolved.recipient?.id || receiverId || '') === 'ai_support';
 
@@ -893,7 +893,7 @@ async function canSendMessage(actor, recipientIdOrUser, clientReceiverRoleHint =
       actorN.productRole,
       resolved.recipient?.productRole || null,
     );
-    // Pairing soft-scopes STAFF↔TEACHER/STUDENT and TEACHER↔STUDENT (assignment) —
+    // Pairing soft-scopes STAFF↔TEACHER/STUDENT and TEACHER↔STUDENT (assignment) -
     // do not fail-closed on missing tenant/branch for those pairs.
     if (shouldSoftAlignScopedTenants(
       actorN.productRole,

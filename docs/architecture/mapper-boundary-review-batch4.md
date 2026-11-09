@@ -1,4 +1,4 @@
-# Mapper Boundary Review — Sprint 4.4 Batch 4
+# Mapper Boundary Review - Sprint 4.4 Batch 4
 
 ## Compliance
 - Mappers successfully generated for edge domains.

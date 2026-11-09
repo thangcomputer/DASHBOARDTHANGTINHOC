@@ -7,7 +7,7 @@ const ENV_PATH = path.join(__dirname, '../../.env');
 
 /**
  * Nội dung .env của máy chủ đã triển khai (có cờ POLICY_CUTOVER_*), hoặc null khi chạy ở
- * CI / máy dev — khi đó các assertion về cấu hình triển khai được bỏ qua.
+ * CI / máy dev - khi đó các assertion về cấu hình triển khai được bỏ qua.
  */
 function readDeployEnv() {
   let content;

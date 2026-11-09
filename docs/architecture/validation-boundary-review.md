@@ -1,4 +1,4 @@
-# Validation Boundary Review — Sprint 4.4 Batch 2
+# Validation Boundary Review - Sprint 4.4 Batch 2
 
 ## Compliance
 - **Exception Wrapping**: `ValidationException` created and utilized to wrap Zod errors.

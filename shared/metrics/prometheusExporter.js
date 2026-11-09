@@ -78,7 +78,7 @@ const prometheusExporter = {
     lines.push('# TYPE http_request_duration_seconds_max gauge');
     lines.push(`http_request_duration_seconds_max ${snapshot.latency.maxMs / 1000}`);
 
-    // Messaging counters (Phase 9) — identifiers only, no message bodies
+    // Messaging counters (Phase 9) - identifiers only, no message bodies
     try {
       const { snapshotCounters } = require('../../services/messagingObservability');
       const m = snapshotCounters();

@@ -29,9 +29,9 @@ const aiSupportSessionSchema = new mongoose.Schema({
   /** Số câu hỏi HV gửi AI trong ngày. */
   questionDate: { type: String, default: '' },
   questionCount: { type: Number, default: 0 },
-  /** Tin user gần nhất — dùng idle 5 phút. */
+  /** Tin user gần nhất - dùng idle 5 phút. */
   lastUserMessageAt: { type: Date, default: null },
-  /** Đã hỏi “còn đó không” — chờ phản hồi rồi kết thúc phiên. */
+  /** Đã hỏi “còn đó không” - chờ phản hồi rồi kết thúc phiên. */
   idlePingAt: { type: Date, default: null },
 }, { timestamps: true });
 

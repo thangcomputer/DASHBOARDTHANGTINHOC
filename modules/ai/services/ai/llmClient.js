@@ -45,7 +45,7 @@ function isGeminiProvider(cfg) {
 }
 
 function buildGeminiHeaders(apiKey) {
-  // Auth keys (AQ.) — Bearer; classic keys (AIza) — x-goog-api-key
+  // Auth keys (AQ.) - Bearer; classic keys (AIza) - x-goog-api-key
   if (String(apiKey).startsWith('AQ.')) {
     return { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' };
   }

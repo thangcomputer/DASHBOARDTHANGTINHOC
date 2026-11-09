@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- *  KỊCH BẢN 1: CONCURRENCY TEST — 20 tài khoản đồng thời
+ *  KỊCH BẢN 1: CONCURRENCY TEST - 20 tài khoản đồng thời
  *  Playwright + Performance Monitoring
  * 
  *  Mục tiêu:
@@ -12,9 +12,9 @@
  *  Chạy: node tests/e2e/scenario1_concurrency.js
  * ═══════════════════════════════════════════════════════════════════════
  */
-const { chromium }     = require('playwright');
-const path             = require('path');
-const fs               = require('fs');
+const { chromium } = require('playwright');
+const path = require('path');
+const fs = require('fs');
 const { BASE_URL, API_BASE_URL, generateTestToken, TEST_CONFIG } = require('../config');
 
 // ── Load test accounts ────────────────────────────────────────────────
@@ -29,17 +29,17 @@ try {
 // ── Performance Metrics Collector ─────────────────────────────────────
 class MetricsCollector {
   constructor() {
-    this.apiCalls    = [];  // { url, method, status, duration, timestamp, account }
-    this.errors      = [];  // { url, error, timestamp, account }
+    this.apiCalls = [];  // { url, method, status, duration, timestamp, account }
+    this.errors = [];  // { url, error, timestamp, account }
     this.tabSwitches = [];  // { from, to, duration, timestamp, account }
     this.socketEvents = []; // { event, latency, timestamp, account }
-    this.startTime   = null;
-    this.endTime     = null;
+    this.startTime = null;
+    this.endTime = null;
   }
 
-  recordApiCall(data)     { this.apiCalls.push({ ...data, timestamp: Date.now() }); }
-  recordError(data)       { this.errors.push({ ...data, timestamp: Date.now() }); }
-  recordTabSwitch(data)   { this.tabSwitches.push({ ...data, timestamp: Date.now() }); }
+  recordApiCall(data) { this.apiCalls.push({ ...data, timestamp: Date.now() }); }
+  recordError(data) { this.errors.push({ ...data, timestamp: Date.now() }); }
+  recordTabSwitch(data) { this.tabSwitches.push({ ...data, timestamp: Date.now() }); }
   recordSocketEvent(data) { this.socketEvents.push({ ...data, timestamp: Date.now() }); }
 
   getSummary() {
@@ -53,18 +53,18 @@ class MetricsCollector {
     const errorRate = this.apiCalls.length ? ((this.errors.length / this.apiCalls.length) * 100).toFixed(2) : 0;
 
     return {
-      totalDuration:   this.endTime ? ((this.endTime - this.startTime) / 1000).toFixed(1) + 's' : 'N/A',
-      totalApiCalls:   this.apiCalls.length,
-      totalErrors:     this.errors.length,
-      errorRate:       `${errorRate}%`,
+      totalDuration: this.endTime ? ((this.endTime - this.startTime) / 1000).toFixed(1) + 's' : 'N/A',
+      totalApiCalls: this.apiCalls.length,
+      totalErrors: this.errors.length,
+      errorRate: `${errorRate}%`,
       avgResponseTime: `${avgResponseTime}ms`,
       maxResponseTime: `${maxResponseTime}ms`,
       minResponseTime: `${minResponseTime}ms`,
       p95ResponseTime: `${p95}ms`,
       p99ResponseTime: `${p99}ms`,
-      slowCalls:       `${slowCalls.length} calls > ${TEST_CONFIG.concurrency.maxDelay}ms`,
-      tabSwitches:     this.tabSwitches.length,
-      socketEvents:    this.socketEvents.length,
+      slowCalls: `${slowCalls.length} calls > ${TEST_CONFIG.concurrency.maxDelay}ms`,
+      tabSwitches: this.tabSwitches.length,
+      socketEvents: this.socketEvents.length,
     };
   }
 }
@@ -77,10 +77,10 @@ async function createBrowserSession(browser, account, role, index, totalAccounts
 
   // Tính toán vị trí cửa sổ trên grid
   const cols = Math.ceil(Math.sqrt(totalAccounts));
-  const row  = Math.floor(index / cols);
-  const col  = index % cols;
-  const vw   = TEST_CONFIG.viewports.small.width;
-  const vh   = TEST_CONFIG.viewports.small.height;
+  const row = Math.floor(index / cols);
+  const col = index % cols;
+  const vw = TEST_CONFIG.viewports.small.width;
+  const vh = TEST_CONFIG.viewports.small.height;
 
   const context = await browser.newContext({
     viewport: { width: vw, height: vh },
@@ -99,17 +99,17 @@ async function createBrowserSession(browser, account, role, index, totalAccounts
     if (url.includes('/api/')) {
       const timing = response.request().timing();
       metrics.recordApiCall({
-        url:      url.replace(API_BASE_URL, ''),
-        method:   response.request().method(),
-        status:   response.status(),
+        url: url.replace(API_BASE_URL, ''),
+        method: response.request().method(),
+        status: response.status(),
         duration: timing.responseEnd > 0 ? Math.round(timing.responseEnd) : null,
-        account:  account.name,
+        account: account.name,
       });
 
       if (response.status() >= 400) {
         metrics.recordError({
-          url:     url.replace(API_BASE_URL, ''),
-          error:   `HTTP ${response.status()}`,
+          url: url.replace(API_BASE_URL, ''),
+          error: `HTTP ${response.status()}`,
           account: account.name,
         });
       }
@@ -119,8 +119,8 @@ async function createBrowserSession(browser, account, role, index, totalAccounts
   page.on('requestfailed', (request) => {
     if (request.url().includes('/api/')) {
       metrics.recordError({
-        url:     request.url().replace(API_BASE_URL, ''),
-        error:   request.failure()?.errorText || 'Unknown',
+        url: request.url().replace(API_BASE_URL, ''),
+        error: request.failure()?.errorText || 'Unknown',
         account: account.name,
       });
     }
@@ -128,18 +128,18 @@ async function createBrowserSession(browser, account, role, index, totalAccounts
 
   // ── Inject session via localStorage ─────────────────────────────
   const tokenPayload = {
-    id:         account._id,
-    role:       role,
-    name:       account.name,
-    adminRole:  role === 'admin' ? 'STAFF' : null,
+    id: account._id,
+    role: role,
+    name: account.name,
+    adminRole: role === 'admin' ? 'STAFF' : null,
     permissions: role === 'admin' ? ['manage_students', 'manage_schedule', 'manage_finance'] : [],
-    branchId:   null,
+    branchId: null,
     branchCode: '',
   };
 
   const token = generateTestToken(tokenPayload, role === 'admin' ? 'internal' : 'public');
   const storagePrefix = role === 'student' ? 'student' : role === 'teacher' ? 'teacher' : 'admin';
-  const dashboardUrl  = role === 'student' ? '/student' : role === 'teacher' ? '/teacher' : '/admin';
+  const dashboardUrl = role === 'student' ? '/student' : role === 'teacher' ? '/teacher' : '/admin';
 
   // Navigate to base URL first to set localStorage
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -154,7 +154,7 @@ async function createBrowserSession(browser, account, role, index, totalAccounts
     user: { ...tokenPayload, _id: account._id, accessToken: token, refreshToken: token },
   });
 
-  console.log(`  ✅ ${label} — Session injected`);
+  console.log(`  ✅ ${label} - Session injected`);
   return { context, page, label, role, dashboardUrl, storagePrefix };
 }
 
@@ -165,20 +165,20 @@ async function simulateTabSwitching(session, durationMs) {
   const startTime = Date.now();
   let currentTabIdx = 0;
 
-  console.log(`  🔄 ${label} — Starting tab switching (${tabs.length} tabs, ${durationMs / 1000}s)`);
+  console.log(`  🔄 ${label} - Starting tab switching (${tabs.length} tabs, ${durationMs / 1000}s)`);
 
   // Navigate to dashboard first
   try {
     await page.goto(`${BASE_URL}${dashboardUrl}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
     await page.waitForTimeout(2000);
   } catch (e) {
-    console.warn(`  ⚠️ ${label} — Dashboard load slow: ${e.message}`);
+    console.warn(`  ⚠️ ${label} - Dashboard load slow: ${e.message}`);
   }
 
   while (Date.now() - startTime < durationMs) {
     const nextTabIdx = (currentTabIdx + 1) % tabs.length;
     const fromTab = tabs[currentTabIdx];
-    const toTab   = tabs[nextTabIdx];
+    const toTab = tabs[nextTabIdx];
 
     const switchStart = Date.now();
 
@@ -199,19 +199,19 @@ async function simulateTabSwitching(session, durationMs) {
 
       const switchDuration = Date.now() - switchStart;
       metrics.recordTabSwitch({
-        from:     fromTab.name,
-        to:       toTab.name,
+        from: fromTab.name,
+        to: toTab.name,
         duration: switchDuration,
-        account:  label,
+        account: label,
       });
 
       if (switchDuration > TEST_CONFIG.concurrency.maxDelay) {
-        console.warn(`  ⚠️ ${label} — Slow tab switch: ${fromTab.name} → ${toTab.name} (${switchDuration}ms)`);
+        console.warn(`  ⚠️ ${label} - Slow tab switch: ${fromTab.name} → ${toTab.name} (${switchDuration}ms)`);
       }
     } catch (err) {
       metrics.recordError({
-        url:     toTab.path || toTab.name,
-        error:   err.message,
+        url: toTab.path || toTab.name,
+        error: err.message,
         account: label,
       });
     }
@@ -220,44 +220,44 @@ async function simulateTabSwitching(session, durationMs) {
     await page.waitForTimeout(TEST_CONFIG.concurrency.tabSwitchInterval);
   }
 
-  console.log(`  ✅ ${label} — Tab switching completed`);
+  console.log(`  ✅ ${label} - Tab switching completed`);
 }
 
 // ── Define tabs per role ──────────────────────────────────────────────
 function getTabsForRole(role, basePath) {
   if (role === 'admin') {
     return [
-      { name: 'Dashboard',    type: 'hash', path: '' },
-      { name: 'Học viên',     type: 'hash', path: '#students' },
-      { name: 'Lịch dạy',    type: 'hash', path: '#schedules' },
-      { name: 'Giảng viên',  type: 'hash', path: '#teachers' },
-      { name: 'Hộp thư',     type: 'route', path: '/admin/inbox' },
+      { name: 'Dashboard', type: 'hash', path: '' },
+      { name: 'Học viên', type: 'hash', path: '#students' },
+      { name: 'Lịch dạy', type: 'hash', path: '#schedules' },
+      { name: 'Giảng viên', type: 'hash', path: '#teachers' },
+      { name: 'Hộp thư', type: 'route', path: '/admin/inbox' },
     ];
   }
   if (role === 'teacher') {
     return [
-      { name: 'Dashboard',   type: 'route', path: '/teacher' },
-      { name: 'Hộp thư',     type: 'route', path: '/teacher/inbox' },
-      { name: 'Tài chính',   type: 'route', path: '/teacher/finance' },
+      { name: 'Dashboard', type: 'route', path: '/teacher' },
+      { name: 'Hộp thư', type: 'route', path: '/teacher/inbox' },
+      { name: 'Tài chính', type: 'route', path: '/teacher/finance' },
       { name: 'Dashboard 2', type: 'route', path: '/teacher' },
     ];
   }
   // student
   return [
-    { name: 'Dashboard',   type: 'route', path: '/student' },
-    { name: 'Phòng thi',   type: 'route', path: '/student/exam' },
-    { name: 'Hộp thư',     type: 'route', path: '/student/inbox' },
+    { name: 'Dashboard', type: 'route', path: '/student' },
+    { name: 'Phòng thi', type: 'route', path: '/student/exam' },
+    { name: 'Hộp thư', type: 'route', path: '/student/inbox' },
     { name: 'Dashboard 2', type: 'route', path: '/student' },
   ];
 }
 
 // ══════════════════════════════════════════════════════════════════════
-//  MAIN — Orchestrator
+//  MAIN - Orchestrator
 // ══════════════════════════════════════════════════════════════════════
 async function runConcurrencyTest() {
   console.log('');
   console.log('╔══════════════════════════════════════════════════════════════╗');
-  console.log('║  🔥  KỊCH BẢN 1: CONCURRENCY TEST — 20 USER ĐỒNG THỜI   ║');
+  console.log('║  🔥  KỊCH BẢN 1: CONCURRENCY TEST - 20 USER ĐỒNG THỜI   ║');
   console.log('║  📊  Đo lường CPU, RAM, API Response Time, Socket.io      ║');
   console.log('║  ⏱️   Thời gian: 5 phút chuyển tab liên tục               ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
@@ -284,7 +284,7 @@ async function runConcurrencyTest() {
     ],
   });
 
-  console.log('🚀 Browser launched — Creating sessions...');
+  console.log('🚀 Browser launched - Creating sessions...');
 
   // ── Create all sessions ─────────────────────────────────────────
   const sessions = [];
@@ -300,7 +300,7 @@ async function runConcurrencyTest() {
     sessions.push(await createBrowserSession(browser, admin, 'admin', idx++, totalAccounts));
   }
 
-  console.log(`\n✅ ${sessions.length} sessions created — Starting concurrent tab switching...\n`);
+  console.log(`\n✅ ${sessions.length} sessions created - Starting concurrent tab switching...\n`);
 
   // ── Run all sessions concurrently ───────────────────────────────
   const promises = sessions.map(session => simulateTabSwitching(session, testDuration));
@@ -325,7 +325,7 @@ async function runConcurrencyTest() {
         path: path.join(__dirname, '..', 'reports', `scenario1_final_${sessions[i].role}_${i}.png`),
         fullPage: false,
       });
-    } catch {}
+    } catch { }
   }
 
   // ── Close all sessions ──────────────────────────────────────────
@@ -334,14 +334,14 @@ async function runConcurrencyTest() {
     try {
       await session.page.close();
       await session.context.close();
-    } catch {}
+    } catch { }
   }
   await browser.close();
 
   // ── Generate Report ─────────────────────────────────────────────
   const summary = metrics.getSummary();
   const report = generateReport(summary);
-  
+
   const reportPath = path.join(__dirname, '..', 'reports', `scenario1_report_${Date.now()}.json`);
   fs.writeFileSync(reportPath, JSON.stringify({ summary, apiCalls: metrics.apiCalls, errors: metrics.errors, tabSwitches: metrics.tabSwitches }, null, 2));
 

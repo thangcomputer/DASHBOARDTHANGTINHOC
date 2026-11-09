@@ -23,7 +23,7 @@ function readGuideSkip() {
  * Nút chụp màn hình:
  * - Bấm Camera = chụp toàn màn (picker → chọn màn nào chụp luôn màn đó).
  * - Mũi tên = thêm «Chụp một phần».
- * onCaptured(File) — gắn pending, không gửi ngay.
+ * onCaptured(File) - gắn pending, không gửi ngay.
  */
 export default function ScreenCaptureButton({
   onCaptured,

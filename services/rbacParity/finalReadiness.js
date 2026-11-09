@@ -1,5 +1,5 @@
 /**
- * Phase 8.19 — Final Enterprise readiness & cutover gate (NON-AUTHORITATIVE).
+ * Phase 8.19 - Final Enterprise readiness & cutover gate (NON-AUTHORITATIVE).
  *
  * Does NOT promote Enterprise.
  * Does NOT mount authorize().
@@ -132,7 +132,7 @@ function evaluateDomainSafetyEvidence({
       teacher: SAFETY.NOT_EVALUATED,
       studentTraining: SAFETY.NOT_EVALUATED,
       legacyPrincipal: SAFETY.NOT_EVALUATED,
-      note: 'No STAGING/PRODUCTION RUNTIME evidence — domains NOT_EVALUATED (not FAIL)',
+      note: 'No STAGING/PRODUCTION RUNTIME evidence - domains NOT_EVALUATED (not FAIL)',
     };
   }
 
@@ -275,7 +275,7 @@ function normalizeSoakEvidence(artifact) {
     legacyPrincipalSafety: artifact.legacyPrincipalSafety?.status,
   });
 
-  // Privilege widening only when there is evaluated FAIL/critical evidence — not NOT_EVALUATED
+  // Privilege widening only when there is evaluated FAIL/critical evidence - not NOT_EVALUATED
   const privilegeWidening = criticalMismatchCount > 0
     || domains.finance === SAFETY.FAIL
     || domains.hr === SAFETY.FAIL
@@ -538,7 +538,7 @@ function evaluateFinalReadiness(opts = {}) {
     },
     note: (
       'NOT_EVALUATED ≠ FAIL and ≠ PASS. NOT_EVALUATED still blocks ENTERPRISE_PRIMARY_READY. '
-      + 'ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only — never auto-promote.'
+      + 'ENTERPRISE_PRIMARY_READY=YES means cutover review eligibility only - never auto-promote.'
     ),
   };
 }

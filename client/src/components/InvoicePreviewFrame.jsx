@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import InvoiceTemplate from './InvoiceTemplate';
 
-/** A5 ngang (mm → px @96dpi) — khớp InvoiceTemplate */
+/** A5 ngang (mm → px @96dpi) - khớp InvoiceTemplate */
 const A5_W = Math.round(210 * 3.7795275591);
 const A5_H = Math.round(148 * 3.7795275591);
 

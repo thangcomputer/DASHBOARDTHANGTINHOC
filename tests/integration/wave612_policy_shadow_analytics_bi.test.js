@@ -1,5 +1,5 @@
 /**
- * Wave 6.12 — Policy SHADOW for LIVE /api/analytics + /api/bi.
+ * Wave 6.12 - Policy SHADOW for LIVE /api/analytics + /api/bi.
  * HTTP authz = MANAGE_FINANCE OR VIEW_BRANCH_REVENUE.
  * Branch/tenant = DATA FILTER (not HTTP DENY), except analytics/branches ignores filter (P2).
  */
@@ -165,7 +165,7 @@ test('Wave6.12: HIGH_ADMIN / SUPPORT need explicit finance|view_revenue (no bypa
   assert.equal(assertBIMatch('sup+', supportOk, 'overview').legacy.decision, 'ALLOW');
 });
 
-// ── Branch / data scope (HTTP ALLOW — not convert to 403) ────────────────────
+// ── Branch / data scope (HTTP ALLOW - not convert to 403) ────────────────────
 
 test('Wave6.12: Branch A actor ALLOW HTTP for revenue/BI (data filter, not DENY)', () => {
   const staffA = analyticsSubject({
@@ -447,7 +447,7 @@ test('Wave6.12 static: legacy middleware remains; Policy shadow-only; CQRS OFF; 
   assert.equal(toPolicyPermission(PERMISSIONS.MANAGE_FINANCE), FINANCE_WRITE_LIVE);
   assert.equal(toPolicyPermission(PERMISSIONS.VIEW_BRANCH_REVENUE), VIEW_BRANCH_REVENUE_LIVE);
 
-  // Read-only routes — no mass-assignment patterns
+  // Read-only routes - no mass-assignment patterns
   assert.ok(!/\{ \.\.\.req\.body \}/.test(analytics));
   assert.ok(!/\{ \.\.\.req\.body \}/.test(bi));
   assert.ok(!/\bio\.emit\(/.test(analytics));

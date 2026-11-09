@@ -1,6 +1,6 @@
 import React from 'react';
 
-/** Icon Zalo chuẩn (nền xanh + chữ Z) — nút mở zalo.me */
+/** Icon Zalo chuẩn (nền xanh + chữ Z) - nút mở zalo.me */
 const ZaloIcon = ({ size = 20, className = '' }) => (
   <svg
     width={size}

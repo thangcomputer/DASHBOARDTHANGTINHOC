@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+﻿import { useCallback, useEffect, useRef } from 'react';
 import { Platform, Vibration } from 'react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { getMobileSoundEnabled, subscribeToMobileSoundPreference } from '../../services/soundPreferences';
@@ -43,7 +43,7 @@ function playWeb(name: GameSound) {
       osc.stop(t + dur + 0.02);
     }
   } catch {
-    /* trình duyệt chặn âm thanh — bỏ qua */
+    /* trình duyệt chặn âm thanh - bỏ qua */
   }
 }
 

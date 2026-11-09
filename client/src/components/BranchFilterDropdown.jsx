@@ -1,5 +1,5 @@
 /**
- * BranchFilterDropdown.jsx — Dropdown chọn Chi nhánh (Topbar)
+ * BranchFilterDropdown.jsx - Dropdown chọn Chi nhánh (Topbar)
  * SUPER_ADMIN / HIGH_ADMIN: chọn chi nhánh (mặc định "Tất cả chi nhánh").
  * STAFF: chỉ hiện nhãn chi nhánh đã khóa.
  */
@@ -144,9 +144,8 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
             role="option"
             aria-selected={!isFiltered}
             onClick={() => handleSelect('all', 'Tất cả chi nhánh')}
-            className={`w-full flex items-center justify-between gap-2 px-3.5 min-h-11 text-left text-[13px] transition-colors ${
-              !isFiltered ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
-            }`}
+            className={`w-full flex items-center justify-between gap-2 px-3.5 min-h-11 text-left text-[13px] transition-colors ${!isFiltered ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
+              }`}
           >
             <span>Tất cả chi nhánh</span>
             {!isFiltered && <Check size={13} className="text-slate-700" aria-hidden="true" />}
@@ -166,9 +165,8 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
               role="option"
               aria-selected={isSelected}
               onClick={() => handleSelect(b._id, b.name)}
-              className={`w-full flex items-center justify-between gap-2 px-3.5 min-h-11 text-left text-[13px] border-t border-slate-50 transition-colors ${
-                isSelected ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
-              }`}
+              className={`w-full flex items-center justify-between gap-2 px-3.5 min-h-11 text-left text-[13px] border-t border-slate-50 transition-colors ${isSelected ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 font-medium hover:bg-slate-50'
+                }`}
             >
               <span className="flex items-center gap-1.5 min-w-0">
                 <span className="truncate" title={b.name}>{b.name}</span>
@@ -212,11 +210,10 @@ export default function BranchFilterDropdown({ className = '', fullWidth = false
         aria-haspopup="listbox"
         aria-label="Lọc theo chi nhánh"
         title={selectedBranchName}
-        className={`inline-flex items-center gap-1.5 px-2.5 border font-semibold transition-colors min-w-0 ${heightCls} ${widthCls} ${
-          isFiltered
+        className={`inline-flex items-center gap-1.5 px-2.5 border font-semibold transition-colors min-w-0 ${heightCls} ${widthCls} ${isFiltered
             ? 'border-slate-300 bg-slate-50 text-slate-800'
             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-        }`}
+          }`}
       >
         <Building2 size={14} className="text-slate-400 flex-shrink-0" aria-hidden="true" />
         <span className="flex-1 text-left truncate min-w-0">

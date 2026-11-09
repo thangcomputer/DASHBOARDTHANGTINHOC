@@ -1,5 +1,5 @@
 /**
- * Wave 5.4 — exam/assignment DTO + branch authz + CQRS teacher emit.
+ * Wave 5.4 - exam/assignment DTO + branch authz + CQRS teacher emit.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -144,7 +144,7 @@ test('Assignment update DTO does not include attribution fields', () => {
 
 // ── CQRS teacher realtime ────────────────────────────────────────────────────
 
-test('CQRS teacher:new path uses emitTeacherEvent — no *GLOBAL*', () => {
+test('CQRS teacher:new path uses emitTeacherEvent - no *GLOBAL*', () => {
   const { io, rooms, emits } = mockIo();
   emitTeacherEvent(
     io,

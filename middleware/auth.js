@@ -1,6 +1,6 @@
-const jwt       = require('jsonwebtoken');
-const Teacher   = require('../models/Teacher');
-const Student   = require('../models/Student');
+const jwt = require('jsonwebtoken');
+const Teacher = require('../models/Teacher');
+const Student = require('../models/Student');
 const SystemSettings = require('../models/SystemSettings');
 const blacklist = require('./tokenBlacklist');
 const logger = require('../config/logger');
@@ -158,7 +158,7 @@ const authMiddleware = async (req, res, next) => {
       }
 
       if (!decoded.sid && dbUser.tokenVersion !== undefined && decoded.tokenVersion !== undefined
-          && dbUser.tokenVersion !== decoded.tokenVersion) {
+        && dbUser.tokenVersion !== decoded.tokenVersion) {
         return res.status(401).json({
           success: false,
           code: 'TOKEN_VERSION_MISMATCH',
@@ -312,7 +312,7 @@ async function assertStaffPermissions(req, res, matcher) {
     return true;
   }
 
-  // HIGH_ADMIN: có quyền rộng nhưng KHÔNG bypass — phải check permissions
+  // HIGH_ADMIN: có quyền rộng nhưng KHÔNG bypass - phải check permissions
   if (user.adminRole === 'HIGH_ADMIN') {
     req.user.adminRole = 'HIGH_ADMIN';
     const perms = Array.isArray(user.permissions) ? user.permissions : [];
@@ -341,7 +341,7 @@ async function assertStaffPermissions(req, res, matcher) {
   return true;
 }
 
-/** Kiểm tra quyền STAFF/admin (boolean) — dùng trong handler đa vai trò. */
+/** Kiểm tra quyền STAFF/admin (boolean) - dùng trong handler đa vai trò. */
 async function userHasPermission(reqUser, requiredPermission) {
   if (!reqUser) return false;
   if (reqUser.id === 'admin') return true;
@@ -367,7 +367,7 @@ const checkPermission = (requiredPermission) => {
         res,
         (perms) => perms.includes(requiredPermission),
       );
-      // Phase 8.11/8.12 — shadow observe / dual-check ONLY (never changes ok / HTTP / next)
+      // Phase 8.11/8.12 - shadow observe / dual-check ONLY (never changes ok / HTTP / next)
       try {
         const { observeLiveStaffGate } = require('../services/rbacParity/observe');
         observeLiveStaffGate(req, {
@@ -455,7 +455,7 @@ const checkAnyPermission = (...requiredPermissions) => {
 };
 
 /**
- * branchFilter — Middleware tự động giới hạn dữ liệu theo chi nhánh
+ * branchFilter - Middleware tự động giới hạn dữ liệu theo chi nhánh
  *
  * Gắn req.branchFilter vào request:
  * - SUPER_ADMIN / hardcoded admin: {}  (không lọc → toàn bộ dữ liệu)
@@ -463,7 +463,7 @@ const checkAnyPermission = (...requiredPermissions) => {
  *
  * Các route dùng: Student.find({ ...req.branchFilter, ... })
  */
-// ── branchFilter — Middleware tự động giới hạn dữ liệu theo chi nhánh
+// ── branchFilter - Middleware tự động giới hạn dữ liệu theo chi nhánh
 // Phase 15–16: Super Admin co the gui X-Tenant-Id / tenant_id de gioi han theo tenant
 const branchFilter = async (req, res, next) => {
   try {
@@ -491,7 +491,7 @@ const branchFilter = async (req, res, next) => {
       }
 
       // SUPER_ADMIN: toàn hệ thống (có thể thu hẹp bằng ?branch_id)
-      // HIGH_ADMIN: bắt buộc chọn chi nhánh (?branch_id) hoặc dùng branch của tài khoản — không mặc định all-branch
+      // HIGH_ADMIN: bắt buộc chọn chi nhánh (?branch_id) hoặc dùng branch của tài khoản - không mặc định all-branch
       // SUPPORT: scoped theo branch như STAFF (không mở student/finance toàn hệ)
       const isActuallySuper = user.adminRole === 'SUPER_ADMIN';
       const isHighAdmin = user.adminRole === 'HIGH_ADMIN';
@@ -523,7 +523,7 @@ const branchFilter = async (req, res, next) => {
           req.userBranchCode = user.branchCode || '';
         } else {
           // HIGH must pick ?branch_id or have account branch (SECURITY_CONTRACT).
-          // Do NOT use { branchId: null } — that only matches unscoped students and
+          // Do NOT use { branchId: null } - that only matches unscoped students and
           // hides HV vừa tạo có branchId thật khi FE gửi branch_id=all.
           req.branchFilter = { _id: { $in: [] } };
         }
@@ -536,7 +536,7 @@ const branchFilter = async (req, res, next) => {
           req.userBranchCode = user.branchCode || '';
         }
       } else {
-        // Admin/staff không có branchId và không phải Super/High — an toàn: không thấy data
+        // Admin/staff không có branchId và không phải Super/High - an toàn: không thấy data
         req.branchFilter = { branchId: null };
       }
     } else {
@@ -610,7 +610,7 @@ async function applyTenantScopeIfAny(req) {
 }
 
 /**
- * requireInternalToken — Chặn token public truy cập API quản trị
+ * requireInternalToken - Chặn token public truy cập API quản trị
  * Áp dụng sau authMiddleware trên các route nhạy cảm (staff/admin routes)
  */
 const requireInternalToken = (req, res, next) => {
@@ -625,7 +625,7 @@ const requireInternalToken = (req, res, next) => {
 };
 
 /**
- * isHighAdminOrAbove — Cho phép HIGH_ADMIN hoặc SUPER_ADMIN
+ * isHighAdminOrAbove - Cho phép HIGH_ADMIN hoặc SUPER_ADMIN
  * Dùng cho các route quản lý staff nhưng không yêu cầu SUPER_ADMIN
  */
 const isHighAdminOrAbove = async (req, res, next) => {

@@ -23,9 +23,9 @@
 ## Files changed
 
 - `utils/vnTimezone.js` **(new)**
-- `services/ledgerService.js` — VN timezone buckets; `aggregateNetRevenueTimeSeries`; `sumFinancialRevenueByBranch`
-- `routes/analyticsRoutes.js` — revenue endpoint Ledger-only for money
-- `client/src/components/RevenueAnalyticsTab.jsx` — 0đ / empty clarity
+- `services/ledgerService.js` - VN timezone buckets; `aggregateNetRevenueTimeSeries`; `sumFinancialRevenueByBranch`
+- `routes/analyticsRoutes.js` - revenue endpoint Ledger-only for money
+- `client/src/components/RevenueAnalyticsTab.jsx` - 0đ / empty clarity
 - `tests/unit/analytics_revenue_sot.test.js`
 - `docs/analytics/ANALYTICS_REVENUE_SOT_FIX_2026-08-13.md`
 
@@ -56,7 +56,7 @@ Command: `node --test tests/unit/analytics_revenue_sot.test.js`
 ## Residual
 
 - Enrollment tab still shows ops tuition from enrollment.paid (labeled as ops, not Ledger).
-- Multi-day periods snap to VN calendar day starts (7/30/… days) instead of pure rolling hours — intentional for chart buckets.
+- Multi-day periods snap to VN calendar day starts (7/30/… days) instead of pure rolling hours - intentional for chart buckets.
 - Integration DB tests for live Ledger aggregation not added in this patch (unit + route source assertion).
 
 ## Verdict

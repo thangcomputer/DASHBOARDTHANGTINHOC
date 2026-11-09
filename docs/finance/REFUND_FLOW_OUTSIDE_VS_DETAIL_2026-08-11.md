@@ -1,7 +1,7 @@
-# REFUND FLOW AUDIT — Outside List vs Student Detail
+# REFUND FLOW AUDIT - Outside List vs Student Detail
 
 **Date:** 2026-08-11  
-**Mode:** REPORT ONLY — zero application / DB / payment / Messaging writes  
+**Mode:** REPORT ONLY - zero application / DB / payment / Messaging writes  
 **Auditor:** source-trace only
 
 ---
@@ -30,9 +30,9 @@ Student validation failed: course: Tên khóa học là bắt buộc
 
 Đây khớp toast lỗi ngoài danh sách (UI evidence).
 
-**CRITICAL:** `postRefund()` chạy **trước** `student.save()`. Không có MongoDB transaction / rollback. Ledger có thể đã ghi hoàn trong khi hồ sơ Student/Enrollment chưa soft-cancel thành công. Retry được bảo vệ **một phần** bởi `idempotencyKey` unique trên Ledger — không double-post cùng key, nhưng có **CONSISTENCY RISK** (sổ cái vs hồ sơ).
+**CRITICAL:** `postRefund()` chạy **trước** `student.save()`. Không có MongoDB transaction / rollback. Ledger có thể đã ghi hoàn trong khi hồ sơ Student/Enrollment chưa soft-cancel thành công. Retry được bảo vệ **một phần** bởi `idempotencyKey` unique trên Ledger - không double-post cùng key, nhưng có **CONSISTENCY RISK** (sổ cái vs hồ sơ).
 
-Bản [`modules/student/routes/studentRoutes.js`](../../modules/student/routes/studentRoutes.js) dùng `student.course = '(Đã hủy)'` — **không** phải runtime path.
+Bản [`modules/student/routes/studentRoutes.js`](../../modules/student/routes/studentRoutes.js) dùng `student.course = '(Đã hủy)'` - **không** phải runtime path.
 
 **Runtime fix trong phase này: NOT IMPLEMENTED.**
 
@@ -60,7 +60,7 @@ UI screenshots (list toast + Detail finance LAN) = **operator-provided**, not re
 
 ## 3. Frontend Entry Points
 
-### A. Admin Students List — [`AdminStudentsTab.jsx`](../../client/src/components/admin/tabs/AdminStudentsTab.jsx)
+### A. Admin Students List - [`AdminStudentsTab.jsx`](../../client/src/components/admin/tabs/AdminStudentsTab.jsx)
 
 ```text
 getRefundableEnrollment(student)
@@ -80,7 +80,7 @@ handleConfirmRefund
 - Success: toast + đóng modal + `refreshStudentList`
 - Fail: toast `res.message` (validation message từ server hiện ở đây)
 
-### B. Student Detail — [`StudentDetailModal.jsx`](../../client/src/components/StudentDetailModal.jsx)
+### B. Student Detail - [`StudentDetailModal.jsx`](../../client/src/components/StudentDetailModal.jsx)
 
 ```text
 handleDeleteEnrollment → cancelEnrModal (reason, refundAmount)
@@ -94,7 +94,7 @@ handleConfirmCancelEnrollment
 - Success: toast + `reloadProfile`
 - Fail: toast `res.message`
 
-### C. API client — [`api.js`](../../client/src/services/api.js) ~788–794
+### C. API client - [`api.js`](../../client/src/services/api.js) ~788–794
 
 ```text
 DELETE /students/${id}/enrollments/${enrollmentId}
@@ -160,7 +160,7 @@ No `mongoose.startSession` / `withTransaction` observed on this path.
 
 ## 6. Root Cause
 
-### Schema — [`models/Student.js`](../../models/Student.js)
+### Schema - [`models/Student.js`](../../models/Student.js)
 
 ```text
 course: {
@@ -170,7 +170,7 @@ course: {
 }
 ```
 
-### Sync — live [`routes/studentRoutes.js`](../../routes/studentRoutes.js) ~2050–2064
+### Sync - live [`routes/studentRoutes.js`](../../routes/studentRoutes.js) ~2050–2064
 
 ```text
 if (!active.length) {
@@ -239,7 +239,7 @@ Hậu quả khi `refundAmt > 0`:
 - Enrollment soft-cancel **có thể chưa persist**  
 - Không có compensation / void tự động khi `save` fail sau refund  
 
-Không có Mongo transaction trên path này (**CONFIRMED** — không thấy session).
+Không có Mongo transaction trên path này (**CONFIRMED** - không thấy session).
 
 ---
 
@@ -271,7 +271,7 @@ DOUBLE_REFUND_RISK = LOW
 (idempotent same enrollment; HIGH consistency gap remains)
 ```
 
-Nếu lần 2 dùng **enrollmentId khác** / key khác → risk khác — ngoài scope case hủy cùng khóa.
+Nếu lần 2 dùng **enrollmentId khác** / key khác → risk khác - ngoài scope case hủy cùng khóa.
 
 ---
 
@@ -289,11 +289,11 @@ Invoice: payment invoice gốc **không** bị xóa; refund có thể tạo cred
 
 | Entity | Updated during refund? | Order | Transaction protected? |
 |--------|------------------------|-------|------------------------|
-| Ledger | YES (if refundAmt > 0) | 1 — before save | NO (idempotent insert only) |
+| Ledger | YES (if refundAmt > 0) | 1 - before save | NO (idempotent insert only) |
 | Credit note / related invoice docs | YES if `created` + CN path | after ledger insert | partial (void on CN fail) |
-| Enrollment (in-memory → save) | YES intended | 2 — with student.save | NO |
-| Student root fields | YES intended | 2 — save | NO |
-| Original payment Invoice.maHoaDon | NO rewrite | — | — |
+| Enrollment (in-memory → save) | YES intended | 2 - with student.save | NO |
+| Student root fields | YES intended | 2 - save | NO |
+| Original payment Invoice.maHoaDon | NO rewrite | - | - |
 
 ```text
 CONSISTENCY RISK: Ledger may show refund while Student/Enrollment still active if save fails
@@ -322,10 +322,10 @@ if (!enrId || enrId === 'main') → toast → BLOCK open modal
 
 ```text
 LEGACY_MAIN_REFUND = REDIRECT_TO_DETAIL / BLOCKED on list
-(Detail may soft-create legacy enrollment server-side on DELETE if course exists — see route hydrate)
+(Detail may soft-create legacy enrollment server-side on DELETE if course exists - see route hydrate)
 ```
 
-Server DELETE: nếu `!enrollments.length && student.course` → hydrate `legacyEnrollmentFromStudent` rồi cancel theo `_id` mới — **NOT VERIFIED** end-to-end in this audit (no live call).
+Server DELETE: nếu `!enrollments.length && student.course` → hydrate `legacyEnrollmentFromStudent` rồi cancel theo `_id` mới - **NOT VERIFIED** end-to-end in this audit (no live call).
 
 ---
 
@@ -342,14 +342,14 @@ SUCCESS CASE = NOT VERIFIED
 ```
 
 Lý do: không đọc Mongo / không gọi API trong phase này.  
-Source **không** chứng minh Detail dùng API khác List. Nếu Detail từng SUCCESS khi còn ≥1 enrollment active khác, hoặc sau khi course đã hợp lệ bằng cách khác — **NOT VERIFIED**.  
-`HD2608-0004` trên UI khớp pattern Invoice payment code (display); dòng hoàn UI dạng `cancel:…` khớp `sourceRef` — **consistent with source mapping**, not DB-proven for this student.
+Source **không** chứng minh Detail dùng API khác List. Nếu Detail từng SUCCESS khi còn ≥1 enrollment active khác, hoặc sau khi course đã hợp lệ bằng cách khác - **NOT VERIFIED**.  
+`HD2608-0004` trên UI khớp pattern Invoice payment code (display); dòng hoàn UI dạng `cancel:…` khớp `sourceRef` - **consistent with source mapping**, not DB-proven for this student.
 
 ---
 
-## 15. Recommended Fix — REPORT ONLY
+## 15. Recommended Fix - REPORT ONLY
 
-### Option A — Safe state value (align modules)
+### Option A - Safe state value (align modules)
 
 ```text
 student.course = '(Đã hủy)'
@@ -358,19 +358,19 @@ student.course = '(Đã hủy)'
 - Pros: minimal; matches modules comment; unblocks save  
 - Cons: display root course becomes placeholder  
 
-### Option B — Preserve last course name
+### Option B - Preserve last course name
 
 Keep last `courseName` on student root; status from enrollments only.
 
 - Pros: UI vẫn thấy tên khóa  
 - Cons: phải đảm bảo mọi list filter dùng enrollment status, không tin `student.course` = đang học  
 
-### Option C — Reorder: save state then postRefund / or compensate
+### Option C - Reorder: save state then postRefund / or compensate
 
 - Pros: giảm HIGH consistency risk  
 - Cons: cần design kỹ (partial fail sau save, trước refund)  
 
-### Option D — Mongo transaction
+### Option D - Mongo transaction
 
 - Only if architecture adopts sessions; **currently unused** on this path  
 

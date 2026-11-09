@@ -1,5 +1,5 @@
 /**
- * Phase 8 — Live messaging runtime helpers.
+ * Phase 8 - Live messaging runtime helpers.
  * Seeds Mongo fixtures + boots real server.js + socket.io-client clients.
  * Does NOT mock notifyUser / sendCanonicalMessage / Socket rooms.
  */
@@ -193,7 +193,7 @@ async function seedFixtures() {
     tokenVersion: 0,
   });
 
-  // Cross-tenant support (tenant B) — for DENY tests; reuse support phone pattern via new doc
+  // Cross-tenant support (tenant B) - for DENY tests; reuse support phone pattern via new doc
   const supportTenantB = await Teacher.create({
     name: `${PREFIX} Support TenantB`,
     phone: '0988110099',

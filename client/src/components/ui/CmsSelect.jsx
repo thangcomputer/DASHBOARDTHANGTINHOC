@@ -15,7 +15,7 @@ function flattenOptionElements(children) {
   const opts = [];
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) return;
-    // React.Fragment / <>...</> — duyệt tiếp children bên trong
+    // React.Fragment / <>...</> - duyệt tiếp children bên trong
     if (child.type === Fragment) {
       flattenOptionElements(child.props?.children).forEach((o) => opts.push(o));
       return;
@@ -187,8 +187,8 @@ export default function CmsSelect({
     onChange?.({
       target: { value: nextValue, name: name ?? '' },
       currentTarget: { value: nextValue, name: name ?? '' },
-      stopPropagation() {},
-      preventDefault() {},
+      stopPropagation() { },
+      preventDefault() { },
     });
   };
 
@@ -228,13 +228,12 @@ export default function CmsSelect({
               aria-selected={isSelected}
               disabled={opt.disabled}
               onClick={() => pick(opt.value, opt.disabled)}
-              className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-sm transition-colors ${
-                opt.disabled
+              className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-sm transition-colors ${opt.disabled
                   ? 'text-slate-300 bg-slate-50 cursor-not-allowed opacity-60 line-through decoration-slate-300'
                   : isSelected
                     ? 'bg-red-600 text-white font-semibold'
                     : 'text-gray-700 font-medium hover:bg-blue-50'
-              }`}
+                }`}
             >
               <span className="min-w-0 break-words whitespace-normal leading-snug">{opt.label}</span>
               {isSelected && !opt.disabled && (

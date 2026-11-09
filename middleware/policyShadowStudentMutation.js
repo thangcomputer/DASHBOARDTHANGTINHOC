@@ -90,7 +90,7 @@ function policyShadowStudentMutation(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_SHADOW] student mutation evaluation error — legacy still authoritative',
+          '[POLICY_SHADOW] student mutation evaluation error - legacy still authoritative',
         );
         req.policyShadow = {
           action: `student_mutation_${action}`,
@@ -132,7 +132,7 @@ function policyShadowStudentMutation(action) {
             requestId: req.requestId,
             correlationId: req.correlationId,
           },
-          '[POLICY_MISMATCH] student mutation shadow disagrees — HTTP unchanged',
+          '[POLICY_MISMATCH] student mutation shadow disagrees - HTTP unchanged',
         );
       }
     } catch (err) {
@@ -144,7 +144,7 @@ function policyShadowStudentMutation(action) {
           requestId: req.requestId,
           correlationId: req.correlationId,
         },
-        '[POLICY_SHADOW] unexpected student mutation error — fail closed to legacy only',
+        '[POLICY_SHADOW] unexpected student mutation error - fail closed to legacy only',
       );
     }
     return next();

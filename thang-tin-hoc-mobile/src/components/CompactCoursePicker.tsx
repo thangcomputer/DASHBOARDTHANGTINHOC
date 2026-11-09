@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BookOpen, Check, ChevronDown, X } from 'lucide-react-native';
 import { colors, spacing } from '../theme/tokens';
@@ -13,7 +13,7 @@ export type CoursePickerItem = {
   completed: boolean;
 };
 
-/** Thanh chọn khóa học gọn (thay cho hàng thẻ khóa học lớn) — bấm để mở danh sách khóa. */
+/** Thanh chọn khóa học gọn (thay cho hàng thẻ khóa học lớn) - bấm để mở danh sách khóa. */
 export function CompactCoursePicker({
   items,
   activeName,

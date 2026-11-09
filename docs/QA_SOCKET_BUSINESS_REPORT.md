@@ -13,5 +13,5 @@
 | SOCK-BIZ-04 | Reconnect không phát lại schedule:new cũ | PASS | old=yVrKeHhEifZ6JgYRAAAD new=e78NOQwrXAJ1_WrAAAAF replay=0 |
 
 ## Notes
-- `assignment:new` emit vào room `student_${id}`; client register join `userId` — WARN nếu event không tới nhưng API OK.
+- `assignment:new` emit vào room `student_${id}`; client register join `userId` - WARN nếu event không tới nhưng API OK.
 - Reconnect phải không replay event lịch sử.

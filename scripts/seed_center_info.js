@@ -1,5 +1,5 @@
 /**
- * Seed mẫu «Thông tin trung tâm» — Thắng Tin Học (tin học văn phòng).
+ * Seed mẫu «Thông tin trung tâm» - Thắng Tin Học (tin học văn phòng).
  * Dữ liệu ghi vào MongoDB → sửa/xóa được trên /admin/center-info/manage (không hardcode UI).
  *
  *   node scripts/seed_center_info.js
@@ -366,7 +366,7 @@ const OVERVIEW = {
   <li>Hỗ trợ luyện đề và thi chứng chỉ tại trung tâm</li>
   <li>3 chi nhánh: TP.HCM · Lâm Đồng · Đà Nẵng</li>
 </ul>
-<p>Nội dung trang này là <em>dữ liệu mẫu</em> — bạn có thể chỉnh sửa toàn bộ trên trang Quản trị Thông tin trung tâm.</p>
+<p>Nội dung trang này là <em>dữ liệu mẫu</em> - bạn có thể chỉnh sửa toàn bộ trên trang Quản trị Thông tin trung tâm.</p>
 `.trim(),
   introVideoUrl: '',
   galleryUrls: [],
@@ -409,7 +409,7 @@ async function main() {
   } else {
     Object.assign(overview, OVERVIEW);
     await overview.save();
-    console.log('✓ Cập nhật overview (published) — có thể sửa lại trên UI');
+    console.log('✓ Cập nhật overview (published) - có thể sửa lại trên UI');
   }
 
   const results = [];

@@ -237,7 +237,7 @@ Không sửa trong lần này:
 
 Không commit, push, deploy, migration, seed, cleanup hoặc thay đổi dữ liệu thật trong Giai đoạn 1.
 
-## 12. Cập nhật kiểm chứng Giai đoạn 1.5 — 31/08/2026
+## 12. Cập nhật kiểm chứng Giai đoạn 1.5 - 31/08/2026
 
 - Đã thêm test DB guard, Compose Mongo 7 disposable, subprocess live harness và
   route matrix cho exam/auth.

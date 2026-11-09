@@ -50,7 +50,7 @@ export default function OfflineBanner() {
         boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
       }}
     >
-      Mất kết nối máy chủ — đang giữ phiên đăng nhập và tự thử lại…
+      Mất kết nối máy chủ - đang giữ phiên đăng nhập và tự thử lại…
     </div>
   );
 }

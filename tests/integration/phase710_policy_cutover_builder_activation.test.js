@@ -1,5 +1,5 @@
 /**
- * Phase 7.10 — Controlled cutover + production activation for /api/builder
+ * Phase 7.10 - Controlled cutover + production activation for /api/builder
  *
  * Preserves: public form_get/submit, draft→404 hide, soft JWT (shadow only),
  * form_submit_auth auth-only, admin isAdmin routes, mass-assignment Legacy handlers.
@@ -57,10 +57,10 @@ function sub(opts = {}) {
     actorDoc: role === 'student'
       ? null
       : {
-          role,
-          adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
-          permissions: opts.permissions ?? [],
-        },
+        role,
+        adminRole: opts.adminRole !== undefined ? opts.adminRole : null,
+        permissions: opts.permissions ?? [],
+      },
     userBranchId: opts.userBranchId ?? null,
   });
 }
@@ -383,16 +383,16 @@ test('Phase7.10 rollback: remove builder → LEGACY; prior families stay POLICY;
   const parsed = parseDotEnvFile();
   if (parsed) {
     const restoredRoutes = String(parsed.POLICY_CUTOVER_ROUTES).split(',').map((s) => s.trim()).filter(Boolean);
-      assert.ok(restoredRoutes.includes('builder'));
-      assert.ok(restoredRoutes.includes('workflows'));
-      assert.ok(restoredRoutes.includes('backups'));
+    assert.ok(restoredRoutes.includes('builder'));
+    assert.ok(restoredRoutes.includes('workflows'));
+    assert.ok(restoredRoutes.includes('backups'));
   }
 });
 
 test('Phase7.10 cross-family isolation', () => {
   const legacyFamilies = [
     'auth', 'finance', 'invoices', 'transactions', 'webhooks', 'students', 'teachers',
-    'courses', 'training', 'quizzes', 'assignments', 'evaluations', 
+    'courses', 'training', 'quizzes', 'assignments', 'evaluations',
     'proctor', 'files', 'blog', 'feed', 'schedules', 'messages',
     'notifications', 'settings',
   ];
@@ -426,8 +426,8 @@ test('Phase7.10 functional smoke: authz only; mutations NOT EXECUTED', () => {
   assert.equal(parity('form_get', anon, {}, { form: { status: 'published' } }).policy.decision, 'ALLOW');
   assert.equal(parity('form_submit', anon).policy.decision, 'ALLOW');
   assert.equal(
-    'NOT EXECUTED — create/update/delete/submit/run production mutation',
-    'NOT EXECUTED — create/update/delete/submit/run production mutation',
+    'NOT EXECUTED - create/update/delete/submit/run production mutation',
+    'NOT EXECUTED - create/update/delete/submit/run production mutation',
   );
 });
 
@@ -444,7 +444,7 @@ test('Phase7.10 static final authority + CQRS OFF + only builder uses gate', () 
   if (env) assert.ok(!/POLICY_CUTOVER_ROUTES\s*=\s*.*\*/.test(env));
   if (env) assert.ok(/ENABLE_CQRS_TEACHER\s*=\s*false/.test(env));
   assert.ok(/POLICY_CUTOVER_ENABLED\s*=\s*false/.test(example));
-  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [,''])[1]));
+  if (env) assert.ok(!/\*/.test((env.match(/^POLICY_CUTOVER_ROUTES=(.*)$/m) || [, ''])[1]));
 
   assert.ok(gate.includes("getAuthorizationAuthority('builder')"));
   assert.ok(gate.includes('legacyBuilderGate'));

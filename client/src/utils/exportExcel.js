@@ -1,12 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// Export Excel Utility — Đúng chuẩn Blob Download
+// Export Excel Utility - Đúng chuẩn Blob Download
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { API_BASE } from '../services/api';
 
 /**
  * Tải file từ backend dưới dạng Blob và kích hoạt download
- * Đảm bảo KHÔNG parse JSON — nhận raw binary data
+ * Đảm bảo KHÔNG parse JSON - nhận raw binary data
  *
  * @param {string} endpoint - API path (VD: /invoices/stats/export)
  * @param {string} filename  - Tên file lưu về (VD: 'bao-cao-2024.xlsx')
@@ -38,15 +38,15 @@ export const downloadFileFromAPI = async (endpoint, filename, options = {}) => {
     throw new Error(errMsg);
   }
 
-  // Nhận về Blob — KHÔNG parse JSON
+  // Nhận về Blob - KHÔNG parse JSON
   const blob = await res.blob();
 
-  if (blob.size === 0) throw new Error('File rỗng — backend chưa trả dữ liệu');
+  if (blob.size === 0) throw new Error('File rỗng - backend chưa trả dữ liệu');
 
   // Tạo URL ảo để trigger download
   const url = URL.createObjectURL(blob);
-  const a   = document.createElement('a');
-  a.href     = url;
+  const a = document.createElement('a');
+  a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
@@ -128,9 +128,9 @@ export const exportToCSV = (data, filename = 'export.csv') => {
   ];
 
   const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();

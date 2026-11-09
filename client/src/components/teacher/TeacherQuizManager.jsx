@@ -303,7 +303,7 @@ export default function TeacherQuizManager({
         return;
       }
       if (res.data.source === 'fallback') {
-        toast.error(res.message || 'AI chưa sẵn sàng — không dùng câu mẫu. Kiểm tra GEMINI_API_KEY trên server.');
+        toast.error(res.message || 'AI chưa sẵn sàng - không dùng câu mẫu. Kiểm tra GEMINI_API_KEY trên server.');
         return;
       }
       setQuestions(res.data.questions.map((q) => ({

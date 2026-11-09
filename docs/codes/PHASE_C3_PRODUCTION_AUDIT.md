@@ -1,4 +1,4 @@
-# PHASE C3 — PRODUCTION BUSINESS CODE AUDIT
+# PHASE C3 - PRODUCTION BUSINESS CODE AUDIT
 
 **Date:** 2026-08-11  
 **Environment:** Workspace / agent session (no production credentials)  
@@ -40,7 +40,7 @@ confidence: NONE
 
 | Candidate source | Value observed | Verdict |
 |------------------|----------------|---------|
-| [`.env`](../../.env) `MONGODB_URI` | `mongodb://127.0.0.1:27018/dashboardthangtinhoc?replicaSet=rs0` | **LOCAL/DEV — NOT production** |
+| [`.env`](../../.env) `MONGODB_URI` | `mongodb://127.0.0.1:27018/dashboardthangtinhoc?replicaSet=rs0` | **LOCAL/DEV - NOT production** |
 | [`.env.example`](../../.env.example) | localhost examples | Not production |
 | [`.env.deploy.example`](../../.env.deploy.example) | VPS deploy path only; **no Mongo URI** | Insufficient |
 | [`client/.env.production`](../../client/.env.production) | Same-origin API comment only | No Mongo URI |
@@ -137,7 +137,7 @@ counter.seq >= max canonical suffix: UNKNOWN
 COUNTER_SAFE: BLOCKED
 ```
 
-Local counters exist from C2 local migration only — **not** evidence of production counter state.
+Local counters exist from C2 local migration only - **not** evidence of production counter state.
 
 ---
 
@@ -180,11 +180,11 @@ Payment compatibility: REVIEW
 | `AddStudentModal` | Uses `POST /api/students/reserve-code`; no `TTH`+`Date.now` | PASS |
 | `AddEnrollmentModal` | Uses `student.studentCode` only | PASS |
 | `TuitionPaymentModal` | Blocks if missing server code; no `_id` slice fallback | PASS |
-| `RegistrationForm` | CK content = branch + **name slug** + “Nop hoc phi” — **not** a persisted business code | NON-BLOCKING note |
+| `RegistrationForm` | CK content = branch + **name slug** + “Nop hoc phi” - **not** a persisted business code | NON-BLOCKING note |
 | `useDataAdminCrud.addStudent` | Forwards `reservedStudentCode` | PASS |
 | Server create (student/teacher/employee/course/auth) | `businessCodeService` | PASS |
 
-Residual note: debug ingest `fetch` instrumentation from a prior debug session remains in some files — **out of C3 scope** (C3 does not modify application code). Does not invent business codes.
+Residual note: debug ingest `fetch` instrumentation from a prior debug session remains in some files - **out of C3 scope** (C3 does not modify application code). Does not invent business codes.
 
 ```text
 Frontend generator audit: PASS (repo scan)
@@ -261,9 +261,9 @@ PRODUCTION MIGRATION = BLOCKED
 ## Non-Blocking Findings
 
 1. C2 foundation (generator, fail-closed SePay matcher, FE reserve-code) is present in application source.  
-2. Local/dev was previously migrated in C2 — irrelevant as production evidence.  
+2. Local/dev was previously migrated in C2 - irrelevant as production evidence.  
 3. `RegistrationForm` still builds transfer text from name (session-first), not a client-minted HV/TTH canonical identity.  
-4. Prior debug-session instrumentation (`fetch` to local ingest) still present in a few files — cleanup is a hygiene task for a later approved phase, not C3.
+4. Prior debug-session instrumentation (`fetch` to local ingest) still present in a few files - cleanup is a hygiene task for a later approved phase, not C3.
 
 ---
 
@@ -297,7 +297,7 @@ Do not start C4 automatically.
 
 ## Rollback Considerations
 
-No production writes occurred in C3 — **nothing to roll back**.
+No production writes occurred in C3 - **nothing to roll back**.
 
 Future C4 must retain C2 rollback design: restore `studentCode` from `legacyStudentCodes`; never delete entities; never rewrite Invoice/Ledger/Message history. See [`PHASE_C2_ROLLBACK.md`](./PHASE_C2_ROLLBACK.md).
 

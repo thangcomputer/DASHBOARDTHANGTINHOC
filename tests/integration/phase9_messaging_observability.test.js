@@ -1,5 +1,5 @@
 /**
- * Phase 9 — Messaging observability wiring (no business behavior change).
+ * Phase 9 - Messaging observability wiring (no business behavior change).
  */
 'use strict';
 

@@ -1,12 +1,12 @@
 /**
- * transactionRoutes.js — Quản lý phiếu chi lương giảng viên
+ * transactionRoutes.js - Quản lý phiếu chi lương giảng viên
  * Có branchFilter: STAFF chỉ thấy giao dịch của chi nhánh mình
  */
-const express     = require('express');
-const router      = express.Router();
+const express = require('express');
+const router = express.Router();
 const Transaction = require('../models/Transaction');
-const Teacher     = require('../models/Teacher');
-const Schedule    = require('../models/Schedule');
+const Teacher = require('../models/Teacher');
+const Schedule = require('../models/Schedule');
 const { authMiddleware, checkPermission, isTeacher, branchFilter } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const { policyShadowFinance } = require('../middleware/policyShadowFinance');
@@ -26,7 +26,7 @@ router.get('/', [authMiddleware, branchFilter, policyShadowFinance('tx_list'), c
     const filter = { ...req.branchFilter };
 
     if (queryBranch && queryBranch !== 'all' && !filter.branchId) filter.branchId = queryBranch;
-    if (status)    filter.status    = status;
+    if (status) filter.status = status;
     if (teacherId) filter.teacherId = teacherId;
     if (month) {
       const safeMonth = sanitizeRegex(String(month), 32);
@@ -90,10 +90,10 @@ router.get('/stats', [authMiddleware, branchFilter, policyShadowFinance('tx_stat
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
 
-    const totalPaid    = totalResult[0]?.total   || 0;
-    const totalPending = pendingResult[0]?.total  || 0;
+    const totalPaid = totalResult[0]?.total || 0;
+    const totalPending = pendingResult[0]?.total || 0;
     const countPending = await Transaction.countDocuments(pendingMatchFilter);
-    const countTotal   = await Transaction.countDocuments(
+    const countTotal = await Transaction.countDocuments(
       req.userBranchId ? { teacherId: matchFilter.teacherId } : {}
     );
 
@@ -163,7 +163,7 @@ router.put('/:id/payment-notice-seen', authMiddleware, policyShadowFinance('tx_p
 router.post('/calculate', authMiddleware, policyShadowFinance('tx_calculate'), isTeacher, async (req, res) => {
   try {
     const { teacherId, month } = req.body;
-    
+
     // Nếu không phải Admin, chỉ được tự tính lương của chính mình
     if (req.user.role !== 'admin' && req.user.role !== 'staff' && req.user.id !== teacherId) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền thực hiện thao tác này' });
@@ -180,29 +180,29 @@ router.post('/calculate', authMiddleware, policyShadowFinance('tx_calculate'), i
 
     const [year, m] = month.split('-').map(Number);
     const startDate = new Date(year, m - 1, 1);
-    const endDate   = new Date(year, m,     1);
+    const endDate = new Date(year, m, 1);
 
     // Đếm số buổi đã hoàn thành
     const completedSessions = await Schedule.countDocuments({
       teacherId,
-      status:  'completed',
+      status: 'completed',
       date: { $gte: startDate, $lt: endDate },
     });
 
     const salaryPerSession = teacher.baseSalaryPerSession || 0;
-    const totalAmount      = completedSessions * salaryPerSession;
-    const monthLabel       = `Tháng ${m}/${year}`;
+    const totalAmount = completedSessions * salaryPerSession;
+    const monthLabel = `Tháng ${m}/${year}`;
 
     res.json({
       success: true,
       data: {
         teacherId,
-        teacherName:       teacher.name,
-        month:             monthLabel,
+        teacherName: teacher.name,
+        month: monthLabel,
         completedSessions,
         salaryPerSession,
         totalAmount,
-        bankAccount:       teacher.bankAccount,
+        bankAccount: teacher.bankAccount,
       },
     });
   } catch (err) {
@@ -227,17 +227,17 @@ router.post('/', authMiddleware, policyShadowFinance('tx_create'), checkPermissi
 
     const transaction = await Transaction.create({
       teacherId,
-      teacherName:  teacher.name,
+      teacherName: teacher.name,
       teacherPhone: teacher.phone || '',
       amount,
-      description:  description || `Thù lao giảng dạy ${month || ''}`,
-      month:        month       || '',
-      note:         note        || '',
-      bankName:     teacher.bankAccount?.bankName    || '',
-      bankAccount:  teacher.bankAccount?.accountNumber || '',
+      description: description || `Thù lao giảng dạy ${month || ''}`,
+      month: month || '',
+      note: note || '',
+      bankName: teacher.bankAccount?.bankName || '',
+      bankAccount: teacher.bankAccount?.accountNumber || '',
       // Gắn branchId từ teacher để filter sau này
-      branchId:     teacher.branchId   || null,
-      branchCode:   teacher.branchCode || '',
+      branchId: teacher.branchId || null,
+      branchCode: teacher.branchCode || '',
       status: 'pending',
     });
 
@@ -306,7 +306,7 @@ router.put('/:id/confirm', authMiddleware, policyShadowFinance('tx_confirm'), ch
         note: transaction.description || `Chi lương ${transaction.month || ''}`,
       });
     } catch (ledgerErr) {
-      logger.error('[TRANSACTIONS] salary ledger on confirm FAILED — rollback: %s', ledgerErr.message);
+      logger.error('[TRANSACTIONS] salary ledger on confirm FAILED - rollback: %s', ledgerErr.message);
       try {
         await Transaction.findByIdAndUpdate(transaction._id, {
           status: 'pending',
@@ -319,7 +319,7 @@ router.put('/:id/confirm', authMiddleware, policyShadowFinance('tx_confirm'), ch
       }
       return res.status(500).json({
         success: false,
-        message: 'Ghi sổ lương thất bại — phiếu vẫn pending. Thử lại.',
+        message: 'Ghi sổ lương thất bại - phiếu vẫn pending. Thử lại.',
       });
     }
 
@@ -395,7 +395,7 @@ router.put('/:id/cancel', authMiddleware, policyShadowFinance('tx_cancel'), chec
         }
       } catch (voidErr) {
         logger.error('[TRANSACTIONS] void salary on cancel: %s', voidErr.message);
-        // Không rollback cancel phiếu — admin có thể void tay; log để reconcile
+        // Không rollback cancel phiếu - admin có thể void tay; log để reconcile
       }
     }
 

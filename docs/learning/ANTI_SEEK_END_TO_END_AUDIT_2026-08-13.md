@@ -44,10 +44,10 @@ localStorage overrides **removed** from decision path.
 
 - `utils/antiSeekPolicy.js` **(new)**
 - `client/src/utils/antiSeekPolicy.js` **(new)**
-- `routes/trainingRoutes.js` — complete + save-watch clamp
+- `routes/trainingRoutes.js` - complete + save-watch clamp
 - `client/src/components/StudentTrainingLMS.jsx`
 - `client/src/components/TeacherTrainingLMS.jsx`
-- `client/src/components/admin/tabs/AdminStudentTrainingTab.jsx` — dead state removed
+- `client/src/components/admin/tabs/AdminStudentTrainingTab.jsx` - dead state removed
 - `tests/unit/anti_seek_policy.test.js`
 - `docs/learning/ANTI_SEEK_END_TO_END_AUDIT_2026-08-13.md`
 
@@ -80,7 +80,7 @@ Command: `node --test tests/unit/anti_seek_policy.test.js`
 - **BACKEND ENFORCEMENT = PARTIAL** against sophisticated cheats: client can still inflate progress slowly via repeated `save-watch-progress` within elapsed-time caps (not DRM).
 - Lesson `duration` missing/0 → server requires `watchedSeconds >= 1` only (cannot compute 2/3). FE still uses YouTube `getDuration()` for UI gate.
 - YouTube native timeline still visible; seek beyond maxPos is **snap-back**, not disabled control.
-- `modules/course` twin routes not live-mounted — not updated.
+- `modules/course` twin routes not live-mounted - not updated.
 - Screen recording / multi-device not in scope.
 
 ## 12. Out of scope

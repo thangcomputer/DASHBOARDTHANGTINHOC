@@ -1,5 +1,5 @@
 /**
- * Linh vật cảm xúc — chỉ dùng trong Luyện tập hằng ngày.
+ * Linh vật cảm xúc - chỉ dùng trong Luyện tập hằng ngày.
  * Asset: /mascot/*.gif (từ cam-xuc-animation). Mood cũ idle/happy/sad/thinking vẫn hoạt động.
  */
 const MOOD_SRC = {

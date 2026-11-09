@@ -1,11 +1,11 @@
-const express  = require('express');
-const crypto   = require('crypto');
+const express = require('express');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
-const multer   = require('multer');
-const path     = require('path');
-const fs       = require('fs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-const Teacher  = require('../models/Teacher');
+const Teacher = require('../models/Teacher');
 const Schedule = require('../models/Schedule');
 const Transaction = require('../models/Transaction');
 const { authMiddleware, branchFilter } = require('../middleware/auth');
@@ -441,15 +441,15 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
     // ⭐ Xác định branchId:
     //   - STAFF → bắt buộc dùng branchId của chính họ (không được chọn chi nhánh khác)
     //   - SUPER_ADMIN / HIGH_ADMIN → dùng branchId từ request body (dropdown chọn)
-    let finalBranchId   = null;
+    let finalBranchId = null;
     let finalBranchCode = '';
     if (req.userBranchId) {
       // STAFF → ép branchId
-      finalBranchId   = req.userBranchId;
+      finalBranchId = req.userBranchId;
       finalBranchCode = req.userBranchCode || '';
     } else if (reqBranchId) {
       // Admin cấp cao chọn chi nhánh
-      finalBranchId   = reqBranchId;
+      finalBranchId = reqBranchId;
       finalBranchCode = reqBranchCode || '';
     }
     if (!finalBranchId || String(finalBranchId).trim() === '' || String(finalBranchId).trim() === 'all') {
@@ -461,7 +461,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
 
     // Auto-Approve Logic: Nếu Admin gán chi nhánh ngay từ lúc tạo, tự động duyệt
     const isAssigningBranch = !!(finalBranchId || finalBranchCode);
-    
+
     const normalizedSubjectIds = Array.isArray(subjectIds)
       ? [...new Set(subjectIds.map((id) => String(id).trim()).filter(Boolean))]
       : [];
@@ -477,13 +477,13 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
       subjectIds: normalizedSubjectIds,
       voiceRegion: normalizeVoiceRegion(voiceRegion),
       startDate: startDate || Date.now(),
-      address:   address   || '',
-      password:  plainPassword,
-      status:    status || 'inactive',
+      address: address || '',
+      password: plainPassword,
+      status: status || 'inactive',
       testStatus: null,
       role: 'teacher',
       isFirstLogin: false,
-      branchId:   finalBranchId,
+      branchId: finalBranchId,
       branchCode: finalBranchCode,
       baseSalaryPerSession: Math.max(0, Number(baseSalaryPerSession) || 0),
       teacherCode,
@@ -496,7 +496,7 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
         teacherId: teacher._id,
         name: teacher.name,
         branchCode: teacher.branchCode,
-        message: `Giảng viên mới: ${teacher.name} — Chi nhánh: ${teacher.branchCode || 'Chưa phân'}`,
+        message: `Giảng viên mới: ${teacher.name} - Chi nhánh: ${teacher.branchCode || 'Chưa phân'}`,
       });
       NotificationService.notifyAdmins(
         io,
@@ -541,10 +541,10 @@ router.post('/', [authMiddleware, branchFilter, ...teacherRouteGuard('create')],
 });
 
 // ─── GET /api/teachers ────────────────────────────────────────────────────────
-// Lấy danh sách giảng viên (Admin/Staff only — Teacher bị chặn)
+// Lấy danh sách giảng viên (Admin/Staff only - Teacher bị chặn)
 router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], async (req, res) => {
   try {
-    // ⭐ Chỉ Admin/Staff được xem danh sách GV — Teacher chỉ được xem profile của mình
+    // ⭐ Chỉ Admin/Staff được xem danh sách GV - Teacher chỉ được xem profile của mình
     if (req.user.role === 'teacher' || req.user.role === 'student') {
       return res.status(403).json({ success: false, message: 'Không có quyền xem danh sách giảng viên' });
     }
@@ -555,16 +555,20 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
     const bf = req.branchFilter || {};
     if (bf.branchId?.$in) {
       // Tenant scope: vẫn hiển thị GV chưa phân chi nhánh
-      andConditions.push({ $or: [
-        { branchId: { $in: bf.branchId.$in } },
-        { branchId: null },
-      ] });
+      andConditions.push({
+        $or: [
+          { branchId: { $in: bf.branchId.$in } },
+          { branchId: null },
+        ]
+      });
     } else if (bf.branchId != null && bf.branchId !== '') {
       // Lọc 1 chi nhánh: gồm GV thuộc chi nhánh đó + GV chưa gán chi nhánh (để vẫn phân công được)
-      andConditions.push({ $or: [
-        { branchId: bf.branchId },
-        { branchId: null },
-      ] });
+      andConditions.push({
+        $or: [
+          { branchId: bf.branchId },
+          { branchId: null },
+        ]
+      });
     } else {
       Object.assign(filter, bf);
     }
@@ -572,12 +576,14 @@ router.get('/', [authMiddleware, branchFilter, ...teacherRouteGuard('list')], as
     if (status) filter.status = status;
     if (search) {
       const s = sanitizeRegex(search);
-      andConditions.push({ $or: [
-        { name:      { $regex: s, $options: 'i' } },
-        { phone:     { $regex: s, $options: 'i' } },
-        { specialty: { $regex: s, $options: 'i' } },
-        { teacherCode: { $regex: s, $options: 'i' } },
-      ] });
+      andConditions.push({
+        $or: [
+          { name: { $regex: s, $options: 'i' } },
+          { phone: { $regex: s, $options: 'i' } },
+          { specialty: { $regex: s, $options: 'i' } },
+          { teacherCode: { $regex: s, $options: 'i' } },
+        ]
+      });
     }
     if (andConditions.length) filter.$and = andConditions;
 
@@ -668,8 +674,8 @@ router.get('/stats/summary', [authMiddleware, branchFilter, ...teacherRouteGuard
       bf.branchId = branch_id;
     }
 
-    const total   = await Teacher.countDocuments({ ...bf, role: 'teacher' });
-    const active  = await Teacher.countDocuments({ ...bf, role: 'teacher', status: { $in: ['active', 'Active'] } });
+    const total = await Teacher.countDocuments({ ...bf, role: 'teacher' });
+    const active = await Teacher.countDocuments({ ...bf, role: 'teacher', status: { $in: ['active', 'Active'] } });
     const pending = await Teacher.countDocuments({ ...bf, role: 'teacher', status: 'pending' });
     const suspended = await Teacher.countDocuments({ ...bf, role: 'teacher', status: 'suspended' });
 
@@ -771,7 +777,7 @@ router.get('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('get_one'
 
     // ⭐ STAFF cross-branch guard: STAFF chỉ xem GV cùng chi nhánh
     if (req.userBranchId && teacher.branchId
-        && String(teacher.branchId) !== String(req.userBranchId)) {
+      && String(teacher.branchId) !== String(req.userBranchId)) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền xem giảng viên chi nhánh khác' });
     }
 
@@ -834,7 +840,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
         if (me?.adminRole !== 'SUPER_ADMIN' && !canTraining && !canManageTeachers) {
           return res.status(403).json({
             success: false,
-            message: '403 Forbidden — Chỉ Super Admin hoặc tài khoản có quyền Đào tạo / Quản lý Giảng viên mới được sửa thông tin giảng viên.',
+            message: '403 Forbidden - Chỉ Super Admin hoặc tài khoản có quyền Đào tạo / Quản lý Giảng viên mới được sửa thông tin giảng viên.',
           });
         }
       }
@@ -854,17 +860,17 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
       });
     }
 
-    const allowedFields = isAdminRole 
+    const allowedFields = isAdminRole
       ? [
-          'name', 'phone', 'age', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio', 'startDate', 'address',
-          'bankAccount', 'avatar', 'baseSalaryPerSession', 'customStarBonusAmount',
-          'assignedClasses', 'assignedStudents',
-          'branchId', 'branchCode',
-        ]
+        'name', 'phone', 'age', 'zalo', 'email', 'specialty', 'subjectIds', 'voiceRegion', 'bio', 'startDate', 'address',
+        'bankAccount', 'avatar', 'baseSalaryPerSession', 'customStarBonusAmount',
+        'assignedClasses', 'assignedStudents',
+        'branchId', 'branchCode',
+      ]
       : isSelfEdit
         ? [
-            'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address', 'age',
-          ]
+          'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address', 'age',
+        ]
         : [
           'zalo', 'email', 'bio', 'voiceRegion', 'bankAccount', 'avatar', 'address',
         ];
@@ -912,7 +918,7 @@ router.put('/:id', [authMiddleware, branchFilter, ...teacherRouteGuard('update_p
     // Auto-Approve Logic: Nếu Admin gán chi nhánh hoặc xếp lớp, tự động duyệt
     if (isAdminRole) {
       const isAssigningStudents = updates.assignedClasses?.length > 0 || updates.assignedStudents?.length > 0;
-      
+
       if (isAssigningStudents) {
         updates.status = 'active';
         // Remove test exemption here if they want strict testing, or keep it if assigning students implies exemption
@@ -1150,10 +1156,10 @@ router.put('/:id/score', [
     const io = req.app.get('io');
     if (io) {
       emitTeacherEvent(io, teacher, 'teacher:scored', {
-        teacherId:  teacher._id.toString(),
+        teacherId: teacher._id.toString(),
         testScore: scoreNum,
-        passed:     scoreNum >= 80,
-        message:    scoreNum >= 80
+        passed: scoreNum >= 80,
+        message: scoreNum >= 80
           ? `🎉 Chúc mừng! Bạn đạt ${scoreNum}/100 điểm. Đã qua bài test!`
           : `❌ Bạn đạt ${scoreNum}/100 điểm. Chưa đạt yêu cầu (>=80). Vui lòng liên hệ Admin.`,
       });
@@ -1171,7 +1177,7 @@ router.put('/:id/score', [
 });
 
 // ─── PUT /api/teachers/:id/approve ────────────────────────────────────────────
-// Admin duyệt giảng viên — STRICT: chỉ khi testScore >= 80
+// Admin duyệt giảng viên - STRICT: chỉ khi testScore >= 80
 router.put('/:id/approve', [
   authMiddleware,
   branchFilter,
@@ -1210,8 +1216,8 @@ router.put('/:id/approve', [
     if (io) {
       emitTeacherEvent(io, teacher, 'teacher:approved', {
         teacherId: teacher._id.toString(),
-        name:      teacher.name,
-        message:   '🎊 Tài khoản của bạn đã được Admin phê duyệt! Bạn có thể bắt đầu giảng dạy.',
+        name: teacher.name,
+        message: '🎊 Tài khoản của bạn đã được Admin phê duyệt! Bạn có thể bắt đầu giảng dạy.',
       });
     }
 
@@ -1505,7 +1511,7 @@ router.post('/:id/submit-practical', authMiddleware, ...teacherRouteGuard('submi
     const io = req.app.get('io');
     if (io) {
       emitTeacherEvent(io, teacher, 'teacher:practical_submitted', {
-        teacherId:   teacher._id.toString(),
+        teacherId: teacher._id.toString(),
         teacherName: teacher.name,
         fileUrl: normalizedFileUrl,
         message: `📁 Giảng viên ${teacher.name} đã nộp bài thực hành`,
@@ -1700,11 +1706,13 @@ router.get('/:id/finance', authMiddleware, ...teacherRouteGuard('finance_self'),
 
     // Tổng đã nhận = Tổng tiền từ các giao dịch thành công của giảng viên
     const transactionsContext = await Transaction.aggregate([
-      { $match: { 
-          teacherId: new mongoose.Types.ObjectId(req.params.id), 
-          status: 'confirmed' 
-      }},
-      { $group: { _id: null, totalString: { $sum: "$amount" } }}
+      {
+        $match: {
+          teacherId: new mongoose.Types.ObjectId(req.params.id),
+          status: 'confirmed'
+        }
+      },
+      { $group: { _id: null, totalString: { $sum: "$amount" } } }
     ]);
     const paidAmount = transactionsContext.length > 0 ? transactionsContext[0].totalString : 0;
 
@@ -1893,10 +1901,10 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       : '';
     const fifoNote = claimedSessions.length
       ? claimedSessions.map((s) => {
-          const name = s.studentName || 'HV';
-          const d = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
-          return d ? `Buổi - ${name} (${d})` : `Buổi - ${name}`;
-        }).join('; ')
+        const name = s.studentName || 'HV';
+        const d = s.date ? new Date(s.date).toLocaleDateString('vi-VN') : '';
+        return d ? `Buổi - ${name} (${d})` : `Buổi - ${name}`;
+      }).join('; ')
       : '';
     const defaultDesc = paidCount > 0
       ? `${fifoNote || `Thù lao ${paidCount} buổi dạy`}${bonusNote}`
@@ -1958,7 +1966,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       throw createErr;
     }
 
-    // P2: post Ledger salary — fail-closed (rollback Transaction + sessions nếu Ledger lỗi)
+    // P2: post Ledger salary - fail-closed (rollback Transaction + sessions nếu Ledger lỗi)
     try {
       await postSalary({
         teacher,
@@ -1977,7 +1985,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
         },
       });
     } catch (ledgerErr) {
-      logger.error('[FINANCE] salary ledger (pay-flexible) FAILED — rollback: %s', ledgerErr.message);
+      logger.error('[FINANCE] salary ledger (pay-flexible) FAILED - rollback: %s', ledgerErr.message);
       try {
         await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
         if (sessionIds.length > 0) {
@@ -1991,7 +1999,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       }
       return res.status(500).json({
         success: false,
-        message: 'Ghi sổ lương thất bại — đã hủy phiếu chi. Thử lại.',
+        message: 'Ghi sổ lương thất bại - đã hủy phiếu chi. Thử lại.',
       });
     }
 
@@ -2035,7 +2043,7 @@ router.put('/:id/finance/pay-flexible', [authMiddleware, ...teacherRouteGuard('f
       success: true,
       message: paidCount > 0
         ? `Thanh toán thành công ${paidCount} buổi`
-          + (starBonusAmount > 0 ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ` : '')
+        + (starBonusAmount > 0 ? ` + thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ` : '')
         : `Thanh toán thưởng sao ${starBonusAmount.toLocaleString('vi-VN')}đ`,
       data: {
         paidSessions: paidCount,
@@ -2080,7 +2088,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
       return res.status(400).json({ success: false, message: `Số tiền thanh toán (${estimatedAmount.toLocaleString('vi-VN')}đ) vượt quá giới hạn 500 triệu. Vui lòng kiểm tra lại mức lương/buổi.` });
     }
 
-    // Claim atomic theo danh sách _id đã chọn — rollback chỉ các id này nếu create fail
+    // Claim atomic theo danh sách _id đã chọn - rollback chỉ các id này nếu create fail
     const pendingSessions = await Schedule.find({
       teacherId: req.params.id,
       status: 'completed',
@@ -2154,7 +2162,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
         metadata: { sessionsCount: paidCount, sessionIds: sessionIds.map(String) },
       });
     } catch (ledgerErr) {
-      logger.error('[FINANCE] salary ledger (pay-all) FAILED — rollback: %s', ledgerErr.message);
+      logger.error('[FINANCE] salary ledger (pay-all) FAILED - rollback: %s', ledgerErr.message);
       try {
         await Transaction.findByIdAndUpdate(transaction._id, { status: 'cancelled' });
         await Schedule.updateMany(
@@ -2166,7 +2174,7 @@ router.put('/:id/finance/pay-all', [authMiddleware, ...teacherRouteGuard('financ
       }
       return res.status(500).json({
         success: false,
-        message: 'Ghi sổ lương thất bại — đã hủy phiếu chi. Thử lại.',
+        message: 'Ghi sổ lương thất bại - đã hủy phiếu chi. Thử lại.',
       });
     }
 

@@ -1,4 +1,4 @@
-# MESSAGING MATRIX — Phase 3
+# MESSAGING MATRIX - Phase 3
 
 **Status:** Derived from live code + Phase 8.24 / 8.24B docs. **No invented business rules.**  
 **Legend:**
@@ -9,7 +9,7 @@
 | N | Denied |
 | Y* | Allowed with scope (branch / assignment) |
 | D≠S | Discover ≠ Send (different rules) |
-| CONFLICT | Contradictory sources — needs business decision |
+| CONFLICT | Contradictory sources - needs business decision |
 | n/a | Not applicable / not modeled |
 
 **ADMIN** in this matrix means elevated product roles **SUPER_ADMIN ∪ HIGH_ADMIN** unless a row splits them.
@@ -29,9 +29,9 @@
 | STUDENT → TEACHER | Y* assigned | Y* | Y* assigned | Y | Y (realtime) | via assignment, not branch matrix | n/a (not enforced) |
 | STUDENT → SUPPORT | Y (contacts; null-branch SUPPORT included) | Y | Y | Y | Y | send: unrestricted for SUPPORT peer; discover: soft branch OR null | n/a |
 | STUDENT → STAFF | Y* same branch | Y* | Y* same branch | Y | Y | same branch (empty soft-allow on send) | n/a |
-| STUDENT → ADMIN (HIGH) | **CONFLICT — REQUIRES BUSINESS DECISION** (pairing send Y; contacts 8.24B student does **not** list HIGH/SUPER) | CONFLICT | Y (pairing) | Y | Y | none | n/a |
+| STUDENT → ADMIN (HIGH) | **CONFLICT - REQUIRES BUSINESS DECISION** (pairing send Y; contacts 8.24B student does **not** list HIGH/SUPER) | CONFLICT | Y (pairing) | Y | Y | none | n/a |
 | STUDENT → ADMIN (SUPER) | **CONFLICT** (contacts hide SUPER; pairing allow) | CONFLICT | Y (pairing) | Y (legacy mailbox paths exist) | Y | none | n/a |
-| STUDENT → STUDENT | N | N | N | N | N | — | — |
+| STUDENT → STUDENT | N | N | N | N | N | - | - |
 
 ---
 
@@ -44,7 +44,7 @@
 | TEACHER → STAFF | Y | Y | Y* same branch | Y | Y | same branch (empty soft-allow) | n/a |
 | TEACHER → ADMIN (HIGH) | Y (contacts) | Y | Y | Y | Y | none | n/a |
 | TEACHER → ADMIN (SUPER) | N discover (contacts: teacher does not load SUPER) / **CONFLICT** with pairing allow | CONFLICT | Y (pairing) | Y | Y | none | n/a |
-| TEACHER → TEACHER | N | N | N | N | N | — | — |
+| TEACHER → TEACHER | N | N | N | N | N | - | - |
 
 ---
 
@@ -54,7 +54,7 @@
 |---|---|---|---|---|---|---|---|
 | SUPPORT → STUDENT | Y (all HV in contacts) | Y | Y | Y | Y | none (pairing) | n/a |
 | SUPPORT → TEACHER | Y | Y | Y | Y | Y | none | n/a |
-| SUPPORT → SUPPORT | Y (via staff list split — peers with SUPPORT) | Y | Y | Y | Y | none | n/a |
+| SUPPORT → SUPPORT | Y (via staff list split - peers with SUPPORT) | Y | Y | Y | Y | none | n/a |
 | SUPPORT → STAFF | Y | Y | Y | Y | Y | none | n/a |
 | SUPPORT → ADMIN (HIGH) | Y | Y | Y | Y | Y | none | n/a |
 | SUPPORT → ADMIN (SUPER) | N discover / **CONFLICT** pairing allow | CONFLICT | Y | Y | Y | none | n/a |
@@ -96,7 +96,7 @@
 | Socket `ALL_BRANCH_*` | Y if in `ALL_SUPPORT_{code}` | Y if in `ALL_STAFF_{code}` | Branch rooms |
 | Private DM | **Only exact recipient user room** | Same | Must not use ALL_* |
 
-**Do not assume** Admin→ALL_SUPPORT vs ALL_STAFF exclusivity for product broadcasts until an explicit broadcast matrix is approved. Current register joins mean SUPPORT also sits in `ALL_STAFF` because transport is `staff` — **CONFLICT — REQUIRES BUSINESS DECISION** for any future “STAFF-only” broadcast intent.
+**Do not assume** Admin→ALL_SUPPORT vs ALL_STAFF exclusivity for product broadcasts until an explicit broadcast matrix is approved. Current register joins mean SUPPORT also sits in `ALL_STAFF` because transport is `staff` - **CONFLICT - REQUIRES BUSINESS DECISION** for any future “STAFF-only” broadcast intent.
 
 ---
 
@@ -121,7 +121,7 @@ Automated coverage: extend Phase 14 tests; isolation_fix / hardening cover staff
 | Scenario | Policy source | Outcome |
 |---|---|---|
 | Student Branch A → Support (null or A) | contacts + pairing | Allow |
-| Student Branch A → Support Branch B only | contacts may exclude if SUPPORT has other branch and no null OR; pairing still allow send to SUPPORT | **CONFLICT / soft** — document after product call |
+| Student Branch A → Support Branch B only | contacts may exclude if SUPPORT has other branch and no null OR; pairing still allow send to SUPPORT | **CONFLICT / soft** - document after product call |
 | Student A → Staff Branch B | pairing deny; contacts deny | N |
 | Student A → Staff Branch A | Y | Y |
 
@@ -136,4 +136,4 @@ Automated coverage: extend Phase 14 tests; isolation_fix / hardening cover staff
 4. notifyUser user rooms                           → RECEIVE (private)
 ```
 
-When 1 and 2 disagree → **CONFLICT — REQUIRES BUSINESS DECISION** (do not “fix” by inventing FE rules).
+When 1 and 2 disagree → **CONFLICT - REQUIRES BUSINESS DECISION** (do not “fix” by inventing FE rules).

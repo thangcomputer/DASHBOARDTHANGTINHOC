@@ -1,7 +1,7 @@
 import { PROCTOR_CONFIG as CONFIG } from './config.js';
 
 /**
- * Kiểm tra quyền camera (Permissions API — không có trên mọi trình duyệt).
+ * Kiểm tra quyền camera (Permissions API - không có trên mọi trình duyệt).
  * @returns {'granted'|'denied'|'prompt'|'unknown'}
  */
 export async function queryCameraPermission() {
