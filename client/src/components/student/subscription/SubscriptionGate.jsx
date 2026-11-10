@@ -20,13 +20,13 @@ async function logoutToLogin() {
 
 function RenewModal({ overview, onClose, onRenewed }) {
   return createPortal(
-    <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-slate-950/55 p-4" role="presentation">
-      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl" role="dialog" aria-modal="true" aria-label="Gia hạn tài khoản">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-          <h2 className="text-base font-black text-slate-900">Gói học Meet</h2>
-          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><X size={18} /></button>
+    <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-slate-950/55 p-2.5 sm:p-4 backdrop-blur-[2px]" role="presentation">
+      <div className="flex max-h-[92dvh] w-full max-w-3xl lg:max-w-4xl flex-col overflow-hidden rounded-[22px] sm:rounded-[26px] bg-white shadow-2xl border border-slate-100" role="dialog" aria-modal="true" aria-label="Gia hạn tài khoản">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 sm:px-5 sm:py-3">
+          <h2 className="text-sm sm:text-base font-black text-slate-900">Gói học Meet</h2>
+          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1 sm:p-1.5 text-slate-400 hover:bg-slate-100 !shadow-none"><X size={17} /></button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3.5 sm:p-5">
           <SubscriptionRenewPanel overview={overview} onRenewed={onRenewed} />
         </div>
       </div>
@@ -172,6 +172,12 @@ export default function SubscriptionGate({ session, children }) {
     setRenewOpen(false);
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const handler = (e) => setRenewOpen(Boolean(e.detail));
+    window.addEventListener('dewskill-test-renew-modal', handler);
+    return () => window.removeEventListener('dewskill-test-renew-modal', handler);
+  }, []);
 
   const value = useMemo(() => ({
     overview,
