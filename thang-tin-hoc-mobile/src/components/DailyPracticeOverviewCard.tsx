@@ -21,7 +21,7 @@ export function DailyPracticeOverviewCard({
   const playedToday = Boolean(stats?.playedToday);
 
   const handlePractice = () => {
-    navigation.navigate('DailyPractice', { practice: 'stage' });
+    navigation.navigate('DailyPractice');
   };
 
   return (

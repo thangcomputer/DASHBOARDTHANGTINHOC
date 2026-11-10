@@ -2934,6 +2934,7 @@ function shuffleList<T>(list: T[]): T[] {
 }
 
 export function DailyPracticeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const route = useRoute<RouteProp<AppStackParamList, 'DailyPractice'>>();
   const linkedTopicId = route.params?.topicId || '';
   const play = useGameSounds();
@@ -3050,15 +3051,16 @@ export function DailyPracticeScreen() {
   useEffect(() => {
     if (route.params?.watch === 'stage') {
       setMode('path');
+      navigation.setParams({ watch: undefined } as never);
     }
-  }, [route.params?.watch]);
+  }, [route.params?.watch, navigation]);
 
   useEffect(() => {
-    if (route.params?.practice === 'stage' && pathTopics.length > 0 && !session && !summary) {
+    if (route.params?.practice === 'stage') {
       setMode('path');
-      quickStart();
+      navigation.setParams({ practice: undefined } as never);
     }
-  }, [route.params?.practice, pathTopics]);
+  }, [route.params?.practice, navigation]);
 
   const goHome = () => {
     setSummary(null);
