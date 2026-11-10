@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Loader2, ArrowRight, Headphones, Crown, Sparkles, ChevronLeft } from 'lucide-react';
+import { Check, Loader2, ArrowRight, Crown, Sparkles, ChevronLeft } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
 import api from '../../../services/api';
 import { generateVietQRUrl } from '../../bankSelectUtils';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
-import { openAdminZalo } from '../../../utils/adminZaloContact';
 
 const MEET_LOGO = '/uploads/popup/google-meet.webp';
 
@@ -100,7 +99,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
   const register = async () => {
     if (!selected || busy) return;
     if (!(selected.price > 0)) {
-      setError('Gói này chưa mở thanh toán tự động. Hãy bấm "Nhận tư vấn" để đăng ký trực tiếp.');
+      setError('Gói này chưa mở thanh toán tự động. Hãy liên hệ trung tâm để đăng ký.');
       return;
     }
     setBusy(true);
@@ -127,11 +126,6 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
     } finally {
       setSimulating(false);
     }
-  };
-
-  const handleConsultation = () => {
-    const msg = `Chào Thầy Thắng, em muốn nhận tư vấn về gói học Tin học văn phòng Google Meet (${selected.label}).`;
-    openAdminZalo(msg);
   };
 
   return createPortal(
@@ -279,7 +273,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
 
                 {/* Giới thiệu ngắn */}
                 <p className="mt-1 text-center text-[10px] leading-tight text-slate-500 max-w-[145px]">
-                  Giảng viên tin học văn phòng – đồng hành cùng người mới bắt đầu.
+                  Giảng viên có 8 năm kinh nghiệm đào tạo tin học văn phòng.
                 </p>
               </div>
 
@@ -302,10 +296,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                   </span>
                 </h2>
 
-                {/* Pill giới thiệu phương pháp */}
-                <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-3 py-0.5 text-[10.5px] font-extrabold text-emerald-800 shadow-2xs">
-                  <span>Học trực tiếp – dễ hiểu – được hướng dẫn từng bước</span>
-                </div>
+
 
                 {/* Đoạn mô tả phù hợp đối tượng */}
                 <p className="mt-1 text-[11px] sm:text-xs font-medium leading-relaxed text-slate-600 max-w-sm">
@@ -384,8 +375,8 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                     type="button"
                     onClick={() => setSelectedId(plan.id)}
                     className={`group relative flex min-w-[125px] shrink-0 snap-start flex-col justify-between rounded-xl border-2 p-2.5 text-center transition-all duration-200 sm:min-w-0 ${isSelected
-                        ? 'border-emerald-500 bg-emerald-50/70 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-400/30 -translate-y-0.5'
-                        : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs'
+                      ? 'border-emerald-500 bg-emerald-50/70 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-400/30 -translate-y-0.5'
+                      : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs'
                       }`}
                   >
                     {/* Huy hiệu ⭐ Nên chọn cho gói 3 tháng */}
@@ -436,14 +427,14 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
 
             {error && <p className="text-center text-xs font-semibold text-red-600">{error}</p>}
 
-            {/* KHỐI NÚT HÀNH ĐỘNG DƯỚI CÙNG (2 NÚT) */}
-            <div className="mt-1 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            {/* KHỐI NÚT HÀNH ĐỘNG DƯỚI CÙNG (CHỈ NÚT ĐĂNG KÝ HỌC NGAY) */}
+            <div className="mt-1.5 flex items-center justify-center">
               {/* Nút Đăng ký học ngay */}
               <button
                 type="button"
                 onClick={register}
                 disabled={busy}
-                className="relative inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 sm:py-3 text-sm font-black text-white transition-all duration-200 active:scale-95 shadow-md shadow-emerald-500/25 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-700 hover:brightness-105 hover:-translate-y-0.5 w-full sm:w-auto cursor-pointer"
+                className="relative inline-flex items-center justify-center gap-2 rounded-full px-8 py-2.5 sm:py-3 text-sm sm:text-base font-black text-white transition-all duration-200 active:scale-95 shadow-md shadow-emerald-500/25 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-700 hover:brightness-105 hover:-translate-y-0.5 w-full sm:w-auto min-w-[280px] cursor-pointer"
               >
                 {busy ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -458,16 +449,6 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                     <ArrowRight size={16} />
                   </>
                 )}
-              </button>
-
-              {/* Nút Nhận tư vấn */}
-              <button
-                type="button"
-                onClick={handleConsultation}
-                className="relative inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 sm:py-3 text-sm font-black text-emerald-800 transition-all duration-200 active:scale-95 border-2 border-emerald-400 bg-white hover:bg-emerald-50 shadow-2xs hover:-translate-y-0.5 w-full sm:w-auto cursor-pointer"
-              >
-                <Headphones size={16} className="text-emerald-600" />
-                <span>Nhận tư vấn</span>
               </button>
             </div>
           </div>
