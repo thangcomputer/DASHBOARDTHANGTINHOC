@@ -175,6 +175,21 @@ export default function FreePortalPage({ onLogin }) {
 
   useEffect(() => {
     document.title = 'Vào luyện tập | DewSkill';
+    const oldFavicon = document.getElementById('app-favicon')?.getAttribute('href') || '/favicon.svg';
+    const favLink = document.getElementById('app-favicon') || document.querySelector("link[rel*='icon']");
+    if (favLink) {
+      favLink.setAttribute('type', 'image/png');
+      favLink.setAttribute('href', `/brand/favicon.png?v=${Date.now()}`);
+    }
+    return () => {
+      if (favLink) {
+        favLink.setAttribute('type', 'image/svg+xml');
+        favLink.setAttribute('href', oldFavicon);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     fetch(`${API_BASE}/auth/free-portal/social/status`)
       .then((r) => r.json())

@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const Student = require('../models/Student');
@@ -37,24 +39,60 @@ function apiOrigin(req) {
   return `${proto}://${host}`;
 }
 
+function getCredentials(provider) {
+  let id = '';
+  let secret = '';
+  if (provider === 'google') {
+    id = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+    secret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  } else if (provider === 'facebook') {
+    id = String(process.env.FACEBOOK_APP_ID || '').trim();
+    secret = String(process.env.FACEBOOK_APP_SECRET || '').trim();
+  }
+  if (!id || !secret) {
+    try {
+      const secPath = path.join(__dirname, '../landingpage-dewskill/data/admin-security.json');
+      if (fs.existsSync(secPath)) {
+        const sec = JSON.parse(fs.readFileSync(secPath, 'utf8'));
+        if (provider === 'google') {
+          id = id || String(sec.googleClientId || '').trim();
+          secret = secret || String(sec.googleClientSecret || '').trim();
+        } else if (provider === 'facebook') {
+          id = id || String(sec.facebookAppId || '').trim();
+          secret = secret || String(sec.facebookAppSecret || '').trim();
+        }
+      }
+      const sitePath = path.join(__dirname, '../landingpage-dewskill/data/site.json');
+      if (fs.existsSync(sitePath)) {
+        const site = JSON.parse(fs.readFileSync(sitePath, 'utf8'));
+        if (provider === 'google') {
+          id = id || String(site.googleClientId || '').trim();
+          secret = secret || String(site.googleClientSecret || '').trim();
+        } else if (provider === 'facebook') {
+          id = id || String(site.facebookAppId || '').trim();
+          secret = secret || String(site.facebookAppSecret || '').trim();
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return { id, secret };
+}
+
 function providerSetup(provider, req) {
   const redirectUri = `${apiOrigin(req)}/api/auth/free-portal/${provider}/callback`;
-  if (provider === 'google') {
-    const id = String(process.env.GOOGLE_CLIENT_ID || '').trim();
-    const secret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
-    if (!id || !secret) return null;
-    return { id, secret, redirectUri };
-  }
-  const id = String(process.env.FACEBOOK_APP_ID || '').trim();
-  const secret = String(process.env.FACEBOOK_APP_SECRET || '').trim();
-  if (!id || !secret) return null;
-  return { id, secret, redirectUri };
+  const creds = getCredentials(provider);
+  if (!creds.id || !creds.secret) return null;
+  return { id: creds.id, secret: creds.secret, redirectUri };
 }
 
 function socialStatus() {
+  const g = getCredentials('google');
+  const f = getCredentials('facebook');
   return {
-    google: Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim() && String(process.env.GOOGLE_CLIENT_SECRET || '').trim()),
-    facebook: Boolean(String(process.env.FACEBOOK_APP_ID || '').trim() && String(process.env.FACEBOOK_APP_SECRET || '').trim()),
+    google: Boolean(g.id && g.secret),
+    facebook: Boolean(f.id && f.secret),
   };
 }
 

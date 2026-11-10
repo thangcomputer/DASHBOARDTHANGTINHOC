@@ -76,14 +76,15 @@ export default function FaviconSwitcher() {
 
   useEffect(() => {
     const isAdminZone = pathname.startsWith('/admin');
-    const custom = isAdminZone ? icons.adminUrl : icons.publicUrl;
-    const fallback = isAdminZone ? ADMIN_ICON : PUBLIC_ICON;
+    const isFreePortal = pathname === '/DANGNHAPMIENPHI' || pathname.startsWith('/DANGNHAPMIENPHI/');
+    const custom = isAdminZone ? icons.adminUrl : isFreePortal ? '/brand/favicon.png' : icons.publicUrl;
+    const fallback = isAdminZone ? ADMIN_ICON : isFreePortal ? '/brand/favicon.png' : PUBLIC_ICON;
     let href = resolveHref(custom, fallback);
     if (icons.rev > 0 && custom) {
       href += (href.includes('?') ? '&' : '?') + 'v=' + icons.rev;
     }
     setFavicon(href);
-    setThemeColor(isAdminZone ? ADMIN_THEME : PUBLIC_THEME);
+    setThemeColor(isAdminZone ? ADMIN_THEME : isFreePortal ? '#059669' : PUBLIC_THEME);
   }, [pathname, icons]);
 
   return null;
