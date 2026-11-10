@@ -9,6 +9,7 @@ export type StudentSubscription = {
   state: 'lifetime' | 'active' | 'expiring' | 'expired';
   daysLeft: number | null;
   activated: boolean;
+  meetLifetime?: boolean;
 };
 
 export type SubscriptionPlan = { id: SubscriptionPlanId; label: string; months: number | null; price: number };

@@ -65,18 +65,31 @@ function Shell({ children, button, onNext }: { children: React.ReactNode; button
 function DoneStage({ summary, play, onNext }: { summary: DpSummary; play: (s: GameSound) => void; onNext: () => void }) {
   const xpDisplay = practiceFinishXpDisplay(summary);
   const xp = useCountUp(xpDisplay.amount);
+  const isPerfect = Boolean(
+    summary &&
+    (summary.total || 0) >= 2 &&
+    (summary.correctCount === summary.total || summary.maxCombo === summary.total)
+  );
   const good = summary.stars >= 2;
   const fly = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    play(good ? 'win' : 'sad');
+    if (isPerfect) play('mascotVictory');
+    else play(good ? 'win' : 'sad');
     Animated.spring(fly, { toValue: 1, friction: 5, tension: 60, useNativeDriver: USE_NATIVE_DRIVER }).start();
-  }, [fly, good, play]);
+  }, [fly, good, isPerfect, play]);
   return (
     <Shell button="NHẬN XP" onNext={onNext}>
       <Animated.View style={{ opacity: fly, transform: [{ translateY: fly.interpolate({ inputRange: [0, 1], outputRange: [60, 0] }) }, { rotate: fly.interpolate({ inputRange: [0, 1], outputRange: ['-12deg', '0deg'] }) }] }}>
-        <Mascot mood={good ? 'done' : 'determinedSoft'} size={140} />
+        <Mascot mood={isPerfect ? 'celebrate' : (good ? 'done' : 'determinedSoft')} size={140} />
       </Animated.View>
-      <Text style={styles.doneTitle}>{good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!'}</Text>
+      {isPerfect ? (
+        <View style={styles.perfectBadge}>
+          <Crown size={13} color="#D97706" fill="#FBBF24" />
+          <Text style={styles.perfectBadgeText}>BÁCH PHÁT BÁCH TRÚNG 100%</Text>
+          <Crown size={13} color="#D97706" fill="#FBBF24" />
+        </View>
+      ) : null}
+      <Text style={styles.doneTitle}>{isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!')}</Text>
       <Text style={styles.doneCaption}>{xpDisplay.caption}</Text>
       <View style={styles.statRow}>
         <StatCard label="NHẬN VỀ" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
@@ -280,4 +293,12 @@ const styles = StyleSheet.create({
     borderRadius: 14, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A',
   },
   trophyMetaText: { color: '#92400E', fontSize: 12, fontWeight: '800' },
+  perfectBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: 999, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A',
+    marginBottom: -4,
+  },
+  perfectBadgeText: {
+    color: '#92400E', fontSize: 11, fontWeight: '900', letterSpacing: 0.6,
+  },
 });

@@ -6854,3 +6854,51 @@ body button.dp-3d-btn.dp-3d-btn--light:not(:disabled):not([aria-disabled='true']
 .dew-mirror-logo:active {
   transform: translateY(0.5px) scale(0.98);
 }
+
+/* Lightning Combo & Perfect Mascot Overlays */
+@keyframes lightning-flash {
+  0% { opacity: 0; }
+  10% { opacity: 0.95; }
+  15% { opacity: 0.35; }
+  25% { opacity: 0.9; }
+  35% { opacity: 0.25; }
+  45% { opacity: 0.85; }
+  60% { opacity: 0.7; }
+  100% { opacity: 0.75; }
+}
+
+@keyframes combo-pop {
+  0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+  50% { transform: scale(1.12) rotate(2deg); opacity: 1; }
+  75% { transform: scale(0.96) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes mascot-celebrate-burst {
+  0% { transform: scale(0.3) translateY(40px); opacity: 0; }
+  60% { transform: scale(1.08) translateY(-8px); opacity: 1; }
+  80% { transform: scale(0.97) translateY(3px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes ray-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-lightning-flash {
+  animation: lightning-flash 0.6s ease-out forwards;
+}
+
+.animate-combo-pop {
+  animation: combo-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.animate-mascot-burst {
+  animation: mascot-celebrate-burst 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.animate-ray-spin {
+  animation: ray-spin 25s linear infinite;
+}
+

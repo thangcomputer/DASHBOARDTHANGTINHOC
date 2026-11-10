@@ -16,6 +16,8 @@ import DailyPracticeGoalPanel from './DailyPracticeGoalPanel';
 import Mascot from './Mascot';
 import PathView, { PathResultCard, continuePracticeTarget, focusCurrentPathLesson, pickActivePathTopic } from './PathView';
 import Celebration from './Celebration';
+import ComboLightningOverlay from './ComboLightningOverlay';
+import PerfectStreakMascotOverlay from './PerfectStreakMascotOverlay';
 import BuyXpModal from './BuyXpModal';
 import WelcomeBackModal, { takeWelcomeBackTurn } from './WelcomeBackModal';
 import FreeMeetPlanModal, { isFreePortalAccount } from './FreeMeetPlanModal';
@@ -355,6 +357,7 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
     return () => window.removeEventListener(DAILY_PRACTICE_STATS_EVENT, onStatsChanged);
   }, []);
   const [combo, setCombo] = useState(0);
+  const [lightningCombo, setLightningCombo] = useState(null);
   const [feedbackTitle, setFeedbackTitle] = useState('');
   const [error, setError] = useState('');
   const [buyXpOpen, setBuyXpOpen] = useState(false);
@@ -389,7 +392,13 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
       setResult(data);
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
       if (data.correct) {
-        setCombo((value) => value + 1);
+        setCombo((value) => {
+          const nextVal = value + 1;
+          if (nextVal === 3 || (nextVal > 3 && nextVal % 3 === 0)) {
+            setLightningCombo(nextVal);
+          }
+          return nextVal;
+        });
         setFeedbackTitle(randomPraise());
         gameSounds.correct();
       } else {
@@ -638,6 +647,13 @@ function PlayScreen({ session, stats, onQuit, onFinished }) {
           onPaid={(status) => {
             if (typeof status?.profileXp === 'number') setProfileXp(status.profileXp);
           }}
+        />
+      )}
+
+      {lightningCombo && (
+        <ComboLightningOverlay
+          combo={lightningCombo}
+          onDone={() => setLightningCombo(null)}
         />
       )}
     </div>
@@ -974,6 +990,7 @@ export default function DailyPracticePage() {
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   const [celebrating, setCelebrating] = useState(false);
+  const [showPerfectStreak, setShowPerfectStreak] = useState(false);
   const [lastPick, setLastPick] = useState(null);
   const [starting, setStarting] = useState(false);
   const [mode, setMode] = useState(() => {
@@ -1220,6 +1237,14 @@ export default function DailyPracticePage() {
   const finished = (data) => {
     setSession(null);
     setSummary(data);
+    const isPerfect = Boolean(
+      data &&
+      (data.total || 0) >= 2 &&
+      (data.correctCount === data.total || data.maxCombo === data.total)
+    );
+    if (isPerfect) {
+      setShowPerfectStreak(true);
+    }
     setCelebrating(true);
     applyStats(data.stats);
     loadOverview(true);
@@ -1326,6 +1351,12 @@ export default function DailyPracticePage() {
         onClose={() => setMeetOfferOpen(false)}
         onPaid={() => { loadOverview(); loadPath(); }}
       />
+      {showPerfectStreak && summary && (
+        <PerfectStreakMascotOverlay
+          total={summary.total || summary.correctCount}
+          onDone={() => setShowPerfectStreak(false)}
+        />
+      )}
     </div>
   );
 }

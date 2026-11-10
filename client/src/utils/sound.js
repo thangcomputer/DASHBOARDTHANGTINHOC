@@ -292,6 +292,55 @@ export const gameSounds = {
     { freq: 349, at: 0.26, dur: 0.28 },
     { freq: 311, at: 0.52, dur: 0.5, slideTo: 262 },
   ], { type: 'sine', volume: 0.14 }),
+  lightningCombo: () => {
+    unlockAudio();
+    const ctx = lessonAudio();
+    if (!ctx) return;
+    const start = ctx.currentTime;
+    try {
+      // 1. Tiếng tia chớp quét tần số cao xuống thấp cực nhanh (electric zap)
+      const zapOsc = ctx.createOscillator();
+      const zapGain = ctx.createGain();
+      zapOsc.type = 'sawtooth';
+      zapOsc.frequency.setValueAtTime(1400, start);
+      zapOsc.frequency.exponentialRampToValueAtTime(180, start + 0.12);
+      zapGain.gain.setValueAtTime(0.24, start);
+      zapGain.gain.exponentialRampToValueAtTime(0.01, start + 0.12);
+      zapOsc.connect(zapGain);
+      zapGain.connect(ctx.destination);
+      zapOsc.start(start);
+      zapOsc.stop(start + 0.13);
+
+      // 2. Chuỗi hợp âm combo tia chớp bùng nổ (C5, E5, G5, C6, E6)
+      playNotes([
+        { freq: 523.25, at: 0.08, dur: 0.12 },
+        { freq: 659.25, at: 0.15, dur: 0.12 },
+        { freq: 783.99, at: 0.22, dur: 0.14 },
+        { freq: 1046.50, at: 0.30, dur: 0.35 },
+        { freq: 1318.51, at: 0.40, dur: 0.42 },
+      ], { type: 'triangle', volume: 0.22 });
+    } catch {
+      /* ignore audio error */
+    }
+  },
+  mascotVictory: () => {
+    unlockAudio();
+    const ctx = lessonAudio();
+    if (!ctx) return;
+    try {
+      // Khúc khải hoàn linh vật chiến thắng xuất sắc tuyệt đối
+      playNotes([
+        { freq: 523.25, at: 0.00, dur: 0.16 }, // C5
+        { freq: 659.25, at: 0.14, dur: 0.16 }, // E5
+        { freq: 783.99, at: 0.28, dur: 0.16 }, // G5
+        { freq: 1046.50, at: 0.42, dur: 0.24 }, // C6
+        { freq: 1318.51, at: 0.58, dur: 0.28 }, // E6
+        { freq: 1567.98, at: 0.74, dur: 0.55 }, // G6
+      ], { type: 'triangle', volume: 0.25 });
+    } catch {
+      /* ignore audio error */
+    }
+  },
 };
 
 export const stopExamWarningSound = () => {

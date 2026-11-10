@@ -19,6 +19,8 @@ import { Mascot, type MascotMood } from '../components/dailyPractice/Mascot';
 import { DropletMark, PathITBackdrop, PathMascotBuddy, PathSnakeConnector, StageBuddiesOverlay } from '../components/dailyPractice/PathDecor';
 import { DragProvider } from '../components/dailyPractice/DragKit';
 import { Celebration } from '../components/dailyPractice/Celebration';
+import { MobileComboLightningOverlay } from '../components/dailyPractice/MobileComboLightningOverlay';
+import { MobilePerfectStreakOverlay } from '../components/dailyPractice/MobilePerfectStreakOverlay';
 import { PathVideoModal } from '../components/dailyPractice/PathVideoModal';
 import { VideoPlayerFrame, type VideoPlayerApi } from './VideoPlayerFrame';
 import { resolveMobilePublicUrl } from '../services/apiClient';
@@ -2461,6 +2463,7 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [combo, setCombo] = useState(0);
+  const [lightningCombo, setLightningCombo] = useState<number | null>(null);
   const comboPop = useRef(new Animated.Value(1)).current;
   const question = session.questions[index];
   const total = session.questions.length;
@@ -2504,13 +2507,20 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
       setResult(data);
       setXp(data.sessionXp);
       if (typeof data.profileXp === 'number') setProfileXp(data.profileXp);
-      setTitle(data.correct ? randomPraise() : randomComfort());
-      setCombo((value) => (data.correct ? value + 1 : 0));
-      if (data.correct) {
+      const isCorrect = data.correct;
+      setTitle(isCorrect ? randomPraise() : randomComfort());
+      setCombo((value) => {
+        const nextCombo = isCorrect ? value + 1 : 0;
+        if (nextCombo === 3 || (nextCombo > 3 && nextCombo % 3 === 0)) {
+          setLightningCombo(nextCombo);
+        }
+        return nextCombo;
+      });
+      if (isCorrect) {
         comboPop.setValue(0.6);
         Animated.spring(comboPop, { toValue: 1, friction: 4, tension: 160, useNativeDriver: USE_NATIVE_DRIVER }).start();
       }
-      play(data.correct ? 'correct' : 'wrong');
+      play(isCorrect ? 'correct' : 'wrong');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không gửi được câu trả lời');
     } finally {
@@ -2715,6 +2725,13 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
               <ArrowRight size={17} color="#FFFFFF" />
             </Pressable>
           </View>
+        ) : null}
+        {lightningCombo ? (
+          <MobileComboLightningOverlay
+            combo={lightningCombo}
+            play={play}
+            onDone={() => setLightningCombo(null)}
+          />
         ) : null}
       </View>
     </DragProvider>
@@ -2927,6 +2944,7 @@ export function DailyPracticeScreen() {
   const [session, setSession] = useState<DpSession | null>(null);
   const [summary, setSummary] = useState<DpSummary | null>(null);
   const [celebrating, setCelebrating] = useState(false);
+  const [showPerfectOverlay, setShowPerfectOverlay] = useState(false);
   const [lastPick, setLastPick] = useState<PracticePick | null>(null);
   const [starting, setStarting] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -3065,6 +3083,14 @@ export function DailyPracticeScreen() {
             onFinished={(data) => {
               setSession(null);
               setSummary(data);
+              const isPerfect = Boolean(
+                data &&
+                (data.total || 0) >= 2 &&
+                (data.correctCount === data.total || data.maxCombo === data.total)
+              );
+              if (isPerfect) {
+                setShowPerfectOverlay(true);
+              }
               setCelebrating(true);
               setStats((prev) => (prev ? { ...prev, ...data.stats } : data.stats));
               DeviceEventEmitter.emit(LEARNING_GOAL_CHANGED_EVENT, null);
@@ -3111,6 +3137,13 @@ export function DailyPracticeScreen() {
           />
         )}
       </ScrollView>
+      {showPerfectOverlay && summary ? (
+        <MobilePerfectStreakOverlay
+          total={summary.total || summary.correctCount}
+          play={play}
+          onDone={() => setShowPerfectOverlay(false)}
+        />
+      ) : null}
       {stakePrompt ? (
         <StakeSessionConfirm
           stakeXp={stakePrompt.stakeXp}

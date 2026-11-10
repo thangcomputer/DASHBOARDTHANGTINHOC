@@ -76,15 +76,28 @@ function StageShell({ children, button, onNext }) {
 function DoneStage({ summary, onNext }) {
   const xpDisplay = practiceFinishXpDisplay(summary);
   const xp = useCountUp(xpDisplay.amount);
+  const isPerfect = Boolean(
+    summary &&
+    (summary.total || 0) >= 2 &&
+    (summary.correctCount === summary.total || summary.maxCombo === summary.total)
+  );
   const good = summary.stars >= 2;
   useEffect(() => {
-    if (good) gameSounds.win();
+    if (isPerfect) gameSounds.mascotVictory();
+    else if (good) gameSounds.win();
     else gameSounds.sad();
-  }, [good]);
+  }, [good, isPerfect]);
   return (
     <StageShell button="Nhận XP" onNext={onNext}>
       <div className="dp-fly-in"><Mascot mood={good ? 'celebrate' : 'sad'} size={150} /></div>
-      <h2 className="text-3xl font-black text-sky-600">{good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!'}</h2>
+      {isPerfect && (
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100 px-3.5 py-1 text-xs font-black uppercase tracking-wider text-amber-900 shadow-sm animate-pulse">
+          <Crown size={14} className="fill-amber-500 text-amber-600" />
+          <span>Bách phát bách trúng 100%</span>
+          <Crown size={14} className="fill-amber-500 text-amber-600" />
+        </div>
+      )}
+      <h2 className="text-3xl font-black text-sky-600">{isPerfect ? 'Xuất sắc tuyệt đối!' : (good ? 'Đã luyện tập xong!' : 'Hoàn thành lượt luyện!')}</h2>
       <p className="max-w-xs text-xs font-semibold text-slate-500">{xpDisplay.caption}</p>
       <div className="grid w-full grid-cols-3 gap-2.5">
         <StatCard label="Nhận về" tone="#F59E0B" icon={Zap} value={xpDisplay.prefix ? `${xpDisplay.prefix}${xp}` : xp} delay={150} />
