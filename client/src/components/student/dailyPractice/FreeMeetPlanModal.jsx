@@ -90,7 +90,14 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
     return () => window.clearTimeout(timer);
   }, [paid]);
 
-  if (!open) return null;
+  const [forceOpen, setForceOpen] = useState(false);
+  useEffect(() => {
+    const handler = (e) => setForceOpen(Boolean(e.detail));
+    window.addEventListener('dewskill-test-meet-modal', handler);
+    return () => window.removeEventListener('dewskill-test-meet-modal', handler);
+  }, []);
+
+  if (!open && !forceOpen) return null;
   const selected = plans.find((plan) => plan.id === selectedId) || plans[1];
   const qrUrl = bank?.bankCode && bank?.accountNumber && order
     ? generateVietQRUrl(bank.bankCode, bank.accountNumber, order.amount, order.ref, bank.accountName || '')
@@ -238,21 +245,21 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
         ) : (
           /* ===================== GIAO DIỆN CHÍNH (THEO ĐÚNG HÌNH 1) ===================== */
           <div className="flex flex-col gap-3 sm:gap-3.5">
-            {/* KHỐI TRÊN: 3 CỘT (GIẢNG VIÊN - HERO TIÊU ĐỀ - QUYỀN LỢI) */}
-            <div className="grid grid-cols-1 lg:grid-cols-[135px_1fr_265px] items-center gap-3 sm:gap-4">
-              {/* CỘT 1: THÔNG TIN GIẢNG VIÊN */}
-              <div className="flex flex-col items-center text-center">
-                <div className="relative">
+            {/* KHỐI TRÊN: GIẢNG VIÊN + 2 CỘT ĐỀU NHAU (HỌC TIN HỌC CÙNG GIẢNG VIÊN & QUYỀN LỢI) */}
+            <div className="grid grid-cols-2 sm:grid-cols-[125px_1fr_1fr] lg:grid-cols-[135px_1fr_1fr] items-stretch gap-2.5 sm:gap-3.5">
+              {/* CỘT 1: THÔNG TIN GIẢNG VIÊN (Trên mobile trải rộng 2 cột, trên desktop là cột trái) */}
+              <div className="col-span-2 sm:col-span-1 flex flex-row sm:flex-col items-center justify-center sm:justify-start gap-2.5 sm:gap-1 text-center bg-emerald-50/60 sm:bg-transparent rounded-xl p-1.5 sm:p-0 border border-emerald-100/80 sm:border-0">
+                <div className="relative shrink-0">
                   {/* Doodles tia sáng xanh xung quanh avatar */}
-                  <span className="absolute -top-1.5 left-0 text-emerald-500 font-black text-xs select-none leading-none animate-pulse">
+                  <span className="hidden sm:inline absolute -top-1.5 left-0 text-emerald-500 font-black text-xs select-none leading-none animate-pulse">
                     \ | /
                   </span>
-                  <span className="absolute -top-1.5 right-0 text-emerald-500 font-black text-xs select-none leading-none animate-pulse">
+                  <span className="hidden sm:inline absolute -top-1.5 right-0 text-emerald-500 font-black text-xs select-none leading-none animate-pulse">
                     \ | /
                   </span>
 
                   {/* Ảnh đại diện thầy Thắng vừa vặn */}
-                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full p-1 bg-gradient-to-tr from-emerald-500 via-emerald-400 to-teal-300 shadow-md shadow-emerald-900/10">
+                  <div className="h-12 w-12 sm:h-20 sm:w-20 lg:h-22 lg:w-22 rounded-full p-0.5 sm:p-1 bg-gradient-to-tr from-emerald-500 via-emerald-400 to-teal-300 shadow-md shadow-emerald-900/10">
                     <img
                       src="/giang-vien-phi-van-thang.png"
                       alt="Giảng viên Phí Văn Thắng"
@@ -261,61 +268,68 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                   </div>
                 </div>
 
-                {/* Badge tên Giảng viên */}
-                <div className="mt-2 w-full max-w-[145px] rounded-xl bg-white px-2 py-1 text-center shadow-xs border border-emerald-100">
-                  <span className="block text-[9px] font-black uppercase tracking-wider text-emerald-600">
-                    GIẢNG VIÊN
-                  </span>
-                  <span className="block text-xs sm:text-[13px] font-black tracking-tight text-slate-900">
-                    Phí Văn Thắng
-                  </span>
-                </div>
+                <div className="flex flex-col items-start sm:items-center text-left sm:text-center">
+                  {/* Badge tên Giảng viên */}
+                  <div className="w-full sm:max-w-[135px] rounded-xl bg-white px-2 py-0.5 sm:py-1 text-center shadow-2xs border border-emerald-100">
+                    <span className="block text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-emerald-600">
+                      GIẢNG VIÊN
+                    </span>
+                    <span className="block text-[11.5px] sm:text-xs lg:text-[13px] font-black tracking-tight text-slate-900">
+                      Phí Văn Thắng
+                    </span>
+                  </div>
 
-                {/* Giới thiệu ngắn */}
-                <p className="mt-1 text-center text-[10px] leading-tight text-slate-500 max-w-[145px]">
-                  Giảng viên có 8 năm kinh nghiệm đào tạo tin học văn phòng.
-                </p>
+                  {/* Giới thiệu ngắn */}
+                  <p className="mt-0.5 sm:mt-1 text-[9.5px] sm:text-[10px] leading-tight text-slate-500 max-w-[135px]">
+                    8 năm kinh nghiệm đào tạo tin học văn phòng.
+                  </p>
+                </div>
               </div>
 
               {/* CỘT 2: TIÊU ĐỀ, CHƯƠNG TRÌNH & LINH VẬT CỬ NHÂN */}
-              <div className="flex flex-col items-center text-center px-1">
-                {/* Tiêu đề chính kèm logo Google Meet */}
-                <h2
-                  id="free-meet-plan-title"
-                  className="text-base sm:text-lg lg:text-[1.28rem] font-black tracking-tight text-slate-900 leading-snug"
-                >
-                  <span>HỌC TIN HỌC CÙNG GIẢNG VIÊN QUA</span>{' '}
-                  <span className="inline-flex items-center gap-1 align-middle rounded-full bg-white px-2.5 py-0.5 shadow-2xs border border-slate-200 text-[11px] font-black text-slate-800">
-                    <img
-                      src={MEET_LOGO}
-                      alt="Google Meet"
-                      className="h-3.5 sm:h-4 w-auto object-contain"
-                      draggable={false}
-                    />
-                    <span>Google Meet</span>
-                  </span>
-                </h2>
+              <div className="col-span-1 h-full flex flex-col justify-between items-center text-center px-1 py-0.5">
+                <div>
+                  {/* Tiêu đề chính kèm logo Google Meet */}
+                  <h2
+                    id="free-meet-plan-title"
+                    className="text-xs sm:text-sm lg:text-[1.12rem] font-black tracking-tight text-slate-900 leading-snug"
+                  >
+                    <span>HỌC TIN HỌC CÙNG GIẢNG VIÊN QUA</span>{' '}
+                    <span className="inline-flex items-center gap-1 align-middle rounded-full bg-white px-2 py-0.5 shadow-2xs border border-slate-200 text-[10px] sm:text-[11px] font-black text-slate-800">
+                      <img
+                        src={MEET_LOGO}
+                        alt="Google Meet"
+                        className="h-3 sm:h-3.5 w-auto object-contain"
+                        draggable={false}
+                      />
+                      <span>Google Meet</span>
+                    </span>
+                  </h2>
 
+                  {/* Pill giới thiệu phương pháp */}
+                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-emerald-800 shadow-2xs">
+                    <span>Học trực tiếp – dễ hiểu – từng bước</span>
+                  </div>
 
-
-                {/* Đoạn mô tả phù hợp đối tượng */}
-                <p className="mt-1 text-[11px] sm:text-xs font-medium leading-relaxed text-slate-600 max-w-sm">
-                  Phù hợp cho người mới bắt đầu, người mất gốc, người cần học Word – Excel – PowerPoint bài bản.
-                </p>
+                  {/* Đoạn mô tả phù hợp đối tượng */}
+                  <p className="mt-1 text-[9.5px] sm:text-[10.5px] lg:text-[11px] font-medium leading-relaxed text-slate-600 max-w-xs">
+                    Phù hợp cho người mới bắt đầu, người mất gốc, cần học Word – Excel – PowerPoint bài bản.
+                  </p>
+                </div>
 
                 {/* Bộ 3 icon Office W, X, P + Linh vật giọt nước cử nhân đọc sách */}
-                <div className="mt-2 flex items-center justify-center gap-2.5">
-                  <div className="flex items-center gap-1.5">
+                <div className="mt-1.5 flex items-center justify-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-1.5">
                     {/* Word */}
-                    <span className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white font-black text-xs shadow-xs">
+                    <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white font-black text-[11px] sm:text-xs shadow-xs">
                       W
                     </span>
                     {/* Excel */}
-                    <span className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-xs shadow-xs">
+                    <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-[11px] sm:text-xs shadow-xs">
                       X
                     </span>
                     {/* PowerPoint */}
-                    <span className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 via-amber-600 to-red-600 text-white font-black text-xs shadow-xs">
+                    <span className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 via-amber-600 to-red-600 text-white font-black text-[11px] sm:text-xs shadow-xs">
                       P
                     </span>
                   </div>
@@ -324,22 +338,22 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                   <img
                     src="/mascot/cam-xuc-hoc-bai.gif"
                     alt="Linh vật học bài"
-                    className="h-11 w-11 sm:h-12 sm:w-12 object-contain -my-1 drop-shadow-xs"
+                    className="h-9 w-9 sm:h-11 sm:w-11 object-contain drop-shadow-xs"
                     draggable={false}
                   />
                 </div>
               </div>
 
               {/* CỘT 3: THẺ QUYỀN LỢI NỔI BẬT */}
-              <div className="rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-2.5 sm:p-3 shadow-md shadow-emerald-900/10 border border-emerald-400/30">
-                <div className="flex items-center gap-1.5 border-b border-emerald-500/50 pb-1.5 mb-2">
-                  <Crown size={15} className="text-amber-300 drop-shadow-xs" />
-                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-white">QUYỀN LỢI</span>
+              <div className="col-span-1 h-full flex flex-col justify-between rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-2.5 sm:p-3 shadow-md shadow-emerald-900/10 border border-emerald-400/30">
+                <div className="flex items-center gap-1.5 border-b border-emerald-500/50 pb-1 mb-1.5">
+                  <Crown size={14} className="text-amber-300 drop-shadow-xs" />
+                  <span className="text-[10.5px] sm:text-xs font-black uppercase tracking-wider text-white">QUYỀN LỢI</span>
                 </div>
 
-                <ul className="space-y-1.5">
+                <ul className="space-y-1 sm:space-y-1.5 flex-1 flex flex-col justify-around">
                   {BENEFITS.map((item) => (
-                    <li key={item} className="flex items-center gap-1.5 text-left text-[10px] sm:text-[11px] font-bold text-white whitespace-nowrap">
+                    <li key={item} className="flex items-center gap-1.5 text-left text-[9.5px] sm:text-[10.5px] font-bold text-white whitespace-nowrap">
                       <span className="flex h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950 font-black shadow-2xs">
                         <Check size={10} strokeWidth={3.5} />
                       </span>
