@@ -19,6 +19,9 @@ const MOOD_SRC = {
   energy: '/mascot/nang-dong.gif',
   sleepy: '/mascot/ngu-gat.gif',
   connected: '/mascot/ket-noi-thanh-cong.gif',
+  cursor: '/mascot/con-tro.webp',
+  pointer: '/mascot/con-tro.webp',
+  'con-tro': '/mascot/con-tro.webp',
 };
 
 const MOOD_LABEL = {
@@ -38,6 +41,9 @@ const MOOD_LABEL = {
   energy: 'Linh vật năng động',
   sleepy: 'Linh vật buồn ngủ',
   connected: 'Linh vật kết nối thành công',
+  cursor: 'Linh vật con trỏ cử nhân',
+  pointer: 'Linh vật con trỏ cử nhân',
+  'con-tro': 'Linh vật con trỏ cử nhân',
 };
 
 const MOTION = {
