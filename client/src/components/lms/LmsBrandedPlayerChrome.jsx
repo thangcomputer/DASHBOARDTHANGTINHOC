@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Volume1, Maximize2, Minimize2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Volume1, Maximize2, Minimize2, ShieldAlert } from 'lucide-react';
 
 const YT_QUALITY_ORDER = [
   'default', 'highres', 'hd2160', 'hd1440', 'hd1080', 'hd720', 'large', 'medium', 'small', 'tiny',
@@ -132,8 +132,10 @@ export default function LmsBrandedPlayerChrome({
   const [dragRatio, setDragRatio] = useState(0);
   const [showVol, setShowVol] = useState(false);
   const [liveQuality, setLiveQuality] = useState(null);
+  const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
   const barRef = useRef(null);
   const preferredMaxOnceRef = useRef(false);
+  const noticeTimerRef = useRef(null);
 
   const rawDur = Math.max(0, Number(duration) || 0);
   const rawTime = Math.max(0, Number(dragging ? dragRatio * rawDur : currentTime) || 0);
@@ -145,6 +147,22 @@ export default function LmsBrandedPlayerChrome({
     : safeDur;
   const progressPct = safeDur > 0 ? Math.min(100, (displayTime / safeDur) * 100) : 0;
   const maxPct = safeDur > 0 ? Math.min(100, (seekCap / safeDur) * 100) : 0;
+  const isAntiSeekNoticeActive = lockSeek && (dragging || showAntiSeekNotice);
+
+  const triggerAntiSeekNotice = useCallback(() => {
+    if (!lockSeek) return;
+    setShowAntiSeekNotice(true);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setShowAntiSeekNotice(false);
+    }, 1800);
+  }, [lockSeek]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    };
+  }, []);
 
   const refreshQualityLevels = useCallback(() => {
     const player = typeof getPlayer === 'function' ? getPlayer() : null;
@@ -199,11 +217,13 @@ export default function LmsBrandedPlayerChrome({
       e.preventDefault?.();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       setDragRatio(clampRatio(ratioFromEvent(clientX)));
+      if (lockSeek) triggerAntiSeekNotice();
     };
     const onUp = (e) => {
       const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
       if (clientX != null) commitSeek(ratioFromEvent(clientX));
       setDragging(false);
+      if (lockSeek) triggerAntiSeekNotice();
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -301,6 +321,18 @@ export default function LmsBrandedPlayerChrome({
         </div>
       )}
 
+      {/* Thông báo HUD giữa màn hình khi kéo tua video có bật tính năng chống tua */}
+      {!overlayVisible && isAntiSeekNoticeActive && (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 z-[25] flex items-center justify-center px-4 animate-in fade-in zoom-in-95 duration-150 select-none">
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-black/85 backdrop-blur-md px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-2xl border border-red-500/50">
+            <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md">
+              <ShieldAlert size={13} className="sm:scale-110" />
+            </span>
+            <span>Chống tua video</span>
+          </div>
+        </div>
+      )}
+
       {!overlayVisible && (
         <div
           className="absolute inset-x-0 bottom-0 z-[30] px-3 sm:px-4 pt-8 pb-3"
@@ -325,6 +357,7 @@ export default function LmsBrandedPlayerChrome({
               setDragRatio(ratio);
               setDragging(true);
               commitSeek(ratio);
+              if (lockSeek) triggerAntiSeekNotice();
             }}
             onTouchStart={(e) => {
               e.stopPropagation();
@@ -332,13 +365,34 @@ export default function LmsBrandedPlayerChrome({
               setDragRatio(ratio);
               setDragging(true);
               commitSeek(ratio);
+              if (lockSeek) triggerAntiSeekNotice();
             }}
             onKeyDown={(e) => {
               if (!safeDur) return;
-              if (e.key === 'ArrowRight') commitSeek((displayTime + 5) / safeDur);
-              if (e.key === 'ArrowLeft') commitSeek((displayTime - 5) / safeDur);
+              if (e.key === 'ArrowRight') {
+                commitSeek((displayTime + 5) / safeDur);
+                if (lockSeek) triggerAntiSeekNotice();
+              }
+              if (e.key === 'ArrowLeft') {
+                commitSeek((displayTime - 5) / safeDur);
+                if (lockSeek) triggerAntiSeekNotice();
+              }
             }}
           >
+            {/* Tooltip chữ chống tua video hiển thị ngay trên nút kéo tua */}
+            {isAntiSeekNoticeActive && (
+              <div
+                className="pointer-events-none absolute -top-8 z-30 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-3 py-0.5 text-[10.5px] sm:text-xs font-black text-white shadow-xl backdrop-blur-md border border-white/30 animate-in fade-in zoom-in-95 duration-150 select-none tracking-wide"
+                style={{
+                  left: `clamp(55px, ${progressPct}%, calc(100% - 55px))`,
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                <ShieldAlert size={12} className="text-white shrink-0 drop-shadow-xs" />
+                <span className="whitespace-nowrap drop-shadow-xs">Chống tua video</span>
+              </div>
+            )}
+
             <div className="absolute inset-x-0 h-2.5 rounded-full bg-white/20">
               {lockSeek && maxPct > 0 && maxPct < 100 && (
                 <div
