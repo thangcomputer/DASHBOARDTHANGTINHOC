@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Platform, Vibration } from 'react-native';
 import { useAudioPlayer } from 'expo-audio';
 import { getMobileSoundEnabled, subscribeToMobileSoundPreference } from '../../services/soundPreferences';
@@ -89,7 +89,7 @@ export function useGameSounds() {
 
   useEffect(() => {
     let active = true;
-    getMobileSoundEnabled().then((enabled) => { if (active) enabledRef.current = enabled; }).catch(() => {});
+    getMobileSoundEnabled().then((enabled) => { if (active) enabledRef.current = enabled; }).catch(() => { });
     const unsubscribe = subscribeToMobileSoundPreference((enabled) => { enabledRef.current = enabled; });
     return () => {
       active = false;
@@ -113,6 +113,6 @@ export function useGameSounds() {
       return;
     }
     const player = playersRef.current[name as keyof typeof playersRef.current] || playersRef.current.win;
-    void player.seekTo(0).then(() => player.play()).catch(() => {});
+    void player.seekTo(0).then(() => player.play()).catch(() => { });
   }, []);
 }

@@ -45,6 +45,7 @@ import dailyPracticeApi from '../services/dailyPracticeApi';
 import { vnTodayKey } from '../utils/dailyPractice';
 import lessonPracticeApi from '../services/lessonPracticeApi';
 import { LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT } from '../utils/learningGoal';
+import { hasRealCourseEnrollment } from '../utils/enrollments';
 import { PENDING_TEACHER_QUIZ_DETAIL_KEY } from './teacher/TeacherQuizResultOverlay';
 import { RATING_CRITERIA } from '../context/useDataRatings';
 import NavArrow from './ui/NavArrow';
@@ -273,6 +274,21 @@ const DashboardLayout = ({ role, session, onLogout }) => {
   const mobileFooterRouteKey = `${location.pathname}${location.hash}`;
   const mobileFooterVisible = mobileFooterHiddenRouteKey !== mobileFooterRouteKey;
   const [brandLogo, setBrandLogo] = useState('');
+  const isFreePortalStudent = role === 'student' && Boolean(
+    (session?.freePortal === true || (() => {
+      try {
+        return JSON.parse(localStorage.getItem('student_user') || '{}')?.freePortal === true;
+      } catch {
+        return false;
+      }
+    })()) && !hasRealCourseEnrollment(session || (() => {
+      try {
+        return JSON.parse(localStorage.getItem('student_user') || '{}');
+      } catch {
+        return null;
+      }
+    })())
+  );
   const scrollPositions = useRef(new WeakMap());
   const focusRestoreTimer = useRef(null);
   const [ratingDetail, setRatingDetail] = useState(null);
@@ -1821,10 +1837,17 @@ const DashboardLayout = ({ role, session, onLogout }) => {
                 type="button"
                 className="cms-topbar__brand"
                 onClick={() => navigate(role === 'teacher' ? '/teacher' : role === 'student' ? '/student' : role === 'staff' ? '/staff' : '/admin')}
-                aria-label="Về trang tổng quan"
-                title="Về trang tổng quan"
+                aria-label={isFreePortalStudent ? "Về trang chủ DewSkill" : "Về trang tổng quan"}
+                title={isFreePortalStudent ? "Về trang chủ DewSkill" : "Về trang tổng quan"}
               >
-                <img src={brandLogo || '/logo-thang-tin-hoc.svg'} alt="Logo Thắng Tin Học" />
+                <img
+                  src={isFreePortalStudent ? '/brand/logo.webp' : (brandLogo || '/logo-thang-tin-hoc.svg')}
+                  alt={isFreePortalStudent ? "DewSkill" : "Logo Thắng Tin Học"}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = isFreePortalStudent ? '/brand/logo.png' : '/logo-thang-tin-hoc.png';
+                  }}
+                />
               </button>
 
               <div className="flex items-center flex-nowrap justify-end gap-0.5 sm:gap-2 shrink-0">

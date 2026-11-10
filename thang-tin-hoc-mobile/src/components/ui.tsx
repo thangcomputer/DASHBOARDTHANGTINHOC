@@ -28,6 +28,7 @@ import { colors, droplet, radius, spacing, typography } from '../theme/tokens';
 import type { Assignment, ScheduleItem } from '../types';
 import { getWebLogoUrl } from '../services/webSettingsApi';
 import type { AppStackParamList } from '../navigation/types';
+import { useAuth } from '../app/AuthContext';
 
 const BRANDING_HEADER_VISIBILITY_EVENT = 'mobile:branding-header-visibility';
 export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility';
@@ -131,6 +132,8 @@ export function AppScreen({
 function BrandingTopBar() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
+  const auth = useAuth();
+  const isFreeStudent = auth?.user?.role === 'student' && auth?.user?.freePortal === true;
   const [logoUrl, setLogoUrl] = useState('');
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -207,22 +210,29 @@ function BrandingTopBar() {
           accessibilityRole="button"
           accessibilityLabel="Về trang tổng quan"
         >
-          {logoUrl && !logoLoadFailed ? (
-            <Image
-              source={{ uri: logoUrl }}
-              style={styles.brandingLogo}
-              resizeMode="contain"
-              accessibilityLabel="Logo DewSkill"
-              onError={() => setLogoLoadFailed(true)}
-            />
-          ) : (
+          {isFreeStudent ? (
             <Image
               source={require('../../assets/logo.png')}
               style={styles.brandingLogo}
               resizeMode="contain"
               accessibilityLabel="Logo DewSkill"
             />
-          )}
+          ) : (logoUrl && !logoLoadFailed ? (
+            <Image
+              source={{ uri: logoUrl }}
+              style={styles.brandingLogo}
+              resizeMode="contain"
+              accessibilityLabel="Logo Thắng Tin Học LMS"
+              onError={() => setLogoLoadFailed(true)}
+            />
+          ) : (
+            <Image
+              source={require('../../assets/logo-lms.png')}
+              style={styles.brandingLogo}
+              resizeMode="contain"
+              accessibilityLabel="Logo Thắng Tin Học LMS"
+            />
+          ))}
         </Pressable>
         <Pressable
           onPress={() => DeviceEventEmitter.emit('mobile:open-notifications')}

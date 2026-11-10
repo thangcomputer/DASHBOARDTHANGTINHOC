@@ -76,7 +76,14 @@ export default function FaviconSwitcher() {
 
   useEffect(() => {
     const isAdminZone = pathname.startsWith('/admin');
-    const isFreePortal = pathname === '/DANGNHAPMIENPHI' || pathname.startsWith('/DANGNHAPMIENPHI/');
+    const isFreePortal = pathname === '/DANGNHAPMIENPHI' || pathname.startsWith('/DANGNHAPMIENPHI/') || (() => {
+      try {
+        const u = JSON.parse(localStorage.getItem('student_user') || '{}');
+        return u?.freePortal === true;
+      } catch {
+        return false;
+      }
+    })();
     const custom = isAdminZone ? icons.adminUrl : isFreePortal ? '/brand/favicon.png' : icons.publicUrl;
     const fallback = isAdminZone ? ADMIN_ICON : isFreePortal ? '/brand/favicon.png' : PUBLIC_ICON;
     let href = resolveHref(custom, fallback);

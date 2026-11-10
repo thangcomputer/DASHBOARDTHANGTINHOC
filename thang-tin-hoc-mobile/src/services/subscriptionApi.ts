@@ -1,4 +1,4 @@
-﻿import { mobileApiRequest } from './apiClient';
+import { mobileApiRequest } from './apiClient';
 
 export type SubscriptionPlanId = '1m' | '3m' | '6m' | '12m' | 'lifetime';
 

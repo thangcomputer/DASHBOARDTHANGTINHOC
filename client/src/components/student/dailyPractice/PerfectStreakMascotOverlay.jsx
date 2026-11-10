@@ -153,3 +153,4 @@ export default function PerfectStreakMascotOverlay({ total = 0, onDone }) {
     document.body
   );
 }
+
