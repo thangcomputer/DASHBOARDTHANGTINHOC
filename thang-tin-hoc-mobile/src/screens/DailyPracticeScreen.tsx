@@ -1515,28 +1515,28 @@ function PathLessonModal({ unit, step, color, play, onClose, onCompleted, onOpen
 
             {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
           </ScrollView>
-          <View style={styles.lessonModalFoot}>
-            <Pressable onPress={onClose} style={styles.lessonFootCloseBtn} accessibilityRole="button">
-              <Text style={styles.lessonFootCloseBtnText}>Đóng</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => { void finishLesson(); }}
-              disabled={finishing}
-              style={[
-                styles.lessonFootDoneBtn,
-                done && styles.lessonFootDoneBtnDone,
-              ]}
-              accessibilityRole="button"
-            >
-              {finishing ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <CheckCircle2 size={16} color="#FFFFFF" />
-              )}
-              <Text style={styles.lessonFootDoneBtnText}>
-                {done ? 'Đã học xong' : 'Đánh dấu đã học'}
-              </Text>
-            </Pressable>
+          <View style={[styles.lessonModalFoot, { gap: 10, padding: spacing.md }]}>
+            <View style={styles.flex}>
+              <DuoButton
+                variant="secondary"
+                size="md"
+                fullWidth
+                text="Đóng"
+                onPress={onClose}
+              />
+            </View>
+            <View style={styles.flex}>
+              <DuoButton
+                variant={done ? 'secondary' : 'primary'}
+                size="md"
+                fullWidth
+                text={done ? 'Đã học xong' : 'Đánh dấu đã học'}
+                icon={finishing ? undefined : <CheckCircle2 size={16} color={done ? '#059669' : '#FFFFFF'} />}
+                loading={finishing}
+                disabled={finishing}
+                onPress={() => { void finishLesson(); }}
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -1651,10 +1651,16 @@ function CourseTrophyCeremonyModal({ current, play, onClose }: {
               <Text style={styles.finaleStatLbl}>Danh hiệu</Text>
             </View>
           </View>
-          <Pressable onPress={onClose} style={[styles.finaleBtn, { alignSelf: 'stretch' }]} accessibilityRole="button">
-            <Trophy size={18} color="#FFFFFF" />
-            <Text style={styles.finaleBtnText}>Tuyệt vời! Tiếp tục chinh phục</Text>
-          </Pressable>
+          <View style={{ width: '100%', marginTop: 8 }}>
+            <DuoButton
+              variant="gold"
+              size="lg"
+              fullWidth
+              text="Tuyệt vời! Tiếp tục chinh phục"
+              icon={<Trophy size={18} color="#FFFFFF" />}
+              onPress={onClose}
+            />
+          </View>
         </View>
       </View>
     </Modal>
@@ -2278,10 +2284,16 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
               <Mascot mood="celebrate" size={88} />
               <Text style={[styles.quitTitle, { color: '#047857' }]}>{`Đã cộng +${checkout?.xp || selectedXp} XP!`}</Text>
               <Text style={styles.quitText}>Ví XP của bạn đã được cập nhật. Chúc bạn luyện tập vui vẻ!</Text>
-              <Pressable onPress={onClose} style={[styles.primary, { alignSelf: 'stretch', marginTop: 8 }]} accessibilityRole="button">
-                <Check size={16} color="#FFFFFF" />
-                <Text style={styles.primaryText}>Luyện tiếp ngay</Text>
-              </Pressable>
+              <View style={{ width: '100%', marginTop: 8 }}>
+                <DuoButton
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  text="Luyện tiếp ngay"
+                  icon={<Check size={16} color="#FFFFFF" />}
+                  onPress={onClose}
+                />
+              </View>
             </View>
           ) : checkout ? (
             <View style={{ padding: spacing.lg, gap: 12, alignItems: 'center' }}>
@@ -2303,15 +2315,29 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
                 <Text style={styles.muted}>Đang chờ xác nhận thanh toán tự động…</Text>
               </View>
               {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
-              <View style={[styles.row, { alignSelf: 'stretch' }]}>
-                <Pressable onPress={() => setCheckout(null)} style={[styles.secondary, styles.flex]} accessibilityRole="button">
-                  <Text style={styles.secondaryText}>Đổi gói</Text>
-                </Pressable>
+              <View style={[styles.row, { alignSelf: 'stretch', gap: 10 }]}>
+                <View style={styles.flex}>
+                  <DuoButton
+                    variant="secondary"
+                    size="md"
+                    fullWidth
+                    text="Đổi gói"
+                    onPress={() => setCheckout(null)}
+                  />
+                </View>
                 {canSimulate ? (
-                  <Pressable onPress={() => { void simulatePaid(); }} disabled={simulating} style={[styles.primary, styles.flex]} accessibilityRole="button">
-                    {simulating ? <ActivityIndicator color="#FFFFFF" /> : <RefreshCw size={15} color="#FFFFFF" />}
-                    <Text style={styles.primaryText}>Giả lập đã TT</Text>
-                  </Pressable>
+                  <View style={styles.flex}>
+                    <DuoButton
+                      variant="primary"
+                      size="md"
+                      fullWidth
+                      text="Giả lập đã TT"
+                      icon={simulating ? undefined : <RefreshCw size={15} color="#FFFFFF" />}
+                      loading={simulating}
+                      disabled={simulating}
+                      onPress={() => { void simulatePaid(); }}
+                    />
+                  </View>
                 ) : null}
               </View>
             </View>
@@ -2325,7 +2351,7 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
                     onPress={() => { play('tap'); setSelectedXp(pack.xp); }}
                     style={[
                       styles.buyXpPackCard,
-                      active && { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' },
+                      active && styles.buyXpPackCardActive,
                     ]}
                     accessibilityRole="button"
                   >
@@ -2341,10 +2367,18 @@ function BuyXpModal({ packs, play, onClose, onPurchased }: {
                 );
               })}
               {errMsg ? <Text style={styles.errorInline}>{errMsg}</Text> : null}
-              <Pressable onPress={() => { void createOrder(); }} disabled={busy} style={[styles.primary, { marginTop: 4 }]} accessibilityRole="button">
-                {busy ? <ActivityIndicator color="#FFFFFF" /> : <ShoppingBag size={16} color="#FFFFFF" />}
-                <Text style={styles.primaryText}>{`Mua ${selectedXp} XP`}</Text>
-              </Pressable>
+              <View style={{ width: '100%', marginTop: 4 }}>
+                <DuoButton
+                  variant="gold"
+                  size="lg"
+                  fullWidth
+                  text={`Mua ${selectedXp} XP`}
+                  icon={busy ? undefined : <ShoppingBag size={16} color="#FFFFFF" />}
+                  loading={busy}
+                  disabled={busy}
+                  onPress={() => { void createOrder(); }}
+                />
+              </View>
             </View>
           )}
         </View>
@@ -2748,10 +2782,15 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
                 </Text>
               </Pressable>
               {!immediate ? (
-                <Pressable onPress={() => { void submit(pending); }} disabled={!pending || busy} style={[styles.primary, (!pending || busy) && styles.disabled]} accessibilityRole="button">
-                  {busy ? <ActivityIndicator color="#FFFFFF" /> : <CheckCircle2 size={17} color="#FFFFFF" />}
-                  <Text style={styles.primaryText}>Kiểm tra</Text>
-                </Pressable>
+                <DuoButton
+                  variant="primary"
+                  size="md"
+                  text="Kiểm tra"
+                  icon={busy ? undefined : <CheckCircle2 size={17} color="#FFFFFF" />}
+                  loading={busy}
+                  disabled={!pending || busy}
+                  onPress={() => { void submit(pending); }}
+                />
               ) : (
                 <Text style={styles.selectAnswerHint}>Chọn 1 đáp án bên trên</Text>
               )}
@@ -4138,11 +4177,14 @@ const styles = StyleSheet.create({
   buyXpCode: { color: '#B45309', fontSize: 13, fontWeight: '600', marginTop: 2 },
   buyXpPackCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18,
-    borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
+    borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+  },
+  buyXpPackCardActive: {
+    borderColor: '#F59E0B', borderBottomColor: '#D97706', backgroundColor: '#FFFBEB',
   },
   buyXpPackBolt: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  buyXpPackTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
-  buyXpPackPrice: { color: colors.brand, fontSize: 15, fontWeight: '700' },
+  buyXpPackTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  buyXpPackPrice: { color: colors.brand, fontSize: 15, fontWeight: '900' },
   stakeGrid2Col: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginTop: 8 },
   stakeColBox: {
     flex: 1, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF',
@@ -4178,9 +4220,9 @@ const styles = StyleSheet.create({
   },
   hintFooterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', backgroundColor: '#FFFBEB',
+    borderRadius: 14, borderWidth: 2, borderColor: '#FDE68A', borderBottomWidth: 4, borderBottomColor: '#F59E0B', backgroundColor: '#FFFBEB',
   },
-  hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '600' },
+  hintFooterBtnText: { color: '#B45309', fontSize: 13, fontWeight: '800' },
   selectAnswerHint: { color: '#94A3B8', fontSize: 13, fontWeight: '400' },
   pageEyebrow: { color: colors.brand, fontSize: 12, fontWeight: '600' },
   topGamifiedBar: {

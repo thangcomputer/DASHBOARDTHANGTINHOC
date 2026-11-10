@@ -115,7 +115,7 @@ export function DuoScheduleCard({
           <Text style={styles.emptySub}>{upcomingText}</Text>
         </View>
         {onAll ? (
-          <Pressable onPress={onAll} hitSlop={8}>
+          <Pressable onPress={onAll} hitSlop={8} style={styles.viewAllBtn} accessibilityRole="button">
             <Text style={styles.viewAllText}>Xem lịch</Text>
           </Pressable>
         ) : null}
@@ -133,7 +133,7 @@ export function DuoScheduleCard({
           <Text style={styles.cardTitle}>Lịch học Meet</Text>
         </View>
         {onAll ? (
-          <Pressable onPress={onAll} hitSlop={8}>
+          <Pressable onPress={onAll} hitSlop={8} style={styles.viewAllBtn} accessibilityRole="button">
             <Text style={styles.viewAllText}>Xem lịch</Text>
           </Pressable>
         ) : null}
@@ -224,10 +224,20 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0F172A',
   },
+  viewAllBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#CBD5E1',
+  },
   viewAllText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2563EB',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#059669',
   },
   schedulesList: {
     gap: 10,
@@ -236,8 +246,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: 16,
     padding: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 4,
+    borderBottomColor: '#CBD5E1',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -246,6 +258,7 @@ const styles = StyleSheet.create({
   itemCardLive: {
     backgroundColor: '#F0FDF4',
     borderColor: '#BBF7D0',
+    borderBottomColor: '#86EFAC',
   },
   itemInfoCol: {
     flex: 1,
@@ -308,8 +321,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     borderRadius: 20,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderWidth: 2,
+    borderBottomWidth: 4,
+    borderColor: '#BBF7D0',
+    borderBottomColor: '#86EFAC',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,

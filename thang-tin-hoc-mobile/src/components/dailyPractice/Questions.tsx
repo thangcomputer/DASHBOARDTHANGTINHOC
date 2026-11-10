@@ -125,7 +125,12 @@ export function TrueFalseQuestion({ result, chosen, onSubmit, play }: {
             key={String(value)}
             disabled={Boolean(result)}
             onPress={() => { play('tap'); onSubmit({ value }); }}
-            style={[styles.tf, isCorrect && styles.chipOk, isWrong && styles.chipBad]}
+            style={({ pressed }) => [
+              styles.tf,
+              isCorrect && styles.chipOk,
+              isWrong && styles.chipBad,
+              pressed && !result && styles.optionPressed,
+            ]}
             accessibilityRole="button"
           >
             <View style={[styles.tfIcon, { backgroundColor: value ? '#10B981' : '#EF4444' }]}>
@@ -480,25 +485,25 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', gap: 8, paddingVertical: 20, borderRadius: 18, borderWidth: 2,
     borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
   },
-  tfIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  tfIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
   tfText: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
   orderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  orderNum: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' },
-  orderNumText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  orderNum: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', borderWidth: 1.5, borderColor: '#059669', borderBottomWidth: 3, borderBottomColor: '#047857' },
+  orderNumText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   orderChip: { flex: 1 },
   matchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  matchLeft: { width: '40%', paddingHorizontal: 10, paddingVertical: 10, borderRadius: 12, backgroundColor: '#0F172A' },
+  matchLeft: { width: '40%', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 14, backgroundColor: '#0284C7', borderWidth: 1.5, borderColor: '#0369A1', borderBottomWidth: 3, borderBottomColor: '#075985' },
   matchLeftText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   slot: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 10, borderRadius: 12,
-    borderWidth: 2, borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#F8FAFC',
+    flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 46, paddingHorizontal: 12, borderRadius: 14,
+    borderWidth: 2, borderBottomWidth: 3, borderStyle: 'dashed', borderColor: '#CBD5E1', borderBottomColor: '#94A3B8', backgroundColor: '#F8FAFC',
   },
-  slotFilled: { borderStyle: 'solid', borderColor: '#7DD3FC', backgroundColor: '#F0F9FF' },
+  slotFilled: { borderStyle: 'solid', borderColor: '#38BDF8', borderBottomColor: '#0284C7', backgroundColor: '#F0F9FF' },
   slotText: { flex: 1, color: '#94A3B8', fontSize: 14, fontWeight: '700' },
   slotTextFilled: { color: '#075985', fontWeight: '900' },
-  bank: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, minHeight: 54, padding: 10, borderRadius: 16, backgroundColor: '#F1F5F9' },
+  bank: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, minHeight: 54, padding: 12, borderRadius: 18, backgroundColor: '#F1F5F9', borderWidth: 2, borderBottomWidth: 3, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1' },
   bankDone: { color: '#94A3B8', fontSize: 13, fontWeight: '700', padding: 6 },
-  fillText: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, padding: 14, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
+  fillText: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 10, padding: 14, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1' },
   fillWord: { color: '#1E293B', fontSize: 16, fontWeight: '600' },
   blank: {
     minWidth: 76, minHeight: 34, marginHorizontal: 4, paddingHorizontal: 10, borderRadius: 10, borderWidth: 2,
@@ -508,7 +513,7 @@ const styles = StyleSheet.create({
   blankFix: { color: '#059669', fontSize: 12, fontWeight: '800' },
   bins: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   binWrap: { flexGrow: 1, flexBasis: '45%' },
-  bin: { minHeight: 120, padding: 8, borderRadius: 14, borderWidth: 2, borderStyle: 'dashed', backgroundColor: '#FFFFFF' },
+  bin: { minHeight: 120, padding: 10, borderRadius: 16, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
   binTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', textAlign: 'center', paddingVertical: 4, borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
   binItems: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 });
