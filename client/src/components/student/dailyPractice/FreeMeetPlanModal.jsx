@@ -20,7 +20,6 @@ const BENEFITS = [
   'Hỏi đáp ngay trong buổi học',
   'Không giới hạn số lần hỏi lại',
   'Có video xem lại sau buổi học',
-  'Hỗ trợ đến khi làm được',
 ];
 
 const OFFER_PLANS = [
@@ -62,12 +61,12 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
         const priced = new Map((data?.plans || []).map((plan) => [plan.id, plan]));
         setPlans(OFFER_PLANS.map((plan) => ({ ...plan, price: Number(priced.get(plan.id)?.price) || 0 })));
       })
-      .catch(() => {});
+      .catch(() => { });
     api.settings.getPayment()
       .then((res) => {
         if (!cancelled && res?.success && res.data?.bankCode) setBank(res.data);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [open]);
 
@@ -246,7 +245,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
           /* ===================== GIAO DIỆN CHÍNH (THEO ĐÚNG HÌNH 1) ===================== */
           <div className="flex flex-col gap-3 sm:gap-3.5">
             {/* KHỐI TRÊN: 3 CỘT (GIẢNG VIÊN - HERO TIÊU ĐỀ - QUYỀN LỢI) */}
-            <div className="grid grid-cols-1 lg:grid-cols-[150px_1fr_225px] items-center gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[135px_1fr_265px] items-center gap-3 sm:gap-4">
               {/* CỘT 1: THÔNG TIN GIẢNG VIÊN */}
               <div className="flex flex-col items-center text-center">
                 <div className="relative">
@@ -269,7 +268,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                 </div>
 
                 {/* Badge tên Giảng viên */}
-                <div className="mt-2 w-full max-w-[155px] rounded-xl bg-white px-2.5 py-1 text-center shadow-xs border border-emerald-100">
+                <div className="mt-2 w-full max-w-[145px] rounded-xl bg-white px-2 py-1 text-center shadow-xs border border-emerald-100">
                   <span className="block text-[9px] font-black uppercase tracking-wider text-emerald-600">
                     GIẢNG VIÊN
                   </span>
@@ -279,7 +278,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                 </div>
 
                 {/* Giới thiệu ngắn */}
-                <p className="mt-1 text-center text-[10.5px] leading-tight text-slate-500 max-w-[155px]">
+                <p className="mt-1 text-center text-[10px] leading-tight text-slate-500 max-w-[145px]">
                   Giảng viên tin học văn phòng – đồng hành cùng người mới bắt đầu.
                 </p>
               </div>
@@ -341,17 +340,17 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
               </div>
 
               {/* CỘT 3: THẺ QUYỀN LỢI NỔI BẬT */}
-              <div className="rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-3 sm:p-3.5 shadow-md shadow-emerald-900/10 border border-emerald-400/30">
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-2.5 sm:p-3 shadow-md shadow-emerald-900/10 border border-emerald-400/30">
                 <div className="flex items-center gap-1.5 border-b border-emerald-500/50 pb-1.5 mb-2">
-                  <Crown size={16} className="text-amber-300 drop-shadow-xs" />
-                  <span className="text-xs font-black uppercase tracking-wider text-white">QUYỀN LỢI</span>
+                  <Crown size={15} className="text-amber-300 drop-shadow-xs" />
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-white">QUYỀN LỢI</span>
                 </div>
 
                 <ul className="space-y-1.5">
                   {BENEFITS.map((item) => (
-                    <li key={item} className="flex items-center gap-2 text-left text-[11px] sm:text-xs font-bold text-white">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950 font-black shadow-2xs">
-                        <Check size={11} strokeWidth={3.5} />
+                    <li key={item} className="flex items-center gap-1.5 text-left text-[10px] sm:text-[11px] font-bold text-white whitespace-nowrap">
+                      <span className="flex h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950 font-black shadow-2xs">
+                        <Check size={10} strokeWidth={3.5} />
                       </span>
                       <span>{item}</span>
                     </li>
@@ -384,11 +383,10 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
                     key={plan.id}
                     type="button"
                     onClick={() => setSelectedId(plan.id)}
-                    className={`group relative flex min-w-[125px] shrink-0 snap-start flex-col justify-between rounded-xl border-2 p-2.5 text-center transition-all duration-200 sm:min-w-0 ${
-                      isSelected
+                    className={`group relative flex min-w-[125px] shrink-0 snap-start flex-col justify-between rounded-xl border-2 p-2.5 text-center transition-all duration-200 sm:min-w-0 ${isSelected
                         ? 'border-emerald-500 bg-emerald-50/70 shadow-md shadow-emerald-500/15 ring-2 ring-emerald-400/30 -translate-y-0.5'
                         : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs'
-                    }`}
+                      }`}
                   >
                     {/* Huy hiệu ⭐ Nên chọn cho gói 3 tháng */}
                     {plan.featured && (
@@ -412,9 +410,8 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
 
                       {/* Hint pill (Làm quen, Nền tảng vững...) */}
                       <span
-                        className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
-                          isSelected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-                        }`}
+                        className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold transition-colors ${isSelected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                          }`}
                       >
                         {plan.hint}
                       </span>
