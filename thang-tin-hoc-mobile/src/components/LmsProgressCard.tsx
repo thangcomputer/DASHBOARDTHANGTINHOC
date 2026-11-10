@@ -574,19 +574,15 @@ const styles = StyleSheet.create({
   },
   tabBtnActive: {
     backgroundColor: '#10B981',
-    borderWidth: 1,
-    borderColor: '#059669',
-    borderBottomWidth: 3,
-    borderBottomColor: '#047857',
   },
   tabBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#64748B',
   },
   tabBtnTextActive: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '800',
   },
   tabBody: {
     minHeight: 80,

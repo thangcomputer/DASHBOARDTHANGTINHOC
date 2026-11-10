@@ -424,10 +424,20 @@ const s = StyleSheet.create({
   tabTxtActive: { fontWeight: '900', color: '#0F172A' },
 
   pillRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
-  pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8F0', borderBottomWidth: 3, borderBottomColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
-  pillActive: { backgroundColor: '#10B981', borderColor: '#059669', borderBottomColor: '#047857' },
-  pillTxt: { fontSize: 12, fontWeight: '800', color: '#64748B' },
-  pillTxtActive: { color: '#FFFFFF', fontWeight: '900' },
+  pill: {
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  pillActive: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  pillTxt: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  pillTxtActive: { color: '#FFFFFF', fontWeight: '800' },
 
   empty: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textAlign: 'center', paddingVertical: 10 },
 

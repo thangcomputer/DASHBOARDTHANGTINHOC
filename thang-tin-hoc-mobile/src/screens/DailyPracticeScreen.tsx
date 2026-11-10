@@ -198,7 +198,7 @@ function DailyPracticeGoalPanel({
           <View style={[styles.pathFill, { width: `${todayProgress}% `, backgroundColor: todayProgress >= 100 ? '#10B981' : '#EF4444' }]} />
         </View>
 
-        <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE', borderBottomColor: '#BFDBFE' }]}>
+        <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={[styles.goalInfoTitle, { color: '#1E3A8A' }]}>Kế hoạch học tập</Text>
             <Pressable
@@ -206,7 +206,7 @@ function DailyPracticeGoalPanel({
               hitSlop={8}
               accessibilityRole="button"
             >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#10B981' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981' }}>
                 {goalData?.goal?.expired ? 'Đặt lại mục tiêu' : goalData?.goal ? 'Đổi mục tiêu' : 'Đặt mục tiêu'}
               </Text>
             </Pressable>
@@ -233,7 +233,7 @@ function DailyPracticeGoalPanel({
                   style={[styles.goalTargetBtn, active && styles.goalTargetBtnActive]}
                   accessibilityRole="button"
                 >
-                  <Text style={[styles.goalTargetBtnText, active && { color: '#FFFFFF', fontWeight: '900' }]}>{n}</Text>
+                  <Text style={[styles.goalTargetBtnText, active && { color: '#FFFFFF', fontWeight: '800' }]}>{n}</Text>
                 </Pressable>
               );
             })}
@@ -244,17 +244,17 @@ function DailyPracticeGoalPanel({
           <Calendar size={15} color="#64748B" />
           <Text style={styles.goalFooterText}>
             {'Đã hoàn thành '}
-            <Text style={{ fontWeight: '800', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text>
+            <Text style={{ fontWeight: '700', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text>
             {' lượt bài hôm nay'}
           </Text>
         </View>
       </View>
 
-      {/* Nhiệm vụ hôm nay - Đồng bộ Web & Image 1 + 6 */}
+      {/* Nhiệm vụ hôm nay */}
       <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A', borderBottomWidth: 3, borderBottomColor: '#F59E0B' }]}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB' }]}>
               <Sparkles size={17} color="#D97706" />
             </View>
             <View>
@@ -262,7 +262,7 @@ function DailyPracticeGoalPanel({
               <Text style={styles.goalCardSub}>Hoàn thành mục tiêu học và rèn luyện</Text>
             </View>
           </View>
-          <View style={[styles.goalBadge, { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', borderBottomWidth: 2, borderBottomColor: '#CBD5E1' }]}>
+          <View style={[styles.goalBadge, { backgroundColor: '#F1F5F9' }]}>
             <Text style={[styles.goalBadgeText, { color: '#334155' }]}>{`${missionDoneCount}/2 hoàn thành`}</Text>
           </View>
         </View>
@@ -271,11 +271,11 @@ function DailyPracticeGoalPanel({
           {/* Cột 1: Luyện tập (Xanh lá) */}
           <Pressable
             onPress={onGoPractice}
-            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderBottomColor: '#34D399' }]}
+            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
             accessibilityRole="button"
             accessibilityLabel={`Luyện tập: ${qDone ? 'Hoàn thành' : `${todayQuestions}/10 câu`}`}
           >
-            <View style={[styles.missionSquareIcon, { backgroundColor: '#10B981', borderWidth: 1.5, borderColor: '#34D399', borderBottomWidth: 3, borderBottomColor: '#059669' }]}>
+            <View style={[styles.missionSquareIcon, { backgroundColor: '#10B981' }]}>
               <Gamepad2 size={20} color="#FFFFFF" />
               {qDone ? (
                 <View style={styles.missionCheckBadge}>
@@ -294,14 +294,14 @@ function DailyPracticeGoalPanel({
             </View>
           </Pressable>
 
-          {/* Cột 2: Xem video (Tím / Trắng đồng bộ Web) */}
+          {/* Cột 2: Xem video */}
           <Pressable
             onPress={onWatchVideo}
-            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1' }]}
+            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}
             accessibilityRole="button"
             accessibilityLabel={`Xem video: ${todayVideos}/1 video`}
           >
-            <View style={[styles.missionCircleIcon, { backgroundColor: '#8B5CF6', borderWidth: 1.5, borderColor: '#A78BFA', borderBottomWidth: 3, borderBottomColor: '#6D28D9' }]}>
+            <View style={[styles.missionCircleIcon, { backgroundColor: '#8B5CF6' }]}>
               <PlayCircle size={22} color="#FFFFFF" />
             </View>
             <View style={styles.flex}>
@@ -328,7 +328,7 @@ function DailyPracticeGoalPanel({
       <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED', borderWidth: 1.5, borderColor: '#FDBA74', borderBottomWidth: 3, borderBottomColor: '#F97316' }]}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED' }]}>
               <Flame size={17} color="#EA580C" />
             </View>
             <View>
@@ -352,14 +352,14 @@ function DailyPracticeGoalPanel({
                 style={[
                   styles.weekCell,
                   active
-                    ? { borderColor: '#FDBA74', borderBottomColor: '#F97316', backgroundColor: '#FFF7ED' }
+                    ? { borderColor: '#FDBA74', backgroundColor: '#FFF7ED' }
                     : isToday
-                      ? { borderColor: '#CBD5E1', borderBottomColor: '#94A3B8', backgroundColor: '#FFFFFF' }
-                      : { borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+                      ? { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }
+                      : { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
                 ]}
               >
-                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
-                <Flame size={16} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
+                <Flame size={15} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
               </View>
             );
           })}
@@ -3360,14 +3360,16 @@ const styles = StyleSheet.create({
   quitCard: {
     width: '100%',
     maxWidth: 380,
-    borderRadius: 28,
+    borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderBottomWidth: 6,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
-    boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
+    shadowRadius: 32,
+    elevation: 12,
   },
   quitHero: {
     alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: spacing.lg, gap: 6, backgroundColor: '#F0F9FF',
@@ -3514,14 +3516,12 @@ const styles = StyleSheet.create({
   reviewExplain: { color: colors.muted, fontSize: 12, fontWeight: '400', lineHeight: 17 },
   modeTabs: {
     flexDirection: 'row',
-    gap: 6,
-    padding: 6,
-    borderRadius: 18,
+    gap: 4,
+    padding: 4,
+    borderRadius: 16,
     backgroundColor: '#F1F5F9',
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
   },
   modeTab: {
     flex: 1,
@@ -3529,18 +3529,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 12,
   },
   modeTabActive: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#10B981',
-    borderBottomWidth: 3,
-    borderBottomColor: '#059669',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   modeTabText: { color: '#64748B', fontSize: 13, fontWeight: '700' },
-  modeTabTextActive: { color: '#047857', fontWeight: '900' },
+  modeTabTextActive: { color: '#047857', fontWeight: '800' },
   chipRow: { gap: 8, paddingRight: spacing.sm },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 16, borderWidth: 2 },
   chipIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -4324,26 +4325,23 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    backgroundImage: 'linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 65%, #F0FDF4 100%)',
-    borderWidth: 2,
-    borderColor: '#A7F3D0',
-    borderBottomWidth: 4,
-    borderBottomColor: '#34D399',
-    boxShadow: '0px 4px 14px rgba(5, 150, 105, 0.08), inset 0px 1px 0px rgba(255, 255, 255, 0.8)',
-  } as never,
-  mascotWrapCompact: {
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#A7F3D0',
-    borderBottomWidth: 3,
-    borderBottomColor: '#6EE7B7',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  mascotWrapCompact: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
     flexShrink: 0,
   },
   mascotContent: {
@@ -4415,50 +4413,49 @@ const styles = StyleSheet.create({
   xpEmptyBuyBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   goalCard: {
     padding: spacing.md,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderBottomWidth: 5,
+    borderRadius: 20,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     gap: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   goalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  goalIconBox: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  goalCardTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  goalCardSub: { color: colors.muted, fontSize: 13, fontWeight: '600' },
-  goalBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  goalBadgeText: { fontSize: 12, fontWeight: '800' },
+  goalIconBox: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  goalCardTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  goalCardSub: { color: colors.muted, fontSize: 13, fontWeight: '500' },
+  goalBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  goalBadgeText: { fontSize: 12, fontWeight: '700' },
   goalInfoBox: {
     padding: 12,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  goalInfoTitle: { fontSize: 13, fontWeight: '800' },
-  goalInfoSub: { fontSize: 12, marginTop: 1, fontWeight: '600', lineHeight: 18 },
-  goalLabelSmall: { color: '#64748B', fontSize: 13, fontWeight: '700' },
-  goalValueSmall: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  goalInfoTitle: { fontSize: 13, fontWeight: '700' },
+  goalInfoSub: { fontSize: 12, marginTop: 1, lineHeight: 18 },
+  goalLabelSmall: { color: '#64748B', fontSize: 13, fontWeight: '600' },
+  goalValueSmall: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   goalTargetBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 9,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderBottomColor: '#CBD5E1',
     backgroundColor: '#F8FAFC',
   },
   goalTargetBtnActive: {
     backgroundColor: '#10B981',
-    borderColor: '#059669',
-    borderBottomColor: '#047857',
+    borderColor: '#10B981',
   },
-  goalTargetBtnText: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  goalTargetBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
   goalFooterBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
-  goalFooterText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
+  goalFooterText: { color: '#64748B', fontSize: 13, fontWeight: '500' },
   questItemBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   questCheckCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   questItemTitle: { color: colors.ink, fontSize: 14, fontWeight: '600' },
@@ -4470,9 +4467,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
   },
   freeModeNotice: {
     padding: 10, borderRadius: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
@@ -4501,9 +4497,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     padding: 12,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderBottomWidth: 4,
+    borderRadius: 16,
+    borderWidth: 1.5,
   },
   missionSquareIcon: {
     position: 'relative',
