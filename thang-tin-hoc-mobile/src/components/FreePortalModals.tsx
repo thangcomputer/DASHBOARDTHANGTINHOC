@@ -12,13 +12,16 @@ import {
   View,
 } from 'react-native';
 import {
+  ArrowRight,
   Award,
   Briefcase,
   Calendar,
   Check,
   Clock,
+  Crown,
   FolderOpen,
   Headphones,
+  KeyRound,
   Lock,
   MapPin,
   MessageCircle,
@@ -29,10 +32,20 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { CoursePaymentModal, type CoursePaymentCheckout } from './CoursePaymentModal';
-import { subscriptionApi, type SubscriptionOverview, type SubscriptionPlan, type SubscriptionPlanId } from '../services/subscriptionApi';
+import {
+  formatActivationCodeInput,
+  subscriptionApi,
+  type SubscriptionOverview,
+  type SubscriptionPlanId,
+} from '../services/subscriptionApi';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
 import type { DemoEnrollment, DemoUser } from '../types';
 import { colors } from '../theme/tokens';
+
+const DEWSKILL_LOGO = require('../../assets/logo.webp');
+const TEACHER_AVATAR = require('../../assets/giang-vien-phi-van-thang.png');
+const GOOGLE_MEET_LOGO = require('../../assets/google-meet.webp');
+const MASCOT_STUDY = require('../../assets/mascot/cam-xuc-hoc-bai.gif');
 
 export const FREE_PORTAL_COURSE_NAME = 'Tài khoản miễn phí';
 
@@ -76,18 +89,34 @@ const LOCKED_ITEMS = [
 ] as const;
 
 const MEET_SLOTS = [
-  { key: 'morning', label: 'Sáng', time: '9h – 12h' },
-  { key: 'afternoon', label: 'Chiều', time: '14h – 16h' },
-  { key: 'evening', label: 'Tối', time: '19h – 21h' },
+  { key: 'morning', icon: '☀️', label: 'Sáng', time: '9h – 12h' },
+  { key: 'afternoon', icon: '⛅', label: 'Chiều', time: '14h – 16h' },
+  { key: 'evening', icon: '🌜', label: 'Tối', time: '19h – 21h' },
 ] as const;
 
-const PLAN_HIGHLIGHTS: Record<string, { badge?: string }> = {
-  '1m': {},
-  '3m': { badge: 'Tiết kiệm' },
-  '6m': { badge: 'Phổ biến' },
-  '12m': { badge: 'Tốt nhất' },
-  lifetime: { badge: 'Trọn đời' },
+const MEET_BENEFITS = [
+  'Học trực tiếp cùng giảng viên',
+  'Hỏi đáp ngay trong buổi học',
+  'Không giới hạn số lần hỏi lại',
+  'Có video xem lại sau buổi học',
+  'Hỗ trợ đến khi làm được',
+] as const;
+
+type OfferPlan = {
+  id: SubscriptionPlanId;
+  label: string;
+  hint: string;
+  price: number;
+  featured?: boolean;
 };
+
+const DEFAULT_OFFER_PLANS: OfferPlan[] = [
+  { id: '1m', label: '1 tháng', hint: 'Làm quen', price: 199000 },
+  { id: '3m', label: '3 tháng', hint: 'Nền tảng vững', price: 399000, featured: true },
+  { id: '6m', label: '6 tháng', hint: 'Học chắc', price: 599000 },
+  { id: '12m', label: '1 năm', hint: 'Tiết kiệm nhất', price: 999000 },
+  { id: 'lifetime', label: 'Trọn khóa', hint: 'Học đến khi thành thạo', price: 1500000 },
+];
 
 function formatVnd(n: number) {
   return `${Math.max(0, Number(n) || 0).toLocaleString('vi-VN')}đ`;
@@ -102,26 +131,36 @@ export function FreeMeetPlanModal({
   onClose: () => void;
   onUnlocked?: () => void;
 }) {
-  const [data, setData] = useState<SubscriptionOverview | null>(null);
+  const [plans, setPlans] = useState<OfferPlan[]>(DEFAULT_OFFER_PLANS);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanId>('3m');
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [error, setError] = useState('');
   const [checkout, setCheckout] = useState<CoursePaymentCheckout | null>(null);
+  const [activationCode, setActivationCode] = useState('');
+  const [activating, setActivating] = useState(false);
+  const [activateSuccess, setActivateSuccess] = useState('');
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     setLoading(true);
     setError('');
+    setActivateSuccess('');
     subscriptionApi
       .overview()
       .then((overview) => {
         if (cancelled) return;
-        setData(overview);
-        const plans = overview.plans || [];
-        if (plans.some((p) => p.id === '3m')) setSelectedPlan('3m');
-        else if (plans[0]?.id) setSelectedPlan(plans[0].id);
+        const serverPlans = overview?.plans || [];
+        if (serverPlans.length > 0) {
+          const map = new Map(serverPlans.map((p) => [p.id, p]));
+          setPlans((prev) =>
+            prev.map((item) => {
+              const sp = map.get(item.id);
+              return sp && Number(sp.price) > 0 ? { ...item, price: Number(sp.price) } : item;
+            }),
+          );
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Không tải được gói học.');
@@ -134,11 +173,9 @@ export function FreeMeetPlanModal({
     };
   }, [visible]);
 
-  const plans: SubscriptionPlan[] = (data?.plans || []).filter((p) => Number(p.price) > 0);
-  const activePlan = plans.find((p) => p.id === selectedPlan) || plans[0] || null;
-  const teacherAvatarUri = resolveMobilePublicUrl('/linh-vat-2.png');
+  const activePlan = plans.find((p) => p.id === selectedPlan) || plans[1] || plans[0];
 
-  const handleCheckout = async (planItem: SubscriptionPlan | null = activePlan) => {
+  const handleCheckout = async (planItem: OfferPlan = activePlan) => {
     if (!planItem || buying) return;
     setBuying(true);
     setError('');
@@ -157,146 +194,239 @@ export function FreeMeetPlanModal({
     }
   };
 
+  const handleRedeem = async () => {
+    const code = activationCode.trim();
+    if (!code) {
+      setError('Vui lòng nhập mã kích hoạt.');
+      return;
+    }
+    setActivating(true);
+    setError('');
+    try {
+      const res = await subscriptionApi.redeem(code);
+      setActivateSuccess(`Kích hoạt thành công gói ${res.redeemedPlanLabel || res.planLabel || 'Meet'}!`);
+      DeviceEventEmitter.emit('mobile:free-portal-unlocked');
+      onUnlocked?.();
+      setTimeout(() => {
+        onClose();
+      }, 1600);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Mã kích hoạt không đúng hoặc đã hết hạn.');
+    } finally {
+      setActivating(false);
+    }
+  };
+
   if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.dialog, styles.meetDialog]}>
-          <View style={styles.meetHeader}>
-            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
-              <X size={18} color="rgba(255,255,255,0.8)" />
-            </Pressable>
-            <View style={styles.meetHeaderRow}>
-              <View style={styles.teacherAvatarWrap}>
-                {teacherAvatarUri ? (
-                  <Image source={{ uri: teacherAvatarUri }} style={styles.teacherAvatar} resizeMode="contain" />
-                ) : (
-                  <Video size={26} color="#FBBF24" />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.meetTitle}>Học trực tiếp cùng thầy Phí Văn Thắng</Text>
-                <Text style={styles.meetSubtitle}>300 XP mỗi ngày · Google Meet</Text>
-              </View>
-            </View>
+        <View style={[styles.dialog, styles.newMeetDialog]}>
+          {/* Nút Đóng góc trên bên phải */}
+          <Pressable onPress={onClose} style={styles.meetPillCloseBtn} hitSlop={10} accessibilityLabel="Đóng popup">
+            <Text style={styles.meetPillCloseText}>Đóng</Text>
+          </Pressable>
+
+          {/* Logo DewSkill ở đỉnh giữa */}
+          <View style={styles.meetLogoHeader}>
+            <Image source={DEWSKILL_LOGO} style={styles.meetBrandLogo} resizeMode="contain" />
           </View>
 
-          <ScrollView style={styles.meetBody} contentContainerStyle={styles.meetBodyContent}>
-            <View style={styles.benefitGrid}>
-              <View style={styles.benefitAmberCard}>
-                <View style={styles.benefitIconAmber}>
-                  <Zap size={18} color="#FFFFFF" />
+          <ScrollView
+            style={styles.meetBody}
+            contentContainerStyle={styles.meetScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* KHỐI TRÊN: GIẢNG VIÊN + TIÊU ĐỀ + QUYỀN LỢI */}
+            <View style={styles.topSectionCard}>
+              {/* Thẻ Giảng viên */}
+              <View style={styles.teacherIntroCard}>
+                <View style={styles.teacherAvatarContainer}>
+                  <Image source={TEACHER_AVATAR} style={styles.teacherAvatarImg} resizeMode="cover" />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.benefitTitle}>300 XP mỗi ngày</Text>
-                  <Text style={styles.benefitSub}>Luyện tập và học bài thoải mái</Text>
+                <View style={styles.teacherNameBadge}>
+                  <Text style={styles.teacherEyebrow}>GIẢNG VIÊN</Text>
+                  <Text style={styles.teacherName}>Phí Văn Thắng</Text>
                 </View>
+                <Text style={styles.teacherDesc}>8 năm kinh nghiệm đào tạo tin học văn phòng.</Text>
               </View>
-              <View style={styles.benefitBlueCard}>
-                <View style={styles.benefitIconBlue}>
-                  <Video size={18} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.benefitTitle}>Lớp Google Meet</Text>
-                  <Text style={styles.benefitSub}>Tương tác trực tiếp với giảng viên</Text>
-                </View>
-              </View>
-            </View>
 
-            <View style={styles.slotSection}>
-              <View style={styles.slotTitleRow}>
-                <Clock size={14} color={colors.brand} />
-                <Text style={styles.slotSectionLabel}>CHỌN 1 TRONG 3 CA HỌC MỖI NGÀY</Text>
-              </View>
-              <View style={styles.slotGrid}>
-                {MEET_SLOTS.map((slot) => (
-                  <View key={slot.key} style={styles.slotCard}>
-                    <Text style={styles.slotLabel}>{slot.label.toUpperCase()}</Text>
-                    <Text style={styles.slotTime}>{slot.time}</Text>
+              {/* Thẻ Tiêu đề & Giới thiệu khóa học */}
+              <View style={styles.courseIntroCard}>
+                <View style={styles.courseTitleRow}>
+                  <Text style={styles.courseMainTitle}>HỌC TIN HỌC CÙNG GIẢNG VIÊN QUA</Text>
+                  <View style={styles.googleMeetBadge}>
+                    <Image source={GOOGLE_MEET_LOGO} style={styles.googleMeetIcon} resizeMode="contain" />
+                    <Text style={styles.googleMeetText}>Google Meet</Text>
                   </View>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.unlockStrip}>
-              <View style={styles.unlockStripHeader}>
-                <Unlock size={14} color="#059669" />
-                <Text style={styles.unlockStripTitle}>Mở toàn bộ mục đang khóa</Text>
-              </View>
-              <View style={styles.unlockBadgeWrap}>
-                {LOCKED_ITEMS.map(({ key, label, Icon }) => (
-                  <View key={key} style={styles.unlockPill}>
-                    <Icon size={13} color="#059669" />
-                    <Text style={styles.unlockPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.planSection}>
-              <Text style={styles.slotSectionLabel}>CHỌN THỜI HẠN GÓI</Text>
-              {loading ? (
-                <View style={styles.loadingWrap}>
-                  <ActivityIndicator color={colors.brand} />
                 </View>
-              ) : (
-                <View style={styles.planGrid}>
-                  {plans.map((p) => {
-                    const selected = p.id === selectedPlan;
-                    const badge = PLAN_HIGHLIGHTS[p.id]?.badge;
-                    const perMonth = p.months && p.months > 1 ? Math.round(p.price / p.months) : null;
-                    return (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => setSelectedPlan(p.id)}
-                        style={[styles.planCard, selected && styles.planCardSelected]}
-                      >
-                        {badge ? (
-                          <View style={[styles.planBadge, selected && styles.planBadgeSelected]}>
-                            <Text style={[styles.planBadgeText, selected && styles.planBadgeTextSelected]}>
-                              {badge}
-                            </Text>
-                          </View>
-                        ) : null}
-                        <View style={styles.planCardHeader}>
-                          <Text style={[styles.planCardLabel, selected && styles.planCardLabelSelected]}>
-                            {p.label}
-                          </Text>
-                          <View style={[styles.planRadio, selected && styles.planRadioSelected]}>
-                            {selected ? <Check size={12} color="#FFFFFF" /> : null}
-                          </View>
+
+                <View style={styles.methodPill}>
+                  <Text style={styles.methodPillText}>Học trực tiếp – dễ hiểu – được hướng dẫn từng bước</Text>
+                </View>
+
+                <Text style={styles.courseTargetDesc}>
+                  Phù hợp cho người mới bắt đầu, người mất gốc, người cần học Word – Excel – PowerPoint bài bản.
+                </Text>
+
+                <View style={styles.officeAndMascotRow}>
+                  <View style={styles.officeBadges}>
+                    <View style={[styles.officeBadge, { backgroundColor: '#2563EB' }]}>
+                      <Text style={styles.officeBadgeText}>W</Text>
+                    </View>
+                    <View style={[styles.officeBadge, { backgroundColor: '#16A34A' }]}>
+                      <Text style={styles.officeBadgeText}>X</Text>
+                    </View>
+                    <View style={[styles.officeBadge, { backgroundColor: '#EA580C' }]}>
+                      <Text style={styles.officeBadgeText}>P</Text>
+                    </View>
+                  </View>
+                  <Image source={MASCOT_STUDY} style={styles.mascotStudyImg} resizeMode="contain" />
+                </View>
+              </View>
+
+              {/* Thẻ Quyền lợi nổi bật (Xanh ngọc đậm) */}
+              <View style={styles.benefitsCard}>
+                <View style={styles.benefitsHeader}>
+                  <Crown size={15} color="#FBBF24" />
+                  <Text style={styles.benefitsHeaderText}>QUYỀN LỢI</Text>
+                </View>
+                <View style={styles.benefitsList}>
+                  {MEET_BENEFITS.map((item) => (
+                    <View key={item} style={styles.benefitRow}>
+                      <View style={styles.benefitCheckCircle}>
+                        <Check size={10} color="#064E3B" strokeWidth={3.5} />
+                      </View>
+                      <Text style={styles.benefitText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* KHỐI 3 CA HỌC */}
+            <View style={styles.slotGridRow}>
+              {MEET_SLOTS.map((slot) => (
+                <View key={slot.key} style={styles.slotPillCard}>
+                  <Text style={styles.slotEmoji}>{slot.icon}</Text>
+                  <Text style={styles.slotPillText}>
+                    {slot.label} <Text style={styles.slotPillTime}>{slot.time}</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* KHỐI 5 GÓI HỌC (VUỐT NGANG) */}
+            <View style={styles.plansSection}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.plansScrollList}
+              >
+                {plans.map((p) => {
+                  const isSelected = p.id === selectedPlan;
+                  return (
+                    <Pressable
+                      key={p.id}
+                      onPress={() => setSelectedPlan(p.id)}
+                      style={[styles.planCardNew, isSelected && styles.planCardNewSelected]}
+                    >
+                      {p.featured ? (
+                        <View style={styles.featuredBadge}>
+                          <Text style={styles.featuredBadgeText}>⭐ Nên chọn</Text>
                         </View>
-                        <Text style={styles.planPrice}>{formatVnd(p.price)}</Text>
-                        <Text style={styles.planPerMonth}>
-                          {perMonth ? `~${formatVnd(perMonth)}/tháng` : p.id === 'lifetime' ? 'Không giới hạn' : '30 ngày'}
+                      ) : null}
+
+                      <View style={styles.planMeetRow}>
+                        <Image source={GOOGLE_MEET_LOGO} style={styles.planMeetIconMini} resizeMode="contain" />
+                        <Text style={styles.planMeetTextMini}>Học qua Meet</Text>
+                      </View>
+
+                      <View style={styles.planNameRow}>
+                        <Calendar size={13} color="#334155" />
+                        <Text style={styles.planNameText}>{p.label}</Text>
+                      </View>
+
+                      <View style={[styles.planHintPill, isSelected && styles.planHintPillSelected]}>
+                        <Text style={[styles.planHintText, isSelected && styles.planHintTextSelected]}>
+                          {p.hint}
                         </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
+                      </View>
+
+                      <View style={styles.planDivider} />
+
+                      <View style={styles.planTeacherSubRow}>
+                        <Text style={styles.planTeacherSubEmoji}>👥</Text>
+                        <Text style={styles.planTeacherSubText}>Đăng ký học cùng giảng viên</Text>
+                      </View>
+
+                      <Text style={[styles.planPriceNew, isSelected && styles.planPriceNewSelected]}>
+                        {formatVnd(p.price)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
 
+            {/* KHỐI NHẬP MÃ KÍCH HOẠT */}
+            <View style={styles.activationRow}>
+              <View style={styles.activationInputWrap}>
+                <KeyRound size={15} color="#64748B" />
+                <TextInput
+                  value={activationCode}
+                  onChangeText={(val) => setActivationCode(formatActivationCodeInput(val))}
+                  placeholder="TTH-XXXX-XXXX"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="characters"
+                  maxLength={13}
+                  style={styles.activationInput}
+                />
+              </View>
+              <Pressable
+                onPress={() => void handleRedeem()}
+                disabled={activating || !activationCode.trim()}
+                style={[styles.activationBtn, (!activationCode.trim() || activating) && styles.disabledBtn]}
+              >
+                {activating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.activationBtnText}>Kích hoạt</Text>
+                )}
+              </Pressable>
+            </View>
+
+            {/* THÔNG BÁO LỖI HOẶC THÀNH CÔNG */}
             {error ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
 
+            {activateSuccess ? (
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>{activateSuccess}</Text>
+              </View>
+            ) : null}
+
+            {/* NÚT ĐĂNG KÝ HỌC NGAY DUY NHẤT (THEO YÊU CẦU NGƯỜI DÙNG: BỎ NÚT NHẬN TƯ VẤN) */}
             <Pressable
               onPress={() => void handleCheckout(activePlan)}
               disabled={!activePlan || buying || loading}
-              style={[styles.primaryCta, (!activePlan || buying || loading) && styles.disabledBtn]}
+              style={[styles.primaryCtaNew, (!activePlan || buying || loading) && styles.disabledBtn]}
             >
               {buying ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Sparkles size={16} color="#FFFFFF" />
+                <>
+                  <Text style={styles.primaryCtaNewEmoji}>🎓</Text>
+                  <Text style={styles.primaryCtaNewText}>
+                    {activePlan ? `Đăng ký học ngay (${formatVnd(activePlan.price)})` : 'Đăng ký học ngay'}
+                  </Text>
+                  <ArrowRight size={18} color="#FFFFFF" strokeWidth={2.5} />
+                </>
               )}
-              <Text style={styles.primaryCtaText}>
-                {activePlan ? `Chọn gói học · ${formatVnd(activePlan.price)}` : 'Chọn gói học'}
-              </Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -617,6 +747,500 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  newMeetDialog: {
+    maxWidth: 620,
+    maxHeight: '94%',
+    backgroundColor: '#F2FCF6',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    borderRadius: 26,
+    position: 'relative',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  meetPillCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    zIndex: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  meetPillCloseText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#334155',
+  },
+  meetLogoHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  meetBrandLogo: {
+    width: 125,
+    height: 30,
+  },
+  meetScrollContent: {
+    paddingHorizontal: 14,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  topSectionCard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    alignItems: 'stretch',
+  },
+  teacherIntroCard: {
+    flexBasis: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 18,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  teacherAvatarContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2.5,
+    borderColor: '#10B981',
+    overflow: 'hidden',
+    shadowColor: '#047857',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    marginBottom: 6,
+  },
+  teacherAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  teacherNameBadge: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    alignItems: 'center',
+    shadowColor: '#047857',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  teacherEyebrow: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#059669',
+    letterSpacing: 0.6,
+  },
+  teacherName: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  teacherDesc: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 14,
+  },
+  courseIntroCard: {
+    flex: 1,
+    minWidth: 200,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 18,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  courseTitleRow: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  courseMainTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0F172A',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  googleMeetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  googleMeetIcon: {
+    width: 14,
+    height: 14,
+  },
+  googleMeetText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#1E293B',
+  },
+  methodPill: {
+    backgroundColor: '#D1FAE5',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  methodPillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#065F46',
+    textAlign: 'center',
+  },
+  courseTargetDesc: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  officeAndMascotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 2,
+  },
+  officeBadges: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  officeBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  officeBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  mascotStudyImg: {
+    width: 38,
+    height: 38,
+  },
+  benefitsCard: {
+    flex: 1,
+    minWidth: 180,
+    backgroundColor: '#047857',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.4)',
+    borderRadius: 18,
+    padding: 12,
+    justifyContent: 'space-between',
+    gap: 8,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  benefitsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    paddingBottom: 6,
+  },
+  benefitsHeaderText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+  },
+  benefitsList: {
+    gap: 6,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  benefitCheckCircle: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#34D399',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    flexShrink: 1,
+  },
+  slotGridRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  slotPillCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+    shadowColor: '#047857',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  slotEmoji: {
+    fontSize: 12,
+  },
+  slotPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  slotPillTime: {
+    color: '#059669',
+    fontWeight: '900',
+  },
+  plansSection: {
+    marginVertical: 4,
+  },
+  plansScrollList: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  planCardNew: {
+    width: 130,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 10,
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  planCardNewSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+    shadowColor: '#059669',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: -9,
+    backgroundColor: '#F59E0B',
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  featuredBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  planMeetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  planMeetIconMini: {
+    width: 11,
+    height: 11,
+  },
+  planMeetTextMini: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  planNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  planNameText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  planHintPill: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginTop: 3,
+  },
+  planHintPillSelected: {
+    backgroundColor: '#D1FAE5',
+  },
+  planHintText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  planHintTextSelected: {
+    color: '#047857',
+  },
+  planDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 8,
+  },
+  planTeacherSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  planTeacherSubEmoji: {
+    fontSize: 9,
+  },
+  planTeacherSubText: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  planPriceNew: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#059669',
+  },
+  planPriceNewSelected: {
+    color: '#047857',
+  },
+  activationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 6,
+    paddingLeft: 10,
+  },
+  activationInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activationInput: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    paddingVertical: 4,
+  },
+  activationBtn: {
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  activationBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  successBox: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  successText: {
+    color: '#065F46',
+    fontSize: 11.5,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  primaryCtaNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 999,
+    backgroundColor: '#059669',
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+    marginTop: 4,
+  },
+  primaryCtaNewEmoji: {
+    fontSize: 16,
+  },
+  primaryCtaNewText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
   meetDialog: {
     maxWidth: 520,

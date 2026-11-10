@@ -56,6 +56,7 @@ import { PinLockGate } from '../components/pinLock/PinLockGate';
 import { TeacherPaymentNoticeModal } from '../components/TeacherPaymentNoticeModal';
 import { LearningGoalHost } from '../components/LearningGoalModal';
 import { FreeFeatureLockModal, FreeSurveyModal, isFreePortalLocked, isFreePortalMenu } from '../components/FreePortalModals';
+import { MobilePopupBanner } from '../components/MobilePopupBanner';
 import { noteStudyActivity } from '../services/studyActivity';
 import { notePinActivity, pinUserKey } from '../services/pinLock';
 import { MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT, animateChrome } from '../components/ui';
@@ -542,6 +543,7 @@ export function RootNavigator() {
         />
       ) : null}
       {searchOverlayVisible ? <GlobalSearchOverlay onClose={() => setSearchOverlayVisible(false)} /> : null}
+      <MobilePopupBanner role={user?.role || 'student'} />
       <Modal
         visible={Boolean(incomingCall)}
         transparent

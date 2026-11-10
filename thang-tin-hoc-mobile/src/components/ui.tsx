@@ -29,6 +29,7 @@ import type { Assignment, ScheduleItem } from '../types';
 import { getWebLogoUrl } from '../services/webSettingsApi';
 import type { AppStackParamList } from '../navigation/types';
 import { useAuth } from '../app/AuthContext';
+import { hasRealCourseEnrollment } from './FreePortalModals';
 
 const BRANDING_HEADER_VISIBILITY_EVENT = 'mobile:branding-header-visibility';
 export const MOBILE_NAVIGATION_BAR_VISIBILITY_EVENT = 'mobile:navigation-bar-visibility';
@@ -133,7 +134,10 @@ function BrandingTopBar() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const auth = useAuth();
-  const isFreeStudent = auth?.user?.role === 'student' && auth?.user?.freePortal === true;
+  const isFreeStudent =
+    auth?.user?.role === 'student'
+    && (auth?.user?.freePortal === true || String(auth?.user?.course || '').toLowerCase().includes('miễn phí'))
+    && !hasRealCourseEnrollment(auth?.user);
   const [logoUrl, setLogoUrl] = useState('');
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -212,7 +216,7 @@ function BrandingTopBar() {
         >
           {isFreeStudent ? (
             <Image
-              source={require('../../assets/logo.png')}
+              source={require('../../assets/logo.webp')}
               style={styles.brandingLogo}
               resizeMode="contain"
               accessibilityLabel="Logo DewSkill"

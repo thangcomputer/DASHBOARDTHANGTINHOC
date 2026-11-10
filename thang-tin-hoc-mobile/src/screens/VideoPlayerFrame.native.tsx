@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { ShieldAlert } from 'lucide-react-native';
 import { typography } from '../theme/tokens';
 import { getMobileApiBaseUrl } from '../services/apiClient';
 import { noteStudyMediaProgress } from '../services/studyActivity';
@@ -10,7 +11,8 @@ import type { VideoPlayerApi, VideoPlayerProgress } from './VideoPlayerFrame';
 
 type PlayerMessage =
   | ({ type: 'progress'; eligible?: boolean } & VideoPlayerProgress)
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'anti_seek' };
 
 function escapedScriptValue(value: string) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -86,7 +88,11 @@ function createPlayerHtml({
   function send(value){window.ReactNativeWebView.postMessage(JSON.stringify(value));}
   function report(time,duration,isPlaying,seek){
     const tick=guard.tick(time,duration,isPlaying,antiSeekEnabled,completed||thresholdReached);
-    if(tick.seekTo!==null){seek(tick.seekTo);return;}
+    if(tick.seekTo!==null){
+      seek(tick.seekTo);
+      send({type:'anti_seek'});
+      return;
+    }
     const now=Date.now();
     if(!completed&&now-lastSaved>=1000){
       lastSaved=now;
@@ -115,6 +121,7 @@ function createPlayerHtml({
     video.addEventListener('loadedmetadata',function(){if(!completed&&initialMaxPosition>0)video.currentTime=Math.min(initialMaxPosition,Math.max(0,video.duration-1));});
     video.addEventListener('play',function(){playing=true;});
     video.addEventListener('pause',function(){playing=false;});
+    video.addEventListener('seeking',poll);
     video.addEventListener('seeked',poll);
   }else if(youtubeId){
     function initializePlayer(){
@@ -200,6 +207,20 @@ export function VideoPlayerFrame({
   playerApiRef?: { current: VideoPlayerApi | null };
 }) {
   const [playerError, setPlayerError] = useState('');
+  const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
+  const antiSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerAntiSeekNotice = () => {
+    setShowAntiSeekNotice(true);
+    if (antiSeekTimerRef.current) clearTimeout(antiSeekTimerRef.current);
+    antiSeekTimerRef.current = setTimeout(() => setShowAntiSeekNotice(false), 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (antiSeekTimerRef.current) clearTimeout(antiSeekTimerRef.current);
+    };
+  }, []);
   const progressRef = useRef<VideoPlayerProgress>({
     currentTime: 0,
     duration: 0,
@@ -243,6 +264,10 @@ export function VideoPlayerFrame({
     }
     if (message.type === 'error') {
       setPlayerError(message.message);
+      return;
+    }
+    if (message.type === 'anti_seek') {
+      triggerAntiSeekNotice();
       return;
     }
     const progress: VideoPlayerProgress = {
@@ -290,6 +315,56 @@ export function VideoPlayerFrame({
       {playerError ? (
         <View pointerEvents="none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(8,13,25,0.82)' }}>
           <Text style={{ color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700', textAlign: 'center' }}>{playerError}</Text>
+        </View>
+      ) : null}
+      {showAntiSeekNotice ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 40,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.88)',
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 20,
+              borderWidth: 1.5,
+              borderColor: '#EF4444',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.5,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: '#DC2626',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ShieldAlert size={14} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.4 }}>
+              Chống tua video
+            </Text>
+          </View>
         </View>
       ) : null}
     </View>

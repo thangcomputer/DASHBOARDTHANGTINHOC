@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ShieldAlert } from 'lucide-react-native';
 import { typography } from '../theme/tokens';
 import { noteStudyMediaProgress } from '../services/studyActivity';
 import { createVideoWatchGuard } from './videoWatchGuard';
@@ -102,6 +103,20 @@ export function VideoPlayerFrame({
   const doneRef = useRef(done);
   const antiSeekRef = useRef(antiSeekEnabled);
   const [playerError, setPlayerError] = useState('');
+  const [showAntiSeekNotice, setShowAntiSeekNotice] = useState(false);
+  const antiSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerAntiSeekNotice = () => {
+    setShowAntiSeekNotice(true);
+    if (antiSeekTimerRef.current) clearTimeout(antiSeekTimerRef.current);
+    antiSeekTimerRef.current = setTimeout(() => setShowAntiSeekNotice(false), 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (antiSeekTimerRef.current) clearTimeout(antiSeekTimerRef.current);
+    };
+  }, []);
   callbackRef.current = onProgress;
   watchedCallbackRef.current = onWatched;
   doneRef.current = done;
@@ -175,6 +190,7 @@ export function VideoPlayerFrame({
       const tick = guard.tick(currentTime, duration, playing, antiSeekRef.current, doneRef.current || thresholdReached);
       if (tick.seekTo !== null) {
         seekTo(tick.seekTo);
+        triggerAntiSeekNotice();
         return;
       }
       const now = Date.now();
@@ -244,17 +260,22 @@ export function VideoPlayerFrame({
         report(video.currentTime, video.duration, !video.paused, (position) => { video.currentTime = position; });
       };
       const onSeeked = () => report(video.currentTime, video.duration, !video.paused, (position) => { video.currentTime = position; });
+      const onSeeking = () => {
+        report(video.currentTime, video.duration, !video.paused, (position) => { video.currentTime = position; });
+      };
       startPolling(
         () => ({ time: video.currentTime, duration: video.duration, playing: !video.paused && !video.ended }),
         (position) => { video.currentTime = position; },
       );
       video.addEventListener('loadedmetadata', onMetadata);
       video.addEventListener('seeked', onSeeked);
+      video.addEventListener('seeking', onSeeking);
       if (video.readyState >= 1) onMetadata();
       return () => {
         stopPolling();
         video.removeEventListener('loadedmetadata', onMetadata);
         video.removeEventListener('seeked', onSeeked);
+        video.removeEventListener('seeking', onSeeking);
       };
     }
 
@@ -405,6 +426,53 @@ export function VideoPlayerFrame({
       {playerError ? (
         <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(8,13,25,0.82)' }}>
           <Text style={{ color: '#FFFFFF', fontSize: typography.caption, fontWeight: '700', textAlign: 'center' }}>{playerError}</Text>
+        </View>
+      ) : null}
+      {showAntiSeekNotice ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 40,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: 'rgba(0, 0, 0, 0.88)',
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 20,
+              borderWidth: 1.5,
+              borderColor: '#EF4444',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.5,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: '#DC2626',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ShieldAlert size={14} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', letterSpacing: 0.4 }}>
+              Chống tua video
+            </Text>
+          </View>
         </View>
       ) : null}
     </View>
