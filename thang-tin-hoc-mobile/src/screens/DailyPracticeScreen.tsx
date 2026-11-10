@@ -198,7 +198,7 @@ function DailyPracticeGoalPanel({
           <View style={[styles.pathFill, { width: `${todayProgress}% `, backgroundColor: todayProgress >= 100 ? '#10B981' : '#EF4444' }]} />
         </View>
 
-        <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
+        <View style={[styles.goalInfoBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE', borderBottomColor: '#BFDBFE' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={[styles.goalInfoTitle, { color: '#1E3A8A' }]}>Kế hoạch học tập</Text>
             <Pressable
@@ -206,7 +206,7 @@ function DailyPracticeGoalPanel({
               hitSlop={8}
               accessibilityRole="button"
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#10B981' }}>
                 {goalData?.goal?.expired ? 'Đặt lại mục tiêu' : goalData?.goal ? 'Đổi mục tiêu' : 'Đặt mục tiêu'}
               </Text>
             </Pressable>
@@ -218,12 +218,12 @@ function DailyPracticeGoalPanel({
           </Text>
         </View>
 
-        <View style={{ gap: 6 }}>
+        <View style={{ gap: 8 }}>
           <View style={styles.goalHeaderRow}>
             <Text style={styles.goalLabelSmall}>Số lượt luyện mỗi ngày</Text>
             <Text style={styles.goalValueSmall}>{`${goal.dailyTarget} lượt`}</Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             {[1, 2, 3, 4, 5].map((n) => {
               const active = goal.dailyTarget === n;
               return (
@@ -233,7 +233,7 @@ function DailyPracticeGoalPanel({
                   style={[styles.goalTargetBtn, active && styles.goalTargetBtnActive]}
                   accessibilityRole="button"
                 >
-                  <Text style={[styles.goalTargetBtnText, active && { color: '#FFFFFF' }]}>{n}</Text>
+                  <Text style={[styles.goalTargetBtnText, active && { color: '#FFFFFF', fontWeight: '900' }]}>{n}</Text>
                 </Pressable>
               );
             })}
@@ -244,17 +244,17 @@ function DailyPracticeGoalPanel({
           <Calendar size={15} color="#64748B" />
           <Text style={styles.goalFooterText}>
             {'Đã hoàn thành '}
-            <Text style={{ fontWeight: '600', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text >
+            <Text style={{ fontWeight: '800', color: '#0F172A' }}>{`${todaySessions} /${goal.dailyTarget}`}</Text>
             {' lượt bài hôm nay'}
-          </Text >
-        </View >
-      </View >
+          </Text>
+        </View>
+      </View>
 
       {/* Nhiệm vụ hôm nay - Đồng bộ Web & Image 1 + 6 */}
-      < View style={styles.goalCard} >
+      <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB' }]}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#FDE68A', borderBottomWidth: 3, borderBottomColor: '#F59E0B' }]}>
               <Sparkles size={17} color="#D97706" />
             </View>
             <View>
@@ -262,20 +262,20 @@ function DailyPracticeGoalPanel({
               <Text style={styles.goalCardSub}>Hoàn thành mục tiêu học và rèn luyện</Text>
             </View>
           </View>
-          <View style={[styles.goalBadge, { backgroundColor: '#F1F5F9' }]}>
+          <View style={[styles.goalBadge, { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', borderBottomWidth: 2, borderBottomColor: '#CBD5E1' }]}>
             <Text style={[styles.goalBadgeText, { color: '#334155' }]}>{`${missionDoneCount}/2 hoàn thành`}</Text>
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
           {/* Cột 1: Luyện tập (Xanh lá) */}
           <Pressable
             onPress={onGoPractice}
-            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
+            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderBottomColor: '#34D399' }]}
             accessibilityRole="button"
             accessibilityLabel={`Luyện tập: ${qDone ? 'Hoàn thành' : `${todayQuestions}/10 câu`}`}
           >
-            <View style={[styles.missionSquareIcon, { backgroundColor: '#10B981' }]}>
+            <View style={[styles.missionSquareIcon, { backgroundColor: '#10B981', borderWidth: 1.5, borderColor: '#34D399', borderBottomWidth: 3, borderBottomColor: '#059669' }]}>
               <Gamepad2 size={20} color="#FFFFFF" />
               {qDone ? (
                 <View style={styles.missionCheckBadge}>
@@ -297,11 +297,11 @@ function DailyPracticeGoalPanel({
           {/* Cột 2: Xem video (Tím / Trắng đồng bộ Web) */}
           <Pressable
             onPress={onWatchVideo}
-            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}
+            style={[styles.missionRowCard, { flex: 1, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1' }]}
             accessibilityRole="button"
             accessibilityLabel={`Xem video: ${todayVideos}/1 video`}
           >
-            <View style={[styles.missionCircleIcon, { backgroundColor: '#A855F7' }]}>
+            <View style={[styles.missionCircleIcon, { backgroundColor: '#8B5CF6', borderWidth: 1.5, borderColor: '#A78BFA', borderBottomWidth: 3, borderBottomColor: '#6D28D9' }]}>
               <PlayCircle size={22} color="#FFFFFF" />
             </View>
             <View style={styles.flex}>
@@ -313,7 +313,7 @@ function DailyPracticeGoalPanel({
                 {`${todayVideos}/1 video`}
               </Text>
               <View style={[styles.missionRowTrack, { backgroundColor: '#F1F5F9' }]}>
-                <View style={[styles.missionRowFill, { width: `${Math.min(100, Math.round(todayVideos * 100))}%`, backgroundColor: '#A855F7' }]} />
+                <View style={[styles.missionRowFill, { width: `${Math.min(100, Math.round(todayVideos * 100))}%`, backgroundColor: '#8B5CF6' }]} />
               </View>
             </View>
           </Pressable>
@@ -322,13 +322,13 @@ function DailyPracticeGoalPanel({
         <Text style={styles.missionFooterText}>
           {`Cả ${periodLabel(period)}: ${periodQuestions} câu · ${periodVideos} video`}
         </Text>
-      </View >
+      </View>
 
       {/* Chuỗi luyện tập */}
-      < View style={styles.goalCard} >
+      <View style={styles.goalCard}>
         <View style={styles.goalHeaderRow}>
           <View style={styles.inline}>
-            <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED' }]}>
+            <View style={[styles.goalIconBox, { backgroundColor: '#FFF7ED', borderWidth: 1.5, borderColor: '#FDBA74', borderBottomWidth: 3, borderBottomColor: '#F97316' }]}>
               <Flame size={17} color="#EA580C" />
             </View>
             <View>
@@ -337,8 +337,8 @@ function DailyPracticeGoalPanel({
             </View>
           </View>
           <View style={styles.inline}>
-            <Flame size={14} color="#EA580C" fill="#FB923C" />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#EA580C' }}>{`${streak} ngày`}</Text>
+            <Flame size={15} color="#EA580C" fill="#FB923C" />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#EA580C' }}>{`${streak} ngày`}</Text>
           </View>
         </View>
 
@@ -352,20 +352,20 @@ function DailyPracticeGoalPanel({
                 style={[
                   styles.weekCell,
                   active
-                    ? { borderColor: '#FDBA74', backgroundColor: '#FFF7ED' }
+                    ? { borderColor: '#FDBA74', borderBottomColor: '#F97316', backgroundColor: '#FFF7ED' }
                     : isToday
-                      ? { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }
-                      : { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+                      ? { borderColor: '#CBD5E1', borderBottomColor: '#94A3B8', backgroundColor: '#FFFFFF' }
+                      : { borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
                 ]}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
-                <Flame size={15} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: active ? '#C2410C' : '#64748B' }}>{label}</Text>
+                <Flame size={16} color={active ? '#F97316' : '#CBD5E1'} fill={active ? '#FB923C' : 'transparent'} />
               </View>
             );
           })}
         </View>
-      </View >
-    </View >
+      </View>
+    </View>
   );
 }
 
@@ -3357,7 +3357,18 @@ const styles = StyleSheet.create({
   },
   quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '800' },
   quitBackdrop: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  quitCard: { width: '100%', maxWidth: 380, borderRadius: 28, overflow: 'hidden', backgroundColor: colors.surface, boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)' },
+  quitCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderBottomWidth: 6,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)',
+  },
   quitHero: {
     alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xl, paddingBottom: spacing.lg, gap: 6, backgroundColor: '#F0F9FF',
     backgroundImage: 'linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 50%, #F1F5F9 100%)',
@@ -4403,34 +4414,66 @@ const styles = StyleSheet.create({
   },
   xpEmptyBuyBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   goalCard: {
-    padding: spacing.md, borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF', gap: 10,
+    padding: spacing.md,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderBottomWidth: 5,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    gap: 12,
   },
   goalHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  goalIconBox: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  goalCardTitle: { color: colors.ink, fontSize: 15, fontWeight: '600' },
-  goalCardSub: { color: colors.muted, fontSize: 13 },
-  goalBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  goalBadgeText: { fontSize: 12, fontWeight: '600' },
-  goalInfoBox: { padding: 8, borderRadius: 12, borderWidth: 1 },
-  goalInfoTitle: { fontSize: 13, fontWeight: '600' },
-  goalInfoSub: { fontSize: 12, marginTop: 1 },
-  goalLabelSmall: { color: '#64748B', fontSize: 12, fontWeight: '500' },
-  goalValueSmall: { color: colors.ink, fontSize: 13, fontWeight: '600' },
-  goalTargetBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7,
-    borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
+  goalIconBox: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  goalCardTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
+  goalCardSub: { color: colors.muted, fontSize: 13, fontWeight: '600' },
+  goalBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  goalBadgeText: { fontSize: 12, fontWeight: '800' },
+  goalInfoBox: {
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderBottomWidth: 4,
   },
-  goalTargetBtnActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  goalTargetBtnText: { color: colors.ink, fontSize: 13, fontWeight: '600' },
+  goalInfoTitle: { fontSize: 13, fontWeight: '800' },
+  goalInfoSub: { fontSize: 12, marginTop: 1, fontWeight: '600', lineHeight: 18 },
+  goalLabelSmall: { color: '#64748B', fontSize: 13, fontWeight: '700' },
+  goalValueSmall: { color: colors.ink, fontSize: 14, fontWeight: '900' },
+  goalTargetBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderBottomWidth: 4,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+  },
+  goalTargetBtnActive: {
+    backgroundColor: '#10B981',
+    borderColor: '#059669',
+    borderBottomColor: '#047857',
+  },
+  goalTargetBtnText: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   goalFooterBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
-  goalFooterText: { color: '#64748B', fontSize: 12 },
+  goalFooterText: { color: '#64748B', fontSize: 13, fontWeight: '600' },
   questItemBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderRadius: 12, borderWidth: 1 },
   questCheckCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   questItemTitle: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   questItemDesc: { color: colors.muted, fontSize: 13 },
   questItemTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  weekCell: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  weekCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderBottomWidth: 4,
+  },
   freeModeNotice: {
     padding: 10, borderRadius: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
   },
@@ -4457,9 +4500,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    padding: 10,
-    borderRadius: 16,
-    borderWidth: 1,
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderBottomWidth: 4,
   },
   missionSquareIcon: {
     position: 'relative',

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CheckCircle2, KeyRound, Lock, X } from 'lucide-react-native';
 import { colors, droplet } from '../../theme/tokens';
+import { DuoButton } from '../duo/DuoButton';
 import { PinPad } from './PinPad';
 import {
   PIN_DEFAULT_TIMEOUT,
@@ -138,34 +139,50 @@ export function PinLockSettingsModal({ userKey, onClose }: { userKey: string; on
                 </View>
                 {config ? (
                   <View style={styles.actions}>
-                    <Pressable onPress={() => goStep('verify-change')} style={styles.secondary} accessibilityRole="button">
-                      <Text style={styles.secondaryText}>Đổi mã PIN</Text>
-                    </Pressable>
-                    <Pressable
+                    <DuoButton
+                      variant="secondary"
+                      size="md"
+                      fullWidth
+                      text="Đổi mã PIN"
+                      onPress={() => goStep('verify-change')}
+                    />
+                    <DuoButton
+                      variant="dark"
+                      size="md"
+                      fullWidth
+                      text="Khóa ngay"
+                      icon={<Lock size={15} color="#FFFFFF" />}
                       onPress={() => { onClose(); DeviceEventEmitter.emit(PIN_LOCK_NOW_EVENT); }}
-                      style={styles.dark}
-                      accessibilityRole="button"
-                    >
-                      <Lock size={15} color="#FFFFFF" />
-                      <Text style={styles.darkText}>Khóa ngay</Text>
-                    </Pressable>
-                    <Pressable onPress={() => goStep('verify-remove')} style={styles.danger} accessibilityRole="button">
-                      <Text style={styles.dangerText}>Tắt khóa</Text>
-                    </Pressable>
+                    />
+                    <DuoButton
+                      variant="danger"
+                      size="md"
+                      fullWidth
+                      text="Tắt khóa"
+                      onPress={() => goStep('verify-remove')}
+                    />
                   </View>
                 ) : (
-                  <Pressable onPress={() => goStep('create')} style={styles.primary} accessibilityRole="button">
-                    <Text style={styles.primaryText}>Tạo mã PIN</Text>
-                  </Pressable>
+                  <DuoButton
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    text="Tạo mã PIN"
+                    onPress={() => goStep('create')}
+                  />
                 )}
               </>
             ) : (
               <View style={styles.pinStep}>
                 <Text style={styles.stepTitle}>{STEP_TITLES[step]}</Text>
                 <PinPad onComplete={(pin) => { void handlePin(pin); }} error={error} resetKey={resetKey} />
-                <Pressable onPress={() => goStep('overview')} style={styles.back} accessibilityRole="button">
-                  <Text style={styles.backText}>Quay lại</Text>
-                </Pressable>
+                <DuoButton
+                  variant="secondary"
+                  size="md"
+                  text="Quay lại"
+                  onPress={() => goStep('overview')}
+                  style={{ alignSelf: 'center', marginTop: 8 }}
+                />
               </View>
             )}
           </ScrollView>
@@ -177,32 +194,74 @@ export function PinLockSettingsModal({ userKey, onClose }: { userKey: string; on
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: 'rgba(15,23,42,0.6)' },
-  sheet: { width: '100%', maxWidth: 440, maxHeight: '92%', borderRadius: 24, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  sheet: {
+    width: '100%',
+    maxWidth: 440,
+    maxHeight: '92%',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderBottomWidth: 6,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8 },
   headerTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  close: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  title: { color: colors.ink, fontSize: 18, fontWeight: '900' },
+  close: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+  },
   body: { paddingHorizontal: 18, paddingBottom: 20, gap: 14 },
-  intro: { color: '#475569', fontSize: 14, lineHeight: 20 },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, backgroundColor: '#ECFDF5', paddingHorizontal: 12, paddingVertical: 8 },
-  noticeText: { color: '#047857', fontSize: 14, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  intro: { color: '#475569', fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  noticeText: { color: '#047857', fontSize: 14, fontWeight: '800' },
+  label: { color: colors.ink, fontSize: 14, fontWeight: '900' },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  option: { borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 9, boxShadow: droplet.button },
-  optionActive: { borderColor: colors.brand, backgroundColor: colors.brand },
-  optionText: { color: '#334155', fontSize: 14, fontWeight: '700' },
-  optionTextActive: { color: '#FFFFFF' },
-  actions: { gap: 8 },
-  primary: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.brand, boxShadow: droplet.button },
-  primaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  secondary: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', boxShadow: droplet.button },
-  secondaryText: { color: colors.ink, fontSize: 14, fontWeight: '700' },
-  dark: { minHeight: 44, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#0F172A', boxShadow: droplet.button },
-  darkText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  danger: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', boxShadow: droplet.button },
-  dangerText: { color: colors.brand, fontSize: 14, fontWeight: '700' },
+  option: {
+    borderRadius: 14,
+    borderWidth: 2,
+    borderBottomWidth: 4,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  optionActive: {
+    borderColor: '#10B981',
+    borderBottomColor: '#059669',
+    backgroundColor: '#10B981',
+  },
+  optionText: { color: '#334155', fontSize: 14, fontWeight: '800' },
+  optionTextActive: { color: '#FFFFFF', fontWeight: '900' },
+  actions: { gap: 10 },
   pinStep: { alignItems: 'center', gap: 12, paddingTop: 4 },
-  stepTitle: { color: '#334155', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  stepTitle: { color: '#334155', fontSize: 14, fontWeight: '800', textAlign: 'center' },
   back: { paddingVertical: 8, paddingHorizontal: 12 },
-  backText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  backText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
 });

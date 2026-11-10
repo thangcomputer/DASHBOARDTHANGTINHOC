@@ -3,7 +3,8 @@ import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Bot, ChevronRight, Headphones, Users, X } from 'lucide-react-native';
-import { AppScreen, Card, PrimaryButton } from '../components/ui';
+import { AppScreen, Card } from '../components/ui';
+import { DuoButton } from '../components/duo/DuoButton';
 import { useAuth } from '../app/AuthContext';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList } from '../navigation/types';
@@ -94,8 +95,11 @@ export function SupportEntryScreen() {
         <Text style={{ color: colors.muted, fontSize: typography.small, lineHeight: 21, textAlign: 'center' }}>
           Hỏi trợ lý AI về tin học và LMS, hoặc chuyển cuộc trò chuyện cho nhân viên hỗ trợ.
         </Text>
-        <PrimaryButton
-          title="Trò chuyện với hỗ trợ"
+        <DuoButton
+          variant="primary"
+          size="lg"
+          fullWidth
+          text="Trò chuyện với hỗ trợ"
           onPress={() => {
             setChoiceError('');
             setChoiceVisible(true);
@@ -201,55 +205,81 @@ const styles = {
     maxWidth: 420,
     gap: spacing.md,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderBottomWidth: 6,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   choiceHeader: {
     flexDirection: 'row' as const,
     alignItems: 'flex-start' as const,
     gap: spacing.sm,
   },
-  choiceTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '800' as const },
+  choiceTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: '900' as const },
   choiceSubtitle: { marginTop: spacing.xs, color: colors.muted, fontSize: typography.caption, lineHeight: 20 },
   closeButton: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderRadius: 12,
-    backgroundColor: colors.canvas,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
   },
   choiceError: {
     padding: spacing.sm,
-    borderRadius: 10,
-    backgroundColor: colors.redSoft,
-    color: colors.red,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    color: '#DC2626',
     fontSize: typography.caption,
     lineHeight: 19,
+    fontWeight: '700' as const,
   },
   choiceRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: spacing.md,
-    minHeight: 72,
+    minHeight: 76,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderBottomWidth: 4,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
   },
-  choiceRowPressed: { backgroundColor: colors.brandSoft, borderColor: '#FECACA' },
+  choiceRowPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+    backgroundColor: '#F0FDF4',
+    borderColor: '#10B981',
+    borderBottomColor: '#059669',
+  },
   choiceRowDisabled: { opacity: 0.6 },
   choiceIcon: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    borderRadius: 14,
-    backgroundColor: colors.brandSoft,
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#6EE7B7',
   },
-  choiceRowTitle: { color: colors.ink, fontSize: typography.caption, fontWeight: '800' as const },
-  choiceRowDescription: { marginTop: 3, color: colors.muted, fontSize: typography.micro, lineHeight: 18 },
+  choiceRowTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' as const },
+  choiceRowDescription: { marginTop: 3, color: '#64748B', fontSize: 13, lineHeight: 18, fontWeight: '600' as const },
 };

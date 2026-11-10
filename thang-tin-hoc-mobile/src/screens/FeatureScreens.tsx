@@ -33,6 +33,7 @@ import { buildDirectConversationId } from '../services/messageApi';
 import { enableMobilePushNotifications, requestWebNotificationPermission } from '../services/mobilePushNotifications';
 import { PinLockSettingsModal } from '../components/pinLock/PinLockSettingsModal';
 import { SubscriptionStatusCard } from '../components/subscription/SubscriptionRenew';
+import { DuoButton } from '../components/duo/DuoButton';
 import { pinUserKey } from '../services/pinLock';
 import { OPEN_LEARNING_GOAL_EVENT } from '../services/learningGoalApi';
 import type { RawStudent, StudentProfileUpdate, TeacherAssignedStudentDetail } from '../services/studentApi';
@@ -4376,19 +4377,18 @@ export function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setPushFeedback(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.cardTitle}>{pushFeedback?.title}</Text>
-            <Text style={styles.metaText}>{pushFeedback?.message}</Text>
-            <View style={styles.modalActions}>
-              <Pressable
+        <View style={[styles.modalBackdrop, { justifyContent: 'center', alignItems: 'center', padding: spacing.lg }]}>
+          <View style={styles.dialog3dCard}>
+            <Text style={[styles.cardTitle, { fontSize: 18, fontWeight: '900', textAlign: 'center' }]}>{pushFeedback?.title}</Text>
+            <Text style={[styles.metaText, { fontSize: 14, lineHeight: 22, color: '#475569', textAlign: 'center' }]}>{pushFeedback?.message}</Text>
+            <View style={[styles.modalActions, { marginTop: 8 }]}>
+              <DuoButton
+                variant="primary"
+                size="md"
+                fullWidth
+                text="Đã hiểu"
                 onPress={() => setPushFeedback(null)}
-                style={styles.profilePushFeedbackButton}
-                accessibilityRole="button"
-                accessibilityLabel="Đóng thông báo trạng thái quyền"
-              >
-                <Text style={styles.profilePushFeedbackButtonText}>Đã hiểu</Text>
-              </Pressable>
+              />
             </View>
           </View>
         </View>
@@ -4686,49 +4686,55 @@ function ChangePasswordModal({
               value={oldPassword}
               onChangeText={setOldPassword}
               placeholder="Mật khẩu hiện tại"
+              placeholderTextColor="#94A3B8"
               secureTextEntry
               autoCapitalize="none"
               autoComplete="current-password"
               textContentType="password"
-              style={[styles.formInput, styles.teacherEditInput]}
+              style={[styles.formInput, styles.passwordInput3d]}
             />
             <TextInput
               value={newPassword}
               onChangeText={setNewPassword}
               placeholder="Mật khẩu mới (ít nhất 6 ký tự)"
+              placeholderTextColor="#94A3B8"
               secureTextEntry
               autoCapitalize="none"
               autoComplete="new-password"
               textContentType="newPassword"
-              style={[styles.formInput, styles.teacherEditInput]}
+              style={[styles.formInput, styles.passwordInput3d]}
             />
             <TextInput
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               placeholder="Nhập lại mật khẩu mới"
+              placeholderTextColor="#94A3B8"
               secureTextEntry
               autoCapitalize="none"
               autoComplete="new-password"
               textContentType="newPassword"
-              style={[styles.formInput, styles.teacherEditInput]}
+              style={[styles.formInput, styles.passwordInput3d]}
             />
           </ScrollView>
           <View style={styles.teacherEditActions}>
-            <Pressable
+            <DuoButton
+              variant="secondary"
+              size="md"
+              text="Hủy"
+              disabled={saving}
               onPress={onClose}
+              style={{ flex: 1 }}
+            />
+            <DuoButton
+              variant="primary"
+              size="md"
+              text={saving ? 'Đang lưu…' : 'Cập nhật mật khẩu'}
+              icon={saving ? undefined : <Save size={16} color="#FFFFFF" />}
+              loading={saving}
               disabled={saving}
-              style={[styles.teacherEditCancel, saving && styles.teacherEditDisabled]}
-            >
-              <Text style={styles.teacherEditCancelText}>Hủy</Text>
-            </Pressable>
-            <Pressable
               onPress={() => { void submit(); }}
-              disabled={saving}
-              style={[styles.teacherEditSave, saving && styles.teacherEditDisabled]}
-            >
-              {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
-              <Text style={styles.teacherEditSaveText}>{saving ? 'Đang lưu…' : 'Cập nhật mật khẩu'}</Text>
-            </Pressable>
+              style={{ flex: 1.5 }}
+            />
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -5743,13 +5749,71 @@ const styles = StyleSheet.create({
   assignmentModalCloseText: { color: colors.brand, fontSize: typography.caption, fontWeight: '800' },
   teacherEditBackdrop: { justifyContent: 'center', alignItems: 'center', padding: spacing.sm, backgroundColor: 'rgba(15, 23, 42, 0.6)' },
   teacherEditModal: { width: '100%', maxWidth: 480, maxHeight: '92%', overflow: 'hidden', alignSelf: 'center', borderRadius: 22, backgroundColor: colors.surface },
-  changePasswordModal: { width: '100%', maxWidth: 440, maxHeight: '92%', overflow: 'hidden', alignSelf: 'center', borderRadius: 22, backgroundColor: colors.surface },
+  changePasswordModal: {
+    width: '100%',
+    maxWidth: 440,
+    maxHeight: '92%',
+    overflow: 'hidden',
+    alignSelf: 'center',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderBottomWidth: 6,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   changePasswordBody: { flexShrink: 1 },
-  changePasswordFields: { gap: spacing.sm, padding: spacing.md },
+  changePasswordFields: { gap: spacing.md, padding: spacing.lg },
+  passwordInput3d: {
+    minHeight: 52,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderBottomWidth: 4,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  dialog3dCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderBottomWidth: 6,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   teacherEditHeader: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: '#F0FDFA' },
   teacherEditTitle: { color: '#115E59', fontSize: typography.body, fontWeight: '900' },
   teacherEditSubtitle: { marginTop: 2, color: colors.muted, fontSize: typography.micro },
-  teacherEditClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.surface },
+  teacherEditClose: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderBottomWidth: 3,
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+  },
   teacherEditBody: { gap: 9, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm },
   teacherEditSection: { color: '#0F766E', fontSize: typography.micro, fontWeight: '900', letterSpacing: 0.8 },
   teacherEditPaymentSection: { marginTop: spacing.xs, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.line },

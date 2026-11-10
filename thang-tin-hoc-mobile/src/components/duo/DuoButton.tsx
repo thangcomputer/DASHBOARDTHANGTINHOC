@@ -17,7 +17,8 @@ export type DuoButtonVariant =
   | 'gold'      // Gold / Yellow (XP, Rương báu, Mua)
   | 'blue'      // Blue (Meet, Video)
   | 'danger'    // Red (Thoát, Bỏ cuộc)
-  | 'purple';   // Purple (Thử thách)
+  | 'purple'    // Purple (Thử thách)
+  | 'dark';     // Dark Slate (Khóa, Bảo mật)
 
 export type DuoButtonSize = 'sm' | 'md' | 'lg';
 
@@ -77,6 +78,12 @@ const VARIANTS: Record<
     face: '#8B5CF6',
     bevel: '#6D28D9',
     text: '#FFFFFF',
+  },
+  dark: {
+    face: '#0F172A',
+    bevel: '#020617',
+    text: '#FFFFFF',
+    border: '#1E293B',
   },
 };
 
