@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Eye,
   EyeOff,
@@ -6,14 +6,16 @@ import {
   User,
   Mail,
   Calendar,
-  Flame,
-  Route,
-  Zap,
   Sparkles,
   ShieldCheck,
   CheckCircle2,
   ArrowLeft,
   Phone,
+  Zap,
+  Flame,
+  BookOpen,
+  Star,
+  Trophy,
 } from 'lucide-react';
 import { ensureCsrfToken, API_BASE, setTokens, clearOtherRoleSessions } from '../services/api';
 import { getDeviceFingerprint } from '../utils/deviceFingerprint';
@@ -39,6 +41,86 @@ function FacebookIcon() {
   );
 }
 
+/* Floating badges & decorative elements on hero panel */
+function HeroDecorations() {
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute -top-12 -right-12 h-64 w-64 rounded-full opacity-60"
+        style={{ background: 'radial-gradient(circle, rgba(52,211,153,0.3) 0%, transparent 70%)', animation: 'float1 9s ease-in-out infinite' }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute bottom-12 -left-16 h-72 w-72 rounded-full opacity-50"
+        style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.25) 0%, transparent 70%)', animation: 'float2 11s ease-in-out infinite' }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute top-1/2 left-1/3 h-40 w-40 rounded-full opacity-30"
+        style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.25) 0%, transparent 70%)', animation: 'float3 8s ease-in-out infinite' }}
+        aria-hidden="true"
+      />
+
+      {/* Floating XP badge */}
+      <div
+        className="pointer-events-none absolute right-8 top-28 z-20 hidden xl:block"
+        style={{ animation: 'float1 6s ease-in-out infinite', animationDelay: '0.4s' }}
+        aria-hidden="true"
+      >
+        <div className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-white backdrop-blur-md border border-white/25 shadow-lg">
+          <Zap size={13} className="text-amber-300 fill-amber-300" />
+          <span className="text-xs font-black tracking-wide">+60 XP</span>
+        </div>
+      </div>
+
+      {/* Floating streak badge */}
+      <div
+        className="pointer-events-none absolute right-16 top-1/2 z-20 hidden xl:block"
+        style={{ animation: 'float2 7s ease-in-out infinite', animationDelay: '1.2s' }}
+        aria-hidden="true"
+      >
+        <div className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-white backdrop-blur-md border border-white/25 shadow-lg">
+          <Flame size={13} className="text-orange-400 fill-orange-400" />
+          <span className="text-xs font-black tracking-wide">Streak 🔥</span>
+        </div>
+      </div>
+
+      {/* Floating trophy */}
+      <div
+        className="pointer-events-none absolute right-10 bottom-24 z-20 hidden xl:block"
+        style={{ animation: 'float3 8s ease-in-out infinite', animationDelay: '0.8s' }}
+        aria-hidden="true"
+      >
+        <div className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-white backdrop-blur-md border border-white/25 shadow-lg">
+          <Trophy size={13} className="text-yellow-300" />
+          <span className="text-xs font-black tracking-wide">Top 10 BXH</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* Compact reusable input field */
+function CompactField({ label, icon: Icon, type = 'text', value, onChange, placeholder, inputMode, children }) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-[11px] font-bold tracking-wider text-slate-500 uppercase">{label}</label>
+      <div className="group relative flex items-center">
+        <Icon size={15} className="pointer-events-none absolute left-3 text-slate-400 transition group-focus-within:text-emerald-500" />
+        <input
+          type={type}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          inputMode={inputMode}
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-300 outline-none ring-0 transition-all duration-150 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function FreePortalPage({ onLogin }) {
   const [mode, setMode] = useState('register');
   const [name, setName] = useState('');
@@ -52,6 +134,44 @@ export default function FreePortalPage({ onLogin }) {
   const [deviceConflict, setDeviceConflict] = useState(false);
   const [socialReady, setSocialReady] = useState({ google: false, facebook: false });
   const [pending, setPending] = useState(null);
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    document.title = 'Vào luyện tập | DewSkill';
+    let cancelled = false;
+    fetch(`${API_BASE}/auth/free-portal/social/status`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d?.success) setSocialReady(d.data || {}); })
+      .catch(() => {});
+    const params = new URLSearchParams(window.location.search);
+    const socialError = params.get('socialError');
+    const ticket = params.get('socialTicket');
+    if (socialError) setError(socialError);
+    if (ticket || socialError) window.history.replaceState({}, '', window.location.pathname);
+    if (!ticket) return () => { cancelled = true; };
+    setLoading(true);
+    ensureCsrfToken().then(async (csrf) => {
+      const response = await fetch(`${API_BASE}/auth/free-portal/social/exchange`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+        body: JSON.stringify({ ticket, deviceFingerprint: getDeviceFingerprint() }),
+      });
+      const data = await response.json();
+      if (cancelled) return;
+      if (!data.success) { setError(data.message || 'Phiên mạng xã hội hết hạn'); return; }
+      if (data.needsProfile) {
+        setPending({ ticket: data.ticket, provider: data.provider });
+        setName(data.name || '');
+        if (data.email) setEmail(data.email);
+        setMode('register');
+        return;
+      }
+      acceptSession(data.data);
+    }).catch(() => { if (!cancelled) setError('Không kết nối được máy chủ'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const acceptSession = (data) => {
     const user = data.user ? { ...data.user } : { ...data };
@@ -68,100 +188,23 @@ export default function FreePortalPage({ onLogin }) {
     onLogin(user);
   };
 
-  useEffect(() => {
-    document.title = 'Vào luyện tập | DewSkill';
-    let cancelled = false;
-    fetch(`${API_BASE}/auth/free-portal/social/status`)
-      .then((response) => response.json())
-      .then((data) => {
-        if (!cancelled && data?.success) setSocialReady(data.data || {});
-      })
-      .catch(() => {});
-    const params = new URLSearchParams(window.location.search);
-    const socialError = params.get('socialError');
-    const ticket = params.get('socialTicket');
-    if (socialError) setError(socialError);
-    if (ticket || socialError) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-    if (!ticket) return undefined;
-    setLoading(true);
-    ensureCsrfToken().then(async (csrf) => {
-      const response = await fetch(`${API_BASE}/auth/free-portal/social/exchange`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        },
-        body: JSON.stringify({ ticket, deviceFingerprint: getDeviceFingerprint() }),
-      });
-      const data = await response.json();
-      if (cancelled) return;
-      if (!data.success) {
-        setError(data.message || 'Phiên mạng xã hội hết hạn');
-        return;
-      }
-      if (data.needsProfile) {
-        setPending({ ticket: data.ticket, provider: data.provider });
-        setName(data.name || '');
-        if (data.email) setEmail(data.email);
-        setMode('register');
-        return;
-      }
-      acceptSession(data.data);
-    }).catch(() => {
-      if (!cancelled) setError('Không kết nối được máy chủ');
-    }).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
   const login = async (forceDevice = false) => {
     const id = normalizePhone(phone);
-    if (!id || !isValidVNPhone(id)) {
-      setError('Số điện thoại không hợp lệ');
-      return;
-    }
-    if (!password) {
-      setError('Hãy nhập mật khẩu');
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (!id || !isValidVNPhone(id)) { setError('Số điện thoại không hợp lệ'); return; }
+    if (!password) { setError('Hãy nhập mật khẩu'); return; }
+    setLoading(true); setError('');
     try {
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/login/public`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        },
-        body: JSON.stringify({
-          phone: id,
-          password,
-          role: 'student',
-          deviceFingerprint: getDeviceFingerprint(),
-          force: forceDevice,
-        }),
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+        body: JSON.stringify({ phone: id, password, role: 'student', deviceFingerprint: getDeviceFingerprint(), force: forceDevice }),
       });
       const data = await response.json();
-      if (response.status === 409 && data.code === 'DEVICE_CONFLICT') {
-        setDeviceConflict(true);
-        return;
-      }
-      if (!data.success) {
-        setError(data.message || 'Số điện thoại hoặc mật khẩu không đúng');
-        return;
-      }
+      if (response.status === 409 && data.code === 'DEVICE_CONFLICT') { setDeviceConflict(true); return; }
+      if (!data.success) { setError(data.message || 'Số điện thoại hoặc mật khẩu không đúng'); return; }
       acceptSession(data.data);
-    } catch {
-      setError('Không kết nối được máy chủ');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
   };
 
   const finishSocial = async (event) => {
@@ -169,131 +212,55 @@ export default function FreePortalPage({ onLogin }) {
     const id = normalizePhone(phone);
     const parsedAge = Number(age);
     const trimmedEmail = email.trim().toLowerCase();
-    if (name.trim().length < 2) {
-      setError('Hãy nhập họ tên');
-      return;
-    }
-    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
-      setError('Địa chỉ email không đúng định dạng (VD: example@gmail.com)');
-      return;
-    }
-    if (!Number.isInteger(parsedAge) || parsedAge < 10 || parsedAge > 80) {
-      setError('Tuổi từ 10 đến 80');
-      return;
-    }
-    if (!id || !isValidVNPhone(id)) {
-      setError('Số điện thoại không hợp lệ');
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (name.trim().length < 2) { setError('Hãy nhập họ tên'); return; }
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) { setError('Địa chỉ email không đúng định dạng'); return; }
+    if (!Number.isInteger(parsedAge) || parsedAge < 10 || parsedAge > 80) { setError('Tuổi từ 10 đến 80'); return; }
+    if (!id || !isValidVNPhone(id)) { setError('Số điện thoại không hợp lệ'); return; }
+    setLoading(true); setError('');
     try {
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/free-portal/social/complete`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        },
-        body: JSON.stringify({
-          ticket: pending.ticket,
-          name: name.trim(),
-          age: parsedAge,
-          phone: id,
-          email: trimmedEmail || undefined,
-          deviceFingerprint: getDeviceFingerprint(),
-        }),
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+        body: JSON.stringify({ ticket: pending.ticket, name: name.trim(), age: parsedAge, phone: id, email: trimmedEmail || undefined, deviceFingerprint: getDeviceFingerprint() }),
       });
       const data = await response.json();
-      if (!data.success) {
-        setError(data.message || 'Chưa hoàn tất đăng ký');
-        return;
-      }
+      if (!data.success) { setError(data.message || 'Chưa hoàn tất đăng ký'); return; }
       acceptSession(data.data);
-    } catch {
-      setError('Không kết nối được máy chủ');
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError('Không kết nối được máy chủ'); } finally { setLoading(false); }
   };
 
   const register = async (event) => {
     event.preventDefault();
-    if (pending) {
-      await finishSocial(event);
-      return;
-    }
-    if (mode === 'login') {
-      await login(false);
-      return;
-    }
+    if (pending) { await finishSocial(event); return; }
+    if (mode === 'login') { await login(false); return; }
     const id = normalizePhone(phone);
     const parsedAge = Number(age);
     const trimmedEmail = email.trim().toLowerCase();
-    if (name.trim().length < 2) {
-      setError('Hãy nhập họ tên');
-      return;
-    }
-    if (!trimmedEmail) {
-      setError('Hãy nhập địa chỉ Gmail / Email');
-      return;
-    }
-    if (!isValidEmail(trimmedEmail)) {
-      setError('Địa chỉ Gmail / Email không đúng định dạng (VD: example@gmail.com)');
-      return;
-    }
-    if (!Number.isInteger(parsedAge) || parsedAge < 10 || parsedAge > 80) {
-      setError('Tuổi từ 10 đến 80');
-      return;
-    }
-    if (!id || !isValidVNPhone(id)) {
-      setError('Số điện thoại không hợp lệ');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Mật khẩu cần ít nhất 6 ký tự');
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (name.trim().length < 2) { setError('Hãy nhập họ tên'); return; }
+    if (!trimmedEmail) { setError('Hãy nhập địa chỉ Gmail / Email'); return; }
+    if (!isValidEmail(trimmedEmail)) { setError('Địa chỉ Gmail / Email không đúng định dạng (VD: example@gmail.com)'); return; }
+    if (!Number.isInteger(parsedAge) || parsedAge < 10 || parsedAge > 80) { setError('Tuổi từ 10 đến 80'); return; }
+    if (!id || !isValidVNPhone(id)) { setError('Số điện thoại không hợp lệ'); return; }
+    if (password.length < 6) { setError('Mật khẩu cần ít nhất 6 ký tự'); return; }
+    setLoading(true); setError('');
     try {
       const csrf = await ensureCsrfToken();
       const response = await fetch(`${API_BASE}/auth/register-free`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: trimmedEmail,
-          age: parsedAge,
-          phone: id,
-          password,
-        }),
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+        body: JSON.stringify({ name: name.trim(), email: trimmedEmail, age: parsedAge, phone: id, password }),
       });
       const data = await response.json();
-      if (!data.success) {
-        setError(data.message || 'Chưa tạo được tài khoản');
-        setLoading(false);
-        return;
-      }
-    } catch {
-      setError('Không kết nối được máy chủ');
-      setLoading(false);
-      return;
-    }
+      if (!data.success) { setError(data.message || 'Chưa tạo được tài khoản'); setLoading(false); return; }
+    } catch { setError('Không kết nối được máy chủ'); setLoading(false); return; }
     setLoading(false);
     await login(false);
   };
 
   const startSocial = (provider) => {
     if (!socialReady[provider]) {
-      setError(provider === 'google'
-        ? 'Chưa cấu hình đăng nhập Google. Thêm GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET.'
-        : 'Chưa cấu hình đăng nhập Facebook. Thêm FACEBOOK_APP_ID và FACEBOOK_APP_SECRET.');
+      setError(provider === 'google' ? 'Chưa cấu hình đăng nhập Google.' : 'Chưa cấu hình đăng nhập Facebook.');
       return;
     }
     const origin = API_BASE.startsWith('http') ? API_BASE.replace(/\/api$/, '') : 'http://127.0.0.1:5000';
@@ -301,360 +268,423 @@ export default function FreePortalPage({ onLogin }) {
   };
 
   const landingUrl = window.location.port === '5173' ? 'http://localhost:3100' : '/';
+  const isRegister = mode === 'register';
 
   return (
-    <div className="relative min-h-[100dvh] bg-[#f4fbf8] text-slate-900 font-sans selection:bg-emerald-500/20 flex flex-col justify-between overflow-x-clip">
-      {/* Background ambient lighting matching DewSkill landing theme */}
-      <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute -right-20 top-1/4 h-96 w-96 rounded-full bg-teal-200/35 blur-3xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-amber-100/50 blur-3xl" aria-hidden="true" />
+    <>
+      {/* Refined fly-in & floating keyframes */}
+      <style>{`
+        @keyframes flyInLeft {
+          0% {
+            opacity: 0;
+            transform: translate3d(-100px, 0, 0);
+          }
+          100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
+        @keyframes flyInRight {
+          0% {
+            opacity: 0;
+            transform: translate3d(100px, 0, 0);
+          }
+          100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
+        @keyframes cardPop {
+          0% {
+            opacity: 0;
+            transform: translate3d(60px, 0, 0) scale(0.96);
+          }
+          100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+          }
+        }
+        @keyframes float1 { 0%,100%{transform:translateY(0px) rotate(0deg)} 50%{transform:translateY(-14px) rotate(2.5deg)} }
+        @keyframes float2 { 0%,100%{transform:translateY(0px) rotate(0deg)} 50%{transform:translateY(-10px) rotate(-2deg)} }
+        @keyframes float3 { 0%,100%{transform:translateY(0px) rotate(0deg)} 33%{transform:translateY(-8px) rotate(1.5deg)} 66%{transform:translateY(6px) rotate(-1deg)} }
+        @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        
+        .animate-fly-left {
+          animation: flyInLeft 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+          will-change: transform, opacity;
+        }
+        .animate-fly-right {
+          animation: flyInRight 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+          will-change: transform, opacity;
+        }
+        .animate-card-pop {
+          animation: cardPop 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+          will-change: transform, opacity;
+        }
+        .btn-shimmer:not(:disabled):hover {
+          box-shadow: 0 10px 28px -4px rgba(16,185,129,0.5);
+        }
+      `}</style>
 
-      {/* Top Header Bar */}
-      <header className="relative z-10 w-full border-b border-emerald-100/70 bg-white/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
-          <a href={landingUrl} className="flex items-center gap-2 group transition" title="Trang chủ DewSkill">
-            <img
-              src="/brand/logo-horizontal.png"
-              alt="DewSkill"
-              className="h-8 sm:h-9 w-auto max-w-[150px] sm:max-w-[180px] object-contain transition group-hover:opacity-90"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                const sibling = e.target.nextElementSibling;
-                if (sibling) sibling.style.display = 'flex';
-              }}
-            />
-            <span style={{ display: 'none' }} className="items-center gap-1.5 text-xl font-black tracking-tight text-slate-800">
-              <span className="text-emerald-600">💧</span> Dew<span className="text-emerald-600">Skill</span>
-            </span>
-          </a>
+      {/* Main container: Exactly 100vh on desktop with NO scrollbar */}
+      <div className="relative h-screen max-h-screen w-full overflow-y-auto lg:overflow-hidden font-sans text-slate-900 selection:bg-emerald-400/20">
 
-          <a
-            href={landingUrl}
-            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-white px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-emerald-800 shadow-xs transition hover:bg-emerald-50 hover:text-emerald-900 active:scale-95"
+        {/* Two-panel split layout: 50% / 50% (or 52% / 48%) */}
+        <div className="flex min-h-screen flex-col lg:h-full lg:flex-row">
+
+          {/* ═══════════════════════════════════════════════════
+              LEFT HERO PANEL (Emerald DewSkill theme)
+          ═══════════════════════════════════════════════════ */}
+          <div
+            className="animate-fly-left relative flex flex-col justify-between overflow-hidden bg-emerald-900 px-6 py-5 sm:px-8 lg:h-full lg:w-[52%] lg:px-12 lg:py-8"
+            style={{
+              background: 'linear-gradient(135deg, #064e3b 0%, #065f46 30%, #047857 60%, #059669 85%, #10b981 100%)',
+            }}
           >
-            <ArrowLeft size={16} />
-            <span>Về trang chủ</span>
-          </a>
-        </div>
-      </header>
+            <HeroDecorations />
 
-      {/* Main Content Area */}
-      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center gap-8 px-4 py-6 sm:px-6 lg:flex-row lg:gap-14 lg:px-8 lg:py-10">
-        {/* Left Column: Brand & Gamified Learning Pitch (order-2 on mobile, order-1 on desktop) */}
-        <section className="order-2 lg:order-1 flex flex-1 flex-col justify-center space-y-5 lg:max-w-xl">
-          {/* Badge */}
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white/90 px-3.5 py-1.5 text-xs font-black text-emerald-800 shadow-xs backdrop-blur-xs">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-600" />
-            </span>
-            <span>DewSkill • Cổng luyện tập hằng ngày</span>
-          </div>
-
-          {/* Heading */}
-          <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
-            Luyện tin học mỗi ngày,{' '}
-            <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">
-              nâng trình vượt bậc
-            </span>
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-sm sm:text-base font-medium leading-relaxed text-slate-600">
-            Học tập theo mô hình game hóa: 5-10 phút mỗi ngày, thực hành bài tập tình huống thực tế, duy trì chuỗi ngọn lửa Streak và tích lũy XP thăng cấp.
-          </p>
-
-          {/* Mascot Companion Box */}
-          <div className="flex items-center gap-3.5 rounded-3xl border border-emerald-100 bg-white/80 p-3.5 sm:p-4 shadow-sm backdrop-blur-xs">
-            <img
-              src="/mascot/tot-nghiep-vui-ve.gif"
-              alt="Mascot DewSkill"
-              className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 object-contain drop-shadow-sm"
-              onError={(e) => {
-                e.target.src = '/brand/favicon.png';
+            {/* Pattern overlay */}
+            <div
+              className="pointer-events-none absolute inset-0 opacity-15"
+              style={{
+                backgroundImage: 'radial-gradient(circle at 20% 50%, #ffffff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #ffffff 1px, transparent 1px)',
+                backgroundSize: '40px 40px, 60px 60px',
               }}
+              aria-hidden="true"
             />
-            <div className="text-xs sm:text-sm">
-              <div className="flex items-center gap-1.5 font-black text-emerald-800">
-                <Sparkles size={14} className="text-emerald-600 shrink-0" />
-                <span>Trợ lý học tập Dewy</span>
+
+            {/* 1. Header inside Left Panel */}
+            <div className="relative z-10 flex items-center justify-between">
+              <a
+                href={landingUrl}
+                className="group inline-flex items-center gap-2 rounded-2xl bg-white/95 px-3.5 py-1.5 shadow-md backdrop-blur-sm transition duration-200 hover:bg-white hover:scale-105"
+                title="Về trang chủ DewSkill"
+              >
+                <img
+                  src="/brand/logo.webp"
+                  alt="DewSkill"
+                  className="h-7 w-auto object-contain"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/brand/favicon.png';
+                  }}
+                />
+              </a>
+
+              <a
+                href={landingUrl}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-md transition hover:bg-white/20 hover:text-white active:scale-95 cursor-pointer shadow-sm"
+              >
+                <ArrowLeft size={13} />
+                <span>Trang chủ</span>
+              </a>
+            </div>
+
+            {/* 2. Hero Content (Center) */}
+            <div className="relative z-10 my-auto py-6 sm:py-8 lg:py-2">
+              {/* Live Status Pill */}
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-white/10 px-3.5 py-1 text-xs font-bold text-emerald-100 backdrop-blur-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
+                </span>
+                Đang mở cổng đăng ký miễn phí
               </div>
-              <p className="mt-0.5 text-slate-600">
-                Đăng ký tài khoản miễn phí để nhận ngay <strong className="text-emerald-700 font-black">+60 XP</strong> chào mừng và mở khóa các chặng học tin học đầu tiên!
+
+              {/* Main Headline */}
+              <h1 className="mb-3 max-w-xl text-3xl font-black leading-[1.15] tracking-tight text-white sm:text-4xl lg:text-[42px] xl:text-[46px]">
+                Luyện tin học <span className="text-emerald-300">mỗi ngày,</span>
+                <br />
+                <span className="text-amber-300">nâng trình</span> vượt bậc
+              </h1>
+
+              {/* Description */}
+              <p className="mb-5 max-w-lg text-xs sm:text-sm font-medium leading-relaxed text-emerald-50/85">
+                Chỉ 5–10 phút mỗi ngày với bài tập tình huống văn phòng thực tế, tích lũy XP, giữ chuỗi Streak và nhận chứng chỉ kỹ năng số.
               </p>
-            </div>
-          </div>
 
-          {/* 3 Feature Value Props */}
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/70 bg-white/70 p-3.5 shadow-xs backdrop-blur-xs transition hover:border-emerald-200 hover:bg-white">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <Zap size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-900">Mỗi ngày 1 lượt</h4>
-                <p className="text-[11px] leading-tight text-slate-500 mt-0.5">Lý thuyết ngắn gọn, làm bài trắc nghiệm & AI chấm ngay</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/70 bg-white/70 p-3.5 shadow-xs backdrop-blur-xs transition hover:border-emerald-200 hover:bg-white">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-                <Flame size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-900">Giữ chuỗi Streak</h4>
-                <p className="text-[11px] leading-tight text-slate-500 mt-0.5">Duy trì phản xạ tin học hằng ngày không lo ngắt quãng</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100/70 bg-white/70 p-3.5 shadow-xs backdrop-blur-xs transition hover:border-emerald-200 hover:bg-white">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                <Route size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-900">Lộ trình bài bản</h4>
-                <p className="text-[11px] leading-tight text-slate-500 mt-0.5">Word, Excel, PowerPoint chuẩn công sở thực chiến</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Trust Guarantees */}
-          <div className="flex flex-wrap items-center gap-y-2 gap-x-5 text-xs font-semibold text-slate-500 pt-1">
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-              100% tài khoản học thử miễn phí
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-              Không cần thẻ ngân hàng
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
-              Bảo mật tài khoản an toàn
-            </span>
-          </div>
-        </section>
-
-        {/* Right Column: Clean, Professional Auth Card (order-1 on mobile, order-2 on desktop) */}
-        <section className="order-1 lg:order-2 w-full max-w-md lg:max-w-[430px]">
-          <div className="relative rounded-3xl border border-emerald-100 bg-white/95 p-6 shadow-2xl shadow-emerald-950/10 backdrop-blur-md sm:p-7">
-            {/* Card Brand Header */}
-            <div className="text-center space-y-1.5 mb-4">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
-                <Sparkles size={13} className="text-emerald-600 shrink-0" />
-                <span>{pending ? 'Bước cuối cùng' : 'Tài khoản miễn phí'}</span>
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                {pending ? 'Hoàn tất hồ sơ' : mode === 'register' ? 'Vào luyện tập ngay' : 'Đăng nhập học tập'}
-              </h2>
-              <p className="text-xs sm:text-sm font-medium text-slate-500">
-                {pending
-                  ? 'Liên kết mạng xã hội thành công! Nhập thông tin để hoàn tất.'
-                  : mode === 'register'
-                  ? 'Đăng ký nhanh bằng số điện thoại hoặc mạng xã hội'
-                  : 'Nhập số điện thoại và mật khẩu để tiếp tục chặng học'}
-              </p>
-            </div>
-
-            {/* Social Logins */}
-            {!pending && (
-              <div className="space-y-3 mb-4">
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => startSocial('google')}
-                    className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-xs transition hover:border-emerald-300 hover:bg-emerald-50/30 active:scale-95 cursor-pointer"
+              {/* 3 Stats Row */}
+              <div className="mb-5 flex flex-wrap gap-2.5 sm:gap-3">
+                {[
+                  { icon: Star, value: '10,000+', label: 'Học viên', color: 'text-yellow-300' },
+                  { icon: Zap, value: '60 XP', label: 'Chào mừng', color: 'text-amber-300' },
+                  { icon: BookOpen, value: '3 khóa', label: 'Miễn phí', color: 'text-emerald-200' },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 backdrop-blur-sm shadow-xs"
                   >
-                    <GoogleIcon />
-                    <span>Google</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => startSocial('facebook')}
-                    className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-xs transition hover:border-emerald-300 hover:bg-emerald-50/30 active:scale-95 cursor-pointer"
-                  >
-                    <FacebookIcon />
-                    <span>Facebook</span>
-                  </button>
+                    <s.icon size={16} className={s.color} />
+                    <div>
+                      <p className="text-xs font-black text-white leading-tight">{s.value}</p>
+                      <p className="text-[10px] font-semibold text-emerald-200/75 leading-none">{s.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Mascot Dewy Box */}
+              <div className="flex items-center gap-3.5 rounded-2xl border border-white/20 bg-white/12 p-3.5 backdrop-blur-md max-w-md shadow-md">
+                <img
+                  src="/mascot/tot-nghiep-vui-ve.gif"
+                  alt="Dewy Mascot"
+                  className="h-12 w-12 shrink-0 object-contain drop-shadow"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/brand/favicon.png';
+                  }}
+                />
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-black text-white">
+                    <Sparkles size={13} className="text-amber-300" />
+                    Trợ lý Dewy đồng hành
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-medium leading-snug text-emerald-100/90">
+                    Đăng ký ngay nhận liền <span className="font-black text-yellow-300">+60 XP</span> bonus để mở khóa các chặng bài tập đầu tiên!
+                  </p>
                 </div>
+              </div>
 
-                <div className="relative flex items-center justify-center text-xs text-slate-400">
-                  <div className="w-full border-t border-slate-200" />
-                  <span className="absolute bg-white px-3 font-semibold text-slate-400">
-                    hoặc số điện thoại
+              {/* Assurances */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-semibold text-emerald-200/80">
+                {['Miễn phí trọn đời', 'Không cần thẻ tín dụng', 'Bảo mật SSL 256-bit'].map((item) => (
+                  <span key={item} className="flex items-center gap-1">
+                    <CheckCircle2 size={12} className="text-emerald-300" />
+                    {item}
                   </span>
-                </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {/* Segmented Mode Tabs (Register / Login) */}
-            {!pending && (
-              <div className="mb-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 text-xs sm:text-sm font-bold" role="tablist">
-                <button
-                  type="button"
-                  onClick={() => { setMode('register'); setError(''); }}
-                  className={`rounded-xl py-2 transition-all cursor-pointer ${
-                    mode === 'register'
-                      ? 'bg-white text-emerald-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Đăng ký mới
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMode('login'); setError(''); }}
-                  className={`rounded-xl py-2 transition-all cursor-pointer ${
-                    mode === 'login'
-                      ? 'bg-white text-emerald-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  Đăng nhập
-                </button>
+            {/* 3. Footer inside Left Panel */}
+            <div className="relative z-10 pt-2 text-[11px] text-emerald-200/50">
+              © 2026 DewSkill • Phát triển bởi Thắng Tin Học
+            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════
+              RIGHT FORM PANEL (Clean, compact, no scrollbar)
+          ═══════════════════════════════════════════════════ */}
+          <div className="animate-fly-right relative flex flex-1 flex-col items-center justify-center bg-slate-50/80 px-4 py-6 sm:px-6 lg:h-full lg:w-[48%] lg:px-8 xl:px-12">
+            {/* Subtle background glow */}
+            <div
+              className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full opacity-60"
+              style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)' }}
+              aria-hidden="true"
+            />
+            <div
+              className="pointer-events-none absolute left-0 bottom-0 h-64 w-64 rounded-full opacity-40"
+              style={{ background: 'radial-gradient(circle, rgba(52,211,153,0.08) 0%, transparent 70%)' }}
+              aria-hidden="true"
+            />
+
+            {/* Form Card Container */}
+            <div
+              ref={formRef}
+              className="animate-card-pop relative z-10 w-full max-w-sm rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xl shadow-slate-200/50"
+            >
+              {/* Header */}
+              <div className="mb-4 text-center">
+                <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200/70">
+                  <Sparkles size={11} className="text-emerald-600" />
+                  {pending ? 'Bước cuối cùng' : 'Tài khoản học thử miễn phí'}
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                  {pending ? 'Hoàn tất hồ sơ' : isRegister ? 'Tạo tài khoản ngay' : 'Đăng nhập học tập'}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {pending
+                    ? 'Liên kết mạng xã hội thành công! Vui lòng bổ sung thông tin.'
+                    : isRegister
+                    ? 'Đăng ký miễn phí nhanh trong 60 giây'
+                    : 'Tiếp tục chuỗi học tập và luyện thi của bạn'}
+                </p>
               </div>
-            )}
 
-            {/* Form */}
-            <form onSubmit={register} className="space-y-3">
-              {(mode === 'register' || pending) && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Họ và tên</label>
-                  <div className="relative flex items-center">
-                    <User size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Nguyễn Văn A"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                    />
+              {/* Social Login Buttons (Google / Facebook) */}
+              {!pending && (
+                <div className="mb-3 space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => startSocial('google')}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
+                    >
+                      <GoogleIcon />
+                      <span>Google</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startSocial('facebook')}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] cursor-pointer"
+                    >
+                      <FacebookIcon />
+                      <span>Facebook</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 text-[11px] text-slate-400">
+                    <div className="h-px flex-1 bg-slate-200" />
+                    <span className="font-semibold">hoặc dùng số điện thoại</span>
+                    <div className="h-px flex-1 bg-slate-200" />
                   </div>
                 </div>
               )}
 
-              {(mode === 'register' || pending) && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Gmail / Email</label>
-                  <div className="relative flex items-center">
-                    <Mail size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="vidu@gmail.com"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
+              {/* Mode switch tabs: Đăng ký / Đăng nhập */}
+              {!pending && (
+                <div className="mb-3.5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                  {[
+                    { id: 'register', label: 'Đăng ký mới' },
+                    { id: 'login', label: 'Đăng nhập' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => { setMode(tab.id); setError(''); }}
+                      className={`rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                        mode === tab.id
+                          ? 'bg-white text-emerald-700 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
               )}
 
-              {(mode === 'register' || pending) && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Tuổi</label>
-                  <div className="relative flex items-center">
-                    <Calendar size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={age}
-                      onChange={(e) => setAge(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                      placeholder="Ví dụ: 18"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                    />
-                  </div>
-                </div>
-              )}
+              {/* Form Body */}
+              <form onSubmit={register} className="space-y-2.5">
+                {(isRegister || pending) && (
+                  <CompactField
+                    label="Họ và tên"
+                    icon={User}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nguyễn Văn A"
+                  />
+                )}
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 ml-1">Số điện thoại</label>
-                <div className="relative flex items-center">
-                  <Phone size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
-                  <input
-                    type="text"
+                {(isRegister || pending) && (
+                  <CompactField
+                    label="Gmail / Email"
+                    icon={Mail}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="vidu@gmail.com"
+                  />
+                )}
+
+                {/* Grid 2 cột: Tuổi & Số điện thoại (tiết kiệm chiều cao màn hình) */}
+                {(isRegister || pending) ? (
+                  <div className="grid grid-cols-5 gap-2">
+                    <div className="col-span-2">
+                      <CompactField
+                        label="Tuổi"
+                        icon={Calendar}
+                        inputMode="numeric"
+                        value={age}
+                        onChange={(e) => setAge(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                        placeholder="18"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <CompactField
+                        label="Số điện thoại"
+                        icon={Phone}
+                        inputMode="numeric"
+                        value={phone}
+                        onChange={(e) => setPhone(limitPhoneInput(e.target.value))}
+                        placeholder="0912 345 678"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <CompactField
+                    label="Số điện thoại"
+                    icon={Phone}
                     inputMode="numeric"
                     value={phone}
                     onChange={(e) => setPhone(limitPhoneInput(e.target.value))}
-                    placeholder="Ví dụ: 0912345678"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-4 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="0912 345 678"
                   />
-                </div>
-              </div>
+                )}
 
-              {!pending && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Mật khẩu</label>
-                  <div className="relative flex items-center">
-                    <Lock size={18} className="pointer-events-none absolute left-3.5 text-slate-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Ít nhất 6 ký tự"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 py-2.5 pl-10 pr-11 text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                    />
+                {!pending && (
+                  <CompactField
+                    label="Mật khẩu"
+                    icon={Lock}
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Ít nhất 6 ký tự"
+                  >
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                      className="absolute right-3 text-slate-400 transition hover:text-slate-600 cursor-pointer"
                       aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
+                  </CompactField>
+                )}
+
+                {/* Error message */}
+                {error && (
+                  <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                    <span className="shrink-0 text-rose-500 font-bold">⚠</span>
+                    <span>{error}</span>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Error Message */}
-              {error && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-bold text-rose-700 animate-in fade-in">
-                  {error}
-                </div>
-              )}
+                {/* Device conflict alert */}
+                {deviceConflict && (
+                  <button
+                    type="button"
+                    onClick={() => login(true)}
+                    className="w-full rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 cursor-pointer"
+                  >
+                    Tài khoản mở ở máy khác — đăng nhập tại đây
+                  </button>
+                )}
 
-              {/* Device Conflict */}
-              {deviceConflict && (
+                {/* Submit button */}
                 <button
-                  type="button"
-                  onClick={() => login(true)}
-                  className="w-full rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100 cursor-pointer"
+                  type="submit"
+                  disabled={loading}
+                  className="btn-shimmer relative mt-1 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-3 text-xs sm:text-sm font-black text-white shadow-md transition-all duration-200 disabled:opacity-60 cursor-pointer active:scale-[0.98]"
+                  style={{
+                    background: loading ? '#6ee7b7' : 'linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%)',
+                  }}
                 >
-                  Tài khoản đang mở ở máy khác. Bấm để đăng nhập trên máy này
+                  <span
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)',
+                      backgroundSize: '200% auto',
+                      animation: loading ? 'none' : 'shimmer 2.2s linear infinite',
+                    }}
+                    aria-hidden="true"
+                  />
+                  <Lock size={14} />
+                  <span>
+                    {loading ? 'Đang xử lý…' : pending ? 'Hoàn tất hồ sơ' : isRegister ? 'Tạo tài khoản miễn phí' : 'Đăng nhập ngay'}
+                  </span>
                 </button>
-              )}
+              </form>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 py-3.5 px-6 text-sm sm:text-base font-black text-white shadow-lg shadow-emerald-600/25 transition-all hover:shadow-emerald-600/35 hover:from-emerald-600 hover:to-teal-700 active:scale-98 disabled:opacity-60 cursor-pointer"
-              >
-                <Lock size={16} />
-                <span>
-                  {loading
-                    ? 'Đang xử lý…'
-                    : pending
-                    ? 'Hoàn tất đăng ký'
-                    : mode === 'register'
-                    ? 'Tạo tài khoản miễn phí'
-                    : 'Đăng nhập ngay'}
-                </span>
-              </button>
-            </form>
-
-            {/* Card Footer Assurance */}
-            <div className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-slate-400">
-              <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
-              <span>Bảo mật 100% • Không yêu cầu thẻ thanh toán</span>
+              {/* Bottom Assurance */}
+              <div className="mt-3.5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400">
+                <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
+                <span>Bảo mật an toàn 100% • Không yêu cầu thẻ ngân hàng</span>
+              </div>
             </div>
           </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="relative z-10 w-full border-t border-emerald-100/60 py-3.5 text-center text-xs font-medium text-slate-500">
-        <p>© 2026 DewSkill - Nền tảng tự học tin học thế hệ mới</p>
-      </footer>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }
