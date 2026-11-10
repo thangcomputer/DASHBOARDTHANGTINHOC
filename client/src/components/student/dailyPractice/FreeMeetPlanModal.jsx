@@ -1,57 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, ArrowRight, Headphones, Crown, Sparkles, ChevronLeft } from 'lucide-react';
 import subscriptionApi from '../../../services/subscriptionApi';
 import api from '../../../services/api';
 import { generateVietQRUrl } from '../../bankSelectUtils';
 import TransferPaymentDetails from '../../shared/TransferPaymentDetails';
-
-const SPARKS = [
-  { top: '-10px', left: '-14px', delay: '0s', size: 11 },
-  { top: '-16px', left: '38%', delay: '0.35s', size: 8 },
-  { top: '-6px', right: '-16px', delay: '0.7s', size: 13 },
-  { top: '70%', left: '-18px', delay: '1.05s', size: 7 },
-  { top: '78%', right: '-12px', delay: '0.5s', size: 9 },
-  { top: '18%', left: '62%', delay: '1.3s', size: 6 },
-  { top: '46%', right: '8%', delay: '0.2s', size: 8 },
-];
+import { openAdminZalo } from '../../../utils/adminZaloContact';
 
 const MEET_LOGO = '/uploads/popup/google-meet.webp';
 
 const MEET_SLOTS = [
-  { label: 'Sáng', time: '9h-12h' },
-  { label: 'Chiều', time: '14h-16h' },
-  { label: 'Tối', time: '19h-21h' },
+  { icon: '☀️', label: 'Sáng', time: '9h – 12h' },
+  { icon: '⛅', label: 'Chiều', time: '14h – 16h' },
+  { icon: '🌜', label: 'Tối', time: '19h – 21h' },
 ];
 
-function GoldSparkles() {
-  return (
-    <span className="pointer-events-none absolute inset-0" aria-hidden="true">
-      {SPARKS.map((spark, index) => (
-        <span
-          key={index}
-          className="free-meet-spark absolute text-amber-200"
-          style={{
-            top: spark.top,
-            left: spark.left,
-            right: spark.right,
-            animationDelay: spark.delay,
-            fontSize: spark.size,
-          }}
-        >
-          ✦
-        </span>
-      ))}
-    </span>
-  );
-}
+const BENEFITS = [
+  'Học trực tiếp cùng giảng viên',
+  'Hỏi đáp ngay trong buổi học',
+  'Không giới hạn số lần hỏi lại',
+  'Có video xem lại sau buổi học',
+  'Hỗ trợ đến khi làm được',
+];
 
 const OFFER_PLANS = [
   { id: '1m', label: '1 tháng', hint: 'Làm quen' },
-  { id: '3m', label: '3 tháng', hint: 'Phổ biến', featured: true },
+  { id: '3m', label: '3 tháng', hint: 'Nền tảng vững', featured: true },
   { id: '6m', label: '6 tháng', hint: 'Học chắc' },
   { id: '12m', label: '1 năm', hint: 'Tiết kiệm nhất' },
-  { id: 'lifetime', label: 'Vĩnh viễn', hint: 'Học mãi' },
+  { id: 'lifetime', label: 'Trọn khóa', hint: 'Học đến khi thành thạo' },
 ];
 
 export function isFreePortalAccount() {
@@ -124,7 +101,7 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
   const register = async () => {
     if (!selected || busy) return;
     if (!(selected.price > 0)) {
-      setError('Gói này chưa mở thanh toán. Hãy liên hệ trung tâm để đăng ký.');
+      setError('Gói này chưa mở thanh toán tự động. Hãy bấm "Nhận tư vấn" để đăng ký trực tiếp.');
       return;
     }
     setBusy(true);
@@ -153,213 +130,352 @@ export default function FreeMeetPlanModal({ open, onClose, onPaid, notice = '' }
     }
   };
 
+  const handleConsultation = () => {
+    const msg = `Chào Thầy Thắng, em muốn nhận tư vấn về gói học Tin học văn phòng Google Meet (${selected.label}).`;
+    openAdminZalo(msg);
+  };
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[9700] flex items-start justify-center overflow-y-auto overscroll-contain bg-slate-950/45 p-2 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[9700] flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-950/60 backdrop-blur-sm p-3 sm:p-4"
       onClick={onClose}
     >
-      <style>{`
-        @keyframes free-meet-twinkle {
-          0%, 100% { opacity: 0.15; transform: scale(0.45) rotate(0deg); }
-          45% { opacity: 1; transform: scale(1.15) rotate(18deg); }
-        }
-        @keyframes free-meet-gold {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 220% 50%; }
-        }
-        @keyframes free-meet-spin { to { transform: rotate(360deg); } }
-        .free-meet-run { overflow: hidden; }
-        .free-meet-run::before {
-          content: "";
-          position: absolute;
-          inset: -70%;
-          background: conic-gradient(#22c55e, #ef4444, #a855f7, #22c55e);
-          animation: free-meet-spin 2.8s linear infinite;
-        }
-        .free-meet-spark { animation: free-meet-twinkle 1.4s ease-in-out infinite; text-shadow: 0 0 8px #fde68a; }
-        .free-meet-gold {
-          background-image: linear-gradient(100deg, #fbbf24 0%, #fff7d6 28%, #f59e0b 46%, #fff 58%, #fbbf24 100%);
-          background-size: 220% 100%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          animation: free-meet-gold 2.2s linear infinite;
-          filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.85));
-        }
-      `}</style>
       <div
-        className="my-2 w-full max-w-4xl max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[28px] border-2 border-white bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.35),0_0_48px_12px_rgba(255,255,255,0.55),0_25px_60px_-12px_rgba(0,0,0,0.45)] sm:my-auto sm:max-h-[min(100dvh-2rem,920px)]"
+        className="relative my-auto w-full max-w-5xl max-h-[92dvh] overflow-y-auto overscroll-contain rounded-[32px] border-2 border-emerald-200/90 bg-gradient-to-b from-[#f2fcf6] via-[#f8fdfa] to-[#ffffff] shadow-[0_25px_60px_-15px_rgba(5,150,105,0.25)] p-4 sm:p-7 text-slate-900 transition-all"
         role="dialog"
         aria-modal="true"
         aria-labelledby="free-meet-plan-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative bg-gradient-to-r from-slate-950 via-red-900 to-orange-600 px-4 py-4 text-white sm:px-6 sm:py-5">
-          <button type="button" onClick={onClose} className="absolute right-3 top-3 z-10 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 hover:bg-amber-100 !shadow-none">
-            Đóng
-          </button>
-          <div className="grid items-start gap-4 pr-10 sm:pr-12 sm:grid-cols-[minmax(0,168px)_minmax(0,1fr)_minmax(0,252px)] sm:items-center sm:gap-6">
-            <div className="flex flex-col items-center">
-              <img
-                src="/giang-vien-phi-van-thang.png"
-                alt="Giảng viên Phí Văn Thắng"
-                className="h-24 w-24 rounded-full border-[3px] border-white object-cover object-top shadow-[0_0_28px_rgba(255,255,255,0.55)] sm:h-32 sm:w-32"
-              />
-              <p className="mt-2 w-full max-w-[220px] rounded-2xl bg-white px-3 py-1.5 text-center shadow-sm">
-                <span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">Giảng viên</span>
-                <span className="mt-0.5 block text-[15px] font-black tracking-tight text-black">Phí Văn Thắng</span>
-              </p>
-              <p className="mt-2 text-center text-[11px] font-medium leading-5 text-white/90">
-                8 năm kinh nghiệm
-                <span className="block">đào tạo tin học.</span>
-                <span className="mt-0.5 block font-semibold text-amber-100">Nhà sáng lập Thắng Tin Học.</span>
-              </p>
-            </div>
-            <div className="min-w-0 text-center">
-              <h2 id="free-meet-plan-title" className="text-xl font-black leading-tight tracking-tight sm:text-[1.85rem] sm:leading-none">
-                <span className="relative inline-block px-1">
-                  <GoldSparkles />
-                  <span className="free-meet-gold">300 XP mỗi ngày</span>
-                </span>
-                <span className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-sm font-black text-white sm:mt-2.5 sm:gap-2 sm:text-base">
-                  <span className="text-amber-200">+</span>
-                  <span>học qua</span>
-                  <img src={MEET_LOGO} alt="Google Meet" className="h-8 w-auto object-contain drop-shadow-md sm:h-10" draggable={false} />
-                </span>
-              </h2>
-              <div className="relative mx-auto mt-2 flex h-20 w-full max-w-[11rem] items-end justify-center sm:h-24 sm:max-w-none sm:w-44">
-                <span
-                  className="pointer-events-none absolute bottom-1 left-1/2 h-10 w-40 -translate-x-1/2 rounded-[50%] bg-white/40 blur-xl"
-                  aria-hidden="true"
-                />
+        {/* Nút Đóng góc trên bên phải */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 rounded-full border border-slate-200/90 bg-white/95 px-4 py-1.5 text-xs font-black text-slate-800 shadow-sm transition hover:bg-slate-100 hover:scale-105 active:scale-95"
+        >
+          Đóng
+        </button>
+
+        {/* LOGO DEWSKILL Ở ĐỈNH GIỮA */}
+        <div className="flex justify-center mb-3 sm:mb-4">
+          <img
+            src="/brand/logo.webp"
+            alt="DewSkill"
+            className="h-8 sm:h-9 w-auto object-contain drop-shadow-xs"
+            onError={(e) => {
+              // fallback nếu chưa tải được logo
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+
+        {notice && !paid && !order ? (
+          <p className="mb-3 rounded-2xl bg-amber-50 px-4 py-2.5 text-center text-xs sm:text-sm font-bold text-amber-900 border border-amber-200/80 shadow-xs">
+            {notice}
+          </p>
+        ) : null}
+
+        {/* ===================== TRƯỜNG HỢP: ĐÃ THANH TOÁN THÀNH CÔNG ===================== */}
+        {order && paid ? (
+          <div className="px-4 py-10 text-center flex flex-col items-center">
+            <div className="relative mx-auto h-40 w-40">
+              <span className="dp-pay-ring absolute inset-0 rounded-full bg-emerald-400/30" />
+              <span className="dp-pay-ring dp-pay-ring-delay absolute inset-3 rounded-full bg-emerald-400/25" />
+              <span className="dp-pay-circle absolute inset-4 overflow-hidden rounded-full bg-emerald-950 shadow-xl ring-4 ring-emerald-500">
                 <img
-                  src="/uploads/popup/word-excel-powerpoint-3d.webp"
-                  alt="Word, Excel và PowerPoint"
-                  className="relative h-24 w-full object-contain drop-shadow-[0_12px_16px_rgba(0,0,0,0.28)]"
+                  src="/mascot/thanh-toan-thanh-cong.gif"
+                  alt="Thanh toán thành công"
+                  className="dp-pay-mascot h-full w-full object-cover"
                   draggable={false}
                 />
-              </div>
-              <p className="mt-1 text-[13px] font-black leading-5 tracking-tight text-amber-50">
-                Chinh phục tin học văn phòng
-                <span className="mt-0.5 block text-xs font-semibold text-white/90">cùng Thầy Thắng</span>
-              </p>
+              </span>
+              <span className="dp-pay-circle absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white shadow-md">
+                <Check size={24} strokeWidth={4} className="text-white" />
+              </span>
             </div>
-            <div className="free-meet-run relative w-full max-w-md rounded-2xl p-[2px] sm:max-w-none">
-              <div className="relative z-[1] rounded-[14px] bg-gradient-to-br from-red-950/95 via-red-800/90 to-orange-700/90 px-4 py-3.5">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-200">Quyền lợi</p>
-                <ul className="mt-3 space-y-2.5">
-                  {['Học liên tục', 'Không giới hạn buổi học', 'Có video xem lại buổi học'].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-left text-[13px] font-bold leading-snug text-white">
-                      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950">
-                        <Check size={12} strokeWidth={3.5} aria-hidden="true" />
+            <p className="mt-4 text-2xl font-black text-emerald-800">Bạn đã thanh toán thành công!</p>
+            <p className="mt-1 text-sm font-semibold text-emerald-700 max-w-md">
+              Gói <strong>{order.planLabel || selected.label}</strong> đã được kích hoạt thành công. Bạn có thể tham gia các buổi học Google Meet trực tiếp với giảng viên.
+            </p>
+          </div>
+        ) : order ? (
+          /* ===================== TRƯỜNG HỢP: ĐANG THANH TOÁN (VIETQR) ===================== */
+          <div className="space-y-4 py-2 px-2 sm:px-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setOrder(null)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+              >
+                <ChevronLeft size={16} /> Quay lại chọn gói
+              </button>
+              <span className="text-sm font-black text-emerald-800">
+                Đăng ký: Gói {order.planLabel || selected.label}
+              </span>
+            </div>
+
+            <p className="text-sm font-semibold text-slate-700 text-center">
+              Quét mã QR chuyển khoản đúng nội dung <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{order.ref}</span> để hệ thống tự động kích hoạt.
+            </p>
+
+            <TransferPaymentDetails
+              courseName={`Gói Meet ${order.planLabel || selected.label}`}
+              amount={order.amount}
+              qrUrl={qrUrl}
+              loading={!bank}
+              error={!bank ? 'Chưa cấu hình tài khoản nhận tiền.' : ''}
+            />
+
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-700">
+              <Loader2 size={16} className="animate-spin text-emerald-600" />
+              <span>Hệ thống đang tự động kiểm tra giao dịch...</span>
+            </div>
+
+            {import.meta.env.DEV && (
+              <button
+                type="button"
+                onClick={markPaid}
+                disabled={simulating}
+                className="w-full rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/80 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 disabled:opacity-60 transition"
+              >
+                {simulating ? 'Đang kích hoạt thử...' : '⚡ Test thử thanh toán thành công (Chỉ DEV)'}
+              </button>
+            )}
+            {error && <p className="text-center text-sm font-semibold text-red-600">{error}</p>}
+          </div>
+        ) : (
+          /* ===================== GIAO DIỆN CHÍNH (THEO ĐÚNG HÌNH 1) ===================== */
+          <div className="flex flex-col gap-4 sm:gap-5">
+            {/* KHỐI TRÊN: 3 CỘT (GIẢNG VIÊN - HERO TIÊU ĐỀ - QUYỀN LỢI) */}
+            <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr_260px] items-center gap-4 sm:gap-6">
+              {/* CỘT 1: THÔNG TIN GIẢNG VIÊN */}
+              <div className="flex flex-col items-center text-center">
+                <div className="relative">
+                  {/* Doodles tia sáng xanh xung quanh avatar */}
+                  <span className="absolute -top-2 left-0 text-emerald-500 font-black text-base select-none leading-none animate-pulse">
+                    \ | /
+                  </span>
+                  <span className="absolute -top-2 right-0 text-emerald-500 font-black text-base select-none leading-none animate-pulse">
+                    \ | /
+                  </span>
+
+                  {/* Ảnh đại diện thầy Thắng có quầng sáng ngọc */}
+                  <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-full p-1.5 bg-gradient-to-tr from-emerald-500 via-emerald-400 to-teal-300 shadow-xl shadow-emerald-900/10">
+                    <img
+                      src="/giang-vien-phi-van-thang.png"
+                      alt="Giảng viên Phí Văn Thắng"
+                      className="h-full w-full rounded-full border-2 border-white object-cover object-top"
+                    />
+                  </div>
+                </div>
+
+                {/* Badge tên Giảng viên */}
+                <div className="mt-3 w-full max-w-[190px] rounded-2xl bg-white px-3 py-1.5 text-center shadow-md shadow-slate-900/5 border border-emerald-100">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                    GIẢNG VIÊN
+                  </span>
+                  <span className="block text-sm sm:text-base font-black tracking-tight text-slate-900">
+                    Phí Văn Thắng
+                  </span>
+                </div>
+
+                {/* Giới thiệu ngắn */}
+                <p className="mt-2 text-center text-[11px] font-medium leading-relaxed text-slate-600 max-w-[190px]">
+                  Giảng viên tin học văn phòng – đồng hành cùng người mới bắt đầu.
+                </p>
+              </div>
+
+              {/* CỘT 2: TIÊU ĐỀ, CHƯƠNG TRÌNH & LINH VẬT CỬ NHÂN */}
+              <div className="flex flex-col items-center text-center px-1">
+                {/* Tiêu đề chính kèm logo Google Meet */}
+                <h2
+                  id="free-meet-plan-title"
+                  className="text-lg sm:text-2xl lg:text-[1.65rem] font-black tracking-tight text-slate-900 leading-snug sm:leading-tight"
+                >
+                  <span>HỌC TIN HỌC CÙNG GIẢNG VIÊN QUA</span>{' '}
+                  <span className="inline-flex items-center gap-1.5 align-middle rounded-full bg-white px-3 py-1 shadow-sm border border-slate-200 text-xs sm:text-sm font-black text-slate-800">
+                    <img
+                      src={MEET_LOGO}
+                      alt="Google Meet"
+                      className="h-4 sm:h-5 w-auto object-contain"
+                      draggable={false}
+                    />
+                    <span>Google Meet</span>
+                  </span>
+                </h2>
+
+                {/* Pill giới thiệu phương pháp */}
+                <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-100/90 px-3.5 py-1 text-xs font-extrabold text-emerald-800 shadow-2xs">
+                  <span>Học trực tiếp – dễ hiểu – được hướng dẫn từng bước</span>
+                </div>
+
+                {/* Đoạn mô tả phù hợp đối tượng */}
+                <p className="mt-2 text-xs sm:text-[13px] font-medium leading-relaxed text-slate-600 max-w-md">
+                  Phù hợp cho người mới bắt đầu, người mất gốc, người cần học Word – Excel – PowerPoint bài bản.
+                </p>
+
+                {/* Bộ 3 icon Office W, X, P + Linh vật giọt nước cử nhân đọc sách */}
+                <div className="mt-3 flex items-center justify-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    {/* Word */}
+                    <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white font-black text-sm shadow-md shadow-blue-500/25">
+                      W
+                    </span>
+                    {/* Excel */}
+                    <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-sm shadow-md shadow-emerald-500/25">
+                      X
+                    </span>
+                    {/* PowerPoint */}
+                    <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 via-amber-600 to-red-600 text-white font-black text-sm shadow-md shadow-orange-500/25">
+                      P
+                    </span>
+                  </div>
+
+                  {/* Linh vật giọt nước đội mũ cử nhân học bài */}
+                  <img
+                    src="/mascot/cam-xuc-hoc-bai.gif"
+                    alt="Linh vật học bài"
+                    className="h-14 w-14 sm:h-16 sm:w-16 object-contain -my-2 drop-shadow-md"
+                    draggable={false}
+                  />
+                </div>
+              </div>
+
+              {/* CỘT 3: THẺ QUYỀN LỢI NỔI BẬT */}
+              <div className="rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-4 sm:p-5 shadow-lg shadow-emerald-900/15 border border-emerald-400/30">
+                <div className="flex items-center gap-2 border-b border-emerald-500/50 pb-2.5 mb-3">
+                  <Crown size={20} className="text-amber-300 drop-shadow-xs" />
+                  <span className="text-sm font-black uppercase tracking-wider text-white">QUYỀN LỢI</span>
+                </div>
+
+                <ul className="space-y-2.5">
+                  {BENEFITS.map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-left text-xs sm:text-[13px] font-bold text-white">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-slate-950 font-black shadow-xs">
+                        <Check size={13} strokeWidth={3.5} />
                       </span>
-                      {item}
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-2 text-center text-[11px] font-black min-[380px]:grid-cols-3">
-            {MEET_SLOTS.map((slot) => (
-              <span key={slot.label} className="rounded-2xl border border-white/25 bg-white/10 px-2 py-2">
-                <span className="block text-amber-200">{slot.label}</span>
-                <span className="mt-0.5 block text-sm">{slot.time}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="px-4 py-4 sm:px-5 sm:py-5">
-          {notice && !paid ? (
-            <p className="mb-3 rounded-2xl bg-amber-50 px-3 py-2 text-center text-sm font-black text-amber-900">{notice}</p>
-          ) : null}
-          {order && paid ? (
-            <div className="px-2 py-3 text-center">
-              <div className="relative mx-auto h-40 w-40">
-                <span className="dp-pay-ring absolute inset-0 rounded-full bg-emerald-400/30" />
-                <span className="dp-pay-ring dp-pay-ring-delay absolute inset-3 rounded-full bg-emerald-400/25" />
-                <span className="dp-pay-circle absolute inset-4 overflow-hidden rounded-full bg-black shadow-lg ring-4 ring-emerald-500">
-                  <img
-                    src="/mascot/thanh-toan-thanh-cong.gif"
-                    alt="Thanh toán thành công"
-                    className="dp-pay-mascot h-full w-full object-cover"
-                    draggable={false}
-                  />
-                </span>
-                <span className="dp-pay-circle absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 ring-4 ring-white shadow-md">
-                  <svg viewBox="0 0 52 52" className="h-7 w-7" aria-hidden="true">
-                    <path className="dp-pay-check" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" d="M14 27 l8 8 l16-16" />
-                  </svg>
-                </span>
-              </div>
-              <p className="dp-pay-copy mt-2 text-lg font-black text-emerald-800">Bạn đã thanh toán thành công</p>
-              <p className="dp-pay-copy text-sm font-semibold text-emerald-700">
-                Gói {order.planLabel || selected.label} đã kích hoạt, kèm 300 XP mỗi ngày. Bạn có thể học Meet với giảng viên.
-              </p>
-            </div>
-          ) : order ? (
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-slate-700">
-                Chuyển khoản đúng nội dung <span className="font-black text-slate-900">{order.ref}</span> để đăng ký gói {order.planLabel || selected.label}.
-              </p>
-              <TransferPaymentDetails
-                courseName={`Gói ${order.planLabel || selected.label}`}
-                amount={order.amount}
-                qrUrl={qrUrl}
-                loading={!bank}
-                error={!bank ? 'Chưa cấu hình tài khoản nhận tiền.' : ''}
-              />
-              <p className="text-center text-[11px] font-semibold text-slate-400">Đang chờ thanh toán…</p>
-              {import.meta.env.DEV && (
-                <button
-                  type="button"
-                  onClick={markPaid}
-                  disabled={simulating}
-                  className="w-full rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 disabled:opacity-60 !shadow-none"
+
+            {/* KHỐI GIỮA: 3 KHUNG GIỜ HỌC */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {MEET_SLOTS.map((slot) => (
+                <div
+                  key={slot.label}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-2xl border border-emerald-200/80 bg-white/90 px-2 py-2 sm:px-4 sm:py-2.5 shadow-sm text-center"
                 >
-                  {simulating ? 'Đang kích hoạt…' : 'Test thử'}
-                </button>
-              )}
-              {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
+                  <span className="text-base sm:text-lg">{slot.icon}</span>
+                  <span className="text-xs sm:text-sm font-black text-slate-800">
+                    {slot.label} <span className="font-extrabold text-emerald-700">{slot.time}</span>
+                  </span>
+                </div>
+              ))}
             </div>
-          ) : (
-            <>
-              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
-                {plans.map((plan) => {
-                  const active = plan.id === selected.id;
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setSelectedId(plan.id)}
-                      className={`group relative isolate min-w-[9.5rem] shrink-0 snap-start overflow-visible rounded-2xl border-2 px-3 py-4 text-left !shadow-none transition duration-200 hover:-translate-y-0.5 sm:min-w-0 ${active ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-amber-300'} ${plan.featured ? 'ring-2 ring-amber-300' : ''}`}
-                    >
+
+            {/* KHỐI GÓI HỌC: 5 THẺ (RESPONSIVE VUỐT NGANG TRÊN MOBILE / 5 CỘT DESKTOP) */}
+            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-3 snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 sm:pt-0 lg:grid-cols-5">
+              {plans.map((plan) => {
+                const isSelected = plan.id === selected.id;
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setSelectedId(plan.id)}
+                    className={`group relative flex min-w-[138px] shrink-0 snap-start flex-col justify-between rounded-2xl border-2 p-3 sm:p-3.5 text-center transition-all duration-200 sm:min-w-0 ${
+                      isSelected
+                        ? 'border-emerald-500 bg-emerald-50/70 shadow-lg shadow-emerald-500/15 ring-2 ring-emerald-400/30 -translate-y-0.5'
+                        : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-md'
+                    }`}
+                  >
+                    {/* Huy hiệu ⭐ Nên chọn cho gói 3 tháng */}
+                    {plan.featured && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-2.5 py-0.5 text-[10px] font-black text-amber-950 shadow-sm">
+                        ⭐ Nên chọn
+                      </span>
+                    )}
+
+                    <div className="flex flex-col items-center gap-1.5">
+                      {/* Học qua Google Meet */}
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                        <img src={MEET_LOGO} alt="" className="h-3 w-auto object-contain" draggable={false} />
+                        <span>Học qua Meet</span>
+                      </div>
+
+                      {/* Tên thời gian gói có icon lịch */}
+                      <div className="mt-1 flex items-center justify-center gap-1 text-base font-black tracking-tight text-slate-900">
+                        <span className="text-sm">📅</span>
+                        <span>{plan.label}</span>
+                      </div>
+
+                      {/* Hint pill (Làm quen, Nền tảng vững...) */}
                       <span
-                        className="pointer-events-none absolute -inset-2 -z-10 rounded-[22px] bg-[radial-gradient(circle,rgba(251,191,36,0.95),rgba(249,115,22,0.55)_42%,transparent_70%)] opacity-0 blur-md transition duration-200 group-hover:opacity-100"
-                        aria-hidden="true"
-                      />
-                      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-[14px]" aria-hidden="true">
-                        <span className="absolute inset-y-[-20%] left-[-40%] w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 transition-all duration-700 group-hover:left-[130%] group-hover:opacity-90" />
+                        className={`mt-0.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-extrabold transition-colors ${
+                          isSelected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {plan.hint}
                       </span>
-                      {plan.featured && <span className="absolute -top-2 right-2 z-[1] rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-amber-950">Nên chọn</span>}
-                      <img src={MEET_LOGO} alt="" className="mb-1.5 h-8 w-auto object-contain" draggable={false} />
-                      <span className="block text-base font-black tracking-tight text-slate-900">{plan.label}</span>
-                      <span className="mt-1 block text-[11px] font-black leading-tight text-amber-600">+300 XP mỗi ngày</span>
-                      <span className="mt-0.5 block text-[11px] font-semibold text-slate-500">{plan.hint}</span>
-                      <span className="mt-3 block text-sm font-black tracking-tight text-red-600">
-                        {plan.price > 0 ? `${plan.price.toLocaleString('vi-VN')}đ` : 'Liên hệ'}
+                    </div>
+
+                    {/* Footer của card: Đăng ký học cùng giảng viên & giá */}
+                    <div className="mt-3 pt-2 border-t border-slate-100/90 flex flex-col items-center gap-0.5">
+                      <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-slate-600 leading-tight">
+                        <span>👥</span>
+                        <span>Đăng ký học cùng giảng viên</span>
+                      </div>
+                      {plan.price > 0 && (
+                        <span className="text-xs font-black text-emerald-700">
+                          {plan.price.toLocaleString('vi-VN')}đ
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && <p className="text-center text-sm font-semibold text-red-600">{error}</p>}
+
+            {/* KHỐI NÚT HÀNH ĐỘNG DƯỚI CÙNG (2 NÚT) */}
+            <div className="mt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              {/* Nút Đăng ký học ngay */}
+              <button
+                type="button"
+                onClick={register}
+                disabled={busy}
+                className="relative inline-flex items-center justify-center gap-2 rounded-full px-8 py-3.5 text-base font-black text-white transition-all duration-200 active:scale-95 shadow-lg shadow-emerald-500/30 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-700 hover:brightness-105 hover:-translate-y-0.5 w-full sm:w-auto cursor-pointer"
+              >
+                {busy ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <>
+                    <span>🎓 Đăng ký học ngay</span>
+                    {selected.price > 0 && (
+                      <span className="text-xs font-bold text-emerald-100">
+                        ({selected.price.toLocaleString('vi-VN')}đ)
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
-              <button type="button" onClick={register} disabled={busy} className="cms-login-submit mt-4">
-                {busy ? <Loader2 size={18} className="animate-spin" /> : 'Đăng ký gói này'}
+                    )}
+                    <ArrowRight size={18} />
+                  </>
+                )}
               </button>
-            </>
-          )}
-        </div>
+
+              {/* Nút Nhận tư vấn */}
+              <button
+                type="button"
+                onClick={handleConsultation}
+                className="relative inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-base font-black text-emerald-800 transition-all duration-200 active:scale-95 border-2 border-emerald-400 bg-white hover:bg-emerald-50 shadow-sm hover:-translate-y-0.5 w-full sm:w-auto cursor-pointer"
+              >
+                <Headphones size={18} className="text-emerald-600" />
+                <span>Nhận tư vấn</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.body,
