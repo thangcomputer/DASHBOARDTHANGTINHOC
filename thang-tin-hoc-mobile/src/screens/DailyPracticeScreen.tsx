@@ -5,7 +5,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Globe,
+  ArrowLeft, ArrowRight, Award, BookOpen, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Code2, Cpu, Crown, Dumbbell, FastForward, FileText, Flame, Gamepad2, Gift, Globe,
   HelpCircle, Image as ImageIcon, Keyboard, Lightbulb, Lock, LogOut, Mail, Monitor, Play, PlayCircle, Presentation, QrCode, RefreshCw, RotateCcw, Route, Sheet, ShieldCheck,
   ShoppingBag, Shuffle, Sparkles, Star, Target, Trophy, Video as VideoIcon, X, XCircle, Zap,
   type LucideIcon,
@@ -28,6 +28,7 @@ import { embeddedVideoUrl, isDirectVideoUrl, playableVideoUrl } from '../utils/v
 import { useAuth } from '../app/AuthContext';
 import { FillQuestion, MatchQuestion, McqQuestion, OrderQuestion, SortQuestion, TrueFalseQuestion } from '../components/dailyPractice/Questions';
 import { useGameSounds, type GameSound } from '../components/dailyPractice/useGameSounds';
+import { DuoButton } from '../components/duo/DuoButton';
 import { getLearningGoal, periodLabel, LEARNING_GOAL_CHANGED_EVENT, OPEN_LEARNING_GOAL_EVENT, STUDY_MINUTE_EVENT, type LearningGoalData, type LearningGoalProgress } from '../services/learningGoalApi';
 import { getMobileImageSource } from '../services/apiClient';
 import {
@@ -809,12 +810,13 @@ function StepNode({ step, isNext, unitProgress, color, selected, onPress }: {
             styles.node,
             {
               width: size,
-              height: size - 6,
+              height: size - 4,
               borderRadius: size / 2,
-              backgroundColor: locked ? '#E5E7EB' : color.from,
-              boxShadow: `0px ${pressed ? 2 : 7}px 0px ${locked ? '#C4C9D1' : darken(color.to, 0.15)}`,
-              transform: [{ translateY: pressed ? 5 : 0 }],
-            } as never,
+              backgroundColor: locked ? '#E2E8F0' : color.from,
+              borderBottomWidth: pressed ? 2 : 6,
+              borderBottomColor: locked ? '#CBD5E1' : darken(color.to, 0.2),
+              transform: [{ translateY: pressed ? 4 : 0 }],
+            },
           ]}
         >
           <Icon size={big ? 30 : 26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={2.8} />
@@ -840,13 +842,14 @@ function VideoNode({ video, color, onPress }: { video: DpPathVideo; color: { fro
           style={({ pressed }) => [
             styles.node,
             {
-              width: 66,
-              height: 60,
-              borderRadius: 33,
-              backgroundColor: locked ? '#E5E7EB' : color.from,
-              boxShadow: `0px ${pressed ? 2 : 7}px 0px ${locked ? '#C4C9D1' : darken(color.to, 0.15)}`,
-              transform: [{ translateY: pressed ? 5 : 0 }],
-            } as never,
+              width: 68,
+              height: 62,
+              borderRadius: 34,
+              backgroundColor: locked ? '#E2E8F0' : color.from,
+              borderBottomWidth: pressed ? 2 : 6,
+              borderBottomColor: locked ? '#CBD5E1' : darken(color.to, 0.2),
+              transform: [{ translateY: pressed ? 4 : 0 }],
+            },
           ]}
         >
           {locked ? <Lock size={24} color="#9CA3AF" strokeWidth={2.8} /> : <VideoIcon size={26} color="#FFFFFF" strokeWidth={2.6} />}
@@ -886,7 +889,7 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
     return () => loop.stop();
   }, [bob, isNext, selected]);
   const nodeTone = done ? { from: '#FFD84D', to: '#F59E0B' } : color;
-  const baseShadowColor = locked ? '#C4C9D1' : done ? '#D97706' : darken(color.to, 0.2);
+  const baseShadowColor = locked ? '#CBD5E1' : done ? '#D97706' : darken(color.to, 0.2);
   return (
     <View style={styles.nodeWrap}>
       {isNext && !selected ? (
@@ -906,18 +909,18 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
           style={({ pressed }) => [
             styles.node,
             locked
-              ? { backgroundColor: '#E5E7EB' }
-              : gradient(nodeTone.from, nodeTone.to),
+              ? { backgroundColor: '#E2E8F0', borderBottomColor: '#CBD5E1' }
+              : { backgroundColor: nodeTone.from, borderBottomColor: baseShadowColor },
             {
               width: size,
-              height: size - 6,
+              height: size - 4,
               borderRadius: size / 2,
-              boxShadow: `0px ${pressed ? 2 : 7}px 0px ${baseShadowColor}`,
-              transform: [{ translateY: pressed ? 5 : 0 }],
+              borderBottomWidth: pressed ? 2 : 6,
+              transform: [{ translateY: pressed ? 4 : 0 }],
               alignItems: 'center',
               justifyContent: 'center',
               gap: 4,
-            } as never,
+            },
           ]}
         >
           <HubIcon size={26} color={locked ? '#9CA3AF' : '#FFFFFF'} strokeWidth={2.8} />
@@ -934,6 +937,11 @@ function PracticeHubNode({ node, color, isNext, selected, onPress }: {
               />
             ))}
           </View>
+          {done ? (
+            <View style={styles.nodeCrown}>
+              <Star size={14} color="#D97706" fill="#FBBF24" />
+            </View>
+          ) : null}
         </Pressable>
       </View >
       <Text style={[styles.nodeLabel, locked && { color: '#94A3B8' }]}>{node.label}</Text>
@@ -2026,6 +2034,30 @@ function PathView({
                       })}
                     </View>
                   </View>
+
+                  {/* Duolingo Unit End Milestone Chest */}
+                  <View style={styles.unitChestWrap}>
+                    <View style={[styles.unitChestBox, doneSteps === totalSteps && totalSteps > 0 ? styles.unitChestBoxDone : styles.unitChestBoxPending]}>
+                      <View style={[styles.unitChestIconBox, doneSteps === totalSteps && totalSteps > 0 ? styles.unitChestIconDone : styles.unitChestIconPending]}>
+                        <Gift size={20} color={doneSteps === totalSteps && totalSteps > 0 ? '#FFFFFF' : '#94A3B8'} strokeWidth={2.5} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.unitChestTitle, doneSteps === totalSteps && totalSteps > 0 && styles.unitChestTitleDone]}>
+                          {doneSteps === totalSteps && totalSteps > 0 ? 'Mở rương chặng · +50 XP' : `Rương phần thưởng chặng (${doneSteps}/${totalSteps})`}
+                        </Text>
+                        <Text style={styles.unitChestSub}>
+                          {doneSteps === totalSteps && totalSteps > 0 ? 'Chúc mừng bạn đã chinh phục toàn bộ chặng!' : 'Hoàn thành các bài tập để nhận quà'}
+                        </Text>
+                      </View>
+                      {doneSteps === totalSteps && totalSteps > 0 ? (
+                        <View style={styles.unitChestBadge}>
+                          <Sparkles size={14} color="#D97706" />
+                        </View>
+                      ) : (
+                        <Lock size={16} color="#CBD5E1" />
+                      )}
+                    </View>
+                  </View>
                 </View>
               );
             })}
@@ -2719,11 +2751,15 @@ function PlayView({ session, stats, play, onQuit, onFinished, onDraggingChange }
                 {result.explanation ? <Text style={styles.feedbackExplain}>{result.explanation}</Text> : null}
               </View>
             </View>
-            <Pressable onPress={() => { void next(); }} disabled={busy} style={[styles.primary, { backgroundColor: result.correct ? '#059669' : '#DC2626' }]} accessibilityRole="button">
-              {busy ? <ActivityIndicator color="#FFFFFF" /> : null}
-              <Text style={styles.primaryText}>{index + 1 < total ? 'Tiếp tục' : 'Xem kết quả'}</Text>
-              <ArrowRight size={17} color="#FFFFFF" />
-            </Pressable>
+            <DuoButton
+              variant={result.correct ? 'primary' : 'danger'}
+              size="lg"
+              fullWidth
+              loading={busy}
+              text={index + 1 < total ? (result.correct ? 'TIẾP TỤC' : 'ĐÃ HIỂU') : 'XEM KẾT QUẢ'}
+              rightIcon={<ArrowRight size={18} color="#FFFFFF" />}
+              onPress={() => { void next(); }}
+            />
           </View>
         ) : null}
         {lightningCombo ? (
@@ -3073,7 +3109,7 @@ export function DailyPracticeScreen() {
   };
 
   return (
-    <AppScreen scroll={false}>
+    <AppScreen scroll={false} hideBrandingTopBar={Boolean(session)}>
       <ScrollView ref={scrollRef} scrollEnabled={scrollEnabled} contentContainerStyle={styles.screen} keyboardShouldPersistTaps="handled">
         {session ? (
           <PlayView
@@ -3271,9 +3307,24 @@ const styles = StyleSheet.create({
   hintBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 10, borderRadius: 12, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
   hintText: { flex: 1, color: '#92400E', fontSize: 13, fontWeight: '400' },
   answerArea: { marginTop: 4 },
-  feedback: { padding: spacing.md, borderRadius: 22, gap: spacing.md, borderWidth: 1 },
-  feedbackOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  feedbackBad: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  feedback: {
+    padding: spacing.lg,
+    borderRadius: 24,
+    gap: spacing.md,
+    borderWidth: 2,
+    borderBottomWidth: 5,
+    marginTop: spacing.sm,
+  },
+  feedbackOk: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#6EE7B7',
+    borderBottomColor: '#10B981',
+  },
+  feedbackBad: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+    borderBottomColor: '#EF4444',
+  },
   feedbackRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   feedbackTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   feedbackTitle: { fontSize: 16, fontWeight: '700' },
@@ -3574,10 +3625,85 @@ const styles = StyleSheet.create({
   comboChip: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: '#F97316' },
   comboText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
   nodeBubble: {
-    marginBottom: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, overflow: 'hidden', backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: colors.line, fontSize: 12, fontWeight: '600',
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderBottomWidth: 3,
+    borderBottomColor: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   nodeLabel: { marginTop: 8, color: '#334155', fontSize: 13, fontWeight: '600' },
+  unitChestWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 22,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
+  },
+  unitChestBox: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderBottomWidth: 4,
+  },
+  unitChestBoxPending: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderBottomColor: '#CBD5E1',
+  },
+  unitChestBoxDone: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderBottomColor: '#F59E0B',
+  },
+  unitChestIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unitChestIconPending: {
+    backgroundColor: '#E2E8F0',
+  },
+  unitChestIconDone: {
+    backgroundColor: '#F59E0B',
+  },
+  unitChestTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  unitChestTitleDone: {
+    color: '#92400E',
+  },
+  unitChestSub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  unitChestBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pathResult: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 22, borderWidth: 1 },
   pathResultOk: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   pathResultBad: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },

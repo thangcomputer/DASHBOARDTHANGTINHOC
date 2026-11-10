@@ -91,11 +91,13 @@ export function AppScreen({
   contentStyle,
   refreshControl,
   scrollViewRef,
+  hideBrandingTopBar = false,
 }: React.PropsWithChildren<{
   scroll?: boolean;
   contentStyle?: ViewStyle;
   refreshControl?: React.ReactElement;
   scrollViewRef?: React.Ref<React.ComponentRef<typeof ScrollView>>;
+  hideBrandingTopBar?: boolean;
 }>) {
   const handleScroll = useBrandingHeaderScrollHandler();
 
@@ -106,7 +108,7 @@ export function AppScreen({
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <BrandingTopBar />
+      {!hideBrandingTopBar ? <BrandingTopBar /> : null}
       {scroll ? (
         <ScrollView
           ref={scrollViewRef}

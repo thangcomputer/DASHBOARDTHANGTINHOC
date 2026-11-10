@@ -27,6 +27,11 @@ import { getTeacherDashboardMetrics } from '../services/teacherApi';
 import { buildStudentDashboardActivity } from '../services/studentDashboardActivity';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { AppStackParamList, MainTabsParamList } from '../navigation/types';
+import { DuoButton } from '../components/duo/DuoButton';
+import { DuoHeaderBar } from '../components/duo/DuoHeaderBar';
+import { DuoHeroCard } from '../components/duo/DuoHeroCard';
+import { DuoDailyQuestsCard } from '../components/duo/DuoDailyQuestsCard';
+import { DuoScheduleCard } from '../components/duo/DuoScheduleCard';
 
 type RootNavigation = NativeStackNavigationProp<AppStackParamList>;
 type TabNavigation = BottomTabNavigationProp<MainTabsParamList>;
@@ -526,7 +531,10 @@ export function HomeScreen() {
   }
 
   return (
-    <AppScreen contentStyle={isTeacher ? styles.screen : styles.studentScreen}>
+    <AppScreen
+      hideBrandingTopBar={!isTeacher}
+      contentStyle={isTeacher ? styles.screen : styles.studentScreen}
+    >
       {isTeacher ? (
         <WelcomeHero
           role="teacher"
@@ -541,11 +549,12 @@ export function HomeScreen() {
           onJoin={(url) => { void openDashboardLink(url); }}
         />
       ) : (
-        <WelcomeHero
-          role="student"
-          name={user?.name || ''}
-          chips={studentHeroChips}
-          showJoin={false}
+        <DuoHeaderBar
+          streak={practiceStats?.streak || 0}
+          xpTotal={practiceStats?.xpTotal || 0}
+          onPressStreak={() => tabNavigation.navigate('DailyPractice')}
+          onPressXp={() => tabNavigation.navigate('DailyPractice')}
+          onPressSubscription={() => tabNavigation.navigate('Profile')}
         />
       )}
 
@@ -660,126 +669,58 @@ export function HomeScreen() {
           </View>
         </>
       ) : (
-        <>
-          {meetCards.length > 0 ? (
-            <Card style={styles.ovCard}>
-              <View style={styles.ovHeadRow}>
-                <Video size={18} color={colors.brand} />
-                <Text style={styles.ovTitle}>Lịch Meet</Text>
-              </View>
-              <View style={styles.meetGrid}>
-                {meetCards.map((m) => (
-                  <View
-                    key={m._id || m.id || m.slotKey}
-                    style={[styles.meetCard, m.live && styles.meetCardLive]}
-                  >
-                    <View style={styles.meetIconWrap}>
-                      <Video size={18} color="#FFFFFF" />
-                    </View>
-                    <View style={styles.flex}>
-                      <Text numberOfLines={1} style={styles.cardTitle}>
-                        {`${m.slotLabel || 'Ca học'} · ${m.startTime || ''} – ${m.endTime || ''}`}
-                      </Text>
-                      <Text style={[styles.meetDayLabel, m.live && styles.meetDayLabelLive]}>
-                        {m.dayLabel}
-                      </Text>
-                    </View>
-                    {m.live && m.linkHoc ? (
-                      <Pressable
-                        onPress={() => { void openDashboardLink(m.linkHoc!); }}
-                        style={styles.meetJoinBtn}
-                        accessibilityRole="button"
-                      >
-                        <Text style={styles.meetJoinText}>Vào Meet</Text>
-                        <ExternalLink size={12} color="#FFFFFF" />
-                      </Pressable>
-                    ) : m.live ? (
-                      <Text style={styles.meetPendingText}>Chờ link từ trung tâm</Text>
-                    ) : (
-                      <Text style={styles.meetIdleText}>Chưa đến giờ</Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-            </Card>
-          ) : null}
+        <View style={styles.duoStudentContainer}>
+          <View style={isWide ? styles.duoGridWide : styles.studentGridStack}>
+            <View style={isWide ? styles.duoColLeft : styles.studentColStack}>
+              {/* 1. DUOLINGO HERO: Tiếp tục học */}
+              <DuoHeroCard
+                stageTitle={pathData?.topics?.[0]?.topic?.name || currentCourse || 'Chặng 1: Windows & Tin học căn bản'}
+                lessonSubtitle={
+                  pathData?.topics?.[0]?.next?.unitTitle
+                    ? `Tiếp tục: ${pathData.topics[0].next.unitTitle}`
+                    : (practiceStats?.playedToday ? 'Hôm nay bạn đã hoàn thành bài tập xuất sắc!' : 'Bắt đầu hành trình chinh phục kiến thức')
+                }
+                progressPercent={
+                  pathData?.topics?.[0]?.totalUnits
+                    ? Math.round(((pathData.topics[0].completedUnits || 0) / pathData.topics[0].totalUnits) * 100)
+                    : (practiceStats?.playedToday ? 100 : 35)
+                }
+                playedToday={practiceStats?.playedToday ?? false}
+                streak={practiceStats?.streak ?? 0}
+                onContinue={() => tabNavigation.navigate('DailyPractice')}
+                continueLabel={practiceStats?.playedToday ? 'ÔN TẬP THÊM' : 'TIẾP TỤC HỌC'}
+                mascotReaction={practiceStats?.playedToday ? 'happy' : 'studying'}
+              />
 
-          <View style={isWide ? styles.studentGridWide : styles.studentGridStack}>
-            <View style={isWide ? styles.studentColLeft : styles.studentColStack}>
-              {/* Lịch học hôm nay */}
-              <Card style={styles.ovCard}>
-                <View style={styles.ovHeadRow}>
-                  <Calendar size={18} color={colors.brand} />
-                  <Text style={[styles.ovTitle, styles.flex]}>Lịch học hôm nay</Text>
-                  {todayMobileClasses.some((c) => c.live) ? (
-                    <View style={styles.todayLiveBadge}>
-                      <Text style={styles.todayLiveBadgeText}>Đang diễn ra</Text>
-                    </View>
-                  ) : null}
-                </View>
+              {/* 2. DUOLINGO DAILY QUESTS: Nhiệm vụ hằng ngày */}
+              <DuoDailyQuestsCard
+                todayAnswers={practiceStats?.todaySessions ? practiceStats.todaySessions * 10 : (practiceStats?.playedToday ? 10 : 0)}
+                todayXp={practiceStats?.todayXp ?? (user as any)?.lms?.dailyXpToday ?? 0}
+                onOpenPractice={() => tabNavigation.navigate('DailyPractice')}
+              />
 
-                {todayMobileClasses.length > 0 ? (
-                  <View style={{ gap: 10 }}>
-                    {todayMobileClasses.map((item) => (
-                      <View key={item.id} style={[styles.todayClassBox, item.live && styles.todayClassBoxLive]}>
-                        <View style={{ flex: 1, gap: 4 }}>
-                          <Text style={styles.todayClassTitle} numberOfLines={2}>
-                            {item.title}
-                          </Text>
-                          <View style={styles.todayClassMetaRow}>
-                            <Clock size={13} color="#64748B" />
-                            <Text style={styles.todayClassMetaText}>{item.time}</Text>
-                            <Text style={styles.todayClassMetaDot}>·</Text>
-                            <Calendar size={13} color="#64748B" />
-                            <Text style={styles.todayClassMetaText}>{item.dateLabel}</Text>
-                          </View>
-                          {item.teacher ? (
-                            <Text style={styles.todayClassTeacherText}>GV: {item.teacher}</Text>
-                          ) : null}
-                        </View>
+              {/* 3. DUOLINGO SMART SCHEDULE: Lịch học Meet gọn gàng */}
+              <DuoScheduleCard
+                todayClasses={todayMobileClasses}
+                meetCards={meetCards}
+                firstSchedule={firstSchedule}
+                nextMeet={nextMeet}
+                onOpenSchedule={() => tabNavigation.navigate('Schedule')}
+              />
 
-                        {item.meetLink ? (
-                          <Pressable
-                            onPress={() => Linking.openURL(item.meetLink)}
-                            style={styles.todayJoinBtn}
-                            accessibilityRole="button"
-                          >
-                            <Video size={14} color="#FFFFFF" />
-                            <Text style={styles.todayJoinBtnText}>Vào Meet</Text>
-                          </Pressable>
-                        ) : (
-                          <View style={styles.todayNoLinkBadge}>
-                            <Text style={styles.todayNoLinkText}>Chưa có link</Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.todayEmptyBox}>
-                    <Calendar size={24} color="#94A3B8" />
-                    <Text style={styles.todayEmptyTitle}>Hôm nay không có lịch</Text>
-                    {firstSchedule ? (
-                      <Text style={styles.todayEmptySub}>
-                        Lịch tới: {firstSchedule.title || 'Buổi học'} · {firstSchedule.time} ({firstSchedule.dateLabel})
-                      </Text>
-                    ) : nextMeet ? (
-                      <Text style={styles.todayEmptySub}>
-                        Lịch Meet tới: {nextMeet.slotLabel || 'Lớp Meet'} · {nextMeet.startTime}–{nextMeet.endTime} ({nextMeet.dayLabel})
-                      </Text>
-                    ) : (
-                      <Text style={styles.todayEmptySub}>Hãy dành thời gian tự luyện tập hằng ngày nhé!</Text>
-                    )}
-                  </View>
-                )}
-              </Card>
+              {/* 4. KHÓA HỌC CỦA TÔI (Nếu có khóa video/lớp đang theo học) */}
               {!freePortalCourse && Boolean(currentCourse) ? (
                 <Card style={styles.ovCard}>
                   <View style={styles.ovHeadRow}>
                     <BookOpen size={18} color={colors.brand} />
                     <Text style={[styles.ovTitle, styles.flex]}>Khóa học của tôi</Text>
                   </View>
-                  <CompactCoursePicker items={coursePickerItems} activeName={currentCourse} onChange={setSelectedCourse} showProgress={false} />
+                  <CompactCoursePicker
+                    items={coursePickerItems}
+                    activeName={currentCourse}
+                    onChange={setSelectedCourse}
+                    showProgress={false}
+                  />
                   {coursePickerItems.length <= 1 ? (
                     <Text numberOfLines={2} style={styles.ovCourseName}>{currentCourse || 'Chưa có khóa học'}</Text>
                   ) : null}
@@ -806,82 +747,46 @@ export function HomeScreen() {
                   </Text>
                   <View style={styles.ovButtonRow}>
                     {isVideoCourse ? (
-                      <Pressable
+                      <DuoButton
+                        variant="blue"
+                        size="md"
+                        icon={<Video size={16} color="#FFFFFF" />}
+                        label={videoNextSubject ? `Học tiếp: ${videoNextSubject.name}` : 'Vào học video'}
                         onPress={() => tabNavigation.navigate('CourseVideos')}
-                        style={styles.ovPrimary}
-                        accessibilityRole="button"
-                      >
-                        <Video size={15} color="#FFFFFF" />
-                        <Text style={styles.ovPrimaryText}>
-                          {videoNextSubject ? `Học tiếp: ${videoNextSubject.name}` : 'Vào học'}
-                        </Text>
-                      </Pressable>
+                        style={{ flex: 1 }}
+                      />
                     ) : (
                       <>
-                        <Pressable onPress={() => tabNavigation.navigate('CourseVideos')} style={styles.ovPrimary} accessibilityRole="button">
-                          <Video size={15} color="#FFFFFF" />
-                          <Text style={styles.ovPrimaryText}>Vào bài học</Text>
-                        </Pressable>
-                        <Pressable onPress={() => tabNavigation.navigate('Schedule')} style={styles.ovSecondary} accessibilityRole="button">
-                          <Calendar size={15} color={colors.ink} />
-                          <Text style={styles.ovSecondaryText}>Lịch học</Text>
-                        </Pressable>
+                        <DuoButton
+                          variant="primary"
+                          size="md"
+                          icon={<Video size={16} color="#FFFFFF" />}
+                          label="Vào bài học"
+                          onPress={() => tabNavigation.navigate('CourseVideos')}
+                          style={{ flex: 1 }}
+                        />
+                        <DuoButton
+                          variant="secondary"
+                          size="md"
+                          icon={<Calendar size={16} color="#475569" />}
+                          label="Lịch học"
+                          onPress={() => tabNavigation.navigate('Schedule')}
+                          style={{ flex: 1 }}
+                        />
                       </>
                     )}
                   </View>
                 </Card>
               ) : null}
-
-              <Card style={styles.ovCard}>
-                <View style={styles.ovHeadRow}>
-                  <CheckCircle size={18} color={colors.brand} />
-                  <Text style={styles.ovTitle}>Việc cần làm hôm nay</Text>
-                </View>
-                {studentTasks.length
-                  ? studentTasks.map(({ key, ...task }) => <OverviewTaskRow key={key} {...task} />)
-                  : <OverviewDoneBox title="Hôm nay bạn đã hoàn thành hết việc!" text="Không còn bài tập, trắc nghiệm hay lượt luyện tập nào đang chờ." />}
-              </Card>
-
-              <DailyPracticeOverviewCard
-                stats={practiceStats || null}
-                pathTopic={pathData?.topics?.[0] || null}
-              />
-
-              {/* Hoạt động gần đây - Đã ẩn trên Web và Mobile theo yêu cầu */}
-              {false && (
-                <Card style={styles.ovCard}>
-                  <View style={styles.ovHeadRow}>
-                    <ClipboardList size={18} color="#059669" />
-                    <Text style={[styles.ovTitle, styles.flex]}>Hoạt động gần đây</Text>
-                    <Pressable
-                      onPress={() => {
-                        if (!freeMenu) tabNavigation.navigate('Schedule');
-                        else navigation?.navigate('Grades');
-                      }}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.ovLink}>{freeMenu ? 'Xem tất cả' : 'Xem nhật ký đầy đủ'}</Text>
-                    </Pressable>
-                  </View>
-                  {assignments.loading || quizzes.loading || evaluationActivity.loading || profile.loading
-                    ? <Text style={styles.muted}>Đang tải…</Text>
-                    : gradeEntries.length ? gradeEntries.slice(0, 5).map((item) => (
-                      <View key={`student-grade-${item.id}`} style={styles.gradeRow}>
-                        <Text style={styles.gradeRowTitle}>{item.note}</Text>
-                        <Text style={styles.gradeRowMeta}>{item.date}{item.grade == null ? '' : `  ·  Điểm: ${item.grade}`}</Text>
-                      </View>
-                    )) : <Text style={styles.muted}>Điểm bài tập, trắc nghiệm và nhận xét của giảng viên sẽ hiện tại đây.</Text>}
-                </Card>
-              )}
             </View>
 
             {!user?.previewMode ? (
-              <View style={isWide ? styles.studentColRight : styles.studentColStack}>
+              <View style={isWide ? styles.duoColRight : styles.studentColStack}>
                 <LmsGoalMergedCard />
               </View>
             ) : null}
           </View>
-        </>
+        </View>
       )}
     </AppScreen>
   );
@@ -1172,4 +1077,21 @@ const styles = StyleSheet.create({
   helpText: { color: '#D1FAE5', fontSize: typography.caption, lineHeight: 17, marginTop: 4 },
   helpArrow: { width: 32, height: 32, flexShrink: 0, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.8 },
+  duoStudentContainer: {
+    gap: 16,
+    paddingBottom: 24,
+  },
+  duoGridWide: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  duoColLeft: {
+    flex: 1,
+    gap: 16,
+  },
+  duoColRight: {
+    width: 360,
+    gap: 16,
+  },
 });

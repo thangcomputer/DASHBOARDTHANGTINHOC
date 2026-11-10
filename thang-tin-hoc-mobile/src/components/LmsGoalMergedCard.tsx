@@ -52,7 +52,7 @@ function pct(v?: number, t?: number) { return !t ? 0 : Math.min(100, Math.round(
 function openGoal() { DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT); }
 
 /* ─── component ─────────────────────────────────────── */
-export function LmsGoalMergedCard() {
+export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: boolean } = {}) {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const { subscription, refreshSubscription } = useAuth();
 
@@ -249,37 +249,39 @@ export function LmsGoalMergedCard() {
                   </View>
                 </View>
 
-                {/* Nhiệm vụ */}
-                <View style={s.missionSection}>
-                  <View style={s.metricRow}>
-                    <Text style={s.missionLabel}>Nhiệm vụ hôm nay</Text>
-                    <Text style={s.missionBadge}>{doneCount}/2 xong</Text>
+                {/* Nhiệm vụ (ẩn khi màn hình chính đã có DuoDailyQuestsCard) */}
+                {!hideMissions ? (
+                  <View style={s.missionSection}>
+                    <View style={s.metricRow}>
+                      <Text style={s.missionLabel}>Nhiệm vụ hôm nay</Text>
+                      <Text style={s.missionBadge}>{doneCount}/2 xong</Text>
+                    </View>
+                    <View style={s.missionRow}>
+                      {/* Luyện tập */}
+                      <Pressable onPress={() => nav.navigate('DailyPractice')}
+                        style={({ pressed }) => [s.mini, qDone && s.miniDone, pressed && s.pressed]}>
+                        <View style={[s.miniIcon, qDone ? s.miniIconDone : s.miniIconQ]}>
+                          {qDone ? <Check size={13} strokeWidth={3} color="#fff" /> : <Gamepad2 size={14} color="#0284C7" />}
+                        </View>
+                        <View style={s.f1}>
+                          <Text numberOfLines={1} style={s.miniTitle}>Luyện tập</Text>
+                          <Text numberOfLines={1} style={[s.miniMeta, qDone && s.miniMetaDone]}>{pr.todayQuestions || 0}/{MQ} câu</Text>
+                        </View>
+                      </Pressable>
+                      {/* Xem video */}
+                      <Pressable onPress={openVideo}
+                        style={({ pressed }) => [s.mini, vDone && s.miniDone, pressed && s.pressed]}>
+                        <View style={[s.miniIcon, vDone ? s.miniIconDone : s.miniIconV]}>
+                          {vDone ? <Check size={13} strokeWidth={3} color="#fff" /> : <PlayCircle size={14} color="#7C3AED" />}
+                        </View>
+                        <View style={s.f1}>
+                          <Text numberOfLines={1} style={s.miniTitle}>Xem video</Text>
+                          <Text numberOfLines={1} style={[s.miniMeta, vDone && s.miniMetaDone]}>{pr.todayVideos || 0}/{MV} video</Text>
+                        </View>
+                      </Pressable>
+                    </View>
                   </View>
-                  <View style={s.missionRow}>
-                    {/* Luyện tập */}
-                    <Pressable onPress={() => nav.navigate('DailyPractice')}
-                      style={({ pressed }) => [s.mini, qDone && s.miniDone, pressed && s.pressed]}>
-                      <View style={[s.miniIcon, qDone ? s.miniIconDone : s.miniIconQ]}>
-                        {qDone ? <Check size={13} strokeWidth={3} color="#fff" /> : <Gamepad2 size={14} color="#0284C7" />}
-                      </View>
-                      <View style={s.f1}>
-                        <Text numberOfLines={1} style={s.miniTitle}>Luyện tập</Text>
-                        <Text numberOfLines={1} style={[s.miniMeta, qDone && s.miniMetaDone]}>{pr.todayQuestions || 0}/{MQ} câu</Text>
-                      </View>
-                    </Pressable>
-                    {/* Xem video */}
-                    <Pressable onPress={openVideo}
-                      style={({ pressed }) => [s.mini, vDone && s.miniDone, pressed && s.pressed]}>
-                      <View style={[s.miniIcon, vDone ? s.miniIconDone : s.miniIconV]}>
-                        {vDone ? <Check size={13} strokeWidth={3} color="#fff" /> : <PlayCircle size={14} color="#7C3AED" />}
-                      </View>
-                      <View style={s.f1}>
-                        <Text numberOfLines={1} style={s.miniTitle}>Xem video</Text>
-                        <Text numberOfLines={1} style={[s.miniMeta, vDone && s.miniMetaDone]}>{pr.todayVideos || 0}/{MV} video</Text>
-                      </View>
-                    </Pressable>
-                  </View>
-                </View>
+                ) : null}
 
                 <Text style={s.hint}>* Giờ học tính khi bạn làm bài, ôn thi hoặc xem video.</Text>
               </>

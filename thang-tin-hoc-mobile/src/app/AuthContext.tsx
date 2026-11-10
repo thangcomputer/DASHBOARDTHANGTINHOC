@@ -82,9 +82,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           ? 'Tài khoản giảng viên chưa được duyệt. Vui lòng hoàn thành bài kiểm tra đầu vào trên máy tính.'
           : '';
       if (reason) {
-        await unregisterMobilePushNotifications().catch(() => {});
-        await authService.signOut().catch(() => {});
-        await clearLastActive(pinUserKey(sessionUser)).catch(() => {});
+        await unregisterMobilePushNotifications().catch(() => { });
+        await authService.signOut().catch(() => { });
+        await clearLastActive(pinUserKey(sessionUser)).catch(() => { });
         disconnectSocket();
         setUser(null);
         setAuthError(reason);
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           };
           const tokens = getMobileApiTokens();
           if (tokens) {
-            await saveMobileSession({ user: updatedUser, tokens }).catch(() => {});
+            await saveMobileSession({ user: updatedUser, tokens }).catch(() => { });
           }
           setUser(updatedUser);
         }
@@ -240,7 +240,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         }
         await authService.signOut();
       } finally {
-        await clearLastActive(pinUserKey(user)).catch(() => {});
+        await clearLastActive(pinUserKey(user)).catch(() => { });
         setUser(null);
         setSubscription(null);
         setAuthError('');

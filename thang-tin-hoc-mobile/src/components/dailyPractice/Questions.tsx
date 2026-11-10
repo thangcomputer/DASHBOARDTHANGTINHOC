@@ -16,7 +16,18 @@ export type QuestionProps = {
 const norm = (value: string) => value.trim().toLowerCase();
 
 function Mark({ ok }: { ok: boolean }) {
-  return ok ? <Check size={16} color="#059669" /> : <X size={16} color="#EF4444" />;
+  return (
+    <View style={{
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: ok ? '#10B981' : '#EF4444',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      {ok ? <Check size={15} color="#FFFFFF" strokeWidth={3} /> : <X size={15} color="#FFFFFF" strokeWidth={3} />}
+    </View>
+  );
 }
 
 function Chip({ label, selected, locked, state }: { label: string; selected?: boolean; locked?: boolean; state?: 'ok' | 'bad' }) {
@@ -52,25 +63,43 @@ export function McqQuestion({ question, reveal, result, chosen, onSubmit, play }
       {(question.options || []).map((option, index) => {
         const isCorrect = Boolean(result) && result?.correctAnswer.correctIndex === index;
         const isWrong = Boolean(result) && chosen === index && !isCorrect;
+        const isChosen = chosen === index;
         const out = eliminated.has(index);
         return (
           <Pressable
             key={option}
             disabled={Boolean(result) || out}
             onPress={() => { play('tap'); onSubmit({ index }); }}
-            style={[
+            style={({ pressed }) => [
               styles.option,
               twoColumns && styles.optionHalf,
+              isChosen && !result && styles.optionSelected,
               isCorrect && styles.chipOk,
               isWrong && styles.chipBad,
               out && styles.optionOut,
+              pressed && !result && !out && styles.optionPressed,
             ]}
             accessibilityRole="button"
           >
-            <View style={[styles.letter, isCorrect && { backgroundColor: '#10B981', borderColor: '#10B981' }, isWrong && { backgroundColor: '#EF4444', borderColor: '#EF4444' }]}>
-              <Text style={[styles.letterText, (isCorrect || isWrong) && { color: '#FFFFFF' }]}>{String.fromCharCode(65 + index)}</Text>
+            <View style={[
+              styles.letter,
+              isChosen && !result && { backgroundColor: '#E0F2FE', borderColor: '#38BDF8' },
+              isCorrect && { backgroundColor: '#10B981', borderColor: '#047857' },
+              isWrong && { backgroundColor: '#EF4444', borderColor: '#B91C1C' },
+            ]}>
+              <Text style={[
+                styles.letterText,
+                isChosen && !result && { color: '#0369A1' },
+                (isCorrect || isWrong) && { color: '#FFFFFF' },
+              ]}>{String.fromCharCode(65 + index)}</Text>
             </View>
-            <Text style={[styles.optionText, out && styles.optionTextOut]}>{option}</Text>
+            <Text style={[
+              styles.optionText,
+              isChosen && !result && { color: '#0369A1', fontWeight: '700' },
+              isCorrect && { color: '#065F46', fontWeight: '700' },
+              isWrong && { color: '#991B1B', fontWeight: '700' },
+              out && styles.optionTextOut,
+            ]}>{option}</Text>
             {isCorrect ? <Mark ok /> : isWrong ? <Mark ok={false} /> : null}
           </Pressable>
         );
@@ -418,29 +447,38 @@ const styles = StyleSheet.create({
   gapLg: { gap: 14 },
   row: { flexDirection: 'row', gap: 10 },
   chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12,
-    borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', boxShadow: '0px 3px 0px #CBD5E1',
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14,
+    borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
   },
-  chipSelected: { borderColor: '#38BDF8', backgroundColor: '#F0F9FF', boxShadow: '0px 3px 0px #7DD3FC' },
-  chipLocked: { borderColor: '#FCD34D', backgroundColor: '#FFFBEB' },
-  chipOk: { borderColor: '#34D399', backgroundColor: '#ECFDF5' },
-  chipBad: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+  chipSelected: { borderColor: '#38BDF8', borderBottomColor: '#0284C7', backgroundColor: '#F0F9FF' },
+  chipLocked: { borderColor: '#FCD34D', borderBottomColor: '#D97706', backgroundColor: '#FFFBEB' },
+  chipOk: { borderColor: '#34D399', borderBottomColor: '#059669', backgroundColor: '#ECFDF5' },
+  chipBad: { borderColor: '#FCA5A5', borderBottomColor: '#DC2626', backgroundColor: '#FEF2F2' },
   chipText: { color: '#1E293B', fontSize: 14, fontWeight: '800' },
   chipTextSelected: { color: '#075985' },
   mcqGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   option: {
     flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, borderWidth: 2,
-    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', boxShadow: '0px 3px 0px #E2E8F0', minHeight: 54,
+    borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF', minHeight: 56,
+  },
+  optionPressed: {
+    transform: [{ translateY: 2 }],
+    borderBottomWidth: 2,
+  },
+  optionSelected: {
+    borderColor: '#0284C7',
+    borderBottomColor: '#0369A1',
+    backgroundColor: '#F0F9FF',
   },
   optionHalf: { width: '48%', flexGrow: 1 },
   optionOut: { opacity: 0.45, backgroundColor: '#F8FAFC' },
-  optionText: { flex: 1, color: '#1E293B', fontSize: 16, fontWeight: '600', lineHeight: 22 },
+  optionText: { flex: 1, color: '#1E293B', fontSize: 15, fontWeight: '700', lineHeight: 22 },
   optionTextOut: { textDecorationLine: 'line-through', color: '#94A3B8' },
-  letter: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  letter: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#CBD5E1' },
   letterText: { color: '#475569', fontSize: 14, fontWeight: '900' },
   tf: {
-    flex: 1, alignItems: 'center', gap: 8, paddingVertical: 22, borderRadius: 16, borderWidth: 2,
-    borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', boxShadow: '0px 3px 0px #CBD5E1',
+    flex: 1, alignItems: 'center', gap: 8, paddingVertical: 20, borderRadius: 18, borderWidth: 2,
+    borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
   },
   tfIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   tfText: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
