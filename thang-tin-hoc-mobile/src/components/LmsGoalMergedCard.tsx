@@ -6,9 +6,10 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Check, ChevronLeft, ChevronRight, Flame, Gamepad2,
+  Check, ChevronLeft, ChevronRight, Crown, Flame, Gamepad2,
   Lock, Medal, PlayCircle, Sparkles, Target, Trophy,
 } from 'lucide-react-native';
+import { useAuth } from '../app/AuthContext';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
 import { getStudyResumePoint } from '../services/courseVideoApi';
 import {
@@ -53,6 +54,7 @@ function openGoal() { DeviceEventEmitter.emit(OPEN_LEARNING_GOAL_EVENT); }
 /* ─── component ─────────────────────────────────────── */
 export function LmsGoalMergedCard() {
   const nav = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const { subscription, refreshSubscription } = useAuth();
 
   /* LMS */
   const [lms, setLms] = useState<LmsData | null>(null);
@@ -103,15 +105,23 @@ export function LmsGoalMergedCard() {
   const [gd, setGd] = useState<LearningGoalData | null>(null);
   const openVideo = () => { void getStudyResumePoint().catch(() => null); nav.navigate('DailyPractice', { watch: 'stage' } as any); };
   const loadGoal = useCallback(() => { getLearningGoal().then(setGd).catch(() => { }); }, []);
-  useFocusEffect(useCallback(() => { loadGoal(); }, [loadGoal]));
+  useFocusEffect(useCallback(() => {
+    loadGoal();
+    void loadLms();
+    void refreshSubscription();
+  }, [loadGoal, loadLms, refreshSubscription]));
   useEffect(() => {
     const c = DeviceEventEmitter.addListener(LEARNING_GOAL_CHANGED_EVENT, (n: LearningGoalData) => { if (n) setGd(n); });
     const m = DeviceEventEmitter.addListener(STUDY_MINUTE_EVENT, ({ todayMinutes: mins }: { todayMinutes?: number }) => {
       if (!Number.isFinite(Number(mins))) return;
       setGd(prev => prev ? { ...prev, progress: { ...prev.progress, todayMinutes: Number(mins), periodMinutes: (prev.progress.periodMinutes || 0) + Math.max(0, Number(mins) - (prev.progress.todayMinutes || 0)) } } : prev);
     });
-    return () => { c.remove(); m.remove(); };
-  }, []);
+    const u = DeviceEventEmitter.addListener('mobile:free-portal-unlocked', () => {
+      void loadLms();
+      void refreshSubscription();
+    });
+    return () => { c.remove(); m.remove(); u.remove(); };
+  }, [loadLms, refreshSubscription]);
 
   if (!lms && !gd) return null;
 
@@ -277,17 +287,50 @@ export function LmsGoalMergedCard() {
           </View>
         )}
 
-        {tab === 'history' && (
-          !lms || lms.history.length === 0
-            ? <Text style={s.empty}>Chưa có XP học bài.</Text>
-            : lms.history.slice(0, 8).map(ev => (
-              <View key={ev.id} style={s.histRow}>
-                <Text style={s.histLabel} numberOfLines={1}>{ev.label}</Text>
-                <Text style={s.histXp}>+{ev.amount}</Text>
-                {ev.at ? <Text style={s.histTime}>{ftime(ev.at)}</Text> : null}
-              </View>
-            ))
-        )}
+        {tab === 'history' && (() => {
+          type TimelineItem = { id: string; kind: 'xp' | 'sub'; label: string; amount: number; at?: string };
+          const timeline: TimelineItem[] = [];
+          if (lms?.history) {
+            for (const h of lms.history) {
+              timeline.push({ id: `xp-${h.id}`, kind: 'xp', label: h.label, amount: h.amount, at: h.at });
+            }
+          }
+          if (subscription?.history) {
+            for (const sh of subscription.history) {
+              timeline.push({
+                id: `sub-${sh.id || sh.createdAt}`,
+                kind: 'sub',
+                label: `Mua gói ${sh.planLabel || sh.plan || ''}`.trim(),
+                amount: sh.amount || 0,
+                at: sh.createdAt,
+              });
+            }
+          }
+          timeline.sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
+
+          if (timeline.length === 0) {
+            return <Text style={s.empty}>Chưa có lịch sử.</Text>;
+          }
+
+          return (
+            <View style={{ gap: 2 }}>
+              {timeline.slice(0, 10).map((ev) => (
+                <View key={ev.id} style={s.histRow}>
+                  {ev.kind === 'sub' ? <Crown size={13} color="#F59E0B" style={s.histIcon} /> : null}
+                  <Text style={s.histLabel} numberOfLines={1}>{ev.label}</Text>
+                  {ev.kind === 'xp' ? (
+                    <Text style={s.histXp}>+{ev.amount}</Text>
+                  ) : (
+                    <Text style={s.histSub}>
+                      {ev.amount > 0 ? `${ev.amount.toLocaleString('vi-VN')}đ` : 'Mã kích hoạt'}
+                    </Text>
+                  )}
+                  {ev.at ? <Text style={s.histTime}>{ftime(ev.at)}</Text> : null}
+                </View>
+              ))}
+            </View>
+          );
+        })()}
 
         {tab === 'badges' && (
           !lms || lms.badges.length === 0
@@ -386,9 +429,11 @@ const s = StyleSheet.create({
 
   empty: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textAlign: 'center', paddingVertical: 10 },
 
-  histRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F8FAFC', paddingVertical: 5 },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F8FAFC', paddingVertical: 5 },
+  histIcon: { marginRight: 2 },
   histLabel: { flex: 1, fontSize: 12, fontWeight: '600', color: '#334155' },
   histXp: { fontSize: 12, fontWeight: '900', color: '#047857' },
+  histSub: { fontSize: 12, fontWeight: '800', color: '#D97706' },
   histTime: { fontSize: 11, color: '#94A3B8' },
 
   calWrap: { gap: 8 },

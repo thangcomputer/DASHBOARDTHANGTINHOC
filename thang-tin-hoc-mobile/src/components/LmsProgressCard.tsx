@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, DeviceEventEmitter, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
+  Crown,
   Flame,
   Lock,
   Medal,
   Sparkles,
   Trophy,
 } from 'lucide-react-native';
+import { useAuth } from '../app/AuthContext';
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
 import { colors } from '../theme/tokens';
 
@@ -100,6 +102,7 @@ function formatWhen(value?: string) {
 }
 
 export function LmsProgressCard() {
+  const { subscription, refreshSubscription } = useAuth();
   const [data, setData] = useState<LmsProgressData | null>(null);
   const [tab, setTab] = useState<'history' | 'badges' | 'rank'>('history');
   const [period, setPeriod] = useState<'week' | 'month' | 'all'>('week');
@@ -198,7 +201,12 @@ export function LmsProgressCard() {
 
   useEffect(() => {
     void loadMe();
-  }, [loadMe]);
+    const u = DeviceEventEmitter.addListener('mobile:free-portal-unlocked', () => {
+      void loadMe();
+      void refreshSubscription();
+    });
+    return () => { u.remove(); };
+  }, [loadMe, refreshSubscription]);
 
   useEffect(() => {
     if (tab === 'rank') void loadLeaderboard(period);
@@ -271,17 +279,46 @@ export function LmsProgressCard() {
       </View>
 
       <View style={styles.tabBody}>
-        {tab === 'history' ? (
-          data.history.length === 0 ? (
-            <Text style={styles.emptyHint}>Chưa có XP học bài.</Text>
-          ) : (
+        {tab === 'history' ? (() => {
+          type TimelineItem = { id: string; kind: 'xp' | 'sub'; label: string; amount: number; at?: string };
+          const timeline: TimelineItem[] = [];
+          if (data.history) {
+            for (const h of data.history) {
+              timeline.push({ id: `xp-${h.id}`, kind: 'xp', label: h.label, amount: h.amount, at: h.at });
+            }
+          }
+          if (subscription?.history) {
+            for (const sh of subscription.history) {
+              timeline.push({
+                id: `sub-${sh.id || sh.createdAt}`,
+                kind: 'sub',
+                label: `Mua gói ${sh.planLabel || sh.plan || ''}`.trim(),
+                amount: sh.amount || 0,
+                at: sh.createdAt,
+              });
+            }
+          }
+          timeline.sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
+
+          if (timeline.length === 0) {
+            return <Text style={styles.emptyHint}>Chưa có lịch sử.</Text>;
+          }
+
+          return (
             <View style={styles.listCol}>
-              {data.history.slice(0, 8).map((ev) => (
+              {timeline.slice(0, 10).map((ev) => (
                 <View key={ev.id} style={styles.historyRow}>
+                  {ev.kind === 'sub' ? <Crown size={13} color="#F59E0B" style={{ marginRight: 4 }} /> : null}
                   <Text style={styles.historyTitle} numberOfLines={1}>
                     {ev.label}
                   </Text>
-                  <Text style={styles.historyXp}>+{ev.amount}</Text>
+                  {ev.kind === 'xp' ? (
+                    <Text style={styles.historyXp}>+{ev.amount}</Text>
+                  ) : (
+                    <Text style={[styles.historyXp, { color: '#D97706' }]}>
+                      {ev.amount > 0 ? `${ev.amount.toLocaleString('vi-VN')}đ` : 'Mã kích hoạt'}
+                    </Text>
+                  )}
                   {ev.at ? (
                     <Text style={styles.historySub} numberOfLines={1}>
                       {formatWhen(ev.at)}
@@ -290,8 +327,8 @@ export function LmsProgressCard() {
                 </View>
               ))}
             </View>
-          )
-        ) : null}
+          );
+        })() : null}
 
         {tab === 'badges' ? (
           data.badges.length === 0 ? (
