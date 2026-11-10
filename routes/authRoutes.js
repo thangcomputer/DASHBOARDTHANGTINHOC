@@ -32,6 +32,7 @@ const { socialOAuthDisabled } = require('../utils/googleOAuthDisabled');
 const { statusOf: subscriptionStatusOf } = require('../services/subscriptionService');
 const { freePortalFlags, FREE_COURSE_NAME, saveFreeSurvey } = require('../services/freePortal');
 const freePortalSocial = require('../services/freePortalSocial');
+const freePortalOtp = require('../services/freePortalOtp');
 const { isMobileMultiSessionAuthEnabled } = require('../config/mobileMultiSessionAuth');
 const { revokeMobileSessionsForUser } = require('../services/mobileAuthSessionSecurity');
 const {
@@ -2269,6 +2270,7 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     const displayName = String(name || '').trim();
     const parsedAge = freePortalSocial.parseAge(age);
     const canonicalPhone = normalizeVNPhone(phone);
+    const rawEmail = String(email || '').trim().toLowerCase();
     if (displayName.length < 2) {
       return res.status(400).json({ success: false, message: 'Hãy nhập họ tên' });
     }
@@ -2293,7 +2295,7 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     }
     try {
       const { assertUniqueContact } = require('../utils/uniqueContact');
-      await assertUniqueContact({ phone: canonicalPhone });
+      await assertUniqueContact({ phone: canonicalPhone, ...(rawEmail ? { email: rawEmail } : {}) });
     } catch (dupErr) {
       if (dupErr.status === 409) {
         return res.status(409).json({ success: false, message: dupErr.message });
@@ -2333,6 +2335,40 @@ router.post('/register-free', sensitiveFlowLimiter, policyShadowAuth('register_f
     }
     logger.error('[AUTH] register-free error:', err);
     return res.status(500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+// ─── Cổng OTP Gmail đăng ký miễn phí DewSkill ─────────────────────────────────
+router.post('/free-portal/send-otp', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
+  try {
+    const { name, email, phone, password } = req.body || {};
+    const result = await freePortalOtp.sendRegisterOtp({ name, email, phone, password });
+    return res.json(result);
+  } catch (err) {
+    logger.error('[AUTH] free-portal send-otp error:', err);
+    return res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.post('/free-portal/resend-otp', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const result = await freePortalOtp.resendRegisterOtp({ email });
+    return res.json(result);
+  } catch (err) {
+    logger.error('[AUTH] free-portal resend-otp error:', err);
+    return res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi server' });
+  }
+});
+
+router.post('/free-portal/verify-otp', sensitiveFlowLimiter, policyShadowAuth('register_free'), async (req, res) => {
+  try {
+    const { email, otp, deviceFingerprint } = req.body || {};
+    const result = await freePortalOtp.verifyOtpAndRegister({ email, otp, deviceFingerprint });
+    return res.json(result);
+  } catch (err) {
+    logger.error('[AUTH] free-portal verify-otp error:', err);
+    return res.status(err.status || 500).json({ success: false, message: err.message || 'Lỗi server' });
   }
 });
 

@@ -358,4 +358,5 @@ module.exports = {
   ticketFor,
   exchangeTicket,
   completeProfile,
+  issueSession,
 };

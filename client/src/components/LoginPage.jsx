@@ -207,7 +207,7 @@ const LoginPage = ({ onLogin }) => {
     : '';
 
   return (
-    <div className="cms-login-bg relative min-h-[100dvh] flex items-center justify-center p-0 font-sans overflow-x-clip overflow-y-auto">
+    <div className="cms-login-bg relative h-screen max-h-screen md:h-screen md:max-h-screen flex items-center justify-center p-0 font-sans overflow-x-hidden overflow-y-auto md:overflow-hidden">
       <div className="cms-login-aura cms-login-aura--red" aria-hidden="true" />
       <div className="cms-login-aura cms-login-aura--blue" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-0 overflow-hidden text-white/[0.05]" aria-hidden="true">
@@ -216,25 +216,25 @@ const LoginPage = ({ onLogin }) => {
         <Award size={64} className="absolute bottom-[18%] left-[4%] rotate-6" />
         <Monitor size={76} className="absolute bottom-[6%] right-[9%] -rotate-6" />
       </div>
-      <div className="relative z-10 w-full min-h-[100dvh] md:h-[100dvh] flex flex-col md:flex-row overflow-x-clip md:overflow-hidden">
+      <div className="relative z-10 w-full h-full min-h-[100dvh] md:min-h-0 md:h-full flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
 
         {/* CỘT TRÁI */}
-        <div className="hidden md:flex md:w-1/2 p-10 lg:p-16 flex-col justify-center relative min-w-0">
-          <div className="absolute top-10 left-10">
+        <div className="hidden md:flex md:w-1/2 p-8 lg:p-12 xl:p-16 flex-col justify-center relative min-w-0">
+          <div className="absolute top-6 left-8 lg:top-10 lg:left-12">
             <div className="cms-login-chip">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
               <span>Hệ thống quản lý trực tuyến</span>
             </div>
           </div>
-          <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000">
-            <h1 className="text-display font-black text-white break-anywhere">
+          <div className="relative z-10 space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000 cms-login-autoscale-left">
+            <h1 className="text-3xl lg:text-4xl xl:text-5xl font-black text-white leading-tight break-anywhere">
               Nền tảng <span className="text-red-500 block md:inline">Học Tin Học</span> <br />Văn Phòng Chuyên Nghiệp
             </h1>
-            <p className="text-slate-400 text-lg leading-relaxed max-w-lg">Tổ chức đào tạo, thi cử và cấp chứng nhận tin học văn phòng với công nghệ hiện đại.</p>
-            <div className="grid max-w-lg grid-cols-3 gap-3 pt-4">
+            <p className="text-slate-400 text-base lg:text-lg leading-relaxed max-w-lg">Tổ chức đào tạo, thi cử và cấp chứng nhận tin học văn phòng với công nghệ hiện đại.</p>
+            <div className="grid max-w-lg grid-cols-3 gap-2.5 sm:gap-3 pt-2">
               {LOGIN_HIGHLIGHTS.map((item) => (
                 <div key={item.label} className="cms-login-highlight">
-                  <span className="cms-login-highlight__icon"><item.icon size={17} aria-hidden="true" /></span>
+                  <span className="cms-login-highlight__icon"><item.icon size={16} aria-hidden="true" /></span>
                   <span>{item.label}</span>
                 </div>
               ))}
@@ -243,23 +243,23 @@ const LoginPage = ({ onLogin }) => {
         </div>
 
         {/* CỘT PHẢI */}
-        <div className="w-full md:w-1/2 flex-1 flex flex-col px-[15px] py-6 sm:p-8 lg:py-10 lg:px-16 xl:py-14 xl:px-20 relative min-w-0 overflow-y-auto">
-          <div className="w-full max-w-md space-y-6 z-10 my-auto mx-auto">
+        <div className="w-full md:w-1/2 flex-1 flex flex-col px-4 py-4 sm:px-8 sm:py-6 lg:px-12 lg:py-6 xl:px-16 xl:py-6 justify-center relative min-w-0 overflow-y-auto md:overflow-hidden">
+          <div className="w-full max-w-md space-y-3 sm:space-y-3.5 z-10 my-auto mx-auto cms-login-autoscale-right">
             <div className="flex justify-center animate-in fade-in zoom-in duration-700">
-              <div className="cms-login-logo">
-                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-11 sm:h-12 max-w-[200px] object-contain" />
+              <div className="cms-login-logo !py-1 !px-4 sm:!py-1.5 sm:!px-5 !rounded-2xl">
+                <img src={dynamicLogo || "/logo-thang-tin-hoc.svg"} alt="Thắng Tin Học" className="h-7 sm:h-8 md:h-8.5 max-w-[170px] object-contain" />
                 <span className="cms-login-shine" aria-hidden="true" />
               </div>
             </div>
 
-            <div className="cms-login-card px-5 py-6 sm:px-7 sm:py-8 space-y-5 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-              <div className="text-center space-y-2">
-                <div className="cms-login-chip mx-auto">
-                  <GraduationCap size={14} aria-hidden="true" />
+            <div className="cms-login-card px-5 py-4 sm:px-6 sm:py-4.5 space-y-3 sm:space-y-3.5 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+              <div className="text-center space-y-1">
+                <div className="cms-login-chip mx-auto !py-0.5 !px-2.5 !text-[10px]">
+                  <GraduationCap size={13} aria-hidden="true" />
                   <span>Nền tảng học Tin học văn phòng</span>
                 </div>
-                <h2 className="text-fluid-2xl font-black text-white">Đăng nhập tài khoản</h2>
-                <p className="text-sm text-slate-400 font-medium">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
+                <h2 className="text-xl sm:text-2xl font-black text-white">Đăng nhập tài khoản</h2>
+                <p className="text-xs sm:text-sm text-slate-400 font-medium">Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
               </div>
 
               <div className="cms-login-roles" role="tablist" aria-label="Chọn vai trò đăng nhập">
@@ -273,25 +273,25 @@ const LoginPage = ({ onLogin }) => {
                     role="tab"
                     aria-selected={role === item.value}
                     onClick={() => setRole(item.value)}
-                    className={`cms-login-role ${role === item.value ? 'is-active' : ''}`}
+                    className={`cms-login-role !py-2 text-xs sm:text-sm ${role === item.value ? 'is-active' : ''}`}
                   >
-                    <item.icon size={16} aria-hidden="true" />
+                    <item.icon size={15} aria-hidden="true" />
                     {item.label}
                     {role === item.value && <span className="cms-login-shine" aria-hidden="true" />}
                   </button>
                 ))}
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5" noValidate>
+              <form onSubmit={handleLogin} className="space-y-3" noValidate>
                 {inactivityMsg && (
-                  <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-3 text-amber-300 text-sm font-bold">
-                    <Clock size={18} aria-hidden="true" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
+                  <div role="status" className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex items-center gap-2.5 text-amber-300 text-xs font-bold">
+                    <Clock size={16} aria-hidden="true" className="shrink-0" /> Phiên làm việc đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.
                   </div>
                 )}
                 {error && (
-                  <div role="alert" className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex flex-col gap-2 text-red-400 text-sm font-bold">
-                    <div className="flex items-center gap-3">
-                      <AlertCircle size={18} aria-hidden="true" className="shrink-0" />
+                  <div role="alert" className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex flex-col gap-1.5 text-red-400 text-xs font-bold">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={16} aria-hidden="true" className="shrink-0" />
                       <span>{error}</span>
                     </div>
                     {(String(error).includes('đăng ký') || String(error).includes('khóa học')) && (
@@ -302,7 +302,7 @@ const LoginPage = ({ onLogin }) => {
                           if (phone) q.set('phone', normalizePhone(phone) || phone);
                           navigate(`/dangkykhoahoc?${q.toString()}`);
                         }}
-                        className="mt-1 w-full py-2.5 rounded-xl bg-red-600 text-white text-xs font-black  tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
+                        className="mt-1 w-full py-2 rounded-xl bg-red-600 text-white text-xs font-black tracking-wide hover:bg-red-500 transition inline-flex items-center justify-center gap-1"
                       >
                         Đăng ký / thanh toán khóa học
                         <NavArrow size={14} className="text-white" />
@@ -310,40 +310,40 @@ const LoginPage = ({ onLogin }) => {
                     )}
                   </div>
                 )}
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="login-identifier" className="text-xs font-bold text-slate-400 block ml-1">Số điện thoại</label>
-                    <div className="cms-login-field group">
-                      <User size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                <div className="space-y-2.5">
+                  <div className="space-y-1">
+                    <label htmlFor="login-identifier" className="text-[11px] font-bold text-slate-400 block ml-1">Số điện thoại</label>
+                    <div className="cms-login-field !min-h-[44px] sm:!min-h-[46px] !px-3.5 !rounded-xl group">
+                      <User size={16} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
                       <input id="login-identifier" type="tel" inputMode="tel" required value={phone} onChange={(e) => setPhone(limitPhoneInput(e.target.value))} autoComplete="tel" maxLength={PHONE_MAX_DIGITS + 1}
-                        className="cms-login-input"
+                        className="cms-login-input !py-2 text-sm"
                         placeholder="VD: 0912345678" />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="login-password" className="text-xs font-bold text-slate-400 block ml-1">Mật khẩu</label>
-                    <div className="cms-login-field group">
-                      <Lock size={18} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <label htmlFor="login-password" className="text-[11px] font-bold text-slate-400 block ml-1">Mật khẩu</label>
+                    <div className="cms-login-field !min-h-[44px] sm:!min-h-[46px] !px-3.5 !rounded-xl group">
+                      <Lock size={16} className="shrink-0 text-slate-400 group-focus-within:text-red-500 transition-colors" aria-hidden="true" />
                       <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
-                        className="cms-login-input"
+                        className="cms-login-input !py-2 text-sm"
                         placeholder="••••••••" />
                       <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} className="shrink-0 text-slate-400 hover:text-white transition-colors">
-                        {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                        {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                       </button>
                     </div>
                   </div>
                 </div>
-                <div className="flex justify-end -mt-2">
+                <div className="flex justify-end -mt-1">
                   <button type="button" onClick={() => { setShowForgot(true); setForgotRole(role); setForgotStep(1); }}
-                    className="text-xs font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1">
+                    className="text-[11px] font-bold text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1">
                     <KeyRound size={12} aria-hidden="true" /> Quên mật khẩu?
                   </button>
                 </div>
-                <button type="submit" disabled={loading} className="cms-login-submit">
+                <button type="submit" disabled={loading} className="cms-login-submit !min-h-[44px] sm:!min-h-[48px] !rounded-xl text-sm font-black">
                   <span className="cms-login-shine" aria-hidden="true" />
                   {loading
-                    ? <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
-                    : <><LogIn size={18} aria-hidden="true" /> Đăng nhập ngay</>}
+                    ? <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                    : <><LogIn size={16} aria-hidden="true" /> Đăng nhập ngay</>}
                 </button>
               </form>
             </div>
@@ -351,17 +351,23 @@ const LoginPage = ({ onLogin }) => {
             <div className="grid grid-cols-3 gap-2 md:hidden">
               {LOGIN_HIGHLIGHTS.map((item) => (
                 <div key={item.label} className="cms-login-highlight">
-                  <span className="cms-login-highlight__icon"><item.icon size={15} aria-hidden="true" /></span>
+                  <span className="cms-login-highlight__icon"><item.icon size={14} aria-hidden="true" /></span>
                   <span>{item.label}</span>
                 </div>
               ))}
             </div>
 
-            <div className="text-center animate-in fade-in duration-1000 delay-500">
-              <p className="text-slate-400 text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open(`https://zalo.me/${ADMIN_ZALO_PHONE}`, '_blank', 'noopener,noreferrer')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
-              <div className="mt-5 flex flex-col items-center gap-1.5">
-                <p className="text-xs font-black text-slate-500 tracking-widest">Hỗ trợ kỹ thuật</p>
-                <p className="text-xs font-bold text-slate-400">Hotline: 093 5758 462</p>
+            <div className="text-center animate-in fade-in duration-1000 delay-500 pt-0.5">
+              <p className="text-slate-400 text-xs sm:text-sm font-medium">Chưa có tài khoản? <button type="button" onClick={() => window.open(`https://zalo.me/${ADMIN_ZALO_PHONE}`, '_blank', 'noopener,noreferrer')} className="text-white font-black hover:text-red-500 transition-colors ml-1">Liên hệ Admin</button></p>
+              <div className="mt-1 flex items-center justify-center gap-1 text-[11px] text-slate-400">
+                <span>Học viên tự học DewSkill?</span>
+                <a href="/DANGNHAPMIENPHI?mode=login" className="text-emerald-400 font-bold hover:underline transition">
+                  Đăng nhập tại đây →
+                </a>
+              </div>
+              <div className="mt-1 flex items-center justify-center gap-2 text-slate-400 text-[11px]">
+                <span className="font-black text-slate-500 tracking-wider">Hỗ trợ kỹ thuật:</span>
+                <span className="font-bold">Hotline 093 5758 462</span>
               </div>
             </div>
           </div>
