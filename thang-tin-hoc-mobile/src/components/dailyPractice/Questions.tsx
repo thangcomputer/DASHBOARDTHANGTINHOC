@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Check, GripVertical, Lock, X } from 'lucide-react-native';
 import type { DpAnswer, DpAnswerResult, DpQuestion, DpReveal } from '../../services/dailyPracticeApi';

@@ -9,6 +9,7 @@ import { getStudyResumePoint, type StudyResumePoint } from '../services/courseVi
 import { navigationRef } from '../navigation/navigationRef';
 import { isActivelyStudying, isStudyMediaPlaying } from '../services/studyActivity';
 import { DailyPracticeReminder } from './dailyPractice/DailyPracticeReminder';
+import { DuoButton } from './duo/DuoButton';
 import {
   LEARNING_GOAL_CHANGED_EVENT,
   LEARNING_GOAL_HOURS,
@@ -356,25 +357,32 @@ function LearningGoalModal({
                       {resume.itemTitle ? <Text numberOfLines={1} style={styles.resumeSub}>{resume.itemTitle}</Text> : null}
                     </View>
                   </View>
-                  <Pressable onPress={continueLearning} style={[styles.primary, styles.successButton]} accessibilityRole="button">
-                    <PlayCircle size={18} color="#FFFFFF" />
-                    <Text style={styles.primaryText}>{resume.kind === 'video' ? 'Tiếp tục xem video' : 'Tiếp tục bài học'}</Text>
-                  </Pressable>
-                  <Pressable onPress={onDone} style={styles.laterButton} accessibilityRole="button">
-                    <Text style={styles.laterText}>Để sau</Text>
-                  </Pressable>
+                  <DuoButton
+                    variant="primary"
+                    size="md"
+                    fullWidth
+                    icon={<PlayCircle size={18} color="#FFFFFF" />}
+                    text={resume.kind === 'video' ? 'Tiếp tục xem video' : 'Tiếp tục bài học'}
+                    onPress={continueLearning}
+                  />
+                  <DuoButton
+                    variant="secondary"
+                    size="md"
+                    fullWidth
+                    text="Để sau"
+                    onPress={onDone}
+                    style={{ marginTop: 8 }}
+                  />
                 </>
               ) : (
-                <Pressable
+                <DuoButton
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  loading={resume === undefined}
+                  text="Tuyệt vời!"
                   onPress={onDone}
-                  disabled={resume === undefined}
-                  style={[styles.primary, styles.successButton]}
-                  accessibilityRole="button"
-                >
-                  {resume === undefined
-                    ? <ActivityIndicator color="#FFFFFF" />
-                    : <Text style={styles.primaryText}>Tuyệt vời!</Text>}
-                </Pressable>
+                />
               )}
             </View>
           ) : (
@@ -466,17 +474,22 @@ function LearningGoalModal({
               </ScrollView>
 
               <View style={styles.actions}>
-                <Pressable onPress={onClose} style={styles.secondary} accessibilityRole="button">
-                  <Text style={styles.secondaryText}>Để sau</Text>
-                </Pressable>
-                <Pressable onPress={() => { void save(); }} disabled={saving} style={[styles.primary, styles.flex]} accessibilityRole="button">
-                  {saving ? <ActivityIndicator color="#FFFFFF" /> : (
-                    <>
-                      <Target size={16} color="#FFFFFF" />
-                      <Text style={styles.primaryText}>{editing ? 'Lưu mục tiêu' : 'Bắt đầu'}</Text>
-                    </>
-                  )}
-                </Pressable>
+                <DuoButton
+                  variant="secondary"
+                  size="md"
+                  text="Để sau"
+                  onPress={onClose}
+                  style={{ width: 105 }}
+                />
+                <DuoButton
+                  variant="accent"
+                  size="md"
+                  loading={saving}
+                  icon={<Target size={16} color="#FFFFFF" />}
+                  text={editing ? 'Lưu mục tiêu' : 'Bắt đầu'}
+                  onPress={() => { void save(); }}
+                  style={styles.flex}
+                />
               </View>
             </>
           )}
@@ -541,10 +554,10 @@ const styles = StyleSheet.create({
   periodRow: { paddingTop: 6 },
   option: {
     flex: 1, alignItems: 'center', gap: 2, paddingTop: spacing.md, paddingBottom: 10, borderRadius: 16, borderWidth: 2,
-    borderColor: '#E2E8F0', backgroundColor: colors.surface,
+    borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: colors.surface,
   },
-  hourOption: { paddingTop: 10, paddingBottom: 8, gap: 0 },
-  optionActive: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+  hourOption: { paddingTop: 10, paddingBottom: 8, gap: 0, borderRadius: 14 },
+  optionActive: { borderColor: '#10B981', borderBottomColor: '#047857', backgroundColor: '#ECFDF5' },
   optionTitle: { color: colors.ink, fontSize: 15, fontWeight: '900' },
   optionTitleActive: { color: '#047857' },
   optionHint: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },

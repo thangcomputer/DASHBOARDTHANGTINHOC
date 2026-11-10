@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Award, Check, Crown, Flame, Gift, Star, Target, Timer, Trophy, Zap, type LucideIcon } from 'lucide-react-native';
 import { Mascot } from './Mascot';
+import { DuoButton } from '../duo/DuoButton';
 import type { GameSound } from './useGameSounds';
 import { practiceFinishXpDisplay, type DpSummary } from '../../services/dailyPracticeApi';
 import { spacing } from '../../theme/tokens';
@@ -55,9 +56,15 @@ function Shell({ children, button, onNext }: { children: React.ReactNode; button
   return (
     <View style={styles.shell}>
       {children}
-      <Pressable onPress={onNext} style={styles.button} accessibilityRole="button">
-        <Text style={styles.buttonText}>{button}</Text>
-      </Pressable>
+      <View style={{ width: '100%', marginTop: spacing.sm }}>
+        <DuoButton
+          variant="primary"
+          size="lg"
+          fullWidth
+          text={button}
+          onPress={onNext}
+        />
+      </View>
     </View>
   );
 }

@@ -41,6 +41,7 @@ import {
 import { mobileApiRequest, resolveMobilePublicUrl } from '../services/apiClient';
 import type { DemoEnrollment, DemoUser } from '../types';
 import { colors } from '../theme/tokens';
+import { DuoButton } from './duo/DuoButton';
 
 const DEWSKILL_LOGO = require('../../assets/logo.webp');
 const TEACHER_AVATAR = require('../../assets/giang-vien-phi-van-thang.png');
@@ -384,17 +385,15 @@ export function FreeMeetPlanModal({
                   style={styles.activationInput}
                 />
               </View>
-              <Pressable
-                onPress={() => void handleRedeem()}
+              <DuoButton
+                variant="primary"
+                size="md"
                 disabled={activating || !activationCode.trim()}
-                style={[styles.activationBtn, (!activationCode.trim() || activating) && styles.disabledBtn]}
-              >
-                {activating ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.activationBtnText}>Kích hoạt</Text>
-                )}
-              </Pressable>
+                loading={activating}
+                text="Kích hoạt"
+                onPress={() => void handleRedeem()}
+                style={{ minWidth: 100 }}
+              />
             </View>
 
             {/* THÔNG BÁO LỖI HOẶC THÀNH CÔNG */}
@@ -410,24 +409,19 @@ export function FreeMeetPlanModal({
               </View>
             ) : null}
 
-            {/* NÚT ĐĂNG KÝ HỌC NGAY DUY NHẤT (THEO YÊU CẦU NGƯỜI DÙNG: BỎ NÚT NHẬN TƯ VẤN) */}
-            <Pressable
-              onPress={() => void handleCheckout(activePlan)}
+            {/* NÚT ĐĂNG KÝ HỌC NGAY DUY NHẤT (CHUẨN 3D DUOLINGO) */}
+            <DuoButton
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={buying}
               disabled={!activePlan || buying || loading}
-              style={[styles.primaryCtaNew, (!activePlan || buying || loading) && styles.disabledBtn]}
-            >
-              {buying ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Text style={styles.primaryCtaNewEmoji}>🎓</Text>
-                  <Text style={styles.primaryCtaNewText}>
-                    {activePlan ? `Đăng ký học ngay (${formatVnd(activePlan.price)})` : 'Đăng ký học ngay'}
-                  </Text>
-                  <ArrowRight size={18} color="#FFFFFF" strokeWidth={2.5} />
-                </>
-              )}
-            </Pressable>
+              icon={<Crown size={18} color="#FFFFFF" />}
+              text={activePlan ? `ĐĂNG KÝ HỌC NGAY (${formatVnd(activePlan.price)})` : 'ĐĂNG KÝ HỌC NGAY'}
+              rightIcon={<ArrowRight size={18} color="#FFFFFF" />}
+              onPress={() => void handleCheckout(activePlan)}
+              style={{ marginTop: 10 }}
+            />
           </ScrollView>
         </View>
       </View>
@@ -1057,9 +1051,11 @@ const styles = StyleSheet.create({
   planCardNew: {
     width: 130,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
+    borderWidth: 2,
+    borderBottomWidth: 4,
     borderColor: '#E2E8F0',
-    borderRadius: 16,
+    borderBottomColor: '#CBD5E1',
+    borderRadius: 18,
     padding: 10,
     alignItems: 'center',
     position: 'relative',
@@ -1071,6 +1067,7 @@ const styles = StyleSheet.create({
   },
   planCardNewSelected: {
     borderColor: '#10B981',
+    borderBottomColor: '#047857',
     backgroundColor: '#ECFDF5',
     shadowColor: '#059669',
     shadowOpacity: 0.15,

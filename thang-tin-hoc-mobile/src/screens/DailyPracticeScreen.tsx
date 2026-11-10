@@ -588,7 +588,7 @@ function HomeView({
                     <Pressable
                       key={topic.id}
                       onPress={() => { play('tap'); setTopicId(topic.id); }}
-                      style={[styles.topic, { borderColor: active ? color.to : '#E2E8F0', backgroundColor: active ? color.soft : '#FFFFFF' }]}
+                      style={[styles.topic, { borderColor: active ? color.to : '#E2E8F0', borderBottomColor: active ? color.to : '#CBD5E1', borderBottomWidth: 4, backgroundColor: active ? color.soft : '#FFFFFF' }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                     >
@@ -609,7 +609,7 @@ function HomeView({
                     <Pressable
                       key={level.id}
                       onPress={() => { play('tap'); setDifficulty(level.id); }}
-                      style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', backgroundColor: active ? level.soft : '#FFFFFF' }]}
+                      style={[styles.level, { borderColor: active ? level.color : '#E2E8F0', borderBottomColor: active ? level.color : '#CBD5E1', borderBottomWidth: 4, backgroundColor: active ? level.soft : '#FFFFFF' }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                     >
@@ -623,10 +623,17 @@ function HomeView({
                 })}
               </View>
 
-              <Pressable onPress={() => topicId && onStart(topicId, difficulty)} disabled={!topicId || starting} style={[styles.primary, styles.primaryBig]} accessibilityRole="button">
-                {starting ? <ActivityIndicator color="#FFFFFF" /> : <Play size={18} color="#FFFFFF" />}
-                <Text style={styles.primaryText}>Bắt đầu ôn tự do (0 XP)</Text>
-              </Pressable>
+              <DuoButton
+                variant="primary"
+                size="lg"
+                fullWidth
+                disabled={!topicId || starting}
+                loading={starting}
+                icon={<Play size={18} color="#FFFFFF" />}
+                text="BẮT ĐẦU ÔN TỰ DO (0 XP)"
+                onPress={() => topicId && onStart(topicId, difficulty)}
+                style={{ marginTop: 8 }}
+              />
             </View>
           ) : null}
 
@@ -1888,7 +1895,7 @@ function PathView({
             <Pressable
               key={item.topic.id}
               onPress={() => { play('tap'); setTopicId(item.topic.id); setPopover(null); }}
-              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', backgroundColor: active ? tone.soft : '#FFFFFF' }]}
+              style={[styles.chip, { borderColor: active ? tone.to : '#E2E8F0', borderBottomColor: active ? tone.to : '#CBD5E1', borderBottomWidth: 4, backgroundColor: active ? tone.soft : '#FFFFFF' }]}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
             >
@@ -1922,14 +1929,13 @@ function PathView({
                 </Text>
               </View>
               {current.next && nextUnit ? (
-                <Pressable
+                <DuoButton
+                  variant="primary"
+                  size="md"
+                  icon={<Play size={16} color="#FFFFFF" />}
+                  text="Tiếp tục học"
                   onPress={() => { if (nextUnit && current.next) toggleHub(nextUnit, current.next.nodeKey || 'study'); }}
-                  style={styles.primary}
-                  accessibilityRole="button"
-                >
-                  <Play size={16} color="#FFFFFF" />
-                  <Text style={styles.primaryText}>Tiếp tục học</Text>
-                </Pressable>
+                />
               ) : null}
             </View>
           </View>
@@ -2392,24 +2398,47 @@ function StakeSessionConfirm({ stakeXp, xpTotal, testOut, busy, play, onCancel, 
             )}
           </View>
           {notEnough ? (
-            <View style={styles.quitActions}>
-              <Pressable onPress={() => { play('tap'); onBuyXp(); }} style={styles.primary} accessibilityRole="button">
-                <Crown size={16} color="#FFFFFF" />
-                <Text style={styles.primaryText}>Nâng cấp gói Meet (+300 XP/ngày)</Text>
-              </Pressable>
-              <Pressable onPress={onCancel} style={styles.secondary} accessibilityRole="button">
-                <Text style={[styles.secondaryText, { color: '#64748B' }]}>Để sau</Text>
-              </Pressable>
+            <View style={[styles.quitActions, { gap: 10 }]}>
+              <DuoButton
+                variant="gold"
+                size="lg"
+                fullWidth
+                text="Nâng cấp gói Meet (+300 XP/ngày)"
+                icon={<Crown size={16} color="#FFFFFF" />}
+                onPress={() => { play('tap'); onBuyXp(); }}
+              />
+              <DuoButton
+                variant="secondary"
+                size="md"
+                fullWidth
+                text="Để sau"
+                onPress={onCancel}
+              />
             </View>
           ) : (
-            <View style={[styles.row, { padding: spacing.lg }]}>
-              <Pressable onPress={onCancel} disabled={busy} style={[styles.secondary, styles.flex]} accessibilityRole="button">
-                <Text style={[styles.secondaryText, { color: '#64748B' }]}>Để sau</Text>
-              </Pressable>
-              <Pressable onPress={onConfirm} disabled={busy} style={[styles.primary, styles.flex]} accessibilityRole="button">
-                {busy ? <ActivityIndicator color="#FFFFFF" /> : <Play size={16} color="#FFFFFF" />}
-                <Text style={styles.primaryText}>Bắt đầu</Text>
-              </Pressable>
+            <View style={[styles.row, { padding: spacing.lg, gap: 12 }]}>
+              <View style={styles.flex}>
+                <DuoButton
+                  variant="secondary"
+                  size="md"
+                  fullWidth
+                  text="Để sau"
+                  disabled={busy}
+                  onPress={onCancel}
+                />
+              </View>
+              <View style={styles.flex}>
+                <DuoButton
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  text="Bắt đầu"
+                  icon={busy ? undefined : <Play size={16} color="#FFFFFF" />}
+                  loading={busy}
+                  disabled={busy}
+                  onPress={onConfirm}
+                />
+              </View>
             </View>
           )}
         </View>
@@ -2454,15 +2483,25 @@ function QuitConfirm({ stats, answered, total, busy, play, onStay, onQuit }: {
               </View>
             ) : null}
           </View>
-          <View style={styles.quitActions}>
-            <Pressable onPress={onStay} disabled={busy} style={styles.primary} accessibilityRole="button">
-              <Play size={16} color="#FFFFFF" />
-              <Text style={styles.primaryText}>Ở lại luyện tiếp</Text>
-            </Pressable>
-            <Pressable onPress={onQuit} disabled={busy} style={styles.secondary} accessibilityRole="button">
-              {busy ? <ActivityIndicator size="small" color="#64748B" /> : null}
-              <Text style={[styles.secondaryText, { color: '#64748B' }]}>Vẫn thoát</Text>
-            </Pressable>
+          <View style={[styles.quitActions, { gap: 10 }]}>
+            <DuoButton
+              variant="primary"
+              size="lg"
+              fullWidth
+              text="Ở lại luyện tiếp"
+              icon={<Play size={16} color="#FFFFFF" />}
+              disabled={busy}
+              onPress={onStay}
+            />
+            <DuoButton
+              variant="secondary"
+              size="md"
+              fullWidth
+              text="Vẫn thoát"
+              loading={busy}
+              disabled={busy}
+              onPress={onQuit}
+            />
           </View>
         </View>
       </View>
@@ -3274,10 +3313,10 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.55 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   quitBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 14, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
   },
-  quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '600' },
+  quitBtnText: { color: '#475569', fontSize: 13, fontWeight: '800' },
   quitBackdrop: { flex: 1, backgroundColor: 'rgba(2, 6, 23, 0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   quitCard: { width: '100%', maxWidth: 380, borderRadius: 28, overflow: 'hidden', backgroundColor: colors.surface, boxShadow: '0px 24px 48px rgba(15, 23, 42, 0.25)' },
   quitHero: {
@@ -4106,31 +4145,30 @@ const styles = StyleSheet.create({
   buyXpPackPrice: { color: colors.brand, fontSize: 15, fontWeight: '700' },
   stakeGrid2Col: { flexDirection: 'row', gap: 8, alignSelf: 'stretch', marginTop: 8 },
   stakeColBox: {
-    flex: 1, padding: 10, borderRadius: 14, backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', gap: 2,
+    flex: 1, padding: 12, borderRadius: 16, backgroundColor: '#FFFFFF',
+    borderWidth: 2, borderColor: '#E2E8F0', borderBottomWidth: 4, borderBottomColor: '#CBD5E1', alignItems: 'center', gap: 3,
   },
-  stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  stakeColValue: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   playWrap: { gap: spacing.lg, paddingTop: 20, maxWidth: 760, width: '100%', alignSelf: 'center' },
   topBarCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12,
-    borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
-    boxShadow: '0px 4px 12px rgba(15, 23, 42, 0.04)',
-  } as never,
+    borderRadius: 20, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+  },
   topBarMetaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
   topBarStepTitle: { flex: 1, color: '#475569', fontSize: 13, fontWeight: '600', marginRight: 8 },
   topBarCount: { color: '#334155', fontSize: 12, fontWeight: '600' },
   xpSubText: { color: '#B45309', fontSize: 11, fontWeight: '500' },
   playQuestionCard: {
-    padding: spacing.xl, borderRadius: 26, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF',
-    gap: 14, boxShadow: '0px 10px 28px rgba(15, 23, 42, 0.06)',
-  } as never,
+    padding: spacing.xl, borderRadius: 24, borderWidth: 2, borderBottomWidth: 5, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#FFFFFF',
+    gap: 14,
+  },
   promptMascotBox: {
     padding: 6, borderRadius: 18, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9',
   },
   questionLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
   questionLabelBadge: {
-    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: '#FEF2F2',
-    borderWidth: 1, borderColor: '#FECACA', color: '#DC2626', fontSize: 11, fontWeight: '600',
+    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, backgroundColor: '#FEF2F2',
+    borderWidth: 1.5, borderColor: '#FECACA', borderBottomWidth: 3, borderBottomColor: '#FCA5A5', color: '#DC2626', fontSize: 11, fontWeight: '900',
     textTransform: 'uppercase', overflow: 'hidden',
   },
   instructionInline: { color: '#64748B', fontSize: 13, fontWeight: '400' },

@@ -396,7 +396,7 @@ export function LmsGoalMergedCard({ hideMissions = true }: { hideMissions?: bool
 /* ─── styles ───────────────────────────────────────────── */
 const s = StyleSheet.create({
   f1: { flex: 1 },
-  card: { borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#fff', overflow: 'hidden' },
+  card: { borderRadius: 22, borderWidth: 2, borderBottomWidth: 4, borderColor: '#E2E8F0', borderBottomColor: '#CBD5E1', backgroundColor: '#fff', overflow: 'hidden' },
   section: { padding: 16, gap: 10 },
   tabGoalWrap: { gap: 10, paddingTop: 4 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E2E8F0', marginHorizontal: 16 },
@@ -408,10 +408,10 @@ const s = StyleSheet.create({
   sectionTag: { fontSize: 10, fontWeight: '900', color: '#94A3B8', letterSpacing: 0.6, textTransform: 'uppercase' },
   lvlText: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginTop: 1 },
   lvlSub: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  streakPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7ED', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  streakPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7ED', borderWidth: 1.5, borderColor: '#FED7AA', borderBottomWidth: 3, borderBottomColor: '#FDBA74', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   streakTxt: { fontSize: 12, fontWeight: '900', color: '#C2410C' },
 
-  barBg: { height: 7, borderRadius: 999, backgroundColor: '#F1F5F9', overflow: 'hidden' },
+  barBg: { height: 10, borderRadius: 999, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 999 },
 
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -423,11 +423,11 @@ const s = StyleSheet.create({
   tabTxt: { fontSize: 11, fontWeight: '700', color: '#64748B' },
   tabTxtActive: { fontWeight: '900', color: '#0F172A' },
 
-  pillRow: { flexDirection: 'row', gap: 6 },
-  pill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: '#F1F5F9' },
-  pillActive: { backgroundColor: '#0F172A' },
-  pillTxt: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  pillTxtActive: { color: '#FFFFFF' },
+  pillRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
+  pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8F0', borderBottomWidth: 3, borderBottomColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+  pillActive: { backgroundColor: '#10B981', borderColor: '#059669', borderBottomColor: '#047857' },
+  pillTxt: { fontSize: 12, fontWeight: '800', color: '#64748B' },
+  pillTxtActive: { color: '#FFFFFF', fontWeight: '900' },
 
   empty: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textAlign: 'center', paddingVertical: 10 },
 
